@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sphere</string>
+    <string name="set_default_launcher">Set Sphere as your home app</string>
+    <string name="set_default_cta">Set as default</string>
+</resources>

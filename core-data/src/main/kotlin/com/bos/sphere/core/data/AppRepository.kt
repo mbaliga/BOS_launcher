@@ -2,7 +2,9 @@ package com.bos.sphere.core.data
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.LauncherApps
+import android.net.Uri
 import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
@@ -21,6 +23,12 @@ import kotlinx.coroutines.flow.callbackFlow
 interface AppRepository {
     val apps: Flow<List<AppEntry>>
     fun launch(entry: AppEntry)
+
+    /** Opens the system App-info screen for [entry] (profile-aware). */
+    fun openAppDetails(entry: AppEntry)
+
+    /** Fires the system uninstall flow for [entry]. */
+    fun requestUninstall(entry: AppEntry)
 }
 
 class LauncherAppsAppRepository(context: Context) : AppRepository {
@@ -81,6 +89,21 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
             /* sourceBounds = */ null,
             /* opts = */ null,
         )
+    }
+
+    override fun openAppDetails(entry: AppEntry) {
+        runCatching {
+            launcherApps.startAppDetailsActivity(entry.componentName, entry.user, null, null)
+        }
+    }
+
+    override fun requestUninstall(entry: AppEntry) {
+        val intent = Intent(Intent.ACTION_DELETE).apply {
+            data = Uri.fromParts("package", entry.packageName, null)
+            putExtra(Intent.EXTRA_USER, entry.user)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { appContext.startActivity(intent) }
     }
 
     companion object {

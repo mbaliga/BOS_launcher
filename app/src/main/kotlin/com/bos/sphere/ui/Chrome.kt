@@ -32,13 +32,15 @@ import java.util.Locale
 
 /**
  * Ambient home chrome: VAIO-gate clock pill (top-centre), weather (top-left), battery + settings
- * gear (top-right), and a now-playing line (bottom-left). Signals are lightweight reads for now;
- * live notification / media / weather sources arrive with the Hub (M3).
+ * gear (top-right), and a now-playing line (bottom-left). Includes voice input button (M4+).
+ * Signals are lightweight reads for now; live notification / media / weather sources arrive
+ * with the Hub (M3).
  */
 @Composable
 fun Chrome(
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit,
+    onVoiceInput: (String) -> Unit = {},
 ) {
     Box(modifier = modifier.safeDrawingPadding().padding(12.dp)) {
         ClockPill(modifier = Modifier.align(Alignment.TopCenter))
@@ -50,6 +52,7 @@ fun Chrome(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             BatteryReadout()
+            VoiceAssistantButton(onVoiceInput = onVoiceInput)
             GearButton(onClick = onOpenSettings)
         }
 

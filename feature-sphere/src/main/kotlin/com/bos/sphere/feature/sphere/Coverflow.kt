@@ -34,6 +34,9 @@ internal val TileSize = 132.dp
  * Render-only coverflow equator. Paints [apps] as magnified tiles via `graphicsLayer` from the
  * transforms in [state]. All gesture handling lives in [LauncherSurface] so the navigation model
  * (scrub / pinch / hub) is arbitrated in one place.
+ *
+ * Performance: For large catalogs (500+ apps), only renders tiles within ±15 columns of the
+ * current position, skipping off-screen transforms entirely.
  */
 @Composable
 fun CoverflowLayer(
@@ -41,28 +44,39 @@ fun CoverflowLayer(
     state: SphereState,
     modifier: Modifier = Modifier,
 ) {
+    val visibleRange by remember(state.position, state.columnCount) {
+        derivedStateOf {
+            val pos = state.position.toInt()
+            val margin = 15
+            (pos - margin).coerceAtLeast(0)..(pos + margin).coerceAtMost(state.maxIndex)
+        }
+    }
+
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         apps.forEachIndexed { index, app ->
-            val transform by remember(index, state) {
-                derivedStateOf { state.transformFor(index) }
-            }
-            if (transform.visible) {
-                AppTile(
-                    app = app,
-                    transform = transform,
-                    modifier = Modifier
-                        .size(TileSize)
-                        .zIndex(transform.zIndex)
-                        .graphicsLayer {
-                            translationX = transform.translationX.dp.toPx()
-                            translationY = transform.translationY.dp.toPx()
-                            scaleX = transform.scale
-                            scaleY = transform.scale
-                            rotationX = transform.rotationX
-                            rotationY = transform.rotationY
-                            cameraDistance = state.params.perspective.dp.toPx()
-                        },
-                )
+            val col = state.columnOf(index)
+            if (col in visibleRange) {
+                val transform by remember(index, state.position, state.params, state.rows) {
+                    derivedStateOf { state.transformFor(index) }
+                }
+                if (transform.visible) {
+                    AppTile(
+                        app = app,
+                        transform = transform,
+                        modifier = Modifier
+                            .size(TileSize)
+                            .zIndex(transform.zIndex)
+                            .graphicsLayer {
+                                translationX = transform.translationX.dp.toPx()
+                                translationY = transform.translationY.dp.toPx()
+                                scaleX = transform.scale
+                                scaleY = transform.scale
+                                rotationX = transform.rotationX
+                                rotationY = transform.rotationY
+                                cameraDistance = state.params.perspective.dp.toPx()
+                            },
+                    )
+                }
             }
         }
     }
@@ -109,6 +123,7 @@ private fun AppTile(
 /**
  * Returns the index of the top-most tile whose transformed rect contains [tap], or -1.
  * Tile centers are reconstructed from the same transforms used to paint them.
+ * Optimized: only checks tiles within visible range.
  */
 internal fun coverflowHitTest(
     tap: Offset,
@@ -122,7 +137,15 @@ internal fun coverflowHitTest(
     val halfBase = TileSize.value * density / 2f
     var best = -1
     var bestZ = Float.NEGATIVE_INFINITY
+
+    val pos = state.position.toInt()
+    val margin = 15
+    val minCol = (pos - margin).coerceAtLeast(0)
+    val maxCol = (pos + margin).coerceAtMost(state.maxIndex)
+
     for (i in 0 until itemCount) {
+        val col = state.columnOf(i)
+        if (col < minCol || col > maxCol) continue
         val t = state.transformFor(i)
         if (!t.visible) continue
         val tileCx = cx + t.translationX * density

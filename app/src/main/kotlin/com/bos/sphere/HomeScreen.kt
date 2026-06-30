@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bos.sphere.core.data.HiddenAppsStore
 import com.bos.sphere.core.data.LauncherAppsAppRepository
+import com.bos.sphere.core.data.VoiceInputManager
+import com.bos.sphere.feature.search.AppSearch
 import com.bos.sphere.feature.sphere.RowMode
 import com.bos.sphere.feature.sphere.SphereParams
 import com.bos.sphere.feature.sphere.LauncherSurface
@@ -86,6 +89,30 @@ fun HomeScreen(homeSignal: Int) {
 
     val chromeAlpha = (1f - smooth(surface.zoomValue)) * (1f - surface.hubValue)
 
+    // Clean up voice resources on disposal
+    DisposableEffect(Unit) {
+        onDispose {
+            VoiceInputManager.release()
+        }
+    }
+
+    // Handle voice input: search for apps and launch or focus the first match
+    val handleVoiceInput = { query: String ->
+        val results = AppSearch.rank(apps, query, limit = 1)
+        if (results.isNotEmpty()) {
+            val app = results[0]
+            // If it's a unique/clear match, launch directly. Otherwise focus on equator.
+            if (query.lowercase() == app.label.lowercase()) {
+                repository.launch(app)
+            } else {
+                val appIndex = apps.indexOf(app)
+                if (appIndex >= 0) {
+                    surface.sphereState.position = appIndex.toFloat()
+                }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         DotGridBackground(Modifier.fillMaxSize())
 
@@ -109,6 +136,7 @@ fun HomeScreen(homeSignal: Int) {
                 .fillMaxSize()
                 .graphicsLayer { alpha = chromeAlpha },
             onOpenSettings = { settingsOpen = true },
+            onVoiceInput = handleVoiceInput,
         )
 
         DefaultLauncherBanner(

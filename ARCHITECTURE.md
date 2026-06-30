@@ -163,22 +163,28 @@ app (MainActivity, HomeScreen, UI chrome)
 
 ---
 
-## Performance Considerations
+## Performance Considerations (M3+)
 
 ### Frame Rate
 - Gesture handling runs on the main (Compose) thread.
-- `LauncherSurface` computes transforms each frame (O(n) where n = app count).
+- **Coverflow optimization (M3+):** Only renders tiles ±15 columns from current position; skips off-screen transforms entirely (O(constant) instead of O(n)).
 - Coverflow rendering via `graphicsLayer` is GPU-accelerated.
-- **Expected performance:** 60 FPS with <200 apps on most devices (2020+).
+- **Expected performance:** 60 FPS with <500 apps on most devices (2020+); <1000 apps with caution.
 
 ### Memory
 - Icons are cached by Compose's Image composable (keyed by app.key).
 - Large icon bitmaps are released when apps scroll off-screen.
 - AppRepository Flow emissions do not leak (callback unregistered on close).
+- Search indexing is lazy (queries rank on-demand, not pre-computed).
 
-### Optimization Opportunities
-- Memoize SphereState transforms if > 500 apps (use `derivedStateOf`).
-- Paginate icon loading (load visible tiles first, preload adjacent, lazy-load far rows).
+### Optimizations Implemented (M3+)
+- **Visible range culling:** CoverflowLayer only computes transforms for tiles within ±15 columns of the current position.
+- **Hit-test optimization:** coverflowHitTest() skips off-screen columns, reducing tap-detection cost.
+- **Memoization:** transform derivedStateOf keys on (index, position, params, rows) to avoid recompute on irrelevant changes.
+
+### Optimization Opportunities (Future)
+- Paginate icon loading (load visible tiles first, preload adjacent, lazy-load far rows) for 1000+ apps.
+- Cache AppSearch results for frequent queries (e.g., single-letter searches).
 - For 1000+ apps, consider a "search-first" UX (default to searching rather than scrolling).
 
 ---

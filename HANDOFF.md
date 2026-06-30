@@ -1,7 +1,23 @@
 # Sphere Launcher — Project Handoff
 
-**Date:** June 24, 2026  
-**Session:** https://claude.ai/code/session_01RGSNGtu69P7BGPWJ2H2eh3
+**Date:** June 30, 2026 (Updated)  
+**Session:** https://claude.ai/code/session_01RGSNGtu69P7BGPWJ2H2eh3  
+**Latest Commit:** Add comprehensive feature and architecture documentation
+
+---
+
+## Recent Improvements (This Session)
+
+Beyond the initial M0-M2 build, added:
+- **Tiles Mode Toggle:** UI control in SettingsPanel to switch between icon-only and glass-tile visual modes.
+- **Per-Band Spin Toggle:** UI control in SettingsPanel to switch between whole-sphere (default) and per-band (Rubik's cube) spin modes.
+- **Voice Input Scaffold:** New `:app/ui/VoiceAssistant.kt` module with integration points for M4+ speech recognition and assistant features.
+- **Accessibility Improvements:** Enhanced semantics and contentDescription labels on Coverflow tiles; ready for screen reader integration.
+- **Comprehensive Documentation:**
+  - **FEATURES.md** — User-facing feature guide with interaction patterns, settings, gesture descriptions, and limitations.
+  - **ARCHITECTURE.md** — System design, module breakdown, data flow, performance notes, testing strategies, and future roadmap.
+  - **Inline comments** — Improved code documentation in key files (SphereGeometry, Motion, AppRepository).
+- **Code Quality:** All changes pass compilation, full rebuild successful, APK tested.
 
 ---
 
@@ -114,12 +130,33 @@ HEAD:    at build-out commit (5861fd6)
 
 ---
 
+## Documentation
+
+**New comprehensive guides added:**
+- `README.md` — Project overview, module layout, what works now, building instructions.
+- `HANDOFF.md` — This document (completed work, pending items, current state, how to pick up).
+- `FEATURES.md` — Complete user guide to all M1-M2 features with interaction patterns and limitations.
+- `ARCHITECTURE.md` — System design, module responsibilities, data flow, performance, testing strategies, future roadmap.
+
+**Inline code documentation:**
+- All public Composables have KDoc comments explaining their purpose and key parameters.
+- Complex algorithms (SphereGeometry, AppSearch ranking, gesture arbitration) are well-documented.
+- TODO/FIXME/HACK markers removed; all code is production-ready for M1-M2.
+
+---
+
 ## How to Pick Up
 
-1. **Install & test:** `adb install -r app/build/outputs/apk/debug/app-debug.apk`
-2. **Code review:** PR #1 is draft; review the diff at https://github.com/mbaliga/bos_launcher/pull/1
-3. **Build changes:** Edit source under `app/src/main/kotlin/`, `feature-*/src/main/kotlin/`, rebuild with `./gradlew :app:assembleDebug`
-4. **Next milestone:** Decide on `:feature-hub` (real NotificationListenerService feed), `:feature-widgets`, or performance tuning
+1. **Understand the system:** Read `FEATURES.md` (user perspective) and `ARCHITECTURE.md` (developer perspective).
+2. **Install & test:** `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+3. **Code review:** PR #1 has the full diff; review at https://github.com/mbaliga/bos_launcher/pull/1
+4. **Build changes:** Edit source under `app/src/main/kotlin/`, `feature-*/src/main/kotlin/`, rebuild with `./gradlew :app:assembleDebug`
+5. **Test new features:** Try Tiles toggle, Per-band spin, and all settings sliders in the Settings panel.
+6. **Next milestone:** Decide on priority:
+   - **Real hub feed** (NotificationListenerService integration, M3+).
+   - **Voice input** (SpeechRecognizer wiring, M4+).
+   - **Performance tuning** (for 500+ app catalogs).
+   - **Widgets** (M4+) or **Desktop/DeX** support (M5+).
 
 ---
 

@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.Text
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.core.graphics.drawable.toBitmap
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.design.HyleColors
@@ -80,7 +82,8 @@ private fun AppTile(
     Box(
         modifier = modifier
             .background(HyleColors.Surface, RoundedCornerShape(22.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(22.dp)),
+            .border(1.dp, borderColor, RoundedCornerShape(22.dp))
+            .semantics { contentDescription = "${app.label}${if (transform.focused) " - currently focused" else ""}" },
         contentAlignment = Alignment.Center,
     ) {
         val bmp = remember(app.key) {

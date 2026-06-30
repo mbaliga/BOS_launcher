@@ -58,6 +58,8 @@ fun HomeScreen(homeSignal: Int) {
     }
 
     var params by remember { mutableStateOf(SphereParams()) }
+    var tilesMode by remember { mutableStateOf(false) }
+    var rubikMode by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var menuApp by remember { mutableStateOf<com.bos.sphere.core.data.AppEntry?>(null) }
 
@@ -120,8 +122,12 @@ fun HomeScreen(homeSignal: Int) {
             visible = settingsOpen,
             params = params,
             rowMode = rowMode,
+            tilesMode = tilesMode,
+            rubikMode = rubikMode,
             onParamsChange = { params = it },
             onRowModeChange = { rowMode = it },
+            onTilesModeChange = { tilesMode = it },
+            onRubikModeChange = { rubikMode = it },
             onClose = { settingsOpen = false },
             modifier = Modifier.align(Alignment.TopEnd),
         )

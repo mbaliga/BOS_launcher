@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,8 +40,12 @@ fun SettingsPanel(
     visible: Boolean,
     params: SphereParams,
     rowMode: RowMode,
+    tilesMode: Boolean = false,
+    rubikMode: Boolean = false,
     onParamsChange: (SphereParams) -> Unit,
     onRowModeChange: (RowMode) -> Unit,
+    onTilesModeChange: (Boolean) -> Unit = {},
+    onRubikModeChange: (Boolean) -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -68,6 +73,9 @@ fun SettingsPanel(
                 Header("SURFACE")
                 Text("Done", color = HyleColors.Violet, fontSize = 12.sp, modifier = Modifier.clickable(onClick = onClose))
             }
+
+            Toggle("Tiles", tilesMode, onTilesModeChange)
+            Toggle("Per-band spin", rubikMode, onRubikModeChange)
 
             ParamSlider("Perspective", params.perspective, 600f, 2400f) { onParamsChange(params.copy(perspective = it)) }
             ParamSlider("Spacing", params.radius, 380f, 980f) { onParamsChange(params.copy(radius = it)) }
@@ -119,6 +127,35 @@ private fun ParamSlider(
                 inactiveTrackColor = HyleColors.Hairline,
             ),
         )
+    }
+}
+
+@Composable
+private fun Toggle(label: String, isOn: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onChange(!isOn) }
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = HyleColors.Ink, fontSize = 11.5.sp)
+        Box(
+            modifier = Modifier
+                .background(
+                    if (isOn) HyleColors.Violet else HyleColors.Surface.copy(alpha = 0.5f),
+                    RoundedCornerShape(10.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        ) {
+            Text(
+                if (isOn) "ON" else "OFF",
+                color = if (isOn) HyleColors.Background else HyleColors.InkDim,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 

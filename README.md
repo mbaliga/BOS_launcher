@@ -1,5 +1,8 @@
 # Sphere Launcher
 
+> **Constellation** · `state: active` · public · [registry: `Personal-Tracker/CONSTELLATION.md`](https://github.com/mbaliga/Personal-Tracker/blob/main/CONSTELLATION.md)
+> Sphere/coverflow Android launcher (Compose, no AOSP fork).
+
 A landscape-first Android launcher whose home surface is the surface of a sphere: apps live on
 a coverflow "equator" with a continuous magnification lens at the front-center tangent point.
 Built from scratch in **Kotlin + Jetpack Compose** (no AOSP/Pixel fork), with AGSL materials
@@ -63,3 +66,9 @@ Notes:
 - `minSdk 31`, `targetSdk 35`. AGSL effects are gated to API 33+ (`ShaderCapability`) with a
   flat fallback for reach.
 - The prototype `spherelauncher13.html` remains the visual source of truth for look/feel.
+
+## Do not touch
+
+- The **AGSL shader path is capability-gated to API 33+** — don't ungate it (flat fallback below 33).
+- **Play-Integrity posture: no root / no Shizuku dependency** — keep it.
+- `core-design` reimplements a Hyle-like palette — a tracked Hyle-consumer debt (see registry); do not "fix" it ad hoc.

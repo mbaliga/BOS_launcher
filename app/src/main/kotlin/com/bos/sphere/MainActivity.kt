@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import com.bos.sphere.core.design.SphereTheme
+import dev.aarso.crashrecovery.CrashRecovery
 
 /**
  * Single-Activity Compose host for the launcher surface. The window is transparent and
@@ -23,6 +24,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // If the previous run crashed, show the shared recovery screen instead of the launcher
+        // surface — a device-only launch crash (which CI never sees) can't brick the install.
+        if (CrashRecovery.maybeShowRecovery(this, appLabel = "Sphere Launcher")) return
+
         setContent {
             SphereTheme {
                 HomeScreen(homeSignal = homeSignal)

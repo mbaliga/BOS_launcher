@@ -16,3 +16,4 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
 ## Owner-verified (on-device behaviour)
 - The build env has no device — all runtime/gesture/render/launcher behaviour is **owner-verified on the phone**.
 - Set-as-default (`ROLE_HOME`), coverflow scrub/launch gestures, globe, search, hub, and voice are owner-confirmed on-device.
+- **Crash recovery** (`dev.aarso:crash-recovery`) — pending device verification (design review, not just compile). **Preview the recovery screen without a real crash:** long-press the settings gear (top-right chrome), debug builds only — calls `CrashRecovery.previewIntent(context, "Sphere Launcher")`. No dedicated About/version screen exists here, so the gear is the nearest persistent affordance.

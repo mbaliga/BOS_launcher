@@ -1,5 +1,9 @@
 [versions]
-agp = "8.7.3"
+# Pinned to match mbaliga/Hyle-Design-System's AGP exactly — Gradle composite builds
+# (includeBuild, used to resolve dev.aarso:crash-recovery) require every participating
+# build to use the SAME AGP version, or the build fails with "Using multiple versions of
+# the Android Gradle plugin ... in the same build is not allowed."
+agp = "8.9.1"
 kotlin = "2.1.0"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"

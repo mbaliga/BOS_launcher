@@ -1,0 +1,3 @@
+First milestone release. Landscape coverflow home you can set as default, the
+all-apps globe, type-to-search, a pull-down hub, live surface settings and app
+management.

@@ -11,13 +11,37 @@ data. It is short because the app does very little.
 
 ## The short version
 
-Sphere Launcher has no accounts, no advertising, no analytics and no tracking.
-**The app has no internet permission**, so nothing it knows about you can leave your
-device even in principle.
+Sphere Launcher has no accounts, no advertising, no analytics and no tracking. We
+operate no servers and receive nothing from the app.
+
+One thing is worth stating plainly rather than hiding behind a permission list: the
+app itself has no internet permission, but **voice search hands your speech to
+Android's own speech recognition service**, which on most devices sends that audio to
+Google to transcribe it. That happens outside this app, under Google's privacy
+policy, and only while you are actively using voice search.
 
 ## What the app collects
 
-**Nothing.** We operate no servers and receive nothing.
+**Nothing reaches us.** We operate no servers.
+
+## Voice search
+
+When you use voice search, your speech is passed to the speech recognition service
+built into your device. On most Android devices that service transcribes in the
+cloud, so the audio leaves your phone, goes to Google, and is handled under their
+privacy policy rather than ours. We never receive it, and we keep no recording.
+
+It happens only while you are actively speaking to the launcher. If you never use
+voice search, no audio is captured at all.
+
+## Your notifications
+
+If you grant notification access, the launcher reads your notifications to build the
+pull-down hub: the app they came from, their title and text, and any actions they
+offer. That reading happens **on your device**, the content is never transmitted
+anywhere, and nothing about it is stored beyond what the hub is currently showing.
+
+Revoking notification access in Android's settings stops it immediately.
 
 ## Your app list
 
@@ -39,6 +63,8 @@ private storage on your device. Uninstalling the launcher deletes all of it.
 | Permission | Why |
 |---|---|
 | `QUERY_ALL_PACKAGES` | To show you all of your apps, which is what a launcher is for. |
+| `RECORD_AUDIO` | Optional. Only while you are using voice search. See above for where that audio goes. |
+| Notification access | Optional. Only to build the pull-down hub, read on device. |
 
 ## Children
 

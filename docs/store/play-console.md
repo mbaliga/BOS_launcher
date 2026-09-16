@@ -29,44 +29,62 @@ about writing two clear sentences, not about winning an argument:
 Also true and worth adding: the app uses `LauncherApps` (the purpose-built system
 API) with a `LauncherApps.Callback`, and is work-profile aware.
 
-### `RECORD_AUDIO` — resolve before submitting
-The manifest declares it, but nothing in the current milestone obviously uses it.
-A launcher requesting microphone access is exactly the combination that draws a
-manual review and unnerves users reading the permission list.
+### `RECORD_AUDIO` — a real feature, and it is NOT on-device
+Voice search is implemented: `core-data/.../VoiceInputManager.kt` wraps
+`SpeechRecognizer` behind a Flow API, and `app/.../ui/VoiceAssistant.kt` drives it.
+Declare it, show an in-app rationale before the first request, and keep it.
 
-- If it is there for a planned assistant feature that has not shipped: **remove it
-  now** and add it back with the feature.
-- If something does use it: the listing and the privacy policy must both say what,
-  and it needs an in-app rationale before the first request.
+⚠️ **The important part for Data safety.** `VoiceInputManager` builds a plain
+`RecognizerIntent.ACTION_RECOGNIZE_SPEECH` with `LANGUAGE_MODEL_FREE_FORM`. It sets
+**no** `EXTRA_PREFER_OFFLINE` and does **not** use
+`SpeechRecognizer.createOnDeviceSpeechRecognizer`. On most devices that means the
+system recognizer sends your audio to **Google's speech service** for recognition.
 
-```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
-```
+The app needs no `INTERNET` permission for this, because the transmission happens in
+the system recognizer's process, not ours. **That does not make it private**, and
+"we have no INTERNET permission so nothing leaves the device" is not a true
+statement about this app while voice search works this way.
 
-### `BIND_NOTIFICATION_LISTENER_SERVICE` — not yet
-The hub currently shows **demo data**; the real notification feed lands at M3. A
-notification listener is high-scrutiny, and Play will ask what it is for.
+Two honest options, and this is a product decision:
+1. **Keep cloud recognition** — then Data safety must disclose it (see below), and
+   the listing should not imply voice is local.
+2. **Force on-device** — `putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)`, or
+   `createOnDeviceSpeechRecognizer` on API 31+, with a graceful failure when no
+   on-device model is installed. Then the app can honestly claim local voice.
 
-**Do not ship it while the feed is fake.** Remove the service until M3, then declare
-it with the hub as the justification. Shipping a notification listener that does
-nothing is the worst of both worlds: full scrutiny, no feature.
+### `BIND_NOTIFICATION_LISTENER_SERVICE` — a real feature too
+`SphereNotificationListener : NotificationListenerService()` is implemented in
+`core-data/.../NotificationManager.kt` and registered in the manifest. It parses
+notification title, text, source package and actions (`parseNotification`,
+`categorizeSource`, `parseActions`) to build the hub feed.
+
+Declare it, with the pull-down hub as the justification. Play scrutinises
+notification access hard and may ask for a demo video showing the feature it powers.
+Notification content is read and rendered **on device** and is not transmitted, which
+is the answer to give — but it must still be disclosed as *used*, per below.
 
 ### Data safety
-**No data collected. No data shared.**
+**Not the simple "no data collected" this sheet originally claimed.** Play's form
+distinguishes data that is *collected* (transmitted off the device) from data that is
+*accessed and used* on it — and this app does both, through two implemented features.
+
+| Data type | Answer |
+|---|---|
+| **Audio → Voice or sound recordings** | **Collected: YES**, while voice search uses the default cloud recognizer (option 1 above). Purpose: App functionality. Shared: to the system speech provider. Optional: yes, only while the user holds the voice control. **If you take option 2 (on-device), this becomes "used but not collected" instead.** |
+| **App activity / Messages** (notification content) | **Used, not collected.** Read on device to build the hub feed; never transmitted. Disclose as used. |
+| Everything else | Not collected, not used. |
 
 | Question | Answer |
 |---|---|
-| Collect or share any user data? | **No** |
-| Encrypted in transit? | Yes (nothing is transmitted) |
-| Deletion? | Users can delete data in the app |
+| Encrypted in transit? | Yes, for the recognizer request (handled by the system provider) |
+| Deletion? | Users can delete data in the app (uninstall removes everything the app stored) |
 
-The app has **no `INTERNET` permission**, which is the strongest possible support
-for that answer. Keep it that way for as long as you can.
-
-> When the real notification feed arrives at M3, "App activity" and possibly
-> "Messages" enter the conversation. It will still be **not collected** as long as
-> nothing is transmitted, but the privacy policy must then say explicitly that
-> notification content is read on device and never leaves it.
+> **Why the app having no `INTERNET` permission does not settle this.** The speech
+> recognition transmission happens in the system recognizer's process. The permission
+> list is not evidence that nothing leaves the device, and a Data safety answer that
+> disagrees with observable behaviour is the kind of error that gets an app removed
+> rather than rejected. Resolve the on-device question above first; the answers here
+> follow from it.
 
 ### Content rating
 - Category `Utility, Productivity, Communication, or Other`. Expected **Everyone**.
@@ -82,8 +100,9 @@ Shooting it in portrait would misrepresent the product and waste its best frame.
 
 ## Pre-submit checklist
 
-- [ ] Remove `RECORD_AUDIO` unless a shipped feature uses it.
-- [ ] Remove the notification listener until the M3 feed is real.
+- [ ] Decide voice recognition: cloud (disclose it) or on-device (`EXTRA_PREFER_OFFLINE`).
+- [ ] Write the notification-access declaration; be ready to record a demo video.
+- [ ] Make the Data safety answers match whichever voice option you chose.
 - [ ] Write the `QUERY_ALL_PACKAGES` declaration using the wording above.
 - [ ] Add a `LICENSE` file.
 - [ ] Landscape screenshots: the coverflow equator, the all-apps globe mid-rotation,

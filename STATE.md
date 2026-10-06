@@ -12,6 +12,7 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
 - M5: desktop / DeX external-display layout + windowing.
 - Graduate the hub / settings UI out of `:app/ui` into `:feature-hub` / `:feature-settings` modules.
 - Resolve the tracked `core-design` Hyle-consumer debt (see registry) rather than ad-hoc patches.
+- Porting (plan only, nothing built; gated on the owner's product-shape ruling): see [`docs/PORTING_PLAN.md`](docs/PORTING_PLAN.md).
 
 ## Owner-verified (on-device behaviour)
 - The build env has no device — all runtime/gesture/render/launcher behaviour is **owner-verified on the phone**.

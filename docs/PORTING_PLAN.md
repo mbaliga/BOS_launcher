@@ -303,3 +303,40 @@ Outside this repo: `Personal-Tracker/PORTING_PROGRAM.md` (§0–§3, §4, this r
 `hnm_playground/ui/build.gradle.kts` (Compose Multiplatform desktop template); the reader profile
 `profiles/read_BOS_launcher.json` (2026-10-06), whose line references were re-checked against the files and corrected
 where they differed.
+
+## Owner rulings and the proposed line (added 2026-10-07)
+
+Status: PLAN. Nothing here is built, run on a device, signed or submitted. The program-level plan is Personal-Tracker `PORTING_PROGRAM.md` ([PR #10](https://github.com/mbaliga/Personal-Tracker/pull/10)), which holds the owner's rulings and section 5A, the proposed port / no-port line. The cells, estimates and open questions above are this repo's original plan and are unedited. Where the owner has since answered a question, the answer is below. Section 5A is a proposal; the owner has not yet confirmed it.
+
+### Where BOS_launcher sits in the proposed line (program section 5A.3, a proposal)
+
+| Target       | Verdict | Weeks and flags |
+| ------------ | ------- | --------------- |
+| Ubuntu Touch | no-port | -               |
+| Linux        | no-port | -               |
+| iOS/iPadOS   | no-port | -               |
+| macOS        | no-port | -               |
+| Windows      | no-port | -               |
+
+Key: `follows` means it ports only as far as the products that depend on it; `exists` means the program reads it as already running there, unverified (finish, verify and sign); flags: `g` gated on a prerequisite, `r` re-estimate or floor, `o` its own program, `s` scope note. The program's P4, P8, P12 and P13 gate whole columns or repos and are not flagged per cell. A port verdict counts the deliverable in the line; where this repo's plan calls a deliverable a reframe (program rule R12) it keeps that label. Tests cited in the reason: (a) the owner said it is needed there; (b) its job is really done on that OS by real users; (c) that OS is where it is sold or its audience is; it has no reason to exist if (x) its surface is absent or untouchable, (y) the capability is forbidden or impossible, or (z) the only form is a thin wrapper or a different product nobody asked for. P-numbers and OQ-numbers refer to the program plan (Personal-Tracker `PORTING_PROGRAM.md`, sections 5A.5 and 8).
+
+Reason: A launcher exists only where the OS lets an app be the home screen; that is Android.
+
+### Owner rulings that apply here
+
+- **OQ-21 (2026-10-06):** "No, native ports only" (Waydroid is not accepted). BOS is named in OQ-21, so this answers the Waydroid half of this plan's Q5 and step U3. The program left this plan's QML picker cell unmarked, because whether a native reframe counts as native is not stated; the proposed verdict is no-port because a launcher has no home-screen surface off Android (test x).
+- **Product shape (OQ-6, open):** the proposed no-port on every non-Android target is the "only a home screen" branch of this plan's Q1. It is a proposal; the repo's own M5 (an Android external-display layout) is unaffected.
+- **OQ-17 toolchain (2026-10-06):** "B: staged pin (Recommended)". BOS is on Kotlin 2.1.0 and AGP 8.7.3 today (plan section 1); the proposed line has no non-Android target for this repo, so no pin change is proposed.
+
+### Prerequisites and open questions that touch this repo (program sections 5A.5 and 8)
+
+No program-level prerequisite is named for this repo.
+
+Owner questions in the program register that concern this repo (status as of 2026-10-07):
+
+- OQ-6 (open): Reframes to accept or reject: a desktop 'sphere app launcher'
+- OQ-12 (open): Licences for repos without a LICENSE (the register's older gap list names this repo, which has none)
+- OQ-17 (ruled): Toolchain pins: the pin is ruled; the "Also" approvals (converting shared modules to kotlin("multiplatform"), asom's no-KMP rule staying asom-local) are unanswered
+- OQ-21 (ruled): Waydroid as the Ubuntu Touch answer
+
+When the owner confirms or changes the line, this repo's original cells above stay as the engineering detail; only the verdicts and re-costs in program section 5A change.

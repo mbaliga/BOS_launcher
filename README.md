@@ -72,3 +72,7 @@ Notes:
 - The **AGSL shader path is capability-gated to API 33+** — don't ungate it (flat fallback below 33).
 - **Play-Integrity posture: no root / no Shizuku dependency** — keep it.
 - `core-design` reimplements a Hyle-like palette — a tracked Hyle-consumer debt (see registry); do not "fix" it ad hoc.
+
+## Licence
+
+Source-available, free for noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). If you make money with it, you need a commercial licence: see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).

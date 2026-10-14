@@ -340,3 +340,28 @@ Owner questions in the program register that concern this repo (status as of 202
 - OQ-21 (ruled): Waydroid as the Ubuntu Touch answer
 
 When the owner confirms or changes the line, this repo's original cells above stay as the engineering detail; only the verdicts and re-costs in program section 5A change.
+
+## Update 2026-10-14: the market lens, iPadOS and the owner's latest answers
+
+Status: PLAN. Nothing here is built, run on a device, signed or submitted. This update follows the section "Owner rulings and the proposed line (added 2026-10-07)" above and the program plan's section 5A.12 (Personal-Tracker `PORTING_PROGRAM.md`, [PR #10](https://github.com/mbaliga/Personal-Tracker/pull/10)), which governs where the two differ. It records the owner's market lens and answers of 2026-10-13 and 2026-10-14; the proposed line is still a proposal. Two tests were added to the program's section 5A.1: (d) a real gap, or we are better or cheaper ("better" only where it has been measured; free alone is no gap when free tools exist); (w) mature free alternatives abound and the app adds nothing.
+
+### Where BOS_launcher sits now (program section 5A.12, a proposal)
+
+| Target       | Verdict, weeks and flags |
+| ------------ | ------------------------ |
+| Ubuntu Touch | no-port                  |
+| Linux        | no-port                  |
+| iPhone       | no-port                  |
+| iPad         | no-port                  |
+| macOS        | no-port                  |
+| Windows      | no-port                  |
+
+### What changed for this repo
+
+- No cell changes (no-port everywhere off Android).
+
+### Owner answers that apply here
+
+- **Skin contract (OQ-39, 2026-10-14):** proposed conformance level for this app: Level 1, cost class A (its own HyleColors object with drifted values). The owner chose Tier 1 (palette) everywhere first and every app declaring its own level; the assistant chose JSON, not XML, after the owner asked for a check; the draft spec is Personal-Tracker `porting/skin-contract/SPEC-DRAFT.md`. This is a proposal, not decided for this app.
+
+When the owner confirms or changes the line, this repo's original cells above stay as the engineering detail; only the verdicts and re-costs in program section 5A.12 change.

@@ -22,8 +22,9 @@ surface settings, and app management.
 | `:feature-sphere` | `SphereGeometry` (ported `magAt`/`txAt`), `SphereState`, `CoverflowLayer`, all-apps `Globe`, and `LauncherSurface` (unified gestures) |
 | `:feature-search` | Apps-only search ranking + the portrait always-keyboard |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
+| `:feature-widgets` | App Widget **hosting**: one `AppWidgetHost`, placement store + reconciliation, picker, bind/configure flow, equator tiles and the hub widget stack ([`docs/widget-hosting.md`](docs/widget-hosting.md)) |
 
-Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`, `:haptics`,
+Planned (per the brief): `:feature-hub`, `:feature-settings`, `:haptics`,
 `:assistant`. (The hub / settings UI currently lives in `:app/ui` and will graduate to modules.)
 
 ## What works now
@@ -34,6 +35,11 @@ Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`
   filtered by a persisted hidden-apps set.
 - **Coverflow equator** with the prototype's magnification-integral spacing via `graphicsLayer`;
   orientation-driven row split (Auto = 2 rows portrait / 1 landscape) with focus-preserving remap.
+- **Hosts App Widgets** (any app's, no pairing): picker (Settings → Widgets, long-press an app or
+  empty surface, or the hub), bind prompt + configure flow, widgets as tiles on the equator
+  (prototype "widgets-as-tiles") or in a full-width stack in the hub; remove / reconfigure / move /
+  resize per widget. Compiled and JVM-tested only: **all on-device behaviour is owner-verify**
+  ([`docs/widget-hosting.md`](docs/widget-hosting.md)).
 - **Unified navigation gestures** (one arbitrated handler): drag to scrub with snap, tap to
   focus/launch, **pinch-in → all-apps globe** (rotate + lens), **spread → settings** (or back
   home), **pull-down → hub**, long-press → app menu.

@@ -6,6 +6,38 @@
 
 ---
 
+## Widget hosting — `:feature-widgets` (2026-11-04)
+
+Sphere now **hosts** standard Android App Widgets from any app (brief §3.D; widget strategy §1.5 / §3:
+an AppWidgetHost shows every app's own widgets with no pairing). Design, touch model, persistence and
+the owner-verify list: [`docs/widget-hosting.md`](docs/widget-hosting.md).
+
+- **Done (compiled + JVM unit tests):** one process-wide `AppWidgetHost` (fixed host id) listening
+  while the activity is started; placements in SharedPreferences with start-up reconciliation
+  (drop forgotten ids, delete orphan ids, "widget unavailable" tile with Remove); picker over
+  `getInstalledProvidersForProfile` for every `LauncherApps` profile; bind via
+  `bindAppWidgetIdIfAllowed` → `ACTION_APPWIDGET_BIND` → configure activity, deleting the id on any
+  cancel or failure; widgets as equator tiles (laid out at the focus-lens size, sizes reported with
+  `updateAppWidgetSize(Bundle, List<SizeF>)`) or in a full-width hub stack (Small / Medium / Large);
+  touch model arbitrated in `LauncherSurface` (focused tile at rest takes taps, drags still scrub,
+  long-press → widget menu, hub stack is a pass-through region once the hub is fully open);
+  backup restore: placements found without this device's `noBackupFilesDir` marker wait as
+  restore-pending (negative ids, no host ids deleted) until `ACTION_APPWIDGET_HOST_RESTORED` maps
+  them, or 3 days pass. No new permission, no new runtime dependency (JUnit 4 is test-only).
+- **Not verified:** everything on a device. No emulator here.
+- **Touches outside the new module (additive):** `feature-sphere` gained `EquatorItem`,
+  `TouchPassThrough`, `SphereState.focusScale` / `focusedItemIndex` and widget tiles in
+  `CoverflowLayer`; `LauncherSurface` takes optional widget parameters (defaults keep the old
+  behaviour) and now reads its lists and callbacks through `rememberUpdatedState`; `HomeScreen`,
+  `MainActivity` (`onActivityResult` forward), `HubPanel` (optional `extraContent`, measured
+  before the notifications, which are now clipped to the height left over),
+  `SettingsPanel` (optional "Widgets" section), `AppContextMenu` (optional "Add widget here").
+- **Next:** owner-verify list; then consider anchoring equator widgets to their neighbouring app
+  (today they keep an index, so app installs before them shift their neighbours), reordering
+  widgets along the equator, and widget stacks/paging if the hub gets crowded.
+
+---
+
 ## Recent Improvements (Extended Session)
 
 ### Phase 1: M1-M2 Polish
@@ -132,7 +164,7 @@
 ### Future Planned (Per Brief) — Not Started
 - `:feature-hub` — Graduate from `:app/ui` to own module; add contextual cards (weather, travel, calendar).
 - `:feature-settings` — Graduate from `:app/ui` to own module.
-- `:feature-widgets` — Home-screen widgets (brief §3.D).
+- `:feature-widgets` — Home-screen widgets (brief §3.D). **Hosting started 2026-11-04** (see top).
 - `:haptics` — Tactile feedback wired to motion primitives (brief §4.C).
 - `:assistant` — AI command palette with intent routing (brief §5).
 

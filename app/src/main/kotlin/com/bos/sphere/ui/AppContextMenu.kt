@@ -5,18 +5,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.feature.widgets.R as WidgetsR
 
 /**
  * Long-press app menu (build brief §2.A "App management"). App info + uninstall route to the
@@ -30,6 +33,7 @@ fun AppContextMenu(
     onAppInfo: () -> Unit,
     onUninstall: () -> Unit,
     onToggleHidden: () -> Unit,
+    onAddWidgetHere: (() -> Unit)? = null,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -48,6 +52,9 @@ fun AppContextMenu(
             )
             MenuItem("App info", onAppInfo)
             MenuItem(if (isHidden) "Unhide" else "Hide", onToggleHidden)
+            if (onAddWidgetHere != null) {
+                MenuItem(stringResource(WidgetsR.string.widgets_add_here), onAddWidgetHere)
+            }
             MenuItem("Uninstall", onUninstall, destructive = true)
         }
     }
@@ -61,6 +68,7 @@ private fun MenuItem(label: String, onClick: () -> Unit, destructive: Boolean = 
         fontSize = 14.sp,
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     )

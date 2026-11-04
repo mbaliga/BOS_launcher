@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":feature-sphere"))
     implementation(project(":feature-search"))
     implementation(project(":shaders"))
+    implementation(project(":feature-widgets"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

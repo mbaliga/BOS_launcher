@@ -186,10 +186,39 @@ The launcher adapts to **landscape** (primary) and **portrait** (secondary) mode
 - **Voice is scaffolded but non-functional** (awaiting M4 integration).
 - **App arrangements are limited to Bands** (Fibonacci sphere works but Usage, Recency, A–Z, Colour are scaffolded only).
 - **Hub is a demo feed** (real NotificationListenerService integration is M3+).
-- **No widgets** (M4+).
+- **Widget hosting is new and unverified on a device** (see *Widgets (hosting)* below).
 - **No local search** beyond type-to-search in portrait.
 - **No haptics** (vibration vocabulary is defined but not wired; M4+).
 - **No AGSL materials** (shader glow effects scaffolded for API 33+, not yet rendered).
+
+---
+
+## Widgets (hosting)
+
+Sphere hosts other apps' standard App Widgets. Full design, touch model and the owner-verify list:
+[`docs/widget-hosting.md`](docs/widget-hosting.md). **Not yet verified on a device.**
+
+- **Add:** Settings → **Widgets → Add widget**, long-press an app → **Add widget here**, long-press
+  empty surface, or **+ Add widget** in the hub. The picker lists every installed widget (work
+  profile included, tagged in words), grouped by app, with preview, description and size in cells,
+  and a local filter. Choose **Equator** or **Hub**.
+- **Binding:** if Android asks, the system "allow Sphere to create widgets" prompt appears; widgets
+  that need setup open their configure screen. Cancelling either leaves nothing behind.
+- **On the equator:** widgets are tiles between apps. Tap an unfocused widget to focus it; the
+  focused widget takes taps itself (its buttons and list rows); dragging still scrubs; long-press
+  opens the widget menu.
+- **In the hub:** pull the hub down; widgets sit in a full-width stack under "Needs you" at Small /
+  Medium / Large height, with normal touch. The ••• button opens the widget menu.
+- **Widget menu:** Reconfigure (when the widget supports it), Move to hub / equator, height in the
+  hub, Remove widget.
+- **Unavailable widgets** (mainly: restored before their app is installed, or in safe mode) show
+  "Widget unavailable" with a Remove button. Widgets whose app is uninstalled or disabled are
+  removed (Android deletes them).
+- Placements are saved locally (SharedPreferences) and restored after restarts and reboots. After a
+  backup restore to a new phone they show "Restoring widget" until Android hands over the
+  restored widgets' new ids.
+- **Known limitation:** an equator widget keeps its position by index, so installing, removing,
+  hiding or unhiding an app that sorts before it gives it a different neighbour.
 
 ---
 

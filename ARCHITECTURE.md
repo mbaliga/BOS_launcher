@@ -269,3 +269,30 @@ All modules depend on:
 - Kotlin stdlib + coroutines.
 - Androidx Compose (foundation, material3, activity).
 - Androidx lifecycle (for state collection).
+
+---
+
+## Widget hosting — `:feature-widgets` (2026-11-04)
+
+Added after the graph above was written; additive so the module map stays accurate.
+
+- **Responsibility:** hosting other apps' App Widgets: one process-wide `AppWidgetHost`, the
+  placement store (SharedPreferences) with reconciliation and backup-restore handling, the
+  picker, the bind / configure flow, equator widget tiles and the hub widget stack.
+- **Dependencies:** `:feature-widgets` → `:feature-sphere` (`EquatorItem`, `TouchPassThrough`,
+  `TILE_SIZE_DP`), `:core-design`, `:core-data`. `:app` → `:feature-widgets`.
+  `:feature-sphere` knows nothing about widget hosting: it renders `EquatorItem.Widget` tiles
+  through a slot and arbitrates their touches in `LauncherSurface`.
+- **Pure, JVM-tested parts:** `PlacementCodec`, `PlacementReconciler`, `RestoreWindow`,
+  `EquatorMerge`, `PlacementEdits`, `WidgetSizing`, `HubStackLayout`, `PickerModel`, `BindFlow`
+  (`feature-widgets/src/test`).
+- **Design, touch model, persistence and owner-verify list:**
+  [`docs/widget-hosting.md`](docs/widget-hosting.md).
+
+```
+app
+└── feature-widgets
+    ├── feature-sphere
+    ├── core-design
+    └── core-data
+```

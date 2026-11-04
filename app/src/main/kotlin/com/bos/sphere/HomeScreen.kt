@@ -1,6 +1,7 @@
 package com.bos.sphere
 
 import android.content.res.Configuration
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,26 +24,40 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bos.sphere.core.data.HiddenAppsStore
 import com.bos.sphere.core.data.LauncherAppsAppRepository
 import com.bos.sphere.core.data.VoiceInputManager
+import com.bos.sphere.core.design.HyleMotion
 import com.bos.sphere.feature.search.AppSearch
+import com.bos.sphere.feature.sphere.EquatorItem
 import com.bos.sphere.feature.sphere.RowMode
 import com.bos.sphere.feature.sphere.SphereParams
 import com.bos.sphere.feature.sphere.LauncherSurface
 import com.bos.sphere.feature.sphere.rememberLauncherSurfaceState
 import com.bos.sphere.feature.search.SearchKeyboard
+import com.bos.sphere.feature.widgets.WidgetHostActivityBinding
+import com.bos.sphere.feature.widgets.WidgetSurface
+import com.bos.sphere.feature.widgets.ui.Dialogs
+import com.bos.sphere.feature.widgets.ui.EquatorTile
+import com.bos.sphere.feature.widgets.ui.FocusNewWidgets
+import com.bos.sphere.feature.widgets.ui.HubStack
+import com.bos.sphere.feature.widgets.ui.equatorItems
+import com.bos.sphere.feature.widgets.ui.rememberWidgetHostUi
 import com.bos.sphere.ui.AppContextMenu
 import com.bos.sphere.ui.Chrome
 import com.bos.sphere.ui.DefaultLauncherBanner
 import com.bos.sphere.ui.DotGridBackground
 import com.bos.sphere.ui.HubPanel
 import com.bos.sphere.ui.SettingsPanel
+import kotlinx.coroutines.launch
 
 /**
  * The home root. Builds the (hidden-filtered) inventory, resolves the row split, hosts the
  * interactive [LauncherSurface], and overlays chrome, the hub, settings, the long-press menu and
  * the set-default prompt. Surface params are hoisted here so the settings panel tunes them live.
+ *
+ * Hosted App Widgets ([widgetHost]) join the equator as tiles between apps, or sit in the hub's
+ * widget stack; the globe and search stay apps-only.
  */
 @Composable
-fun HomeScreen(homeSignal: Int) {
+fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
     val context = LocalContext.current
     val repository = remember { LauncherAppsAppRepository(context) }
     val hiddenStore = remember { HiddenAppsStore(context) }
@@ -66,7 +82,15 @@ fun HomeScreen(homeSignal: Int) {
     var settingsOpen by remember { mutableStateOf(false) }
     var menuApp by remember { mutableStateOf<com.bos.sphere.core.data.AppEntry?>(null) }
 
-    val surface = rememberLauncherSurfaceState(itemCount = apps.size, rows = rows, params = params)
+    // Equator = apps with hosted widgets merged in at their slots.
+    val widgetUi = rememberWidgetHostUi(widgetHost)
+    val equatorItems = widgetUi.equatorItems(apps)
+    val scope = rememberCoroutineScope()
+    // Packages added / removed / changed reach us through the repository's LauncherApps.Callback;
+    // re-check hosted widgets on the same signal.
+    LaunchedEffect(allApps) { widgetUi.onPackagesChanged() }
+
+    val surface = rememberLauncherSurfaceState(itemCount = equatorItems.size, rows = rows, params = params)
 
     // Centre the equator on the middle app the first time the inventory arrives.
     var centred by remember { mutableStateOf(false) }
@@ -82,6 +106,7 @@ fun HomeScreen(homeSignal: Int) {
         if (homeSignal > 0) {
             settingsOpen = false
             menuApp = null
+            widgetUi.dismissAll()
             surface.zoom.animateTo(0f)
             surface.hub.animateTo(0f)
         }
@@ -105,9 +130,9 @@ fun HomeScreen(homeSignal: Int) {
             if (query.lowercase() == app.label.lowercase()) {
                 repository.launch(app)
             } else {
-                val appIndex = apps.indexOf(app)
-                if (appIndex >= 0) {
-                    surface.sphereState.position = appIndex.toFloat()
+                val itemIndex = equatorItems.indexOfFirst { it is EquatorItem.App && it.entry.key == app.key }
+                if (itemIndex >= 0) {
+                    surface.sphereState.position = surface.sphereState.columnOf(itemIndex).toFloat()
                 }
             }
         }
@@ -126,9 +151,38 @@ fun HomeScreen(homeSignal: Int) {
                 .fillMaxSize()
                 // In portrait, leave room for the always-keyboard so the equator stays clear.
                 .padding(bottom = if (isPortrait) 300.dp else 0.dp),
+            equatorItems = equatorItems,
+            onLongPressWidget = { widgetUi.openMenu(it.appWidgetId) },
+            onLongPressEmpty = {
+                widgetUi.openPicker(WidgetSurface.Equator, surface.sphereState.focusedItemIndex())
+            },
+            touchPassThrough = widgetUi.passThrough,
+            widgetTile = { item, interactive ->
+                widgetUi.EquatorTile(item, interactive, lens = surface.sphereState.focusScale)
+            },
         ) { fraction ->
-            HubPanel(fraction = fraction)
+            HubPanel(fraction = fraction) { sharesPanel ->
+                widgetUi.HubStack(hubFraction = fraction, sharesPanel = sharesPanel)
+            }
         }
+
+        // Bring a just-added widget into view: scrub to it, or open the hub it went to. An equator
+        // widget added or moved from inside the hub would sit behind it, so the hub (and globe)
+        // close first.
+        widgetUi.FocusNewWidgets(
+            items = equatorItems,
+            onFocusEquatorIndex = { index ->
+                scope.launch { surface.hub.animateTo(0f, HyleMotion.give()) }
+                scope.launch { surface.zoom.animateTo(0f, HyleMotion.give()) }
+                scope.launch {
+                    Animatable(surface.sphereState.position)
+                        .animateTo(surface.sphereState.columnOf(index).toFloat(), HyleMotion.settle()) {
+                            surface.sphereState.position = value
+                        }
+                }
+            },
+            onOpenHub = { scope.launch { surface.hub.animateTo(1f, HyleMotion.settle()) } },
+        )
 
         // Chrome (clock / weather / battery), fading out of the way for globe + hub.
         Chrome(
@@ -158,6 +212,14 @@ fun HomeScreen(homeSignal: Int) {
             onRubikModeChange = { rubikMode = it },
             onClose = { settingsOpen = false },
             modifier = Modifier.align(Alignment.TopEnd),
+            onAddWidget = if (widgetUi.enabled) {
+                {
+                    settingsOpen = false
+                    widgetUi.openPicker(WidgetSurface.Equator, surface.sphereState.focusedItemIndex())
+                }
+            } else {
+                null
+            },
         )
 
         // Portrait: the always-open keyboard for type-to-search (hidden in globe / hub).
@@ -180,8 +242,23 @@ fun HomeScreen(homeSignal: Int) {
                     hiddenStore.setHidden(app.key, app.key !in hidden)
                     menuApp = null
                 },
+                onAddWidgetHere = if (widgetUi.enabled) {
+                    {
+                        val index = equatorItems.indexOfFirst { it is EquatorItem.App && it.entry.key == app.key }
+                        widgetUi.openPicker(WidgetSurface.Equator, index)
+                        menuApp = null
+                    }
+                } else {
+                    null
+                },
             )
         }
+
+        // Widget picker and widget menu (remove / reconfigure / move / hub height).
+        widgetUi.Dialogs(
+            lens = surface.sphereState.focusScale,
+            focusedEquatorIndex = { surface.sphereState.focusedItemIndex() },
+        )
     }
 }
 

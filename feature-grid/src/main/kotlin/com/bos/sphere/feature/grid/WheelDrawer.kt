@@ -401,7 +401,7 @@ private class Spoke(val angle: Float, val apps: List<AppEntry>)
 private const val INSET_DEG = 4f
 private const val CULL_MARGIN_DEG = 30f
 // Spread across the hub; chips stay upright (readable) and inset from the screen edges.
-private val ChipAngles = floatArrayOf(17f, 45f, 73f)
+private val ChipAngles = floatArrayOf(13f, 45f, 77f)
 
 /** Unfurl: the wheel grows from 35% and sweeps 60° clockwise into place as [p] goes 0 → 1. */
 private fun openScale(p: Float) = 0.35f + 0.65f * p
@@ -737,8 +737,8 @@ private fun WheelContent(
                     WheelGrouping.entries.forEachIndexed { i, g ->
                         val selected = g == grouping
                         val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                            textSize = 12.sp.toPx()
-                            letterSpacing = 0.1f
+                            textSize = 11.sp.toPx()
+                            letterSpacing = 0.06f
                             typeface = if (selected) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
                             color = (if (selected) textInk else dimInk).toArgb()
                         }

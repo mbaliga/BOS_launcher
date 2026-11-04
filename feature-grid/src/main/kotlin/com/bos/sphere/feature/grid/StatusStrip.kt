@@ -56,23 +56,25 @@ fun StatusStrip(
     onClockTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier.fillMaxWidth().padding(horizontal = sidePadding), verticalAlignment = Alignment.CenterVertically) {
+    // One layer per zone over the full width: the centre zone is truly centred and none is squeezed
+    // into a third (a big clock needs the room); left / right hug their edges.
+    Box(modifier.fillMaxWidth().padding(horizontal = sidePadding)) {
         for (zone in StripZone.entries) {
             val items = StripItem.entries.filter { prefs.strip[it] == zone }
-            Box(
-                Modifier.weight(1f),
-                contentAlignment = when (zone) {
-                    StripZone.Left -> Alignment.CenterStart
-                    StripZone.Centre -> Alignment.Center
-                    StripZone.Right -> Alignment.CenterEnd
-                },
+            if (items.isEmpty()) continue
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.align(
+                    when (zone) {
+                        StripZone.Left -> Alignment.CenterStart
+                        StripZone.Centre -> Alignment.Center
+                        StripZone.Right -> Alignment.CenterEnd
+                    },
+                ),
             ) {
-                if (items.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        items.forEach { item ->
-                            if (item == StripItem.Time) ClockBlock(prefs, weather, onClockTap) else StripChip(item)
-                        }
-                    }
+                items.forEach { item ->
+                    if (item == StripItem.Time) ClockBlock(prefs, weather, onClockTap) else StripChip(item)
                 }
             }
         }

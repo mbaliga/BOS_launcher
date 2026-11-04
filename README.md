@@ -70,6 +70,18 @@ in settings):
   from a background foreground-service.
 - **Network dots** — the substrate dot grid breathes green (good signal) → red (poor), solid grey in
   airplane mode, dark when offline.
+- **Status strip** — a 3DS-style bar (top or bottom) with left / centre / right zones: the clock (size,
+  12/24-hour, day, date, optional weather) plus small readouts — battery, signal, steps, next alarm, ring
+  mode, storage, memory, notifications.
+- **Spacing and density** — icon size and spacing are separate; a bound gesture (e.g. pinch) steps the
+  grid denser or sparser and pulls icons forward to fill the gaps.
+- **Indicator** — the background reads out any measurement (signal, battery, storage, memory,
+  notifications, volume, time of day) through combinable effects: breathing dots, dot bloom from the
+  centre or edges, vignette, comic-book lines, snake outline, edge meter; colours are configurable.
+- **Apps and drawer** — keep all apps on the pages or only chosen ones, one page or many; the drawer is
+  its own space (grid / list / details; A–Z, type, recent, most used; edge scrub rail).
+- **Theme and language** — dark / AMOLED / light, accent colour picker, icon shape / tint / plate and
+  per-app icon colour; the launcher's own UI is translated (es, fr, de, pt, hi, zh, ja, ar).
 - **Settings space** — long-press anywhere empty: a full-screen cross-media-bar (categories across,
   items down, option pane at the side), with Orrery's console tones (`UiSound`, ported from
   `orrery-kit/sfx.js`).

@@ -17,6 +17,10 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
 - Graduate the hub / settings UI out of `:app/ui` into `:feature-hub` / `:feature-settings` modules.
 - Resolve the tracked `core-design` Hyle-consumer debt (see registry) rather than ad-hoc patches.
 
+- Round 2 (owner feedback): edge-to-edge pager, flush status strip, ring-wedge palettes, curved wheel
+  labels, XMB settings with tap-to-configure, discreet default hint, light search overlay, spacing +
+  pinch density, indicator effects, drawer space, theme / icon theming, UI languages, R8 release build.
+
 ## Needs on-device verification (Pages home)
 - Gesture feel (drag-rearrange, pinch, palette slide-select, coverflow ↔ pager hand-off), motion-gesture
   thresholds on real sensors, widget bind/config flows, background motion service on Android 14/15,

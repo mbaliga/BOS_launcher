@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home-screen widget colours, night: Sphere's own palette (core-design HyleColors and the prototype's
+  widget tiles, docs/spherelauncher13.html): surface #161922, violet-tinted hairline, ink ramp, violet.
+-->
+<resources>
+    <color name="hw_surface">#FF161922</color>
+    <color name="hw_stroke">#338E7BFF</color>
+    <color name="hw_ink_bright">#FFE7E9F0</color>
+    <color name="hw_ink">#FFC9CDD6</color>
+    <color name="hw_ink_dim">#FF7D8496</color>
+    <color name="hw_accent">#FFCFC6FF</color>
+    <color name="hw_fill">#FF8E7BFF</color>
+    <color name="hw_track">#1FFFFFFF</color>
+    <color name="hw_pad">#0FFFFFFF</color>
+    <color name="hw_pad_stroke">#1AFFFFFF</color>
+    <color name="hw_ripple">#338E7BFF</color>
+</resources>

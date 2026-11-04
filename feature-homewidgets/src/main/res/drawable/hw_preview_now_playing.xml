@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker preview for launchers that read previewImage instead of previewLayout: the card and its glyph. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="160dp" android:height="80dp" android:drawable="@drawable/hw_bg" />
+    <item android:width="32dp" android:height="32dp" android:gravity="center" android:drawable="@drawable/hw_ic_note" />
+</layer-list>

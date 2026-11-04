@@ -53,9 +53,11 @@ fun HubPanel(
 ) {
     if (fraction <= 0.001f) return
     val context = LocalContext.current
-    val notifications by NotificationProvider.notifications.collectAsStateWithLifecycle(initialValue = emptyList())
+    // A StateFlow: the hub shows what is in the shade the moment it opens (a Needs you widget tap
+    // opens it directly), not only after the next notification arrives.
+    val notifications by NotificationProvider.notifications.collectAsStateWithLifecycle()
 
-    // Fallback to demo if notifications not available
+    // Fallback to demo if notification access is not granted (listener access, not DND access)
     val displayNotes = if (notifications.isEmpty() && !SphereNotificationListener.isEnabled(context)) {
         demoNotifications()
     } else {

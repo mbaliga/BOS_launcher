@@ -6,6 +6,40 @@
 
 ---
 
+## Sphere's own home-screen widgets — `:feature-homewidgets` (2026-11-04)
+
+Owner: "develop the widgets across multiple sizes for each and every app ... at least 5 widgets each"
+and "The widgets should be usable by Android launchers". Design, data, privacy and the owner-verify
+list: [`docs/widgets.md`](docs/widgets.md).
+
+- **Done (compiled + JVM unit tests):** five App Widget providers (Gate clock, Battery, Now playing,
+  Needs you, App pads), each with small / medium / large layouts as size-mapped RemoteViews, preview
+  layouts, day/night colours; push updates from a process-wide runtime started by the new
+  `SphereApplication` (battery receiver, media sessions, the notification listener's package+flags
+  facts, LauncherApps callbacks, the hidden-apps set); taps through a non-exported trampoline
+  (LauncherApps launches, notification-access setting) and receiver (media controls, battery
+  re-read); a non-exported options screen (pads' apps; "counts only" / "show track and artist").
+  64 tests: models, size keys (also per font scale), colour contrast, and the layout files themselves.
+- **Review fixes (same day):** Now playing shows the app name only by default and never names an
+  app hidden in Sphere; Needs you has no "hidden apps" row (hidden apps count only in the total and
+  "+N more"), splits work-profile apps into their own badged rows that open in that profile; "as of"
+  at every size where data can lapse; size keys grow with the font scale; one-row pads are 48 dp;
+  providers ignore ids that aren't theirs; battery tap uses goAsync; media controls reach the
+  session shown; pads redraw icons on app updates. In `:core-data`, the hub the Needs you card
+  opens is fixed: `SphereNotificationListener.isEnabled` checks listener access (it checked DND
+  access) and `NotificationProvider.notifications` is a StateFlow filled on connect, so the hub no
+  longer opens empty or on demo cards while access is on.
+- **Touches outside the new module:** `SphereApplication` + manifest `android:name` (also redraws
+  widgets on a font-scale change); `MainActivity` / `HomeScreen` (`hubSignal`: a widget can open
+  home with the hub down); `HiddenAppsStore.PREFS_NAME` made public; backup rules leave out
+  `home_widgets.xml`; `:core-data` `NotificationManager.kt` (`ActiveNotification.userSerial`,
+  `isEnabled`, the hub's StateFlow, styled titles) and `HubPanel` (collects that StateFlow).
+- **Not verified:** everything on a device. No emulator here.
+- **Owner decisions open:** whether Now playing should show the track by default (it shows the app
+  name only until the owner says otherwise); which notifications count (shared with pages §7).
+
+---
+
 ## Pages — `:feature-pages` (2026-11-04)
 
 Owner (2026-11-04): "also add the Orrery widget runtime to the launcher"; full-page widgets ("Orrery

@@ -223,6 +223,28 @@ Sphere hosts other apps' standard App Widgets. Full design, touch model and the 
 
 ---
 
+## Sphere's widgets for any launcher
+
+Sphere provides five home-screen widgets you can place in any launcher (Pixel, One UI, Nova, or
+Sphere itself), also when Sphere isn't your home app. Full detail and the owner-verify list:
+[`docs/widgets.md`](docs/widgets.md). **Not yet verified on a device.**
+
+- **Gate clock:** time; date; next alarm. Tap opens Sphere.
+- **Battery:** level, state (glyph + word), level bar, time to full, "as of" time. Tap reads it again.
+- **Now playing:** which app is playing and its state, with previous / play-pause / next at the large
+  size. App name only by default; the option "Show track and artist" adds the title. An app hidden in
+  Sphere is never named. Needs Sphere's notification access; says so when it's off.
+- **Needs you:** how many notifications wait, per app (never their content; a work-profile app is
+  its own row); apps hidden in Sphere are never named and get no row (they count in the total).
+  Rows open their app; the card opens Sphere's hub. Option: counts only.
+- **App pads:** up to six apps you choose (work profile too), one tap each.
+
+Each resizes through small, medium and large layouts, stepping down a size at larger font scales
+rather than clipping. They update while Sphere is running; when it isn't, they keep their last state,
+and Battery, Now playing and Needs you print at every size the time that state was drawn.
+
+---
+
 ## Pages
 
 Home is page 0 of a scrollable set of pages. Full design, runtime rules and the owner-verify list:

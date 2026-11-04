@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App pads, medium: four apps in a row, icons only. Pads are the full widget height (no vertical
+  padding): the 48 dp size key and minResizeHeight keep them 48 dp tall.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/hw_bg"
+    android:baselineAligned="false"
+    android:clipToOutline="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="2dp">
+
+    <FrameLayout
+        android:id="@+id/hw_pad_1"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@drawable/hw_pad_bg"
+        android:minHeight="@dimen/hw_touch">
+
+        <ImageView
+            android:id="@+id/hw_pad_1_icon"
+            android:layout_width="@dimen/hw_pad_icon"
+            android:layout_height="@dimen/hw_pad_icon"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:src="@drawable/hw_ic_apps" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/hw_pad_2"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_marginStart="2dp"
+        android:background="@drawable/hw_pad_bg"
+        android:minHeight="@dimen/hw_touch">
+
+        <ImageView
+            android:id="@+id/hw_pad_2_icon"
+            android:layout_width="@dimen/hw_pad_icon"
+            android:layout_height="@dimen/hw_pad_icon"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:src="@drawable/hw_ic_apps" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/hw_pad_3"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_marginStart="2dp"
+        android:background="@drawable/hw_pad_bg"
+        android:minHeight="@dimen/hw_touch">
+
+        <ImageView
+            android:id="@+id/hw_pad_3_icon"
+            android:layout_width="@dimen/hw_pad_icon"
+            android:layout_height="@dimen/hw_pad_icon"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:src="@drawable/hw_ic_apps" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/hw_pad_4"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_marginStart="2dp"
+        android:background="@drawable/hw_pad_bg"
+        android:minHeight="@dimen/hw_touch">
+
+        <ImageView
+            android:id="@+id/hw_pad_4_icon"
+            android:layout_width="@dimen/hw_pad_icon"
+            android:layout_height="@dimen/hw_pad_icon"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:src="@drawable/hw_ic_apps" />
+    </FrameLayout>
+</LinearLayout>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gate clock, small: the time alone, like the gate pill at the top of Sphere's home. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/hw_bg"
+    android:clipToOutline="true"
+    android:paddingHorizontal="@dimen/hw_padding"
+    android:paddingVertical="4dp">
+
+    <TextClock
+        android:id="@+id/hw_clock_time"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:autoSizeMaxTextSize="40sp"
+        android:autoSizeMinTextSize="14sp"
+        android:autoSizeTextType="uniform"
+        android:fontFamily="sans-serif-light"
+        android:fontFeatureSettings="tnum"
+        android:format12Hour="h:mm"
+        android:format24Hour="HH:mm"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="@color/hw_ink_bright" />
+</FrameLayout>

@@ -327,3 +327,31 @@ app
 │   └── core-data
 └── feature-widgets   (App Widget pages: placements on the Page surface)
 ```
+
+---
+
+## Sphere's own home-screen widgets — `:feature-homewidgets` (2026-11-04)
+
+Added after the sections above; additive so the module map stays accurate.
+
+- **Responsibility:** the App Widgets Sphere *provides* to any launcher (Gate clock, Battery, Now
+  playing, Needs you, App pads): providers, size-mapped RemoteViews, the live sources that push
+  redraws while the process runs, taps, and the options screen. (`:feature-widgets` *hosts* other
+  apps' widgets; the two don't depend on each other.)
+- **Dependencies:** `:feature-homewidgets` → `:core-data` (`NotificationProvider.active`,
+  `SphereNotificationListener`, `HiddenAppsStore`, `AppEntry`), `:core-design`, `:feature-search`
+  (`AppSearch` in the options filter). `:app` → `:feature-homewidgets` (`SphereApplication` calls
+  `HomeWidgets.init`; `MainActivity` reads `HomeWidgets.EXTRA_OPEN`).
+- **Pure, JVM-tested parts:** `WidgetKind` / `WidgetTiers`, `ClockModel`, `BatteryModel`,
+  `NowPlayingModel`, `NeedsYouModel`, `PadsModel` / `PadsCodec`, `WidgetAction`; plus tests over the
+  resource files (colour contrast, layouts) (`feature-homewidgets/src/test`).
+- **Persistence:** SharedPreferences `home_widgets` (per-widget options), left out of backups.
+- **Design, data, privacy and owner-verify list:** [`docs/widgets.md`](docs/widgets.md).
+
+```
+app
+└── feature-homewidgets
+    ├── core-data
+    ├── core-design
+    └── feature-search
+```

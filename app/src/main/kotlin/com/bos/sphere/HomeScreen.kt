@@ -81,7 +81,7 @@ import kotlin.math.roundToInt
  * mode); the coverflow yields a claimed gesture ([LauncherSurface]'s `gestureClaimed`).
  */
 @Composable
-fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
+fun HomeScreen(homeSignal: Int, hubSignal: Int = 0, widgetHost: WidgetHostActivityBinding? = null) {
     val context = LocalContext.current
     val repository = remember { LauncherAppsAppRepository(context) }
     val hiddenStore = remember { HiddenAppsStore(context) }
@@ -161,6 +161,19 @@ fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
             pagesUi.goHome()
             surface.zoom.animateTo(0f)
             surface.hub.animateTo(0f)
+        }
+    }
+
+    // A Needs-you home-screen widget asked for the hub: home, as the home key leaves it, then the
+    // hub pulled down (its notifications are what the widget counts).
+    LaunchedEffect(hubSignal) {
+        if (hubSignal > 0) {
+            settingsOpen = false
+            menuApp = null
+            widgetUi.dismissAll()
+            pagesUi.goHome()
+            surface.zoom.animateTo(0f)
+            surface.hub.animateTo(1f, HyleMotion.settle())
         }
     }
 

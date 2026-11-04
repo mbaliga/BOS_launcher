@@ -18,6 +18,12 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -144,14 +150,27 @@ private fun SettingsSpaceContent(
 ) {
     val haptics = LocalHapticFeedback.current
     var cat by remember { mutableIntStateOf(initialCategory.coerceIn(0, (categories.size - 1).coerceAtLeast(0))) }
-    // Options are all visible; vertical drags scroll the list (it is not a one-at-a-time focus).
+    // Options are all visible; the list scrolls (with fling) and a tap opens one.
     var scrollPx by remember { mutableFloatStateOf(0f) }
-    var paneOpen by remember { mutableIntStateOf(-1) } // index of the item whose pane is open
+    var maxScroll by remember { mutableFloatStateOf(0f) }
+    var paneOpen by remember { mutableIntStateOf(-1) } // index (in the displayed list) of the item whose pane is open
+    var searching by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val latestCategories by rememberUpdatedState(categories)
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) { sounds?.play(UiSound.Open) }
 
-    fun items() = latestCategories.getOrNull(cat)?.items.orEmpty()
+    /** What is listed: the category's options, or — while searching — matches across every category. */
+    class Shown(val item: SettingItem, val origin: String?)
+    fun shown(): List<Shown> {
+        val q = query.trim()
+        if (!searching || q.isEmpty()) return latestCategories.getOrNull(cat)?.items.orEmpty().map { Shown(it, null) }
+        return latestCategories.flatMap { c ->
+            c.items.filter { i -> i.title.contains(q, true) || i.value.contains(q, true) || c.title.contains(q, true) }.map { Shown(it, c.title) }
+        }
+    }
 
     fun moveCategory(to: Int) {
         val next = to.coerceIn(0, latestCategories.lastIndex)
@@ -164,7 +183,7 @@ private fun SettingsSpaceContent(
     }
 
     fun activate(index: Int) {
-        val it = items().getOrNull(index) ?: return
+        val it = shown().getOrNull(index)?.item ?: return
         when (it) {
             is SettingItem.Toggle -> { it.onChange(!it.checked); sounds?.play(UiSound.Tick) }
             is SettingItem.Action -> { sounds?.play(UiSound.Select); it.onClick() }
@@ -172,11 +191,23 @@ private fun SettingsSpaceContent(
         }
     }
 
+    fun closeSearch() { searching = false; query = ""; paneOpen = -1; scrollPx = 0f; keyboard?.hide() }
+
     BackHandler {
-        if (paneOpen >= 0) { paneOpen = -1; sounds?.play(UiSound.Back) } else { sounds?.play(UiSound.Close); onClose() }
+        when {
+            paneOpen >= 0 -> { paneOpen = -1; sounds?.play(UiSound.Back) }
+            searching -> { closeSearch(); sounds?.play(UiSound.Back) }
+            else -> { sounds?.play(UiSound.Close); onClose() }
+        }
     }
 
     val catAnim by animateFloatAsState(cat.toFloat(), spring(dampingRatio = 0.82f, stiffness = 320f), label = "cat")
+    val scrollState = androidx.compose.foundation.gestures.rememberScrollableState { delta ->
+        val n = (scrollPx - delta).coerceIn(0f, maxScroll)
+        val used = scrollPx - n
+        scrollPx = n
+        used
+    }
 
     BoxWithConstraints(
         Modifier
@@ -189,62 +220,96 @@ private fun SettingsSpaceContent(
         val landscape = w > h
         val catSpacing = with(density) { 104.dp.toPx() }
         val rowH = with(density) { 64.dp.toPx() }
-        val barY = h * (if (landscape) 0.24f else 0.22f)
+        val barY = h * (if (landscape) 0.24f else 0.2f)
         val anchorX = w * (if (landscape) 0.24f else 0.3f)
+        // Portrait needs more air between the category row and the options beneath it.
+        val firstY = barY + with(density) { (if (landscape) 104.dp else 150.dp).toPx() }
+        val list = shown()
+        val paneItem = list.getOrNull(paneOpen)?.item as? SettingItem.Pane
+        // In portrait the pane is a bottom sheet; the list scrolls within the space above it.
+        val sheetFraction = 0.5f
+        val visibleBottom = if (paneItem != null && !landscape) h * (1f - sheetFraction) else h
+        maxScroll = ((list.size - 1) * rowH - (visibleBottom - firstY - rowH * 1.2f)).coerceAtLeast(0f)
+        if (scrollPx > maxScroll) scrollPx = maxScroll
+
+        // Opening a pane scrolls its row up to the top of the list so the sheet doesn't cover it.
+        LaunchedEffect(paneOpen) {
+            if (paneOpen >= 0 && !landscape) {
+                val target = (paneOpen * rowH).coerceIn(0f, maxScroll)
+                scrollState.animateScrollBy(scrollPx - target)
+            }
+        }
 
         WaveField(Modifier.fillMaxSize())
 
-        // Gestures: horizontal → categories, vertical → items, tap → activate.
+        // Gestures: vertical scrolls the options (with fling), horizontal changes category, tap activates.
         var dragAcc by remember { mutableFloatStateOf(0f) }
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    var axis = 0 // 0 undecided, 1 horizontal, 2 vertical
-                    detectDragGestures(
-                        onDragStart = { axis = 0; dragAcc = 0f },
-                        onDragEnd = { axis = 0; dragAcc = 0f },
-                        onDragCancel = { axis = 0; dragAcc = 0f },
+                .scrollable(scrollState, androidx.compose.foundation.gestures.Orientation.Vertical)
+                .pointerInput(cat, searching) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragAcc = 0f },
+                        onDragEnd = { dragAcc = 0f },
+                        onDragCancel = { dragAcc = 0f },
                     ) { change, d ->
                         change.consume()
-                        if (axis == 0) axis = if (abs(d.x) > abs(d.y)) 1 else 2
-                        if (axis == 1) {
-                            dragAcc += d.x
-                            val step = 72.dp.toPx()
-                            while (dragAcc <= -step) { dragAcc += step; moveCategory(cat + 1) }
-                            while (dragAcc >= step) { dragAcc -= step; moveCategory(cat - 1) }
-                        } else {
-                            // Follow the finger; clamp so the first and last options stay reachable.
-                            val firstYPx = barY + ITEMS_GAP.toPx()
-                            val maxScroll = ((items().size - 1) * rowH - (h - firstYPx - rowH * 1.6f)).coerceAtLeast(0f)
-                            scrollPx = (scrollPx - d.y).coerceIn(0f, maxScroll)
-                        }
+                        if (searching) return@detectHorizontalDragGestures
+                        dragAcc += d
+                        val step = 72.dp.toPx()
+                        while (dragAcc <= -step) { dragAcc += step; moveCategory(cat + 1) }
+                        while (dragAcc >= step) { dragAcc -= step; moveCategory(cat - 1) }
                     }
                 }
-                .pointerInput(w, h, catSpacing, rowH) {
+                .pointerInput(w, h, catSpacing, rowH, firstY, searching) {
                     detectTapGestures { p ->
-                        // Category bar hit?
-                        if (abs(p.y - barY) < 44.dp.toPx()) {
+                        if (!searching && abs(p.y - barY) < 44.dp.toPx()) {
                             val idx = ((p.x - anchorX) / catSpacing + cat).roundToInt()
                             if (idx in latestCategories.indices) moveCategory(idx)
                             return@detectTapGestures
                         }
-                        val firstY = barY + ITEMS_GAP.toPx()
                         if (p.y > firstY - rowH / 2) {
                             val idx = ((p.y - firstY + scrollPx) / rowH).roundToInt()
-                            if (idx in items().indices && p.x < (if (paneOpen >= 0) w * 0.52f else w)) activate(idx)
+                            if (idx in shown().indices && p.x < (if (paneOpen >= 0 && landscape) w * 0.52f else w) &&
+                                (landscape || paneOpen < 0 || p.y < h * (1f - sheetFraction))
+                            ) activate(idx)
                         }
                     }
                 },
         )
 
-        // Header.
+        // Header: title (or the search field), search, close.
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 22.dp, vertical = 14.dp).fillMaxWidth(),
         ) {
-            Text("SPHERE", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
-            Text("  ·  SETTINGS", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
+            if (searching) {
+                LaunchedEffect(Unit) { runCatching { focus.requestFocus(); keyboard?.show() } }
+                Box(Modifier.weight(1f).padding(end = 8.dp)) {
+                    if (query.isEmpty()) Text(com.bos.sphere.core.design.L10n.tr("Search settings"), color = HyleColors.InkDim, fontSize = 15.sp)
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = query,
+                        onValueChange = { query = it; scrollPx = 0f; paneOpen = -1 },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(color = HyleColors.InkBright, fontSize = 15.sp),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(HyleColors.Violet),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    )
+                }
+            } else {
+                Text("SPHERE", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
+                Text("  ·  SETTINGS", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
+            }
+            Icon(
+                Glyphs.Search,
+                contentDescription = "Search settings",
+                tint = if (searching) HyleColors.Violet else HyleColors.Ink,
+                modifier = Modifier
+                    .size(36.dp)
+                    .pointerInput(searching) { detectTapGestures { if (searching) closeSearch() else { searching = true; paneOpen = -1 } } }
+                    .padding(8.dp),
+            )
             Icon(
                 Glyphs.Close,
                 contentDescription = "Close settings",
@@ -256,8 +321,8 @@ private fun SettingsSpaceContent(
             )
         }
 
-        // Category bar.
-        categories.forEachIndexed { i, c ->
+        // Category bar (hidden while searching).
+        if (!searching) categories.forEachIndexed { i, c ->
             val d = i - catAnim
             val x = anchorX + d * catSpacing
             val sel = i == cat
@@ -295,21 +360,21 @@ private fun SettingsSpaceContent(
             }
         }
 
-        // Item column under the selected category.
-        val list = items()
-        val firstY = barY + with(density) { ITEMS_GAP.toPx() }
-        list.forEachIndexed { i, it ->
-            val y = firstY + i * rowH - scrollPx
-            val top = firstY - rowH * 0.9f
-            if (y < top || y > h + rowH) return@forEachIndexed
+        // Options.
+        val top = firstY - rowH * 0.9f
+        val listTop = if (searching) with(density) { 80.dp.toPx() } else firstY
+        list.forEachIndexed { i, row ->
+            val it = row.item
+            val y = listTop + i * rowH - scrollPx
+            val rowTop = listTop - rowH * 0.9f
+            if (y < rowTop || y > h + rowH) return@forEachIndexed
             val sel = i == paneOpen
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .offset { IntOffset((anchorX - 20.dp.toPx()).roundToInt(), (y - rowH / 2).roundToInt()) }
-                    .width(with(density) { ((if (paneOpen >= 0) w * 0.5f else w * 0.72f) - 10f).toDp() })
-                    // Rows fade out as they scroll up under the category bar.
-                    .alpha(((y - top) / (rowH * 0.6f)).coerceIn(0f, 1f))
+                    .width(with(density) { ((if (paneOpen >= 0 && landscape) w * 0.5f else w * 0.72f) - 10f).toDp() })
+                    .alpha(((y - rowTop) / (rowH * 0.6f)).coerceIn(0f, 1f))
                     .semantics(mergeDescendants = true) {
                         contentDescription = "${it.title}, ${it.value}"
                         selected = sel
@@ -329,9 +394,10 @@ private fun SettingsSpaceContent(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (it.value.isNotEmpty()) {
+                    val sub = listOfNotNull(row.origin, it.value.takeIf { v -> v.isNotEmpty() }).joinToString(" · ")
+                    if (sub.isNotEmpty()) {
                         Text(
-                            it.value,
+                            sub,
                             color = if (sel) HyleColors.VioletSoft else HyleColors.InkDim,
                             fontSize = 12.sp,
                             maxLines = 1,
@@ -342,28 +408,44 @@ private fun SettingsSpaceContent(
             }
         }
 
-        // Option pane.
-        val pane = list.getOrNull(paneOpen) as? SettingItem.Pane
+        if (searching && query.isNotBlank() && list.isEmpty()) {
+            Text(
+                com.bos.sphere.core.design.L10n.tr("No settings match “%s”", query),
+                color = HyleColors.InkDim,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(start = 24.dp, top = 96.dp).windowInsetsPadding(WindowInsets.safeDrawing),
+            )
+        }
+
+        // Option pane: a bottom sheet in portrait, a side panel in landscape.
         AnimatedVisibility(
-            visible = pane != null,
-            enter = slideInHorizontally { it / 2 } + fadeIn(),
-            exit = slideOutHorizontally { it / 2 } + fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd),
+            visible = paneItem != null,
+            enter = if (landscape) slideInHorizontally { it / 2 } + fadeIn() else androidx.compose.animation.slideInVertically { it } + fadeIn(),
+            exit = if (landscape) slideOutHorizontally { it / 2 } + fadeOut() else androidx.compose.animation.slideOutVertically { it } + fadeOut(),
+            modifier = Modifier.align(if (landscape) Alignment.CenterEnd else Alignment.BottomCenter),
         ) {
-            val current = pane ?: return@AnimatedVisibility
+            val current = paneItem ?: return@AnimatedVisibility
             Column(
                 Modifier
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(12.dp)
-                    .width(with(density) { (w * 0.46f).toDp() }.coerceAtMost(420.dp))
-                    .fillMaxHeight(0.86f)
-                    .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.9f), RoundedCornerShape(18.dp))
+                    .then(
+                        if (landscape) Modifier.width(with(density) { (w * 0.46f).toDp() }.coerceAtMost(460.dp)).fillMaxHeight(0.86f)
+                        else Modifier.fillMaxWidth().heightIn(max = with(density) { (h * sheetFraction).toDp() }),
+                    )
+                    .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.94f), RoundedCornerShape(18.dp))
                     .border(1.dp, Brush.verticalGradient(listOf(HyleColors.Violet.copy(alpha = 0.6f), HyleColors.Hairline)), RoundedCornerShape(18.dp))
                     .pointerInput(Unit) { detectTapGestures { } } // keep taps inside the pane
                     .padding(16.dp),
             ) {
-                Text(current.title.uppercase(), color = HyleColors.InkBright, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold)
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(current.title.uppercase(), color = HyleColors.InkBright, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Icon(
+                        Glyphs.Close, "Close", tint = HyleColors.InkDim,
+                        modifier = Modifier.size(32.dp).pointerInput(Unit) { detectTapGestures { paneOpen = -1; sounds?.play(UiSound.Back) } }.padding(7.dp),
+                    )
+                }
+                Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 8.dp)) {
                     current.content(this)
                 }
             }

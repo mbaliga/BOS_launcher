@@ -25,6 +25,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.RailSide
@@ -291,6 +292,35 @@ class ScreenshotTest {
             SearchOverlay(visible = true, apps = apps, recent = apps.take(5), onLaunch = {}, onLongPressApp = {}, onDismiss = {}, modifier = Modifier.fillMaxSize())
         }
         shoot("10-search")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun settingsPortraitPane() {
+        rule.mainClock.autoAdvance = false
+        val zones = listOf<String?>(null, "Left", "Centre", "Right")
+        val cats = listOf(
+            SettingCategory("Home", Glyphs.Apps, listOf(SettingItem.Action("Style", Glyphs.Apps, "Pages") {})),
+            SettingCategory(
+                "Clock", Glyphs.Clock,
+                listOf(
+                    SettingItem.Pane("Status strip", Glyphs.Dial, "1") {
+                        for (name in listOf("Time", "Battery", "Signal", "Steps", "Next alarm", "Ring mode")) {
+                            SectionHeader(name)
+                            ChipRow(zones, if (name == "Time") "Centre" else null, { it ?: "Off" }) {}
+                        }
+                    },
+                    SettingItem.Pane("Size", Glyphs.Dial, "34") { Text("slider") },
+                    SettingItem.Pane("Format", Glyphs.Clock, "System") { ChipRow(listOf("System", "12-hour", "24-hour"), "System", { it }) {} },
+                    SettingItem.Toggle("Day", Glyphs.Calendar, false) {},
+                    SettingItem.Toggle("Date", Glyphs.Calendar, false) {},
+                ),
+            ),
+            SettingCategory("Theme", Glyphs.Palette, emptyList()),
+        )
+        rule.setContent { SettingsSpace(visible = true, categories = cats, initialCategory = 1, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) }
+        rule.mainClock.advanceTimeBy(400)
+        rule.onNodeWithContentDescription("Status strip, 1").performClick()
+        shoot("11-settings-portrait-pane", settleMs = 700)
     }
 
     /** A gradient tile with a bold initial — stands in for an adaptive icon foreground. */

@@ -351,8 +351,13 @@ private fun PaletteOverlay(
                     close()
                 }
                 val isHover = slot.index == hovered
-                drawPath(path, if (isHover) accent.copy(alpha = 0.85f) else glass.copy(alpha = 0.92f))
-                drawPath(path, if (isHover) HyleColors.InkBright.copy(alpha = 0.7f) else HyleColors.InsetHighlight, style = Stroke(width = if (isHover) 1.6.dp.toPx() else 0.8.dp.toPx()))
+                if (items[slot.index] is CornerItem.App) {
+                    // App icons float on the scrim — no pie block behind them; only a hover ring shows.
+                    if (isHover) drawPath(path, accent.copy(alpha = 0.9f), style = Stroke(width = 2.dp.toPx()))
+                } else {
+                    drawPath(path, if (isHover) accent.copy(alpha = 0.85f) else glass.copy(alpha = 0.92f))
+                    drawPath(path, if (isHover) HyleColors.InkBright.copy(alpha = 0.7f) else HyleColors.InsetHighlight, style = Stroke(width = if (isHover) 1.6.dp.toPx() else 0.8.dp.toPx()))
+                }
             }
         }
         slots.forEach { slot ->

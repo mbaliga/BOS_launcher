@@ -4,6 +4,16 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Build identity shown in Settings → About, taken from git so every APK is traceable to a commit.
+fun git(vararg args: String): String = providers.exec {
+    commandLine("git", *args)
+    workingDir = rootDir
+    isIgnoreExitValue = true
+}.standardOutput.asText.get().trim()
+val gitSha = git("rev-parse", "--short", "HEAD").ifEmpty { "unknown" }
+val gitDate = git("show", "-s", "--format=%cs", "HEAD").ifEmpty { "unknown" }
+val gitCount = git("rev-list", "--count", "HEAD").toIntOrNull() ?: 1
+
 android {
     namespace = "com.bos.sphere"
     compileSdk = 35
@@ -12,8 +22,10 @@ android {
         applicationId = "com.bos.sphere"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-m1"
+        versionCode = gitCount
+        versionName = "0.2.0"
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("String", "GIT_DATE", "\"$gitDate\"")
     }
 
     buildTypes {
@@ -30,6 +42,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
@@ -18,6 +19,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -43,6 +45,7 @@ import com.bos.sphere.feature.grid.IconTheme
 import com.bos.sphere.feature.grid.IndicatorLayer
 import com.bos.sphere.feature.grid.LocalIconTheme
 import com.bos.sphere.feature.grid.SearchOverlay
+import com.bos.sphere.feature.grid.StripHost
 import com.bos.sphere.feature.grid.TextButtonPill
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -155,6 +158,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (allApps.isNotEmpty()) stores.layout.pruneRemoved(allApps.mapTo(HashSet()) { it.key })
     }
     LaunchedEffect(Unit) { Torch.init(context) }
+    // Search signals: categories (resolved off the main thread) and launch stats.
+    LaunchedEffect(allApps) {
+        if (allApps.isNotEmpty()) {
+            WheelCategoryCache.warm(context, allApps.map { it.packageName })
+            com.bos.sphere.feature.search.AppSearch.categoryNameOf = { WheelCategoryCache.nameOf(it) }
+        }
+    }
 
     val prefs by stores.prefs.prefs.collectAsStateWithLifecycle()
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
@@ -474,75 +484,93 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var tilesMode by remember { mutableStateOf(false) }
     var rubikMode by remember { mutableStateOf(false) }
 
+    // Shared by both home styles: the four corners (kept clear of the always-on keyboard).
+    val kbHeight = remember { mutableStateOf(0.dp) }
+    val bottomClear = if (prefs.alwaysKeyboard) kbHeight.value else 0.dp
+    @Composable
+    fun Corners(alpha: Float = 1f) {
+        Box(Modifier.fillMaxSize().padding(bottom = bottomClear).graphicsLayer { this.alpha = alpha }) {
+            CornerLayer(
+                placements = placements,
+                style = prefs.cornerStyle,
+                iconSize = prefs.cornerIconSize.dp,
+                iconMode = prefs.cornerIconMode,
+                appsByKey = appsByKey,
+                onRun = { item, screen -> runItem(item, screen) },
+                onEdit = { editCorner = it },
+                complication = { placement, slot, mod ->
+                    ComplicationView(slot.kind, 48.dp, onClick = { slot.kind.action?.let { runItem(CornerItem.Action(it), placement.screen) } }, modifier = mod)
+                },
+                cluster = { placement, slot, mod ->
+                    ComplicationCluster(
+                        kinds = slot.kinds,
+                        anchor = placement.screen,
+                        itemSize = 42.dp,
+                        radius = 92.dp,
+                        onClick = { k -> k.action?.let { runItem(CornerItem.Action(it), placement.screen) } },
+                        modifier = mod,
+                    )
+                },
+                widget = { placement, slot ->
+                    PeekWidget(
+                        host = widgetHost,
+                        appWidgetId = slot.appWidgetId,
+                        label = slot.label,
+                        anchor = placement.screen,
+                        expanded = expandedWidget == placement.physical,
+                        onExpandedChange = { expandedWidget = if (it) placement.physical else null },
+                        onRemove = { setCorner(placement.physical, CornerSlot.Empty) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+            )
+        }
+    }
+    @Composable
+    fun Background() {
+        if (!prefs.showWallpaper) Box(Modifier.fillMaxSize().background(Color.Black))
+        IndicatorLayer(
+            reading = reading,
+            effects = prefs.indicatorEffects,
+            colorArgb = indicatorColor.toArgb().toLong() and 0xFFFFFFFFL,
+            intensity = prefs.indicatorIntensity,
+            speed = prefs.indicatorSpeed,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
     Box(modifier = Modifier.fillMaxSize()) {
         when (prefs.homeStyle) {
             HomeStyle.Grid -> {
-                if (!prefs.showWallpaper) Box(Modifier.fillMaxSize().background(Color.Black))
-                IndicatorLayer(
-                    reading = reading,
-                    effects = prefs.indicatorEffects,
-                    colorArgb = indicatorColor.toArgb().toLong() and 0xFFFFFFFFL,
-                    intensity = prefs.indicatorIntensity,
-                    speed = prefs.indicatorSpeed,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                GridHome(
-                    pages = pages,
-                    appsByKey = appsByKey,
-                    prefs = prefs,
-                    isLandscape = isLandscape,
-                    state = gridState,
-                    suggestion = suggestion,
-                    gesturesBound = gestures.keys,
-                    capacityOf = capacityOf,
-                    onLaunch = ::launch,
-                    onAppLongPress = { menuApp = it },
-                    onPagesChange = { savePages(it) },
-                    onEmptyLongPress = { page -> openSettings(CATEGORY_THIS_PAGE, page) },
-                    onGesture = ::onGesture,
-                    onClockTap = { runner.run(CornerActionId.Clock) },
-                    onTileLongPress = { key, _ -> tileMenu = key },
-                    weather = weather,
-                    health = health,
-                )
-                CornerLayer(
-                    placements = placements,
-                    style = prefs.cornerStyle,
-                    iconSize = prefs.cornerIconSize.dp,
-                    iconMode = prefs.cornerIconMode,
-                    appsByKey = appsByKey,
-                    onRun = { item, screen -> runItem(item, screen) },
-                    onEdit = { editCorner = it },
-                    complication = { placement, slot, mod ->
-                        ComplicationView(slot.kind, 48.dp, onClick = { slot.kind.action?.let { runItem(CornerItem.Action(it), placement.screen) } }, modifier = mod)
-                    },
-                    cluster = { placement, slot, mod ->
-                        ComplicationCluster(
-                            kinds = slot.kinds,
-                            anchor = placement.screen,
-                            itemSize = 42.dp,
-                            radius = 92.dp,
-                            onClick = { k -> k.action?.let { runItem(CornerItem.Action(it), placement.screen) } },
-                            modifier = mod,
-                        )
-                    },
-                    widget = { placement, slot ->
-                        PeekWidget(
-                            host = widgetHost,
-                            appWidgetId = slot.appWidgetId,
-                            label = slot.label,
-                            anchor = placement.screen,
-                            expanded = expandedWidget == placement.physical,
-                            onExpandedChange = { expandedWidget = if (it) placement.physical else null },
-                            onRemove = { setCorner(placement.physical, CornerSlot.Empty) },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    },
-                )
+                Background()
+                Box(Modifier.fillMaxSize().padding(bottom = bottomClear)) {
+                    GridHome(
+                        pages = pages,
+                        appsByKey = appsByKey,
+                        prefs = prefs,
+                        isLandscape = isLandscape,
+                        state = gridState,
+                        suggestion = suggestion,
+                        gesturesBound = gestures.keys,
+                        capacityOf = capacityOf,
+                        onLaunch = ::launch,
+                        onAppLongPress = { menuApp = it },
+                        onPagesChange = { savePages(it) },
+                        onEmptyLongPress = { page -> openSettings(CATEGORY_THIS_PAGE, page) },
+                        onGesture = ::onGesture,
+                        onClockTap = { runner.run(CornerActionId.Clock) },
+                        onTileLongPress = { key, _ -> tileMenu = key },
+                        weather = weather,
+                        health = health,
+                    )
+                }
+                Corners()
             }
 
             HomeStyle.Sphere -> {
+                // The sphere / coverflow surface, in the same chrome as the pages: indicator
+                // background, status strip, corners, long-press → settings.
                 val surface = rememberLauncherSurfaceState(itemCount = apps.size, rows = rowsFor(rowMode), params = sphereParams)
                 var centred by remember { mutableStateOf(false) }
                 LaunchedEffect(apps.size) {
@@ -555,29 +583,34 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     if (homeSignal > 0) { surface.zoom.animateTo(0f); surface.hub.animateTo(0f) }
                 }
                 val chromeAlpha = (1f - smooth(surface.zoomValue)) * (1f - surface.hubValue)
-                DotGridBackground(Modifier.fillMaxSize())
+                Background()
                 LauncherSurface(
                     apps = apps,
                     state = surface,
                     onLaunch = ::launch,
                     onLongPressApp = { menuApp = it },
                     onOpenSettings = { openSettings(CATEGORY_HOME) },
-                    modifier = Modifier.fillMaxSize().padding(bottom = if (isPortrait) 300.dp else 0.dp),
+                    onLongPressEmpty = { openSettings(CATEGORY_HOME) },
+                    modifier = Modifier.fillMaxSize().padding(bottom = bottomClear),
                 ) { fraction -> HubPanel(fraction = fraction) }
-                Chrome(
-                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = chromeAlpha },
-                    onOpenSettings = { openSettings(CATEGORY_HOME) },
-                    onVoiceInput = { query ->
-                        AppSearch.rank(apps, query, limit = 1).firstOrNull()?.let { app ->
-                            if (query.equals(app.label, ignoreCase = true)) launch(app)
-                            else apps.indexOf(app).takeIf { it >= 0 }?.let { surface.sphereState.position = it.toFloat() }
-                        }
-                    },
-                )
-                if (isPortrait && surface.zoomValue < 0.4f && surface.hubValue < 0.5f && !settingsOpen) {
-                    SearchKeyboard(apps = apps, onLaunch = ::launch, modifier = Modifier.align(Alignment.BottomCenter))
+                Box(Modifier.fillMaxSize().padding(bottom = bottomClear).graphicsLayer { alpha = chromeAlpha }) {
+                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 }
+                Corners(chromeAlpha)
             }
+        }
+
+        // Old-school mode: an always-open keyboard that searches as you type.
+        if (prefs.alwaysKeyboard && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen) {
+            val kbDensity = androidx.compose.ui.platform.LocalDensity.current
+            SearchKeyboard(
+                apps = apps,
+                onLaunch = ::launch,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .androidx_navPadding()
+                    .onSizeChanged { kbHeight.value = with(kbDensity) { it.height.toDp() } },
+            )
         }
 
         // Notifications hub (grid style opens it from a corner / gesture).
@@ -593,6 +626,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
 
         val usage = remember(history) { UsageStats.of(history) }
+        androidx.compose.runtime.SideEffect { com.bos.sphere.feature.search.AppSearch.usage = usage }
         AppDrawerSpace(
             visible = drawerOpen,
             apps = apps,
@@ -669,6 +703,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 gestures = gestures,
                 setGesture = { g, item -> stores.shortcuts.setGesture(g, item) },
                 requestHealth = { requestHealth() },
+                about = remember {
+                    val pi = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
+                    listOf(
+                        "Version" to (pi?.versionName ?: "?"),
+                        "Build number" to (pi?.longVersionCode?.toString() ?: "?"),
+                        "Commit" to com.bos.sphere.BuildConfig.GIT_SHA,
+                        "Commit date" to com.bos.sphere.BuildConfig.GIT_DATE,
+                        "Build type" to if (com.bos.sphere.BuildConfig.DEBUG) "debug" else "release",
+                        "Package" to context.packageName,
+                        "Android" to "${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})",
+                        "Device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+                    )
+                },
                 healthAvailable = healthSource.available(),
                 appsByKey = appsByKey,
                 isLandscape = isLandscape,
@@ -776,5 +823,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     }
 }
+
+/** Keeps the keyboard above the system navigation bar. */
+private fun Modifier.androidx_navPadding(): Modifier = this.then(Modifier.navigationBarsPadding())
 
 private fun smooth(t: Float): Float = (t * t * (3 - 2 * t)).coerceIn(0f, 1f)

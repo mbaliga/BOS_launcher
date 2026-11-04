@@ -20,7 +20,8 @@ surface settings, and app management.
 | `:core-design` | Hyle/Aarso design system — color, type, shapes, `SphereTheme`, the 8 named motion primitives |
 | `:core-data` | `AppRepository` over `LauncherApps` exposing a live `Flow<List<AppEntry>>` |
 | `:feature-sphere` | `SphereGeometry` (ported `magAt`/`txAt`), `SphereState`, `CoverflowLayer`, all-apps `Globe`, and `LauncherSurface` (unified gestures) |
-| `:feature-search` | Apps-only search ranking + the portrait always-keyboard |
+| `:feature-search` | App search (the shared search engine behind an app vocabulary) + the always-on keyboard |
+| `:search-engine` | Vendored `search-core` from Shared-Libraries-asoc: query language, facets, relative dates, natural-language interpretation, ranking |
 | `:feature-grid` | The **Pages** home (default): paged grid / circle / coverflow pages, corners + radial palettes, complications, peek widgets, wheel + list drawers, network dot grid, the XMB-style settings space and its synthesized UI sounds |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
 
@@ -82,6 +83,10 @@ in settings):
   its own space (grid / list / details; A–Z, type, recent, most used; edge scrub rail).
 - **Theme and language** — dark / AMOLED / light, accent colour picker, icon shape / tint / plate and
   per-app icon colour; the launcher's own UI is translated (es, fr, de, pt, hi, zh, ja, ar).
+- **Search** — the shared engine: plain words match name and package as you type; facets `type:games`,
+  `used:yesterday`, `launches:>5`, `is:work|recent|frequent|never`, `pkg:`; quotes, `OR`, `-not`; and
+  natural language when a plain query finds nothing ("games I used yesterday"). An always-on keyboard
+  mode makes the home screen a type-to-find phone.
 - **Settings space** — long-press anywhere empty: a full-screen cross-media-bar (categories across,
   items down, option pane at the side), with Orrery's console tones (`UiSound`, ported from
   `orrery-kit/sfx.js`).

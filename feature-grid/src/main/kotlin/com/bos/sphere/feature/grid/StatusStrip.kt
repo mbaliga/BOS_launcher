@@ -4,8 +4,12 @@ import android.app.ActivityManager
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -59,10 +63,12 @@ fun StatusStrip(
     sidePadding: Dp,
     onClockTap: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Height of the corner icons' row, so the strip is vertically centred on them. */
+    rowHeight: Dp = 0.dp,
 ) {
     // One layer per zone over the full width: the centre zone is truly centred and none is squeezed
     // into a third (a big clock needs the room); left / right hug their edges.
-    Box(modifier.fillMaxWidth().padding(horizontal = sidePadding)) {
+    Box(modifier.fillMaxWidth().padding(horizontal = sidePadding).heightIn(min = rowHeight)) {
         for (zone in StripZone.entries) {
             val items = StripItem.entries.filter { prefs.strip[it] == zone }
             if (items.isEmpty()) continue
@@ -173,3 +179,32 @@ private fun rememberMemoryText(): String {
     }
     return text
 }
+
+/** Places the strip at the top or bottom (or hides it) per [LauncherPrefs.clockPosition], centred on the corner row. */
+@Composable
+fun BoxScope.StripHost(
+    prefs: LauncherPrefs,
+    weather: WeatherInfo?,
+    health: HealthToday?,
+    onClockTap: () -> Unit,
+) {
+    val safe = androidx.compose.foundation.layout.WindowInsets.safeDrawing
+    val bubble = prefs.cornerStyle == com.bos.sphere.core.data.CornerStyle.Bubble
+    val edge = if (bubble) 10.dp else 6.dp
+    val rowH = prefs.cornerIconSize.dp + 26.dp
+    val side = prefs.cornerIconSize.dp + 26.dp
+    when (prefs.clockPosition) {
+        com.bos.sphere.core.data.ClockPosition.Top -> StatusStrip(
+            prefs, weather, health, side, onClockTap, rowHeight = rowH,
+            modifier = Modifier.align(Alignment.TopCenter).androidx_windowInsetsPadding(safe).padding(top = edge),
+        )
+        com.bos.sphere.core.data.ClockPosition.Bottom -> StatusStrip(
+            prefs, weather, health, side, onClockTap, rowHeight = rowH,
+            modifier = Modifier.align(Alignment.BottomCenter).androidx_windowInsetsPadding(safe).padding(bottom = edge),
+        )
+        com.bos.sphere.core.data.ClockPosition.Hidden -> Unit
+    }
+}
+
+private fun Modifier.androidx_windowInsetsPadding(insets: androidx.compose.foundation.layout.WindowInsets): Modifier =
+    this.then(Modifier.windowInsetsPadding(insets))

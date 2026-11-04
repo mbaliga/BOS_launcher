@@ -205,6 +205,9 @@ object Glyphs {
     val Storage = glyph("storage") {
         moveTo(4f, 8f); lineTo(20f, 8f); lineTo(20f, 17f); lineTo(4f, 17f); close(); moveTo(7f, 12.5f); lineTo(7.1f, 12.5f); moveTo(11f, 12.5f); lineTo(17f, 12.5f)
     }
+    val Info = glyph("info") {
+        circle(12f, 12f, 9f); moveTo(12f, 11f); lineTo(12f, 17f); moveTo(12f, 7.4f); lineTo(12.1f, 7.4f)
+    }
     val Plus = glyph("plus") { moveTo(12f, 5f); lineTo(12f, 19f); moveTo(5f, 12f); lineTo(19f, 12f) }
     val Close = glyph("close") { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) }
     val Up = glyph("up") { moveTo(6f, 15f); lineTo(12f, 9f); lineTo(18f, 15f) }

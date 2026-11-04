@@ -75,6 +75,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putString("strip", next.strip.entries.joinToString(",") { "${it.key.name}:${it.value.name}" })
             .putFloat("iconSpacing", next.iconSpacing)
             .putString("healthSource", next.healthSource.name)
+            .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
             .putFloat("clockSize", next.clockSize)
             .putString("clockFormat", next.clockFormat.name)
             .putBoolean("clockDate", next.clockShowDate)
@@ -139,6 +140,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             } ?: d.strip,
             iconSpacing = sp.getFloat("iconSpacing", d.iconSpacing).coerceIn(0f, 1f),
             healthSource = enumOr(sp.getString("healthSource", null), d.healthSource),
+            alwaysKeyboard = sp.getBoolean("alwaysKeyboard", d.alwaysKeyboard),
             clockSize = sp.getFloat("clockSize", d.clockSize).coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
             clockFormat = enumOr(sp.getString("clockFormat", null), d.clockFormat),
             clockShowDate = sp.getBoolean("clockDate", d.clockShowDate),

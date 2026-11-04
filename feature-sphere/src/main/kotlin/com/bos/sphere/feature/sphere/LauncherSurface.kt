@@ -84,6 +84,8 @@ fun LauncherSurface(
     onLongPressApp: (AppEntry) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Long-press on empty space (no tile under the finger). */
+    onLongPressEmpty: () -> Unit = {},
     hubContent: @Composable (fraction: Float) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -124,7 +126,7 @@ fun LauncherSurface(
                             // long-press: no movement within the timeout
                             longPressFired = true
                             val idx = coverflowHitTest(downPos, apps.size, state.sphereState, container, dpi)
-                            if (idx in apps.indices) onLongPressApp(apps[idx])
+                            if (idx in apps.indices) onLongPressApp(apps[idx]) else onLongPressEmpty()
                             continue
                         }
 

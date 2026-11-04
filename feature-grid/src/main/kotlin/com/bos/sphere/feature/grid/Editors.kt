@@ -107,7 +107,7 @@ fun CornerEditorDialog(
             color = HyleColors.InkDim,
             fontSize = 11.5.sp,
         )
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
+        Row(Modifier.padding(vertical = 8.dp)) {
             ChipRow(SlotKind.entries, kind, { L10n.tr(it.label) }) { kind = it }
         }
         when (kind) {

@@ -80,6 +80,7 @@ class SettingsModel(
     val gestures: Map<HomeGesture, CornerItem>,
     val setGesture: (HomeGesture, CornerItem?) -> Unit,
     val requestHealth: () -> Unit,
+    val about: List<Pair<String, String>>,
     val healthAvailable: Boolean,
     val appsByKey: Map<String, AppEntry>,
     val isLandscape: Boolean,
@@ -124,7 +125,7 @@ private fun note(text: String) {
 
 @Composable
 private fun <T> Chips(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState())) { ChipRow(options, selected, { L10n.tr(label(it)) }, onSelect) }
+    ChipRow(options, selected, { L10n.tr(label(it)) }, onSelect)
 }
 
 @Composable
@@ -230,6 +231,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 Chips(PagingAxis.entries, p.landscapePaging, { it.label }) { a -> upd { it.copy(landscapePaging = a) } }
                 note("Swipes across the other axis are free for gestures.")
             },
+            SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("A keyboard that's always open: type to find an app, like an old-school phone")) { v -> upd { it.copy(alwaysKeyboard = v) } },
             SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("The clock and corner icons sit flush to the top; swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } },
         ),
     )
@@ -499,6 +501,12 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Action(x("Do Not Disturb access"), Glyphs.Moon, x("Needed for silent mode / DND actions"), m.system.dndAccess),
             SettingItem.Action(x("Android settings"), Glyphs.Gear, "", m.system.androidSettings),
         ),
+    )
+    // --- About -------------------------------------------------------------------------------
+    out += SettingCategory(
+        x("About"),
+        Glyphs.Info,
+        m.about.map { (k, v) -> SettingItem.Action(x(k), Glyphs.Info, v) {} },
     )
     return out
 }

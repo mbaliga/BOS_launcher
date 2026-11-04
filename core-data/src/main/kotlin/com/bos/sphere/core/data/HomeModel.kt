@@ -178,6 +178,8 @@ data class LauncherPrefs(
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
 
     val healthSource: HealthSourcePref = HealthSourcePref.Phone,
+    /** An always-open keyboard that searches apps as you type — the old-school-phone mode. */
+    val alwaysKeyboard: Boolean = false,
     // --- status strip: which readouts sit where (absent = not shown)
     val strip: Map<StripItem, StripZone> = mapOf(StripItem.Time to StripZone.Centre),
     /** 0 = compact square cells, 1 = icons spread to fill the free space (rows and columns separately). */

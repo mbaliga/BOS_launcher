@@ -305,6 +305,13 @@ object WheelCategoryCache {
         if (packageName == null) cache.clear() else cache.remove(packageName)
     }
 
+    /** Category name for [packageName] from the cache ("Other" until it has been resolved). */
+    fun nameOf(packageName: String): String =
+        wheelCategoryName(cache[packageName] ?: ApplicationInfo.CATEGORY_UNDEFINED)
+
+    /** Resolves and caches categories for [packages] off the main thread (so search can use them). */
+    suspend fun warm(context: Context, packages: Collection<String>) { resolve(context, packages) }
+
     /** All of [packages] from the cache, or null if any is missing. */
     internal fun cachedFor(packages: Collection<String>): Map<String, Int>? {
         val out = HashMap<String, Int>(packages.size)
@@ -584,7 +591,12 @@ private fun WheelContent(
                         val bounds = WheelGeometry.rotationBounds(currentLayout)
                         var target = rotation.value
                         var dragging = false
-                        var lastAngle = WheelGeometry.screenToPolar(anchor, w, h, down.position.x, down.position.y).angleDeg
+                        val startPolar = WheelGeometry.screenToPolar(anchor, w, h, down.position.x, down.position.y)
+                        var lastAngle = startPolar.angleDeg
+                        // A drag that starts on the letter band scrubs: the finger's place along the arc
+                        // picks the group, so one swipe across jumps the whole alphabet.
+                        val slack = 14.dp.toPx()
+                        val scrubbing = startPolar.radius in (metrics.bandInner - slack)..(metrics.bandOuter + slack)
                         var up: PointerInputChange? = null
                         while (true) {
                             val event = awaitPointerEvent()
@@ -597,7 +609,17 @@ private fun WheelContent(
                             if (!dragging && (change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
                                 dragging = true
                             }
-                            if (dragging) {
+                            if (dragging && scrubbing) {
+                                val polar = WheelGeometry.screenToPolar(anchor, w, h, change.position.x, change.position.y)
+                                var rel = (polar.angleDeg - WheelGeometry.quadrantStart(anchor)) % 360f
+                                if (rel < 0f) rel += 360f
+                                val f = (rel / WheelGeometry.QUADRANT).coerceIn(0f, 1f)
+                                // First group centred at f = 0, last at f = 1.
+                                target = bounds.endInclusive + (bounds.start - bounds.endInclusive) * f
+                                val t = target
+                                scope.launch { rotation.snapTo(t) }
+                                change.consume()
+                            } else if (dragging) {
                                 val polar = WheelGeometry.screenToPolar(anchor, w, h, change.position.x, change.position.y)
                                 if (polar.radius > metrics.iconPx * 0.5f) {
                                     target = (target + WheelGeometry.normalize180(polar.angleDeg - lastAngle))
@@ -610,7 +632,15 @@ private fun WheelContent(
                             }
                         }
                         val release = up
-                        if (dragging && release != null) {
+                        if (dragging && scrubbing) {
+                            // Settle on the nearest group.
+                            val l = currentLayout
+                            val i = WheelGeometry.focusedSegment(l, target)
+                            scope.launch {
+                                rotation.snapTo(target)
+                                if (i >= 0) rotation.animateTo(WheelGeometry.rotationToCenter(l, i), spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium))
+                            }
+                        } else if (dragging && release != null) {
                             val v = tracker.calculateVelocity()
                             val omega = WheelGeometry.angularVelocityDeg(
                                 release.position.x - corner.x, release.position.y - corner.y, v.x, v.y,

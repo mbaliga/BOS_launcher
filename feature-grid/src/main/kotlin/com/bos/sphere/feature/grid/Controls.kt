@@ -118,14 +118,22 @@ private fun StepButton(text: String, enabled: Boolean, description: String, onCl
 }
 
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+    // Whole chips wrap onto the next line; a chip's own text never breaks.
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(vertical = 4.dp),
+    ) {
         options.forEach { opt ->
             val sel = opt == selected
             Text(
                 label(opt),
                 color = if (sel) HyleColors.Background else HyleColors.Ink,
                 fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false,
                 modifier = Modifier
                     .background(if (sel) HyleColors.Violet else HyleColors.Surface, RoundedCornerShape(8.dp))
                     .border(1.dp, HyleColors.Hairline, RoundedCornerShape(8.dp))

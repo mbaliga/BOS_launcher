@@ -352,25 +352,7 @@ fun GridHome(
 
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Box(modifier = modifier.fillMaxSize()) {
-        when (prefs.clockPosition) {
-            ClockPosition.Top -> StatusStrip(
-                prefs = prefs,
-                weather = weather,
-                health = health,
-                sidePadding = prefs.cornerIconSize.dp + 26.dp,
-                onClockTap = onClockTap,
-                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(safe).padding(top = 8.dp),
-            )
-            ClockPosition.Bottom -> StatusStrip(
-                prefs = prefs,
-                weather = weather,
-                health = health,
-                sidePadding = prefs.cornerIconSize.dp + 26.dp,
-                onClockTap = onClockTap,
-                modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(bottom = 14.dp),
-            )
-            ClockPosition.Hidden -> Unit
-        }
+        StripHost(prefs, weather, health, onClockTap)
 
         Box(
             modifier = Modifier

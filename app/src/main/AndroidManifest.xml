@@ -28,8 +28,16 @@
             android:stateNotNeeded="true"
             android:clearTaskOnLaunch="true"
             android:screenOrientation="unspecified"
+            android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection"
             android:theme="@style/Theme.SphereLauncher">
+
+            <!-- Freeform (desktop mode) window size. Ignored in fullscreen; minimums kept small so phone split-screen is unaffected. -->
+            <layout
+                android:defaultWidth="900dp"
+                android:defaultHeight="600dp"
+                android:minWidth="320dp"
+                android:minHeight="240dp" />
 
             <!-- Standard launch -->
             <intent-filter>

@@ -14,6 +14,18 @@ enum class HomeStyle { Grid, Sphere }
 /** Corner look: a bare glyph, or a quarter-circle bubble hugging the screen corner. */
 enum class CornerStyle(val label: String) { Glyph("Glyph"), Bubble("Bubble") }
 
+/** Where the home clock sits. It can also be a page tile ([HomeTiles.CLOCK]) or a corner Time complication. */
+enum class ClockPosition(val label: String) { Top("Top"), Bottom("Bottom"), Hidden("Hidden") }
+
+/** Non-app items that can occupy a page slot. Stored in page key lists under a `tile:` prefix. */
+object HomeTiles {
+    const val PREFIX = "tile:"
+    const val CLOCK = "tile:clock"
+    val ALL = listOf(CLOCK)
+
+    fun isTile(key: String) = key.startsWith(PREFIX)
+}
+
 /** The axis pages scroll along. */
 enum class PagingAxis(val label: String) { Horizontal("Sideways"), Vertical("Up / down") }
 
@@ -66,6 +78,9 @@ data class LauncherPrefs(
     /** How the four corners are drawn. */
     val cornerStyle: CornerStyle = CornerStyle.Glyph,
     val drawerStyle: DrawerStyle = DrawerStyle.Wheel,
+    val clockPosition: ClockPosition = ClockPosition.Top,
+    /** The substrate dots breathe in the network's colour (green good … red poor, grey airplane, dark offline). */
+    val networkDots: Boolean = true,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
 ) {
     fun gridFor(landscape: Boolean): GridSpec = if (landscape) landscapeGrid else portraitGrid
@@ -239,7 +254,7 @@ val DefaultGestures: Map<HomeGesture, CornerItem> = mapOf(
 // ---------------------------------------------------------------------------------------------
 
 /** How one page arranges its apps. */
-enum class PageShape(val label: String) { Grid("Grid"), Circle("Circle") }
+enum class PageShape(val label: String) { Grid("Grid"), Circle("Circle"), Coverflow("Coverflow") }
 
 /**
  * Per-page arrangement. A null grid spec means "follow the global density from [LauncherPrefs]".
@@ -257,11 +272,15 @@ data class PageLayout(
     fun capacity(landscape: Boolean, prefs: LauncherPrefs): Int = when (shape) {
         PageShape.Grid -> gridFor(landscape, prefs).capacity
         PageShape.Circle -> circleCapacity(rings)
+        PageShape.Coverflow -> COVERFLOW_CAPACITY
     }
 
     companion object {
         const val MIN_RINGS = 1
         const val MAX_RINGS = 3
+
+        /** A coverflow page scrolls, so its limit is about usability, not space. */
+        const val COVERFLOW_CAPACITY = 40
 
         /** Slots on ring [ring] (0 = the centre). */
         fun ringSlots(ring: Int): Int = if (ring == 0) 1 else 6 * ring
@@ -298,7 +317,7 @@ object HomeLayoutMath {
      * (an added blank page). Always returns at least one page.
      */
     fun visualPages(layout: HomeLayout, available: List<String>, capacityOf: (PageLayout) -> Int): List<HomePage> {
-        val known = available.toHashSet()
+        val known = available.toHashSet().apply { addAll(HomeTiles.ALL) }
         val placed = HashSet<String>()
         val pages = layout.pages.map { page ->
             page.copy(keys = page.keys.filter { it in known && placed.add(it) })

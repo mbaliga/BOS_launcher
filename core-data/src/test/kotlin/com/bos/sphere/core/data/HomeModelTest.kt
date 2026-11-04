@@ -83,6 +83,12 @@ class HomeModelTest {
     }
 
     @Test
+    fun `tiles survive resolution even though they are not apps`() {
+        val layout = HomeLayout(pages = pages(listOf("app1", HomeTiles.CLOCK)), seeded = true)
+        assertEquals(listOf("app1", HomeTiles.CLOCK), HomeLayoutMath.visualPages(layout, listOf("app1"), cap(4))[0].keys)
+    }
+
+    @Test
     fun `move within a page reorders`() {
         assertEquals(listOf(listOf("b", "c", "a")), HomeLayoutMath.move(pages(listOf("a", "b", "c")), "a", 0, 2, cap(3)).keys())
     }
@@ -189,5 +195,28 @@ class HomeModelTest {
         assertEquals("evening", AppSuggester.suggest(events, now, 20, all, emptySet()))
         assertEquals("evening", AppSuggester.suggest(events, now, 8, all, setOf("morning")))
         assertNull(AppSuggester.suggest(events, now, 8, setOf("other"), emptySet()))
+    }
+}
+
+class NetworkStatusMathTest {
+    @Test
+    fun `airplane mode is grey even if wifi is on`() {
+        assertEquals(NetworkKind.Airplane, NetworkStatusMath.classify(true, true, true, -50, null, true).kind)
+        assertEquals(NetworkKind.Airplane, NetworkStatusMath.classify(true, false, false, null, null, false).kind)
+    }
+
+    @Test
+    fun `no connection is None`() {
+        assertEquals(NetworkKind.None, NetworkStatusMath.classify(false, false, false, null, 4, false).kind)
+    }
+
+    @Test
+    fun `strength drives good versus poor`() {
+        assertEquals(NetworkKind.Good, NetworkStatusMath.classify(false, true, true, -55, null, true).kind)
+        assertEquals(NetworkKind.Poor, NetworkStatusMath.classify(false, true, true, -85, null, true).kind)
+        assertEquals(NetworkKind.Good, NetworkStatusMath.classify(false, true, true, null, 4, false).kind)
+        assertEquals(NetworkKind.Poor, NetworkStatusMath.classify(false, true, true, null, 1, false).kind)
+        // Unvalidated (captive portal / no internet) caps at poor.
+        assertEquals(NetworkKind.Poor, NetworkStatusMath.classify(false, true, false, -50, null, true).kind)
     }
 }

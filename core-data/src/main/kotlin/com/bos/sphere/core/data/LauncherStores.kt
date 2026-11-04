@@ -61,6 +61,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putFloat("motionSens", next.motionSensitivity)
             .putString("cornerStyle", next.cornerStyle.name)
             .putString("drawerStyle", next.drawerStyle.name)
+            .putString("clockPosition", next.clockPosition.name)
+            .putBoolean("networkDots", next.networkDots)
             .putString("wheelGrouping", next.wheelGrouping.name)
             .apply()
     }
@@ -84,6 +86,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             motionSensitivity = sp.getFloat("motionSens", d.motionSensitivity).coerceIn(0f, 1f),
             cornerStyle = enumOr(sp.getString("cornerStyle", null), d.cornerStyle),
             drawerStyle = enumOr(sp.getString("drawerStyle", null), d.drawerStyle),
+            clockPosition = enumOr(sp.getString("clockPosition", null), d.clockPosition),
+            networkDots = sp.getBoolean("networkDots", d.networkDots),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
         )
     }

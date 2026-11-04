@@ -10,6 +10,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bos.sphere.core.data.CornerActionId
+import com.bos.sphere.core.data.LauncherStores
+import com.bos.sphere.core.data.ThemeMode
+import com.bos.sphere.core.design.HyleTheme
+import com.bos.sphere.core.design.L10n
+import com.bos.sphere.core.design.ThemeVariant
 import com.bos.sphere.core.design.SphereTheme
 import com.bos.sphere.feature.grid.WidgetConfigureResults
 
@@ -32,6 +37,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleAction(intent)
+        // Apply theme and language before the first frame so there is no flash of defaults.
+        LauncherStores.get(this).prefs.prefs.value.let { p ->
+            HyleTheme.apply(
+                when (p.themeMode) { ThemeMode.Dark -> ThemeVariant.Dark; ThemeMode.Amoled -> ThemeVariant.Amoled; ThemeMode.Light -> ThemeVariant.Light },
+                p.accentColor,
+            )
+            L10n.setLanguage(p.language.code)
+        }
         setContent {
             SphereTheme {
                 HomeScreen(homeSignal = homeSignal, externalAction = externalAction)

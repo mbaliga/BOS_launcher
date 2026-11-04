@@ -271,3 +271,30 @@ fun GlassDialog(
         }
     }
 }
+
+/** A small centred yes/no card in the same visual language (used for short questions). */
+@Composable
+fun ConfirmDialog(
+    title: String,
+    text: String,
+    confirm: String,
+    dismiss: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.98f), RoundedCornerShape(20.dp))
+                .border(1.dp, HyleColors.Hairline, RoundedCornerShape(20.dp))
+                .padding(20.dp),
+        ) {
+            Text(title, color = HyleColors.InkBright, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+            Text(text, color = HyleColors.Ink, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
+                TextButtonPill(dismiss, onClick = onDismiss)
+                TextButtonPill(confirm, primary = true, onClick = onConfirm)
+            }
+        }
+    }
+}

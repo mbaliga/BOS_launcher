@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.L10n
 
 /**
  * Long-press app menu (build brief §2.A "App management"). App info + uninstall route to the
@@ -32,6 +33,7 @@ fun AppContextMenu(
     onToggleHidden: () -> Unit,
     isOnHome: Boolean? = null,
     onToggleHome: () -> Unit = {},
+    onIconColor: (() -> Unit)? = null,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -48,10 +50,11 @@ fun AppContextMenu(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
-            if (isOnHome != null) MenuItem(if (isOnHome) "Remove from home" else "Add to home", onToggleHome)
-            MenuItem("App info", onAppInfo)
-            MenuItem(if (isHidden) "Unhide" else "Hide", onToggleHidden)
-            MenuItem("Uninstall", onUninstall, destructive = true)
+            if (isOnHome != null) MenuItem(L10n.tr(if (isOnHome) "Remove from home" else "Add to home"), onToggleHome)
+            if (onIconColor != null) MenuItem(L10n.tr("Icon colour"), onIconColor)
+            MenuItem(L10n.tr("App info"), onAppInfo)
+            MenuItem(L10n.tr(if (isHidden) "Unhide" else "Hide"), onToggleHidden)
+            MenuItem(L10n.tr("Uninstall"), onUninstall, destructive = true)
         }
     }
 }

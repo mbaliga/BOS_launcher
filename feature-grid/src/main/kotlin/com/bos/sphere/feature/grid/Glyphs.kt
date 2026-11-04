@@ -179,6 +179,32 @@ object Glyphs {
         moveTo(12f, 3.5f); lineTo(12f, 6f)
         moveTo(12f, 12f); lineTo(16f, 8.5f)
     }
+    val Denser = glyph("denser", fill = true) {
+        for (r in 0..2) for (c in 0..2) rrect(3f + c * 6.4f, 3f + r * 6.4f, 7.4f + c * 6.4f, 7.4f + r * 6.4f, 0.9f)
+    }
+    val Sparser = glyph("sparser", fill = true) {
+        for (r in 0..1) for (c in 0..1) rrect(3f + c * 10f, 3f + r * 10f, 11f + c * 10f, 11f + r * 10f, 1.6f)
+    }
+    val Steps = glyph("steps") {
+        moveTo(7f, 13f); curveTo(7f, 9f, 9.5f, 5f, 12f, 5f); curveTo(13.8f, 5f, 14.3f, 7f, 14f, 9.5f); curveTo(13.8f, 11.5f, 13f, 13f, 13f, 14.5f)
+        lineTo(7f, 14.5f); close()
+        moveTo(7.5f, 17f); lineTo(13.5f, 17f); lineTo(13.5f, 19f); lineTo(7.5f, 19f); close()
+        moveTo(17f, 10f); curveTo(18.5f, 10f, 19.5f, 11.5f, 19.5f, 13f); lineTo(19.5f, 15f); lineTo(16f, 15f)
+    }
+    val Battery = glyph("battery") {
+        rrect(3f, 7f, 19f, 17f, 2f); moveTo(21f, 10.5f); lineTo(21f, 13.5f)
+        moveTo(6f, 10f); lineTo(14f, 10f); lineTo(14f, 14f); lineTo(6f, 14f); close()
+    }
+    val Signal = glyph("signal") {
+        moveTo(4f, 19f); lineTo(4f, 16f); moveTo(9f, 19f); lineTo(9f, 12f); moveTo(14f, 19f); lineTo(14f, 8f); moveTo(19f, 19f); lineTo(19f, 4f)
+    }
+    val Memory = glyph("memory") {
+        rrect(5f, 6f, 19f, 18f, 1.5f); moveTo(9f, 3f); lineTo(9f, 6f); moveTo(15f, 3f); lineTo(15f, 6f)
+        moveTo(9f, 18f); lineTo(9f, 21f); moveTo(15f, 18f); lineTo(15f, 21f)
+    }
+    val Storage = glyph("storage") {
+        moveTo(4f, 8f); lineTo(20f, 8f); lineTo(20f, 17f); lineTo(4f, 17f); close(); moveTo(7f, 12.5f); lineTo(7.1f, 12.5f); moveTo(11f, 12.5f); lineTo(17f, 12.5f)
+    }
     val Plus = glyph("plus") { moveTo(12f, 5f); lineTo(12f, 19f); moveTo(5f, 12f); lineTo(19f, 12f) }
     val Close = glyph("close") { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) }
     val Up = glyph("up") { moveTo(6f, 15f); lineTo(12f, 9f); lineTo(18f, 15f) }
@@ -220,6 +246,8 @@ object Glyphs {
         CornerActionId.Calculator -> Calculator
         CornerActionId.Assistant -> Mic
         CornerActionId.Flashlight -> Flashlight
+        CornerActionId.GridDenser -> Denser
+        CornerActionId.GridSparser -> Sparser
         CornerActionId.RingerCycle -> Ring
         CornerActionId.RingerNormal -> Ring
         CornerActionId.RingerVibrate -> Vibrate

@@ -44,9 +44,9 @@ class PaletteMathTest {
         val slots = PaletteMath.layout(8, Corner.TopLeft)
         val s = slots[0]
         val c = PaletteMath.centre(s)
-        // 10 dp beyond the outer edge along the same ray.
-        val k = (s.outerDp + 10f) / s.midDp
+        // 1 dp past the outer edge, in the gap before the next ring, along the same ray.
+        val k = (s.outerDp + 1f) / s.midDp
         assertEquals(-1, PaletteMath.hit(c.x * k, c.y * k, slots, slackDp = 0f))
-        assertEquals(s.index, PaletteMath.hit(c.x * k, c.y * k, slots, slackDp = 14f))
+        assertEquals(s.index, PaletteMath.hit(c.x * k, c.y * k, slots, slackDp = 4f))
     }
 }

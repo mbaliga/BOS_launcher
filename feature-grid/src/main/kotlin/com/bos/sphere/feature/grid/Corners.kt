@@ -125,7 +125,7 @@ fun rememberDisplayRotation(): Int {
 
 /** Label for a corner item (action name or app label). */
 fun itemLabel(item: CornerItem, appsByKey: Map<String, AppEntry>): String = when (item) {
-    is CornerItem.Action -> item.id.label
+    is CornerItem.Action -> com.bos.sphere.core.design.L10n.tr(item.id.label)
     is CornerItem.App -> appsByKey[item.key]?.label ?: "Missing app"
 }
 

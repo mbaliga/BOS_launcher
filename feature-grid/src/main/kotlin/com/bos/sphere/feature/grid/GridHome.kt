@@ -121,9 +121,9 @@ internal sealed interface PageGeometry {
 
     class Grid(val g: GridGeometry, iconScale: Float, labels: Boolean) : PageGeometry {
         override val capacity = g.capacity
-        override val iconPx = g.pitch * iconScale * (if (labels) 0.78f else 1f)
-        val labelOffset = if (labels) g.pitch * 0.06f else 0f
-        override fun center(index: Int) = Pt(g.cellLeft(index) + g.pitch / 2f, g.cellTop(index) + g.pitch / 2f - labelOffset * 2)
+        override val iconPx = g.base * iconScale * (if (labels) 0.78f else 1f)
+        val labelOffset = if (labels) g.base * 0.06f else 0f
+        override fun center(index: Int) = Pt(g.centreX(index), g.centreY(index) - labelOffset * 2)
         override fun slotAt(x: Float, y: Float) = g.cellAt(x, y)
         override fun nearest(x: Float, y: Float) = g.nearestCell(x, y)
     }
@@ -159,7 +159,7 @@ internal sealed interface PageGeometry {
                 PageShape.Grid -> {
                     val spec = layout.gridFor(landscape, prefs)
                     Grid(
-                        GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else 0.12f),
+                        GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else 0.12f, spread = prefs.iconSpacing),
                         prefs.iconScale,
                         prefs.showLabels,
                     )
@@ -230,7 +230,7 @@ fun GridHome(
     val indicatorAtStartEarly = prefs.pagingFor(isLandscape) == PagingAxis.Vertical
     val clockTop = prefs.clockPosition == ClockPosition.Top
     val clockBottom = prefs.clockPosition == ClockPosition.Bottom
-    val clockH = clockBlockHeight(prefs)
+    val clockH = stripHeight(prefs)
     val cornerRow = prefs.cornerIconSize.dp + 22.dp
     val padTopDp = if (clockTop) maxOf(clockH + 14.dp, cornerRow) else cornerRow
     val padBottomDp = when {
@@ -352,16 +352,18 @@ fun GridHome(
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Box(modifier = modifier.fillMaxSize()) {
         when (prefs.clockPosition) {
-            ClockPosition.Top -> ClockBlock(
+            ClockPosition.Top -> StatusStrip(
                 prefs = prefs,
                 weather = weather,
-                onTap = onClockTap,
+                sidePadding = prefs.cornerIconSize.dp + 26.dp,
+                onClockTap = onClockTap,
                 modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(safe).padding(top = 8.dp),
             )
-            ClockPosition.Bottom -> ClockBlock(
+            ClockPosition.Bottom -> StatusStrip(
                 prefs = prefs,
                 weather = weather,
-                onTap = onClockTap,
+                sidePadding = prefs.cornerIconSize.dp + 26.dp,
+                onClockTap = onClockTap,
                 modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(bottom = 14.dp),
             )
             ClockPosition.Hidden -> Unit

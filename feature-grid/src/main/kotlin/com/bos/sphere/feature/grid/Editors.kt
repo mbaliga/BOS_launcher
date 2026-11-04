@@ -44,6 +44,7 @@ import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.PageLayout
 import com.bos.sphere.core.data.PageShape
 import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.AppSearch
 
 private enum class SlotKind(val label: String) {
@@ -85,20 +86,20 @@ fun CornerEditorDialog(
     }
 
     GlassDialog(
-        title = "${corner.label} corner",
+        title = L10n.tr("%s corner", L10n.tr(corner.label)),
         onDismiss = onDismiss,
         footer = {
             when (kind) {
-                SlotKind.Palette -> TextButtonPill("Save palette", primary = true, enabled = paletteItems.isNotEmpty()) {
+                SlotKind.Palette -> TextButtonPill(L10n.tr("Save palette"), primary = true, enabled = paletteItems.isNotEmpty()) {
                     onSave(CornerSlot.Palette(paletteName.ifBlank { "Palette" }, paletteItems.toList()))
                 }
-                SlotKind.Cluster -> TextButtonPill("Save cluster", primary = true, enabled = clusterKinds.isNotEmpty()) {
+                SlotKind.Cluster -> TextButtonPill(L10n.tr("Save cluster"), primary = true, enabled = clusterKinds.isNotEmpty()) {
                     onSave(CornerSlot.ComplicationCluster(clusterKinds.toList()))
                 }
-                SlotKind.None -> TextButtonPill("Clear corner", primary = true) { onSave(CornerSlot.Empty) }
+                SlotKind.None -> TextButtonPill(L10n.tr("Clear corner"), primary = true) { onSave(CornerSlot.Empty) }
                 else -> Unit
             }
-            TextButtonPill("Cancel", onClick = onDismiss)
+            TextButtonPill(L10n.tr("Cancel"), onClick = onDismiss)
         },
     ) {
         Text(
@@ -107,7 +108,7 @@ fun CornerEditorDialog(
             fontSize = 11.5.sp,
         )
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
-            ChipRow(SlotKind.entries, kind, { it.label }) { kind = it }
+            ChipRow(SlotKind.entries, kind, { L10n.tr(it.label) }) { kind = it }
         }
         when (kind) {
             SlotKind.Action -> ActionList(apps, selected = ((current as? CornerSlot.Single)?.item as? CornerItem.Action)?.id) {
@@ -117,7 +118,7 @@ fun CornerEditorDialog(
                 onSave(CornerSlot.Single(CornerItem.App(it.key)))
             }
             SlotKind.Palette -> {
-                Text("A palette is a folder: its items fan out in arcs from the corner.", color = HyleColors.InkDim, fontSize = 11.5.sp)
+                Text(L10n.tr("A palette is a folder: its items fan out in arcs from the corner."), color = HyleColors.InkDim, fontSize = 11.5.sp)
                 NameField(paletteName) { paletteName = it.take(24) }
                 paletteItems.forEachIndexed { i, item ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
@@ -133,7 +134,7 @@ fun CornerEditorDialog(
                         ItemPicker(apps = apps, onPick = { paletteItems += it; addingToPalette = false })
                     } else {
                         Row(Modifier.padding(top = 8.dp)) {
-                            TextButtonPill("+ Add item") { addingToPalette = true }
+                            TextButtonPill(L10n.tr("+ Add item")) { addingToPalette = true }
                         }
                     }
                 }
@@ -141,7 +142,7 @@ fun CornerEditorDialog(
             }
             SlotKind.Complication -> ComplicationKind.entries.forEach { k ->
                 ActionRow(
-                    label = k.label,
+                    label = L10n.tr(k.label),
                     summary = k.action?.let { "Tap: ${it.label}" },
                     leading = { ComplicationView(k, 28.dp, onClick = null) },
                     selected = (current as? CornerSlot.Complication)?.kind == k,
@@ -152,7 +153,7 @@ fun CornerEditorDialog(
                 ComplicationKind.entries.forEach { k ->
                     val on = k in clusterKinds
                     ActionRow(
-                        label = k.label,
+                        label = L10n.tr(k.label),
                         summary = if (on) "#${clusterKinds.indexOf(k) + 1}" else null,
                         leading = { ComplicationView(k, 28.dp, onClick = null) },
                         selected = on,
@@ -170,9 +171,9 @@ fun CornerEditorDialog(
                 (current as? CornerSlot.Widget)?.let {
                     Text("Current: ${it.label}", color = HyleColors.InkBright, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                 }
-                Row(Modifier.padding(top = 10.dp)) { TextButtonPill("Choose widget…", primary = true, onClick = onPickWidget) }
+                Row(Modifier.padding(top = 10.dp)) { TextButtonPill(L10n.tr("Choose widget…"), primary = true, onClick = onPickWidget) }
             }
-            SlotKind.None -> Text("This corner will be empty (long-press it to assign something later).", color = HyleColors.InkDim, fontSize = 12.sp)
+            SlotKind.None -> Text(L10n.tr("This corner will be empty (long-press it to assign something later)."), color = HyleColors.InkDim, fontSize = 12.sp)
         }
     }
 }
@@ -187,14 +188,14 @@ fun GestureBindingDialog(
     onDismiss: () -> Unit,
 ) {
     GlassDialog(
-        title = gesture.label,
+        title = L10n.tr(gesture.label),
         onDismiss = onDismiss,
         footer = {
-            TextButtonPill("Do nothing") { onSave(null) }
-            TextButtonPill("Cancel", onClick = onDismiss)
+            TextButtonPill(L10n.tr("Do nothing")) { onSave(null) }
+            TextButtonPill(L10n.tr("Cancel"), onClick = onDismiss)
         },
     ) {
-        Text(gesture.hint, color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 6.dp))
+        Text(L10n.tr(gesture.hint), color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 6.dp))
         ItemPicker(apps = apps, selected = current, onPick = onSave)
     }
 }
@@ -225,7 +226,7 @@ private fun ActionList(apps: List<AppEntry>, selected: CornerActionId?, onPick: 
         return
     }
     CornerActionId.entries.forEach { a ->
-        ActionRow(label = a.label, glyph = Glyphs.forAction(a), selected = a == selected) {
+        ActionRow(label = L10n.tr(a.label), glyph = Glyphs.forAction(a), selected = a == selected) {
             if (a in ActionApps.appCapable) pending = a else onPick(CornerItem.Action(a))
         }
     }
@@ -242,25 +243,25 @@ private fun OpenWith(id: CornerActionId, apps: List<AppEntry>, onBack: () -> Uni
         }.getOrDefault(emptySet())
     }
     val suggested = remember(apps, handlerPackages) { apps.filter { it.packageName in handlerPackages } }
-    ActionRow(label = "‹  Back", onClick = onBack)
+    ActionRow(label = L10n.tr("‹  Back"), onClick = onBack)
     SectionHeader("Open ${id.label} with")
-    ActionRow(label = "System default", summary = "Uses your default; asks if there are several", glyph = Glyphs.forAction(id)) {
+    ActionRow(label = L10n.tr("System default"), summary = "Uses your default; asks if there are several", glyph = Glyphs.forAction(id)) {
         onPick(CornerItem.Action(id))
     }
     if (suggested.isNotEmpty()) {
-        SectionHeader("Apps that handle it")
+        SectionHeader(L10n.tr("Apps that handle it"))
         suggested.forEach { app ->
             ActionRow(label = app.label, leading = { AppIcon(app, 28.dp, Modifier.size(28.dp)) }) { onPick(CornerItem.App(app.key)) }
         }
     }
-    SectionHeader("Any app")
+    SectionHeader(L10n.tr("Any app"))
     AppList(apps, selected = null) { onPick(CornerItem.App(it.key)) }
 }
 
 @Composable
 private fun AppList(apps: List<AppEntry>, selected: String?, onPick: (AppEntry) -> Unit) {
     var query by remember { mutableStateOf("") }
-    NameField(query, placeholder = "Search apps") { query = it }
+    NameField(query, placeholder = L10n.tr("Search apps")) { query = it }
     val shown = remember(apps, query) { if (query.isBlank()) apps else AppSearch.rank(apps, query, limit = 40) }
     shown.forEach { app ->
         ActionRow(label = app.label, leading = { AppIcon(app, 28.dp, Modifier.size(28.dp)) }, selected = app.key == selected) { onPick(app) }
@@ -305,10 +306,10 @@ private fun SmallGlyphButton(glyph: androidx.compose.ui.graphics.vector.ImageVec
 /** Long-press on a page tile (the clock). */
 @Composable
 fun TileMenuDialog(title: String, onRemove: () -> Unit, onDismiss: () -> Unit) {
-    GlassDialog(title = title, onDismiss = onDismiss, footer = { TextButtonPill("Cancel", onClick = onDismiss) }) {
-        Text("Long-press and drag to move it.", color = HyleColors.InkDim, fontSize = 12.sp)
+    GlassDialog(title = title, onDismiss = onDismiss, footer = { TextButtonPill(L10n.tr("Cancel"), onClick = onDismiss) }) {
+        Text(L10n.tr("Long-press and drag to move it."), color = HyleColors.InkDim, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.Start, modifier = Modifier.padding(top = 10.dp).semantics { contentDescription = "Remove tile" }) {
-            TextButtonPill("Remove from page", primary = true, onClick = onRemove)
+            TextButtonPill(L10n.tr("Remove from page"), primary = true, onClick = onRemove)
         }
     }
 }

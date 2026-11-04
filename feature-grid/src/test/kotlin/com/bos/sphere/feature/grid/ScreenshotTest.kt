@@ -27,6 +27,13 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.AppEntry
+import com.bos.sphere.core.data.RailSide
+import com.bos.sphere.core.data.DrawerSort
+import com.bos.sphere.core.data.DrawerView
+import com.bos.sphere.core.data.IndicatorColors
+import com.bos.sphere.core.data.IndicatorEffect
+import com.bos.sphere.core.data.ReadingKind
+import com.bos.sphere.core.data.IndicatorReading
 import com.bos.sphere.core.data.ComplicationKind
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerActionId
@@ -39,8 +46,6 @@ import com.bos.sphere.core.data.HomeLayoutMath
 import com.bos.sphere.core.data.HomeLayout
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.LauncherPrefs
-import com.bos.sphere.core.data.NetworkKind
-import com.bos.sphere.core.data.NetworkStatus
 import com.bos.sphere.core.data.PageLayout
 import com.bos.sphere.core.data.PageShape
 import com.bos.sphere.core.data.WheelGrouping
@@ -102,11 +107,17 @@ class ScreenshotTest {
         pages: List<HomePage>,
         corners: Map<Corner, CornerSlot> = DefaultCorners,
         rotation: Int = if (landscape) 1 else 0,
-        status: NetworkStatus = NetworkStatus(NetworkKind.Good, 0.9f),
+        status: IndicatorReading = IndicatorReading(ReadingKind.Live, 0.9f, ""),
+        effects: Set<IndicatorEffect> = setOf(IndicatorEffect.DotsBreathe),
+        prefs2: LauncherPrefs? = null,
     ) {
         val state = rememberGridHomeState()
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            NetworkDotGrid(status, modifier = Modifier.fillMaxSize())
+            IndicatorLayer(
+                status, effects,
+                IndicatorColors.argb(status, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, false),
+                0.6f, 0.5f, Modifier.fillMaxSize(),
+            )
             GridHome(
                 pages = pages,
                 appsByKey = byKey,
@@ -122,6 +133,8 @@ class ScreenshotTest {
             CornerLayer(
                 placements = cornerPlacements(corners, rotation, true),
                 style = prefs.cornerStyle,
+                iconSize = prefs.cornerIconSize.dp,
+                iconMode = prefs.cornerIconMode,
                 appsByKey = byKey,
                 onRun = { _, _ -> }, onEdit = {},
                 complication = { _, slot, mod -> ComplicationView(slot.kind, 48.dp, onClick = {}, modifier = mod) },
@@ -179,7 +192,7 @@ class ScreenshotTest {
             Corner.TopRight to CornerSlot.Palette("Media", listOf(CornerActionId.Music, CornerActionId.Camera, CornerActionId.Gallery, CornerActionId.Flashlight).map(CornerItem::Action)),
             Corner.BottomLeft to CornerSlot.ComplicationCluster(listOf(ComplicationKind.Battery, ComplicationKind.Date, ComplicationKind.Ringer)),
         )
-        rule.setContent { Scene(prefs, landscape = false, pages = pages, corners = corners, status = NetworkStatus(NetworkKind.Poor, 0.15f)) }
+        rule.setContent { Scene(prefs, landscape = false, pages = pages, corners = corners, status = IndicatorReading(ReadingKind.Live, 0.15f, ""), effects = setOf(IndicatorEffect.DotsBreathe, IndicatorEffect.Vignette)) }
         shoot("04-circle-bubbles-portrait")
     }
 
@@ -187,16 +200,13 @@ class ScreenshotTest {
     fun paletteOpen() {
         rule.mainClock.autoAdvance = false
         val prefs = LauncherPrefs()
-        val items = listOf(
-            CornerActionId.Music, CornerActionId.Camera, CornerActionId.Flashlight, CornerActionId.RingerCycle,
-            CornerActionId.Maps, CornerActionId.Calendar, CornerActionId.Clock,
-        ).map(CornerItem::Action) + CornerItem.App(apps[5].key)
+        val items = CornerActionId.entries.filter { !it.internal }.map(CornerItem::Action) + apps.map { CornerItem.App(it.key) }
         val corners = DefaultCorners + (Corner.TopRight to CornerSlot.Palette("Quick", items))
         rule.setContent { Scene(prefs, landscape = false, pages = pagesFor(prefs, false), corners = corners) }
         rule.mainClock.advanceTimeBy(300)
         rule.onNodeWithContentDescription("Quick palette").performTouchInput { down(center) }
         // Stay under the long-press timeout (holding still that long opens the corner editor).
-        shoot("05-palette-open", settleMs = 350)
+        shoot("05-palette-open", settleMs = 450)
     }
 
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
@@ -210,7 +220,6 @@ class ScreenshotTest {
         }
         rule.setContent {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
-                NetworkDotGrid(NetworkStatus(NetworkKind.Good, 0.9f), modifier = Modifier.fillMaxSize())
                 WheelDrawer(
                     visible = true, anchor = Corner.BottomRight, apps = many, grouping = WheelGrouping.Letter,
                     onGroupingChange = {}, recentKeys = emptyList(), onLaunch = {}, onLongPressApp = {}, onSearch = {}, onDismiss = {},
@@ -246,6 +255,42 @@ class ScreenshotTest {
         )
         rule.setContent { SettingsSpace(visible = true, categories = cats, initialCategory = 1, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) }
         shoot("07-settings-space")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun clockBigAndEffects() {
+        rule.mainClock.autoAdvance = false
+        val prefs = LauncherPrefs(clockSize = 64f, clockShowDay = true, clockShowDate = true, cornerIconSize = 40f)
+        rule.setContent {
+            Scene(
+                prefs, landscape = false, pages = pagesFor(prefs, false),
+                effects = setOf(IndicatorEffect.DotsBloomCentre, IndicatorEffect.SnakeOutline, IndicatorEffect.EdgeMeter),
+            )
+        }
+        shoot("08-big-clock-effects", settleMs = 2_000)
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun drawerSpace() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            AppDrawerSpace(
+                visible = true, apps = apps, usage = emptyMap(),
+                view = DrawerView.Details, sort = DrawerSort.Alphabetical, rail = RailSide.Right,
+                onViewChange = {}, onSortChange = {}, onLaunch = {}, onLongPress = {}, onDismiss = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        shoot("09-drawer-details")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun searchOverlay() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            SearchOverlay(visible = true, apps = apps, recent = apps.take(5), onLaunch = {}, onLongPressApp = {}, onDismiss = {}, modifier = Modifier.fillMaxSize())
+        }
+        shoot("10-search")
     }
 
     /** A gradient tile with a bold initial — stands in for an adaptive icon foreground. */

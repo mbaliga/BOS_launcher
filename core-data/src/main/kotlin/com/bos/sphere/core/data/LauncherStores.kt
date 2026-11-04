@@ -44,6 +44,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
                 motionSensitivity = it.motionSensitivity.coerceIn(0f, 1f),
                 uiSoundVolume = it.uiSoundVolume.coerceIn(0f, 1f),
                 clockSize = it.clockSize.coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
+                iconSpacing = it.iconSpacing.coerceIn(0f, 1f),
                 cornerIconSize = it.cornerIconSize.coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
                 indicatorIntensity = it.indicatorIntensity.coerceIn(0f, 1f),
                 indicatorSpeed = it.indicatorSpeed.coerceIn(0f, 1f),
@@ -71,6 +72,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putBoolean("networkDots", next.networkDots)
             .putBoolean("uiSounds", next.uiSounds)
             .putFloat("uiSoundVolume", next.uiSoundVolume)
+            .putString("strip", next.strip.entries.joinToString(",") { "${it.key.name}:${it.value.name}" })
+            .putFloat("iconSpacing", next.iconSpacing)
             .putFloat("clockSize", next.clockSize)
             .putString("clockFormat", next.clockFormat.name)
             .putBoolean("clockDate", next.clockShowDate)
@@ -125,6 +128,15 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             networkDots = sp.getBoolean("networkDots", d.networkDots),
             uiSounds = sp.getBoolean("uiSounds", d.uiSounds),
             uiSoundVolume = sp.getFloat("uiSoundVolume", d.uiSoundVolume).coerceIn(0f, 1f),
+            strip = sp.getString("strip", null)?.let { raw ->
+                raw.split(',').filter { it.isNotEmpty() }.mapNotNull { pair ->
+                    val (a, b) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+                    val item = StripItem.entries.firstOrNull { it.name == a } ?: return@mapNotNull null
+                    val zone = StripZone.entries.firstOrNull { it.name == b } ?: return@mapNotNull null
+                    item to zone
+                }.toMap()
+            } ?: d.strip,
+            iconSpacing = sp.getFloat("iconSpacing", d.iconSpacing).coerceIn(0f, 1f),
             clockSize = sp.getFloat("clockSize", d.clockSize).coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
             clockFormat = enumOr(sp.getString("clockFormat", null), d.clockFormat),
             clockShowDate = sp.getBoolean("clockDate", d.clockShowDate),

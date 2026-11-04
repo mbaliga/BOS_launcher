@@ -54,6 +54,22 @@ enum class DensityPreset(val label: String, val portrait: GridSpec, val landscap
     Packed("Packed", GridSpec(5, 8), GridSpec(8, 3)),
 }
 
+/** Small readouts that can sit in the status strip (the clock itself is one of them). */
+enum class StripItem(val label: String) {
+    Time("Time"),
+    Battery("Battery"),
+    Signal("Signal"),
+    Steps("Steps"),
+    NextAlarm("Next alarm"),
+    Ringer("Ring mode"),
+    Storage("Storage"),
+    Memory("Memory"),
+    Notifications("Notifications"),
+}
+
+/** Where in the strip an item sits. */
+enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right("Right") }
+
 /** Clock number format. */
 enum class ClockFormat(val label: String) { System("System"), Hour12("12-hour"), Hour24("24-hour") }
 
@@ -153,6 +169,11 @@ data class LauncherPrefs(
     val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
 
+    // --- status strip: which readouts sit where (absent = not shown)
+    val strip: Map<StripItem, StripZone> = mapOf(StripItem.Time to StripZone.Centre),
+    /** 0 = compact square cells, 1 = icons spread to fill the free space (rows and columns separately). */
+    val iconSpacing: Float = 0f,
+
     // --- clock
     /** Clock text size in sp. */
     val clockSize: Float = 34f,
@@ -209,6 +230,7 @@ data class LauncherPrefs(
         const val DEFAULT_ICON_SCALE = 0.82f
         const val MIN_ICON_SCALE = 0.5f
         const val MAX_ICON_SCALE = 0.95f
+        const val MAX_ICON_SPACING = 1f
         const val MIN_CLOCK_SIZE = 14f
         const val MAX_CLOCK_SIZE = 96f
         const val MIN_CORNER_ICON = 20f
@@ -264,6 +286,8 @@ enum class CornerActionId(val label: String, val internal: Boolean = false) {
     Calculator("Calculator"),
     Assistant("Assistant"),
     Flashlight("Flashlight"),
+    GridDenser("Denser grid", internal = true),
+    GridSparser("Sparser grid", internal = true),
     RingerCycle("Cycle ring / vibrate / silent"),
     RingerNormal("Ring mode"),
     RingerVibrate("Vibrate mode"),
@@ -317,8 +341,8 @@ enum class ComplicationKind(val label: String, val action: CornerActionId?) {
 enum class DrawerStyle(val label: String) {
     /** A Concepts-style wheel of app spokes fanned out around the corner it was opened from. */
     Wheel("Wheel"),
-    /** A plain full-screen alphabetical grid. */
-    List("List"),
+    /** The separate app-drawer space (grid / list / details, sortable, with edge scrubbing). */
+    List("Drawer"),
 }
 
 /** How the wheel drawer groups apps into spokes. */

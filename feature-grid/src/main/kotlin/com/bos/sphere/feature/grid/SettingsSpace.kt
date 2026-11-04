@@ -144,8 +144,8 @@ private fun SettingsSpaceContent(
 ) {
     val haptics = LocalHapticFeedback.current
     var cat by remember { mutableIntStateOf(initialCategory.coerceIn(0, (categories.size - 1).coerceAtLeast(0))) }
-    val itemIndex = remember { mutableMapOf<Int, Int>() }
-    var item by remember { mutableIntStateOf(0) }
+    // Options are all visible; vertical drags scroll the list (it is not a one-at-a-time focus).
+    var scrollPx by remember { mutableFloatStateOf(0f) }
     var paneOpen by remember { mutableIntStateOf(-1) } // index of the item whose pane is open
     val latestCategories by rememberUpdatedState(categories)
 
@@ -156,25 +156,15 @@ private fun SettingsSpaceContent(
     fun moveCategory(to: Int) {
         val next = to.coerceIn(0, latestCategories.lastIndex)
         if (next == cat) { sounds?.play(UiSound.Nope); return }
-        itemIndex[cat] = item
         cat = next
-        item = (itemIndex[next] ?: 0).coerceIn(0, (items().size - 1).coerceAtLeast(0))
+        scrollPx = 0f
         paneOpen = -1
         sounds?.play(UiSound.Move)
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
-    fun moveItem(to: Int) {
-        val next = to.coerceIn(0, (items().size - 1).coerceAtLeast(0))
-        if (next == item) return
-        item = next
-        paneOpen = -1
-        sounds?.play(UiSound.Hover)
-    }
-
     fun activate(index: Int) {
         val it = items().getOrNull(index) ?: return
-        if (index != item) { moveItem(index); return }
         when (it) {
             is SettingItem.Toggle -> { it.onChange(!it.checked); sounds?.play(UiSound.Tick) }
             is SettingItem.Action -> { sounds?.play(UiSound.Select); it.onClick() }
@@ -187,7 +177,6 @@ private fun SettingsSpaceContent(
     }
 
     val catAnim by animateFloatAsState(cat.toFloat(), spring(dampingRatio = 0.82f, stiffness = 320f), label = "cat")
-    val itemAnim by animateFloatAsState(item.toFloat(), spring(dampingRatio = 0.85f, stiffness = 360f), label = "item")
 
     BoxWithConstraints(
         Modifier
@@ -225,10 +214,10 @@ private fun SettingsSpaceContent(
                             while (dragAcc <= -step) { dragAcc += step; moveCategory(cat + 1) }
                             while (dragAcc >= step) { dragAcc -= step; moveCategory(cat - 1) }
                         } else {
-                            dragAcc += d.y
-                            val step = 52.dp.toPx()
-                            while (dragAcc <= -step) { dragAcc += step; moveItem(item + 1) }
-                            while (dragAcc >= step) { dragAcc -= step; moveItem(item - 1) }
+                            // Follow the finger; clamp so the first and last options stay reachable.
+                            val firstYPx = barY + ITEMS_GAP.toPx()
+                            val maxScroll = ((items().size - 1) * rowH - (h - firstYPx - rowH * 1.6f)).coerceAtLeast(0f)
+                            scrollPx = (scrollPx - d.y).coerceIn(0f, maxScroll)
                         }
                     }
                 }
@@ -242,7 +231,7 @@ private fun SettingsSpaceContent(
                         }
                         val firstY = barY + ITEMS_GAP.toPx()
                         if (p.y > firstY - rowH / 2) {
-                            val idx = ((p.y - firstY) / rowH + item).roundToInt()
+                            val idx = ((p.y - firstY + scrollPx) / rowH).roundToInt()
                             if (idx in items().indices && p.x < (if (paneOpen >= 0) w * 0.52f else w)) activate(idx)
                         }
                     }
@@ -310,31 +299,32 @@ private fun SettingsSpaceContent(
         val list = items()
         val firstY = barY + with(density) { ITEMS_GAP.toPx() }
         list.forEachIndexed { i, it ->
-            val d = i - itemAnim
-            val y = firstY + d * rowH
-            if (d < -0.6f || y > h + rowH) return@forEachIndexed
-            val sel = i == item
+            val y = firstY + i * rowH - scrollPx
+            val top = firstY - rowH * 0.9f
+            if (y < top || y > h + rowH) return@forEachIndexed
+            val sel = i == paneOpen
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .offset { IntOffset((anchorX - 20.dp.toPx()).roundToInt(), (y - rowH / 2).roundToInt()) }
                     .width(with(density) { ((if (paneOpen >= 0) w * 0.5f else w * 0.72f) - 10f).toDp() })
-                    .alpha(if (d < 0) (1f + d / 0.6f).coerceIn(0f, 1f) else (1f - d * 0.12f).coerceIn(0.3f, 1f))
+                    // Rows fade out as they scroll up under the category bar.
+                    .alpha(((y - top) / (rowH * 0.6f)).coerceIn(0f, 1f))
                     .semantics(mergeDescendants = true) {
                         contentDescription = "${it.title}, ${it.value}"
                         selected = sel
-                        onClick { item = i; activate(i); true }
+                        onClick { activate(i); true }
                     },
             ) {
                 Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
                     if (sel) Halo(44.dp)
-                    Icon(it.glyph, null, tint = if (sel) HyleColors.InkBright else HyleColors.InkDim, modifier = Modifier.size(if (sel) 26.dp else 22.dp))
+                    Icon(it.glyph, null, tint = if (sel) HyleColors.InkBright else HyleColors.Ink, modifier = Modifier.size(24.dp))
                 }
                 Column(Modifier.padding(start = 14.dp)) {
                     Text(
                         it.title,
-                        color = if (sel) HyleColors.InkBright else HyleColors.Ink,
-                        fontSize = if (sel) 17.sp else 15.sp,
+                        color = HyleColors.InkBright,
+                        fontSize = 16.sp,
                         fontWeight = if (sel) FontWeight.Medium else FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -351,15 +341,6 @@ private fun SettingsSpaceContent(
                 }
             }
         }
-
-        // Footer hint.
-        Text(
-            "◀ ▶ categories   ▲ ▼ items   tap to open   back to leave",
-            color = HyleColors.InkDim.copy(alpha = 0.7f),
-            fontSize = 10.sp,
-            letterSpacing = 1.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(bottom = 12.dp),
-        )
 
         // Option pane.
         val pane = list.getOrNull(paneOpen) as? SettingItem.Pane

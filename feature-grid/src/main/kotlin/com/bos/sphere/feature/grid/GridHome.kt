@@ -213,7 +213,10 @@ fun GridHome(
 ) {
     val paging = prefs.pagingFor(isLandscape)
     val pagerState = state.pager
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    // The whole surface is laid out in physical (LTR) coordinates — geometry, hit-testing and
+    // gestures are physical, and corners are pinned to physical corners — so RTL locales draw
+    // exactly where touches land. Text inside still shapes right-to-left.
+    val rtl = false
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -229,14 +232,21 @@ fun GridHome(
     // Fractional focused index per coverflow page.
     val coverPos = remember { androidx.compose.runtime.mutableStateMapOf<Int, Float>() }
 
+    val coverJobs = remember { mutableMapOf<Int, kotlinx.coroutines.Job>() }
+
     fun geomFor(page: Int, p: HomePage?) =
-        PageGeometry.of(p?.layout ?: PageLayout(), areaSize, prefs, isLandscape, p?.keys?.size ?: 0, coverPos[page] ?: 0f)
+        PageGeometry.of(p?.layout ?: PageLayout(), areaSize, prefs, isLandscape, p?.keys?.size ?: 0, clampedCover(coverPos, page, p))
 
     fun focusCover(page: Int, index: Int) {
-        scope.launch {
-            androidx.compose.animation.core.animate(coverPos[page] ?: 0f, index.toFloat(), animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f)) { v, _ ->
-                coverPos[page] = v
-            }
+        coverJobs.remove(page)?.cancel()
+        val last = (pages.getOrNull(page)?.keys?.size ?: 1) - 1
+        val target = index.coerceIn(0, last.coerceAtLeast(0)).toFloat()
+        coverJobs[page] = scope.launch {
+            androidx.compose.animation.core.animate(
+                clampedCover(coverPos, page, pages.getOrNull(page)),
+                target,
+                animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+            ) { v, _ -> coverPos[page] = v }
         }
     }
 
@@ -282,16 +292,16 @@ fun GridHome(
 
     // Latest values for the long-lived gesture coroutine.
     val st by rememberUpdatedState(
-        GestureInputs(pages, appsByKey, suggestion, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos.toMap(), rtl),
+        GestureInputs(pages, appsByKey, suggestion, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl),
     )
     val cb by rememberUpdatedState(
-        GestureCallbacks(onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap, onTileLongPress),
+        GestureCallbacks(onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap, onTileLongPress, capacityOf, ::focusCover),
     )
 
     fun hitTest(page: Int, pos: Offset): Hit {
         val s = st
         val p = s.pages.getOrNull(page) ?: return Hit.Empty
-        val coverPosition = s.coverPos[page] ?: 0f
+        val coverPosition = clampedCover(s.coverPos, page, p)
         val geom = PageGeometry.of(p.layout, s.areaSize, s.prefs, s.landscape, p.keys.size, coverPosition)
         val slot = geom.slotAt(pos.x, pos.y)
         if (slot < 0) return Hit.Empty
@@ -305,6 +315,7 @@ fun GridHome(
     val safe = WindowInsets.safeDrawing
     val indicatorAtStart = paging == PagingAxis.Vertical
 
+    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Box(modifier = modifier.fillMaxSize()) {
         when (prefs.clockPosition) {
             ClockPosition.Top -> HomeClock(
@@ -334,6 +345,16 @@ fun GridHome(
                 )
                 .onSizeChanged { areaSize = it }
                 .pointerInput(Unit) {
+                    // Drop target from the *latest* inputs (this coroutine outlives compositions).
+                    fun dropTargetNow(): Pair<Int, Int> {
+                        val key = dragKey ?: return 0 to 0
+                        val s = st
+                        val tp = pagerState.currentPage
+                        val base = dragBase.getOrNull(tp)
+                        val rest = base?.keys?.filter { it != key }.orEmpty()
+                        val geom = PageGeometry.of(base?.layout ?: PageLayout(), s.areaSize, s.prefs, s.landscape, rest.size, clampedCover(s.coverPos, tp, base))
+                        return tp to geom.nearest(dragPos.x, dragPos.y).coerceAtMost(rest.size)
+                    }
                     val slop = viewConfiguration.touchSlop
                     val swipeMin = 56.dp.toPx()
                     awaitEachGesture {
@@ -368,15 +389,40 @@ fun GridHome(
                                 when (hit) {
                                     is Hit.App -> st.apps[hit.key]?.let(cb.onLaunch)
                                     is Hit.Suggested -> cb.onLaunch(hit.app)
-                                    is Hit.Focus -> focusCover(hit.page, hit.index)
+                                    is Hit.Focus -> cb.focusCover(hit.page, hit.index)
                                     is Hit.Tile -> if (hit.key == HomeTiles.CLOCK) cb.onClockTap()
                                     Hit.Empty -> if (HomeGesture.DoubleTap in st.bound) {
                                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                                             awaitFirstDown(requireUnconsumed = false)
                                         }
-                                        if (second != null && (second.position - down.position).getDistance() < 48.dp.toPx()) {
-                                            do { val ev = awaitPointerEvent() } while (ev.changes.any { it.pressed })
-                                            cb.onGesture(HomeGesture.DoubleTap)
+                                        if (second != null) {
+                                            // Wait for the second release (a held second press is not a tap).
+                                            val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                                var last = second
+                                                while (true) {
+                                                    val ev = awaitPointerEvent()
+                                                    val c = ev.changes.firstOrNull { it.id == second.id } ?: return@withTimeoutOrNull null
+                                                    if (c.isConsumed) return@withTimeoutOrNull null
+                                                    if (!c.pressed) return@withTimeoutOrNull last
+                                                    last = c
+                                                    if ((c.position - second.position).getDistance() > slop) return@withTimeoutOrNull null
+                                                }
+                                                @Suppress("UNREACHABLE_CODE") null
+                                            }
+                                            if (up != null) {
+                                                if ((second.position - down.position).getDistance() < 48.dp.toPx()) {
+                                                    cb.onGesture(HomeGesture.DoubleTap)
+                                                } else if (!pagerState.isScrollInProgress) {
+                                                    // Not a double tap: an ordinary tap somewhere else.
+                                                    when (val h2 = hitTest(pagerState.currentPage, second.position)) {
+                                                        is Hit.App -> st.apps[h2.key]?.let(cb.onLaunch)
+                                                        is Hit.Suggested -> cb.onLaunch(h2.app)
+                                                        is Hit.Focus -> cb.focusCover(h2.page, h2.index)
+                                                        is Hit.Tile -> if (h2.key == HomeTiles.CLOCK) cb.onClockTap()
+                                                        Hit.Empty -> Unit
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -490,8 +536,8 @@ fun GridHome(
                                         if (dragging) {
                                             val key = dragKey
                                             if (key != null) {
-                                                val (tp, idx) = dropTarget()
-                                                cb.onPagesChange(HomeLayoutMath.move(dragBase, key, tp, idx, capacityOf, dropEmpty = true))
+                                                val (tp, idx) = dropTargetNow()
+                                                cb.onPagesChange(HomeLayoutMath.move(dragBase, key, tp, idx, cb.capacityOf, dropEmpty = true))
                                             }
                                             dragKey = null
                                             dragBase = emptyList()
@@ -513,13 +559,14 @@ fun GridHome(
                 val coverModifier = if (geometry is PageGeometry.Coverflow) {
                     val cover = androidx.compose.foundation.gestures.rememberScrollableState { delta ->
                         val step = geometry.c.stepPx
-                        val cur = coverPos[index] ?: 0f
+                        val cur = clampedCover(coverPos, index, page)
                         val next = (cur - delta / step).coerceIn(0f, (page.keys.size - 1).coerceAtLeast(0).toFloat())
                         coverPos[index] = next
                         -(next - cur) * step
                     }
                     LaunchedEffect(cover.isScrollInProgress) {
-                        if (!cover.isScrollInProgress) focusCover(index, kotlin.math.round(coverPos[index] ?: 0f).toInt())
+                        if (cover.isScrollInProgress) coverJobs.remove(index)?.cancel()
+                        else focusCover(index, kotlin.math.round(clampedCover(coverPos, index, page)).toInt())
                     }
                     Modifier.scrollable(cover, androidx.compose.foundation.gestures.Orientation.Horizontal)
                 } else Modifier
@@ -586,6 +633,14 @@ fun GridHome(
             },
         )
     }
+    }
+}
+
+/** A coverflow page's focus position, clamped to its current item count. */
+private fun clampedCover(map: Map<Int, Float>, page: Int, p: HomePage?): Float {
+    val last = ((p?.keys?.size ?: 1) - 1).coerceAtLeast(0)
+    // Until the user scrubs, a coverflow page rests on its middle app (neighbours on both sides).
+    return (map[page] ?: (last / 2).toFloat()).coerceIn(0f, last.toFloat())
 }
 
 private data class GestureInputs(
@@ -609,6 +664,8 @@ private class GestureCallbacks(
     val onPagesChange: (List<HomePage>) -> Unit,
     val onClockTap: () -> Unit,
     val onTileLongPress: (String, Int) -> Unit,
+    val capacityOf: (PageLayout) -> Int,
+    val focusCover: (Int, Int) -> Unit,
 )
 
 @Composable

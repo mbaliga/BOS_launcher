@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.design.SphereTheme
+import com.bos.sphere.feature.grid.WidgetConfigureResults
 
 /** [seq] makes repeated requests for the same action distinct. */
 data class ExternalAction(val id: CornerActionId, val seq: Int)
@@ -49,6 +50,14 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_ACTION = "com.bos.sphere.extra.ACTION"
+    }
+
+    /** The system-launched widget configure screen reports back here (not through Compose). */
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        WidgetConfigureResults.deliver(requestCode, resultCode)
     }
 
     /** Pressing Home while already here delivers a new MAIN/HOME intent — reset the surface. */

@@ -19,6 +19,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** True if running [id] needs to start an activity (as opposed to toggling a system service). */
+fun CornerActionId.opensUi(): Boolean = when (this) {
+    CornerActionId.Flashlight, CornerActionId.RingerCycle, CornerActionId.RingerNormal,
+    CornerActionId.RingerVibrate, CornerActionId.RingerSilent, CornerActionId.DoNotDisturb -> false
+    else -> true
+}
+
 /**
  * Executes corner / palette / gesture items. External actions resolve to system intents or
  * system services (ringer, torch, DND); [CornerActionId.internal] ones are handed to
@@ -156,6 +163,9 @@ object Torch {
 
     @Volatile private var cameraId: String? = null
     @Volatile private var registered = false
+
+    /** Registers the torch callback early so [on] reflects the real state before the first toggle. */
+    fun init(context: Context) { ensure(context) }
 
     private fun ensure(context: Context): CameraManager? {
         val cm = context.applicationContext.getSystemService(CameraManager::class.java) ?: return null

@@ -117,6 +117,8 @@ fun SettingsSpace(
     sounds: UiSounds?,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Bump to reset the selection to [initialCategory] for a fresh visit. */
+    session: Int = 0,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -124,7 +126,12 @@ fun SettingsSpace(
         exit = fadeOut(tween(180)) + scaleOut(targetScale = 1.04f, animationSpec = tween(180)),
         modifier = modifier,
     ) {
-        SettingsSpaceContent(categories, initialCategory, sounds, onClose)
+        // Physical layout: positions and hit-tests below are computed in screen coordinates.
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+        ) {
+            androidx.compose.runtime.key(session) { SettingsSpaceContent(categories, initialCategory, sounds, onClose) }
+        }
     }
 }
 
@@ -225,7 +232,7 @@ private fun SettingsSpaceContent(
                         }
                     }
                 }
-                .pointerInput(Unit) {
+                .pointerInput(w, h, catSpacing, rowH) {
                     detectTapGestures { p ->
                         // Category bar hit?
                         if (abs(p.y - barY) < 44.dp.toPx()) {
@@ -233,7 +240,7 @@ private fun SettingsSpaceContent(
                             if (idx in latestCategories.indices) moveCategory(idx)
                             return@detectTapGestures
                         }
-                        val firstY = barY + 70.dp.toPx()
+                        val firstY = barY + ITEMS_GAP.toPx()
                         if (p.y > firstY - rowH / 2) {
                             val idx = ((p.y - firstY) / rowH + item).roundToInt()
                             if (idx in items().indices && p.x < (if (paneOpen >= 0) w * 0.52f else w)) activate(idx)
@@ -301,7 +308,7 @@ private fun SettingsSpaceContent(
 
         // Item column under the selected category.
         val list = items()
-        val firstY = barY + with(density) { 70.dp.toPx() }
+        val firstY = barY + with(density) { ITEMS_GAP.toPx() }
         list.forEachIndexed { i, it ->
             val d = i - itemAnim
             val y = firstY + d * rowH
@@ -382,6 +389,9 @@ private fun SettingsSpaceContent(
         }
     }
 }
+
+/** Distance from the category bar to the first item row (clears the category label). */
+private val ITEMS_GAP = 104.dp
 
 /** Soft violet glow behind the selected glyph. */
 @Composable

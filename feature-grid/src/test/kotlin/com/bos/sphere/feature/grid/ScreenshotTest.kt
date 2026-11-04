@@ -21,11 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.AppEntry
@@ -63,7 +61,7 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ScreenshotTest {
 
-    @get:Rule val rule = createComposeRule()
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
     private val outDir = File(System.getProperty("user.dir"), "build/screenshots").apply { mkdirs() }
 
@@ -134,9 +132,16 @@ class ScreenshotTest {
         LaunchedEffect(pages.size) { state.goToPage(0, animate = false) }
     }
 
-    private fun shoot(name: String) {
-        rule.mainClock.advanceTimeBy(1_500)
-        val bmp = rule.onRoot().captureToImage().asAndroidBitmap()
+    /**
+     * Draws the activity's view tree straight into a bitmap. (captureToImage waits for an idle
+     * redraw, which never comes with the clock paused and the dot grid breathing forever.)
+     */
+    private fun shoot(name: String, settleMs: Long = 1_500) {
+        rule.mainClock.advanceTimeBy(settleMs)
+        // The content view only (no Robolectric window title).
+        val view = rule.activity.findViewById<android.view.View>(android.R.id.content)
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        rule.runOnUiThread { view.draw(Canvas(bmp)) }
         File(outDir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
@@ -190,8 +195,8 @@ class ScreenshotTest {
         rule.setContent { Scene(prefs, landscape = false, pages = pagesFor(prefs, false), corners = corners) }
         rule.mainClock.advanceTimeBy(300)
         rule.onNodeWithContentDescription("Quick palette").performTouchInput { down(center) }
-        rule.mainClock.advanceTimeBy(250)
-        shoot("05-palette-open")
+        // Stay under the long-press timeout (holding still that long opens the corner editor).
+        shoot("05-palette-open", settleMs = 350)
     }
 
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")

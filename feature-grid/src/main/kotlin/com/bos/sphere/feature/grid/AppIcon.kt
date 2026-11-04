@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
@@ -69,9 +72,11 @@ fun AppIcon(
 ) {
     val px = with(LocalDensity.current) { size.roundToPx() }.coerceAtLeast(1)
     val cacheKey = "${app.key}@$px"
-    val bitmap by produceState(initialValue = IconCache.get(cacheKey), cacheKey) {
-        if (value == null) {
-            value = withContext(Dispatchers.Default) {
+    // Keyed on app + size so a reused slot never shows the previous app's bitmap.
+    var bitmap by remember(app, cacheKey) { mutableStateOf(IconCache.get(cacheKey)) }
+    LaunchedEffect(app, cacheKey) {
+        if (bitmap == null) {
+            bitmap = withContext(Dispatchers.Default) {
                 runCatching {
                     app.loadIcon()?.let { IconCache.rasterize(it, px).asImageBitmap() }
                 }.getOrNull()?.also { IconCache.put(cacheKey, it) }

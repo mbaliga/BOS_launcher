@@ -5,12 +5,20 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.role.RoleManager
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.os.PowerManager
+import android.widget.Toast
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import com.bos.sphere.core.data.ActionRunner
 import com.bos.sphere.core.data.CornerActionId
+import com.bos.sphere.core.data.CornerItem
+import com.bos.sphere.core.data.Torch
+import com.bos.sphere.core.data.opensUi
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.MotionGestureSensors
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +30,7 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * Keeps motion gestures (shake / flick twice / flip twice / face down) working while home is
- * not on screen. Opt-in from settings; runs as a foreground service with a quiet notification.
+ * not on screen (paused while the screen is off). Opt-in from settings; runs as a foreground service with a quiet notification.
  * Ringer / torch / DND / app actions run here directly; launcher-internal actions (search, all
  * apps, settings, notifications) bring the home activity forward with [MainActivity.EXTRA_ACTION].
  */
@@ -40,19 +48,46 @@ class MotionGestureService : Service() {
             onInternal = { id -> openHome(id) },
             onAppLaunched = { stores.history.record(it) },
         )
+        Torch.init(this)
         sensors = MotionGestureSensors(this) { gesture ->
-            stores.shortcuts.gestures.value[gesture]?.let(runner::run)
+            val item = stores.shortcuts.gestures.value[gesture] ?: return@MotionGestureSensors
+            val opensUi = item is CornerItem.App || (item is CornerItem.Action && item.id.opensUi())
+            // Android only lets a background service open UI for the default home app.
+            if (opensUi && !isDefaultHome()) {
+                Toast.makeText(this, "Set Sphere as your home app to open things with motion gestures", Toast.LENGTH_SHORT).show()
+            } else {
+                runner.run(item)
+            }
         }
         stores.prefs.prefs.onEach { sensors.sensitivity = it.motionSensitivity }.launchIn(scope)
+        // Don't listen (or act) with the screen off: saves battery and avoids pocket triggers.
+        registerReceiver(
+            screenReceiver,
+            IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON) },
+            Context.RECEIVER_NOT_EXPORTED,
+        )
     }
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> sensors.stop()
+                Intent.ACTION_SCREEN_ON -> sensors.start()
+            }
+        }
+    }
+
+    private fun isDefaultHome(): Boolean =
+        getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_HOME) == true
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        sensors.start()
+        if (getSystemService(PowerManager::class.java)?.isInteractive != false) sensors.start()
         return START_STICKY
     }
 
     override fun onDestroy() {
+        runCatching { unregisterReceiver(screenReceiver) }
         sensors.stop()
         scope.cancel()
         super.onDestroy()

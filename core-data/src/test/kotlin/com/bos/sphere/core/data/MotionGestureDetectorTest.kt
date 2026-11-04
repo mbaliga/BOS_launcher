@@ -111,4 +111,42 @@ class MotionGestureDetectorTest {
         assertEquals(emptyList<HomeGesture>(), firm.fired)
         assertEquals(listOf(HomeGesture.Shake), light.fired)
     }
+
+    @Test
+    fun `jogging footsteps do not register as a shake`() {
+        val r = Rig().apply { detector.sensitivity = 1f }
+        r.rest()
+        // 2.8 Hz one-sided vertical impacts up to +2.4 g.
+        r.feed(6_000, accel = { s ->
+            val ph = (s * 2.8) % 1.0
+            val pulse = if (ph < 0.18) 24 * sin(PI * ph / 0.18) else 0.0
+            Triple(0f, 0f, (g + pulse).toFloat())
+        })
+        r.rest()
+        assertEquals(emptyList<HomeGesture>(), r.fired)
+    }
+
+    @Test
+    fun `turning face down long after being face up does not fire FaceDown`() {
+        val r = Rig()
+        r.rest()
+        // Propped upright for a while (screen facing you), then laid face down.
+        r.feed(5_000, accel = { Triple(0f, 9.3f, 3f) })
+        r.feed(500, accel = { s -> Triple(0f, (9.3 * cos(PI * s / 0.5 / 2)).toFloat(), (3 - 12.8 * s / 0.5).toFloat()) })
+        r.feed(3_000, accel = { Triple(0f, 0f, -g) })
+        assertEquals(emptyList<HomeGesture>(), r.fired)
+    }
+
+    @Test
+    fun `flick still works after the phone has been face down`() {
+        val r = Rig()
+        r.rest()
+        r.feed(500, accel = { s -> Triple(0f, 0f, (g * cos(PI * s / 0.5)).toFloat()) })
+        r.feed(3_000, accel = { Triple(0f, 0f, -g) })
+        // Picked up and held upright.
+        r.feed(3_000, accel = { Triple(0f, g, 0f) })
+        r.feed(800, accel = { Triple(0f, g, 0f) }, gyro = { s -> Triple(0f, (9 * sin(2 * PI * 2.5 * s)).toFloat(), 0f) })
+        r.feed(2_000, accel = { Triple(0f, g, 0f) })
+        assertEquals(listOf(HomeGesture.FaceDown, HomeGesture.DoubleFlick), r.fired)
+    }
 }

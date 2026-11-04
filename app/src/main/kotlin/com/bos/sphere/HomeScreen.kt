@@ -91,7 +91,13 @@ import com.bos.sphere.ui.SettingsModel
 import com.bos.sphere.ui.SphereSettings
 import com.bos.sphere.ui.SystemLinks
 import com.bos.sphere.ui.buildSettingsCategories
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.snapshotFlow
+import com.bos.sphere.core.data.Torch
 import java.util.Calendar
 
 /**
@@ -115,8 +121,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val hidden by hiddenStore.hidden.collectAsStateWithLifecycle()
     val apps = remember(allApps, hidden) { allApps.filter { it.key !in hidden } }
     val appsByKey = remember(apps) { apps.associateBy { it.key } }
-    // Package changes can change icons and categories.
-    LaunchedEffect(allApps) { IconCache.clear(); WheelCategoryCache.invalidate() }
+    // Package changes can change icons and categories; uninstalled apps forget "removed from home".
+    LaunchedEffect(allApps) {
+        IconCache.clear()
+        WheelCategoryCache.invalidate()
+        if (allApps.isNotEmpty()) stores.layout.pruneRemoved(allApps.mapTo(HashSet()) { it.key })
+    }
+    LaunchedEffect(Unit) { Torch.init(context) }
 
     val prefs by stores.prefs.prefs.collectAsStateWithLifecycle()
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
@@ -131,6 +142,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val pages = remember(layout, apps, isLandscape, prefs) {
         HomeLayoutMath.visualPages(layout, apps.map { it.key }, capacityOf)
     }
+    // Stored keys that can't be drawn right now (hidden apps, a paused work profile): every save keeps them.
+    val preserve = remember(layout, apps) {
+        layout.pages.flatMapTo(HashSet()) { it.keys } - appsByKey.keys - HomeTiles.ALL.toSet()
+    }
+    fun savePages(visual: List<com.bos.sphere.core.data.HomePage>) = stores.layout.setPages(visual, preserve)
 
     // ---- overlay state
     var settingsOpen by remember { mutableStateOf(false) }
@@ -242,8 +258,23 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (motionHere && lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) motion.start()
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer); motion.stop() }
     }
+    // The background service shows an ongoing notification; on Android 13+ that needs permission.
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+            android.widget.Toast.makeText(context, "Motion gestures still run; their notification is hidden", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     LaunchedEffect(prefs.motionEnabled, prefs.motionInBackground) {
-        if (prefs.motionEnabled && prefs.motionInBackground) MotionGestureService.start(context) else MotionGestureService.stop(context)
+        if (prefs.motionEnabled && prefs.motionInBackground) {
+            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+            MotionGestureService.start(context)
+        } else {
+            MotionGestureService.stop(context)
+        }
     }
 
     // ---- network-aware dots
@@ -304,7 +335,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     capacityOf = capacityOf,
                     onLaunch = ::launch,
                     onAppLongPress = { menuApp = it },
-                    onPagesChange = { stores.layout.setPages(it) },
+                    onPagesChange = { savePages(it) },
                     onEmptyLongPress = { page -> openSettings(CATEGORY_THIS_PAGE, page) },
                     onGesture = ::onGesture,
                     onClockTap = { runner.run(CornerActionId.Clock) },
@@ -428,19 +459,24 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 updatePrefs = stores.prefs::update,
                 pageIndex = settingsPage,
                 pages = pages,
-                setPageLayout = { i, l -> stores.layout.setPages(HomeLayoutMath.setLayout(pages, i, l, capacityOf)) },
+                setPageLayout = { i, l -> savePages(HomeLayoutMath.setLayout(pages, i, l, capacityOf)) },
                 addPageAfter = { i ->
-                    stores.layout.setPages(HomeLayoutMath.insertPage(pages, i))
-                    scope.launch { gridState.goToPage(i + 1) }
+                    savePages(HomeLayoutMath.insertPage(pages, i))
                     settingsPage = i + 1
+                    // The pager only learns about the page after the next composition; wait for it.
+                    scope.launch {
+                        withTimeoutOrNull(1_000) { snapshotFlow { gridState.pager.pageCount }.first { it > i + 1 } }
+                        gridState.goToPage(i + 1)
+                    }
                 },
                 deletePage = { i ->
-                    stores.layout.setPages(HomeLayoutMath.deletePage(pages, i, capacityOf))
+                    savePages(HomeLayoutMath.deletePage(pages, i, capacityOf))
                     settingsPage = (i - 1).coerceAtLeast(0)
                 },
                 setClockTile = { page, present ->
-                    stores.layout.setPages(
-                        if (present) HomeLayoutMath.add(pages, HomeTiles.CLOCK, page, capacityOf)
+                    // Put it first on that page; a full page spills its last app forward.
+                    savePages(
+                        if (present) HomeLayoutMath.move(pages, HomeTiles.CLOCK, page, 0, capacityOf)
                         else HomeLayoutMath.remove(pages, HomeTiles.CLOCK),
                     )
                 },
@@ -471,16 +507,15 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 ),
             ),
         )
-        androidx.compose.runtime.key(settingsSession) {
-            SettingsSpace(
-                visible = settingsOpen,
-                categories = categories,
-                initialCategory = settingsCategory,
-                sounds = sounds,
-                onClose = { settingsOpen = false },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        SettingsSpace(
+            visible = settingsOpen,
+            categories = categories,
+            initialCategory = settingsCategory,
+            sounds = sounds,
+            onClose = { settingsOpen = false },
+            modifier = Modifier.fillMaxSize(),
+            session = settingsSession,
+        )
 
         // ---- dialogs
         menuApp?.let { app ->
@@ -493,8 +528,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onToggleHidden = { hiddenStore.setHidden(app.key, app.key !in hidden); menuApp = null },
                 isOnHome = if (prefs.homeStyle == HomeStyle.Grid) pages.any { app.key in it.keys } else null,
                 onToggleHome = {
-                    if (pages.any { app.key in it.keys }) stores.layout.removeFromHome(app.key, pages)
-                    else stores.layout.addToHome(app.key, pages, gridState.currentPage, capacityOf)
+                    if (pages.any { app.key in it.keys }) stores.layout.removeFromHome(app.key, pages, preserve)
+                    else stores.layout.addToHome(app.key, pages, gridState.currentPage, capacityOf, preserve)
                     menuApp = null
                 },
             )
@@ -522,7 +557,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         tileMenu?.let { key ->
             TileMenuDialog(
                 title = if (key == HomeTiles.CLOCK) "Clock tile" else "Tile",
-                onRemove = { stores.layout.setPages(HomeLayoutMath.remove(pages, key)); tileMenu = null },
+                onRemove = { savePages(HomeLayoutMath.remove(pages, key)); tileMenu = null },
                 onDismiss = { tileMenu = null },
             )
         }

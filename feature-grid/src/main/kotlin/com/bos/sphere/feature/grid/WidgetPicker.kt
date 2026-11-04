@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+/**
+ * Bridge for configure results that only reach `Activity.onActivityResult` (the system-launched
+ * configure path). The host activity calls [deliver]; the picker collects [results].
+ */
+object WidgetConfigureResults {
+    private val _results = kotlinx.coroutines.flow.MutableSharedFlow<Pair<Int, Int>>(extraBufferCapacity = 4)
+    val results: kotlinx.coroutines.flow.SharedFlow<Pair<Int, Int>> = _results
+
+    /** Returns true if [requestCode] belonged to the widget configure flow. */
+    fun deliver(requestCode: Int, resultCode: Int): Boolean {
+        if (requestCode != REQUEST_CONFIGURE) return false
+        _results.tryEmit(requestCode to resultCode)
+        return true
+    }
+}
 
 /** Handle returned by [rememberWidgetPicker]; [launch] opens the in-app widget picker. */
 class WidgetPickerLauncher internal constructor(private val onLaunch: () -> Unit) {
@@ -125,12 +142,19 @@ fun rememberWidgetPicker(
         }.isSuccess
         if (launched) return
         // Fallback: let the system launch it (handles non-exported / cross-profile). Its result
-        // lands in Activity.onActivityResult, which Compose cannot observe — treat as success.
+        // lands in Activity.onActivityResult; the host activity forwards it to
+        // [WidgetConfigureResults], collected below, so a cancel still deletes the widget.
         val activity = context.findActivity()
         val ok = activity != null && runCatching {
             host.host.startAppWidgetConfigureActivityForResult(activity, id, 0, REQUEST_CONFIGURE, null)
         }.isSuccess
-        finish(ok)
+        if (!ok) finish(false)
+    }
+
+    LaunchedEffect(Unit) {
+        WidgetConfigureResults.results.collect { (requestCode, resultCode) ->
+            if (requestCode == REQUEST_CONFIGURE) finish(resultCode == Activity.RESULT_OK)
+        }
     }
 
     val bindLauncher = rememberLauncherForActivityResult(

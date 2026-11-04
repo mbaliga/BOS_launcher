@@ -212,8 +212,12 @@ fun CornerLayer(
     // A rotation re-maps corners: drop any open palette rather than leave it anchored wrongly.
     LaunchedEffect(placements) { if (open != null) { open = null; hovered = -1; progress.snapTo(0f) } }
 
+    // Corners are physical: lay out LTR so palette offsets match the touch coordinates in RTL too.
+    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Box(modifier = modifier.fillMaxSize().onGloballyPositioned { layerCoords = it }) {
         placements.forEach { placement ->
+          // Keyed so a rotation re-mapping never leaves gesture handlers bound to the old corner.
+          androidx.compose.runtime.key(placement.screen, placement.physical) {
             when (val slot = placement.slot) {
                 is CornerSlot.Widget -> widget(placement, slot)
                 else -> CornerSlotView(
@@ -249,6 +253,7 @@ fun CornerLayer(
                     cluster = cluster,
                 )
             }
+          }
         }
 
         open?.let { o ->
@@ -261,6 +266,7 @@ fun CornerLayer(
                 onDismiss = { close() },
             )
         }
+    }
     }
 }
 
@@ -294,7 +300,9 @@ private fun PaletteOverlay(
     ) {
         // Arc guides behind the items (the "palette rim").
         Canvas(Modifier.fillMaxSize()) {
-            val rings = (items.size + 3) / 4
+            var rings = 0
+            var left = items.size
+            while (left > 0) { left -= PaletteMath.RING_CAPACITY.getOrElse(rings) { 9 }; rings++ }
             for (r in 0 until minOf(rings, PaletteMath.RING_RADIUS_DP.size)) {
                 val radius = PaletteMath.RING_RADIUS_DP[r].dp.toPx() * progress
                 drawArc(

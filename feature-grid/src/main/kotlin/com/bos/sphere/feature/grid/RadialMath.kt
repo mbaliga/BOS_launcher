@@ -18,8 +18,8 @@ data class Pt(val x: Float, val y: Float) {
  * from a corner. Ring capacities grow outward (4, 6, 8) so spacing along each arc stays even.
  */
 object PaletteMath {
-    val RING_CAPACITY = intArrayOf(4, 6, 8)
-    val RING_RADIUS_DP = floatArrayOf(96f, 164f, 232f)
+    val RING_CAPACITY = intArrayOf(3, 5, 7)
+    val RING_RADIUS_DP = floatArrayOf(108f, 186f, 264f)
     private const val EDGE_INSET_DEG = 11f
 
     /** Start angle (degrees, screen space: 0 = right, 90 = down) of the inward quadrant. */
@@ -37,7 +37,7 @@ object PaletteMath {
         var ring = 0
         while (remaining > 0) {
             val cap = RING_CAPACITY.getOrElse(ring) { RING_CAPACITY.last() + 2 * (ring - RING_CAPACITY.lastIndex) }
-            val radius = RING_RADIUS_DP.getOrElse(ring) { RING_RADIUS_DP.last() + 68f * (ring - RING_RADIUS_DP.lastIndex) }
+            val radius = RING_RADIUS_DP.getOrElse(ring) { RING_RADIUS_DP.last() + 78f * (ring - RING_RADIUS_DP.lastIndex) }
             val k = min(cap, remaining)
             val start = quadrantStart(corner) + EDGE_INSET_DEG
             val span = 90f - 2 * EDGE_INSET_DEG

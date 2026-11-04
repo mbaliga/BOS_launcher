@@ -374,7 +374,7 @@ private class WheelMetrics(width: Float, height: Float, density: Density) {
     init {
         with(density) {
             iconPx = iconDp.toPx()
-            hubRadius = (minSide * 0.29f).coerceAtMost(170.dp.toPx())
+            hubRadius = (minSide * 0.34f).coerceAtMost(190.dp.toPx())
             bandInner = hubRadius + 3.dp.toPx()
             bandOuter = bandInner + 26.dp.toPx()
             firstRadius = bandOuter + 14.dp.toPx() + iconPx / 2f
@@ -385,7 +385,7 @@ private class WheelMetrics(width: Float, height: Float, density: Density) {
             gapDeg = spokeStepDeg * 0.35f
             outerRadius = firstRadius + (perSpoke - 1) * radialStep + iconPx / 2f + 16.dp.toPx()
             chipRadius = hubRadius * 0.8f
-            searchRadius = hubRadius * 0.4f
+            searchRadius = hubRadius * 0.34f
             labelPad = 8.dp.toPx()
         }
     }
@@ -398,7 +398,8 @@ private class Spoke(val angle: Float, val apps: List<AppEntry>)
 
 private const val INSET_DEG = 4f
 private const val CULL_MARGIN_DEG = 30f
-private val ChipAngles = floatArrayOf(10f, 45f, 80f)
+// Spread across the hub; chips stay upright (readable) and inset from the screen edges.
+private val ChipAngles = floatArrayOf(17f, 45f, 73f)
 
 /** Unfurl: the wheel grows from 35% and sweeps 60° clockwise into place as [p] goes 0 → 1. */
 private fun openScale(p: Float) = 0.35f + 0.65f * p
@@ -443,6 +444,11 @@ fun WheelDrawer(
     val shown by remember { derivedStateOf { visibleNow || progress.value > 0.002f } }
     if (!shown) return
 
+    // The wheel is physical geometry around a screen corner: lay it out LTR so RTL locales don't
+    // shift every positioned child away from where its hit-test expects it.
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+    ) {
     WheelContent(
         anchor = anchor,
         apps = apps,
@@ -457,6 +463,7 @@ fun WheelDrawer(
         progress = progress,
         modifier = modifier,
     )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -723,7 +730,7 @@ private fun WheelContent(
                     GroupingChip(
                         label = g.label,
                         selected = g == grouping,
-                        rotationDeg = WheelGeometry.tangentTextRotation(angle),
+                        rotationDeg = 0f,
                         onClick = { if (g != grouping) onGroupingChange(g) },
                         modifier = Modifier.centeredAt { Offset(pt.x, pt.y) },
                     )

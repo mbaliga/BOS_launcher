@@ -292,8 +292,17 @@ data class PageLayout(
     }
 }
 
-/** One home page: its app keys in order, and how it lays them out. */
-data class HomePage(val keys: List<String> = emptyList(), val layout: PageLayout = PageLayout())
+/**
+ * One home page: its item keys in order, and how it lays them out. [id] identifies the *stored*
+ * (logical) page: when a page holds more than one screen's worth — after a rotation or a density
+ * change — it is drawn as several visual pages sharing one id, and they merge back into a single
+ * stored page on save ([HomeLayoutMath.toStored]), so rotating never fragments the layout.
+ */
+data class HomePage(
+    val keys: List<String> = emptyList(),
+    val layout: PageLayout = PageLayout(),
+    val id: Long = 0L,
+)
 
 /**
  * The persisted home arrangement. [seeded] is false until the first arrangement is written
@@ -308,40 +317,83 @@ data class HomeLayout(
 
 /**
  * Layout math over pages whose capacity varies per page ([capacityOf] maps a [PageLayout] to its
- * slot count for the current orientation and global density).
+ * slot count for the current orientation and global density). Edits operate on *visual* pages
+ * (what is on screen); [toStored] folds them back for persistence.
  */
 object HomeLayoutMath {
 
     /**
      * Resolves the stored [layout] into what is drawn: unknown / hidden keys dropped, duplicates
      * removed, apps not yet placed (new installs, first run) appended to the last page, and every
-     * stored page split into as many pages (same layout) as it needs so a density change never
-     * hides an app. Pages left empty are kept only if they were stored that way deliberately
-     * (an added blank page). Always returns at least one page.
+     * stored page split into as many visual pages (same layout and id) as it needs, so a density
+     * change never hides an app. A page stored empty (a deliberate blank page) is kept; a page that
+     * only *became* empty because its apps are hidden or unavailable is not drawn. Always returns
+     * at least one page.
      */
     fun visualPages(layout: HomeLayout, available: List<String>, capacityOf: (PageLayout) -> Int): List<HomePage> {
         val known = available.toHashSet().apply { addAll(HomeTiles.ALL) }
         val placed = HashSet<String>()
-        val pages = layout.pages.map { page ->
-            page.copy(keys = page.keys.filter { it in known && placed.add(it) })
+        val stored = normalizeIds(layout.pages)
+        val pages = stored.map { page ->
+            page to page.copy(keys = page.keys.filter { it in known && placed.add(it) })
         }.toMutableList()
         val extras = available.filter { it !in placed && it !in layout.removed }
         if (extras.isNotEmpty()) {
-            if (pages.isEmpty()) pages += HomePage()
-            pages[pages.lastIndex] = pages.last().let { it.copy(keys = it.keys + extras) }
+            if (pages.isEmpty()) {
+                val fresh = HomePage(id = 1L)
+                pages += fresh to fresh
+            }
+            val (orig, last) = pages.last()
+            pages[pages.lastIndex] = orig to last.copy(keys = last.keys + extras)
         }
-        val out = pages.flatMap { page ->
-            if (page.keys.isEmpty()) listOf(page)
-            else page.keys.chunked(capacityOf(page.layout).coerceAtLeast(1)).map { HomePage(it, page.layout) }
+        val out = pages.flatMap { (orig, page) ->
+            when {
+                page.keys.isNotEmpty() ->
+                    page.keys.chunked(capacityOf(page.layout).coerceAtLeast(1)).map { HomePage(it, page.layout, page.id) }
+                orig.keys.isEmpty() -> listOf(page) // a deliberate blank page
+                else -> emptyList()
+            }
         }
-        return out.ifEmpty { listOf(HomePage()) }
+        return out.ifEmpty { listOf(HomePage(id = 1L)) }
+    }
+
+    /**
+     * Folds visual pages back into stored pages: consecutive pages with the same id merge (keys
+     * concatenated, first layout wins). Then [preserve]d keys — on the previous stored layout but
+     * not drawable right now (hidden, or a work profile paused) — are put back on the page with
+     * their old id at their old position, so an edit never silently drops them.
+     */
+    fun toStored(visual: List<HomePage>, previous: List<HomePage>, preserve: Set<String>): List<HomePage> {
+        val merged = ArrayList<HomePage>()
+        for (p in visual) {
+            val last = merged.lastOrNull()
+            if (last != null && last.id == p.id && p.id != 0L) merged[merged.lastIndex] = last.copy(keys = last.keys + p.keys)
+            else merged += p
+        }
+        if (preserve.isEmpty()) return merged
+        val present = merged.flatMap { it.keys }.toHashSet()
+        val out = merged.map { it.keys.toMutableList() }
+        for (old in previous) {
+            old.keys.forEachIndexed { idx, key ->
+                if (key !in preserve || key in present) return@forEachIndexed
+                val target = merged.indexOfFirst { it.id == old.id }.takeIf { it >= 0 } ?: merged.lastIndex
+                if (target < 0) return@forEachIndexed
+                val list = out[target]
+                // Anchor after its nearest earlier neighbour that is still on this page; else its old index.
+                val anchor = (idx - 1 downTo 0).map { old.keys[it] }.firstOrNull { it in list }
+                val at = if (anchor != null) list.indexOf(anchor) + 1 else idx.coerceAtMost(list.size)
+                list.add(at, key)
+                present += key
+            }
+        }
+        return merged.mapIndexed { i, p -> p.copy(keys = out[i].toList()) }
     }
 
     /**
      * Moves [key] to ([toPage], [toIndex]). `toPage == pages.size` creates a new page (default
-     * layout). Overflow cascades into following pages; a page created by overflow inherits the
-     * layout of the page it spilled from. With [dropEmpty] false the page count is preserved
-     * (the live drag preview, so page indices don't shift under the finger).
+     * layout, new id). Overflow cascades into following pages; a page created by overflow belongs
+     * to the page it spilled from (same layout and id). With [dropEmpty] false the page count is
+     * preserved (the live drag preview, so page indices don't shift under the finger).
      */
     fun move(
         pages: List<HomePage>,
@@ -352,54 +404,62 @@ object HomeLayoutMath {
         dropEmpty: Boolean = true,
     ): List<HomePage> {
         val src = pages.indexOfFirst { key in it.keys }
-        val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout) }.toMutableList()
+        val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout, p.id) }.toMutableList()
         val target = toPage.coerceIn(0, work.size)
-        if (target == work.size) work += Work(mutableListOf(), PageLayout())
+        if (target == work.size) work += Work(mutableListOf(), PageLayout(), nextId(pages))
         val page = work[target].keys
         page.add(toIndex.coerceIn(0, page.size), key)
         cascade(work, capacityOf)
-        // Only the page the app was dragged out of is dropped when emptied; deliberate blank pages stay.
-        return finish(work, dropIndex = if (dropEmpty) src else -1)
+        // Only the page the item was dragged out of is dropped when emptied; deliberate blank pages stay.
+        return finish(work, dropIndex = if (dropEmpty && src != target) src else -1)
     }
 
     /** Removes [key] from the pages (its page is dropped if that empties it). */
     fun remove(pages: List<HomePage>, key: String): List<HomePage> {
         val src = pages.indexOfFirst { key in it.keys }
-        val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout) }.toMutableList()
+        val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout, p.id) }.toMutableList()
         return finish(work, dropIndex = src)
     }
 
     /** Adds [key] at the end of [preferredPage] if it has room, else at the end of the last page. */
     fun add(pages: List<HomePage>, key: String, preferredPage: Int, capacityOf: (PageLayout) -> Int): List<HomePage> {
-        val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout) }.toMutableList()
-        if (work.isEmpty()) work += Work(mutableListOf(), PageLayout())
+        val src = pages.indexOfFirst { key in it.keys }
+        val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout, p.id) }.toMutableList()
+        if (work.isEmpty()) work += Work(mutableListOf(), PageLayout(), 1L)
         val pref = preferredPage.coerceIn(0, work.lastIndex)
         val dest = if (work[pref].keys.size < capacityOf(work[pref].layout)) pref else work.lastIndex
         work[dest].keys.add(key)
         cascade(work, capacityOf)
-        return finish(work, dropIndex = -1)
+        return finish(work, dropIndex = if (src != dest) src else -1)
     }
 
     /** Inserts a blank page after [afterPage]. */
     fun insertPage(pages: List<HomePage>, afterPage: Int, layout: PageLayout = PageLayout()): List<HomePage> =
-        pages.toMutableList().apply { add((afterPage + 1).coerceIn(0, size), HomePage(emptyList(), layout)) }
+        pages.toMutableList().apply { add((afterPage + 1).coerceIn(0, size), HomePage(emptyList(), layout, nextId(pages))) }
 
     /** Deletes page [index]; its apps move to the end of the previous (or next) page. */
     fun deletePage(pages: List<HomePage>, index: Int, capacityOf: (PageLayout) -> Int): List<HomePage> {
         if (index !in pages.indices || pages.size == 1) return pages
         val orphans = pages[index].keys
         val work = pages.filterIndexed { i, _ -> i != index }
-            .map { Work(it.keys.toMutableList(), it.layout) }.toMutableList()
+            .map { Work(it.keys.toMutableList(), it.layout, it.id) }.toMutableList()
         val dest = (index - 1).coerceAtLeast(0)
         work[dest].keys.addAll(orphans)
         cascade(work, capacityOf)
         return finish(work, dropIndex = -1)
     }
 
-    /** Changes the layout of page [index]; apps that no longer fit overflow forward. */
+    /**
+     * Changes the layout of page [index] — and of every visual page sharing its id, since they are
+     * one stored page. Apps that no longer fit overflow forward.
+     */
     fun setLayout(pages: List<HomePage>, index: Int, layout: PageLayout, capacityOf: (PageLayout) -> Int): List<HomePage> {
         if (index !in pages.indices) return pages
-        val work = pages.mapIndexed { i, p -> Work(p.keys.toMutableList(), if (i == index) layout else p.layout) }.toMutableList()
+        val id = pages[index].id
+        val work = pages.mapIndexed { i, p ->
+            val mine = i == index || (id != 0L && p.id == id)
+            Work(p.keys.toMutableList(), if (mine) layout else p.layout, p.id)
+        }.toMutableList()
         cascade(work, capacityOf)
         return finish(work, dropIndex = -1)
     }
@@ -407,7 +467,18 @@ object HomeLayoutMath {
     /** Index of the page holding [key], or -1. */
     fun pageOf(pages: List<HomePage>, key: String): Int = pages.indexOfFirst { key in it.keys }
 
-    private class Work(val keys: MutableList<String>, val layout: PageLayout)
+    /** Gives every stored page a unique, non-zero id (legacy data, duplicates after edits). */
+    fun normalizeIds(pages: List<HomePage>): List<HomePage> {
+        val seen = HashSet<Long>()
+        var next = (pages.maxOfOrNull { it.id } ?: 0L) + 1L
+        return pages.map { p ->
+            if (p.id != 0L && seen.add(p.id)) p else p.copy(id = next++).also { seen += it.id }
+        }
+    }
+
+    private fun nextId(pages: List<HomePage>): Long = (pages.maxOfOrNull { it.id } ?: 0L) + 1L
+
+    private class Work(val keys: MutableList<String>, val layout: PageLayout, val id: Long)
 
     private fun cascade(work: MutableList<Work>, capacityOf: (PageLayout) -> Int) {
         var i = 0
@@ -415,7 +486,10 @@ object HomeLayoutMath {
             val cap = capacityOf(work[i].layout).coerceAtLeast(1)
             while (work[i].keys.size > cap) {
                 val spill = work[i].keys.removeAt(work[i].keys.lastIndex)
-                if (i + 1 == work.size) work += Work(mutableListOf(), work[i].layout)
+                // Spill-over is a continuation of the same stored page unless the next page already is.
+                if (i + 1 == work.size || work[i + 1].id != work[i].id && work[i + 1].keys.size >= capacityOf(work[i + 1].layout)) {
+                    work.add(i + 1, Work(mutableListOf(), work[i].layout, work[i].id))
+                }
                 work[i + 1].keys.add(0, spill)
             }
             i++
@@ -425,9 +499,9 @@ object HomeLayoutMath {
     /** Freezes [work]; page [dropIndex] is dropped if it ended up empty (-1 = keep all). */
     private fun finish(work: List<Work>, dropIndex: Int): List<HomePage> {
         val out = work.mapIndexedNotNull { i, w ->
-            if (i == dropIndex && w.keys.isEmpty()) null else HomePage(w.keys.toList(), w.layout)
+            if (i == dropIndex && w.keys.isEmpty()) null else HomePage(w.keys.toList(), w.layout, w.id)
         }
-        return out.ifEmpty { listOf(HomePage()) }
+        return out.ifEmpty { listOf(HomePage(id = 1L)) }
     }
 }
 

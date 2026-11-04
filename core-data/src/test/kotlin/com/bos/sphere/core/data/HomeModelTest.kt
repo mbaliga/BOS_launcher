@@ -77,9 +77,42 @@ class HomeModelTest {
 
     @Test
     fun `blank pages are kept and an empty inventory still yields one page`() {
-        assertEquals(listOf(HomePage()), HomeLayoutMath.visualPages(HomeLayout(), emptyList(), cap(4)))
+        assertEquals(listOf(emptyList<String>()), HomeLayoutMath.visualPages(HomeLayout(), emptyList(), cap(4)).keys())
         val layout = HomeLayout(pages = pages(listOf("app1"), emptyList()), seeded = true)
         assertEquals(2, HomeLayoutMath.visualPages(layout, listOf("app1"), cap(4)).size)
+    }
+
+    @Test
+    fun `a page emptied only by hidden apps is not drawn`() {
+        val layout = HomeLayout(pages = pages(listOf("hidden"), listOf("app1")), seeded = true)
+        assertEquals(listOf(listOf("app1")), HomeLayoutMath.visualPages(layout, listOf("app1"), cap(4)).keys())
+    }
+
+    @Test
+    fun `visual splits fold back into one stored page so rotation does not fragment`() {
+        val stored = listOf(HomePage(apps, id = 7L))
+        val visual = HomeLayoutMath.visualPages(HomeLayout(stored, seeded = true), apps, cap(3))
+        assertEquals(3, visual.size)
+        val back = HomeLayoutMath.toStored(visual, stored, emptySet())
+        assertEquals(listOf(HomePage(apps, id = 7L)), back)
+    }
+
+    @Test
+    fun `saving keeps hidden apps in their old place`() {
+        val stored = listOf(HomePage(listOf("a", "hidden", "b"), id = 1L), HomePage(listOf("c"), id = 2L))
+        val visual = HomeLayoutMath.visualPages(HomeLayout(stored, seeded = true), listOf("a", "b", "c"), cap(9))
+        val edited = HomeLayoutMath.move(visual, "c", 0, 0, cap(9))
+        val back = HomeLayoutMath.toStored(edited, stored, setOf("hidden"))
+        assertEquals(listOf("c", "a", "hidden", "b"), back.flatMap { it.keys })
+    }
+
+    @Test
+    fun `new pages get fresh ids and duplicate ids are normalised`() {
+        val p = listOf(HomePage(listOf("a"), id = 4L))
+        assertEquals(5L, HomeLayoutMath.move(p, "x", 1, 0, cap(4))[1].id)
+        assertEquals(5L, HomeLayoutMath.insertPage(p, 0)[1].id)
+        val ids = HomeLayoutMath.normalizeIds(listOf(HomePage(id = 3L), HomePage(id = 3L), HomePage())).map { it.id }
+        assertEquals(ids.toSet().size, 3)
     }
 
     @Test

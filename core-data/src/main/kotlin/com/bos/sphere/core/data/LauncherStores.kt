@@ -102,26 +102,46 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
     private val _layout = MutableStateFlow(read())
     val layout: StateFlow<HomeLayout> = _layout.asStateFlow()
 
-    /** Persists a new page arrangement (marks the layout as seeded). */
-    fun setPages(pages: List<HomePage>) = write(_layout.value.copy(pages = pages, seeded = true))
+    /**
+     * Persists an edited *visual* page list: split pages fold back together ([HomeLayoutMath.toStored])
+     * and [preserve]d keys (stored but not drawable now — hidden apps, a paused work profile) keep
+     * their places.
+     */
+    fun setPages(visual: List<HomePage>, preserve: Set<String> = emptySet()) {
+        val cur = _layout.value
+        write(cur.copy(pages = HomeLayoutMath.toStored(visual, cur.pages, preserve), seeded = true))
+    }
 
     /** Takes [key] off the home pages (it stays in the drawer). */
-    fun removeFromHome(key: String, currentPages: List<HomePage>) = write(
-        _layout.value.copy(
-            pages = HomeLayoutMath.remove(currentPages, key),
-            removed = _layout.value.removed + key,
-            seeded = true,
-        ),
-    )
+    fun removeFromHome(key: String, visual: List<HomePage>, preserve: Set<String> = emptySet()) {
+        val cur = _layout.value
+        write(
+            cur.copy(
+                pages = HomeLayoutMath.toStored(HomeLayoutMath.remove(visual, key), cur.pages, preserve - key),
+                removed = cur.removed + key,
+                seeded = true,
+            ),
+        )
+    }
 
     /** Puts [key] back on the home pages. */
-    fun addToHome(key: String, currentPages: List<HomePage>, preferredPage: Int, capacityOf: (PageLayout) -> Int) = write(
-        _layout.value.copy(
-            pages = HomeLayoutMath.add(currentPages, key, preferredPage, capacityOf),
-            removed = _layout.value.removed - key,
-            seeded = true,
-        ),
-    )
+    fun addToHome(key: String, visual: List<HomePage>, preferredPage: Int, capacityOf: (PageLayout) -> Int, preserve: Set<String> = emptySet()) {
+        val cur = _layout.value
+        write(
+            cur.copy(
+                pages = HomeLayoutMath.toStored(HomeLayoutMath.add(visual, key, preferredPage, capacityOf), cur.pages, preserve),
+                removed = cur.removed - key,
+                seeded = true,
+            ),
+        )
+    }
+
+    /** Forgets "removed from home" for apps no longer installed, so a reinstall lands on home again. */
+    fun pruneRemoved(installed: Set<String>) {
+        val cur = _layout.value
+        val kept = cur.removed.filterTo(HashSet()) { it in installed }
+        if (kept.size != cur.removed.size) write(cur.copy(removed = kept))
+    }
 
     private fun write(next: HomeLayout) {
         _layout.value = next
@@ -133,13 +153,13 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
     }
 
     private fun read(): HomeLayout = HomeLayout(
-        pages = HomeLayoutCodec.decode(sp.getString("pages", null)),
+        pages = HomeLayoutMath.normalizeIds(HomeLayoutCodec.decode(sp.getString("pages", null))),
         removed = sp.getStringSet("removed", emptySet())!!.toSet(),
         seeded = sp.getBoolean("seeded", false),
     )
 }
 
-/** JSON codec for the page list: `[{"k":[keys],"s":"Grid","p":[c,r],"l":[c,r],"r":2}, …]`. */
+/** JSON codec for the page list: `[{"k":[keys],"s":"Grid","p":[c,r],"l":[c,r],"r":2,"id":1}, …]`. */
 object HomeLayoutCodec {
     fun encode(pages: List<HomePage>): String = JSONArray().apply {
         pages.forEach { page ->
@@ -148,6 +168,7 @@ object HomeLayoutCodec {
                     .put("k", JSONArray(page.keys))
                     .put("s", page.layout.shape.name)
                     .put("r", page.layout.rings)
+                    .put("id", page.id)
                     .apply {
                         page.layout.portrait?.let { put("p", JSONArray(listOf(it.columns, it.rows))) }
                         page.layout.landscape?.let { put("l", JSONArray(listOf(it.columns, it.rows))) }
@@ -170,6 +191,7 @@ object HomeLayoutCodec {
                     landscape = spec("l"),
                     rings = o.optInt("r", 2).coerceIn(PageLayout.MIN_RINGS, PageLayout.MAX_RINGS),
                 ),
+                id = o.optLong("id", 0L),
             )
         }
     }.getOrDefault(emptyList())

@@ -44,6 +44,7 @@ dependencies {
     implementation(project(":core-data"))
     implementation(project(":feature-sphere"))
     implementation(project(":feature-search"))
+    implementation(project(":feature-grid"))
     implementation(project(":shaders"))
 
     implementation(libs.androidx.core.ktx)

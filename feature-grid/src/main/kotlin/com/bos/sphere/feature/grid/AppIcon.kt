@@ -8,6 +8,7 @@ import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -85,7 +86,9 @@ fun AppIcon(
     }
     val shape = RoundedCornerShape(size * 0.22f)
     Box(
+        // Sized here so every caller gets a visible icon (a zero-size box drew nothing).
         modifier = modifier
+            .size(size)
             .clip(shape)
             .background(HyleColors.Surface, shape),
     ) {

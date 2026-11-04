@@ -21,6 +21,7 @@ surface settings, and app management.
 | `:core-data` | `AppRepository` over `LauncherApps` exposing a live `Flow<List<AppEntry>>` |
 | `:feature-sphere` | `SphereGeometry` (ported `magAt`/`txAt`), `SphereState`, `CoverflowLayer`, all-apps `Globe`, and `LauncherSurface` (unified gestures) |
 | `:feature-search` | Apps-only search ranking + the portrait always-keyboard |
+| `:feature-grid` | The **Pages** home (default): paged grid / circle / coverflow pages, corners + radial palettes, complications, peek widgets, wheel + list drawers, network dot grid, the XMB-style settings space and its synthesized UI sounds |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
 
 Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`, `:haptics`,
@@ -47,6 +48,32 @@ Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`
 - **Hyle identity:** theme, the 8 motion primitives, dot-grid substrate, ambient chrome
   (clock / weather / battery / now-playing / settings gear).
 
+## Pages home (default style)
+
+The home that ships by default is a paged, rotatable surface (the Sphere coverflow remains as a style
+in settings):
+
+- **Pages** — each page is its own **grid** (with its own density, or the home default), a **circle**
+  (centre + rings of 6/12/18) or a **coverflow** strip. Long-press an app and drag to rearrange (edge-dwell
+  flips pages; drop past the last page to make a new one). Page-turning direction is chosen per
+  orientation (sideways / up-down); the indicator follows the axis.
+- **Clock** — top (default), bottom, hidden, a page tile, or a corner complication.
+- **Corners** — four slots pinned to the device's **physical** corners as it rotates (or fixed to the
+  screen). Each holds an action, an app, a **palette** (a folder that fans out radially from the corner:
+  tap then tap, or press-slide-release), a **complication** / cluster (battery, date, time, alarm,
+  ring mode, torch, storage, notifications), or a **widget** that peeks from the corner and pops out on
+  touch. Glyph or quarter-circle Bubble style. Long-press a corner to change it.
+- **All apps** — opens as a **wheel** around the corner you opened it from (groups as spokes: A–Z,
+  category or recent; drag to turn), or as a plain list; Search lands in the list with the keyboard up.
+- **Gestures** — pinch in/out, swipes across the paging axis, double-tap; **motion**: shake, flick twice,
+  flip twice, face-down → any action (ringer vibrate/silent/cycle, DND, flashlight, apps…), optionally
+  from a background foreground-service.
+- **Network dots** — the substrate dot grid breathes green (good signal) → red (poor), solid grey in
+  airplane mode, dark when offline.
+- **Settings space** — long-press anywhere empty: a full-screen cross-media-bar (categories across,
+  items down, option pane at the side), with Orrery's console tones (`UiSound`, ported from
+  `orrery-kit/sfx.js`).
+
 ## Building
 
 Requires the Android SDK (platform 35, build-tools 35.0.0). Point Gradle at it via
@@ -60,7 +87,10 @@ Then:
 
 ```
 ./gradlew :app:assembleDebug
+./gradlew testDebugUnitTest   # JVM tests incl. Robolectric screenshot smoke tests
 ```
+
+`ScreenshotTest` (in `:feature-grid`) renders the main surfaces to `feature-grid/build/screenshots/`.
 
 Notes:
 - `minSdk 31`, `targetSdk 35`. AGSL effects are gated to API 33+ (`ShaderCapability`) with a

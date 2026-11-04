@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup and device transfer (docs/pages.md, "Backups"). Everything the launcher keeps is backed
+  up as before (widget placements, the page list, settings) except the WebView profile, app_webview/:
+  website cookies and session tokens, sites' IndexedDB and Cache Storage, and HTML pages' storage
+  (Orrery's localStorage). Those never leave the device in a backup, and they can't push the backup
+  past its 25 MB quota (which would skip the whole backup). Imported page files are already in
+  noBackupFilesDir.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_webview/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_webview/" />
+    </device-transfer>
+</data-extraction-rules>

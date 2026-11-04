@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    <!--
+      Pages (docs/pages.md): website pages, and single-file pages whose per-page network switch
+      the user turned on, need the network. The launcher itself sends nothing of its own.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Query other launchable activities so LauncherApps can enumerate the inventory. -->
     <queries>
@@ -14,12 +19,34 @@
         </intent>
     </queries>
 
+    <!--
+      dataExtractionRules: backups leave out the WebView profile (website cookies, page storage); see
+      res/xml/data_extraction_rules.xml.
+      usesCleartextTraffic: website pages accept http:// addresses (shown "not https", shape and word);
+      without this, Android refuses every http page (net::ERR_CLEARTEXT_NOT_PERMITTED). The launcher
+      itself still sends nothing of its own. Owner decision recorded in docs/pages.md.
+    -->
     <application
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.SphereLauncher">
+
+        <!-- WebView (pages): no usage metrics to Google. -->
+        <meta-data
+            android:name="android.webkit.WebView.MetricsOptOut"
+            android:value="true" />
+        <!--
+          WebView (pages): Safe Browsing OFF, the owner's decision (2026-11-04), so no visited URL is
+          checked with Google. Cost: no warning before a known-malicious site. Also set off on every
+          WebView the launcher creates (WebSettings.setSafeBrowsingEnabled(false)).
+        -->
+        <meta-data
+            android:name="android.webkit.WebView.EnableSafeBrowsing"
+            android:value="false" />
 
         <activity
             android:name=".MainActivity"

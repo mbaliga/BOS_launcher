@@ -81,6 +81,10 @@ private const val HUB_STACK_REGION = "hub-widget-stack"
 /** Width assumed for the hub stack until it has been measured once. */
 private const val DEFAULT_HUB_WIDTH_DP = 360f
 
+/** Page size assumed until a page widget has been measured once (a phone in portrait). */
+private const val DEFAULT_PAGE_WIDTH_DP = 360f
+private const val DEFAULT_PAGE_HEIGHT_DP = 640f
+
 /**
  * The home screen's handle on App Widget hosting: the merged equator items, the equator tile and
  * hub stack content, the picker and the widget menu. With a null binding (no activity to run the
@@ -103,6 +107,10 @@ class WidgetHostUi internal constructor(
     internal var menuWidgetId by mutableStateOf<Int?>(null)
     internal var hubWidthDp by mutableFloatStateOf(DEFAULT_HUB_WIDTH_DP)
 
+    /** The size of a full page (measured by [PageWidget]), for the bind options of a page widget. */
+    internal var pageWidthDp by mutableFloatStateOf(DEFAULT_PAGE_WIDTH_DP)
+    internal var pageHeightDp by mutableFloatStateOf(DEFAULT_PAGE_HEIGHT_DP)
+
     /**
      * Opens the picker. [equatorIndex] is where an equator widget is inserted (its index in the
      * merged list); pass -1 to use the focused tile's index at the time of picking.
@@ -111,6 +119,37 @@ class WidgetHostUi internal constructor(
         if (!enabled) return
         menuWidgetId = null
         pickerTarget = PlacementTarget(surface, equatorIndex)
+    }
+
+    /** Opens the picker for a widget that will fill a page; [slot] is that page's widget slot. */
+    fun openPagePicker(slot: Int) {
+        openPicker(WidgetSurface.Page, slot)
+    }
+
+    /** The label of the widget on the page with widget slot [slot] (null if none or not known yet). */
+    fun pageLabel(slot: Int): String? {
+        val placement = hosting?.placements?.value?.let { PlacementEdits.onPage(it, slot) } ?: return null
+        return when (val s = hosting?.status?.value?.get(placement.appWidgetId)) {
+            is WidgetStatus.Available -> s.label
+            is WidgetStatus.Unavailable -> s.appLabel.ifBlank { null }
+            null -> null
+        }
+    }
+
+    /** Removes the widget on page [slot] (the page itself belongs to `:feature-pages`). */
+    fun removePageWidget(slot: Int) {
+        val placement = hosting?.placements?.value?.let { PlacementEdits.onPage(it, slot) } ?: return
+        hosting?.remove(placement.appWidgetId)
+    }
+
+    fun canReconfigurePage(slot: Int): Boolean {
+        val placement = hosting?.placements?.value?.let { PlacementEdits.onPage(it, slot) } ?: return false
+        return (hosting?.status?.value?.get(placement.appWidgetId) as? WidgetStatus.Available)?.reconfigurable == true
+    }
+
+    fun reconfigurePage(slot: Int) {
+        val placement = hosting?.placements?.value?.let { PlacementEdits.onPage(it, slot) } ?: return
+        if (placement.appWidgetId > 0) binding?.reconfigure(placement.appWidgetId)
     }
 
     /** Opens the widget menu (remove, reconfigure, move, size). */
@@ -159,6 +198,50 @@ fun rememberWidgetHostUi(binding: WidgetHostActivityBinding?): WidgetHostUi {
     return ui
 }
 
+/** Widget slots of the widgets placed on pages (each is one App Widget page's link). */
+@Composable
+fun WidgetHostUi.pageSlots(): Set<Int> {
+    val placements by placementsState()
+    return remember(placements) {
+        placements.filter { it.surface == WidgetSurface.Page }.mapTo(LinkedHashSet()) { it.slot }
+    }
+}
+
+/**
+ * A widget filling a page. Told its real page size with `updateAppWidgetSize(Bundle, List<SizeF>)`
+ * whenever the page is measured (first layout, rotation, window changes). Takes touches only while
+ * [interactive] (the current page, at rest); the pager above it still claims two-finger swipes and
+ * edge strips first.
+ */
+@Composable
+fun WidgetHostUi.PageWidget(slot: Int, interactive: Boolean, modifier: Modifier = Modifier) {
+    val placements by placementsState()
+    val status by statusState()
+    val placement = remember(placements, slot) { PlacementEdits.onPage(placements, slot) } ?: return
+    val density = LocalDensity.current.density
+    var size by remember { mutableStateOf(SizeDp(pageWidthDp, pageHeightDp)) }
+    val sizes = remember(size) { WidgetSizing.pageSizes(size.width, size.height) }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged {
+                if (it.width > 0 && it.height > 0) {
+                    size = SizeDp(it.width / density, it.height / density)
+                    pageWidthDp = size.width
+                    pageHeightDp = size.height
+                }
+            },
+    ) {
+        WidgetBody(
+            appWidgetId = placement.appWidgetId,
+            status = status[placement.appWidgetId],
+            interactive = interactive,
+            sizes = sizes,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
 /** Apps plus equator widgets, merged in slot order: the coverflow's item list. */
 @Composable
 fun WidgetHostUi.equatorItems(apps: List<AppEntry>): List<EquatorItem> {
@@ -181,18 +264,20 @@ fun WidgetHostUi.equatorItems(apps: List<AppEntry>): List<EquatorItem> {
 
 /**
  * Brings a just-placed (or just-moved) widget into view once: [onFocusEquatorIndex] with its index
- * on the equator, or [onOpenHub] when it went to the hub.
+ * on the equator, [onOpenHub] when it went to the hub, or [onOpenPage] with the page's widget slot.
  */
 @Composable
 fun WidgetHostUi.FocusNewWidgets(
     items: List<EquatorItem>,
     onFocusEquatorIndex: (Int) -> Unit,
     onOpenHub: () -> Unit,
+    onOpenPage: (slot: Int) -> Unit = {},
 ) {
     val focus by (hosting?.focusRequest ?: NoFocus).collectAsState()
     val placements by placementsState()
     val focusEquator by rememberUpdatedState(onFocusEquatorIndex)
     val openHub by rememberUpdatedState(onOpenHub)
+    val openPage by rememberUpdatedState(onOpenPage)
     LaunchedEffect(focus, items, placements) {
         val id = focus ?: return@LaunchedEffect
         val placement = placements.firstOrNull { it.appWidgetId == id } ?: return@LaunchedEffect
@@ -200,6 +285,10 @@ fun WidgetHostUi.FocusNewWidgets(
             WidgetSurface.Hub -> {
                 hosting?.consumeFocusRequest(id)
                 openHub()
+            }
+            WidgetSurface.Page -> {
+                hosting?.consumeFocusRequest(id)
+                openPage(placement.slot)
             }
             WidgetSurface.Equator -> {
                 val index = items.indexOfFirst { it is EquatorItem.Widget && it.appWidgetId == id }

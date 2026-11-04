@@ -11,6 +11,9 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 
 /**
@@ -37,6 +40,17 @@ data class HubAction(
 )
 
 /**
+ * One active notification reduced to what a count needs: the posting package and two flags. No
+ * title, text, people or extras. Feeds the pages runtime's `launcher.notifications` channel
+ * (counts and app names only).
+ */
+data class ActiveNotification(
+    val packageName: String,
+    val isGroupSummary: Boolean,
+    val isOngoing: Boolean,
+)
+
+/**
  * Singleton provider for the notification stream. The actual service runs in the system
  * notification daemon; this manager provides a Flow API for composables.
  */
@@ -59,6 +73,18 @@ object NotificationProvider {
     internal fun setListener(svc: NotificationListenerService?) {
         listener = svc
     }
+
+    private val _active = MutableStateFlow<List<ActiveNotification>?>(null)
+
+    /**
+     * Every active notification as [ActiveNotification] (package and flags only), or null until the
+     * listener has connected (notification access not granted, or not bound yet).
+     */
+    val active: StateFlow<List<ActiveNotification>?> = _active.asStateFlow()
+
+    internal fun onActiveChanged(list: List<ActiveNotification>?) {
+        _active.value = list
+    }
 }
 
 /**
@@ -78,7 +104,18 @@ class SphereNotificationListener : NotificationListenerService() {
 
     override fun onDestroy() {
         NotificationProvider.setListener(null)
+        NotificationProvider.onActiveChanged(null)
         super.onDestroy()
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        publishActive()
+    }
+
+    override fun onListenerDisconnected() {
+        NotificationProvider.onActiveChanged(null)
+        super.onListenerDisconnected()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -90,7 +127,21 @@ class SphereNotificationListener : NotificationListenerService() {
         updateNotifications()
     }
 
+    /** Package and flags of every active notification, for counts (no content). */
+    private fun publishActive() {
+        val facts = runCatching { activeNotifications }.getOrNull()?.map { sbn ->
+            val flags = sbn.notification?.flags ?: 0
+            ActiveNotification(
+                packageName = sbn.packageName,
+                isGroupSummary = (flags and Notification.FLAG_GROUP_SUMMARY) != 0,
+                isOngoing = (flags and Notification.FLAG_ONGOING_EVENT) != 0,
+            )
+        }
+        NotificationProvider.onActiveChanged(facts)
+    }
+
     private fun updateNotifications() {
+        publishActive()
         val current = activeNotifications?.mapNotNull { sbn ->
             parseNotification(sbn)
         }?.sortedByDescending { it.timestamp } ?: emptyList()

@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -50,6 +51,38 @@ class LauncherSurfaceState(
 ) {
     val zoomValue: Float get() = zoom.value
     val hubValue: Float get() = hub.value
+
+    /**
+     * While scrubbing: how far the finger has pulled past the equator's first (negative) or last
+     * (positive) column, in columns, before the rubber-band clamp; 0 inside. Back to 0 on release.
+     * The launcher's pages read it to turn the page past a threshold (`PastEnd`).
+     */
+    var scrubPastEnd: Float by mutableFloatStateOf(0f)
+        internal set
+
+    /**
+     * True from the moment a long-press in the current gesture opened something (an app's menu, a
+     * widget's menu, the widget picker) until the next gesture starts. The pages read it so a drag
+     * that follows such a long-press never turns the page behind what just opened.
+     */
+    var longPressOpened: Boolean = false
+        internal set
+}
+
+/**
+ * How far a scrub has pulled past the equator's ends, in columns ([LauncherSurfaceState.scrubPastEnd]):
+ * [raw] is the unclamped scrub position, [startScrub] where the scrub began. A pull counts only when
+ * the scrub *began at that end* (within half a column of it), so the page turn past the ends is a
+ * second, deliberate pull from the last (or first) item: a long, fast stroke from the middle of the
+ * list that overshoots the end never turns the page, because the coverflow has no fling and the finger
+ * travel alone would otherwise count. Pure.
+ */
+object ScrubPastEnd {
+    fun columns(startScrub: Float, raw: Float, maxIndex: Float): Float = when {
+        raw < 0f && startScrub <= 0.5f -> raw
+        raw > maxIndex && startScrub >= maxIndex - 0.5f -> raw - maxIndex
+        else -> 0f
+    }
 }
 
 @Composable
@@ -87,6 +120,11 @@ private enum class Mode { Undecided, Scrub, Hub, Globe, Pinch, PassThrough }
  * receives ACTION_CANCEL. Long-press on a widget → [onLongPressWidget]; on empty surface →
  * [onLongPressEmpty]. Gestures that start inside a [touchPassThrough] region (the hub's widget
  * stack) are left to that content.
+ *
+ * Pages (a parent that reads touches first): when [gestureClaimed] turns true during a gesture, the
+ * parent has taken it as a page gesture, and the surface does nothing more with it (a scrub in
+ * progress settles). [onScrubReleased] reports, at the end of each scrub, how far it went past the
+ * equator's ends ([LauncherSurfaceState.scrubPastEnd]). Both default to the old behaviour.
  */
 @Composable
 fun LauncherSurface(
@@ -101,6 +139,8 @@ fun LauncherSurface(
     onLongPressEmpty: () -> Unit = {},
     touchPassThrough: TouchPassThrough? = null,
     widgetTile: @Composable (item: EquatorItem.Widget, interactive: Boolean) -> Unit = { _, _ -> },
+    gestureClaimed: () -> Boolean = { false },
+    onScrubReleased: (pastEndColumns: Float) -> Unit = {},
     hubContent: @Composable (fraction: Float) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -114,6 +154,8 @@ fun LauncherSurface(
     val currentOnLongPressWidget by rememberUpdatedState(onLongPressWidget)
     val currentOnLongPressEmpty by rememberUpdatedState(onLongPressEmpty)
     val currentOnOpenSettings by rememberUpdatedState(onOpenSettings)
+    val currentGestureClaimed by rememberUpdatedState(gestureClaimed)
+    val currentOnScrubReleased by rememberUpdatedState(onScrubReleased)
     val surfaceCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
 
     Box(
@@ -130,6 +172,7 @@ fun LauncherSurface(
 
                 awaitEachGesture {
                     val first = awaitFirstDown(requireUnconsumed = false)
+                    state.longPressOpened = false
                     val downPos = first.position
                     val startScrub = state.sphereState.position
                     val startHub = state.hub.value
@@ -147,6 +190,22 @@ fun LauncherSurface(
                     var longPressFired = false
                     // True only when the long-press actually opened something (a menu or the picker).
                     var longPressClaimed = false
+                    // Whether this gesture moved the coverflow or the hub before a page gesture took
+                    // it: the surface switches to Pinch as soon as a second finger lands, so the
+                    // mode alone can't tell (a two-finger page swipe often starts with one finger).
+                    var scrubbed = false
+                    var hubPulled = false
+
+                    fun settleScrub() {
+                        val target = state.sphereState.position
+                            .roundToInt().coerceIn(0, state.sphereState.maxIndex)
+                        scope.launch {
+                            Animatable(state.sphereState.position)
+                                .animateTo(target.toFloat(), HyleMotion.settle()) {
+                                    state.sphereState.position = value
+                                }
+                        }
+                    }
 
                     while (true) {
                         val useTimeout = mode == Mode.Undecided && !longPressFired
@@ -180,7 +239,19 @@ fun LauncherSurface(
                                     longPressClaimed = true
                                 }
                             }
+                            state.longPressOpened = longPressClaimed
                             continue
+                        }
+
+                        // A page gesture took over (the pages read touches before the surface).
+                        if (mode != Mode.PassThrough && currentGestureClaimed()) {
+                            if (scrubbed) settleScrub()
+                            if (hubPulled) {
+                                val target = if (state.hub.value > HubLatch) 1f else 0f
+                                scope.launch { state.hub.animateTo(target, HyleMotion.settle()) }
+                            }
+                            state.scrubPastEnd = 0f
+                            mode = Mode.PassThrough
                         }
 
                         val pressed = event.changes.filter { it.pressed }
@@ -243,13 +314,18 @@ fun LauncherSurface(
                         }
 
                         if (mode == Mode.Scrub) {
+                            scrubbed = true
+                            val raw = startScrub - totalDx / dragScalePx
+                            state.scrubPastEnd =
+                                ScrubPastEnd.columns(startScrub, raw, state.sphereState.maxIndex.toFloat())
                             state.sphereState.position =
-                                (startScrub - totalDx / dragScalePx).coerceIn(
+                                raw.coerceIn(
                                     state.sphereState.minPosition,
                                     state.sphereState.maxPosition,
                                 )
                             ch.consume()
                         } else if (mode == Mode.Hub) {
+                            hubPulled = true
                             val f = (startHub + totalDy / pullPx).coerceIn(0f, 1f)
                             scope.launch { state.hub.snapTo(f) }
                             ch.consume()
@@ -257,16 +333,12 @@ fun LauncherSurface(
                     }
 
                     // --- gesture end: settle ---
+                    val pastEnd = state.scrubPastEnd
+                    state.scrubPastEnd = 0f
                     when (mode) {
                         Mode.Scrub -> {
-                            val target = state.sphereState.position
-                                .roundToInt().coerceIn(0, state.sphereState.maxIndex)
-                            scope.launch {
-                                Animatable(state.sphereState.position)
-                                    .animateTo(target.toFloat(), HyleMotion.settle()) {
-                                        state.sphereState.position = value
-                                    }
-                            }
+                            settleScrub()
+                            currentOnScrubReleased(pastEnd)
                         }
 
                         Mode.Hub -> {

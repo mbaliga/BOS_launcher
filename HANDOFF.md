@@ -6,6 +6,54 @@
 
 ---
 
+## Pages — `:feature-pages` (2026-11-04)
+
+Owner (2026-11-04): "also add the Orrery widget runtime to the launcher"; full-page widgets ("Orrery
+would be one such widget"); a page can be a website ("anything can become part of a scrollable set of
+pages"); and "Let the user choose between all three options: 2 finger swipe + dots, swipe past the
+coverflow's ends, vertical pages (swipe up)". Design, rules and the owner-verify list:
+[`docs/pages.md`](docs/pages.md).
+
+- **Done (compiled + JVM unit tests):** page model (home = page 0; `appwidget` / `html` / `web`)
+  persisted as schema-versioned JSON in SharedPreferences with forward-compatible entries; page manager
+  (add, rename, reorder, info, remove; from Settings and a long-press on the dots); the three
+  navigation modes as a setting (two-finger swipe + dots by default), read in the Initial pass and
+  claimed only once clearly a page gesture; page dots (48 dp targets, shape not colour); App Widget
+  pages on a new `Page` placement surface (reusing reconciliation and backup-restore remap; linked to
+  their page by slot); the Orrery widget runtime (own https origin per page under `.invalid`, request
+  interceptor, D-AC package import/validation from zip or folder, single-file pages with Orrery
+  detected by title, permissions denied, popups and downloads refused, packages never online,
+  per-page network switch for single-file pages with reached / refused hosts, host API over an
+  origin-restricted MessagePort with declaration enforcement and D-AC envelopes, `launcher.clock` /
+  `.battery` / `.notifications` channels, `app:` / `page:` routes); website pages (URL validation,
+  https mark, back / reload, third-party cookies off, Safe Browsing off by owner decision, metrics opt
+  out); memory policy (current page ± 1 alive, others saved and destroyed, off-screen paused).
+- **New permission:** `INTERNET` (website pages; network-on single-file pages). No new third-party
+  dependency (`androidx.webkit` was not needed; JUnit 4 is test-only).
+- **Not verified:** everything on a device. No emulator here.
+- **Touches outside the new module (additive):** `feature-sphere/LauncherSurface` (`gestureClaimed`,
+  `onScrubReleased`, `LauncherSurfaceState.scrubPastEnd`; defaults keep the old behaviour),
+  `feature-widgets` (`WidgetSurface.Page`, `PlacementEdits.putOnPage` / `onPage`,
+  `WidgetSizing.pageSizes`, `PageWidget`, a page target in the picker, `FocusNewWidgets(onOpenPage)`),
+  `core-data` (`ActiveNotification`, `NotificationProvider.active`: package and flags only),
+  `HomeScreen` (the pager around home; Chrome now slides with home), `SettingsPanel` (optional pages
+  section), the app manifest.
+- **Review round (2026-11-04, uncommitted with the rest):** three reviewers' findings verified and
+  fixed: two-finger release (blocker), mode-2 past-end from mid-list, claim settling, long-press then
+  drag, turns cancelled by list changes, package navigation / popups, `intent:` crash paths, `open`
+  only after a tap, JS dialogs, WebRTC head-block bypasses, asset documents sandboxed, per-page sites
+  (`<id>.invalid`), package storage removal, page-removal wipe of `localStorage`, import errors and
+  atomic swap, start-up sweep vs unread lists, http cleartext, backup rules, IME on page change, dots
+  placement, TalkBack. Pure parts are JVM-tested (`PageDirsTest`, `RuntimeLimitsTest`, `ReleaseTest`,
+  `ScrubPastEndTest` in `:feature-sphere`, …).
+- **Owner decisions open:** `docs/pages.md` §7 (wrap past the start on home; storage for D-AC
+  packages; `'self'` in the package CSP for `assets/`; file pickers inside pages; WebRTC residual risk;
+  website data on removal; which notifications count; http via cleartext; backups without the WebView
+  profile, so without Orrery's saved state).
+- **Next:** owner-verify list; then the decisions above.
+
+---
+
 ## Widget hosting — `:feature-widgets` (2026-11-04)
 
 Sphere now **hosts** standard Android App Widgets from any app (brief §3.D; widget strategy §1.5 / §3:

@@ -12,6 +12,18 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
   persisted placements with reconciliation and backup-restore remap (restored placements wait,
   marked pending, for Android's restore broadcast), remove / reconfigure / move / resize. Pure logic JVM-tested (`feature-widgets/src/test`); see `docs/widget-hosting.md`.
 
+- **Pages (2026-11-04, unverified on device):** new `:feature-pages`: an ordered page set (home =
+  page 0) with a page manager; full-page App Widgets (reusing the hosting placements on a new `Page`
+  surface), the Orrery widget runtime (D-AC packages with the host API and launcher channels; single-file
+  pages such as Orrery's, network off by default per page) and website pages; three navigation modes as
+  a setting. Adds `INTERNET`; Safe Browsing off (owner decision). Pure logic JVM-tested
+  (`feature-pages/src/test`, plus `PageSurfaceTest` in `:feature-widgets`); see `docs/pages.md`.
+  A review round (same day) fixed the two-finger release (it could snap back or turn backwards), the
+  sandbox (packages can't navigate out or open windows; `open` only after a tap; intents sanitised;
+  JS dialogs gated; head block can't be bypassed; per-page sites), page removal (storage really
+  cleared), imports (errors can't crash; atomic swap; no sweep of an unread list), http pages
+  (cleartext allowed) and backups (WebView profile excluded).
+
 ## Next steps
 - M5: desktop / DeX external-display layout + windowing.
 - Graduate the hub / settings UI out of `:app/ui` into `:feature-hub` / `:feature-settings` modules.
@@ -20,6 +32,9 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
 ## Owner-verified (on-device behaviour)
 - The build env has no device — all runtime/gesture/render/launcher behaviour is **owner-verified on the phone**.
 - Set-as-default (`ROLE_HOME`), coverflow scrub/launch gestures, globe, search, hub, and voice are owner-confirmed on-device.
+- **Pages are not yet owner-verified:** every gesture in every mode, two-finger swipes over real
+  websites, back behaviour, Orrery's page in the runtime (state kept, fonts, Dial), WebView memory with
+  several pages, rotation (list in `docs/pages.md` §8).
 - **Widget hosting is not yet owner-verified:** bind prompt, configure activities, restore after
   reboot and after backup restore, taps inside the transformed coverflow, hub stack resizing,
   work-profile widgets, OEM differences (list in `docs/widget-hosting.md`).

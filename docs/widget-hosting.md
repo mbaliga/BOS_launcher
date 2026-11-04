@@ -206,7 +206,9 @@ interop code is from its bytecode, not from a device: owner-verify item 5 below.
   allocated id that the next start deletes (the activity is `stateNotNeeded`, so its result is not
   delivered to a new process).
 - **Backup restore** (`allowBackup` stays true): the placements file comes back with the app's
-  data, holding the old device's widget ids. The system restores the widgets themselves under
+  data, holding the old device's widget ids. (Since pages, `data_extraction_rules.xml` leaves the
+  WebView profile `app_webview/` out of backups; the placements and everything else are backed up as
+  before.) The system restores the widgets themselves under
   **new** ids and tells the host with `ACTION_APPWIDGET_HOST_RESTORED` (old and new ids) at the end
   of the restore, which can be after the launcher has already started.
   - *Detection:* a marker file in `noBackupFilesDir` (never backed up) means "these placements were
@@ -234,6 +236,30 @@ with the tile, `#161922` surface, violet hairline at 20 % / 55 % when focused) w
 glow, no label under the tile. Widget content is the provider's own RemoteViews, drawn as is.
 Every control added has a content description and a ≥ 48 dp target; selection is shown with a
 check mark and words, never by colour alone.
+
+## Pages (2026-11-04)
+
+App Widget **pages** (`:feature-pages`, [`docs/pages.md`](pages.md)) reuse this hosting: a page's
+widget is a placement on a third surface, `WidgetSurface.Page`, whose `slot` is the page's link (a
+number the page list stores). Everything above applies to it: the bind / configure flow (the picker
+opens with the destination fixed to the page, and the bind options carry the page's size),
+reconciliation (a page widget's id is kept; a widget the system deleted makes its page say "No widget
+on this page"), backup restore (the remap keeps the slot, so the restored widget lands on its page),
+the "Restoring" / "Unavailable" states, and the hosted-view cache. Choosing another widget for the
+same page displaces the old placement and gives its id back (`PlacementEdits.putOnPage`). The
+equator merge and the hub stack ignore page widgets. Page widgets are managed in the page manager
+(Reconfigure when the provider allows it, Remove); the widget menu, if it were opened for one, would
+offer only Reconfigure and Remove.
+
+- A page widget is laid out at the page's size and told it with `updateAppWidgetSize(Bundle,
+  List<SizeF>)` (`WidgetSizing.pageSizes`), re-reported whenever the page is measured again (rotation,
+  window size changes), debounced as above.
+- It takes touches only while its page is current and at rest; the pager above it still claims
+  two-finger swipes (and mode 2's edge strips) first.
+- A version without `Page` reads such placement lines as unreadable, keeps them verbatim and reserves
+  their ids (the codec's existing forward compatibility), so a downgrade never deletes a page widget.
+- Since pages, the launcher holds `INTERNET` (for website pages). Widget hosting itself still uses no
+  network.
 
 ## Owner-verify (none of this has been seen running)
 
@@ -277,3 +303,6 @@ check mark and words, never by colour alone.
     widget's app removes its widgets from the equator and the hub (the system deletes them).
 13. **Long-press on the open hub:** holding a notification's Dismiss or action button for over
     half a second and releasing still triggers it; long-press on a tile still opens its menu.
+14. **Page widgets** (see `docs/pages.md` §8 item 11): bind and configure for a page, full-page
+    layout at the page's real size, re-layout on rotation, taps when current, restore after reboot
+    and after backup restore onto the same page.

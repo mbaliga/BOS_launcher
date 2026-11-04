@@ -97,6 +97,7 @@ fun WidgetHostUi.Dialogs(lens: Float, focusedEquatorIndex: () -> Int) {
                         hubWidthDp,
                         WidgetSizing.defaultHubSize(item.info.minHeight / density),
                     )
+                    WidgetSurface.Page -> WidgetSizing.pageSizes(pageWidthDp, pageHeightDp)
                 }
                 pickerTarget = null
                 binding.addWidget(item, PlacementTarget(surface, index), sizes)
@@ -158,7 +159,10 @@ private fun WidgetPicker(
                     onClick = onDismiss,
                 )
             }
-            SurfaceSelector(selected = surface, onSelect = { surface = it })
+            // A widget for a page has its destination fixed: that page.
+            if (initialSurface != WidgetSurface.Page) {
+                SurfaceSelector(selected = surface, onSelect = { surface = it })
+            }
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -223,7 +227,7 @@ private fun WidgetPicker(
 private fun SurfaceSelector(selected: WidgetSurface, onSelect: (WidgetSurface) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.widgets_picker_place_on), color = HyleColors.InkDim, fontSize = 12.sp)
-        WidgetSurface.entries.forEach { surface ->
+        listOf(WidgetSurface.Equator, WidgetSurface.Hub).forEach { surface ->
             val label = stringResource(
                 if (surface == WidgetSurface.Equator) R.string.widgets_surface_equator else R.string.widgets_surface_hub,
             )
@@ -414,7 +418,9 @@ private fun WidgetHostUi.WidgetMenu(
                     binding?.reconfigure(appWidgetId)
                 }
             }
-            if (placement.surface == WidgetSurface.Equator) {
+            if (placement.surface == WidgetSurface.Page) {
+                // A page's widget is managed with its page (Settings → Pages).
+            } else if (placement.surface == WidgetSurface.Equator) {
                 MenuRow(stringResource(R.string.widgets_menu_move_to_hub)) {
                     hosting?.moveToHub(appWidgetId)
                     onDismiss()

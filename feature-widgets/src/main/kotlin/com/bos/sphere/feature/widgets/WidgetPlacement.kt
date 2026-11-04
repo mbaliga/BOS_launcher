@@ -1,7 +1,11 @@
 package com.bos.sphere.feature.widgets
 
-/** Where a hosted widget lives: a tile on the coverflow equator, or the pull-down hub's stack. */
-enum class WidgetSurface { Equator, Hub }
+/**
+ * Where a hosted widget lives: a tile on the coverflow equator, the pull-down hub's stack, or a
+ * full page of its own ([Page], from `:feature-pages`; the placement's slot is the page's link).
+ * A version without [Page] keeps such lines verbatim and reserves their ids (see [PlacementCodec]).
+ */
+enum class WidgetSurface { Equator, Hub, Page }
 
 /**
  * Height presets for a widget in the hub stack, which is always the full panel width. Three
@@ -25,7 +29,9 @@ enum class HubSize(val heightDp: Float) {
  * - [userSerial]: `UserManager.getSerialNumberForUser` of the profile the provider belongs to
  *   (work-profile widgets keep their profile across restarts).
  * - [slot]: on the [WidgetSurface.Equator], the index the widget takes in the merged app + widget
- *   list ([EquatorMerge]); in the [WidgetSurface.Hub], its order in the stack.
+ *   list ([EquatorMerge]); in the [WidgetSurface.Hub], its order in the stack; on a
+ *   [WidgetSurface.Page], the page's widget slot (a number the page list stores, which survives the
+ *   id remapping of a backup restore).
  * - [hubSize]: the height chosen for the hub stack (kept while on the equator, so moving back to
  *   the hub restores it).
  */

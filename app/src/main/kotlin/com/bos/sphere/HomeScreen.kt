@@ -4,27 +4,42 @@ import android.content.res.Configuration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bos.sphere.core.data.HiddenAppsStore
 import com.bos.sphere.core.data.LauncherAppsAppRepository
 import com.bos.sphere.core.data.VoiceInputManager
 import com.bos.sphere.core.design.HyleMotion
+import com.bos.sphere.feature.pages.ui.AppWidgetPageHooks
+import com.bos.sphere.feature.pages.ui.PageDots
+import com.bos.sphere.feature.pages.ui.PagesDialogs
+import com.bos.sphere.feature.pages.ui.PagesHost
+import com.bos.sphere.feature.pages.ui.PagesSettingsSection
+import com.bos.sphere.feature.pages.ui.PastEndHint
+import com.bos.sphere.feature.pages.ui.SyncWidgetPages
+import com.bos.sphere.feature.pages.ui.rememberPagesUi
 import com.bos.sphere.feature.search.AppSearch
 import com.bos.sphere.feature.sphere.EquatorItem
 import com.bos.sphere.feature.sphere.RowMode
@@ -38,7 +53,9 @@ import com.bos.sphere.feature.widgets.ui.Dialogs
 import com.bos.sphere.feature.widgets.ui.EquatorTile
 import com.bos.sphere.feature.widgets.ui.FocusNewWidgets
 import com.bos.sphere.feature.widgets.ui.HubStack
+import com.bos.sphere.feature.widgets.ui.PageWidget
 import com.bos.sphere.feature.widgets.ui.equatorItems
+import com.bos.sphere.feature.widgets.ui.pageSlots
 import com.bos.sphere.feature.widgets.ui.rememberWidgetHostUi
 import com.bos.sphere.ui.AppContextMenu
 import com.bos.sphere.ui.Chrome
@@ -47,6 +64,8 @@ import com.bos.sphere.ui.DotGridBackground
 import com.bos.sphere.ui.HubPanel
 import com.bos.sphere.ui.SettingsPanel
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * The home root. Builds the (hidden-filtered) inventory, resolves the row split, hosts the
@@ -55,6 +74,11 @@ import kotlinx.coroutines.launch
  *
  * Hosted App Widgets ([widgetHost]) join the equator as tiles between apps, or sit in the hub's
  * widget stack; the globe and search stay apps-only.
+ *
+ * Pages (`:feature-pages`): all of the above is page 0 of an ordered set of pages; the others are
+ * full-page App Widgets, HTML widgets / pages run by the widget runtime, and websites. The pager
+ * reads touches before the coverflow and claims only page gestures (per the chosen navigation
+ * mode); the coverflow yields a claimed gesture ([LauncherSurface]'s `gestureClaimed`).
  */
 @Composable
 fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
@@ -92,6 +116,33 @@ fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
 
     val surface = rememberLauncherSurfaceState(itemCount = equatorItems.size, rows = rows, params = params)
 
+    // Pages: page 0 is everything below; App Widget pages are hosted by widgetUi (placements on the
+    // Page surface, linked to their page by slot).
+    val pagesUi = rememberPagesUi()
+    val pageSlots = widgetUi.pageSlots()
+    val slotsState = rememberUpdatedState(pageSlots)
+    val pageHooks: AppWidgetPageHooks? = if (widgetUi.enabled) {
+        remember(widgetUi) {
+            object : AppWidgetPageHooks {
+                override val placedSlots: Set<Int> get() = slotsState.value
+                override fun label(slot: Int) = widgetUi.pageLabel(slot)
+                override fun add(slot: Int) = widgetUi.openPagePicker(slot)
+                override fun remove(slot: Int) = widgetUi.removePageWidget(slot)
+                override fun canReconfigure(slot: Int) = widgetUi.canReconfigurePage(slot)
+                override fun reconfigure(slot: Int) = widgetUi.reconfigurePage(slot)
+            }
+        }
+    } else {
+        null
+    }
+    if (pageHooks != null) pagesUi.SyncWidgetPages(pageSlots)
+    val homeRegion = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val homeAtRest = { surface.hubValue < 0.01f && surface.zoomValue < 0.01f }
+    val nearHome by remember { derivedStateOf { abs(pagesUi.position.value) < 0.999f } }
+    // The settings panel belongs to home: going to a page (from the page manager opened in it, the
+    // dots, a gesture) closes it, so Back on that page doesn't first meet a panel left open behind it.
+    LaunchedEffect(nearHome) { if (!nearHome) settingsOpen = false }
+
     // Centre the equator on the middle app the first time the inventory arrives.
     var centred by remember { mutableStateOf(false) }
     LaunchedEffect(apps.size) {
@@ -107,6 +158,7 @@ fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
             settingsOpen = false
             menuApp = null
             widgetUi.dismissAll()
+            pagesUi.goHome()
             surface.zoom.animateTo(0f)
             surface.hub.animateTo(0f)
         }
@@ -141,28 +193,58 @@ fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
     Box(modifier = Modifier.fillMaxSize()) {
         DotGridBackground(Modifier.fillMaxSize())
 
-        LauncherSurface(
-            apps = apps,
-            state = surface,
-            onLaunch = { repository.launch(it) },
-            onLongPressApp = { menuApp = it },
-            onOpenSettings = { settingsOpen = true },
-            modifier = Modifier
-                .fillMaxSize()
-                // In portrait, leave room for the always-keyboard so the equator stays clear.
-                .padding(bottom = if (isPortrait) 300.dp else 0.dp),
-            equatorItems = equatorItems,
-            onLongPressWidget = { widgetUi.openMenu(it.appWidgetId) },
-            onLongPressEmpty = {
-                widgetUi.openPicker(WidgetSurface.Equator, surface.sphereState.focusedItemIndex())
-            },
-            touchPassThrough = widgetUi.passThrough,
-            widgetTile = { item, interactive ->
-                widgetUi.EquatorTile(item, interactive, lens = surface.sphereState.focusScale)
-            },
-        ) { fraction ->
-            HubPanel(fraction = fraction) { sharesPanel ->
-                widgetUi.HubStack(hubFraction = fraction, sharesPanel = sharesPanel)
+        pagesUi.PagesHost(
+            homeAtRest = homeAtRest,
+            homeLongPressOpened = { surface.longPressOpened },
+            homeRegion = { homeRegion[0] },
+            appWidgets = pageHooks,
+            appWidgetPage = { page, interactive -> widgetUi.PageWidget(page.widgetSlot, interactive) },
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                LauncherSurface(
+                    apps = apps,
+                    state = surface,
+                    onLaunch = { repository.launch(it) },
+                    onLongPressApp = { menuApp = it },
+                    onOpenSettings = { settingsOpen = true },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // In portrait, leave room for the always-keyboard so the equator stays clear.
+                        .padding(bottom = if (isPortrait) 300.dp else 0.dp)
+                        .onGloballyPositioned { homeRegion[0] = it },
+                    equatorItems = equatorItems,
+                    onLongPressWidget = { widgetUi.openMenu(it.appWidgetId) },
+                    onLongPressEmpty = {
+                        widgetUi.openPicker(WidgetSurface.Equator, surface.sphereState.focusedItemIndex())
+                    },
+                    touchPassThrough = widgetUi.passThrough,
+                    widgetTile = { item, interactive ->
+                        widgetUi.EquatorTile(item, interactive, lens = surface.sphereState.focusScale)
+                    },
+                    gestureClaimed = pagesUi::gestureClaimed,
+                    onScrubReleased = { past -> pagesUi.onScrubReleased(past, homeAtRest()) },
+                ) { fraction ->
+                    HubPanel(fraction = fraction) { sharesPanel ->
+                        widgetUi.HubStack(hubFraction = fraction, sharesPanel = sharesPanel)
+                    }
+                }
+
+                // Chrome (clock / weather / battery), fading out of the way for globe + hub. Part of the
+                // home page, so it slides away with it.
+                Chrome(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = chromeAlpha },
+                    onOpenSettings = { settingsOpen = true },
+                    onVoiceInput = handleVoiceInput,
+                )
+
+                // Mode 2: names the page a further pull past the coverflow's end opens.
+                pagesUi.PastEndHint(
+                    pastEndColumns = { surface.scrubPastEnd },
+                    hooks = pageHooks,
+                    modifier = Modifier.align(Alignment.Center).padding(top = 220.dp),
+                )
             }
         }
 
@@ -182,16 +264,28 @@ fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
                 }
             },
             onOpenHub = { scope.launch { surface.hub.animateTo(1f, HyleMotion.settle()) } },
+            onOpenPage = { slot -> pagesUi.showWidgetPage(slot) },
         )
 
-        // Chrome (clock / weather / battery), fading out of the way for globe + hub.
-        Chrome(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = chromeAlpha },
-            onOpenSettings = { settingsOpen = true },
-            onVoiceInput = handleVoiceInput,
-        )
+        // Page dots: the fallback in every mode; hidden while only home exists, and while the globe or
+        // hub covers home (so an invisible dot can't take a tap). Bottom centre in every mode, clear of
+        // the equator in both orientations; on home in portrait they sit above the keyboard and glide
+        // down with the turn (a layout-phase offset, so nothing jumps when the turn ends).
+        val keyboardShown = isPortrait && surface.zoomValue < 0.4f && surface.hubValue < 0.5f
+        if (!nearHome || chromeAlpha > 0.05f) {
+            pagesUi.PageDots(
+                hooks = pageHooks,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 8.dp)
+                    .offset {
+                        val lift = if (keyboardShown) (1f - abs(pagesUi.position.value)).coerceIn(0f, 1f) else 0f
+                        IntOffset(0, -(296.dp.toPx() * lift).roundToInt())
+                    }
+                    .graphicsLayer { alpha = if (nearHome) chromeAlpha.coerceAtLeast(abs(pagesUi.position.value)) else 1f },
+            )
+        }
 
         DefaultLauncherBanner(
             modifier = Modifier
@@ -220,14 +314,20 @@ fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
             } else {
                 null
             },
+            pagesSection = {
+                pagesUi.PagesSettingsSection()
+            },
         )
 
-        // Portrait: the always-open keyboard for type-to-search (hidden in globe / hub).
-        if (isPortrait && surface.zoomValue < 0.4f && surface.hubValue < 0.5f) {
+        // Portrait: the always-open keyboard for type-to-search (hidden in globe / hub, and on full
+        // pages: it belongs to home and fades out as home slides away).
+        if (nearHome && isPortrait && surface.zoomValue < 0.4f && surface.hubValue < 0.5f) {
             SearchKeyboard(
                 apps = apps,
                 onLaunch = { repository.launch(it) },
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .graphicsLayer { alpha = (1f - abs(pagesUi.position.value)).coerceIn(0f, 1f) },
             )
         }
 
@@ -259,6 +359,9 @@ fun HomeScreen(homeSignal: Int, widgetHost: WidgetHostActivityBinding? = null) {
             lens = surface.sphereState.focusScale,
             focusedEquatorIndex = { surface.sphereState.focusedItemIndex() },
         )
+
+        // Page manager, add / import / address, rename, remove, page info.
+        pagesUi.PagesDialogs(pageHooks)
     }
 }
 

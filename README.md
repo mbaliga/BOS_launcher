@@ -23,6 +23,7 @@ surface settings, and app management.
 | `:feature-search` | Apps-only search ranking + the portrait always-keyboard |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
 | `:feature-widgets` | App Widget **hosting**: one `AppWidgetHost`, placement store + reconciliation, picker, bind/configure flow, equator tiles and the hub widget stack ([`docs/widget-hosting.md`](docs/widget-hosting.md)) |
+| `:feature-pages` | **Pages**: page model + manager, the three "Move between pages" modes, the Orrery widget runtime (D-AC packages and single-file pages such as Orrery's) and website pages ([`docs/pages.md`](docs/pages.md)) |
 
 Planned (per the brief): `:feature-hub`, `:feature-settings`, `:haptics`,
 `:assistant`. (The hub / settings UI currently lives in `:app/ui` and will graduate to modules.)
@@ -40,6 +41,15 @@ Planned (per the brief): `:feature-hub`, `:feature-settings`, `:haptics`,
   (prototype "widgets-as-tiles") or in a full-width stack in the hub; remove / reconfigure / move /
   resize per widget. Compiled and JVM-tested only: **all on-device behaviour is owner-verify**
   ([`docs/widget-hosting.md`](docs/widget-hosting.md)).
+- **Pages** (2026-11-04): home is page 0 of a scrollable set; add full-page App Widgets, HTML widgets
+  and pages run by the Orrery widget runtime (D-AC packages; single-file pages such as Orrery's own,
+  with a per-page network switch, off by default) and websites. Move between them by two-finger swipe +
+  dots (default), by swiping past the coverflow's ends, or with vertical pages (swipe up): a setting.
+  Adds `INTERNET` (website pages) and allows cleartext so http sites load (marked "not https");
+  WebView metrics opted out; **Safe Browsing off by the owner's decision** (no warning before
+  known-malicious sites). Backups leave out the WebView profile (website logins, HTML pages' storage).
+  Compiled and JVM-tested only: **all on-device behaviour is owner-verify**
+  ([`docs/pages.md`](docs/pages.md)).
 - **Unified navigation gestures** (one arbitrated handler): drag to scrub with snap, tap to
   focus/launch, **pinch-in → all-apps globe** (rotate + lens), **spread → settings** (or back
   home), **pull-down → hub**, long-press → app menu.

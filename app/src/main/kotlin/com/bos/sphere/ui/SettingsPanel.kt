@@ -57,6 +57,7 @@ fun SettingsPanel(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     onAddWidget: (() -> Unit)? = null,
+    pagesSection: (@Composable () -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -102,6 +103,9 @@ fun SettingsPanel(
                 Header(stringResource(WidgetsR.string.widgets_section))
                 AddWidgetRow(onAddWidget)
             }
+
+            // Pages: "Move between pages" (three modes) and "Manage pages".
+            pagesSection?.invoke()
         }
     }
 }

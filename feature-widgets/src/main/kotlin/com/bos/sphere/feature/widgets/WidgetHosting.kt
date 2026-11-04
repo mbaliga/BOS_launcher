@@ -185,13 +185,16 @@ class WidgetHosting private constructor(private val appContext: Context) {
 
     internal fun place(appWidgetId: Int, request: AddRequest) {
         val placement = request.toPlacement(appWidgetId)
+        var displaced = emptyList<Int>()
         store.update { list ->
             when (request.target.surface) {
                 WidgetSurface.Equator ->
                     PlacementEdits.insertOnEquator(list, placement, request.target.equatorIndex)
                 WidgetSurface.Hub -> PlacementEdits.appendToHub(list, placement)
+                WidgetSurface.Page -> PlacementEdits.putOnPage(list, placement).also { displaced = it.second }.first
             }
         }
+        displaced.filter { it > 0 }.forEach { id -> runCatching { host.deleteAppWidgetId(id) } }
         _status.value = _status.value + (appWidgetId to statusOf(appWidgetId, infoFor(appWidgetId)))
         _focusRequest.value = appWidgetId
     }

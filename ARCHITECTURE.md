@@ -296,3 +296,34 @@ app
     ├── core-design
     └── core-data
 ```
+
+---
+
+## Pages — `:feature-pages` (2026-11-04)
+
+Added after the sections above; additive so the module map stays accurate.
+
+- **Responsibility:** the launcher's pages: the page list and manager, the three navigation modes
+  (the pager reads touches in the Initial pass and claims only page gestures), the Orrery widget
+  runtime (WebViews served from app-private storage at their own origins, the D-AC host API and the
+  launcher's channels) and website pages.
+- **Dependencies:** `:feature-pages` → `:core-design`, `:core-data`. It does not depend on
+  `:feature-widgets`: `HomeScreen` passes App Widget pages in through `AppWidgetPageHooks` and a
+  content slot. `:app` → `:feature-pages`.
+- **Pure, JVM-tested parts:** `PageListCodec`, `PageEdits`, `TwoFingerSwipe`, `EdgeSwipe`,
+  `HomeSwipeUp`, `PageTurn`, `PastEnd`, `UrlRules`, `ManifestRules`, `HtmlScan`, `PackageLayout`,
+  `HostProtocol`, `OpenRoutes`, `Envelope`, `ServePolicy`, `HtmlPrep`, `LauncherChannelData`,
+  `ThemeTokens`, `MiniJson`, `PageDirs`, `PageBackups`, `DragFeed`, `IntentRules`, `DialogBudget`,
+  `RateGate`, `OpenGate`, `OriginWipe` (`feature-pages/src/test`); `ScrubPastEnd`
+  (`feature-sphere/src/test`).
+- **Persistence:** SharedPreferences `pages` (list + navigation mode); imported files in
+  `noBackupFilesDir/pages/`. Backups leave out `app_webview/` (`res/xml/data_extraction_rules.xml`).
+- **Design, gestures, sandbox and owner-verify list:** [`docs/pages.md`](docs/pages.md).
+
+```
+app
+├── feature-pages
+│   ├── core-design
+│   └── core-data
+└── feature-widgets   (App Widget pages: placements on the Page surface)
+```

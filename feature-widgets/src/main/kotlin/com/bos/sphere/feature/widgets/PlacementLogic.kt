@@ -196,6 +196,23 @@ object PlacementEdits {
         return insertOnEquator(remove(list, appWidgetId), target, index)
     }
 
+    /**
+     * Puts [placement] on its page (its slot is the page's link). A widget already on that page is
+     * displaced: it leaves the list, and its id is returned so the caller gives it back to the
+     * system.
+     */
+    fun putOnPage(list: List<WidgetPlacement>, placement: WidgetPlacement): Pair<List<WidgetPlacement>, List<Int>> {
+        val displaced = list.filter {
+            it.surface == WidgetSurface.Page && it.slot == placement.slot && it.appWidgetId != placement.appWidgetId
+        }
+        val rest = list.filter { it.appWidgetId != placement.appWidgetId && it !in displaced }
+        return (rest + placement.copy(surface = WidgetSurface.Page)) to displaced.map { it.appWidgetId }
+    }
+
+    /** The widget placed on the page with widget slot [slot], if any. */
+    fun onPage(list: List<WidgetPlacement>, slot: Int): WidgetPlacement? =
+        list.firstOrNull { it.surface == WidgetSurface.Page && it.slot == slot }
+
     fun setHubSize(list: List<WidgetPlacement>, appWidgetId: Int, size: HubSize): List<WidgetPlacement> =
         list.map { if (it.appWidgetId == appWidgetId) it.copy(hubSize = size) else it }
 

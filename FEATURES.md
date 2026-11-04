@@ -187,6 +187,7 @@ The launcher adapts to **landscape** (primary) and **portrait** (secondary) mode
 - **App arrangements are limited to Bands** (Fibonacci sphere works but Usage, Recency, A–Z, Colour are scaffolded only).
 - **Hub is a demo feed** (real NotificationListenerService integration is M3+).
 - **Widget hosting is new and unverified on a device** (see *Widgets (hosting)* below).
+- **Pages are new and unverified on a device** (see *Pages* below).
 - **No local search** beyond type-to-search in portrait.
 - **No haptics** (vibration vocabulary is defined but not wired; M4+).
 - **No AGSL materials** (shader glow effects scaffolded for API 33+, not yet rendered).
@@ -219,6 +220,47 @@ Sphere hosts other apps' standard App Widgets. Full design, touch model and the 
   restored widgets' new ids.
 - **Known limitation:** an equator widget keeps its position by index, so installing, removing,
   hiding or unhiding an app that sorts before it gives it a different neighbour.
+
+---
+
+## Pages
+
+Home is page 0 of a scrollable set of pages. Full design, runtime rules and the owner-verify list:
+[`docs/pages.md`](docs/pages.md). **Not yet verified on a device.**
+
+- **Kinds of page:** a full-page **App Widget** (any app's, bound with the usual picker / prompt /
+  configure flow, told the page's real size); an **HTML widget or page** run by the Orrery widget
+  runtime (a D-AC widget package, `.zip` or folder, or a single `.html` page such as Orrery's own
+  build, which appears as "Orrery"); a **website** (any http or https address).
+- **Manage pages:** Settings → Pages → **Manage pages**, or long-press the page dots: add, rename,
+  reorder (▲ / ▼), page info, reconfigure (App Widget pages that allow it), remove. Home is always
+  first and can't be removed.
+- **Move between pages** (Settings → Pages), three modes:
+  1. **Two-finger swipe + dots** (default): swipe sideways with two fingers on any page, over any
+     content. Pinch and spread on the coverflow still open the globe and settings.
+  2. **Swipe past the coverflow's ends:** on home, from the last app, pull past it (a hint names the
+     page) and release (a stroke from the middle of the list that overshoots the end doesn't count);
+     on other pages, swipe inward from just inside the screen's edge.
+  3. **Vertical pages (swipe up):** on home, swipe up (pull down still opens the hub); on other pages,
+     two-finger vertical swipe.
+  The **page dots** always work (a row at the bottom; tap a dot; the filled dot is the current page;
+  TalkBack names the page after each turn). The home key goes back to page 0; back on a website goes
+  back in its history first, then home.
+- **HTML pages and widgets** run sandboxed, each at its own origin with its own storage: no permissions,
+  no popups (a page's links leave for your browser or a chooser), no downloads, dialogs only from the
+  page on screen. Widget packages never reach the network and never open a link or an app by
+  themselves (only a declared route, right after you tap them). Removing a page clears what it stored. A single-file page starts with **no network**; its info has the switch **"Allow this page to
+  reach the network"** and lists the hosts it reached or was refused; while it is on, a "Network on"
+  tag sits beside the dots. With it off, Orrery's connectors and Google Fonts don't load (system fonts
+  are used) and its saved state stays.
+- **Websites** (http sites load too) show their host with an https / not-https mark (padlock shape and
+  word), Back and Reload. Third-party cookies are off; permission requests are refused; downloads are refused.
+  **Safe Browsing is off** (the owner's decision): there is no warning before a known-malicious site.
+- **Memory:** only the current page and its neighbours keep a live WebView; others are rebuilt from
+  their saved state or address when you come back. Off-screen pages are paused and give up the
+  keyboard.
+- **Backups** leave out website logins and HTML pages' saved state (Orrery's included): those stay on
+  the phone.
 
 ---
 

@@ -38,6 +38,13 @@ object WidgetSizing {
         return listOf(SizeDp(laidOut, laidOut))
     }
 
+    /**
+     * Size for a widget filling a page: the page's real size (it changes with rotation and window
+     * size, and is re-reported each time).
+     */
+    fun pageSizes(widthDp: Float, heightDp: Float): List<SizeDp> =
+        listOf(SizeDp(wholeDp(widthDp.coerceAtLeast(1f)), wholeDp(heightDp.coerceAtLeast(1f))))
+
     /** Size for a hub widget: the full panel width at the chosen height preset. */
     fun hubSizes(panelWidthDp: Float, size: HubSize): List<SizeDp> =
         listOf(SizeDp(wholeDp(panelWidthDp.coerceAtLeast(1f)), size.heightDp))

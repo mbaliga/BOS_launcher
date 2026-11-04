@@ -102,7 +102,7 @@ class HomeModelTest {
     }
 
     @Test
-    fun `moving past the end creates a page; only the emptied source page is dropped`() {
+    fun `moving past the end creates a page and only the emptied source page is dropped`() {
         val p = pages(listOf("a"), listOf("b"), emptyList())
         assertEquals(listOf(listOf("b"), emptyList(), listOf("a")), HomeLayoutMath.move(p, "a", 3, 0, cap(4)).keys())
         // Preview keeps the emptied source page so indices stay stable.

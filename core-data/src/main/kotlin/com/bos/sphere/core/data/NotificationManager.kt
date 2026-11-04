@@ -2,16 +2,19 @@ package com.bos.sphere.core.data
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.UserManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Real notification feed from the system, triaged and formatted for display in the Hub.
@@ -37,27 +40,52 @@ data class HubAction(
 )
 
 /**
+ * One active notification reduced to what a count needs: the posting package, the profile it was
+ * posted in and two flags. No title, text, people or extras. Feeds the pages runtime's
+ * `launcher.notifications` channel and Sphere's Needs you home-screen widget (counts and app names
+ * only). [userSerial] is the posting profile's `UserManager` serial number (a personal-profile
+ * listener also receives the work profile's notifications), or -1 when it couldn't be read.
+ */
+data class ActiveNotification(
+    val packageName: String,
+    val isGroupSummary: Boolean,
+    val isOngoing: Boolean,
+    val userSerial: Long = -1L,
+)
+
+/**
  * Singleton provider for the notification stream. The actual service runs in the system
  * notification daemon; this manager provides a Flow API for composables.
  */
 object NotificationProvider {
     private var listener: NotificationListenerService? = null
-    private val listeners = mutableListOf<(List<HubNotification>) -> Unit>()
+    private val _notifications = MutableStateFlow<List<HubNotification>>(emptyList())
 
-    val notifications: Flow<List<HubNotification>> = callbackFlow {
-        val callback: (List<HubNotification>) -> Unit = { notifs ->
-            trySend(notifs)
-        }
-        listeners.add(callback)
-        awaitClose { listeners.remove(callback) }
-    }
+    /**
+     * The current triaged notifications. A StateFlow, so a collector that starts late (the hub
+     * opening, perhaps from a Needs you widget tap) gets the list at once instead of waiting for
+     * the next notification to be posted or removed. Empty while the listener isn't connected.
+     */
+    val notifications: StateFlow<List<HubNotification>> = _notifications.asStateFlow()
 
     internal fun onNotificationsChanged(notifs: List<HubNotification>) {
-        listeners.forEach { it(notifs) }
+        _notifications.value = notifs
     }
 
     internal fun setListener(svc: NotificationListenerService?) {
         listener = svc
+    }
+
+    private val _active = MutableStateFlow<List<ActiveNotification>?>(null)
+
+    /**
+     * Every active notification as [ActiveNotification] (package and flags only), or null until the
+     * listener has connected (notification access not granted, or not bound yet).
+     */
+    val active: StateFlow<List<ActiveNotification>?> = _active.asStateFlow()
+
+    internal fun onActiveChanged(list: List<ActiveNotification>?) {
+        _active.value = list
     }
 }
 
@@ -78,7 +106,21 @@ class SphereNotificationListener : NotificationListenerService() {
 
     override fun onDestroy() {
         NotificationProvider.setListener(null)
+        NotificationProvider.onActiveChanged(null)
+        NotificationProvider.onNotificationsChanged(emptyList())
         super.onDestroy()
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        // Both feeds start from what is already in the shade, not from the next post.
+        updateNotifications()
+    }
+
+    override fun onListenerDisconnected() {
+        NotificationProvider.onActiveChanged(null)
+        NotificationProvider.onNotificationsChanged(emptyList())
+        super.onListenerDisconnected()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -90,8 +132,27 @@ class SphereNotificationListener : NotificationListenerService() {
         updateNotifications()
     }
 
+    /** Package, profile and flags of every active notification, for counts (no content). */
+    private fun publishActive(active: Array<StatusBarNotification>?) {
+        val um = getSystemService(UserManager::class.java)
+        val serials = HashMap<android.os.UserHandle, Long>()
+        val facts = active?.map { sbn ->
+            val flags = sbn.notification?.flags ?: 0
+            ActiveNotification(
+                packageName = sbn.packageName,
+                isGroupSummary = (flags and Notification.FLAG_GROUP_SUMMARY) != 0,
+                isOngoing = (flags and Notification.FLAG_ONGOING_EVENT) != 0,
+                userSerial = serials.getOrPut(sbn.user) { runCatching { um?.getSerialNumberForUser(sbn.user) ?: -1L }.getOrDefault(-1L) },
+            )
+        }
+        NotificationProvider.onActiveChanged(facts)
+    }
+
     private fun updateNotifications() {
-        val current = activeNotifications?.mapNotNull { sbn ->
+        // Throws if the listener isn't connected (yet, or any more).
+        val active = runCatching { activeNotifications }.getOrNull()
+        publishActive(active)
+        val current = active?.mapNotNull { sbn ->
             parseNotification(sbn)
         }?.sortedByDescending { it.timestamp } ?: emptyList()
         NotificationProvider.onNotificationsChanged(current)
@@ -99,8 +160,9 @@ class SphereNotificationListener : NotificationListenerService() {
 
     private fun parseNotification(sbn: StatusBarNotification): HubNotification? {
         val n = sbn.notification ?: return null
-        val title = n.extras.getString(Notification.EXTRA_TITLE) ?: return null
-        val text = n.extras.getString(Notification.EXTRA_TEXT) ?: ""
+        // getCharSequence: apps often post styled titles, which getString would read as null.
+        val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return null
+        val text = n.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
 
         // Filter: only show messaging, calendar, and "interesting" notifications
         val tag = sbn.tag ?: ""
@@ -153,14 +215,16 @@ class SphereNotificationListener : NotificationListenerService() {
     }
 
     companion object {
-        /** Check if notification access is granted (user has enabled it in system settings). */
+        /**
+         * Whether notification access is granted to this listener (user has enabled it in system
+         * settings). Listener access, not Do Not Disturb access (`isNotificationPolicyAccessGranted`,
+         * which this used to check by mistake).
+         */
         fun isEnabled(context: Context): Boolean {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-                nm?.isNotificationPolicyAccessGranted == true
-            } else {
-                false
-            }
+            return runCatching {
+                nm?.isNotificationListenerAccessGranted(ComponentName(context, SphereNotificationListener::class.java)) == true
+            }.getOrDefault(false)
         }
 
         /** Intent to open system notification access settings (helpful for onboarding). */

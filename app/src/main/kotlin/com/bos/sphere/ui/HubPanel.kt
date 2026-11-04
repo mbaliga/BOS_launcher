@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -38,15 +39,25 @@ import com.bos.sphere.core.design.HyleColors
 /**
  * The pull-down context Hub. Driven by [fraction] (0 hidden .. 1 fully down) from the surface
  * gesture; slides in from the top as a glass panel. Content is triaged notifications from the
- * system (M3+) with a demo fallback if notification access is not granted.
+ * system (M3+) with a demo fallback if notification access is not granted. [extraContent] is
+ * drawn below the notifications at full panel width (the hosted-widget stack). It is measured
+ * before the notifications, so it gets the height it needs and the notifications are clipped to
+ * what is left; its argument says whether notifications share the panel (so it can leave them
+ * some room).
  */
 @Composable
-fun HubPanel(fraction: Float, modifier: Modifier = Modifier) {
+fun HubPanel(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    extraContent: @Composable (sharesPanel: Boolean) -> Unit = {},
+) {
     if (fraction <= 0.001f) return
     val context = LocalContext.current
-    val notifications by NotificationProvider.notifications.collectAsStateWithLifecycle(initialValue = emptyList())
+    // A StateFlow: the hub shows what is in the shade the moment it opens (a Needs you widget tap
+    // opens it directly), not only after the next notification arrives.
+    val notifications by NotificationProvider.notifications.collectAsStateWithLifecycle()
 
-    // Fallback to demo if notifications not available
+    // Fallback to demo if notification access is not granted (listener access, not DND access)
     val displayNotes = if (notifications.isEmpty() && !SphereNotificationListener.isEnabled(context)) {
         demoNotifications()
     } else {
@@ -90,17 +101,24 @@ fun HubPanel(fraction: Float, modifier: Modifier = Modifier) {
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            visibleNotes.forEach { note ->
-                HubNotificationRow(note) { dismissedKeys += note.key }
+            // Weighted, so it is measured after (and gives way to) the extra content below.
+            Column(
+                modifier = Modifier.weight(1f, fill = false).clipToBounds(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                visibleNotes.forEach { note ->
+                    HubNotificationRow(note) { dismissedKeys += note.key }
+                }
+                if (displayNotes.size > visibleNotes.size) {
+                    Text(
+                        "${displayNotes.size - visibleNotes.size} more notifications · Show all",
+                        color = HyleColors.InkDim,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             }
-            if (displayNotes.size > visibleNotes.size) {
-                Text(
-                    "${displayNotes.size - visibleNotes.size} more notifications · Show all",
-                    color = HyleColors.InkDim,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
+            extraContent(visibleNotes.isNotEmpty())
         }
     }
 }

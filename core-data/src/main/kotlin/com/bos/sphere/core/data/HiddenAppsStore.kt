@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class HiddenAppsStore(context: Context) {
 
     private val prefs =
-        context.applicationContext.getSharedPreferences("hidden_apps", Context.MODE_PRIVATE)
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _hidden = MutableStateFlow(prefs.getStringSet(KEY, emptySet())!!.toSet())
     val hidden: StateFlow<Set<String>> = _hidden.asStateFlow()
@@ -28,7 +28,12 @@ class HiddenAppsStore(context: Context) {
         prefs.edit().putStringSet(KEY, next).apply()
     }
 
-    private companion object {
-        const val KEY = "keys"
+    companion object {
+        /**
+         * The SharedPreferences file. Sphere's home-screen widgets watch it for changes (each store
+         * instance has its own [hidden] flow, so the file is the one signal every reader shares).
+         */
+        const val PREFS_NAME = "hidden_apps"
+        private const val KEY = "keys"
     }
 }

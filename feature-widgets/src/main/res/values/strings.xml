@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Entry points -->
+    <string name="widgets_add">Add widget</string>
+    <string name="widgets_add_here">Add widget here</string>
+    <string name="widgets_section">WIDGETS</string>
+
+    <!-- Picker -->
+    <string name="widgets_picker_title">Add a widget</string>
+    <string name="widgets_picker_close">Close</string>
+    <string name="widgets_picker_close_cd">Close the widget picker</string>
+    <string name="widgets_picker_place_on">Place on</string>
+    <string name="widgets_surface_equator">Equator</string>
+    <string name="widgets_surface_hub">Hub</string>
+    <string name="widgets_surface_selected_cd">%1$s, selected</string>
+    <string name="widgets_surface_choose_cd">Place on the %1$s</string>
+    <string name="widgets_picker_filter">Filter by app or widget</string>
+    <string name="widgets_picker_loading">Loading widgets…</string>
+    <string name="widgets_picker_empty">No widgets installed</string>
+    <string name="widgets_picker_no_match">No widgets match \"%1$s\"</string>
+    <string name="widgets_picker_work">Work profile</string>
+    <string name="widgets_picker_cells">%1$d × %2$d cells</string>
+    <string name="widgets_picker_add_cd">Add %1$s widget, %2$s</string>
+    <string name="widgets_picker_preview_cd">Preview of %1$s</string>
+
+    <!-- Hosted widget states -->
+    <string name="widgets_unavailable_title">Widget unavailable</string>
+    <string name="widgets_unavailable_body">%1$s isn\'t providing this widget right now.</string>
+    <string name="widgets_unavailable_body_unknown">Its app isn\'t providing it right now.</string>
+    <string name="widgets_restoring_title">Restoring widget</string>
+    <string name="widgets_restoring_body">Waiting for Android to restore it from your backup.</string>
+    <string name="widgets_loading">Loading widget…</string>
+    <string name="widgets_remove">Remove</string>
+    <string name="widgets_remove_cd">Remove the %1$s widget</string>
+    <string name="widgets_options_cd">Options for the %1$s widget</string>
+    <string name="widgets_unavailable_label">Unavailable widget</string>
+    <string name="widgets_generic_label">Widget</string>
+
+    <!-- Widget menu -->
+    <string name="widgets_menu_on_equator">On the equator</string>
+    <string name="widgets_menu_in_hub">In the hub</string>
+    <string name="widgets_menu_reconfigure">Reconfigure</string>
+    <string name="widgets_menu_move_to_hub">Move to hub</string>
+    <string name="widgets_menu_move_to_equator">Move to equator</string>
+    <string name="widgets_menu_height">Height in the hub</string>
+    <string name="widgets_size_small">Small</string>
+    <string name="widgets_size_medium">Medium</string>
+    <string name="widgets_size_large">Large</string>
+    <string name="widgets_menu_remove">Remove widget</string>
+
+    <!-- Feedback -->
+    <string name="widget_add_failed">Couldn\'t add that widget</string>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home-screen widget colours, day. Sphere's palette (core-design HyleColors) is dark only; the night
+  set in values-night/ is that palette. This day set keeps the same roles and the same violet hue at
+  contrasts that hold on a light card (checked by WidgetColorsTest: text 4.5:1, glyphs 3:1). No colour
+  here carries meaning on its own: every state also has a glyph and a word.
+-->
+<resources>
+    <color name="hw_surface">#FFF6F5FB</color>
+    <color name="hw_stroke">#338E7BFF</color>
+    <color name="hw_ink_bright">#FF15171E</color>
+    <color name="hw_ink">#FF2B2F3A</color>
+    <color name="hw_ink_dim">#FF585E6E</color>
+    <color name="hw_accent">#FF5B47D6</color>
+    <color name="hw_fill">#FF6F5BEA</color>
+    <color name="hw_track">#2415171E</color>
+    <color name="hw_pad">#0D15171E</color>
+    <color name="hw_pad_stroke">#1F15171E</color>
+    <color name="hw_ripple">#335B47D6</color>
+</resources>

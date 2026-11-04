@@ -22,8 +22,11 @@ surface settings, and app management.
 | `:feature-sphere` | `SphereGeometry` (ported `magAt`/`txAt`), `SphereState`, `CoverflowLayer`, all-apps `Globe`, and `LauncherSurface` (unified gestures) |
 | `:feature-search` | Apps-only search ranking + the portrait always-keyboard |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
+| `:feature-widgets` | App Widget **hosting**: one `AppWidgetHost`, placement store + reconciliation, picker, bind/configure flow, equator tiles and the hub widget stack ([`docs/widget-hosting.md`](docs/widget-hosting.md)) |
+| `:feature-homewidgets` | Sphere's **own** home-screen App Widgets for any launcher: Gate clock, Battery, Now playing, Needs you, App pads ([`docs/widgets.md`](docs/widgets.md)) |
+| `:feature-pages` | **Pages**: page model + manager, the three "Move between pages" modes, the Orrery widget runtime (D-AC packages and single-file pages such as Orrery's) and website pages ([`docs/pages.md`](docs/pages.md)) |
 
-Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`, `:haptics`,
+Planned (per the brief): `:feature-hub`, `:feature-settings`, `:haptics`,
 `:assistant`. (The hub / settings UI currently lives in `:app/ui` and will graduate to modules.)
 
 ## What works now
@@ -34,6 +37,24 @@ Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`
   filtered by a persisted hidden-apps set.
 - **Coverflow equator** with the prototype's magnification-integral spacing via `graphicsLayer`;
   orientation-driven row split (Auto = 2 rows portrait / 1 landscape) with focus-preserving remap.
+- **Hosts App Widgets** (any app's, no pairing): picker (Settings → Widgets, long-press an app or
+  empty surface, or the hub), bind prompt + configure flow, widgets as tiles on the equator
+  (prototype "widgets-as-tiles") or in a full-width stack in the hub; remove / reconfigure / move /
+  resize per widget. Compiled and JVM-tested only: **all on-device behaviour is owner-verify**
+  ([`docs/widget-hosting.md`](docs/widget-hosting.md)).
+- **Provides its own widgets** (2026-11-04) to any launcher, also when Sphere isn't home: Gate clock,
+  Battery, Now playing, Needs you (notification counts per app, never content), App pads; three sizes
+  each, no new permission. Compiled and JVM-tested only: **all on-device behaviour is owner-verify**
+  ([`docs/widgets.md`](docs/widgets.md)).
+- **Pages** (2026-11-04): home is page 0 of a scrollable set; add full-page App Widgets, HTML widgets
+  and pages run by the Orrery widget runtime (D-AC packages; single-file pages such as Orrery's own,
+  with a per-page network switch, off by default) and websites. Move between them by two-finger swipe +
+  dots (default), by swiping past the coverflow's ends, or with vertical pages (swipe up): a setting.
+  Adds `INTERNET` (website pages) and allows cleartext so http sites load (marked "not https");
+  WebView metrics opted out; **Safe Browsing off by the owner's decision** (no warning before
+  known-malicious sites). Backups leave out the WebView profile (website logins, HTML pages' storage).
+  Compiled and JVM-tested only: **all on-device behaviour is owner-verify**
+  ([`docs/pages.md`](docs/pages.md)).
 - **Unified navigation gestures** (one arbitrated handler): drag to scrub with snap, tap to
   focus/launch, **pinch-in → all-apps globe** (rotate + lens), **spread → settings** (or back
   home), **pull-down → hub**, long-press → app menu.

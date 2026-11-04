@@ -4,6 +4,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val robolectricRuntime: Configuration by configurations.creating { isTransitive = false }
+val robolectricJarDir = layout.buildDirectory.dir("robolectric-jars")
+val robolectricJars = tasks.register<Copy>("robolectricJars") {
+    from(robolectricRuntime)
+    into(robolectricJarDir)
+}
+
 android {
     namespace = "com.bos.sphere.feature.grid"
     compileSdk = 35
@@ -25,6 +32,12 @@ android {
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        unitTests.all { test ->
+            // Robolectric's Android runtime comes through Gradle (proxy/caching-friendly), offline.
+            test.dependsOn(robolectricJars)
+            test.systemProperty("robolectric.offline", "true")
+            test.systemProperty("robolectric.dependency.dir", robolectricJarDir.get().asFile.absolutePath)
+        }
     }
 }
 
@@ -46,6 +59,7 @@ dependencies {
     testImplementation(libs.junit)
     // JVM screenshot smoke tests (Robolectric native graphics) — see ScreenshotTest.
     testImplementation(libs.robolectric)
+    robolectricRuntime("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

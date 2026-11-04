@@ -30,6 +30,8 @@ fun AppContextMenu(
     onAppInfo: () -> Unit,
     onUninstall: () -> Unit,
     onToggleHidden: () -> Unit,
+    isOnHome: Boolean? = null,
+    onToggleHome: () -> Unit = {},
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -46,6 +48,7 @@ fun AppContextMenu(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
+            if (isOnHome != null) MenuItem(if (isOnHome) "Remove from home" else "Add to home", onToggleHome)
             MenuItem("App info", onAppInfo)
             MenuItem(if (isHidden) "Unhide" else "Hide", onToggleHidden)
             MenuItem("Uninstall", onUninstall, destructive = true)

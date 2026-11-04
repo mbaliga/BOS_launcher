@@ -5,6 +5,16 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    <!-- Network-aware dot grid -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Haptic tick when a motion gesture fires -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Silent / vibrate / Do-Not-Disturb actions (user grants access in system settings) -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Optional background motion gestures -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Query other launchable activities so LauncherApps can enumerate the inventory. -->
     <queries>
@@ -52,6 +62,14 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+        </service>
+        <service
+            android:name=".MotionGestureService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Listens to the accelerometer and gyroscope for user-configured motion gestures (shake, flick, flip) that toggle ringer mode, flashlight and shortcuts while the launcher is not in the foreground." />
         </service>
     </application>
 

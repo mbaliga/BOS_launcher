@@ -41,6 +41,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
                 landscapeGrid = it.landscapeGrid.coerced(),
                 iconScale = it.iconScale.coerceIn(LauncherPrefs.MIN_ICON_SCALE, LauncherPrefs.MAX_ICON_SCALE),
                 motionSensitivity = it.motionSensitivity.coerceIn(0f, 1f),
+                uiSoundVolume = it.uiSoundVolume.coerceIn(0f, 1f),
             )
         }
         if (next == _prefs.value) return
@@ -63,6 +64,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putString("drawerStyle", next.drawerStyle.name)
             .putString("clockPosition", next.clockPosition.name)
             .putBoolean("networkDots", next.networkDots)
+            .putBoolean("uiSounds", next.uiSounds)
+            .putFloat("uiSoundVolume", next.uiSoundVolume)
             .putString("wheelGrouping", next.wheelGrouping.name)
             .apply()
     }
@@ -88,6 +91,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             drawerStyle = enumOr(sp.getString("drawerStyle", null), d.drawerStyle),
             clockPosition = enumOr(sp.getString("clockPosition", null), d.clockPosition),
             networkDots = sp.getBoolean("networkDots", d.networkDots),
+            uiSounds = sp.getBoolean("uiSounds", d.uiSounds),
+            uiSoundVolume = sp.getFloat("uiSoundVolume", d.uiSoundVolume).coerceIn(0f, 1f),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
         )
     }

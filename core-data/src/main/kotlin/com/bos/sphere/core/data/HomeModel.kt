@@ -81,6 +81,9 @@ data class LauncherPrefs(
     val clockPosition: ClockPosition = ClockPosition.Top,
     /** The substrate dots breathe in the network's colour (green good … red poor, grey airplane, dark offline). */
     val networkDots: Boolean = true,
+    /** Console-style interface tones in the settings space. */
+    val uiSounds: Boolean = true,
+    val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
 ) {
     fun gridFor(landscape: Boolean): GridSpec = if (landscape) landscapeGrid else portraitGrid

@@ -283,6 +283,13 @@ private fun DrawerContent(
                         scrollTo = { st.requestScrollToItem(it) }
                         DrawerGrid(st, rows, padding, onLaunch, onLongPress)
                     }
+                    DrawerView.Bubbles -> {
+                        BubbleField(
+                            apps = rows.filterIsInstance<DrawerRow.App>().map { it.app },
+                            onLaunch = onLaunch, onLongPress = onLongPress,
+                            modifier = Modifier.fillMaxSize(), contentPadding = padding, sounds = sounds,
+                        )
+                    }
                     else -> {
                         val st = rememberLazyListState()
                         scrollTo = { st.requestScrollToItem(it) }

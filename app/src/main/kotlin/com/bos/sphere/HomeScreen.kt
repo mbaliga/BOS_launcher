@@ -57,6 +57,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.bos.sphere.feature.grid.observeBackgroundTouch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -434,6 +435,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
     }
 
+    val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
+    val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     // ---- steps need the activity-recognition permission
     val stepsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(StripItem.Steps in prefs.strip) {
@@ -526,9 +529,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
     }
+    val bgTouch = remember { mutableStateOf<com.bos.sphere.feature.grid.TouchPoint?>(null) }
     @Composable
     fun Background() {
-        if (!prefs.showWallpaper) Box(Modifier.fillMaxSize().background(Color.Black))
+        com.bos.sphere.feature.grid.BackgroundLayer(
+            kind = prefs.backgroundKind,
+            preset = prefs.backgroundPreset,
+            colorA = prefs.backgroundColorA,
+            colorB = prefs.backgroundColorB,
+            modifier = Modifier.fillMaxSize(),
+            touch = bgTouch,
+        )
         IndicatorLayer(
             reading = reading,
             effects = prefs.indicatorEffects,
@@ -540,7 +551,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch)) {
         when (prefs.homeStyle) {
             HomeStyle.Grid -> {
                 Background()
@@ -568,7 +579,21 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 Corners()
             }
 
-            HomeStyle.Bubbles -> { Background() } // replaced by the bubble field when it lands
+            HomeStyle.Bubbles -> {
+                Background()
+                com.bos.sphere.feature.grid.BubbleField(
+                    apps = apps,
+                    onLaunch = ::launch,
+                    onLongPress = { menuApp = it },
+                    modifier = Modifier.fillMaxSize(),
+                    bubbleSize = (68 * prefs.iconScale).dp,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 56.dp, bottom = bottomClear),
+                    showLabels = prefs.showLabels,
+                    sounds = sounds,
+                )
+                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                Corners()
+            }
             HomeStyle.Sphere -> {
                 // The sphere / coverflow surface, in the same chrome as the pages: indicator
                 // background, status strip, corners, long-press → settings.
@@ -649,8 +674,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             visible = searchOpen,
             apps = apps,
             recent = recentApps,
+            prefs = prefs,
+            contacts = contactSource,
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },
+            onOpenIntent = { i -> runCatching { context.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+            onRequestContactsPermission = { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) },
             onDismiss = { searchOpen = false },
             modifier = Modifier.fillMaxSize(),
         )
@@ -812,6 +841,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 dismiss = L10n.tr("Keep"),
                 onConfirm = { savePages(HomeLayoutMath.reflow(pages, capacityOf)); fillPrompt = false },
                 onDismiss = { fillPrompt = false },
+            )
+        }
+        if (!prefs.onboardingDone) {
+            com.bos.sphere.ui.Onboarding(
+                prefs = prefs,
+                update = { f -> stores.prefs.update(f) },
+                setDefaultHome = {
+                    val i = DefaultLauncher.requestRoleIntent(context) ?: DefaultLauncher.homeSettingsIntent()
+                    runCatching { context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                },
+                onDone = { stores.prefs.update { it.copy(onboardingDone = true) } },
             )
         }
         tileMenu?.let { key ->

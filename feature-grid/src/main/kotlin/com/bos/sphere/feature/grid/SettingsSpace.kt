@@ -232,14 +232,6 @@ private fun SettingsSpaceContent(
         maxScroll = ((list.size - 1) * rowH - (visibleBottom - firstY - rowH * 1.2f)).coerceAtLeast(0f)
         if (scrollPx > maxScroll) scrollPx = maxScroll
 
-        // Opening a pane scrolls its row up to the top of the list so the sheet doesn't cover it.
-        LaunchedEffect(paneOpen) {
-            if (paneOpen >= 0 && !landscape) {
-                val target = (paneOpen * rowH).coerceIn(0f, maxScroll)
-                scrollState.animateScrollBy(scrollPx - target)
-            }
-        }
-
         WaveField(Modifier.fillMaxSize())
 
         // Gestures: vertical scrolls the options (with fling), horizontal changes category, tap activates.
@@ -271,9 +263,7 @@ private fun SettingsSpaceContent(
                         }
                         if (p.y > firstY - rowH / 2) {
                             val idx = ((p.y - firstY + scrollPx) / rowH).roundToInt()
-                            if (idx in shown().indices && p.x < (if (paneOpen >= 0 && landscape) w * 0.52f else w) &&
-                                (landscape || paneOpen < 0 || p.y < h * (1f - sheetFraction))
-                            ) activate(idx)
+                            if (idx in shown().indices) activate(idx)
                         }
                     }
                 },
@@ -373,7 +363,7 @@ private fun SettingsSpaceContent(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .offset { IntOffset((anchorX - 20.dp.toPx()).roundToInt(), (y - rowH / 2).roundToInt()) }
-                    .width(with(density) { ((if (paneOpen >= 0 && landscape) w * 0.5f else w * 0.72f) - 10f).toDp() })
+                    .width(with(density) { ((w * 0.72f) - 10f).toDp() })
                     .alpha(((y - rowTop) / (rowH * 0.6f)).coerceIn(0f, 1f))
                     .semantics(mergeDescendants = true) {
                         contentDescription = "${it.title}, ${it.value}"
@@ -417,38 +407,17 @@ private fun SettingsSpaceContent(
             )
         }
 
-        // Option pane: a bottom sheet in portrait, a side panel in landscape.
-        AnimatedVisibility(
+        // Option page: full screen, breadcrumbs on top.
+        androidx.compose.animation.AnimatedVisibility(
             visible = paneItem != null,
-            enter = if (landscape) slideInHorizontally { it / 2 } + fadeIn() else androidx.compose.animation.slideInVertically { it } + fadeIn(),
-            exit = if (landscape) slideOutHorizontally { it / 2 } + fadeOut() else androidx.compose.animation.slideOutVertically { it } + fadeOut(),
-            modifier = Modifier.align(if (landscape) Alignment.CenterEnd else Alignment.BottomCenter),
+            enter = fadeIn(tween(180)) + slideInHorizontally(tween(220)) { it / 6 },
+            exit = fadeOut(tween(140)) + slideOutHorizontally(tween(160)) { it / 6 },
         ) {
             val current = paneItem ?: return@AnimatedVisibility
-            Column(
-                Modifier
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(12.dp)
-                    .then(
-                        if (landscape) Modifier.width(with(density) { (w * 0.46f).toDp() }.coerceAtMost(460.dp)).fillMaxHeight(0.86f)
-                        else Modifier.fillMaxWidth().heightIn(max = with(density) { (h * sheetFraction).toDp() }),
-                    )
-                    .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.94f), RoundedCornerShape(18.dp))
-                    .border(1.dp, Brush.verticalGradient(listOf(HyleColors.Violet.copy(alpha = 0.6f), HyleColors.Hairline)), RoundedCornerShape(18.dp))
-                    .pointerInput(Unit) { detectTapGestures { } } // keep taps inside the pane
-                    .padding(16.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(current.title.uppercase(), color = HyleColors.InkBright, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Icon(
-                        Glyphs.Close, "Close", tint = HyleColors.InkDim,
-                        modifier = Modifier.size(32.dp).pointerInput(Unit) { detectTapGestures { paneOpen = -1; sounds?.play(UiSound.Back) } }.padding(7.dp),
-                    )
-                }
-                Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 8.dp)) {
-                    current.content(this)
-                }
-            }
+            DetailScreen(
+                crumbs = listOf(com.bos.sphere.core.design.L10n.tr("Settings"), categories.getOrNull(cat)?.title ?: "", current.title),
+                onCrumb = { i -> sounds?.play(UiSound.Back); if (i == 0) onClose() else paneOpen = -1 },
+            ) { current.content(this) }
         }
     }
 }

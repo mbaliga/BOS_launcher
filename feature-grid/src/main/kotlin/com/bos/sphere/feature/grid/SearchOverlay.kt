@@ -1,0 +1,470 @@
+package com.bos.sphere.feature.grid
+
+import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathBuilder
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bos.sphere.core.data.AppEntry
+import com.bos.sphere.core.data.Channel
+import com.bos.sphere.core.data.ContactActions
+import com.bos.sphere.core.data.ContactHit
+import com.bos.sphere.core.data.ContactLogic
+import com.bos.sphere.core.data.ContactSource
+import com.bos.sphere.core.data.LauncherPrefs
+import com.bos.sphere.core.data.WebSearch
+import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.L10n
+import com.bos.sphere.feature.search.AppSearch
+import com.bos.sphere.feature.search.SectionKind
+import com.bos.sphere.feature.search.Suggestion
+import com.bos.sphere.feature.search.SuggestionKind
+import com.bos.sphere.feature.search.WebRow
+import com.bos.sphere.feature.search.sections
+import com.bos.sphere.feature.search.suggest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+
+/**
+ * Universal search: apps, people (with the ways to reach them, BlackBerry style), and the web
+ * (DuckDuckGo by default so !bangs work). Refinement chips in the Spotlight manner rewrite the field.
+ * Kept light so it comes up instantly; the keyboard is requested after the first frame.
+ */
+@Composable
+fun SearchOverlay(
+    visible: Boolean,
+    apps: List<AppEntry>,
+    recent: List<AppEntry>,
+    prefs: LauncherPrefs,
+    contacts: ContactSource?,
+    onLaunch: (AppEntry) -> Unit,
+    onLongPressApp: (AppEntry) -> Unit,
+    onOpenIntent: (Intent) -> Unit,
+    onRequestContactsPermission: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var field by remember { mutableStateOf(TextFieldValue("")) }
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(visible) {
+        if (visible) {
+            field = TextFieldValue("")
+            delay(60) // let the overlay draw its first frame before the IME animates
+            runCatching { focus.requestFocus(); keyboard?.show() }
+        } else {
+            keyboard?.hide()
+        }
+    }
+    if (visible) BackHandler(onBack = onDismiss)
+
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(HyleColors.Background.copy(alpha = 0.96f))
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .imePadding(),
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)
+                        .fillMaxWidth()
+                        .background(HyleColors.Surface, RoundedCornerShape(14.dp))
+                        .border(1.dp, HyleColors.Hairline, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    Icon(Glyphs.Search, null, tint = HyleColors.InkDim, modifier = Modifier.size(18.dp))
+                    Box(Modifier.weight(1f).padding(start = 10.dp)) {
+                        if (field.text.isEmpty()) Text(L10n.tr("Search apps, people, the web"), color = HyleColors.InkDim, fontSize = 15.sp)
+                        BasicTextField(
+                            value = field,
+                            onValueChange = { field = it },
+                            singleLine = true,
+                            textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 15.sp),
+                            cursorBrush = SolidColor(HyleColors.Violet),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                            keyboardActions = KeyboardActions(
+                                onGo = { submitSearch(field.text, apps, prefs, onLaunch, onOpenIntent) },
+                            ),
+                            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                        )
+                    }
+                    Icon(
+                        Glyphs.Close,
+                        contentDescription = "Close",
+                        tint = HyleColors.InkDim,
+                        modifier = Modifier.size(32.dp).clickable(onClick = onDismiss).padding(6.dp),
+                    )
+                }
+                SearchResults(
+                    query = field.text,
+                    // Chips and bang hints rewrite the text: put the caret at the end.
+                    onQueryChange = { field = TextFieldValue(it, TextRange(it.length)) },
+                    apps = apps, recent = recent, prefs = prefs, contacts = contacts,
+                    onLaunch = onLaunch, onLongPressApp = onLongPressApp,
+                    onOpenIntent = onOpenIntent, onRequestContactsPermission = onRequestContactsPermission,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Enter / IME-Go: launch the top app result, otherwise open the first web row (a URL, a bang, or
+ * the web search). Does nothing for a blank query.
+ */
+fun submitSearch(
+    query: String,
+    apps: List<AppEntry>,
+    prefs: LauncherPrefs,
+    onLaunch: (AppEntry) -> Unit,
+    onOpenIntent: (Intent) -> Unit,
+) {
+    val q = query.trim()
+    if (q.isEmpty()) return
+    val bangOrUrl = WebSearch.bang(q) != null || WebSearch.looksLikeUrl(q)
+    val top = if (bangOrUrl && prefs.searchWeb) null else AppSearch.rank(apps, q, limit = 1).firstOrNull()
+    if (top != null) { onLaunch(top); return }
+    if (!prefs.searchWeb) return
+    val s = sections(q, prefs.webEngine, emptyList<AppEntry>(), emptyList<ContactHit>())
+    val url = when (val first = s.web.firstOrNull()) {
+        is WebRow.Open -> first.url
+        is WebRow.BangSearch -> first.url
+        is WebRow.Search -> first.url
+        is WebRow.PlayStore -> first.url
+        else -> null
+    }
+    if (url != null) onOpenIntent(WebSearch.intentFor(url))
+}
+
+private class ContactRow(val hit: ContactHit, val channels: List<Channel>)
+
+private sealed interface Row {
+    val key: String
+    data class Header(val title: String) : Row { override val key get() = "h:$title" }
+    data class App(val app: AppEntry) : Row { override val key get() = "a:${app.key}" }
+    data class Person(val c: ContactRow) : Row { override val key get() = "c:${c.hit.id}" }
+    data object AllowContacts : Row { override val key get() = "allow" }
+    data class Web(val row: WebRow, val index: Int) : Row { override val key get() = "w:$index" }
+    data class Hint(val text: String) : Row { override val key get() = "hint:$text" }
+}
+
+/**
+ * Chips + the sectioned result list, for the overlay and for the always-on keyboard (which owns the
+ * field and passes its text as [query]; [onQueryChange] is called when a chip rewrites it).
+ */
+@Composable
+fun SearchResults(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    apps: List<AppEntry>,
+    recent: List<AppEntry>,
+    prefs: LauncherPrefs,
+    contacts: ContactSource?,
+    onLaunch: (AppEntry) -> Unit,
+    onLongPressApp: (AppEntry) -> Unit,
+    onOpenIntent: (Intent) -> Unit,
+    onRequestContactsPermission: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val wantContacts = prefs.searchContacts && contacts != null
+
+    // Contacts: debounced, off the main thread; a newer keystroke cancels the stale lookup.
+    var rows by remember { mutableStateOf<List<ContactRow>>(emptyList()) }
+    var permitted by remember { mutableStateOf(true) }
+    LaunchedEffect(query, contacts, wantContacts) {
+        val q = query.trim()
+        if (!wantContacts || q.length < 2 || contacts == null) {
+            rows = emptyList()
+            return@LaunchedEffect
+        }
+        delay(120)
+        val (ok, found) = withContext(Dispatchers.IO) {
+            val ok = contacts.hasPermission()
+            ok to if (ok) contacts.search(q).map { ContactRow(it, ContactActions.availableChannels(context, it)) } else emptyList()
+        }
+        permitted = ok
+        rows = found
+    }
+
+    val trimmed = query.trim()
+    val ranked = remember(apps, query) { if (trimmed.isEmpty()) emptyList() else AppSearch.rank(apps, trimmed, limit = 8) }
+    val categories = remember(apps) { apps.map { AppSearch.categoryNameOf(it.packageName) }.distinct().sorted() }
+    val chips = remember(query, categories) { suggest(query, categories) }
+    val data = remember(query, ranked, rows, prefs.webEngine, prefs.searchWeb, prefs.searchContacts, permitted, wantContacts) {
+        sections(
+            trimmed, prefs.webEngine, ranked, if (wantContacts) rows else emptyList(),
+            searchWeb = prefs.searchWeb, searchContacts = wantContacts,
+            hasContactsPermission = permitted,
+        )
+    }
+    val list = remember(data, recent, trimmed) {
+        buildList<Row> {
+            if (trimmed.isEmpty()) {
+                if (recent.isNotEmpty()) {
+                    add(Row.Header(L10n.tr("Recent")))
+                    recent.take(8).forEach { add(Row.App(it)) }
+                }
+                add(Row.Hint(L10n.tr("Type to find apps, people and the web. Try kind: or used:today")))
+                return@buildList
+            }
+            for (kind in data.order) when (kind) {
+                SectionKind.Apps -> { add(Row.Header(L10n.tr("Apps"))); data.apps.forEach { add(Row.App(it)) } }
+                SectionKind.Contacts -> {
+                    add(Row.Header(L10n.tr("Contacts")))
+                    data.contacts.forEach { add(Row.Person(it)) }
+                    if (data.askContactsPermission) add(Row.AllowContacts)
+                }
+                SectionKind.Web -> { add(Row.Header(L10n.tr("Web"))); data.web.forEachIndexed { i, w -> add(Row.Web(w, i)) } }
+            }
+            if (data.order.isEmpty()) add(Row.Hint(L10n.tr("No matches for “%s”", trimmed)))
+        }
+    }
+
+    Column(modifier) {
+        if (chips.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                chips.forEach { s -> SuggestionChip(s) { onQueryChange(s.insertion) } }
+            }
+        }
+        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+            items(list, key = { it.key }) { row ->
+                when (row) {
+                    is Row.Header -> Text(
+                        row.title.uppercase(), color = HyleColors.InkDim, fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp,
+                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp, start = 4.dp),
+                    )
+                    is Row.Hint -> Text(row.text, color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(top = 16.dp, start = 4.dp))
+                    is Row.App -> AppRow(row.app, onLaunch, onLongPressApp)
+                    is Row.Person -> PersonRow(row.c, onOpenIntent)
+                    Row.AllowContacts -> SimpleRow(Glyphs.Person, L10n.tr("Allow contacts to find people"), dim = true, onClick = onRequestContactsPermission)
+                    is Row.Web -> WebRowView(row.row, onOpenIntent, onQueryChange, query)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionChip(s: Suggestion, onClick: () -> Unit) {
+    val accent = s.kind == SuggestionKind.Key || s.kind == SuggestionKind.Value
+    Text(
+        s.label,
+        color = if (accent) HyleColors.Violet else HyleColors.Ink,
+        fontSize = 13.sp,
+        maxLines = 1,
+        modifier = Modifier
+            .padding(end = 8.dp)
+            .background(HyleColors.Surface, RoundedCornerShape(50))
+            .border(1.dp, if (accent) HyleColors.Violet.copy(alpha = 0.5f) else HyleColors.Hairline, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, onLong: (AppEntry) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = { onLaunch(app) }, onLongClick = { onLong(app) })
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+    ) {
+        AppIcon(app, 42.dp)
+        Text(app.label, color = HyleColors.InkBright, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 14.dp))
+    }
+}
+
+@Composable
+private fun PersonRow(c: ContactRow, onOpenIntent: (Intent) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 4.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f).clickable { onOpenIntent(ContactActions.openContact(c.hit)) },
+        ) {
+            Box(
+                Modifier.size(38.dp).background(HyleColors.VioletSoft, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(ContactLogic.initials(c.hit.name), color = HyleColors.InkBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Text(
+                c.hit.name, color = HyleColors.InkBright, fontSize = 15.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp),
+            )
+        }
+        c.channels.forEach { ch ->
+            ChannelButton(ch) { ContactActions.intentFor(ch, c.hit)?.let(onOpenIntent) }
+        }
+    }
+}
+
+@Composable
+private fun ChannelButton(ch: Channel, onClick: () -> Unit) {
+    val glyph = when (ch) {
+        Channel.Call -> Glyphs.Phone
+        Channel.Sms -> Glyphs.Message
+        Channel.Email -> Glyphs.Mail
+        Channel.WhatsApp -> WhatsAppGlyph
+        Channel.Telegram -> TelegramGlyph
+        Channel.Signal -> SignalGlyph
+    }
+    val desc = when (ch) {
+        Channel.Call -> "Call"; Channel.Sms -> "Message"; Channel.Email -> "Email"
+        Channel.WhatsApp -> "WhatsApp"; Channel.Telegram -> "Telegram"; Channel.Signal -> "Signal"
+    }
+    Box(
+        Modifier
+            .padding(start = 5.dp)
+            .size(32.dp)
+            .background(HyleColors.Surface, CircleShape)
+            .border(1.dp, HyleColors.Hairline, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(glyph, desc, tint = HyleColors.Violet, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+private fun SimpleRow(icon: ImageVector, text: String, dim: Boolean = false, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
+    ) {
+        Icon(icon, null, tint = if (dim) HyleColors.InkDim else HyleColors.Violet, modifier = Modifier.size(20.dp))
+        Text(
+            text, color = if (dim) HyleColors.InkDim else HyleColors.InkBright, fontSize = 14.sp, maxLines = 1,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 14.dp),
+        )
+    }
+}
+
+@Composable
+private fun WebRowView(row: WebRow, onOpenIntent: (Intent) -> Unit, onQueryChange: (String) -> Unit, query: String) {
+    when (row) {
+        is WebRow.Open -> SimpleRow(Glyphs.Globe, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
+        is WebRow.BangSearch -> SimpleRow(Glyphs.Search, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
+        is WebRow.Search -> SimpleRow(Glyphs.Search, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
+        is WebRow.PlayStore -> SimpleRow(Glyphs.Apps, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
+        is WebRow.BangHints -> Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp, horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(L10n.tr("Try"), color = HyleColors.InkDim, fontSize = 12.sp)
+            Spacer(Modifier.width(8.dp))
+            row.chips.forEach { chip ->
+                Text(
+                    "!${chip.code}",
+                    color = HyleColors.Violet, fontSize = 13.sp,
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .background(HyleColors.Surface, RoundedCornerShape(50))
+                        .border(1.dp, HyleColors.Hairline, RoundedCornerShape(50))
+                        .clickable { onQueryChange(chip.rewritten) }
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
+        }
+    }
+}
+
+// ---- private glyphs (stroke style matching Glyphs) ----
+
+private fun glyph(name: String, block: PathBuilder.() -> Unit): ImageVector =
+    ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).apply {
+        path(
+            fill = null, stroke = SolidColor(Color.White), strokeLineWidth = 2.1f,
+            strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round, pathBuilder = block,
+        )
+    }.build()
+
+private val WhatsAppGlyph = glyph("whatsapp") {
+    // Speech bubble with a tail, and a small handset curve inside.
+    moveTo(4f, 20f); lineTo(5.4f, 16f)
+    arcTo(8.4f, 8.4f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 8.2f, y1 = 18.6f)
+    close()
+    moveTo(9.5f, 8.8f); quadTo(9f, 11f, 12.2f, 14.2f); quadTo(14.5f, 15.3f, 15.3f, 14.5f)
+    lineTo(14.6f, 13.2f); lineTo(13.2f, 13.5f); lineTo(10.5f, 10.8f); lineTo(10.8f, 9.4f); close()
+}
+
+private val TelegramGlyph = glyph("telegram") {
+    moveTo(20.5f, 4f); lineTo(3.5f, 10.8f); lineTo(9f, 13f); lineTo(11.2f, 19.5f); lineTo(14f, 15.2f)
+    lineTo(18.5f, 18.5f); close()
+    moveTo(9f, 13f); lineTo(20.5f, 4f)
+}
+
+private val SignalGlyph = glyph("signal") {
+    moveTo(4f, 20f); lineTo(5.2f, 16.2f)
+    arcTo(8.5f, 8.5f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 8f, y1 = 18.8f)
+    close()
+    moveTo(9f, 11.5f); lineTo(9.1f, 11.5f); moveTo(12f, 11.5f); lineTo(12.1f, 11.5f); moveTo(15f, 11.5f); lineTo(15.1f, 11.5f)
+}

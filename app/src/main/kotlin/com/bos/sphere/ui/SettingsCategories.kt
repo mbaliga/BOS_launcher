@@ -2,6 +2,10 @@ package com.bos.sphere.ui
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
@@ -54,6 +58,16 @@ import com.bos.sphere.core.data.PagingAxis
 import com.bos.sphere.core.data.WheelGrouping
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.feature.grid.ChipRow
+import com.bos.sphere.feature.grid.VisualChoice
+import com.bos.sphere.feature.grid.HomeStylePreview
+import com.bos.sphere.feature.grid.PageShapePreview
+import com.bos.sphere.feature.grid.PagingPreview
+import com.bos.sphere.feature.grid.DrawerViewPreview
+import com.bos.sphere.feature.grid.StripPositionPreview
+import com.bos.sphere.feature.grid.CornerStylePreview
+import com.bos.sphere.feature.grid.ThemeModePreview
+import com.bos.sphere.feature.grid.ThemedSampleIcon
+import com.bos.sphere.feature.grid.DensityPreview
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.LabeledSlider
 import com.bos.sphere.feature.grid.SettingCategory
@@ -113,6 +127,24 @@ class SystemLinks(
 const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
 
+private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.Sphere -> "Sphere"; HomeStyle.Bubbles -> "Bubbles" }
+
+/** A miniature status strip showing what is placed where. */
+@Composable
+private fun StripPreview(strip: Map<StripItem, StripZone>) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp).background(androidx.compose.ui.graphics.Color.Black, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .border(1.dp, HyleColors.Hairline, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+    ) {
+        StripZone.entries.forEach { z ->
+            val items = strip.filterValues { it == z }.keys.joinToString("  ") { L10n.tr(it.label) }
+            Text(if (items.isEmpty()) "·" else items, color = HyleColors.InkBright, fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f),
+                textAlign = when (z) { StripZone.values().first() -> androidx.compose.ui.text.style.TextAlign.Start; StripZone.values().last() -> androidx.compose.ui.text.style.TextAlign.End; else -> androidx.compose.ui.text.style.TextAlign.Center })
+        }
+    }
+}
+
 private fun gridLabel(g: GridSpec) = "${g.columns} × ${g.rows}"
 
 private fun x(english: String) = L10n.tr(english)
@@ -144,7 +176,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     val pageItems = buildList {
         add(
             SettingItem.Pane(x("Layout"), Glyphs.Apps, x(layout.shape.label)) {
-                Chips(PageShape.entries, layout.shape, { it.label }) { m.setPageLayout(m.pageIndex, layout.copy(shape = it)) }
+                VisualChoice(PageShape.entries, layout.shape, { m.setPageLayout(m.pageIndex, layout.copy(shape = it)) }, { x(it.label) }, previewHeight = 110.dp) { PageShapePreview(it) }
                 note(
                     when (layout.shape) {
                         PageShape.Grid -> "Rows and columns of icons."
@@ -201,12 +233,15 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Home"),
         Glyphs.Apps,
         listOf(
-            SettingItem.Pane(x("Style"), Glyphs.Apps, if (p.homeStyle == HomeStyle.Grid) x("Pages") else x("Sphere")) {
-                Chips(HomeStyle.entries, p.homeStyle, { if (it == HomeStyle.Grid) "Pages" else "Sphere" }) { s -> upd { it.copy(homeStyle = s) } }
+            SettingItem.Pane(x("Style"), Glyphs.Apps, x(homeStyleName(p.homeStyle))) {
+                VisualChoice(HomeStyle.entries, p.homeStyle, { s -> upd { it.copy(homeStyle = s) } }, { x(homeStyleName(it)) }, previewHeight = 120.dp) { HomeStylePreview(it) }
             },
             SettingItem.Pane(x("Default density"), Glyphs.Widget, "${gridLabel(p.portraitGrid)} · ${gridLabel(p.landscapeGrid)}") {
                 val preset = DensityPreset.entries.firstOrNull { it.portrait == p.portraitGrid && it.landscape == p.landscapeGrid }
-                Chips(DensityPreset.entries, preset ?: DensityPreset.Default, { it.label }) { d -> upd { it.copy(portraitGrid = d.portrait, landscapeGrid = d.landscape) } }
+                VisualChoice(DensityPreset.entries, preset ?: DensityPreset.Default, { d -> upd { it.copy(portraitGrid = d.portrait, landscapeGrid = d.landscape) } }, { x(it.label) }, previewHeight = 96.dp) {
+                    DensityPreview(it.portrait.columns, it.portrait.rows, p.iconScale, p.iconSpacing)
+                }
+                DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
                 Sub("Portrait")
                 Stepper(L10n.tr("Columns"), p.portraitGrid.columns, GridSpec.MIN_COLUMNS..GridSpec.MAX_COLUMNS) { v -> upd { it.copy(portraitGrid = it.portraitGrid.copy(columns = v)) } }
                 Stepper(L10n.tr("Rows"), p.portraitGrid.rows, GridSpec.MIN_ROWS..GridSpec.MAX_ROWS) { v -> upd { it.copy(portraitGrid = it.portraitGrid.copy(rows = v)) } }
@@ -216,9 +251,11 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 note("Pages with their own density keep it. After changing it you can choose to fill the empty space.")
             },
             SettingItem.Pane(x("Icon size"), Glyphs.Apps, "${(p.iconScale * 100).roundToInt()}%") {
+                DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
                 LabeledSlider(L10n.tr("Icon size"), p.iconScale, LauncherPrefs.MIN_ICON_SCALE..LauncherPrefs.MAX_ICON_SCALE, "${(p.iconScale * 100).roundToInt()}%") { v -> upd { it.copy(iconScale = v) } }
             },
             SettingItem.Pane(x("Spacing"), Glyphs.Widget, "${(p.iconSpacing * 100).roundToInt()}%") {
+                DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
                 LabeledSlider(L10n.tr("Spacing"), p.iconSpacing, 0f..1f, "${(p.iconSpacing * 100).roundToInt()}%") { v -> upd { it.copy(iconSpacing = v) } }
                 note("Compact keeps square cells; higher spreads the icons into the free space without resizing them.")
             },
@@ -226,9 +263,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Toggle(x("Suggested app"), Glyphs.Bolt, p.showSuggestion) { v -> upd { it.copy(showSuggestion = v) } },
             SettingItem.Pane(x("Page turning"), Glyphs.Swipe, "${x(p.portraitPaging.label)} · ${x(p.landscapePaging.label)}") {
                 Sub("Portrait")
-                Chips(PagingAxis.entries, p.portraitPaging, { it.label }) { a -> upd { it.copy(portraitPaging = a) } }
+                VisualChoice(PagingAxis.entries, p.portraitPaging, { a -> upd { it.copy(portraitPaging = a) } }, { x(it.label) }, columns = 2) { PagingPreview(it) }
                 Sub("Landscape")
-                Chips(PagingAxis.entries, p.landscapePaging, { it.label }) { a -> upd { it.copy(landscapePaging = a) } }
+                VisualChoice(PagingAxis.entries, p.landscapePaging, { a -> upd { it.copy(landscapePaging = a) } }, { x(it.label) }, columns = 2) { PagingPreview(it) }
                 note("Swipes across the other axis are free for gestures.")
             },
             SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("A keyboard that's always open: type to find an app, like an old-school phone")) { v -> upd { it.copy(alwaysKeyboard = v) } },
@@ -257,7 +294,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             },
             SettingItem.Pane(x("Drawer layout"), Glyphs.Widget, "${x(p.drawerView.label)} · ${x(p.drawerSort.label)}") {
                 Sub("View")
-                Chips(DrawerView.entries, p.drawerView, { it.label }) { v -> upd { it.copy(drawerView = v) } }
+                VisualChoice(DrawerView.entries, p.drawerView, { v -> upd { it.copy(drawerView = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { DrawerViewPreview(it) }
                 Sub("Sort by")
                 Chips(DrawerSort.entries, p.drawerSort, { it.label }) { v -> upd { it.copy(drawerSort = v) } }
                 Sub("Quick scrub")
@@ -273,7 +310,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         Glyphs.Clock,
         listOf(
             SettingItem.Pane(x("Position"), Glyphs.Clock, x(p.clockPosition.label)) {
-                Chips(ClockPosition.entries, p.clockPosition, { it.label }) { c -> upd { it.copy(clockPosition = c) } }
+                VisualChoice(ClockPosition.entries, p.clockPosition, { c -> upd { it.copy(clockPosition = c) } }, { x(it.label) }, previewHeight = 96.dp) { StripPositionPreview(it) }
                 note("It can also be a tile on a page, or a corner complication.")
             },
             SettingItem.Pane(x("Health data"), Glyphs.Steps, x(p.healthSource.label)) {
@@ -284,6 +321,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             },
             SettingItem.Pane(x("Status strip"), Glyphs.Dial, "${p.strip.size}") {
                 note("Put readouts on the left, centre or right of the strip — like the top of a Nintendo 3DS.")
+                StripPreview(p.strip)
                 StripItem.entries.forEach { item ->
                     Sub(item.label)
                     ChipRow(listOf<StripZone?>(null) + StripZone.entries, p.strip[item], { z -> if (z == null) L10n.tr("Off") else L10n.tr(z.label) }) { z ->
@@ -311,7 +349,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         buildList {
             add(
                 SettingItem.Pane(x("Corner style"), Glyphs.Palette, x(p.cornerStyle.label)) {
-                    Chips(CornerStyle.entries, p.cornerStyle, { it.label }) { c -> upd { it.copy(cornerStyle = c) } }
+                    VisualChoice(CornerStyle.entries, p.cornerStyle, { c -> upd { it.copy(cornerStyle = c) } }, { x(it.label) }, columns = 2, previewHeight = 96.dp) { CornerStylePreview(it) }
                     note("Bubble draws a quarter-circle at each corner.")
                 },
             )
@@ -382,20 +420,57 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         Glyphs.Palette,
         listOf(
             SettingItem.Pane(x("Mode"), Glyphs.Moon, x(p.themeMode.label)) {
-                Chips(ThemeMode.entries, p.themeMode, { it.label }) { v -> upd { it.copy(themeMode = v) } }
+                VisualChoice(ThemeMode.entries, p.themeMode, { v -> upd { it.copy(themeMode = v) } }, { x(it.label) }, previewHeight = 96.dp) { ThemeModePreview(it, androidx.compose.ui.graphics.Color(p.accentColor)) }
             },
             SettingItem.Pane(x("Accent"), Glyphs.Palette, "") {
                 ColorPicker(p.accentColor, { v -> upd { it.copy(accentColor = v) } })
             },
             SettingItem.Pane(x("Icon shape"), Glyphs.Apps, x(p.iconShape.label)) {
-                Chips(IconShape.entries, p.iconShape, { it.label }) { v -> upd { it.copy(iconShape = v) } }
+                VisualChoice(IconShape.entries, p.iconShape, { v -> upd { it.copy(iconShape = v) } }, { x(it.label) }, columns = 3, previewHeight = 64.dp) { ThemedSampleIcon(52.dp, 1, shape = it) }
             },
             SettingItem.Pane(x("Icon colour"), Glyphs.Image, x(p.iconTint.label)) {
-                Chips(IconTint.entries, p.iconTint, { it.label }) { v -> upd { it.copy(iconTint = v) } }
+                VisualChoice(IconTint.entries, p.iconTint, { v -> upd { it.copy(iconTint = v) } }, { x(it.label) }, columns = 3, previewHeight = 64.dp) { ThemedSampleIcon(52.dp, 2, tint = it) }
                 note("Long-press an app and choose Icon colour to tint just that app.")
             },
             SettingItem.Toggle(x("Icon plate"), Glyphs.Widget, p.iconPlate, x("A tile behind transparent icons")) { v -> upd { it.copy(iconPlate = v) } },
-            SettingItem.Toggle(x("Show wallpaper"), Glyphs.Image, p.showWallpaper) { v -> upd { it.copy(showWallpaper = v) } },
+            SettingItem.Pane(x("Background"), Glyphs.Image, x(p.backgroundKind.name)) {
+                val kinds = com.bos.sphere.core.data.BackgroundKind.entries
+                VisualChoice(kinds, p.backgroundKind, { k ->
+                    upd { it.copy(backgroundKind = k, backgroundPreset = com.bos.sphere.feature.grid.BackgroundPresets.default(k)) }
+                }, { x(it.name) }, columns = 3, previewHeight = 90.dp) { k ->
+                    com.bos.sphere.feature.grid.BackgroundLayer(k, com.bos.sphere.feature.grid.BackgroundPresets.default(k), p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false)
+                }
+                val presets = com.bos.sphere.feature.grid.BackgroundPresets.of(p.backgroundKind)
+                if (presets.isNotEmpty()) {
+                    Sub(p.backgroundKind.name)
+                    VisualChoice(presets, presets.firstOrNull { it.id == p.backgroundPreset } ?: presets.first(), { pr -> upd { it.copy(backgroundPreset = pr.id) } }, { it.label }, columns = 3, previewHeight = 90.dp) { pr ->
+                        com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, pr.id, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false)
+                    }
+                }
+                if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Solid || p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Gradient) {
+                    Sub("Your own colour")
+                    ColorPicker(p.backgroundColorA, { v -> upd { it.copy(backgroundColorA = v, backgroundPreset = "custom") } })
+                    if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Gradient) {
+                        Sub("Second colour")
+                        ColorPicker(p.backgroundColorB, { v -> upd { it.copy(backgroundColorB = v, backgroundPreset = "custom") } })
+                    }
+                }
+                if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System) note("Your phone's wallpaper shows through.")
+            },
+        ),
+    )
+
+    // --- Search ------------------------------------------------------------------------------
+    out += SettingCategory(
+        x("Search"),
+        Glyphs.Search,
+        listOf(
+            SettingItem.Pane(x("Web engine"), Glyphs.Globe, p.webEngine.label) {
+                Chips(com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }) { v -> upd { it.copy(webEngine = v) } }
+                note("DuckDuckGo understands !bangs: type !g for Google, !gi for images, !yt for YouTube.")
+            },
+            SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },
+            SettingItem.Toggle(x("Contacts"), Glyphs.Message, p.searchContacts, x("Call, message or email people straight from results")) { v -> upd { it.copy(searchContacts = v) } },
         ),
     )
 

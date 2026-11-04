@@ -29,3 +29,11 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
 ## Owner-verified (on-device behaviour)
 - The build env has no device — all runtime/gesture/render/launcher behaviour is **owner-verified on the phone**.
 - Set-as-default (`ROLE_HOME`), coverflow scrub/launch gestures, globe, search, hub, and voice are owner-confirmed on-device.
+
+## Round 4
+- Bubbles (Apple-Watch-style fisheye field) as a home style and a drawer view (`BubbleField`).
+- Backgrounds: Black / System / Solid / Gradient / Texture / Live (8 live scenes, incl. Ribbon and Bokeh with touch-scatter); `BackgroundLayer`.
+- Settings option panes open full screen with tappable breadcrumbs (`DetailScreen`) and visual, real-component previews (`SettingsPreviews`).
+- Search: contact rows with Call/SMS/Email/WhatsApp/Telegram/Signal, macOS-style refinement chips, web rows (DuckDuckGo default so !bangs work, Play Store), `READ_CONTACTS` requested on demand.
+- Three-card onboarding.
+- Not verified on a device. Headless screenshots don't apply per-bubble layer transforms, so the bubble field has only unit tests (math) and no picture. New strings are English-only until translated.

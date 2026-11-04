@@ -289,9 +289,36 @@ class ScreenshotTest {
     fun searchOverlay() {
         rule.mainClock.autoAdvance = false
         rule.setContent {
-            SearchOverlay(visible = true, apps = apps, recent = apps.take(5), onLaunch = {}, onLongPressApp = {}, onDismiss = {}, modifier = Modifier.fillMaxSize())
+            SearchOverlay(visible = true, apps = apps, recent = apps.take(5), prefs = com.bos.sphere.core.data.LauncherPrefs(), contacts = null, onLaunch = {}, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {}, modifier = Modifier.fillMaxSize())
         }
         shoot("10-search")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun detailVisualHomeStyle() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            DetailScreen(listOf("Settings", "Home", "Style"), {}) {
+                VisualChoice(com.bos.sphere.core.data.HomeStyle.entries, com.bos.sphere.core.data.HomeStyle.Grid, {}, { it.name }, previewHeight = 140.dp) { HomeStylePreview(it) }
+                VisualChoice(com.bos.sphere.core.data.ClockPosition.entries, com.bos.sphere.core.data.ClockPosition.entries.first(), {}, { it.label }, previewHeight = 96.dp) { StripPositionPreview(it) }
+            }
+        }
+        shoot("20-detail-visual")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun backgroundsShot() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            androidx.compose.foundation.layout.Column {
+                for (k in listOf(com.bos.sphere.core.data.BackgroundKind.Gradient, com.bos.sphere.core.data.BackgroundKind.Texture, com.bos.sphere.core.data.BackgroundKind.Live)) {
+                    androidx.compose.foundation.layout.Row(Modifier.weight(1f)) {
+                        BackgroundPresets.of(k).take(4).forEach { BackgroundLayer(k, it.id, 0xFF0A0B10, 0xFF2A1B5E, Modifier.weight(1f).fillMaxSize(), animate = false) }
+                    }
+                }
+            }
+        }
+        shoot("22-backgrounds")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")

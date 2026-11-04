@@ -9,7 +9,7 @@ import kotlin.math.exp
  */
 
 /** Which home surface is shown. */
-enum class HomeStyle { Grid, Sphere }
+enum class HomeStyle { Grid, Sphere, Bubbles }
 
 /** Corner look: a bare glyph, or a quarter-circle bubble hugging the screen corner. */
 enum class CornerStyle(val label: String) { Glyph("Glyph"), Bubble("Bubble") }
@@ -78,6 +78,23 @@ enum class HealthSourcePref(val label: String) { Phone("Phone sensor"), HealthCo
 /** Where in the strip an item sits. */
 enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right("Right") }
 
+/** What sits behind everything on the home screen. */
+enum class BackgroundKind(val label: String) {
+    Black("Black"), System("Wallpaper"), Solid("Solid"), Gradient("Gradient"), Texture("Texture"), Live("Live"),
+}
+
+/** Web search engine for the "search the web" rows. DuckDuckGo is the default so !bangs work (!g, !gi, !yt, !w …). */
+enum class WebEngine(val label: String, private val template: String) {
+    DuckDuckGo("DuckDuckGo", "https://duckduckgo.com/?q=%s"),
+    Google("Google", "https://www.google.com/search?q=%s"),
+    Brave("Brave", "https://search.brave.com/search?q=%s"),
+    Bing("Bing", "https://www.bing.com/search?q=%s"),
+    Startpage("Startpage", "https://www.startpage.com/do/search?q=%s");
+
+    /** The results URL for [query] (URL-encoded). Bangs are just text; DuckDuckGo interprets them. */
+    fun url(query: String): String = template.replace("%s", java.net.URLEncoder.encode(query.trim(), "UTF-8"))
+}
+
 /** Clock number format. */
 enum class ClockFormat(val label: String) { System("System"), Hour12("12-hour"), Hour24("24-hour") }
 
@@ -91,7 +108,7 @@ enum class AppsOnHome(val label: String) { Everything("All apps"), PinnedOnly("O
 enum class PageMode(val label: String) { Multiple("Multiple pages"), Single("One page") }
 
 /** App drawer presentation. */
-enum class DrawerView(val label: String) { Grid("Grid"), List("List"), Details("Details") }
+enum class DrawerView(val label: String) { Grid("Grid"), List("List"), Details("Details"), Bubbles("Bubbles") }
 
 /** App drawer ordering. */
 enum class DrawerSort(val label: String) { Alphabetical("A–Z"), Category("Type"), Recent("Recent"), Frequent("Most used") }
@@ -180,6 +197,22 @@ data class LauncherPrefs(
     val healthSource: HealthSourcePref = HealthSourcePref.Phone,
     /** An always-open keyboard that searches apps as you type — the old-school-phone mode. */
     val alwaysKeyboard: Boolean = false,
+    // --- background
+    val backgroundKind: BackgroundKind = BackgroundKind.Black,
+    /** Preset id within the kind (e.g. "aurora", "grain", "dusk"); ignored for Black / System. */
+    val backgroundPreset: String = "",
+    /** Custom colours: Solid uses A; Gradient uses A → B; textures and live scenes tint with A. */
+    val backgroundColorA: Long = 0xFF0A0B10,
+    val backgroundColorB: Long = 0xFF2A1B5E,
+
+    // --- search
+    val webEngine: WebEngine = WebEngine.DuckDuckGo,
+    val searchWeb: Boolean = true,
+    val searchContacts: Boolean = true,
+
+    // --- first run
+    val onboardingDone: Boolean = false,
+
     // --- status strip: which readouts sit where (absent = not shown)
     val strip: Map<StripItem, StripZone> = mapOf(StripItem.Time to StripZone.Centre),
     /** 0 = compact square cells, 1 = icons spread to fill the free space (rows and columns separately). */

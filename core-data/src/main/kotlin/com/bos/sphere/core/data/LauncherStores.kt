@@ -75,6 +75,11 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putString("strip", next.strip.entries.joinToString(",") { "${it.key.name}:${it.value.name}" })
             .putFloat("iconSpacing", next.iconSpacing)
             .putString("healthSource", next.healthSource.name)
+            .putString("bgKind", next.backgroundKind.name).putString("bgPreset", next.backgroundPreset)
+            .putLong("bgA", next.backgroundColorA).putLong("bgB", next.backgroundColorB)
+            .putString("webEngine", next.webEngine.name)
+            .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
+            .putBoolean("onboardingDone", next.onboardingDone)
             .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
             .putFloat("clockSize", next.clockSize)
             .putString("clockFormat", next.clockFormat.name)
@@ -140,6 +145,17 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             } ?: d.strip,
             iconSpacing = sp.getFloat("iconSpacing", d.iconSpacing).coerceIn(0f, 1f),
             healthSource = enumOr(sp.getString("healthSource", null), d.healthSource),
+            // Older installs stored "show wallpaper" as a switch; it is now a background kind.
+            backgroundKind = sp.getString("bgKind", null)?.let { n -> BackgroundKind.entries.firstOrNull { it.name == n } }
+                ?: if (sp.getBoolean("wallpaper", false)) BackgroundKind.System else d.backgroundKind,
+            backgroundPreset = sp.getString("bgPreset", d.backgroundPreset) ?: d.backgroundPreset,
+            backgroundColorA = sp.getLong("bgA", d.backgroundColorA),
+            backgroundColorB = sp.getLong("bgB", d.backgroundColorB),
+            webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
+            searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
+            searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
+            // An install that already has settings saved is not a first run.
+            onboardingDone = sp.getBoolean("onboardingDone", sp.contains("style") || sp.contains("pCols")),
             alwaysKeyboard = sp.getBoolean("alwaysKeyboard", d.alwaysKeyboard),
             clockSize = sp.getFloat("clockSize", d.clockSize).coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
             clockFormat = enumOr(sp.getString("clockFormat", null), d.clockFormat),

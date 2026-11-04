@@ -568,6 +568,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 Corners()
             }
 
+            HomeStyle.Bubbles -> { Background() } // replaced by the bubble field when it lands
             HomeStyle.Sphere -> {
                 // The sphere / coverflow surface, in the same chrome as the pages: indicator
                 // background, status strip, corners, long-press → settings.

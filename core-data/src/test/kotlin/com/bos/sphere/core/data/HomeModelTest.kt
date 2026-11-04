@@ -116,6 +116,22 @@ class HomeModelTest {
     }
 
     @Test
+    fun `reflow fills gaps left by a density increase and drops emptied pages`() {
+        val p = pages(listOf("a", "b"), listOf("c", "d"), listOf("e"))
+        assertTrue(HomeLayoutMath.hasGaps(p, cap(4)))
+        assertEquals(listOf(listOf("a", "b", "c", "d"), listOf("e")), HomeLayoutMath.reflow(p, cap(4)).keys())
+        assertEquals(listOf(listOf("a", "b", "c", "d", "e")), HomeLayoutMath.reflow(p, cap(9)).keys())
+        assertTrue(!HomeLayoutMath.hasGaps(pages(listOf("a", "b"), listOf("c")), cap(2)))
+    }
+
+    @Test
+    fun `pinned-only home does not auto-place apps`() {
+        val layout = HomeLayout(pages = pages(listOf("app1")), seeded = true)
+        assertEquals(listOf(listOf("app1")), HomeLayoutMath.visualPages(layout, apps, cap(9), autoPlace = false).keys())
+        assertEquals(listOf(listOf<String>()), HomeLayoutMath.visualPages(HomeLayout(), apps, cap(9), autoPlace = false).keys())
+    }
+
+    @Test
     fun `tiles survive resolution even though they are not apps`() {
         val layout = HomeLayout(pages = pages(listOf("app1", HomeTiles.CLOCK)), seeded = true)
         assertEquals(listOf("app1", HomeTiles.CLOCK), HomeLayoutMath.visualPages(layout, listOf("app1"), cap(4))[0].keys)

@@ -21,6 +21,7 @@ class LauncherStores private constructor(context: Context) {
     val layout = HomeLayoutStore(app.getSharedPreferences("home_layout", Context.MODE_PRIVATE))
     val shortcuts = ShortcutStore(app.getSharedPreferences("shortcuts", Context.MODE_PRIVATE))
     val history = LaunchHistoryStore(app.getSharedPreferences("launch_history", Context.MODE_PRIVATE))
+    val iconColors = IconColorStore(app.getSharedPreferences("icon_colors", Context.MODE_PRIVATE))
 
     companion object {
         @Volatile private var instance: LauncherStores? = null
@@ -42,6 +43,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
                 iconScale = it.iconScale.coerceIn(LauncherPrefs.MIN_ICON_SCALE, LauncherPrefs.MAX_ICON_SCALE),
                 motionSensitivity = it.motionSensitivity.coerceIn(0f, 1f),
                 uiSoundVolume = it.uiSoundVolume.coerceIn(0f, 1f),
+                clockSize = it.clockSize.coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
+                cornerIconSize = it.cornerIconSize.coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
+                indicatorIntensity = it.indicatorIntensity.coerceIn(0f, 1f),
+                indicatorSpeed = it.indicatorSpeed.coerceIn(0f, 1f),
             )
         }
         if (next == _prefs.value) return
@@ -66,6 +71,33 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putBoolean("networkDots", next.networkDots)
             .putBoolean("uiSounds", next.uiSounds)
             .putFloat("uiSoundVolume", next.uiSoundVolume)
+            .putFloat("clockSize", next.clockSize)
+            .putString("clockFormat", next.clockFormat.name)
+            .putBoolean("clockDate", next.clockShowDate)
+            .putBoolean("clockDay", next.clockShowDay)
+            .putBoolean("clockWeather", next.clockShowWeather)
+            .putBoolean("weatherF", next.weatherFahrenheit)
+            .putFloat("cornerIconSize", next.cornerIconSize)
+            .putString("cornerIconMode", next.cornerIconMode.name)
+            .putBoolean("hideStatusBar", next.hideStatusBar)
+            .putString("appsOnHome", next.appsOnHome.name)
+            .putString("pageMode", next.pageMode.name)
+            .putString("drawerView", next.drawerView.name)
+            .putString("drawerSort", next.drawerSort.name)
+            .putString("drawerRail", next.drawerRail.name)
+            .putString("indMetric", next.indicatorMetric.name)
+            .putString("indEffects", next.indicatorEffects.joinToString(",") { it.name })
+            .putLong("indLow", next.indicatorLow).putLong("indMid", next.indicatorMid)
+            .putLong("indHigh", next.indicatorHigh).putLong("indIdle", next.indicatorIdle)
+            .putBoolean("indInvert", next.indicatorInvert)
+            .putFloat("indIntensity", next.indicatorIntensity)
+            .putFloat("indSpeed", next.indicatorSpeed)
+            .putString("themeMode", next.themeMode.name)
+            .putLong("accent", next.accentColor)
+            .putString("iconShape", next.iconShape.name)
+            .putString("iconTint", next.iconTint.name)
+            .putBoolean("iconPlate", next.iconPlate)
+            .putString("language", next.language.name)
             .putString("wheelGrouping", next.wheelGrouping.name)
             .apply()
     }
@@ -93,6 +125,36 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             networkDots = sp.getBoolean("networkDots", d.networkDots),
             uiSounds = sp.getBoolean("uiSounds", d.uiSounds),
             uiSoundVolume = sp.getFloat("uiSoundVolume", d.uiSoundVolume).coerceIn(0f, 1f),
+            clockSize = sp.getFloat("clockSize", d.clockSize).coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
+            clockFormat = enumOr(sp.getString("clockFormat", null), d.clockFormat),
+            clockShowDate = sp.getBoolean("clockDate", d.clockShowDate),
+            clockShowDay = sp.getBoolean("clockDay", d.clockShowDay),
+            clockShowWeather = sp.getBoolean("clockWeather", d.clockShowWeather),
+            weatherFahrenheit = sp.getBoolean("weatherF", d.weatherFahrenheit),
+            cornerIconSize = sp.getFloat("cornerIconSize", d.cornerIconSize).coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
+            cornerIconMode = enumOr(sp.getString("cornerIconMode", null), d.cornerIconMode),
+            hideStatusBar = sp.getBoolean("hideStatusBar", d.hideStatusBar),
+            appsOnHome = enumOr(sp.getString("appsOnHome", null), d.appsOnHome),
+            pageMode = enumOr(sp.getString("pageMode", null), d.pageMode),
+            drawerView = enumOr(sp.getString("drawerView", null), d.drawerView),
+            drawerSort = enumOr(sp.getString("drawerSort", null), d.drawerSort),
+            drawerRail = enumOr(sp.getString("drawerRail", null), d.drawerRail),
+            indicatorMetric = enumOr(sp.getString("indMetric", null), d.indicatorMetric),
+            indicatorEffects = sp.getString("indEffects", null)
+                ?.split(',')?.filter { it.isNotEmpty() }
+                ?.mapNotNull { n -> IndicatorEffect.entries.firstOrNull { it.name == n } }?.toSet()
+                ?: d.indicatorEffects,
+            indicatorLow = sp.getLong("indLow", d.indicatorLow), indicatorMid = sp.getLong("indMid", d.indicatorMid),
+            indicatorHigh = sp.getLong("indHigh", d.indicatorHigh), indicatorIdle = sp.getLong("indIdle", d.indicatorIdle),
+            indicatorInvert = sp.getBoolean("indInvert", d.indicatorInvert),
+            indicatorIntensity = sp.getFloat("indIntensity", d.indicatorIntensity).coerceIn(0f, 1f),
+            indicatorSpeed = sp.getFloat("indSpeed", d.indicatorSpeed).coerceIn(0f, 1f),
+            themeMode = enumOr(sp.getString("themeMode", null), d.themeMode),
+            accentColor = sp.getLong("accent", d.accentColor),
+            iconShape = enumOr(sp.getString("iconShape", null), d.iconShape),
+            iconTint = enumOr(sp.getString("iconTint", null), d.iconTint),
+            iconPlate = sp.getBoolean("iconPlate", d.iconPlate),
+            language = enumOr(sp.getString("language", null), d.language),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
         )
     }
@@ -319,3 +381,29 @@ class LaunchHistoryStore internal constructor(private val sp: SharedPreferences)
 
 private inline fun <reified E : Enum<E>> enumOr(name: String?, fallback: E): E =
     name?.let { n -> enumValues<E>().firstOrNull { it.name == n } } ?: fallback
+
+
+/** Per-app icon tint overrides (ARGB), keyed by [AppEntry.key]. */
+class IconColorStore internal constructor(private val sp: SharedPreferences) {
+    private val _colors = MutableStateFlow(sp.all.mapNotNull { (k, v) -> (v as? Long)?.let { k to it } }.toMap())
+    val colors: StateFlow<Map<String, Long>> = _colors.asStateFlow()
+
+    fun set(key: String, argb: Long?) {
+        _colors.value = if (argb == null) _colors.value - key else _colors.value + (key to argb)
+        sp.edit().apply { if (argb == null) remove(key) else putLong(key, argb) }.apply()
+    }
+}
+
+/** Launch statistics derived from the history log, for drawer sorting. */
+object UsageStats {
+    data class Usage(val count: Int, val lastMillis: Long)
+
+    fun of(events: List<LaunchEvent>): Map<String, Usage> {
+        val out = HashMap<String, Usage>()
+        for (e in events) {
+            val cur = out[e.key]
+            out[e.key] = Usage((cur?.count ?: 0) + 1, maxOf(cur?.lastMillis ?: 0L, e.timeMillis))
+        }
+        return out
+    }
+}

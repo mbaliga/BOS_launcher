@@ -54,6 +54,73 @@ enum class DensityPreset(val label: String, val portrait: GridSpec, val landscap
     Packed("Packed", GridSpec(5, 8), GridSpec(8, 3)),
 }
 
+/** Clock number format. */
+enum class ClockFormat(val label: String) { System("System"), Hour12("12-hour"), Hour24("24-hour") }
+
+/** Whether corner actions show a drawn glyph or the real icon of the app they open. */
+enum class CornerIconMode(val label: String) { Glyph("Glyph"), AppIcon("App icon") }
+
+/** What lives on the home pages. */
+enum class AppsOnHome(val label: String) { Everything("All apps"), PinnedOnly("Only ones I add") }
+
+/** One page or many. */
+enum class PageMode(val label: String) { Multiple("Multiple pages"), Single("One page") }
+
+/** App drawer presentation. */
+enum class DrawerView(val label: String) { Grid("Grid"), List("List"), Details("Details") }
+
+/** App drawer ordering. */
+enum class DrawerSort(val label: String) { Alphabetical("A–Z"), Category("Type"), Recent("Recent"), Frequent("Most used") }
+
+/** Which screen edge(s) carry the quick-scrub rail. */
+enum class RailSide(val label: String) { Left("Left"), Right("Right"), Both("Both") }
+
+/** The measurement the background indicator shows. */
+enum class IndicatorMetric(val label: String) {
+    Network("Signal"),
+    Battery("Battery"),
+    Storage("Storage used"),
+    Memory("Memory used"),
+    Notifications("Notifications"),
+    Volume("Volume"),
+    DayProgress("Time of day"),
+    Fixed("Fixed colour"),
+}
+
+/** Visual effects the indicator can paint. Several can be on at once. */
+enum class IndicatorEffect(val label: String) {
+    DotsBreathe("Breathing dots"),
+    DotsBloomCentre("Dot bloom from centre"),
+    DotsBloomEdges("Dot bloom from edges"),
+    Vignette("Vignette"),
+    ComicLines("Comic-book lines"),
+    SnakeOutline("Snake outline"),
+    EdgeMeter("Edge meter"),
+}
+
+/** Launcher UI palette. */
+enum class ThemeMode(val label: String) { Dark("Dark"), Amoled("AMOLED"), Light("Light") }
+
+/** Shape every app icon is drawn in. */
+enum class IconShape(val label: String) { Original("Original"), Rounded("Rounded"), Squircle("Squircle"), Circle("Circle"), Square("Square") }
+
+/** Tint applied to every app icon (a per-app colour overrides it). */
+enum class IconTint(val label: String) { None("None"), Accent("Accent"), Mono("Monochrome") }
+
+/** UI languages for the launcher's own screens (empty code = follow the system). */
+enum class UiLanguage(val code: String, val label: String) {
+    System("", "System"),
+    English("en", "English"),
+    Spanish("es", "Español"),
+    French("fr", "Français"),
+    German("de", "Deutsch"),
+    Portuguese("pt", "Português"),
+    Hindi("hi", "हिन्दी"),
+    Chinese("zh", "中文"),
+    Japanese("ja", "日本語"),
+    Arabic("ar", "العربية"),
+}
+
 data class LauncherPrefs(
     val homeStyle: HomeStyle = HomeStyle.Grid,
     val portraitGrid: GridSpec = DensityPreset.Default.portrait,
@@ -85,6 +152,55 @@ data class LauncherPrefs(
     val uiSounds: Boolean = true,
     val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
+
+    // --- clock
+    /** Clock text size in sp. */
+    val clockSize: Float = 34f,
+    val clockFormat: ClockFormat = ClockFormat.System,
+    val clockShowDate: Boolean = false,
+    val clockShowDay: Boolean = false,
+    val clockShowWeather: Boolean = false,
+    val weatherFahrenheit: Boolean = false,
+
+    // --- corners
+    /** Corner icon edge in dp. */
+    val cornerIconSize: Float = 32f,
+    val cornerIconMode: CornerIconMode = CornerIconMode.Glyph,
+
+    // --- screen
+    /** Hide the system status bar on home so corner icons and the clock sit flush to the top. */
+    val hideStatusBar: Boolean = true,
+
+    // --- apps and pages
+    val appsOnHome: AppsOnHome = AppsOnHome.Everything,
+    val pageMode: PageMode = PageMode.Multiple,
+    val drawerView: DrawerView = DrawerView.Grid,
+    val drawerSort: DrawerSort = DrawerSort.Alphabetical,
+    val drawerRail: RailSide = RailSide.Right,
+
+    // --- indicator (the background dots and effects)
+    val indicatorMetric: IndicatorMetric = IndicatorMetric.Network,
+    val indicatorEffects: Set<IndicatorEffect> = setOf(IndicatorEffect.DotsBreathe),
+    /** ARGB colours for low / middle / high readings, plus idle (airplane / fixed). */
+    val indicatorLow: Long = 0xFFFF4D4D,
+    val indicatorMid: Long = 0xFFFFB347,
+    val indicatorHigh: Long = 0xFF6BFF8F,
+    val indicatorIdle: Long = 0xFF8A8F99,
+    /** true = low readings are the good ones (storage / memory used), flipping the colour ramp. */
+    val indicatorInvert: Boolean = false,
+    val indicatorIntensity: Float = 0.6f,
+    val indicatorSpeed: Float = 0.5f,
+
+    // --- theme
+    val themeMode: ThemeMode = ThemeMode.Dark,
+    val accentColor: Long = 0xFF8E7BFF,
+    val iconShape: IconShape = IconShape.Rounded,
+    val iconTint: IconTint = IconTint.None,
+    /** Draw a plate behind transparent icons. */
+    val iconPlate: Boolean = true,
+
+    // --- language
+    val language: UiLanguage = UiLanguage.System,
 ) {
     fun gridFor(landscape: Boolean): GridSpec = if (landscape) landscapeGrid else portraitGrid
     fun pagingFor(landscape: Boolean): PagingAxis = if (landscape) landscapePaging else portraitPaging
@@ -93,6 +209,10 @@ data class LauncherPrefs(
         const val DEFAULT_ICON_SCALE = 0.82f
         const val MIN_ICON_SCALE = 0.5f
         const val MAX_ICON_SCALE = 0.95f
+        const val MIN_CLOCK_SIZE = 14f
+        const val MAX_CLOCK_SIZE = 96f
+        const val MIN_CORNER_ICON = 20f
+        const val MAX_CORNER_ICON = 72f
     }
 }
 
@@ -176,7 +296,7 @@ sealed interface CornerSlot {
     data class Widget(val appWidgetId: Int, val label: String) : CornerSlot
 
     companion object {
-        const val MAX_PALETTE_ITEMS = 12
+        const val MAX_PALETTE_ITEMS = 40
         const val MAX_CLUSTER = 4
     }
 }
@@ -330,14 +450,20 @@ object HomeLayoutMath {
      * only *became* empty because its apps are hidden or unavailable is not drawn. Always returns
      * at least one page.
      */
-    fun visualPages(layout: HomeLayout, available: List<String>, capacityOf: (PageLayout) -> Int): List<HomePage> {
+    fun visualPages(
+        layout: HomeLayout,
+        available: List<String>,
+        capacityOf: (PageLayout) -> Int,
+        /** false = only apps the user placed appear (new installs are not appended). */
+        autoPlace: Boolean = true,
+    ): List<HomePage> {
         val known = available.toHashSet().apply { addAll(HomeTiles.ALL) }
         val placed = HashSet<String>()
         val stored = normalizeIds(layout.pages)
         val pages = stored.map { page ->
             page to page.copy(keys = page.keys.filter { it in known && placed.add(it) })
         }.toMutableList()
-        val extras = available.filter { it !in placed && it !in layout.removed }
+        val extras = if (autoPlace) available.filter { it !in placed && it !in layout.removed } else emptyList()
         if (extras.isNotEmpty()) {
             if (pages.isEmpty()) {
                 val fresh = HomePage(id = 1L)
@@ -462,6 +588,35 @@ object HomeLayoutMath {
         }.toMutableList()
         cascade(work, capacityOf)
         return finish(work, dropIndex = -1)
+    }
+
+    /** True if some page has free slots while a later page still has items (a density change leaves these). */
+    fun hasGaps(pages: List<HomePage>, capacityOf: (PageLayout) -> Int): Boolean {
+        for (i in 0 until pages.lastIndex) {
+            if (pages[i].keys.size < capacityOf(pages[i].layout) && pages.drop(i + 1).any { it.keys.isNotEmpty() }) return true
+        }
+        return false
+    }
+
+    /**
+     * Packs items forward so every page is full before the next starts (pages keep their layouts;
+     * pages left empty are dropped, deliberate blank trailing pages are kept).
+     */
+    fun reflow(pages: List<HomePage>, capacityOf: (PageLayout) -> Int): List<HomePage> {
+        val work = pages.map { Work(it.keys.toMutableList(), it.layout, it.id) }
+        for (i in 0 until work.lastIndex) {
+            val cap = capacityOf(work[i].layout).coerceAtLeast(1)
+            var j = i + 1
+            while (work[i].keys.size < cap && j < work.size) {
+                if (work[j].keys.isEmpty()) { j++; continue }
+                work[i].keys.add(work[j].keys.removeAt(0))
+            }
+        }
+        // Drop pages emptied by the pull-forward, but keep a blank page that was already blank.
+        val out = work.mapIndexedNotNull { i, w ->
+            if (w.keys.isEmpty() && pages[i].keys.isNotEmpty()) null else HomePage(w.keys.toList(), w.layout, w.id)
+        }
+        return out.ifEmpty { listOf(HomePage(id = 1L)) }
     }
 
     /** Index of the page holding [key], or -1. */

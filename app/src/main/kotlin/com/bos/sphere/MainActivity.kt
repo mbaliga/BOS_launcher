@@ -7,8 +7,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.bos.sphere.core.data.CornerActionId
+import com.bos.sphere.core.data.LauncherStores
+import com.bos.sphere.core.data.ThemeMode
+import com.bos.sphere.core.design.HyleTheme
+import com.bos.sphere.core.design.L10n
+import com.bos.sphere.core.design.ThemeVariant
 import com.bos.sphere.core.design.SphereTheme
+import com.bos.sphere.feature.grid.WidgetConfigureResults
+
+/** [seq] makes repeated requests for the same action distinct. */
+data class ExternalAction(val id: CornerActionId, val seq: Int)
 
 /**
  * Single-Activity Compose host for the launcher surface. The window is transparent and
@@ -19,20 +30,52 @@ import com.bos.sphere.core.design.SphereTheme
 class MainActivity : ComponentActivity() {
 
     private var homeSignal by mutableIntStateOf(0)
+    private var externalAction by mutableStateOf<ExternalAction?>(null)
+    private var actionSeq = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        handleAction(intent)
+        // Apply theme and language before the first frame so there is no flash of defaults.
+        LauncherStores.get(this).prefs.prefs.value.let { p ->
+            HyleTheme.apply(
+                when (p.themeMode) { ThemeMode.Dark -> ThemeVariant.Dark; ThemeMode.Amoled -> ThemeVariant.Amoled; ThemeMode.Light -> ThemeVariant.Light },
+                p.accentColor,
+            )
+            L10n.setLanguage(p.language.code)
+        }
         setContent {
             SphereTheme {
-                HomeScreen(homeSignal = homeSignal)
+                HomeScreen(homeSignal = homeSignal, externalAction = externalAction)
             }
         }
+    }
+
+    /** A launcher-internal action forwarded by the motion service or its notification. */
+    private fun handleAction(intent: Intent?): Boolean {
+        val name = intent?.getStringExtra(EXTRA_ACTION) ?: return false
+        val id = CornerActionId.entries.firstOrNull { it.name == name } ?: return false
+        intent.removeExtra(EXTRA_ACTION)
+        externalAction = ExternalAction(id, ++actionSeq)
+        return true
+    }
+
+    companion object {
+        const val EXTRA_ACTION = "com.bos.sphere.extra.ACTION"
+    }
+
+    /** The system-launched widget configure screen reports back here (not through Compose). */
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        WidgetConfigureResults.deliver(requestCode, resultCode)
     }
 
     /** Pressing Home while already here delivers a new MAIN/HOME intent — reset the surface. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        homeSignal++
+        if (!handleAction(intent)) homeSignal++
     }
 }

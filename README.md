@@ -20,7 +20,9 @@ surface settings, and app management.
 | `:core-design` | Hyle/Aarso design system — color, type, shapes, `SphereTheme`, the 8 named motion primitives |
 | `:core-data` | `AppRepository` over `LauncherApps` exposing a live `Flow<List<AppEntry>>` |
 | `:feature-sphere` | `SphereGeometry` (ported `magAt`/`txAt`), `SphereState`, `CoverflowLayer`, all-apps `Globe`, and `LauncherSurface` (unified gestures) |
-| `:feature-search` | Apps-only search ranking + the portrait always-keyboard |
+| `:feature-search` | App search (the shared search engine behind an app vocabulary) + the always-on keyboard |
+| `:search-engine` | Vendored `search-core` from Shared-Libraries-asoc: query language, facets, relative dates, natural-language interpretation, ranking |
+| `:feature-grid` | The **Pages** home (default): paged grid / circle / coverflow pages, corners + radial palettes, complications, peek widgets, wheel + list drawers, network dot grid, the XMB-style settings space and its synthesized UI sounds |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
 
 Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`, `:haptics`,
@@ -47,6 +49,48 @@ Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`
 - **Hyle identity:** theme, the 8 motion primitives, dot-grid substrate, ambient chrome
   (clock / weather / battery / now-playing / settings gear).
 
+## Pages home (default style)
+
+The home that ships by default is a paged, rotatable surface (the Sphere coverflow remains as a style
+in settings):
+
+- **Pages** — each page is its own **grid** (with its own density, or the home default), a **circle**
+  (centre + rings of 6/12/18) or a **coverflow** strip. Long-press an app and drag to rearrange (edge-dwell
+  flips pages; drop past the last page to make a new one). Page-turning direction is chosen per
+  orientation (sideways / up-down); the indicator follows the axis.
+- **Clock** — top (default), bottom, hidden, a page tile, or a corner complication.
+- **Corners** — four slots pinned to the device's **physical** corners as it rotates (or fixed to the
+  screen). Each holds an action, an app, a **palette** (a folder that fans out radially from the corner:
+  tap then tap, or press-slide-release), a **complication** / cluster (battery, date, time, alarm,
+  ring mode, torch, storage, notifications), or a **widget** that peeks from the corner and pops out on
+  touch. Glyph or quarter-circle Bubble style. Long-press a corner to change it.
+- **All apps** — opens as a **wheel** around the corner you opened it from (groups as spokes: A–Z,
+  category or recent; drag to turn), or as a plain list; Search lands in the list with the keyboard up.
+- **Gestures** — pinch in/out, swipes across the paging axis, double-tap; **motion**: shake, flick twice,
+  flip twice, face-down → any action (ringer vibrate/silent/cycle, DND, flashlight, apps…), optionally
+  from a background foreground-service.
+- **Network dots** — the substrate dot grid breathes green (good signal) → red (poor), solid grey in
+  airplane mode, dark when offline.
+- **Status strip** — a 3DS-style bar (top or bottom) with left / centre / right zones: the clock (size,
+  12/24-hour, day, date, optional weather) plus small readouts — battery, signal, steps, next alarm, ring
+  mode, storage, memory, notifications.
+- **Spacing and density** — icon size and spacing are separate; a bound gesture (e.g. pinch) steps the
+  grid denser or sparser and pulls icons forward to fill the gaps.
+- **Indicator** — the background reads out any measurement (signal, battery, storage, memory,
+  notifications, volume, time of day) through combinable effects: breathing dots, dot bloom from the
+  centre or edges, vignette, comic-book lines, snake outline, edge meter; colours are configurable.
+- **Apps and drawer** — keep all apps on the pages or only chosen ones, one page or many; the drawer is
+  its own space (grid / list / details; A–Z, type, recent, most used; edge scrub rail).
+- **Theme and language** — dark / AMOLED / light, accent colour picker, icon shape / tint / plate and
+  per-app icon colour; the launcher's own UI is translated (es, fr, de, pt, hi, zh, ja, ar).
+- **Search** — the shared engine: plain words match name and package as you type; facets `type:games`,
+  `used:yesterday`, `launches:>5`, `is:work|recent|frequent|never`, `pkg:`; quotes, `OR`, `-not`; and
+  natural language when a plain query finds nothing ("games I used yesterday"). An always-on keyboard
+  mode makes the home screen a type-to-find phone.
+- **Settings space** — long-press anywhere empty: a full-screen cross-media-bar (categories across,
+  items down, option pane at the side), with Orrery's console tones (`UiSound`, ported from
+  `orrery-kit/sfx.js`).
+
 ## Building
 
 Requires the Android SDK (platform 35, build-tools 35.0.0). Point Gradle at it via
@@ -60,7 +104,10 @@ Then:
 
 ```
 ./gradlew :app:assembleDebug
+./gradlew testDebugUnitTest   # JVM tests incl. Robolectric screenshot smoke tests
 ```
+
+`ScreenshotTest` (in `:feature-grid`) renders the main surfaces to `feature-grid/build/screenshots/`.
 
 Notes:
 - `minSdk 31`, `targetSdk 35`. AGSL effects are gated to API 33+ (`ShaderCapability`) with a

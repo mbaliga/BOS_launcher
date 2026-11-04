@@ -45,6 +45,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -724,15 +726,55 @@ private fun WheelContent(
                         transformOrigin = origin
                     },
             ) {
+                // Labels follow the hub's curve: no enclosing shapes, the active one is lit and underlined.
+                val textInk = HyleColors.InkBright
+                val dimInk = HyleColors.InkDim
+                val accent = HyleColors.Violet
+                Canvas(Modifier.fillMaxSize()) {
+                    val corner = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
+                    val r = metrics.chipRadius
+                    val oval = android.graphics.RectF(corner.x - r, corner.y - r, corner.x + r, corner.y + r)
+                    WheelGrouping.entries.forEachIndexed { i, g ->
+                        val selected = g == grouping
+                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            textSize = 12.sp.toPx()
+                            letterSpacing = 0.1f
+                            typeface = if (selected) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                            color = (if (selected) textInk else dimInk).toArgb()
+                        }
+                        val textW = paint.measureText(g.label)
+                        val sweep = Math.toDegrees((textW / r).toDouble()).toFloat()
+                        val start = qs + ChipAngles[i.coerceAtMost(ChipAngles.lastIndex)] - sweep / 2f
+                        val path = android.graphics.Path().apply { addArc(oval, start, sweep) }
+                        drawContext.canvas.nativeCanvas.drawTextOnPath(g.label, path, 0f, 0f, paint)
+                        if (selected) {
+                            val ur = r - 4.dp.toPx()
+                            drawArc(
+                                color = accent,
+                                startAngle = start,
+                                sweepAngle = sweep,
+                                useCenter = false,
+                                topLeft = Offset(corner.x - ur, corner.y - ur),
+                                size = Size(ur * 2, ur * 2),
+                                style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round),
+                            )
+                        }
+                    }
+                }
+                // Invisible touch targets over each label.
                 WheelGrouping.entries.forEachIndexed { i, g ->
                     val angle = qs + ChipAngles[i.coerceAtMost(ChipAngles.lastIndex)]
                     val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.chipRadius, angle)
-                    GroupingChip(
-                        label = g.label,
-                        selected = g == grouping,
-                        rotationDeg = 0f,
-                        onClick = { if (g != grouping) onGroupingChange(g) },
-                        modifier = Modifier.centeredAt { Offset(pt.x, pt.y) },
+                    Box(
+                        Modifier
+                            .centeredAt { Offset(pt.x, pt.y) }
+                            .size(width = 72.dp, height = 40.dp)
+                            .semantics { contentDescription = g.label }
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null,
+                                role = Role.Tab,
+                            ) { if (g != grouping) onGroupingChange(g) },
                     )
                 }
                 val sp = WheelGeometry.polarToScreen(anchor, w, h, metrics.searchRadius, qs + WheelGeometry.MID)
@@ -863,22 +905,19 @@ private fun GroupingChip(
     }
 }
 
-/** The hub's round search button (the Concepts eyedropper analogue); magnifier drawn on Canvas. */
+/** The hub's search glyph (the Concepts eyedropper analogue): a bare magnifier, no enclosing shape. */
 @Composable
 private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(HyleColors.Surface, CircleShape)
-            .border(1.dp, HyleColors.Violet.copy(alpha = 0.55f), CircleShape)
+            .size(48.dp)
             .semantics { contentDescription = "Search apps" }
             .clickable(role = Role.Button, onClick = onClick),
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = 1.8.dp.toPx()
-            val r = size.minDimension * 0.17f
-            val c = Offset(size.width * 0.46f, size.height * 0.46f)
+            val r = size.minDimension * 0.24f
+            val c = Offset(size.width * 0.44f, size.height * 0.44f)
             drawCircle(HyleColors.InkBright, radius = r, center = c, style = Stroke(stroke))
             val d = r / 1.4142135f
             drawLine(

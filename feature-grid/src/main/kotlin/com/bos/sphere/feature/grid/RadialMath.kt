@@ -13,16 +13,35 @@ data class Pt(val x: Float, val y: Float) {
     fun dist(o: Pt): Float = hypot(x - o.x, y - o.y)
 }
 
+/** One tile of a radial palette: an annular wedge in ring [ring]. Angles are screen degrees (0 = right, 90 = down). */
+data class PaletteSlot(
+    val index: Int,
+    val ring: Int,
+    val startDeg: Float,
+    val sweepDeg: Float,
+    val innerDp: Float,
+    val outerDp: Float,
+) {
+    val midDeg: Float get() = startDeg + sweepDeg / 2f
+    val midDp: Float get() = (innerDp + outerDp) / 2f
+}
+
 /**
- * Radial-palette placement: items fan out on concentric quarter-arcs facing into the screen
- * from a corner. Ring capacities grow outward (4, 6, 8) so spacing along each arc stays even.
+ * Concepts-style radial palette: concentric rings of wedge tiles fanning into the screen from a
+ * corner (up to [MAX_RINGS] rings, [CAPACITY] tiles each, inner rings first).
  */
 object PaletteMath {
-    val RING_CAPACITY = intArrayOf(3, 5, 7)
-    val RING_RADIUS_DP = floatArrayOf(108f, 186f, 264f)
-    private const val EDGE_INSET_DEG = 11f
+    const val MAX_RINGS = 5
+    val CAPACITY = intArrayOf(4, 6, 8, 10, 12)
+    const val HUB_DP = 84f
+    const val RING_DP = 54f
+    const val GAP_DP = 3f
+    private const val EDGE_INSET_DEG = 3f
+    private const val TILE_GAP_DEG = 1.6f
 
-    /** Start angle (degrees, screen space: 0 = right, 90 = down) of the inward quadrant. */
+    val TOTAL: Int get() = CAPACITY.sum()
+
+    /** Start angle (degrees) of the quadrant facing into the screen from [corner]. */
     fun quadrantStart(corner: Corner): Float = when (corner) {
         Corner.TopLeft -> 0f
         Corner.TopRight -> 90f
@@ -30,35 +49,66 @@ object PaletteMath {
         Corner.BottomLeft -> 270f
     }
 
-    /** Offsets (dp, relative to the anchor) for [count] items around [corner]. */
-    fun offsets(count: Int, corner: Corner): List<Pt> {
-        val out = ArrayList<Pt>(count)
-        var remaining = count
+    fun ringInner(ring: Int): Float = HUB_DP + ring * (RING_DP + GAP_DP)
+    fun ringOuter(ring: Int): Float = ringInner(ring) + RING_DP
+
+    /** How many rings [count] items occupy. */
+    fun ringsFor(count: Int): Int {
+        var left = count.coerceAtMost(TOTAL)
+        var r = 0
+        while (left > 0) { left -= CAPACITY[r]; r++ }
+        return r
+    }
+
+    /** Wedge tiles for [count] items around [corner]. Rings fill inner → outer, each evenly spread over the quadrant. */
+    fun layout(count: Int, corner: Corner): List<PaletteSlot> {
+        val out = ArrayList<PaletteSlot>()
+        var placed = 0
         var ring = 0
-        while (remaining > 0) {
-            val cap = RING_CAPACITY.getOrElse(ring) { RING_CAPACITY.last() + 2 * (ring - RING_CAPACITY.lastIndex) }
-            val radius = RING_RADIUS_DP.getOrElse(ring) { RING_RADIUS_DP.last() + 78f * (ring - RING_RADIUS_DP.lastIndex) }
-            val k = min(cap, remaining)
+        val total = count.coerceAtMost(TOTAL)
+        while (placed < total) {
+            val k = minOf(CAPACITY[ring], total - placed)
+            // A partial outer ring still spans the quadrant with wider tiles, so it reads as a ring.
             val start = quadrantStart(corner) + EDGE_INSET_DEG
             val span = 90f - 2 * EDGE_INSET_DEG
+            val w = span / k
             for (i in 0 until k) {
-                val deg = if (k == 1) start + span / 2 else start + span * i / (k - 1)
-                val rad = deg * PI.toFloat() / 180f
-                out += Pt(radius * cos(rad), radius * sin(rad))
+                out += PaletteSlot(placed + i, ring, start + i * w + TILE_GAP_DEG / 2, w - TILE_GAP_DEG, ringInner(ring), ringOuter(ring))
             }
-            remaining -= k
+            placed += k
             ring++
         }
         return out
     }
 
-    /** Index of the item within [reach] of [p] (all in the same units), or -1. */
-    fun hit(p: Pt, anchor: Pt, offsets: List<Pt>, scale: Float, reach: Float): Int {
+    /** Centre of [slot] as an offset (dp) from the anchor corner. */
+    fun centre(slot: PaletteSlot): Pt {
+        val a = slot.midDeg * PI.toFloat() / 180f
+        return Pt(slot.midDp * cos(a), slot.midDp * sin(a))
+    }
+
+    /**
+     * Index of the tile under [dx], [dy] (dp relative to the anchor), or -1. [slack] widens the
+     * radial and angular tolerance (dp / degrees) so a thumb sliding between tiles keeps a selection.
+     */
+    fun hit(dx: Float, dy: Float, slots: List<PaletteSlot>, slackDp: Float = 0f): Int {
+        val r = hypot(dx, dy)
+        var deg = Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
+        if (deg < 0f) deg += 360f
         var best = -1
-        var bestD = reach
-        offsets.forEachIndexed { i, o ->
-            val d = p.dist(Pt(anchor.x + o.x * scale, anchor.y + o.y * scale))
-            if (d <= bestD) { bestD = d; best = i }
+        var bestScore = Float.MAX_VALUE
+        for (s in slots) {
+            val radial = when {
+                r < s.innerDp -> s.innerDp - r
+                r > s.outerDp -> r - s.outerDp
+                else -> 0f
+            }
+            // Angular distance outside the wedge, in degrees, folded onto the circle.
+            var d = ((deg - s.startDeg) % 360f + 360f) % 360f
+            val outside = if (d <= s.sweepDeg) 0f else minOf(d - s.sweepDeg, 360f - d)
+            val arcDp = Math.toRadians(outside.toDouble()).toFloat() * r.coerceAtLeast(1f)
+            val score = radial + arcDp
+            if (score <= slackDp && score < bestScore) { bestScore = score; best = s.index }
         }
         return best
     }

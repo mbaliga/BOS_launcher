@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -167,9 +171,9 @@ fun ActionRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (selected) HyleColors.Violet.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(10.dp))
+            .background(if (selected) HyleColors.Violet.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 11.dp),
     ) {
         when {
             leading != null -> Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) { leading() }
@@ -202,34 +206,67 @@ fun TextButtonPill(text: String, primary: Boolean = false, enabled: Boolean = tr
     )
 }
 
-/** A glass dialog card with a title and a scrolling body. */
+/**
+ * A full-screen sheet in the settings space's look (gradient, waves, spaced-caps header) used for
+ * every picker and editor, so nothing floats over the UI as a Material dialog.
+ */
 @Composable
 fun GlassDialog(
     title: String,
     onDismiss: () -> Unit,
-    width: Dp = 360.dp,
+    width: Dp = 560.dp,
     footer: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val maxH = (LocalConfiguration.current.screenHeightDp * 0.86f).dp
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Column(
-            Modifier
-                .padding(16.dp)
-                .widthIn(max = width)
-                .fillMaxWidth()
-                .heightIn(max = maxH)
-                .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.97f), RoundedCornerShape(20.dp))
-                .border(1.dp, HyleColors.Hairline, RoundedCornerShape(20.dp))
-                .padding(18.dp),
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
         ) {
-            Text(title, color = HyleColors.InkBright, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 6.dp), content = content)
-            if (footer != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                ) { footer() }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color(0xFF07080D), androidx.compose.ui.graphics.Color(0xFF0E0C22), androidx.compose.ui.graphics.Color(0xFF071622)))),
+            ) {
+                WaveField(Modifier.fillMaxSize())
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
+                        .imePadding(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp).fillMaxWidth(),
+                    ) {
+                        Text("SPHERE", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
+                        Text("  ·  ${title.uppercase()}", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                        Icon(
+                            Glyphs.Close,
+                            contentDescription = "Close",
+                            tint = HyleColors.Ink,
+                            modifier = Modifier.size(40.dp).clickable(onClick = onDismiss).padding(10.dp),
+                        )
+                    }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .widthIn(max = width)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 18.dp, vertical = 4.dp),
+                        content = content,
+                    )
+                    if (footer != null) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            modifier = Modifier.widthIn(max = width).fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                        ) { footer() }
+                    }
+                }
             }
         }
     }

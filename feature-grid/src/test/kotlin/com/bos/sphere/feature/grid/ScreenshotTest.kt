@@ -93,7 +93,7 @@ class ScreenshotTest {
     private val byKey = apps.associateBy { it.key }
 
     private fun pagesFor(prefs: LauncherPrefs, landscape: Boolean, layout: HomeLayout = HomeLayout()) =
-        HomeLayoutMath.visualPages(layout, apps.take(9).map { it.key }) { it.capacity(landscape, prefs) }
+        HomeLayoutMath.visualPages(layout, apps.take(9).map { it.key }, capacityOf = { it.capacity(landscape, prefs) })
 
     @Composable
     private fun Scene(

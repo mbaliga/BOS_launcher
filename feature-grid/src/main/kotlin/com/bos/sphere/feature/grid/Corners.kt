@@ -31,6 +31,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import com.bos.sphere.core.data.ActionApps
+import com.bos.sphere.core.data.CornerActionId
+import com.bos.sphere.core.data.CornerIconMode
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -122,9 +131,28 @@ fun itemLabel(item: CornerItem, appsByKey: Map<String, AppEntry>): String = when
 
 /** Glyph for an action, or the app's icon. */
 @Composable
-fun ItemGlyph(item: CornerItem, appsByKey: Map<String, AppEntry>, size: Dp, tint: Color = HyleColors.InkBright) {
+fun ItemGlyph(
+    item: CornerItem,
+    appsByKey: Map<String, AppEntry>,
+    size: Dp,
+    tint: Color = HyleColors.InkBright,
+    mode: CornerIconMode = CornerIconMode.Glyph,
+) {
     when (item) {
-        is CornerItem.Action -> Icon(Glyphs.forAction(item.id), contentDescription = null, tint = tint, modifier = Modifier.size(size))
+        is CornerItem.Action -> {
+            // In app-icon mode, actions that open an app show that app's real icon.
+            val real = if (mode == CornerIconMode.AppIcon && item.id in ActionApps.appCapable) actionAppIcon(item.id) else null
+            if (real != null) {
+                Image(
+                    bitmap = real,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(size * 1.25f).clip(RoundedCornerShape(size * 0.28f)),
+                )
+            } else {
+                Icon(Glyphs.forAction(item.id), contentDescription = null, tint = tint, modifier = Modifier.size(size))
+            }
+        }
         is CornerItem.App -> appsByKey[item.key]?.let { AppIcon(it, size) }
             ?: Box(Modifier.size(size).background(HyleColors.Surface, CircleShape))
     }
@@ -161,7 +189,6 @@ internal fun Corner.absoluteAlignment(): Alignment {
 }
 
 private val BubbleRadius = 84.dp
-private val GlyphBox = 56.dp
 
 /** State of an open radial palette. */
 private class OpenPalette(
@@ -188,6 +215,8 @@ fun CornerLayer(
     cluster: @Composable (CornerPlacement, CornerSlot.ComplicationCluster, Modifier) -> Unit,
     widget: @Composable (CornerPlacement, CornerSlot.Widget) -> Unit,
     modifier: Modifier = Modifier,
+    iconSize: Dp = 32.dp,
+    iconMode: CornerIconMode = CornerIconMode.Glyph,
 ) {
     var layerCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var open by remember { mutableStateOf<OpenPalette?>(null) }
@@ -196,7 +225,6 @@ fun CornerLayer(
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val reachPx = with(density) { 38.dp.toPx() }
 
     fun close() {
         scope.launch {
@@ -223,6 +251,8 @@ fun CornerLayer(
                 else -> CornerSlotView(
                     placement = placement,
                     style = style,
+                    iconSize = iconSize,
+                    iconMode = iconMode,
                     appsByKey = appsByKey,
                     layerCoords = { layerCoords },
                     onTap = { item -> onRun(item, placement.screen) },
@@ -235,7 +265,7 @@ fun CornerLayer(
                     onPaletteDrag = { pos ->
                         val o = open ?: return@CornerSlotView
                         // Hit-test against the fully-open layout so a fast slide isn't lost mid-animation.
-                        val h = paletteHit(o, pos, 1f, density.density, reachPx)
+                        val h = paletteHit(o, pos, density.density)
                         if (h != hovered && h >= 0) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         hovered = h
                     },
@@ -270,14 +300,13 @@ fun CornerLayer(
     }
 }
 
-private val PaletteItemSize = 52.dp
-
-private fun paletteHit(o: OpenPalette, pos: Offset, scale: Float, density: Float, reachPx: Float): Int {
-    val offsets = PaletteMath.offsets(o.palette.items.size, o.placement.screen)
-        .map { Pt(it.x * density, it.y * density) }
-    return PaletteMath.hit(Pt(pos.x, pos.y), Pt(o.anchor.x, o.anchor.y), offsets, scale.coerceAtLeast(0.01f), reachPx)
+private fun paletteHit(o: OpenPalette, pos: Offset, density: Float): Int {
+    val slots = PaletteMath.layout(o.palette.items.size, o.placement.screen)
+    // A thumb sliding between tiles keeps its nearest tile (slack in dp).
+    return PaletteMath.hit((pos.x - o.anchor.x) / density, (pos.y - o.anchor.y) / density, slots, slackDp = 10f)
 }
 
+/** Concepts-style wheel: concentric rings of wedge tiles fanning out from the corner. */
 @Composable
 private fun PaletteOverlay(
     open: OpenPalette,
@@ -290,89 +319,89 @@ private fun PaletteOverlay(
     val density = LocalDensity.current
     BackHandler(onBack = onDismiss)
     val items = open.palette.items
-    val offsets = remember(items.size, open.placement.screen) { PaletteMath.offsets(items.size, open.placement.screen) }
+    val corner = open.placement.screen
+    val slots = remember(items.size, corner) { PaletteMath.layout(items.size, corner) }
+    val p = progress.coerceIn(0f, 1f)
+    val glass = HyleColors.SurfaceTranslucent
+    val accent = HyleColors.Violet
     Box(
         Modifier
             .fillMaxSize()
-            .graphicsLayer { alpha = progress.coerceIn(0f, 1f) }
-            .background(Color.Black.copy(alpha = 0.55f))
-            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+            .background(Color.Black.copy(alpha = 0.55f * p))
+            .pointerInput(open, slots) {
+                detectTapGestures { pos ->
+                    val h = paletteHit(open, pos, density.density)
+                    if (h >= 0) onItem(h) else onDismiss()
+                }
+            },
     ) {
-        // Arc guides behind the items (the "palette rim").
         Canvas(Modifier.fillMaxSize()) {
-            var rings = 0
-            var left = items.size
-            while (left > 0) { left -= PaletteMath.RING_CAPACITY.getOrElse(rings) { 9 }; rings++ }
-            for (r in 0 until minOf(rings, PaletteMath.RING_RADIUS_DP.size)) {
-                val radius = PaletteMath.RING_RADIUS_DP[r].dp.toPx() * progress
-                drawArc(
-                    color = HyleColors.Hairline,
-                    startAngle = PaletteMath.quadrantStart(open.placement.screen),
-                    sweepAngle = 90f,
-                    useCenter = false,
-                    topLeft = Offset(open.anchor.x - radius, open.anchor.y - radius),
-                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-                    style = Stroke(width = 1.dp.toPx()),
-                )
+            val d = density.density
+            for (slot in slots) {
+                // Each ring unfurls a little after the one inside it.
+                val local = (progress * (1.25f + slot.ring * 0.18f) - slot.ring * 0.18f).coerceIn(0f, 1f)
+                if (local <= 0f) continue
+                val inner = slot.innerDp * d * local
+                val outer = slot.outerDp * d * local
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    val oRect = androidx.compose.ui.geometry.Rect(open.anchor, outer)
+                    val iRect = androidx.compose.ui.geometry.Rect(open.anchor, inner)
+                    arcTo(oRect, slot.startDeg, slot.sweepDeg, false)
+                    arcTo(iRect, slot.startDeg + slot.sweepDeg, -slot.sweepDeg, false)
+                    close()
+                }
+                val isHover = slot.index == hovered
+                drawPath(path, if (isHover) accent.copy(alpha = 0.85f) else glass.copy(alpha = 0.92f))
+                drawPath(path, if (isHover) HyleColors.InkBright.copy(alpha = 0.7f) else HyleColors.InsetHighlight, style = Stroke(width = if (isHover) 1.6.dp.toPx() else 0.8.dp.toPx()))
             }
         }
-        val half = with(density) { (PaletteItemSize / 2).toPx() }
-        items.forEachIndexed { i, item ->
-            val stagger = (progress * (1f + items.size * 0.06f) - i * 0.06f).coerceIn(0f, 1.2f)
-            val o = offsets[i]
-            val x = open.anchor.x + o.x * density.density * stagger
-            val y = open.anchor.y + o.y * density.density * stagger
-            val isHover = i == hovered
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
+        slots.forEach { slot ->
+            val local = (progress * (1.25f + slot.ring * 0.18f) - slot.ring * 0.18f).coerceIn(0f, 1f)
+            if (local <= 0.35f) return@forEach
+            val c = PaletteMath.centre(slot)
+            val item = items[slot.index]
+            val iconDp = if (item is CornerItem.App) 34.dp else 26.dp
+            val half = with(density) { (iconDp / 2).toPx() }
+            val x = open.anchor.x + c.x * density.density * local
+            val y = open.anchor.y + c.y * density.density * local
+            val isHover = slot.index == hovered
+            Box(
+                Modifier
                     .offset { IntOffset((x - half).roundToInt(), (y - half).roundToInt()) }
-                    .width(PaletteItemSize)
                     .graphicsLayer {
-                        val s = (if (isHover) 1.18f else 1f) * stagger.coerceIn(0f, 1f)
-                        scaleX = s; scaleY = s
+                        val sc = (if (isHover) 1.15f else 1f) * local
+                        scaleX = sc; scaleY = sc; alpha = local
                     }
                     .semantics(mergeDescendants = true) {
                         contentDescription = itemLabel(item, appsByKey)
-                        onClick { onItem(i); true }
-                    }
-                    .pointerInput(i) { detectTapGestures { onItem(i) } },
+                        onClick { onItem(slot.index); true }
+                    },
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(PaletteItemSize)
-                        .background(HyleColors.SurfaceTranslucent, CircleShape)
-                        .border(if (isHover) 2.dp else 1.dp, if (isHover) HyleColors.Violet else HyleColors.InsetHighlight, CircleShape),
-                ) {
-                    ItemGlyph(item, appsByKey, size = if (item is CornerItem.App) 36.dp else 24.dp)
-                }
-                Text(
-                    itemLabel(item, appsByKey),
-                    color = if (isHover) HyleColors.InkBright else HyleColors.Ink,
-                    fontSize = 9.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 3.dp).width(72.dp),
-                )
+                ItemGlyph(item, appsByKey, size = iconDp, tint = if (isHover) HyleColors.Background else HyleColors.InkBright)
             }
         }
-        // Palette name, tucked near the anchor.
-        val nameOffset = offsets.firstOrNull()
-        if (nameOffset != null) {
-            Text(
-                open.palette.name.uppercase(),
-                color = HyleColors.InkDim,
-                fontSize = 10.sp,
-                letterSpacing = 1.5.sp,
-                modifier = Modifier.offset {
-                    val dx = if (open.placement.screen == Corner.TopRight || open.placement.screen == Corner.BottomRight) -90.dp.toPx() else 24.dp.toPx()
-                    val dy = if (open.placement.screen == Corner.BottomLeft || open.placement.screen == Corner.BottomRight) -36.dp.toPx() else 24.dp.toPx()
+        // The hovered item's name (or the palette's) sits in the hub near the corner.
+        val label = items.getOrNull(hovered)?.let { itemLabel(it, appsByKey) } ?: open.palette.name
+        val hubDp = PaletteMath.HUB_DP
+        val onRight = corner == Corner.TopRight || corner == Corner.BottomRight
+        val onBottom = corner == Corner.BottomLeft || corner == Corner.BottomRight
+        Text(
+            label.uppercase(),
+            color = HyleColors.InkBright,
+            fontSize = 10.sp,
+            letterSpacing = 1.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .width((hubDp - 12).dp)
+                .offset {
+                    val w = (hubDp - 12).dp.toPx()
+                    val dx = if (onRight) -(w + 8.dp.toPx()) else 8.dp.toPx()
+                    val dy = if (onBottom) -(hubDp * 0.5f).dp.toPx() else (hubDp * 0.42f).dp.toPx()
                     IntOffset((open.anchor.x + dx).roundToInt(), (open.anchor.y + dy).roundToInt())
                 },
-            )
-        }
+            textAlign = if (onRight) TextAlign.End else TextAlign.Start,
+        )
     }
 }
 
@@ -380,6 +409,8 @@ private fun PaletteOverlay(
 private fun CornerSlotView(
     placement: CornerPlacement,
     style: CornerStyle,
+    iconSize: Dp,
+    iconMode: CornerIconMode,
     appsByKey: Map<String, AppEntry>,
     layerCoords: () -> LayoutCoordinates?,
     onTap: (CornerItem) -> Unit,
@@ -419,7 +450,7 @@ private fun CornerSlotView(
             is CornerSlot.Palette -> Box(
                 contentAlignment = Alignment.Center,
                 modifier = boxModifier
-                    .size(GlyphBox)
+                    .size(iconSize + 26.dp)
                     .semantics {
                         contentDescription = "${slot.name} palette"
                         onLongClick { onEdit(); true }
@@ -475,12 +506,12 @@ private fun CornerSlotView(
                         }
                     },
             ) {
-                PaletteBadge(slot, appsByKey)
+                PaletteBadge(slot, appsByKey, iconSize, iconMode)
             }
             is CornerSlot.Single -> Box(
                 contentAlignment = Alignment.Center,
                 modifier = boxModifier
-                    .size(GlyphBox)
+                    .size(iconSize + 26.dp)
                     .semantics {
                         contentDescription = itemLabel(slot.item, appsByKey)
                         onClick { onTap(slot.item); true }
@@ -493,12 +524,12 @@ private fun CornerSlotView(
                         )
                     },
             ) {
-                ItemGlyph(slot.item, appsByKey, size = if (slot.item is CornerItem.App) 34.dp else 28.dp)
+                ItemGlyph(slot.item, appsByKey, size = if (slot.item is CornerItem.App) iconSize * 1.2f else iconSize, mode = iconMode)
             }
             CornerSlot.Empty -> Box(
                 // Invisible but long-pressable so an empty corner can still be assigned.
                 modifier = boxModifier
-                    .size(GlyphBox)
+                    .size(iconSize + 26.dp)
                     .semantics { contentDescription = "Empty corner"; onLongClick { onEdit(); true } }
                     .pointerInput(Unit) {
                         detectTapGestures(onLongPress = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onEdit() })
@@ -511,16 +542,17 @@ private fun CornerSlotView(
 
 /** A palette shows as a 2×2 cluster of its first items (the corner-folder look). */
 @Composable
-private fun PaletteBadge(slot: CornerSlot.Palette, appsByKey: Map<String, AppEntry>) {
+private fun PaletteBadge(slot: CornerSlot.Palette, appsByKey: Map<String, AppEntry>, iconSize: Dp, mode: CornerIconMode) {
     val shown = slot.items.take(4)
     if (shown.size <= 1) {
-        shown.firstOrNull()?.let { ItemGlyph(it, appsByKey, 28.dp) } ?: Icon(Glyphs.Palette, null, tint = HyleColors.InkBright, modifier = Modifier.size(28.dp))
+        shown.firstOrNull()?.let { ItemGlyph(it, appsByKey, iconSize, mode = mode) } ?: Icon(Glyphs.Palette, null, tint = HyleColors.InkBright, modifier = Modifier.size(iconSize))
         return
     }
+    val cell = iconSize * 0.56f
     Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)) {
         shown.chunked(2).forEach { row ->
             Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)) {
-                row.forEach { ItemGlyph(it, appsByKey, size = if (it is CornerItem.App) 18.dp else 16.dp) }
+                row.forEach { ItemGlyph(it, appsByKey, size = if (it is CornerItem.App) cell * 1.1f else cell, mode = mode) }
             }
         }
     }
@@ -594,4 +626,27 @@ internal fun Modifier.longPressFirst(onLongPress: () -> Unit): Modifier = pointe
             } while (ev.changes.any { it.pressed })
         }
     }
+}
+
+/** The real icon of the app that handles [id] (Music → your music player), or null if none resolves. */
+@Composable
+fun actionAppIcon(id: CornerActionId): androidx.compose.ui.graphics.ImageBitmap? {
+    val context = LocalContext.current
+    val icon by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(ActionIconCache.get(id), id) {
+        if (value == null) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching {
+                    val cn = ActionApps.resolve(context, id) ?: return@runCatching null
+                    context.packageManager.getActivityIcon(cn).toBitmap(160, 160).asImageBitmap()
+                }.getOrNull()?.also { ActionIconCache.put(id, it) }
+            }
+        }
+    }
+    return icon
+}
+
+private object ActionIconCache {
+    private val map = HashMap<CornerActionId, androidx.compose.ui.graphics.ImageBitmap>()
+    @Synchronized fun get(id: CornerActionId) = map[id]
+    @Synchronized fun put(id: CornerActionId, b: androidx.compose.ui.graphics.ImageBitmap) { map[id] = b }
 }

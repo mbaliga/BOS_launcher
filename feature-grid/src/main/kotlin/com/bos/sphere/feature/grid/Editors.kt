@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bos.sphere.core.data.ActionApps
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.ComplicationKind
 import com.bos.sphere.core.data.Corner
@@ -109,8 +110,8 @@ fun CornerEditorDialog(
             ChipRow(SlotKind.entries, kind, { it.label }) { kind = it }
         }
         when (kind) {
-            SlotKind.Action -> ActionList(selected = ((current as? CornerSlot.Single)?.item as? CornerItem.Action)?.id) {
-                onSave(CornerSlot.Single(CornerItem.Action(it)))
+            SlotKind.Action -> ActionList(apps, selected = ((current as? CornerSlot.Single)?.item as? CornerItem.Action)?.id) {
+                onSave(CornerSlot.Single(it))
             }
             SlotKind.App -> AppList(apps, selected = ((current as? CornerSlot.Single)?.item as? CornerItem.App)?.key) {
                 onSave(CornerSlot.Single(CornerItem.App(it.key)))
@@ -204,17 +205,56 @@ fun ItemPicker(apps: List<AppEntry>, selected: CornerItem? = null, onPick: (Corn
     var tab by remember { mutableStateOf(if (selected is CornerItem.App) 1 else 0) }
     ChipRow(listOf(0, 1), tab, { if (it == 0) "Actions" else "Apps" }) { tab = it }
     if (tab == 0) {
-        ActionList((selected as? CornerItem.Action)?.id) { onPick(CornerItem.Action(it)) }
+        ActionList(apps, (selected as? CornerItem.Action)?.id, onPick)
     } else {
         AppList(apps, (selected as? CornerItem.App)?.key) { onPick(CornerItem.App(it.key)) }
     }
 }
 
+/**
+ * Actions to pick from. Ones that open an app (Music, Camera, Phone …) take a second step — "open
+ * with" — so you can choose the system default or a specific app, including players the system
+ * chooser doesn't list (e.g. Apple Music).
+ */
 @Composable
-private fun ActionList(selected: CornerActionId?, onPick: (CornerActionId) -> Unit) {
-    CornerActionId.entries.forEach { id ->
-        ActionRow(label = id.label, glyph = Glyphs.forAction(id), selected = id == selected) { onPick(id) }
+private fun ActionList(apps: List<AppEntry>, selected: CornerActionId?, onPick: (CornerItem) -> Unit) {
+    var pending by remember { mutableStateOf<CornerActionId?>(null) }
+    val id = pending
+    if (id != null) {
+        OpenWith(id, apps, onBack = { pending = null }, onPick = onPick)
+        return
     }
+    CornerActionId.entries.forEach { a ->
+        ActionRow(label = a.label, glyph = Glyphs.forAction(a), selected = a == selected) {
+            if (a in ActionApps.appCapable) pending = a else onPick(CornerItem.Action(a))
+        }
+    }
+}
+
+@Composable
+private fun OpenWith(id: CornerActionId, apps: List<AppEntry>, onBack: () -> Unit, onPick: (CornerItem) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val handlerPackages = remember(id) {
+        val intent = ActionApps.intentFor(id)
+        if (intent == null) emptySet() else runCatching {
+            context.packageManager.queryIntentActivities(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                .map { it.activityInfo.packageName }.toSet()
+        }.getOrDefault(emptySet())
+    }
+    val suggested = remember(apps, handlerPackages) { apps.filter { it.packageName in handlerPackages } }
+    ActionRow(label = "‹  Back", onClick = onBack)
+    SectionHeader("Open ${id.label} with")
+    ActionRow(label = "System default", summary = "Uses your default; asks if there are several", glyph = Glyphs.forAction(id)) {
+        onPick(CornerItem.Action(id))
+    }
+    if (suggested.isNotEmpty()) {
+        SectionHeader("Apps that handle it")
+        suggested.forEach { app ->
+            ActionRow(label = app.label, leading = { AppIcon(app, 28.dp, Modifier.size(28.dp)) }) { onPick(CornerItem.App(app.key)) }
+        }
+    }
+    SectionHeader("Any app")
+    AppList(apps, selected = null) { onPick(CornerItem.App(it.key)) }
 }
 
 @Composable

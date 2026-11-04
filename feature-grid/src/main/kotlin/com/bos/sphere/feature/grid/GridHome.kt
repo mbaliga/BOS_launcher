@@ -209,6 +209,7 @@ fun GridHome(
     onGesture: (HomeGesture) -> Unit,
     onClockTap: () -> Unit,
     onTileLongPress: (key: String, page: Int) -> Unit,
+    weather: com.bos.sphere.core.data.WeatherInfo? = null,
     modifier: Modifier = Modifier,
 ) {
     val paging = prefs.pagingFor(isLandscape)
@@ -221,7 +222,38 @@ fun GridHome(
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
-    var areaSize by remember { mutableStateOf(IntSize.Zero) }
+    // The pager fills the whole screen so pages slide edge to edge; each page insets its own
+    // content. [areaSize] is that inner content area and [contentOffset] its top-left in screen px.
+    var fullSize by remember { mutableStateOf(IntSize.Zero) }
+    val safeInsets = WindowInsets.safeDrawing
+    val dir = LayoutDirection.Ltr
+    val indicatorAtStartEarly = prefs.pagingFor(isLandscape) == PagingAxis.Vertical
+    val clockTop = prefs.clockPosition == ClockPosition.Top
+    val clockBottom = prefs.clockPosition == ClockPosition.Bottom
+    val clockH = clockBlockHeight(prefs)
+    val cornerRow = prefs.cornerIconSize.dp + 22.dp
+    val padTopDp = if (clockTop) maxOf(clockH + 14.dp, cornerRow) else cornerRow
+    val padBottomDp = when {
+        clockBottom && !indicatorAtStartEarly -> maxOf(clockH + 50.dp, cornerRow)
+        clockBottom -> maxOf(clockH + 24.dp, cornerRow)
+        indicatorAtStartEarly -> cornerRow
+        else -> maxOf(cornerRow, 44.dp)
+    }
+    val padStartDp = if (indicatorAtStartEarly) 38.dp else 14.dp
+    val padEndDp = 14.dp
+    val insetLeft = with(density) { safeInsets.getLeft(this, dir).toDp() }
+    val insetRight = with(density) { safeInsets.getRight(this, dir).toDp() }
+    val insetTop = with(density) { safeInsets.getTop(this).toDp() }
+    val insetBottom = with(density) { safeInsets.getBottom(this).toDp() }
+    val contentLeftPx = with(density) { (insetLeft + padStartDp).toPx() }
+    val contentTopPx = with(density) { (insetTop + padTopDp).toPx() }
+    val contentRightPx = with(density) { (insetRight + padEndDp).toPx() }
+    val contentBottomPx = with(density) { (insetBottom + padBottomDp).toPx() }
+    val areaSize = IntSize(
+        (fullSize.width - contentLeftPx - contentRightPx).toInt().coerceAtLeast(0),
+        (fullSize.height - contentTopPx - contentBottomPx).toInt().coerceAtLeast(0),
+    )
+    val contentOffset = Offset(contentLeftPx, contentTopPx)
 
     // ---- drag state
     var dragKey by remember { mutableStateOf<String?>(null) }
@@ -255,7 +287,8 @@ fun GridHome(
         val tp = pagerState.currentPage
         val base = dragBase.getOrNull(tp)
         val remaining = base?.keys?.count { it != key } ?: 0
-        val idx = geomFor(tp, base?.copy(keys = base.keys.filter { it != key })).nearest(dragPos.x, dragPos.y).coerceAtMost(remaining)
+        val local = dragPos - contentOffset
+        val idx = geomFor(tp, base?.copy(keys = base.keys.filter { it != key })).nearest(local.x, local.y).coerceAtMost(remaining)
         return tp to idx
     }
 
@@ -292,14 +325,15 @@ fun GridHome(
 
     // Latest values for the long-lived gesture coroutine.
     val st by rememberUpdatedState(
-        GestureInputs(pages, appsByKey, suggestion, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl),
+        GestureInputs(pages, appsByKey, suggestion, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl, contentOffset),
     )
     val cb by rememberUpdatedState(
         GestureCallbacks(onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap, onTileLongPress, capacityOf, ::focusCover),
     )
 
-    fun hitTest(page: Int, pos: Offset): Hit {
+    fun hitTest(page: Int, screenPos: Offset): Hit {
         val s = st
+        val pos = screenPos - s.contentOffset
         val p = s.pages.getOrNull(page) ?: return Hit.Empty
         val coverPosition = clampedCover(s.coverPos, page, p)
         val geom = PageGeometry.of(p.layout, s.areaSize, s.prefs, s.landscape, p.keys.size, coverPosition)
@@ -313,18 +347,22 @@ fun GridHome(
     }
 
     val safe = WindowInsets.safeDrawing
-    val indicatorAtStart = paging == PagingAxis.Vertical
+    val indicatorAtStart = indicatorAtStartEarly
 
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
     Box(modifier = modifier.fillMaxSize()) {
         when (prefs.clockPosition) {
-            ClockPosition.Top -> HomeClock(
+            ClockPosition.Top -> ClockBlock(
+                prefs = prefs,
+                weather = weather,
                 onTap = onClockTap,
-                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(safe).padding(top = 14.dp),
+                modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(safe).padding(top = 8.dp),
             )
-            ClockPosition.Bottom -> HomeClock(
+            ClockPosition.Bottom -> ClockBlock(
+                prefs = prefs,
+                weather = weather,
                 onTap = onClockTap,
-                modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(bottom = 18.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(bottom = 14.dp),
             )
             ClockPosition.Hidden -> Unit
         }
@@ -332,18 +370,7 @@ fun GridHome(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(safe)
-                .padding(
-                    top = 56.dp,
-                    bottom = when {
-                        prefs.clockPosition == ClockPosition.Bottom && !indicatorAtStart -> 88.dp
-                        indicatorAtStart -> 64.dp
-                        else -> 72.dp
-                    },
-                    start = if (indicatorAtStart) 34.dp else 14.dp,
-                    end = 14.dp,
-                )
-                .onSizeChanged { areaSize = it }
+                .onSizeChanged { fullSize = it }
                 .pointerInput(Unit) {
                     // Drop target from the *latest* inputs (this coroutine outlives compositions).
                     fun dropTargetNow(): Pair<Int, Int> {
@@ -353,7 +380,8 @@ fun GridHome(
                         val base = dragBase.getOrNull(tp)
                         val rest = base?.keys?.filter { it != key }.orEmpty()
                         val geom = PageGeometry.of(base?.layout ?: PageLayout(), s.areaSize, s.prefs, s.landscape, rest.size, clampedCover(s.coverPos, tp, base))
-                        return tp to geom.nearest(dragPos.x, dragPos.y).coerceAtMost(rest.size)
+                        val local = dragPos - s.contentOffset
+                        return tp to geom.nearest(local.x, local.y).coerceAtMost(rest.size)
                     }
                     val slop = viewConfiguration.touchSlop
                     val swipeMin = 56.dp.toPx()
@@ -519,9 +547,9 @@ fun GridHome(
                                                 dragPos = c.position
                                                 val edge = 28.dp.toPx()
                                                 val (along, extent) = if (st.paging == PagingAxis.Horizontal) {
-                                                    c.position.x to st.areaSize.width.toFloat()
+                                                    c.position.x to size.width.toFloat()
                                                 } else {
-                                                    c.position.y to st.areaSize.height.toFloat()
+                                                    c.position.y to size.height.toFloat()
                                                 }
                                                 val rtlFlip = st.paging == PagingAxis.Horizontal && st.rtl
                                                 val raw = when {
@@ -573,7 +601,12 @@ fun GridHome(
                 PageView(
                     page = page,
                     geometry = geometry,
-                    modifier = coverModifier,
+                    modifier = Modifier
+                        .padding(
+                            start = insetLeft + padStartDp, top = insetTop + padTopDp,
+                            end = insetRight + padEndDp, bottom = insetBottom + padBottomDp,
+                        )
+                        .then(coverModifier),
                     appsByKey = appsByKey,
                     showLabels = prefs.showLabels && page.layout.shape == PageShape.Grid,
                     draggingKey = dragKey,
@@ -654,6 +687,7 @@ private data class GestureInputs(
     val landscape: Boolean,
     val coverPos: Map<Int, Float>,
     val rtl: Boolean,
+    val contentOffset: Offset,
 )
 
 private class GestureCallbacks(

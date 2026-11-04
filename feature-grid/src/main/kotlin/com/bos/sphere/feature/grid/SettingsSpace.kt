@@ -18,6 +18,12 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -104,10 +110,10 @@ sealed interface SettingItem {
 data class SettingCategory(val title: String, val glyph: ImageVector, val items: List<SettingItem>)
 
 /**
- * The dedicated settings space — a cross-media-bar: category glyphs run along a horizontal
- * bar; the selected category's items run vertically beneath it; swipe sideways for
- * categories, up/down for items, tap to open. A slow wave field and the substrate dots sit
- * behind; every move clicks with Orrery's console tones ([UiSounds]).
+ * The dedicated settings space. Categories run along a bar (tap one, or swipe sideways); the
+ * selected category's options are all visible in a list beneath it — tapping an option flips it
+ * (toggles), runs it (actions) or opens its configuration pane. A slow wave field and dot lattice
+ * sit behind, and every interaction clicks with Orrery's console tones ([UiSounds]).
  */
 @Composable
 fun SettingsSpace(
@@ -122,11 +128,11 @@ fun SettingsSpace(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(220)) + scaleIn(initialScale = 1.06f, animationSpec = tween(260)),
-        exit = fadeOut(tween(180)) + scaleOut(targetScale = 1.04f, animationSpec = tween(180)),
+        enter = fadeIn(tween(200)),
+        exit = fadeOut(tween(150)),
         modifier = modifier,
     ) {
-        // Physical layout: positions and hit-tests below are computed in screen coordinates.
+        // Physical layout: positions are computed in screen coordinates.
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
         ) {
@@ -144,254 +150,218 @@ private fun SettingsSpaceContent(
 ) {
     val haptics = LocalHapticFeedback.current
     var cat by remember { mutableIntStateOf(initialCategory.coerceIn(0, (categories.size - 1).coerceAtLeast(0))) }
-    val itemIndex = remember { mutableMapOf<Int, Int>() }
-    var item by remember { mutableIntStateOf(0) }
-    var paneOpen by remember { mutableIntStateOf(-1) } // index of the item whose pane is open
-    val latestCategories by rememberUpdatedState(categories)
+    var paneItem by remember { mutableIntStateOf(-1) } // index of the item whose pane is open
+    val latest by rememberUpdatedState(categories)
+    val barState = androidx.compose.foundation.rememberScrollState()
 
     LaunchedEffect(Unit) { sounds?.play(UiSound.Open) }
 
-    fun items() = latestCategories.getOrNull(cat)?.items.orEmpty()
-
-    fun moveCategory(to: Int) {
-        val next = to.coerceIn(0, latestCategories.lastIndex)
-        if (next == cat) { sounds?.play(UiSound.Nope); return }
-        itemIndex[cat] = item
+    fun select(to: Int) {
+        val next = to.coerceIn(0, latest.lastIndex)
+        if (next == cat) return
         cat = next
-        item = (itemIndex[next] ?: 0).coerceIn(0, (items().size - 1).coerceAtLeast(0))
-        paneOpen = -1
+        paneItem = -1
         sounds?.play(UiSound.Move)
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
-    fun moveItem(to: Int) {
-        val next = to.coerceIn(0, (items().size - 1).coerceAtLeast(0))
-        if (next == item) return
-        item = next
-        paneOpen = -1
-        sounds?.play(UiSound.Hover)
-    }
-
-    fun activate(index: Int) {
-        val it = items().getOrNull(index) ?: return
-        if (index != item) { moveItem(index); return }
-        when (it) {
-            is SettingItem.Toggle -> { it.onChange(!it.checked); sounds?.play(UiSound.Tick) }
-            is SettingItem.Action -> { sounds?.play(UiSound.Select); it.onClick() }
-            is SettingItem.Pane -> { paneOpen = index; sounds?.play(UiSound.Select) }
-        }
-    }
+    fun leave() { sounds?.play(UiSound.Close); onClose() }
 
     BackHandler {
-        if (paneOpen >= 0) { paneOpen = -1; sounds?.play(UiSound.Back) } else { sounds?.play(UiSound.Close); onClose() }
+        if (paneItem >= 0) { paneItem = -1; sounds?.play(UiSound.Back) } else leave()
     }
-
-    val catAnim by animateFloatAsState(cat.toFloat(), spring(dampingRatio = 0.82f, stiffness = 320f), label = "cat")
-    val itemAnim by animateFloatAsState(item.toFloat(), spring(dampingRatio = 0.85f, stiffness = 360f), label = "item")
 
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Color(0xFF07080D), Color(0xFF0E0C22), Color(0xFF071622)))),
     ) {
-        val density = LocalDensity.current
-        val w = constraints.maxWidth.toFloat()
-        val h = constraints.maxHeight.toFloat()
-        val landscape = w > h
-        val catSpacing = with(density) { 104.dp.toPx() }
-        val rowH = with(density) { 64.dp.toPx() }
-        val barY = h * (if (landscape) 0.24f else 0.22f)
-        val anchorX = w * (if (landscape) 0.24f else 0.3f)
-
+        val landscape = maxWidth > maxHeight
         WaveField(Modifier.fillMaxSize())
 
-        // Gestures: horizontal → categories, vertical → items, tap → activate.
-        var dragAcc by remember { mutableFloatStateOf(0f) }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    var axis = 0 // 0 undecided, 1 horizontal, 2 vertical
-                    detectDragGestures(
-                        onDragStart = { axis = 0; dragAcc = 0f },
-                        onDragEnd = { axis = 0; dragAcc = 0f },
-                        onDragCancel = { axis = 0; dragAcc = 0f },
-                    ) { change, d ->
-                        change.consume()
-                        if (axis == 0) axis = if (abs(d.x) > abs(d.y)) 1 else 2
-                        if (axis == 1) {
-                            dragAcc += d.x
-                            val step = 72.dp.toPx()
-                            while (dragAcc <= -step) { dragAcc += step; moveCategory(cat + 1) }
-                            while (dragAcc >= step) { dragAcc -= step; moveCategory(cat - 1) }
-                        } else {
-                            dragAcc += d.y
-                            val step = 52.dp.toPx()
-                            while (dragAcc <= -step) { dragAcc += step; moveItem(item + 1) }
-                            while (dragAcc >= step) { dragAcc -= step; moveItem(item - 1) }
-                        }
-                    }
-                }
-                .pointerInput(w, h, catSpacing, rowH) {
-                    detectTapGestures { p ->
-                        // Category bar hit?
-                        if (abs(p.y - barY) < 44.dp.toPx()) {
-                            val idx = ((p.x - anchorX) / catSpacing + cat).roundToInt()
-                            if (idx in latestCategories.indices) moveCategory(idx)
-                            return@detectTapGestures
-                        }
-                        val firstY = barY + ITEMS_GAP.toPx()
-                        if (p.y > firstY - rowH / 2) {
-                            val idx = ((p.y - firstY) / rowH + item).roundToInt()
-                            if (idx in items().indices && p.x < (if (paneOpen >= 0) w * 0.52f else w)) activate(idx)
-                        }
-                    }
-                },
-        )
+        val items = latest.getOrNull(cat)?.items.orEmpty()
+        val pane = items.getOrNull(paneItem) as? SettingItem.Pane
+        // Portrait: the pane is a bottom sheet; landscape: a side panel.
+        val listEndFraction = if (landscape && pane != null) 0.5f else 1f
 
-        // Header.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 22.dp, vertical = 14.dp).fillMaxWidth(),
-        ) {
-            Text("SPHERE", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
-            Text("  ·  SETTINGS", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
-            Icon(
-                Glyphs.Close,
-                contentDescription = "Close settings",
-                tint = HyleColors.Ink,
-                modifier = Modifier
-                    .size(36.dp)
-                    .pointerInput(Unit) { detectTapGestures { sounds?.play(UiSound.Close); onClose() } }
-                    .padding(8.dp),
-            )
-        }
-
-        // Category bar.
-        categories.forEachIndexed { i, c ->
-            val d = i - catAnim
-            val x = anchorX + d * catSpacing
-            val sel = i == cat
-            val scale = 1f + 0.38f * (1f - abs(d).coerceAtMost(1f))
-            val glyphPx = with(density) { 34.dp.toPx() }
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .offset { IntOffset((x - glyphPx).roundToInt(), (barY - glyphPx / 2).roundToInt()) }
-                    .width(with(density) { (glyphPx * 2).toDp() })
-                    .alpha((1f - abs(d) * 0.22f).coerceIn(0.25f, 1f))
-                    .semantics {
-                        contentDescription = c.title
-                        selected = sel
-                        onClick { moveCategory(i); true }
-                    },
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (sel) Halo(56.dp)
-                    Icon(
-                        c.glyph,
-                        null,
-                        tint = if (sel) HyleColors.InkBright else HyleColors.Ink,
-                        modifier = Modifier.size(34.dp).graphicsLayer { scaleX = scale; scaleY = scale },
-                    )
-                }
-                Text(
-                    c.title,
-                    color = HyleColors.InkBright,
-                    fontSize = 12.sp,
-                    letterSpacing = 1.sp,
-                    maxLines = 1,
-                    modifier = Modifier.padding(top = 10.dp).alpha((1f - abs(d) * 2f).coerceIn(0f, 1f)),
-                )
-            }
-        }
-
-        // Item column under the selected category.
-        val list = items()
-        val firstY = barY + with(density) { ITEMS_GAP.toPx() }
-        list.forEachIndexed { i, it ->
-            val d = i - itemAnim
-            val y = firstY + d * rowH
-            if (d < -0.6f || y > h + rowH) return@forEachIndexed
-            val sel = i == item
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .offset { IntOffset((anchorX - 20.dp.toPx()).roundToInt(), (y - rowH / 2).roundToInt()) }
-                    .width(with(density) { ((if (paneOpen >= 0) w * 0.5f else w * 0.72f) - 10f).toDp() })
-                    .alpha(if (d < 0) (1f + d / 0.6f).coerceIn(0f, 1f) else (1f - d * 0.12f).coerceIn(0.3f, 1f))
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "${it.title}, ${it.value}"
-                        selected = sel
-                        onClick { item = i; activate(i); true }
-                    },
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp).fillMaxWidth(),
             ) {
-                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    if (sel) Halo(44.dp)
-                    Icon(it.glyph, null, tint = if (sel) HyleColors.InkBright else HyleColors.InkDim, modifier = Modifier.size(if (sel) 26.dp else 22.dp))
-                }
-                Column(Modifier.padding(start = 14.dp)) {
-                    Text(
-                        it.title,
-                        color = if (sel) HyleColors.InkBright else HyleColors.Ink,
-                        fontSize = if (sel) 17.sp else 15.sp,
-                        fontWeight = if (sel) FontWeight.Medium else FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (it.value.isNotEmpty()) {
+                Text("SPHERE", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
+                Text("  ·  SETTINGS", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
+                Icon(
+                    Glyphs.Close,
+                    contentDescription = "Close settings",
+                    tint = HyleColors.Ink,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .pointerInput(Unit) { detectTapGestures { leave() } }
+                        .padding(10.dp),
+                )
+            }
+
+            // Category bar: every category visible (scrolls if there are more than fit).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(barState)
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                latest.forEachIndexed { i, c ->
+                    val sel = i == cat
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .width(76.dp)
+                            .pointerInput(i) { detectTapGestures { select(i) } }
+                            .padding(vertical = 6.dp)
+                            .semantics { contentDescription = c.title; selected = sel; onClick { select(i); true } },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (sel) Halo(52.dp)
+                            Icon(
+                                c.glyph, null,
+                                tint = if (sel) HyleColors.InkBright else HyleColors.InkDim,
+                                modifier = Modifier.size(if (sel) 30.dp else 26.dp),
+                            )
+                        }
                         Text(
-                            it.value,
-                            color = if (sel) HyleColors.VioletSoft else HyleColors.InkDim,
-                            fontSize = 12.sp,
+                            c.title,
+                            color = if (sel) HyleColors.InkBright else HyleColors.InkDim,
+                            fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        Box(
+                            Modifier
+                                .padding(top = 4.dp)
+                                .height(2.dp)
+                                .width(if (sel) 22.dp else 0.dp)
+                                .background(HyleColors.Violet, RoundedCornerShape(1.dp)),
                         )
                     }
                 }
             }
-        }
+            // Keep the selected category in view when the bar scrolls.
+            val catWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) { 78.dp.toPx() }
+            LaunchedEffect(cat) {
+                barState.animateScrollTo(((cat * catWidthPx) - barState.viewportSize / 2 + catWidthPx / 2).toInt().coerceAtLeast(0))
+            }
 
-        // Footer hint.
-        Text(
-            "◀ ▶ categories   ▲ ▼ items   tap to open   back to leave",
-            color = HyleColors.InkDim.copy(alpha = 0.7f),
-            fontSize = 10.sp,
-            letterSpacing = 1.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(bottom = 12.dp),
-        )
-
-        // Option pane.
-        val pane = list.getOrNull(paneOpen) as? SettingItem.Pane
-        AnimatedVisibility(
-            visible = pane != null,
-            enter = slideInHorizontally { it / 2 } + fadeIn(),
-            exit = slideOutHorizontally { it / 2 } + fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            val current = pane ?: return@AnimatedVisibility
-            Column(
-                Modifier
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(12.dp)
-                    .width(with(density) { (w * 0.46f).toDp() }.coerceAtMost(420.dp))
-                    .fillMaxHeight(0.86f)
-                    .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.9f), RoundedCornerShape(18.dp))
-                    .border(1.dp, Brush.verticalGradient(listOf(HyleColors.Violet.copy(alpha = 0.6f), HyleColors.Hairline)), RoundedCornerShape(18.dp))
-                    .pointerInput(Unit) { detectTapGestures { } } // keep taps inside the pane
-                    .padding(16.dp),
-            ) {
-                Text(current.title.uppercase(), color = HyleColors.InkBright, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold)
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 8.dp)) {
-                    current.content(this)
+            // Options: all visible; tap to open. Horizontal swipes change category.
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = Modifier
+                        .weight(listEndFraction.coerceAtLeast(0.01f))
+                        .fillMaxHeight()
+                        .pointerInput(cat) {
+                            var dx = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { dx = 0f },
+                                onDragEnd = { if (dx < -90f) select(cat + 1) else if (dx > 90f) select(cat - 1) },
+                            ) { _, d -> dx += d }
+                        },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 16.dp, end = 16.dp, top = 8.dp,
+                        bottom = if (pane != null && !landscape) 8.dp else 24.dp,
+                    ),
+                ) {
+                    itemsIndexed(items) { i, it ->
+                        SettingRow(
+                            item = it,
+                            selected = i == paneItem,
+                            onClick = {
+                                when (it) {
+                                    is SettingItem.Toggle -> { it.onChange(!it.checked); sounds?.play(UiSound.Tick) }
+                                    is SettingItem.Action -> { sounds?.play(UiSound.Select); it.onClick() }
+                                    is SettingItem.Pane -> {
+                                        paneItem = if (paneItem == i) -1 else i
+                                        sounds?.play(UiSound.Select)
+                                    }
+                                }
+                            },
+                        )
+                    }
                 }
+                if (landscape && pane != null) {
+                    PanePanel(pane, onClose = { paneItem = -1; sounds?.play(UiSound.Back) }, modifier = Modifier.weight(0.5f).fillMaxHeight())
+                }
+            }
+            if (!landscape && pane != null) {
+                PanePanel(
+                    pane,
+                    onClose = { paneItem = -1; sounds?.play(UiSound.Back) },
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.55f),
+                )
             }
         }
     }
 }
 
+@Composable
+private fun SettingRow(item: SettingItem, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .background(if (selected) HyleColors.Violet.copy(alpha = 0.14f) else Color.Transparent, RoundedCornerShape(12.dp))
+            .pointerInput(item) { detectTapGestures { onClick() } }
+            .padding(horizontal = 10.dp, vertical = 11.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${item.title}, ${item.value}"
+                onClick { onClick(); true }
+            },
+    ) {
+        Icon(item.glyph, null, tint = if (selected) HyleColors.InkBright else HyleColors.Ink, modifier = Modifier.size(24.dp))
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+            Text(item.title, color = HyleColors.InkBright, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val sub = when (item) {
+                is SettingItem.Toggle -> item.hint
+                else -> item.value.takeIf { it.isNotEmpty() }
+            }
+            if (sub != null) Text(sub, color = HyleColors.InkDim, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        when (item) {
+            is SettingItem.Toggle -> Box(
+                Modifier
+                    .size(width = 40.dp, height = 22.dp)
+                    .background(if (item.checked) HyleColors.Violet else HyleColors.Surface, RoundedCornerShape(11.dp))
+                    .border(1.dp, HyleColors.Hairline, RoundedCornerShape(11.dp)),
+                contentAlignment = if (item.checked) Alignment.CenterEnd else Alignment.CenterStart,
+            ) { Box(Modifier.padding(3.dp).size(16.dp).background(HyleColors.InkBright, androidx.compose.foundation.shape.CircleShape)) }
+            is SettingItem.Pane -> Text("›", color = HyleColors.InkDim, fontSize = 20.sp)
+            is SettingItem.Action -> Unit
+        }
+    }
+}
+
+@Composable
+private fun PanePanel(pane: SettingItem.Pane, onClose: () -> Unit, modifier: Modifier) {
+    Column(
+        modifier
+            .padding(10.dp)
+            .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
+            .border(1.dp, Brush.verticalGradient(listOf(HyleColors.Violet.copy(alpha = 0.55f), HyleColors.Hairline)), RoundedCornerShape(18.dp))
+            .pointerInput(Unit) { detectTapGestures { } }
+            .padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(pane.title.uppercase(), color = HyleColors.InkBright, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Icon(Glyphs.Close, "Close", tint = HyleColors.InkDim, modifier = Modifier.size(32.dp).pointerInput(Unit) { detectTapGestures { onClose() } }.padding(7.dp))
+        }
+        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(top = 8.dp)) {
+            pane.content(this)
+        }
+    }
+}
+
 /** Distance from the category bar to the first item row (clears the category label). */
-private val ITEMS_GAP = 104.dp
+private val ITEMS_GAP = 104.dp // unused now; kept for reference
 
 /** Soft violet glow behind the selected glyph. */
 @Composable
@@ -407,7 +377,7 @@ private fun Halo(size: androidx.compose.ui.unit.Dp) {
 
 /** Slowly drifting translucent ribbons — the "waves" behind a console menu, in Hyle colours. */
 @Composable
-private fun WaveField(modifier: Modifier) {
+internal fun WaveField(modifier: Modifier) {
     val t = rememberInfiniteTransition(label = "waves")
     val phase by t.animateFloat(0f, 1f, infiniteRepeatable(tween(18_000, easing = LinearEasing)), label = "phase")
     Canvas(modifier) {

@@ -19,6 +19,47 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** The intents behind app-backed actions, shared by the runner and the icon resolver. */
+object ActionApps {
+    fun intentFor(id: CornerActionId): Intent? = when (id) {
+        CornerActionId.Music -> category(Intent.CATEGORY_APP_MUSIC)
+        CornerActionId.Camera -> Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+        CornerActionId.Phone -> Intent(Intent.ACTION_DIAL)
+        CornerActionId.Messages -> category(Intent.CATEGORY_APP_MESSAGING)
+        CornerActionId.Browser -> category(Intent.CATEGORY_APP_BROWSER)
+        CornerActionId.Email -> category(Intent.CATEGORY_APP_EMAIL)
+        CornerActionId.Maps -> category(Intent.CATEGORY_APP_MAPS)
+        CornerActionId.Calendar -> category(Intent.CATEGORY_APP_CALENDAR)
+        CornerActionId.Gallery -> category(Intent.CATEGORY_APP_GALLERY)
+        CornerActionId.Contacts -> category(Intent.CATEGORY_APP_CONTACTS)
+        CornerActionId.Calculator -> category(Intent.CATEGORY_APP_CALCULATOR)
+        CornerActionId.Clock -> Intent(AlarmClock.ACTION_SHOW_ALARMS)
+        CornerActionId.Assistant -> Intent(Intent.ACTION_ASSIST)
+        CornerActionId.SystemSettings -> Intent(Settings.ACTION_SETTINGS)
+        else -> null
+    }
+
+    private fun category(c: String) = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, c)
+
+    /** Actions where the user may prefer to pick one specific app (the system would ask, or pick for them). */
+    val appCapable: Set<CornerActionId> = setOf(
+        CornerActionId.Music, CornerActionId.Camera, CornerActionId.Phone, CornerActionId.Messages, CornerActionId.Browser,
+        CornerActionId.Email, CornerActionId.Maps, CornerActionId.Calendar, CornerActionId.Gallery, CornerActionId.Contacts,
+        CornerActionId.Calculator, CornerActionId.Clock,
+    )
+
+    /** The app that would handle [id] right now, or null when the system would show a chooser / nothing handles it. */
+    fun resolve(context: Context, id: CornerActionId): ComponentName? {
+        val intent = intentFor(id) ?: return null
+        val pm = context.packageManager
+        val best = pm.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo
+        // The chooser lives in the "android" package; fall back to the first real handler.
+        val info = if (best != null && best.packageName != "android") best
+        else pm.queryIntentActivities(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY).firstOrNull()?.activityInfo
+        return info?.let { ComponentName(it.packageName, it.name) }
+    }
+}
+
 /** True if running [id] needs to start an activity (as opposed to toggling a system service). */
 fun CornerActionId.opensUi(): Boolean = when (this) {
     CornerActionId.Flashlight, CornerActionId.RingerCycle, CornerActionId.RingerNormal,

@@ -9,7 +9,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -18,10 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.AppEntry
@@ -34,7 +33,8 @@ import kotlin.math.roundToInt
  * Renders app icons the way the reference shows them: full-bleed rounded squares. Adaptive
  * icons are drawn with their layers expanded to fill the tile (the 72/108 safe zone becomes the
  * whole tile); legacy icons sit on a dark tile. Bitmaps are rasterised off the main thread and
- * kept in a small LRU keyed by app + pixel size.
+ * kept in a small LRU keyed by app (one shared bitmap per app). Shape, tint and plate come from
+ * [LocalIconTheme] and are applied at draw time.
  */
 object IconCache {
     private val cache = object : LruCache<String, ImageBitmap>(16 * 1024 * 1024) {
@@ -65,35 +65,48 @@ object IconCache {
     }
 }
 
+/** Edge of the one shared bitmap kept per app; every display size scales this down at draw time. */
+private const val ICON_PX = 192
+
 @Composable
 fun AppIcon(
     app: AppEntry,
     size: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val px = with(LocalDensity.current) { size.roundToPx() }.coerceAtLeast(1)
-    val cacheKey = "${app.key}@$px"
-    // Keyed on app + size so a reused slot never shows the previous app's bitmap.
+    val cacheKey = app.key
+    // One bitmap per app: a reused slot never shows the previous app's bitmap, and no size or
+    // theme change ever re-rasterises.
     var bitmap by remember(app, cacheKey) { mutableStateOf(IconCache.get(cacheKey)) }
     LaunchedEffect(app, cacheKey) {
         if (bitmap == null) {
             bitmap = withContext(Dispatchers.Default) {
                 runCatching {
-                    app.loadIcon()?.let { IconCache.rasterize(it, px).asImageBitmap() }
+                    app.loadIcon()?.let { IconCache.rasterize(it, ICON_PX).asImageBitmap() }
                 }.getOrNull()?.also { IconCache.put(cacheKey, it) }
             }
         }
     }
-    val shape = RoundedCornerShape(size * 0.22f)
-    Box(
-        // Sized here so every caller gets a visible icon (a zero-size box drew nothing).
-        modifier = modifier
-            .size(size)
-            .clip(shape)
-            .background(HyleColors.Surface, shape),
-    ) {
+    val theme = LocalIconTheme.current
+    val override = theme.overrides[app.key]
+    val filter = remember(theme.tint, theme.accentArgb, override) { theme.filterFor(app.key) }
+    val shape = theme.shape.toShape()
+    // Sized here so every caller gets a visible icon (a zero-size box drew nothing).
+    var box = modifier.size(size)
+    if (shape != null) {
+        box = box.clip(shape)
+        if (theme.plate) box = box.background(HyleColors.Surface, shape)
+    }
+    Box(modifier = box) {
         bitmap?.let {
-            Image(bitmap = it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.matchParentSize())
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                filterQuality = FilterQuality.Medium,
+                colorFilter = filter,
+                modifier = Modifier.matchParentSize(),
+            )
         }
     }
 }

@@ -51,6 +51,7 @@ dependencies {
     implementation(project(":shaders"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.health.connect.client)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)

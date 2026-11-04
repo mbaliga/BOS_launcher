@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bos.sphere.core.data.ComplicationKind
+import com.bos.sphere.core.data.HealthFormat
+import com.bos.sphere.core.data.HealthSourcePref
+import com.bos.sphere.core.data.HealthToday
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.NetworkKind
 import com.bos.sphere.core.data.NetworkSignal
@@ -52,6 +55,7 @@ fun stripHeight(prefs: LauncherPrefs): Dp =
 fun StatusStrip(
     prefs: LauncherPrefs,
     weather: WeatherInfo?,
+    health: HealthToday?,
     sidePadding: Dp,
     onClockTap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -74,7 +78,7 @@ fun StatusStrip(
                 ),
             ) {
                 items.forEach { item ->
-                    if (item == StripItem.Time) ClockBlock(prefs, weather, onClockTap) else StripChip(item)
+                    if (item == StripItem.Time) ClockBlock(prefs, weather, onClockTap) else StripChip(item, prefs, health)
                 }
             }
         }
@@ -83,8 +87,8 @@ fun StatusStrip(
 
 /** A small glyph + value readout. */
 @Composable
-private fun StripChip(item: StripItem) {
-    val v = rememberStripValue(item)
+private fun StripChip(item: StripItem, prefs: LauncherPrefs, health: HealthToday?) {
+    val v = rememberStripValue(item, prefs, health)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.semantics { contentDescription = "${item.label} ${v.text}" },
@@ -97,16 +101,29 @@ private fun StripChip(item: StripItem) {
 internal data class StripValue(val glyph: ImageVector, val text: String)
 
 @Composable
-private fun rememberStripValue(item: StripItem): StripValue = when (item) {
+private fun rememberStripValue(item: StripItem, prefs: LauncherPrefs, health: HealthToday?): StripValue {
+    val imperial = HealthFormat.usesImperial(java.util.Locale.getDefault().country)
+    val hc = prefs.healthSource == HealthSourcePref.HealthConnect
+    return when (item) {
+        StripItem.Steps -> StripValue(Glyphs.Steps, if (hc) health?.let { HealthFormat.steps(it.steps) } ?: "…" else rememberStepsText())
+        StripItem.Floors -> StripValue(Glyphs.Up, health?.let { HealthFormat.floors(it.floors) } ?: "—")
+        StripItem.Elevation -> StripValue(Glyphs.Up, health?.let { HealthFormat.elevation(it.elevationM, imperial) } ?: "—")
+        StripItem.Distance -> StripValue(Glyphs.Swipe, health?.let { HealthFormat.distance(it.distanceM, imperial) } ?: "—")
+        StripItem.Calories -> StripValue(Glyphs.Bolt, health?.let { HealthFormat.kcal(it.activeKcal) } ?: "—")
+        else -> rememberBasicStripValue(item)
+    }
+}
+
+@Composable
+private fun rememberBasicStripValue(item: StripItem): StripValue = when (item) {
     StripItem.Battery -> StripValue(Glyphs.Battery, rememberComplicationValue(ComplicationKind.Battery).text)
     StripItem.NextAlarm -> StripValue(Glyphs.Clock, rememberComplicationValue(ComplicationKind.NextAlarm).text)
     StripItem.Ringer -> StripValue(Glyphs.Ring, rememberComplicationValue(ComplicationKind.Ringer).text)
     StripItem.Storage -> StripValue(Glyphs.Storage, rememberComplicationValue(ComplicationKind.Storage).text)
     StripItem.Notifications -> StripValue(Glyphs.Bell, rememberComplicationValue(ComplicationKind.Notifications).text)
     StripItem.Signal -> StripValue(Glyphs.Signal, rememberSignalText())
-    StripItem.Steps -> StripValue(Glyphs.Steps, rememberStepsText())
     StripItem.Memory -> StripValue(Glyphs.Memory, rememberMemoryText())
-    StripItem.Time -> StripValue(Glyphs.Clock, "")
+    else -> StripValue(Glyphs.Clock, "")
 }
 
 @Composable

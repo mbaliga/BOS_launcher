@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -397,6 +398,32 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (prefs.hideStatusBar) controller.hide(WindowInsetsCompat.Type.statusBars()) else controller.show(WindowInsetsCompat.Type.statusBars())
     }
 
+    // ---- Health Connect: steps, floors, elevation, distance, calories
+    val healthSource = remember { com.bos.sphere.core.data.HealthSource(context) }
+    val health by healthSource.today.collectAsStateWithLifecycle()
+    val healthPermission = rememberLauncherForActivityResult(
+        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract(),
+    ) { healthSource.refresh() }
+    val stripNeedsHealth = prefs.strip.keys.any { it in setOf(StripItem.Floors, StripItem.Elevation, StripItem.Distance, StripItem.Calories) }
+    val wantsHealth = prefs.healthSource == com.bos.sphere.core.data.HealthSourcePref.HealthConnect || stripNeedsHealth
+    fun requestHealth() {
+        if (healthSource.available()) healthPermission.launch(com.bos.sphere.core.data.HealthSource.PERMISSIONS)
+        else runCatching {
+            context.startActivity(
+                Intent(androidx.health.connect.client.HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+    LaunchedEffect(wantsHealth) {
+        if (wantsHealth && healthSource.available() && !healthSource.hasAllPermissions()) requestHealth()
+    }
+    LaunchedEffect(wantsHealth, lifecycleOwner) {
+        if (!wantsHealth) return@LaunchedEffect
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) { healthSource.refresh(); kotlinx.coroutines.delay(60_000) }
+        }
+    }
+
     // ---- steps need the activity-recognition permission
     val stepsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(StripItem.Steps in prefs.strip) {
@@ -477,6 +504,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     onClockTap = { runner.run(CornerActionId.Clock) },
                     onTileLongPress = { key, _ -> tileMenu = key },
                     weather = weather,
+                    health = health,
                 )
                 CornerLayer(
                     placements = placements,
@@ -640,6 +668,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 corners = corners,
                 gestures = gestures,
                 setGesture = { g, item -> stores.shortcuts.setGesture(g, item) },
+                requestHealth = { requestHealth() },
+                healthAvailable = healthSource.available(),
                 appsByKey = appsByKey,
                 isLandscape = isLandscape,
                 motionAvailable = motion.available,

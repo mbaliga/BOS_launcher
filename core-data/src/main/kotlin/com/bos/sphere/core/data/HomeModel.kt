@@ -65,7 +65,15 @@ enum class StripItem(val label: String) {
     Storage("Storage"),
     Memory("Memory"),
     Notifications("Notifications"),
+    /** The items below need Health Connect (a Fitbit / Samsung Health / Garmin / Google Fit app writing into it). */
+    Floors("Floors climbed"),
+    Elevation("Elevation gained"),
+    Distance("Distance"),
+    Calories("Active calories"),
 }
+
+/** Where steps and the other activity numbers come from. */
+enum class HealthSourcePref(val label: String) { Phone("Phone sensor"), HealthConnect("Health Connect") }
 
 /** Where in the strip an item sits. */
 enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right("Right") }
@@ -169,6 +177,7 @@ data class LauncherPrefs(
     val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
 
+    val healthSource: HealthSourcePref = HealthSourcePref.Phone,
     // --- status strip: which readouts sit where (absent = not shown)
     val strip: Map<StripItem, StripZone> = mapOf(StripItem.Time to StripZone.Centre),
     /** 0 = compact square cells, 1 = icons spread to fill the free space (rows and columns separately). */

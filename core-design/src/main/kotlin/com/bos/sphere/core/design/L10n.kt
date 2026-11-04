@@ -27,7 +27,7 @@ object L10n {
     fun effectiveLanguage(): String = language.ifEmpty { Locale.getDefault().language }
 
     /** Every English key that has a translation. */
-    val englishKeys: Set<String> get() = L10nEnglish + L10nMoreEnglish + L10nMore2English
+    val englishKeys: Set<String> get() = L10nEnglish + L10nMoreEnglish + L10nMore2English + L10nMore3English
 
     /** The translation table for a language code, or null for English / unknown codes. */
     fun tableFor(code: String): Map<String, String>? = merged[code]
@@ -36,7 +36,7 @@ object L10n {
         mapOf(
             "es" to L10nEs, "fr" to L10nFr, "de" to L10nDe, "pt" to L10nPt,
             "hi" to L10nHi, "zh" to L10nZh, "ja" to L10nJa, "ar" to L10nAr,
-        ).mapValues { (code, base) -> base + (L10nMore[code] ?: emptyMap()) + (L10nMore2[code] ?: emptyMap()) }
+        ).mapValues { (code, base) -> base + (L10nMore[code] ?: emptyMap()) + (L10nMore2[code] ?: emptyMap()) + (L10nMore3[code] ?: emptyMap()) }
     }
 
     /** Translate [english] (reads [language], so it is snapshot-aware). */

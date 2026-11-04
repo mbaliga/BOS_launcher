@@ -210,6 +210,7 @@ fun GridHome(
     onClockTap: () -> Unit,
     onTileLongPress: (key: String, page: Int) -> Unit,
     weather: com.bos.sphere.core.data.WeatherInfo? = null,
+    health: com.bos.sphere.core.data.HealthToday? = null,
     modifier: Modifier = Modifier,
 ) {
     val paging = prefs.pagingFor(isLandscape)
@@ -355,6 +356,7 @@ fun GridHome(
             ClockPosition.Top -> StatusStrip(
                 prefs = prefs,
                 weather = weather,
+                health = health,
                 sidePadding = prefs.cornerIconSize.dp + 26.dp,
                 onClockTap = onClockTap,
                 modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(safe).padding(top = 8.dp),
@@ -362,6 +364,7 @@ fun GridHome(
             ClockPosition.Bottom -> StatusStrip(
                 prefs = prefs,
                 weather = weather,
+                health = health,
                 sidePadding = prefs.cornerIconSize.dp + 26.dp,
                 onClockTap = onClockTap,
                 modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(bottom = 14.dp),

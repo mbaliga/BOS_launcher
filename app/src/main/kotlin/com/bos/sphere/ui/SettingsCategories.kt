@@ -79,6 +79,8 @@ class SettingsModel(
     val corners: Map<Corner, CornerSlot>,
     val gestures: Map<HomeGesture, CornerItem>,
     val setGesture: (HomeGesture, CornerItem?) -> Unit,
+    val requestHealth: () -> Unit,
+    val healthAvailable: Boolean,
     val appsByKey: Map<String, AppEntry>,
     val isLandscape: Boolean,
     val motionAvailable: Boolean,
@@ -271,6 +273,12 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Pane(x("Position"), Glyphs.Clock, x(p.clockPosition.label)) {
                 Chips(ClockPosition.entries, p.clockPosition, { it.label }) { c -> upd { it.copy(clockPosition = c) } }
                 note("It can also be a tile on a page, or a corner complication.")
+            },
+            SettingItem.Pane(x("Health data"), Glyphs.Steps, x(p.healthSource.label)) {
+                Chips(com.bos.sphere.core.data.HealthSourcePref.entries, p.healthSource, { it.label }) { v -> upd { it.copy(healthSource = v) } }
+                note("Steps, floors climbed, elevation, distance and active calories can come from Health Connect, where Fitbit, Samsung Health, Garmin and the Google Fit app write their data.")
+                if (!m.healthAvailable) note("Health Connect isn't available on this phone yet — install or update it from the Play Store.")
+                com.bos.sphere.feature.grid.TextButtonPill(L10n.tr("Allow access"), primary = true, onClick = m.requestHealth)
             },
             SettingItem.Pane(x("Status strip"), Glyphs.Dial, "${p.strip.size}") {
                 note("Put readouts on the left, centre or right of the strip — like the top of a Nintendo 3DS.")

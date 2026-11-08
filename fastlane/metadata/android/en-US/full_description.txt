@@ -1,0 +1,34 @@
+A home screen that is the surface of a sphere. Your apps sit on a coverflow
+equator, magnified continuously at the point nearest you, and the whole thing is
+built for landscape first.
+
+It is a real launcher, written from scratch in Kotlin and Compose. Nothing here is
+a skin over the stock home screen and nothing requires a modified system.
+
+THE SURFACE
+• A coverflow equator with a continuous magnification lens at the front centre,
+  not a row of icons with one scaled up.
+• Pinch in for the all-apps globe: every app projected onto a sphere you can
+  rotate, with the same lens.
+• Spread for live surface settings, and tune the geometry while you look at it:
+  perspective, spacing, turn, depth, minimum scale, focus, arc and tilt.
+• Pull down for the hub.
+• One row in landscape, two in portrait, with your focused app preserved across
+  the change.
+
+USING IT
+• Drag to scrub with a snap, tap to focus and launch, long press for the app menu.
+• Type to search, with an always-up keyboard in portrait and live ranked results.
+• Hide apps you do not want to see.
+• Work-profile aware.
+
+BUILT FOR THE DEVICE YOU HAVE
+Hardware-accelerated surface materials are used where the device supports them,
+with a plain fallback where it does not. No root, and no system modification.
+
+QUIET BY DESIGN
+• No ads, no accounts, no analytics, no tracking.
+• Your app list, your hidden apps and your surface settings never leave the device.
+
+This is an early release. The coverflow, the globe, search, the hub and the live
+settings all work. Widgets and the full notification feed are still to come.

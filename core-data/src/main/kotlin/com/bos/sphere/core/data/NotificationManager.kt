@@ -67,7 +67,7 @@ object NotificationProvider {
  *
  * To enable on a device:
  * - System Settings > Notifications > Notification access (if available)
- * - Grant "Sphere Launcher" permission to access notifications
+ * - Grant "Liftoff" permission to access notifications
  */
 class SphereNotificationListener : NotificationListenerService() {
 

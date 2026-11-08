@@ -1,4 +1,4 @@
-# Sphere Launcher — Feature Guide
+# Liftoff — Feature Guide
 
 A comprehensive guide to the features implemented in this build (M0–M2) and their interactions.
 

@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bos.sphere"
+        applicationId = "com.asoc.liftoff"
         minSdk = 31
         targetSdk = 35
         versionCode = 1

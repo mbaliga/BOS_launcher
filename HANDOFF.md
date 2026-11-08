@@ -1,4 +1,4 @@
-# Sphere Launcher — Project Handoff
+# Liftoff — Project Handoff
 
 **Date:** June 30, 2026 (Updated)  
 **Session:** https://claude.ai/code/session_01RGSNGtu69P7BGPWJ2H2eh3  
@@ -103,7 +103,7 @@
 - ✅ Branch `claude/sphere-launcher-native-hwzcxi` pushed to origin
 - ✅ `main` branch created (base for feature branch)
 - ✅ Draft PR #1 opened: https://github.com/mbaliga/bos_launcher/pull/1
-  - Title: *Implement Sphere Launcher M0-M2 native build*
+  - Title: *Implement Liftoff M0-M2 native build*
   - Diff shows the "Build out home surface" commit (1515 insertions, 205 deletions across 19 files)
   - Draft status — awaiting review/feedback
 
@@ -217,7 +217,7 @@ HEAD:    at build-out commit (5861fd6)
 
 ### Testing M3 (Real Notifications)
 1. Open **System Settings > Notifications > Notification access** (if available).
-2. Grant **Sphere Launcher** notification access.
+2. Grant **Liftoff** notification access.
 3. Pull down hub (top of home surface) — should show real system notifications instead of demo.
 4. Send test notifications: `adb shell am send-notification <package-name>`
 5. Verify notifications appear, can be dismissed, and show counts.

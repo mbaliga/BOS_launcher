@@ -5,7 +5,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Performance monitoring utilities for profiling Sphere Launcher. Used during development to
+ * Performance monitoring utilities for profiling Liftoffer. Used during development to
  * identify bottlenecks and measure optimization impact.
  *
  * Example usage:

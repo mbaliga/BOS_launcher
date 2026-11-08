@@ -1,19 +1,20 @@
-# Sphere Launcher — Play Console answer sheet
+# Liftoff — Play Console answer sheet
 
 > Only the **deltas** from `Personal-Tracker/store/HOUSE_DEFAULTS.md`.
 
 | | |
 |---|---|
-| applicationId | `com.bos.sphere` |
+| applicationId | `com.asoc.liftoff` |
 | Version at time of writing | `0.1.0-m1` (versionCode `1`) |
 | Category | **Personalization** |
 | Tags | launcher, home screen, landscape, coverflow, customisation |
-| Contact email | `sphere@asystemofcells.com` |
-| Website | `https://asystemofcells.com/sphere` |
-| Privacy policy | `https://asystemofcells.com/sphere/privacy` |
+| Contact email | `liftoff@asystemofcells.com` |
+| Website | `https://asystemofcells.com/liftoff` |
+| Privacy policy | `https://asystemofcells.com/liftoff/privacy` |
 
-> The product name is owner-gated (`NAMES.md`: "Sphere Launcher" in docs, "BOS" in
-> the repo). This sheet uses **Sphere Launcher**, which is what the README calls it.
+> Renamed to **Liftoff** by the owner on 2026-11-08 (was Sphere Launcher), with applicationId
+> `com.asoc.liftoff` (was `com.bos.sphere`, unpublished). Kotlin packages stay `com.bos.sphere.*`.
+> The `/liftoff` URLs and `liftoff@` mailbox are proposed slugs: confirm before the page goes live.
 
 ## Deltas from the house defaults
 

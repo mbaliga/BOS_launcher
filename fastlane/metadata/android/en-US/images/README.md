@@ -4,7 +4,7 @@ Sizes and check commands: `Personal-Tracker/store/ASSET_SPECS.md`.
 
 ## Needed, none present yet
 
-- `icon.png` 512x512 no alpha · `featureGraphic.png` 1024x500 no alpha
+`icon.png` (512x512) is in place. Still needed: - `featureGraphic.png` 1024x500 no alpha
 - `phoneScreenshots/` — 2 to 8, **landscape 16:9** (1920x1080), no alpha.
 
 ## Shoot in landscape

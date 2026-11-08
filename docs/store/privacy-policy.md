@@ -1,17 +1,17 @@
-# Privacy Policy — Sphere Launcher
+# Privacy Policy — Liftoff
 
 > **This is the working copy, not the hosted one.** The URL Play Console points at
-> is **https://asystemofcells.com/sphere/privacy**. Keep the two in sync by hand.
+> is **https://asystemofcells.com/liftoff/privacy**. Keep the two in sync by hand.
 
 **Last updated: 29 August 2026**
 
-Sphere Launcher is a home-screen replacement for Android (package `com.bos.sphere`),
+Liftoff is a home-screen replacement for Android (package `com.asoc.liftoff`),
 made by A System of Cells. This policy describes exactly what the app does with
 data. It is short because the app does very little.
 
 ## The short version
 
-Sphere Launcher has no accounts, no advertising, no analytics and no tracking. We
+Liftoff has no accounts, no advertising, no analytics and no tracking. We
 operate no servers and receive nothing from the app.
 
 One thing is worth stating plainly rather than hiding behind a permission list: the
@@ -45,7 +45,7 @@ Revoking notification access in Android's settings stops it immediately.
 
 ## Your app list
 
-A launcher has to know which apps you have in order to launch them. Sphere Launcher
+A launcher has to know which apps you have in order to launch them. Liftoff
 reads that list through Android's own launcher API, uses it to draw your home
 screen and to answer your searches, and does nothing else with it.
 
@@ -68,7 +68,7 @@ private storage on your device. Uninstalling the launcher deletes all of it.
 
 ## Children
 
-Sphere Launcher is not directed at children and collects no personal information
+Liftoff is not directed at children and collects no personal information
 from anyone, including children.
 
 ## Changes
@@ -78,5 +78,5 @@ revised policy is published at this same URL.
 
 ## Contact
 
-Sphere Launcher is made by **A System of Cells**. Questions about this policy or
-the app: sphere@asystemofcells.com
+Liftoff is made by **A System of Cells**. Questions about this policy or
+the app: liftoff@asystemofcells.com

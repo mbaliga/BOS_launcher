@@ -474,11 +474,74 @@ enum class HomeGesture(val label: String, val kind: GestureKind, val hint: Strin
     ;
 
     /** Swipes along the paging axis turn pages instead of firing. */
-    fun usableWith(paging: PagingAxis): Boolean = when (this) {
-        SwipeUp, SwipeDown -> paging == PagingAxis.Horizontal
-        SwipeLeft, SwipeRight -> paging == PagingAxis.Vertical
-        else -> true
+    fun usableWith(paging: PagingAxis): Boolean =
+        usableOn(HomeSurface(if (paging == PagingAxis.Horizontal) SurfaceScroll.Horizontal else SurfaceScroll.Vertical, paged = true, hasDensity = true))
+
+    /** Whether this gesture can fire at all on [surface] (see [unavailableReason]). */
+    fun usableOn(surface: HomeSurface): Boolean = unavailableReason(surface) == null
+
+    /**
+     * Why this gesture cannot fire on [surface], as a short English phrase for Settings, or null
+     * when it can. The rule: a one-finger swipe is only a gesture on an axis the home does not
+     * already scroll along; swipe right is the Launchpad's when a left page is on and the home
+     * turns pages up / down; density changes need a grid with a density.
+     */
+    fun unavailableReason(surface: HomeSurface): String? {
+        if (kind == GestureKind.Motion) return null
+        val s = surface.scroll
+        return when (this) {
+            SwipeUp, SwipeDown -> if (s == SurfaceScroll.Vertical || s == SurfaceScroll.Both) "the home scrolls this way" else null
+            SwipeLeft -> if (s == SurfaceScroll.Horizontal || s == SurfaceScroll.Both) "the home scrolls this way" else null
+            SwipeRight -> when {
+                s == SurfaceScroll.Horizontal || s == SurfaceScroll.Both -> "the home scrolls this way"
+                surface.paged && surface.leftPageOn -> "opens the left page"
+                else -> null
+            }
+            else -> null
+        }
     }
+}
+
+/** The axes a one-finger drag already moves the home along. */
+enum class SurfaceScroll { Horizontal, Vertical, Both }
+
+/**
+ * What the active home surface does with a finger, derived from the prefs by [LauncherPrefs.surface]:
+ * which way it scrolls, whether it has pages, whether it has a grid density, and whether a left
+ * page (Launchpad / widget) claims the rightward swipe.
+ */
+data class HomeSurface(
+    val scroll: SurfaceScroll,
+    val paged: Boolean,
+    val hasDensity: Boolean,
+    val leftPageOn: Boolean = false,
+)
+
+/** True when the home is the paged grid (pages, per-page layouts, page dots, drag-to-rearrange). */
+val LauncherPrefs.isPaged: Boolean get() = homeStyle == HomeStyle.Grid && homeScroll == HomeScroll.Paged
+
+/** Whether the Continuous / DSi homes scroll sideways in this orientation. */
+fun LauncherPrefs.scrollsHorizontally(landscape: Boolean): Boolean = when (scrollAxis) {
+    ScrollAxis.Long -> landscape
+    ScrollAxis.Short -> !landscape
+    ScrollAxis.Vertical -> false
+    ScrollAxis.Horizontal -> true
+}
+
+/** The gesture surface the current prefs put on screen. */
+fun LauncherPrefs.surface(landscape: Boolean): HomeSurface = when {
+    isPaged -> HomeSurface(
+        if (pagingFor(landscape) == PagingAxis.Horizontal) SurfaceScroll.Horizontal else SurfaceScroll.Vertical,
+        paged = true, hasDensity = true, leftPageOn = leftPage != LeftPage.Off,
+    )
+    homeStyle == HomeStyle.Grid -> HomeSurface(
+        if (scrollsHorizontally(landscape)) SurfaceScroll.Horizontal else SurfaceScroll.Vertical, paged = false, hasDensity = true,
+    )
+    homeStyle == HomeStyle.Dsi -> HomeSurface(
+        if (scrollsHorizontally(landscape)) SurfaceScroll.Horizontal else SurfaceScroll.Vertical, paged = false, hasDensity = false,
+    )
+    homeStyle == HomeStyle.List -> HomeSurface(SurfaceScroll.Vertical, paged = false, hasDensity = false)
+    else -> HomeSurface(SurfaceScroll.Both, paged = false, hasDensity = false) // PSP: sideways for categories, up / down for apps
 }
 
 /** Defaults: the requested pinch-in → search, plus the three motion examples. */

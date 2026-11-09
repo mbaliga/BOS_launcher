@@ -268,4 +268,50 @@ class NetworkStatusMathTest {
         // Unvalidated (captive portal / no internet) caps at poor.
         assertEquals(NetworkKind.Poor, NetworkStatusMath.classify(false, true, false, -50, null, true).kind)
     }
+
+    // --- gesture availability per home surface ------------------------------------------------
+
+    private fun touch() = HomeGesture.entries.filter { it.kind == GestureKind.Touch }
+
+    @Test
+    fun `paged home keeps the old paging rule`() {
+        val h = LauncherPrefs(portraitPaging = PagingAxis.Horizontal, leftPage = LeftPage.Off).surface(landscape = false)
+        assertTrue(h.paged && h.hasDensity)
+        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.SwipeUp, HomeGesture.SwipeDown, HomeGesture.DoubleTap), touch().filter { it.usableOn(h) }.toSet())
+        val v = LauncherPrefs(portraitPaging = PagingAxis.Vertical, leftPage = LeftPage.Off).surface(landscape = false)
+        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.SwipeLeft, HomeGesture.SwipeRight, HomeGesture.DoubleTap), touch().filter { it.usableOn(v) }.toSet())
+        for (g in touch()) assertEquals(g.usableWith(PagingAxis.Vertical), g.usableOn(v))
+    }
+
+    @Test
+    fun `a left page claims swipe right on a vertically paged home only`() {
+        val v = LauncherPrefs(portraitPaging = PagingAxis.Vertical, leftPage = LeftPage.Launchpad).surface(landscape = false)
+        assertEquals("opens the left page", HomeGesture.SwipeRight.unavailableReason(v))
+        assertNull(HomeGesture.SwipeLeft.unavailableReason(v))
+        // Scrolling homes open it from the edge only, so swipe right elsewhere stays a gesture.
+        val dsi = LauncherPrefs(homeStyle = HomeStyle.Dsi, leftPage = LeftPage.Launchpad).surface(landscape = false)
+        assertNull(HomeGesture.SwipeRight.unavailableReason(dsi))
+    }
+
+    @Test
+    fun `scrolling homes free the cross axis and follow the scroll direction setting`() {
+        val dsiPortrait = LauncherPrefs(homeStyle = HomeStyle.Dsi, scrollAxis = ScrollAxis.Long).surface(landscape = false)
+        assertEquals(SurfaceScroll.Vertical, dsiPortrait.scroll)
+        assertTrue(HomeGesture.SwipeLeft.usableOn(dsiPortrait) && HomeGesture.SwipeRight.usableOn(dsiPortrait))
+        assertTrue(!HomeGesture.SwipeUp.usableOn(dsiPortrait) && !HomeGesture.SwipeDown.usableOn(dsiPortrait))
+        val dsiLandscape = LauncherPrefs(homeStyle = HomeStyle.Dsi, scrollAxis = ScrollAxis.Long).surface(landscape = true)
+        assertEquals(SurfaceScroll.Horizontal, dsiLandscape.scroll)
+        assertTrue(HomeGesture.SwipeUp.usableOn(dsiLandscape) && !HomeGesture.SwipeLeft.usableOn(dsiLandscape))
+        val continuous = LauncherPrefs(homeScroll = HomeScroll.Continuous, scrollAxis = ScrollAxis.Horizontal).surface(landscape = false)
+        assertEquals(HomeSurface(SurfaceScroll.Horizontal, paged = false, hasDensity = true), continuous)
+        assertTrue(!LauncherPrefs(homeScroll = HomeScroll.Continuous).isPaged && LauncherPrefs().isPaged)
+    }
+
+    @Test
+    fun `PSP scrolls both ways so only pinch and double tap remain`() {
+        val psp = LauncherPrefs(homeStyle = HomeStyle.Psp).surface(landscape = false)
+        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.DoubleTap), touch().filter { it.usableOn(psp) }.toSet())
+        // Motion gestures never depend on the surface.
+        HomeGesture.entries.filter { it.kind == GestureKind.Motion }.forEach { assertNull(it.unavailableReason(psp)) }
+    }
 }

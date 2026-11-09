@@ -39,6 +39,7 @@
         <package android:name="io.github.mbaliga.fylz.debug" />
         <package android:name="com.fotoxplorr.app" />
         <package android:name="com.fotoxplorr.app.debug" />
+        <package android:name="com.fotoxplorr.app.connect" />
         <package android:name="org.telegram.messenger" />
         <package android:name="org.thoughtcrime.securesms" />
         <intent>

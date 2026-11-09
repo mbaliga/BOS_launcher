@@ -677,7 +677,17 @@ private fun WheelContent(
                 val a = p.coerceIn(0f, 1f)
                 val s = openScale(p)
                 val rot = rotation.value + openRotation(p)
-                drawRect(Color.Black.copy(alpha = 0.55f * a))
+                // Black, solid at the corner the wheel opens from, fading radially to nothing.
+                val reach = kotlin.math.hypot(size.width, size.height) * 0.95f
+                drawRect(
+                    Brush.radialGradient(
+                        0f to Color.Black.copy(alpha = a),
+                        0.35f to Color.Black.copy(alpha = 0.88f * a),
+                        0.65f to Color.Black.copy(alpha = 0.45f * a),
+                        1f to Color.Transparent,
+                        center = corner, radius = reach,
+                    ),
+                )
 
                 // Faint outer boundary + hub.
                 drawCircle(HyleColors.Hairline.copy(alpha = 0.06f * a), radius = metrics.outerRadius * s, center = corner, style = Stroke(1.dp.toPx()))

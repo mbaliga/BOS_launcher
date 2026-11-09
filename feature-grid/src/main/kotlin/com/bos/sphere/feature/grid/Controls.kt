@@ -224,6 +224,8 @@ fun GlassDialog(
     onDismiss: () -> Unit,
     width: Dp = 560.dp,
     footer: (@Composable () -> Unit)? = null,
+    /** False when [content] manages its own scrolling (a LazyColumn that fills the space). */
+    scrollable: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     androidx.compose.ui.window.Dialog(
@@ -250,7 +252,7 @@ fun GlassDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp).fillMaxWidth(),
                     ) {
-                        Text("SPHERE", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
+                        Text("LIFTOFF", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
                         Text("  ·  ${title.uppercase()}", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, maxLines = 1, modifier = Modifier.weight(1f))
                         Icon(
                             Glyphs.Close,
@@ -264,7 +266,7 @@ fun GlassDialog(
                             .weight(1f)
                             .widthIn(max = width)
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
+                            .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
                             .padding(horizontal = 18.dp, vertical = 4.dp),
                         content = content,
                     )

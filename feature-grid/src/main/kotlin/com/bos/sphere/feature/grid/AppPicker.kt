@@ -54,7 +54,7 @@ fun AppPickerDialog(
         val (fit, rest) = matches.sortedBy { it.label.lowercase() }.partition { it.packageName in suggested }
         fit to rest
     }
-    GlassDialog(title = title, onDismiss = onDismiss) {
+    GlassDialog(title = title, onDismiss = onDismiss, scrollable = false) {
         BasicTextField(
             value = query, onValueChange = { query = it }, singleLine = true,
             textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 16.sp),
@@ -63,7 +63,7 @@ fun AppPickerDialog(
             decorationBox = { inner -> Box { if (query.isEmpty()) Text(L10n.tr("Search apps"), color = HyleColors.InkDim, fontSize = 16.sp); inner() } },
         )
         Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+        LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
             if (list.first.isNotEmpty()) item { Header(L10n.tr("Suggested")) }
             items(list.first, key = { "s:" + it.key }) { PickerRow(it, onPick) }
             if (list.second.isNotEmpty()) item { Header(L10n.tr("All apps")) }

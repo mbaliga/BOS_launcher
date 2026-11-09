@@ -61,7 +61,7 @@ fun Onboarding(
                     0 -> {
                         Title("Pick a look")
                         VisualChoice(HomeStyle.entries, prefs.homeStyle, { s -> update { it.copy(homeStyle = s) } }, {
-                            L10n.tr(when (it) { HomeStyle.Grid -> "Pages"; HomeStyle.Bubbles -> "Bubbles"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" })
+                            L10n.tr(when (it) { HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" })
                         }, previewHeight = 140.dp) { HomeStylePreview(it) }
                     }
                     1 -> {

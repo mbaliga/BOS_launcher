@@ -33,6 +33,8 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import com.bos.sphere.core.design.L10n
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -210,6 +212,7 @@ fun GridHome(
     onEmptyLongPress: (page: Int) -> Unit,
     onGesture: (HomeGesture) -> Unit,
     onClockTap: () -> Unit,
+    onTileTap: (String) -> Unit = {},
     onTileLongPress: (key: String, page: Int) -> Unit,
     weather: com.bos.sphere.core.data.WeatherInfo? = null,
     health: com.bos.sphere.core.data.HealthToday? = null,
@@ -331,7 +334,7 @@ fun GridHome(
         GestureInputs(pages, appsByKey, suggestion, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl, contentOffset),
     )
     val cb by rememberUpdatedState(
-        GestureCallbacks(onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap, onTileLongPress, capacityOf, ::focusCover),
+        GestureCallbacks(onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap, onTileTap, onTileLongPress, capacityOf, ::focusCover),
     )
 
     fun hitTest(page: Int, screenPos: Offset): Hit {
@@ -407,7 +410,7 @@ fun GridHome(
                                     is Hit.App -> st.apps[hit.key]?.let(cb.onLaunch)
                                     is Hit.Suggested -> cb.onLaunch(hit.app)
                                     is Hit.Focus -> cb.focusCover(hit.page, hit.index)
-                                    is Hit.Tile -> if (hit.key == HomeTiles.CLOCK) cb.onClockTap()
+                                    is Hit.Tile -> if (hit.key == HomeTiles.CLOCK) cb.onClockTap() else cb.onTileTap(hit.key)
                                     Hit.Empty -> if (HomeGesture.DoubleTap in st.bound) {
                                         val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                                             awaitFirstDown(requireUnconsumed = false)
@@ -435,7 +438,7 @@ fun GridHome(
                                                         is Hit.App -> st.apps[h2.key]?.let(cb.onLaunch)
                                                         is Hit.Suggested -> cb.onLaunch(h2.app)
                                                         is Hit.Focus -> cb.focusCover(h2.page, h2.index)
-                                                        is Hit.Tile -> if (h2.key == HomeTiles.CLOCK) cb.onClockTap()
+                                                        is Hit.Tile -> if (h2.key == HomeTiles.CLOCK) cb.onClockTap() else cb.onTileTap(h2.key)
                                                         Hit.Empty -> Unit
                                                     }
                                                 }
@@ -637,6 +640,7 @@ fun GridHome(
                 when {
                     ghost != null -> AppIcon(ghost, iconDp, ghostModifier)
                     key == HomeTiles.CLOCK -> ClockTile(iconDp, ghostModifier)
+                    key == HomeTiles.SETTINGS -> SettingsTile(iconDp, ghostModifier)
                 }
             }
         }
@@ -686,6 +690,7 @@ private class GestureCallbacks(
     val onGesture: (HomeGesture) -> Unit,
     val onPagesChange: (List<HomePage>) -> Unit,
     val onClockTap: () -> Unit,
+    val onTileTap: (String) -> Unit,
     val onTileLongPress: (String, Int) -> Unit,
     val capacityOf: (PageLayout) -> Int,
     val focusCover: (Int, Int) -> Unit,
@@ -749,6 +754,9 @@ private fun PageView(
                     if (app != null) {
                         AppIcon(app, itemDp, Modifier.size(itemDp))
                         if (showLabels) AppLabel(app.label, itemDp)
+                    } else if (itemKey == HomeTiles.SETTINGS) {
+                        SettingsTile(itemDp, Modifier.size(itemDp))
+                        if (showLabels) AppLabel(L10n.tr("Settings"), itemDp)
                     } else {
                         ClockTile(itemDp, Modifier.size(itemDp))
                     }
@@ -782,6 +790,17 @@ fun ClockTile(size: Dp, modifier: Modifier = Modifier) {
     ) {
         Text(text, color = HyleColors.InkBright, fontSize = (size.value * 0.24f).sp, fontWeight = FontWeight.Light, maxLines = 1)
         Text(day.uppercase(), color = HyleColors.InkDim, fontSize = (size.value * 0.1f).sp, letterSpacing = 1.sp, maxLines = 1)
+    }
+}
+
+/** The "Home settings" icon: a gear on the accent plate. */
+@Composable
+fun SettingsTile(size: Dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier.background(Brush.linearGradient(listOf(HyleColors.VioletSoft, HyleColors.Violet)), RoundedCornerShape(size * 0.22f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Glyphs.Gear, contentDescription = "Settings", tint = HyleColors.OnAccent, modifier = Modifier.size(size * 0.5f))
     }
 }
 

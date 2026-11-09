@@ -9,9 +9,14 @@ import kotlin.math.exp
  */
 
 /** Which home surface is shown. */
-enum class HomeStyle { Grid, Bubbles, Psp, Dsi }
+enum class HomeStyle { Grid, List, Psp, Dsi }
 
 /** Pages (swipe between screens) or one continuous scroll. */
+/** Which way the Continuous / DSi homes scroll. */
+enum class ScrollAxis(val label: String) {
+    Long("Along the long side"), Short("Along the short side"), Vertical("Top to bottom"), Horizontal("Left to right"),
+}
+
 enum class HomeScroll(val label: String) { Paged("Pages"), Continuous("Continuous") }
 
 /** Corner look: a bare glyph, or a quarter-circle bubble hugging the screen corner. */
@@ -24,7 +29,9 @@ enum class ClockPosition(val label: String) { Top("Top"), Bottom("Bottom"), Hidd
 object HomeTiles {
     const val PREFIX = "tile:"
     const val CLOCK = "tile:clock"
-    val ALL = listOf(CLOCK)
+    /** A "Home settings" icon that can sit on a page like an app. */
+    const val SETTINGS = "tile:settings"
+    val ALL = listOf(CLOCK, SETTINGS)
 
     fun isTile(key: String) = key.startsWith(PREFIX)
 }
@@ -120,7 +127,7 @@ enum class AppsOnHome(val label: String) { Everything("All apps"), PinnedOnly("O
 enum class PageMode(val label: String) { Multiple("Multiple pages"), Single("One page") }
 
 /** App drawer presentation. */
-enum class DrawerView(val label: String) { Grid("Grid"), List("List"), Details("Details"), Bubbles("Bubbles") }
+enum class DrawerView(val label: String) { Grid("Grid"), List("List"), Details("Details") }
 
 /** App drawer ordering. */
 enum class DrawerSort(val label: String) { Alphabetical("A–Z"), Category("Type"), Recent("Recent"), Frequent("Most used") }
@@ -177,6 +184,7 @@ enum class UiLanguage(val code: String, val label: String) {
 data class LauncherPrefs(
     val homeStyle: HomeStyle = HomeStyle.Grid,
     val homeScroll: HomeScroll = HomeScroll.Paged,
+    val scrollAxis: ScrollAxis = ScrollAxis.Long,
     /** Icons across the short side in the Continuous / DSi homes. */
     val continuousColumns: Int = 4,
     val portraitGrid: GridSpec = DensityPreset.Default.portrait,

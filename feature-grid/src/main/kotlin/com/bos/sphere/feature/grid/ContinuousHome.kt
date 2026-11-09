@@ -38,6 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlin.math.roundToInt
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
@@ -207,7 +212,7 @@ private fun ContinuousImpl(
                 }
             }
         }
-        if (dsi) {
+        run {
             DsiScrollBar(
                 state = gridState, landscape = landscape, count = apps.size, crossCount = crossCount,
                 extentPx = with(density) { extent.dp.toPx() },
@@ -217,6 +222,25 @@ private fun ContinuousImpl(
                 insetAfterPx = with(density) { (if (landscape) padR else padB).toPx() + 10.dp.toPx() },
                 crossInsetPx = with(density) { 2.dp.toPx() },
             )
+            // Grab the bar and drag: speed-scrubs the whole list (a fat, invisible touch strip along the bar).
+            val scrubScope = rememberCoroutineScope()
+            val rowsTotal = ContinuousMath.rows(apps.size, crossCount)
+            val strip = Modifier.pointerInput(rowsTotal, crossCount, landscape) {
+                fun jump(pos: Float, length: Float) {
+                    val f = (pos / length.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                    val idx = (f * (rowsTotal - 1).coerceAtLeast(0)).roundToInt() * crossCount
+                    scrubScope.launch { gridState.scrollToItem(idx.coerceIn(0, (apps.size - 1).coerceAtLeast(0))) }
+                }
+                detectDragGestures(
+                    onDragStart = { o -> jump(if (landscape) o.x else o.y, if (landscape) size.width.toFloat() else size.height.toFloat()) },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        jump(if (landscape) change.position.x else change.position.y, if (landscape) size.width.toFloat() else size.height.toFloat())
+                    },
+                )
+            }
+            if (landscape) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(40.dp).then(strip))
+            else Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(40.dp).then(strip))
         }
     }
 }

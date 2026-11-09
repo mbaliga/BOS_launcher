@@ -53,7 +53,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
         if (next == _prefs.value) return
         _prefs.value = next
         sp.edit()
-            .putString("style", next.homeStyle.name).putString("homeScroll", next.homeScroll.name).putInt("contCols", next.continuousColumns)
+            .putString("style", next.homeStyle.name).putString("homeScroll", next.homeScroll.name).putString("scrollAxis", next.scrollAxis.name).putInt("contCols", next.continuousColumns)
             .putInt("pCols", next.portraitGrid.columns).putInt("pRows", next.portraitGrid.rows)
             .putInt("lCols", next.landscapeGrid.columns).putInt("lRows", next.landscapeGrid.rows)
             .putFloat("iconScale", next.iconScale)
@@ -124,6 +124,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
         return LauncherPrefs(
             homeStyle = enumOr(sp.getString("style", null), d.homeStyle),
             homeScroll = enumOr(sp.getString("homeScroll", null), d.homeScroll),
+            scrollAxis = enumOr(sp.getString("scrollAxis", null), d.scrollAxis),
             continuousColumns = sp.getInt("contCols", d.continuousColumns),
             portraitGrid = GridSpec(sp.getInt("pCols", d.portraitGrid.columns), sp.getInt("pRows", d.portraitGrid.rows)).coerced(),
             landscapeGrid = GridSpec(sp.getInt("lCols", d.landscapeGrid.columns), sp.getInt("lRows", d.landscapeGrid.rows)).coerced(),
@@ -193,7 +194,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             cornerIconSize = sp.getFloat("cornerIconSize", d.cornerIconSize).coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
             cornerIconMode = enumOr(sp.getString("cornerIconMode", null), d.cornerIconMode),
             hideStatusBar = sp.getBoolean("hideStatusBar", d.hideStatusBar),
-            appsOnHome = enumOr(sp.getString("appsOnHome", null), d.appsOnHome),
+            // New installs keep the home nearly empty (the drawer has everything); existing ones keep All apps.
+            appsOnHome = enumOr(sp.getString("appsOnHome", null), if (sp.contains("style") || sp.contains("pCols")) AppsOnHome.Everything else AppsOnHome.PinnedOnly),
             pageMode = enumOr(sp.getString("pageMode", null), d.pageMode),
             drawerView = enumOr(sp.getString("drawerView", null), d.drawerView),
             drawerSort = enumOr(sp.getString("drawerSort", null), d.drawerSort),

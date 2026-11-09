@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.BoxScope
@@ -60,6 +61,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.bos.sphere.core.data.HomePage
+import com.bos.sphere.core.data.ActionApps
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -187,6 +190,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val capacityOf: (PageLayout) -> Int = { it.capacity(isLandscape, prefs) }
     val allPages = remember(layout, apps, isLandscape, prefs) {
         HomeLayoutMath.visualPages(layout, apps.map { it.key }, capacityOf, autoPlace = prefs.appsOnHome == AppsOnHome.Everything)
+    }
+    // A fresh "only the ones I add" home isn't blank: Settings, Phone and Messages are put there once.
+    LaunchedEffect(prefs.appsOnHome, apps.isNotEmpty()) {
+        val misc = context.getSharedPreferences("liftoff_misc", android.content.Context.MODE_PRIVATE)
+        if (prefs.appsOnHome == AppsOnHome.PinnedOnly && apps.isNotEmpty() && !misc.getBoolean("defaultHomeSeeded", false) &&
+            layout.pages.all { it.keys.isEmpty() }
+        ) {
+            val keys = mutableListOf(HomeTiles.SETTINGS)
+            listOf(CornerActionId.Phone, CornerActionId.Messages).forEach { id ->
+                ActionApps.resolve(context, id)?.packageName?.let { pkg -> apps.firstOrNull { it.packageName == pkg }?.let { keys += it.key } }
+            }
+            stores.layout.setPages(listOf(HomePage(keys = keys)))
+            misc.edit().putBoolean("defaultHomeSeeded", true).apply()
+        }
     }
     // "One page" shows only the first page; the rest of the apps stay in the drawer.
     val pages = remember(allPages, prefs.pageMode) { if (prefs.pageMode == PageMode.Single) allPages.take(1) else allPages }
@@ -580,7 +597,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     // Breathing room at the sides of the scrolling homes (plus whatever "Sides" margin is set).
-    val sideGap = 16.dp + (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * prefs.gridInsetX).dp
+    val scrollHorizontal = when (prefs.scrollAxis) {
+        com.bos.sphere.core.data.ScrollAxis.Long -> isLandscape
+        com.bos.sphere.core.data.ScrollAxis.Short -> !isLandscape
+        com.bos.sphere.core.data.ScrollAxis.Vertical -> false
+        com.bos.sphere.core.data.ScrollAxis.Horizontal -> true
+    }
+    val sideGap = 36.dp + (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * prefs.gridInsetX).dp
     // Homes with no empty space to long-press: holding the top band (clock area) opens Settings.
     @Composable
     fun BoxScope.SettingsHoldBand() {
@@ -591,12 +614,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         )
     }
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
-    Box(modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch)) {
+    Box(
+        modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).leftSwipe(
+            enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen &&
+                (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous),
+            atFirstPage = { true },
+            onOpen = { leftOpen = true },
+            edgeDp = 28f,
+        ),
+    ) {
         when (prefs.homeStyle) {
             HomeStyle.Grid -> if (prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
                 Background()
                 com.bos.sphere.feature.grid.ContinuousHome(
-                    apps = apps, crossCount = prefs.continuousColumns, landscape = isLandscape, style = com.bos.sphere.feature.grid.ContinuousStyle.Plain,
+                    apps = apps, crossCount = prefs.continuousColumns, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Plain,
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
@@ -629,15 +660,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         onEmptyLongPress = { page -> openSettings(CATEGORY_THIS_PAGE, page) },
                         onGesture = ::onGesture,
                         onClockTap = { runner.run(CornerActionId.Clock) },
+                        onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },
                         onTileLongPress = { key, _ -> tileMenu = key },
                         weather = weather,
                         health = health,
                     )
                 }
                 Corners()
-                if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && prefs.launchpadRail && !leftOpen) {
-                    com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(Alignment.CenterStart))
-                }
             }
 
             HomeStyle.Psp -> {
@@ -658,7 +687,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             HomeStyle.Dsi -> {
                 Background()
                 com.bos.sphere.feature.grid.ContinuousHome(
-                    apps = apps, crossCount = 3, landscape = isLandscape, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
+                    apps = apps, crossCount = 3, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
@@ -668,22 +697,34 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             }
-            HomeStyle.Bubbles -> {
+            HomeStyle.List -> {
                 Background()
-                com.bos.sphere.feature.grid.BubbleField(
-                    apps = apps,
-                    onLaunch = ::launch,
-                    onLongPress = { menuApp = it },
-                    modifier = Modifier.fillMaxSize(),
-                    bubbleSize = (68 * prefs.iconScale).dp,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 56.dp, bottom = bottomClear),
-                    showLabels = prefs.showLabels,
-                    sounds = sounds,
+                com.bos.sphere.feature.grid.ListHome(
+                    apps = apps, onLaunch = ::launch, onLongPress = { menuApp = it },
+                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    iconScale = prefs.iconScale, showLabels = prefs.showLabels,
                 )
                 SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             }
+        }
+
+        // The way into the left page on every home style: the unread strip, plus a slim edge handle
+        // (tap it, or swipe in from the left edge) so it is always discoverable.
+        if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen) {
+            if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && prefs.launchpadRail) {
+                com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(Alignment.CenterStart))
+            }
+            Box(
+                Modifier.align(Alignment.CenterStart).padding(start = 2.dp).width(5.dp).height(64.dp)
+                    .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
+            )
+            Box(
+                Modifier.align(Alignment.CenterStart).width(22.dp).height(180.dp)
+                    .pointerInput(Unit) { detectTapGestures(onTap = { leftOpen = true }) },
+            )
         }
 
         // Old-school mode: an always-open keyboard that searches as you type.
@@ -1007,11 +1048,12 @@ private fun LeftWidgetPage(
 }
 
 /** Opens the left page on a rightward swipe that starts while the first home page is settled. */
-private fun Modifier.leftSwipe(enabled: Boolean, atFirstPage: () -> Boolean, onOpen: () -> Unit): Modifier =
+private fun Modifier.leftSwipe(enabled: Boolean, atFirstPage: () -> Boolean, onOpen: () -> Unit, edgeDp: Float = 0f): Modifier =
     if (!enabled) this else this.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
             if (!atFirstPage()) return@awaitEachGesture
+            if (edgeDp > 0f && down.position.x > edgeDp * density) return@awaitEachGesture
             val slop = viewConfiguration.touchSlop
             var dx = 0f
             var dy = 0f

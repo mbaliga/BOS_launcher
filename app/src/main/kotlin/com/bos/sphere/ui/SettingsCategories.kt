@@ -122,7 +122,7 @@ class SystemLinks(
 const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
 
-private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.Bubbles -> "Bubbles"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
+private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
 
 /** A miniature status strip showing what is placed where. */
 @Composable
@@ -239,7 +239,11 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 if (p.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous && p.homeStyle == HomeStyle.Grid) {
                     Stepper(L10n.tr("Icons across"), p.continuousColumns, 2..8) { v -> upd { it.copy(continuousColumns = v) } }
                 }
-                note("Pages: swipe between screens. Continuous: one long scroll of every app — the DSi look uses 3 icons across.")
+                if (p.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous || p.homeStyle == HomeStyle.Dsi) {
+                    Sub("Scroll direction")
+                    Chips(com.bos.sphere.core.data.ScrollAxis.entries, p.scrollAxis, { it.label }) { v -> upd { it.copy(scrollAxis = v) } }
+                }
+                note("Pages: swipe between screens. Continuous: one long scroll of every app — the DSi look uses 3 icons across. \"Long side\" keeps scrolling along the phone's longer edge however you hold it.")
             },
             SettingItem.Pane(x("Default density"), Glyphs.Widget, "${gridLabel(p.portraitGrid)} · ${gridLabel(p.landscapeGrid)}") {
                 val preset = DensityPreset.entries.firstOrNull { it.portrait == p.portraitGrid && it.landscape == p.landscapeGrid }

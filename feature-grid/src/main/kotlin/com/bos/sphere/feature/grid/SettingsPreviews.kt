@@ -241,15 +241,14 @@ fun HomeStylePreview(style: HomeStyle) {
         }
         HomeStyle.Psp -> XmbPreview()
         HomeStyle.Dsi -> DsiPreview()
-        HomeStyle.Bubbles -> ComposeCanvas(Modifier.fillMaxSize().padding(4.dp)) {
-            // A honeycomb of round bubbles shrinking toward the edge.
-            val cx = size.width / 2; val cy = size.height / 2; val pitch = size.width * 0.27f
-            val cells = listOf(0 to 0) + (0 until 6).map { i -> val a = Math.PI / 3 * i; ((cos(a) * 1).toInt() to (sin(a) * 1).toInt()) }
-            for ((i, pair) in (listOf(Offset(0f, 0f)) + (0 until 6).map { k -> val a = Math.PI / 3 * k; Offset(cos(a).toFloat(), sin(a).toFloat()) } + (0 until 6).map { k -> val a = Math.PI / 3 * k + Math.PI / 6; Offset((cos(a) * 1.73).toFloat(), (sin(a) * 1.73).toFloat()) }).withIndex().map { it.index to it.value }) {
-                val d = kotlin.math.hypot(pair.x, pair.y); val s = (1f - d * 0.28f).coerceAtLeast(0.3f)
-                drawCircle(SampleApps.color(i), pitch * 0.42f * s, Offset(cx + pair.x * pitch, cy + pair.y * pitch * 0.95f))
+        HomeStyle.List -> ComposeCanvas(Modifier.fillMaxSize().padding(6.dp)) {
+            val rowH = size.height / 6f
+            for (i in 0 until 5) {
+                val y = i * rowH + rowH * 0.5f
+                drawRoundRect(SampleApps.color(i), Offset(2f, y - rowH * 0.3f), Size(rowH * 0.6f, rowH * 0.6f), CornerRadius(rowH * 0.15f))
+                drawRoundRect(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f), Offset(rowH * 0.9f, y - 2f), Size(size.width * 0.5f, 4f), CornerRadius(2f))
             }
-            cells.size
+            drawRoundRect(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f), Offset(size.width - 4f, 8f), Size(3f, size.height * 0.5f), CornerRadius(2f))
         }
     }
 }
@@ -345,7 +344,6 @@ fun DrawerViewPreview(view: DrawerView) {
             DrawerView.Grid -> for (r in 0 until 4) for (c in 0 until 3) { val s = size.width / 3.6f; drawRoundRect(SampleApps.color(r * 3 + c), Offset(c * (s + 6f), r * (s + 6f)), Size(s, s), CornerRadius(s * 0.25f)) }
             DrawerView.List -> for (r in 0 until 5) { val h = size.height / 6f; drawRoundRect(SampleApps.color(r), Offset(0f, r * (h + 4f)), Size(h, h), CornerRadius(h * 0.25f)); drawRoundRect(Color.White.copy(alpha = 0.5f), Offset(h + 8f, r * (h + 4f) + h * 0.3f), Size(size.width * 0.5f, h * 0.35f), CornerRadius(4f)) }
             DrawerView.Details -> for (r in 0 until 4) { val h = size.height / 5f; drawRoundRect(SampleApps.color(r), Offset(0f, r * (h + 5f)), Size(h, h), CornerRadius(h * 0.25f)); drawRoundRect(Color.White.copy(alpha = 0.6f), Offset(h + 8f, r * (h + 5f) + h * 0.12f), Size(size.width * 0.5f, h * 0.28f), CornerRadius(4f)); drawRoundRect(Color.White.copy(alpha = 0.25f), Offset(h + 8f, r * (h + 5f) + h * 0.55f), Size(size.width * 0.38f, h * 0.22f), CornerRadius(4f)) }
-            DrawerView.Bubbles -> { val cx = size.width / 2; val cy = size.height / 2; val p = size.width * 0.27f; drawCircle(SampleApps.color(0), p * 0.5f, Offset(cx, cy)); for (k in 0 until 6) { val a = Math.PI / 3 * k; drawCircle(SampleApps.color(k + 1), p * 0.36f, Offset(cx + (p * cos(a)).toFloat(), cy + (p * sin(a)).toFloat())) } }
         }
     }
 }

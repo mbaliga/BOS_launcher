@@ -159,7 +159,7 @@ internal sealed interface PageGeometry {
                 PageShape.Grid -> {
                     val spec = layout.gridFor(landscape, prefs)
                     Grid(
-                        GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else 0.12f, spread = prefs.iconSpacing,
+                        GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else prefs.gridBias, spread = prefs.iconSpacing,
                             spreadY = if (prefs.spacingV >= 0f) prefs.spacingV else prefs.iconSpacing,
                             insetX = prefs.gridInsetX, insetTop = prefs.gridInsetTop, insetBottom = prefs.gridInsetBottom),
                         prefs.iconScale,

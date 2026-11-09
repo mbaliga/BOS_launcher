@@ -231,6 +231,8 @@ data class LauncherPrefs(
     /** Vertical icon spacing 0..1; negative = same as [iconSpacing]. */
     val spacingV: Float = -1f,
     /** Free margins around the grid, as fractions of the page (sides / top / bottom). */
+    /** Where spare height sits around the grid on portrait pages: 0 = all below it (grid hugs the clock), 1 = all above. */
+    val gridBias: Float = 0.4f,
     val gridInsetX: Float = 0f,
     val gridInsetTop: Float = 0f,
     val gridInsetBottom: Float = 0f,

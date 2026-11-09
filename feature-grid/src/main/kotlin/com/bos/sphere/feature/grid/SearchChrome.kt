@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -201,7 +202,7 @@ internal fun BlinkingCaret(height: Dp, color: Color = Color.White, modifier: Mod
 internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier.height(WheelHeight).clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onTap), contentAlignment = Alignment.CenterEnd) {
         if (query.isEmpty()) {
-            Text(L10n.tr("RADAR"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
+            Text(L10n.tr("SEARCH"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End) {
                 Box(
@@ -241,7 +242,7 @@ internal fun ScopeToken(
             val dim = Color(0xB3FFFFFF)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
+                modifier = Modifier.alpha(if (open) 0f else 1f).clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
                 Text(scopeLabel(shown, webLabel), color = dim, fontSize = 16.sp, maxLines = 1)
                 Icon(scopeGlyph(shown), null, tint = dim, modifier = Modifier.padding(start = 8.dp).size(20.dp))
@@ -291,7 +292,7 @@ internal fun ScopeToken(
             )
             Icon(Glyphs.Down, null, tint = Color.White, modifier = Modifier.size(14.dp))
         }
-        DropdownMenu(
+        if (!plain) DropdownMenu(
             expanded = open, onDismissRequest = { open = false },
             containerColor = Color(0xF21F2024), shape = RoundedCornerShape(12.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF)),

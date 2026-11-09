@@ -157,10 +157,15 @@ internal fun Filmstrip(
         if (n == 0) {
             Box(Modifier.height(StripTile)) {}
         } else {
+            // The first tile starts exactly in the middle, and a flick settles on a tile (not between two).
+            val sidePad = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.let { ((it - StripTile) / 2).coerceAtLeast(0.dp) }
             LazyRow(
                 state = state,
                 horizontalArrangement = Arrangement.spacedBy(StripGap),
-                contentPadding = PaddingValues(horizontal = 20.dp),
+                contentPadding = PaddingValues(horizontal = sidePad),
+                flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(
+                    state, androidx.compose.foundation.gestures.snapping.SnapPosition.Center,
+                ),
                 modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {

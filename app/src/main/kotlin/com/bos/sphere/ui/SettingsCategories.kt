@@ -273,6 +273,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Pane(x("Margins"), Glyphs.Widget, "${(p.gridInsetX * 100).roundToInt()} · ${(p.gridInsetTop * 100).roundToInt()} · ${(p.gridInsetBottom * 100).roundToInt()}") {
                 DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(170.dp),
                     spacingV = vSpacing, insetX = p.gridInsetX, insetTop = p.gridInsetTop, insetBottom = p.gridInsetBottom)
+                LabeledSlider(L10n.tr("Height in page"), p.gridBias, 0f..1f, "${(p.gridBias * 100).roundToInt()}%") { v -> upd { it.copy(gridBias = v) } }
                 LabeledSlider(L10n.tr("Sides"), p.gridInsetX, 0f..0.25f, "${(p.gridInsetX * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetX = v) } }
                 LabeledSlider(L10n.tr("Top"), p.gridInsetTop, 0f..0.4f, "${(p.gridInsetTop * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetTop = v) } }
                 LabeledSlider(L10n.tr("Bottom"), p.gridInsetBottom, 0f..0.4f, "${(p.gridInsetBottom * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetBottom = v) } }

@@ -316,15 +316,17 @@ internal fun SearchScreen(
                 Column(Modifier.fillMaxSize().padding(bottom = 52.dp)) {
                     Spacer(Modifier.height(52.dp))
                     val wheelRow: @Composable () -> Unit = {
+                        // "SEARCH" ends just left of the screen's centre line and the wheel starts just right of it.
                         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                            QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 14.dp))
-                            CategoryWheel(
-                                selected = selected, counts = counts,
-                                onSelect = { userCat = it; touched = true; expandedContact = null },
-                                onTick = { tick() }, onTouch = { touched = true },
-                                modifier = Modifier.width(124.dp),
-                            )
-                            Spacer(Modifier.width(76.dp))
+                            QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp))
+                            Box(Modifier.weight(1f)) {
+                                CategoryWheel(
+                                    selected = selected, counts = counts,
+                                    onSelect = { userCat = it; touched = true; expandedContact = null },
+                                    onTick = { tick() }, onTouch = { touched = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                     if (layout == SearchLayout.Orbit) {
@@ -343,7 +345,7 @@ internal fun SearchScreen(
                         Filmstrip(
                             tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                             expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
+                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 8.dp),
                         )
                     }
                 }

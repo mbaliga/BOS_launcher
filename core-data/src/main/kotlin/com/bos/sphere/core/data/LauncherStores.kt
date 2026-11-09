@@ -81,7 +81,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
             .putString("bgPicture", next.backgroundPicturePath).putString("leftPage", next.leftPage.name).putInt("leftWidgetId", next.leftWidgetId).putBoolean("launchpadRail", next.launchpadRail)
             .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
-            .putFloat("spacingV", next.spacingV).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
+            .putFloat("spacingV", next.spacingV).putFloat("gridBias", next.gridBias).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
             .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
             .putString("searchLayout", next.searchLayout.name).putBoolean("searchBackdrop", next.searchBackdrop)
             .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
@@ -168,6 +168,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             settingsBackdrop = runCatching { SettingsBackdrop.valueOf(sp.getString("settingsBackdrop", null) ?: "") }.getOrDefault(d.settingsBackdrop),
             settingsDim = sp.getFloat("settingsDim", d.settingsDim),
             spacingV = sp.getFloat("spacingV", d.spacingV),
+            gridBias = sp.getFloat("gridBias", d.gridBias),
             gridInsetX = sp.getFloat("gridInsetX", d.gridInsetX),
             gridInsetTop = sp.getFloat("gridInsetTop", d.gridInsetTop),
             gridInsetBottom = sp.getFloat("gridInsetBottom", d.gridInsetBottom),

@@ -231,15 +231,52 @@ internal fun ScopeToken(
     modifier: Modifier = Modifier,
     /** Plain text with an up/down mark (the bottom query line) instead of the chip. */
     plain: Boolean = false,
+    /** What "The web" is called in the list: the chosen search engine. */
+    webLabel: String = L10n.tr("The web"),
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
-        if (plain) Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
-        ) {
-            Text(shown?.label ?: L10n.tr("Everything"), color = Color(0xB3FFFFFF), fontSize = 16.sp, maxLines = 1)
-            Icon(Glyphs.Down, null, tint = Color(0xB3FFFFFF), modifier = Modifier.size(16.dp))
+        if (plain) {
+            // The bottom query line: "Everything 🌐 ⇅". Tapping fans the scopes out upward, right-aligned (macOS-style).
+            val dim = Color(0xB3FFFFFF)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
+            ) {
+                Text(scopeLabel(shown, webLabel), color = dim, fontSize = 16.sp, maxLines = 1)
+                Icon(scopeGlyph(shown), null, tint = dim, modifier = Modifier.padding(start = 8.dp).size(20.dp))
+                Column(Modifier.padding(start = 2.dp)) {
+                    Icon(Glyphs.Up, null, tint = dim, modifier = Modifier.size(10.dp).offset(y = 2.dp))
+                    Icon(Glyphs.Down, null, tint = dim, modifier = Modifier.size(10.dp).offset(y = (-2).dp))
+                }
+            }
+            if (open) {
+                androidx.compose.ui.window.Popup(
+                    alignment = Alignment.BottomEnd,
+                    onDismissRequest = { open = false },
+                    properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+                ) {
+                    // Furthest scope on top, "Everything" last — sitting exactly where the label was.
+                    val order: List<SearchCategory?> = listOf(SearchCategory.Files, SearchCategory.Actions, SearchCategory.Web, SearchCategory.Contacts, SearchCategory.Apps, null)
+                    Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(horizontal = 6.dp)) {
+                        order.forEach { opt ->
+                            val on = opt == scope
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { open = false; onPick(opt) }
+                                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                            ) {
+                                Text(scopeLabel(opt, webLabel), color = if (on) Color.White else dim, fontSize = 16.sp, maxLines = 1)
+                                Icon(scopeGlyph(opt), null, tint = if (on) Color.White else dim, modifier = Modifier.padding(start = 8.dp).size(20.dp))
+                                Spacer(Modifier.width(12.dp)) // lines the glyphs up with the ⇅ mark
+                            }
+                        }
+                    }
+                }
+            }
         } else Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -273,6 +310,21 @@ internal fun ScopeToken(
             }
         }
     }
+}
+
+private fun scopeLabel(c: SearchCategory?, webLabel: String): String = when (c) {
+    null -> L10n.tr("Everything")
+    SearchCategory.Web -> webLabel
+    else -> c.label
+}
+
+private fun scopeGlyph(c: SearchCategory?): ImageVector = when (c) {
+    null -> Glyphs.Globe
+    SearchCategory.Web -> Glyphs.Search
+    SearchCategory.Actions -> Glyphs.Bolt
+    SearchCategory.Apps -> Glyphs.Apps
+    SearchCategory.Contacts -> Glyphs.Person
+    SearchCategory.Files -> FolderGlyph
 }
 
 // ---------------------------------------------------------------- suggestion card

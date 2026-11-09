@@ -366,7 +366,7 @@ internal fun SearchScreen(
                     QueryInput(field, { field = it }, go, focus, Color.White, 20.sp, Modifier.fillMaxWidth())
                 }
                 if (typing) {
-                    ScopeToken(userCat, userCat, { userCat = it; expandedContact = null }, plain = true)
+                    ScopeToken(userCat, userCat, { userCat = it; expandedContact = null }, plain = true, webLabel = prefs.webEngine.label)
                     Icon(
                         Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
                         modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),

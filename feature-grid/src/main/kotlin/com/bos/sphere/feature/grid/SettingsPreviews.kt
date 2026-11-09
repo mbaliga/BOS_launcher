@@ -239,14 +239,6 @@ fun HomeStylePreview(style: HomeStyle) {
                 drawRoundRect(SampleApps.color(i), Offset((size.width - cell * cols) / 2 + c * cell + (cell - icon) / 2, r * cell + (cell - icon) / 2), Size(icon, icon), CornerRadius(icon * 0.25f))
             }
         }
-        HomeStyle.Sphere -> ComposeCanvas(Modifier.fillMaxSize().padding(4.dp)) {
-            // A coverflow strip: the centre icon large, neighbours shrinking.
-            val n = 5; val cy = size.height / 2
-            for (k in -(n / 2)..(n / 2)) {
-                val s = 1f - 0.2f * kotlin.math.abs(k); val w = size.width * 0.3f * s
-                drawRoundRect(SampleApps.color(k + 3), Offset(size.width / 2 + k * size.width * 0.22f - w / 2, cy - w / 2), Size(w, w), CornerRadius(w * 0.25f))
-            }
-        }
         HomeStyle.Psp -> XmbPreview()
         HomeStyle.Dsi -> DsiPreview()
         HomeStyle.Bubbles -> ComposeCanvas(Modifier.fillMaxSize().padding(4.dp)) {
@@ -267,7 +259,7 @@ fun HomeStylePreview(style: HomeStyle) {
 fun PageShapePreview(shape: PageShape) {
     when (shape) {
         PageShape.Grid -> HomeStylePreview(HomeStyle.Grid)
-        PageShape.Coverflow -> HomeStylePreview(HomeStyle.Sphere)
+        PageShape.Coverflow -> HomeStylePreview(HomeStyle.Grid)
         PageShape.Circle -> ComposeCanvas(Modifier.fillMaxSize().padding(4.dp)) {
             val cx = size.width / 2; val cy = size.height / 2; val r1 = size.width * 0.27f; val ic = size.width * 0.17f
             drawCircle(Color.White.copy(alpha = 0.12f), r1, Offset(cx, cy), style = Stroke(1f))

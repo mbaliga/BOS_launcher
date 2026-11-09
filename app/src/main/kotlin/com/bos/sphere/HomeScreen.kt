@@ -9,6 +9,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -125,7 +128,6 @@ import com.bos.sphere.ui.DefaultLauncherBanner
 import com.bos.sphere.ui.DotGridBackground
 import com.bos.sphere.ui.HubPanel
 import com.bos.sphere.ui.SettingsModel
-import com.bos.sphere.ui.SphereSettings
 import com.bos.sphere.ui.SystemLinks
 import com.bos.sphere.ui.buildSettingsCategories
 import kotlinx.coroutines.flow.first
@@ -513,13 +515,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     LaunchedEffect(externalAction) { externalAction?.let { internal(it.id, null) } }
 
-    // ---- sphere-style state (unchanged surface, settings now live in the settings space)
-    val rowsFor = { mode: RowMode -> when (mode) { RowMode.One -> 1; RowMode.Two -> 2; RowMode.Auto -> if (isPortrait) 2 else 1 } }
-    var rowMode by remember { mutableStateOf(RowMode.Auto) }
-    var sphereParams by remember { mutableStateOf(SphereParams()) }
-    var tilesMode by remember { mutableStateOf(false) }
-    var rubikMode by remember { mutableStateOf(false) }
-
     // Shared by both home styles: the four corners (kept clear of the always-on keyboard).
     val kbHeight = remember { mutableStateOf(0.dp) }
     val bottomClear = if (prefs.alwaysKeyboard) kbHeight.value else 0.dp
@@ -584,6 +579,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         )
     }
 
+    // Breathing room at the sides of the scrolling homes (plus whatever "Sides" margin is set).
+    val sideGap = 16.dp + (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * prefs.gridInsetX).dp
+    // Homes with no empty space to long-press: holding the top band (clock area) opens Settings.
+    @Composable
+    fun BoxScope.SettingsHoldBand() {
+        Box(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                .height(com.bos.sphere.feature.grid.stripHeight(prefs) + 44.dp)
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { openSettings(CATEGORY_HOME) }) },
+        )
+    }
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
     Box(modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch)) {
         when (prefs.homeStyle) {
@@ -593,9 +599,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     apps = apps, crossCount = prefs.continuousColumns, landscape = isLandscape, style = com.bos.sphere.feature.grid.ContinuousStyle.Plain,
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
                     iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                 )
+                SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             } else {
@@ -641,9 +648,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     categoryOf = { com.bos.sphere.feature.search.AppSearch.categoryNameOf(it.packageName) },
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
                     showLabels = prefs.showLabels, sounds = sounds,
                 )
+                SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             }
@@ -653,9 +661,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     apps = apps, crossCount = 3, landscape = isLandscape, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
                     iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                 )
+                SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             }
@@ -671,38 +680,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     showLabels = prefs.showLabels,
                     sounds = sounds,
                 )
+                SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
-            }
-            HomeStyle.Sphere -> {
-                // The sphere / coverflow surface, in the same chrome as the pages: indicator
-                // background, status strip, corners, long-press → settings.
-                val surface = rememberLauncherSurfaceState(itemCount = apps.size, rows = rowsFor(rowMode), params = sphereParams)
-                var centred by remember { mutableStateOf(false) }
-                LaunchedEffect(apps.size) {
-                    if (!centred && apps.isNotEmpty()) {
-                        surface.sphereState.position = (surface.sphereState.maxIndex / 2).toFloat()
-                        centred = true
-                    }
-                }
-                LaunchedEffect(homeSignal) {
-                    if (homeSignal > 0) { surface.zoom.animateTo(0f); surface.hub.animateTo(0f) }
-                }
-                val chromeAlpha = (1f - smooth(surface.zoomValue)) * (1f - surface.hubValue)
-                Background()
-                LauncherSurface(
-                    apps = apps,
-                    state = surface,
-                    onLaunch = ::launch,
-                    onLongPressApp = { menuApp = it },
-                    onOpenSettings = { openSettings(CATEGORY_HOME) },
-                    onLongPressEmpty = { openSettings(CATEGORY_HOME) },
-                    modifier = Modifier.fillMaxSize().padding(bottom = bottomClear),
-                ) { fraction -> HubPanel(fraction = fraction) }
-                Box(Modifier.fillMaxSize().padding(bottom = bottomClear).graphicsLayer { alpha = chromeAlpha }) {
-                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                }
-                Corners(chromeAlpha)
             }
         }
 
@@ -841,11 +821,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 motionAvailable = motion.available,
                 editCorner = { editCorner = it },
                 editGesture = { editGesture = it },
-                sphere = SphereSettings(
-                    sphereParams, rowMode, tilesMode, rubikMode,
-                    onParams = { sphereParams = it }, onRowMode = { rowMode = it },
-                    onTiles = { tilesMode = it }, onRubik = { rubikMode = it },
-                ),
                 system = SystemLinks(
                     setDefaultHome = {
                         val i = DefaultLauncher.requestRoleIntent(context) ?: DefaultLauncher.homeSettingsIntent()
@@ -892,6 +867,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onUninstall = { repository.requestUninstall(app); menuApp = null },
                 onToggleHidden = { hiddenStore.setHidden(app.key, app.key !in hidden); menuApp = null },
                 onIconColor = { colorApp = app; menuApp = null },
+                onHomeSettings = if (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
+                    { menuApp = null; openSettings(CATEGORY_HOME) }
+                } else null,
                 isOnHome = if (prefs.homeStyle == HomeStyle.Grid) pages.any { app.key in it.keys } else null,
                 onToggleHome = {
                     if (pages.any { app.key in it.keys }) stores.layout.removeFromHome(app.key, pages, preserve)

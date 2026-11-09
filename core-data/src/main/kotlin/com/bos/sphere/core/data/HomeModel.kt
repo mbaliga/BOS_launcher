@@ -9,7 +9,7 @@ import kotlin.math.exp
  */
 
 /** Which home surface is shown. */
-enum class HomeStyle { Grid, Sphere, Bubbles, Psp, Dsi }
+enum class HomeStyle { Grid, Bubbles, Psp, Dsi }
 
 /** Pages (swipe between screens) or one continuous scroll. */
 enum class HomeScroll(val label: String) { Paged("Pages"), Continuous("Continuous") }

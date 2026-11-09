@@ -108,19 +108,7 @@ class SettingsModel(
     val motionAvailable: Boolean,
     val editCorner: (Corner) -> Unit,
     val editGesture: (HomeGesture) -> Unit,
-    val sphere: SphereSettings,
     val system: SystemLinks,
-)
-
-class SphereSettings(
-    val params: SphereParams,
-    val rowMode: RowMode,
-    val tiles: Boolean,
-    val rubik: Boolean,
-    val onParams: (SphereParams) -> Unit,
-    val onRowMode: (RowMode) -> Unit,
-    val onTiles: (Boolean) -> Unit,
-    val onRubik: (Boolean) -> Unit,
 )
 
 class SystemLinks(
@@ -134,7 +122,7 @@ class SystemLinks(
 const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
 
-private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.Sphere -> "Sphere"; HomeStyle.Bubbles -> "Bubbles"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
+private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.Bubbles -> "Bubbles"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
 
 /** A miniature status strip showing what is placed where. */
 @Composable
@@ -630,32 +618,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         ),
     )
 
-    // --- Sphere (only when that style is active) -------------------------------------------
-    if (p.homeStyle == HomeStyle.Sphere) {
-        val s = m.sphere
-        fun slider(title: String, value: Float, range: ClosedFloatingPointRange<Float>, decimals: Int, set: (Float) -> SphereParams) =
-            SettingItem.Pane(title, Glyphs.Dial, if (decimals == 0) "${value.roundToInt()}" else "%.${decimals}f".format(value)) {
-                LabeledSlider(title, value, range, if (decimals == 0) "${value.roundToInt()}" else "%.${decimals}f".format(value)) { s.onParams(set(it)) }
-            }
-        out += SettingCategory(
-            "Sphere",
-            Glyphs.Globe,
-            listOf(
-                SettingItem.Pane(x("Rows"), Glyphs.Widget, s.rowMode.name) { Chips(RowMode.entries, s.rowMode, { it.name }, s.onRowMode) },
-                SettingItem.Toggle(x("Tiles"), Glyphs.Apps, s.tiles, onChange = s.onTiles),
-                SettingItem.Toggle(x("Per-band spin"), Glyphs.Dial, s.rubik, onChange = s.onRubik),
-                slider("Perspective", s.params.perspective, 600f..2400f, 0) { s.params.copy(perspective = it) },
-                slider("Spacing", s.params.radius, 380f..980f, 0) { s.params.copy(radius = it) },
-                slider("Turn", s.params.maxRotation, 0f..80f, 0) { s.params.copy(maxRotation = it) },
-                slider("Depth", s.params.depth, 0f..1.6f, 2) { s.params.copy(depth = it) },
-                slider("Min scale", s.params.minScale, 0.4f..1f, 2) { s.params.copy(minScale = it) },
-                slider("Focus", s.params.focus, 1f..2f, 2) { s.params.copy(focus = it) },
-                slider("Arc", s.params.arc, 0f..160f, 0) { s.params.copy(arc = it) },
-                slider("Tilt", s.params.tilt, 0f..24f, 0) { s.params.copy(tilt = it) },
-            ),
-        )
-    }
-
     // --- System ------------------------------------------------------------------------------
     out += SettingCategory(
         x("System"),
@@ -691,7 +653,7 @@ private fun reorganise(built: List<SettingCategory>, m: SettingsModel): List<Set
     fun items(vararg titles: String) = titles.flatMap { cat(it)?.items.orEmpty() }
     val out = ArrayList<SettingCategory>()
     built.firstOrNull()?.let { out += it } // This page
-    out += SettingCategory(x("Home screen"), Glyphs.Apps, items("Home", "Sphere"))
+    out += SettingCategory(x("Home screen"), Glyphs.Apps, items("Home"))
     out += SettingCategory(x("Look"), Glyphs.Palette, items("Theme", "Indicator"))
     out += SettingCategory(x("Clock & status"), Glyphs.Clock, items("Clock"))
     out += SettingCategory(x("Corners"), Glyphs.Plus, items("Corners"))

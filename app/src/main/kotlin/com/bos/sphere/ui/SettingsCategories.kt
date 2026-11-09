@@ -78,8 +78,8 @@ import com.bos.sphere.feature.grid.Stepper
 import com.bos.sphere.feature.grid.ToggleRow
 import com.bos.sphere.feature.grid.itemLabel
 import com.bos.sphere.feature.grid.slotSummary
-import com.bos.sphere.feature.sphere.RowMode
-import com.bos.sphere.feature.sphere.SphereParams
+import com.bos.sphere.core.data.isPaged
+import com.bos.sphere.core.data.surface
 import kotlin.math.roundToInt
 
 /** Everything the settings space reads and the callbacks it writes through. */
@@ -118,9 +118,26 @@ class SystemLinks(
     val androidSettings: () -> Unit,
 )
 
-/** Index of the "This page" category (opened by long-pressing a page). */
+/**
+ * Which category Settings opens on. [CATEGORY_THIS_PAGE] is the "Page N" category (long-press on a
+ * page of the paged home); [CATEGORY_HOME] is "Home screen". Resolve to a list index with
+ * [settingsCategoryIndex]: the page category only exists on the paged home, so indices move.
+ */
 const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
+
+private const val HOME_SCREEN_TITLE = "Home screen"
+
+/** The index of [which] (one of the CATEGORY_ constants) in [categories] as built for the active home. */
+fun settingsCategoryIndex(categories: List<SettingCategory>, which: Int): Int {
+    val home = categories.indexOfFirst { it.title == x(HOME_SCREEN_TITLE) }.coerceAtLeast(0)
+    return when (which) {
+        CATEGORY_HOME -> home
+        // No page category (a scrolling home): fall through to Home screen.
+        CATEGORY_THIS_PAGE -> if (home == 0) 0 else CATEGORY_THIS_PAGE
+        else -> which.coerceIn(0, (categories.size - 1).coerceAtLeast(0))
+    }
+}
 
 private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
 
@@ -165,8 +182,15 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     val vSpacing = if (p.spacingV >= 0f) p.spacingV else p.iconSpacing
     val out = ArrayList<SettingCategory>()
     fun upd(f: (LauncherPrefs) -> LauncherPrefs) = m.updatePrefs(f)
+    // What the active home style can use. Items that only mean something on the paged grid (pages,
+    // per-page layout, density, page turning, the suggested app …) are left out elsewhere rather
+    // than shown doing nothing.
+    val paged = p.isPaged
+    val continuous = p.homeStyle == HomeStyle.Grid && !paged
+    val styleName = x(homeStyleName(p.homeStyle))
 
-    // --- This page ---------------------------------------------------------------------------
+    // --- This page (paged home only) -------------------------------------------------------
+    if (paged) {
     val page = m.pages.getOrNull(m.pageIndex) ?: HomePage()
     val layout = page.layout
     val pageItems = buildList {
@@ -223,28 +247,46 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         if (m.pages.size > 1) add(SettingItem.Action(x("Delete this page"), Glyphs.Close, x("Apps move to the previous page")) { m.deletePage(m.pageIndex) })
     }
     out += SettingCategory(x("Page %d", m.pageIndex + 1), Glyphs.Widget, pageItems)
+    }
 
     // --- Home --------------------------------------------------------------------------------
     out += SettingCategory(
         x("Home"),
         Glyphs.Apps,
-        listOf(
-            SettingItem.Pane(x("Style"), Glyphs.Apps, x(homeStyleName(p.homeStyle))) {
+        buildList {
+            add(
+            SettingItem.Pane(x("Style"), Glyphs.Apps, styleName) {
                 VisualChoice(HomeStyle.entries, p.homeStyle, { s -> upd { it.copy(homeStyle = s) } }, { x(homeStyleName(it)) }, previewHeight = 120.dp) { HomeStylePreview(it) }
+                note(
+                    when (p.homeStyle) {
+                        HomeStyle.Grid -> "Pages of icons you arrange yourself — or one long scroll (see Scrolling)."
+                        HomeStyle.List -> "Every app in an A–Z list with a letter rail. Long-press an app for its menu; long-press a letter header or the margin for Settings."
+                        HomeStyle.Psp -> "A cross media bar: swipe sideways for categories, up / down for apps. Hold the clock band for Settings."
+                        HomeStyle.Dsi -> "Every app on a glossy tile, three across, one long scroll. Long-press the empty space for Settings."
+                    },
+                )
             },
+            )
+            if (p.homeStyle == HomeStyle.Grid) add(
             SettingItem.Pane(x("Scrolling"), Glyphs.Swipe, x(p.homeScroll.label)) {
                 VisualChoice(com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { v -> upd { it.copy(homeScroll = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { v ->
                     GlyphPreview(if (v == com.bos.sphere.core.data.HomeScroll.Paged) Glyphs.Swipe else Glyphs.Down, x(v.label))
                 }
-                if (p.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous && p.homeStyle == HomeStyle.Grid) {
+                if (continuous) {
                     Stepper(L10n.tr("Icons across"), p.continuousColumns, 2..8) { v -> upd { it.copy(continuousColumns = v) } }
-                }
-                if (p.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous || p.homeStyle == HomeStyle.Dsi) {
                     Sub("Scroll direction")
                     Chips(com.bos.sphere.core.data.ScrollAxis.entries, p.scrollAxis, { it.label }) { v -> upd { it.copy(scrollAxis = v) } }
                 }
-                note("Pages: swipe between screens. Continuous: one long scroll of every app — the DSi look uses 3 icons across. \"Long side\" keeps scrolling along the phone's longer edge however you hold it.")
+                note("Pages: swipe between screens. Continuous: one long scroll of every app. \"Long side\" keeps scrolling along the phone's longer edge however you hold it.")
             },
+            )
+            if (p.homeStyle == HomeStyle.Dsi) add(
+            SettingItem.Pane(x("Scroll direction"), Glyphs.Swipe, x(p.scrollAxis.label)) {
+                Chips(com.bos.sphere.core.data.ScrollAxis.entries, p.scrollAxis, { it.label }) { v -> upd { it.copy(scrollAxis = v) } }
+                note("\"Long side\" keeps scrolling along the phone's longer edge however you hold it. Swipes across the other way are free for gestures.")
+            },
+            )
+            if (paged) add(
             SettingItem.Pane(x("Default density"), Glyphs.Widget, "${gridLabel(p.portraitGrid)} · ${gridLabel(p.landscapeGrid)}") {
                 val preset = DensityPreset.entries.firstOrNull { it.portrait == p.portraitGrid && it.landscape == p.landscapeGrid }
                 VisualChoice(DensityPreset.entries, preset ?: DensityPreset.Default, { d -> upd { it.copy(portraitGrid = d.portrait, landscapeGrid = d.landscape) } }, { x(it.label) }, previewHeight = 96.dp) {
@@ -259,10 +301,15 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 Stepper(L10n.tr("Rows"), p.landscapeGrid.rows, GridSpec.MIN_ROWS..GridSpec.MAX_ROWS) { v -> upd { it.copy(landscapeGrid = it.landscapeGrid.copy(rows = v)) } }
                 note("Pages with their own density keep it. After changing it you can choose to fill the empty space.")
             },
+            )
+            // Icon size: the paged / continuous grids, DSi tiles and List rows scale; the PSP bar is fixed.
+            if (p.homeStyle != HomeStyle.Psp) add(
             SettingItem.Pane(x("Icon size"), Glyphs.Apps, "${(p.iconScale * 100).roundToInt()}%") {
-                DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
+                if (paged) DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
                 LabeledSlider(L10n.tr("Icon size"), p.iconScale, LauncherPrefs.MIN_ICON_SCALE..LauncherPrefs.MAX_ICON_SCALE, "${(p.iconScale * 100).roundToInt()}%") { v -> upd { it.copy(iconScale = v) } }
             },
+            )
+            if (paged) add(
             SettingItem.Pane(x("Spacing"), Glyphs.Widget, "${(p.iconSpacing * 100).roundToInt()}% · ${(vSpacing * 100).roundToInt()}%") {
                 DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(170.dp),
                     spacingV = vSpacing, insetX = p.gridInsetX, insetTop = p.gridInsetTop, insetBottom = p.gridInsetBottom)
@@ -271,6 +318,15 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 if (p.spacingV >= 0f) LabeledSlider(L10n.tr("Down"), p.spacingV, 0f..1f, "${(p.spacingV * 100).roundToInt()}%") { v -> upd { it.copy(spacingV = v) } }
                 note("Compact keeps square cells; higher spreads the icons into the free space without resizing them.")
             },
+            )
+            // The scrolling grids (Continuous, DSi) only have a gap between rows.
+            else if (continuous || p.homeStyle == HomeStyle.Dsi) add(
+            SettingItem.Pane(x("Spacing"), Glyphs.Widget, "${(p.iconSpacing * 100).roundToInt()}%") {
+                LabeledSlider(L10n.tr("Spacing"), p.iconSpacing, 0f..1f, "${(p.iconSpacing * 100).roundToInt()}%") { v -> upd { it.copy(iconSpacing = v) } }
+                note("Room between the rows of icons.")
+            },
+            )
+            if (paged) add(
             SettingItem.Pane(x("Margins"), Glyphs.Widget, "${(p.gridInsetX * 100).roundToInt()} · ${(p.gridInsetTop * 100).roundToInt()} · ${(p.gridInsetBottom * 100).roundToInt()}") {
                 DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(170.dp),
                     spacingV = vSpacing, insetX = p.gridInsetX, insetTop = p.gridInsetTop, insetBottom = p.gridInsetBottom)
@@ -280,12 +336,23 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 LabeledSlider(L10n.tr("Bottom"), p.gridInsetBottom, 0f..0.4f, "${(p.gridInsetBottom * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetBottom = v) } }
                 note("Free room around the icons — leave space for the clock, or keep thumbs clear at the bottom.")
             },
+            )
+            // The scrolling homes only take a side margin (the strip and corners set top and bottom).
+            else add(
+            SettingItem.Pane(x("Margins"), Glyphs.Widget, "${(p.gridInsetX * 100).roundToInt()}%") {
+                LabeledSlider(L10n.tr("Sides"), p.gridInsetX, 0f..0.25f, "${(p.gridInsetX * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetX = v) } }
+                note("Extra room at the left and right edges.")
+            },
+            )
+            if (paged) add(
             SettingItem.Pane(x("Label size"), Glyphs.Message, "${(p.labelScale * 100).roundToInt()}%") {
                 LabeledSlider(L10n.tr("Label size"), p.labelScale, 0.7f..1.5f, "${(p.labelScale * 100).roundToInt()}%") { v -> upd { it.copy(labelScale = v) } }
                 ToggleRow(L10n.tr("Show labels"), p.showLabels, { v -> upd { it.copy(showLabels = v) } })
             },
-            SettingItem.Toggle(x("App labels"), Glyphs.Message, p.showLabels) { v -> upd { it.copy(showLabels = v) } },
-            SettingItem.Toggle(x("Suggested app"), Glyphs.Bolt, p.showSuggestion) { v -> upd { it.copy(showSuggestion = v) } },
+            )
+            add(SettingItem.Toggle(x("App labels"), Glyphs.Message, p.showLabels, if (p.homeStyle == HomeStyle.Psp) x("Off shows only the focused app's name") else null) { v -> upd { it.copy(showLabels = v) } })
+            if (paged) add(SettingItem.Toggle(x("Suggested app"), Glyphs.Bolt, p.showSuggestion, x("A predicted app in the first free slot of page one")) { v -> upd { it.copy(showSuggestion = v) } })
+            if (paged) add(
             SettingItem.Pane(x("Page turning"), Glyphs.Swipe, "${x(p.portraitPaging.label)} · ${x(p.landscapePaging.label)}") {
                 Sub("Portrait")
                 VisualChoice(PagingAxis.entries, p.portraitPaging, { a -> upd { it.copy(portraitPaging = a) } }, { x(it.label) }, columns = 2) { PagingPreview(it) }
@@ -293,30 +360,39 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 VisualChoice(PagingAxis.entries, p.landscapePaging, { a -> upd { it.copy(landscapePaging = a) } }, { x(it.label) }, columns = 2) { PagingPreview(it) }
                 note("Swipes across the other axis are free for gestures.")
             },
-            SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("A keyboard that's always open: type to find an app, like an old-school phone")) { v -> upd { it.copy(alwaysKeyboard = v) } },
-            SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("The clock and corner icons sit flush to the top; swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } },
-        ),
+            )
+            add(SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("A keyboard that's always open: type to find an app, like an old-school phone")) { v -> upd { it.copy(alwaysKeyboard = v) } })
+            add(SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("The clock and corner icons sit flush to the top; swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } })
+        },
     )
 
     // --- Apps --------------------------------------------------------------------------------
     out += SettingCategory(
         x("Apps"),
         Glyphs.Widget,
-        listOf(
+        buildList {
+            // Only the paged home has pages to curate; the scrolling homes always show every app.
+            if (paged) add(
             SettingItem.Pane(x("Apps on home"), Glyphs.Apps, x(p.appsOnHome.label)) {
                 Chips(AppsOnHome.entries, p.appsOnHome, { it.label }) { v -> upd { it.copy(appsOnHome = v) } }
                 note("\"Only ones I add\" keeps the pages for what you choose; everything else lives in the drawer. Long-press an app to add or remove it.")
             },
+            )
+            if (paged) add(
             SettingItem.Pane(x("Pages"), Glyphs.Swipe, x(p.pageMode.label)) {
                 Chips(PageMode.entries, p.pageMode, { it.label }) { v -> upd { it.copy(pageMode = v) } }
                 note("One page shows just the first page; the rest stay in the drawer.")
             },
+            )
+            add(
             SettingItem.Pane(x("All apps opens as"), Glyphs.Apps, x(p.drawerStyle.label)) {
                 Chips(DrawerStyle.entries, p.drawerStyle, { it.label }) { v -> upd { it.copy(drawerStyle = v) } }
                 Sub("Wheel groups")
                 Chips(WheelGrouping.entries, p.wheelGrouping, { it.label }) { g -> upd { it.copy(wheelGrouping = g) } }
                 note("The wheel fans out around the corner you open it from.")
             },
+            )
+            add(
             SettingItem.Pane(x("Open with"), Glyphs.Apps, x("Choose the app for Music, Browser…")) {
                 listOf(
                     CornerActionId.Music, CornerActionId.Messages, CornerActionId.Browser, CornerActionId.Email, CornerActionId.Maps,
@@ -328,6 +404,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 }
                 note("Pick any installed app — the list isn't limited to what the system suggests.")
             },
+            )
+            add(
             SettingItem.Pane(x("Drawer layout"), Glyphs.Widget, "${x(p.drawerView.label)} · ${x(p.drawerSort.label)}") {
                 Sub("View")
                 VisualChoice(DrawerView.entries, p.drawerView, { v -> upd { it.copy(drawerView = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { DrawerViewPreview(it) }
@@ -337,7 +415,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 Chips(RailSide.entries, p.drawerRail, { it.label }) { v -> upd { it.copy(drawerRail = v) } }
                 note("Run a finger down the edge to jump through the list.")
             },
-        ),
+            )
+        },
     )
 
     // --- Clock -------------------------------------------------------------------------------
@@ -431,14 +510,20 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     )
 
     // --- Gestures ----------------------------------------------------------------------------
-    val paging = p.pagingFor(m.isLandscape)
+    // Touch gestures are the same on every home; what differs is which swipes the home itself
+    // already scrolls with (and whether there is a grid density to pinch). Those are annotated.
+    val surface = p.surface(m.isLandscape)
     val pinchDensity = (m.gestures[HomeGesture.PinchIn] as? CornerItem.Action)?.id == CornerActionId.GridDenser &&
         (m.gestures[HomeGesture.PinchOut] as? CornerItem.Action)?.id == CornerActionId.GridSparser
     out += SettingCategory(
         x("Gestures"),
         Glyphs.Pinch,
-        listOf<SettingItem>(
-            SettingItem.Toggle(x("Pinch changes grid density"), Glyphs.Pinch, pinchDensity, x("Pinch in packs more icons in; spread opens them up")) { on ->
+        buildList<SettingItem> {
+            if (surface.hasDensity) add(
+            SettingItem.Toggle(
+                x("Pinch changes grid density"), Glyphs.Pinch, pinchDensity,
+                if (paged) x("Pinch in packs more icons in; spread opens them up") else x("Pinch in adds a column; spread removes one"),
+            ) { on ->
                 if (on) {
                     m.setGesture(HomeGesture.PinchIn, CornerItem.Action(CornerActionId.GridDenser))
                     m.setGesture(HomeGesture.PinchOut, CornerItem.Action(CornerActionId.GridSparser))
@@ -447,9 +532,13 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     m.setGesture(HomeGesture.PinchOut, null)
                 }
             },
-        ) + HomeGesture.entries.filter { it.kind == GestureKind.Touch }.map { g ->
-            val bound = m.gestures[g]?.let { itemLabel(it, m.appsByKey) } ?: x("Nothing")
-            SettingItem.Action(x(g.label), Glyphs.forGesture(g), if (g.usableWith(paging)) bound else "$bound · ${x("pages turn this way now")}") { m.editGesture(g) }
+            )
+            HomeGesture.entries.filter { it.kind == GestureKind.Touch }.forEach { g ->
+                val bound = m.gestures[g]?.let { itemLabel(it, m.appsByKey) } ?: x("Nothing")
+                val why = g.unavailableReason(surface)
+                add(SettingItem.Action(x(g.label), Glyphs.forGesture(g), if (why == null) bound else "$bound · ${x("not on %s: %s", styleName, x(why))}") { m.editGesture(g) })
+            }
+            add(SettingItem.Action(x("On this home"), Glyphs.Info, x(gestureSummary(p.homeStyle, surface))) {})
         },
     )
 
@@ -644,20 +733,32 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         Glyphs.Info,
         m.about.map { (k, v) -> SettingItem.Action(x(k), Glyphs.Info, v) {} },
     )
-    return reorganise(out, m)
+    return reorganise(out, paged)
+}
+
+/** One line for the Gestures category saying how touch works on the active home. */
+internal fun gestureSummary(style: HomeStyle, surface: com.bos.sphere.core.data.HomeSurface): String = when {
+    surface.paged -> if (surface.scroll == com.bos.sphere.core.data.SurfaceScroll.Horizontal)
+        "Pages turn sideways, so up / down swipes, pinch and double tap on empty space are free; long-press empty space for page settings."
+    else "Pages turn up / down, so sideways swipes, pinch and double tap on empty space are free; long-press empty space for page settings."
+    style == HomeStyle.Psp -> "The bar scrolls both ways, so only pinch and double tap on empty space fire here; hold the clock band for Settings."
+    surface.scroll == com.bos.sphere.core.data.SurfaceScroll.Horizontal ->
+        "This home scrolls sideways, so up / down swipes, pinch and double tap on empty space are free; long-press empty space for Settings."
+    else -> "This home scrolls up / down, so sideways swipes, pinch and double tap on empty space are free; long-press empty space for Settings."
 }
 
 /**
  * The information architecture, as a launcher user expects it: what's on the home screen, how it
  * looks, the clock, corners, gestures, the app drawer, search, the left page, then system.
- * (The categories above are built by topic; this regroups them.)
+ * (The categories above are built by topic; this regroups them.) [paged] = the first built
+ * category is the "Page N" one, which only the paged home has.
  */
-private fun reorganise(built: List<SettingCategory>, m: SettingsModel): List<SettingCategory> {
+private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<SettingCategory> {
     fun cat(title: String) = built.firstOrNull { it.title == title || it.title == x(title) }
     fun items(vararg titles: String) = titles.flatMap { cat(it)?.items.orEmpty() }
     val out = ArrayList<SettingCategory>()
-    built.firstOrNull()?.let { out += it } // This page
-    out += SettingCategory(x("Home screen"), Glyphs.Apps, items("Home"))
+    if (paged) built.firstOrNull()?.let { out += it } // This page
+    out += SettingCategory(x(HOME_SCREEN_TITLE), Glyphs.Apps, items("Home"))
     out += SettingCategory(x("Look"), Glyphs.Palette, items("Theme", "Indicator"))
     out += SettingCategory(x("Clock & status"), Glyphs.Clock, items("Clock"))
     out += SettingCategory(x("Corners"), Glyphs.Plus, items("Corners"))

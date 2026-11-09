@@ -454,6 +454,8 @@ fun GridHome(
                                     val ev = awaitPointerEvent()
                                     if (ev.changes.count { it.pressed } >= 2) return@awaitEachGesture
                                     val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    // An ancestor took it (the Launchpad's swipe-right): not ours any more.
+                                    if (c.isConsumed) return@awaitEachGesture
                                     total = c.position - down.position
                                     if (!c.pressed) break
                                 }

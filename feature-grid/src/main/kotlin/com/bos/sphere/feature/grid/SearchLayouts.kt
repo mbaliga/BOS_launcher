@@ -71,6 +71,7 @@ import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.WebRow
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -254,14 +255,28 @@ internal fun Orbit(
         val colW = 80.dp
         val colWPx = with(density) { colW.toPx() }
         val margin = colWPx / 2f
-        val radii = floatArrayOf(0.36f * wPx, 0.58f * wPx, 0.80f * wPx, 1.02f * wPx)
+        // Ring gaps stay wider than a tile (face + caption) so rings revolving past each other never touch.
+        val gap = max(0.22f * wPx, with(density) { 92.dp.toPx() })
+        val radii = FloatArray(4) { 0.36f * wPx + it * gap }
         val spacing = colWPx * 0.95f
-        val swayPx = with(density) { 5.dp.toPx() }
 
         // The rings are centred on the wheel and only their upper arcs are used. Slots run from the
         // top of each arc outward, so the best matches sit straight above the wheel.
-        val slots = remember(wPx, hPx, tiles.size) {
+        val slots = remember(wPx, hPx, tiles.size, motion) {
             val out = ArrayList<Pair<Int, Double>>() // ring, angle
+            if (motion) {
+                // Moving: whole rings, tiles spread round the full circle, so they revolve like planets
+                // (the lower half passes behind the wheel and keyboard). Best matches start at the top.
+                for (r in radii.indices) {
+                    val rad = radii[r]
+                    val n = max(1, (2 * PI * rad / spacing).toInt())
+                    val order = ArrayList<Double>()
+                    for (k in 0 until n) order += -PI / 2 + k * 2 * PI / n + (if (r % 2 == 1) PI / n else 0.0)
+                    order.sortBy { Math.abs(Math.atan2(sin(it + PI / 2), cos(it + PI / 2))) }
+                    order.forEach { out += r to it }
+                }
+                return@remember out
+            }
             for (r in radii.indices) {
                 val rad = radii[r]
                 val maxCos = ((cx - margin) / rad).coerceAtMost(1f)
@@ -289,6 +304,10 @@ internal fun Orbit(
             kept
         }
 
+        // Whole revolutions per animation period at about 18 dp/s, so the loop has no jump.
+        val revs = IntArray(radii.size) { r ->
+            max(1, ((ORBIT_PERIOD_MS / 1000.0) * with(density) { 18.dp.toPx() } / (2 * PI * radii[r])).roundToInt())
+        }
         Canvas(Modifier.fillMaxSize()) {
             for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.10f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
         }
@@ -300,7 +319,7 @@ internal fun Orbit(
                 Modifier
                     .width(colW)
                     .offset {
-                        val sway = if (motion) (swayPx / radii[ring]) * sin(2 * PI * phase.value * 15.0 + ring * 1.7 + i * 0.9) * dir else 0.0
+                        val sway = if (motion) dir * phase.value * 2 * PI * revs[ring] else 0.0
                         val a = baseAngle + sway
                         val x = cx + radii[ring] * cos(a).toFloat()
                         val y = cy + radii[ring] * sin(a).toFloat()

@@ -98,6 +98,8 @@ class SettingsModel(
     val healthAvailable: Boolean,
     val appsByKey: Map<String, AppEntry>,
     val isLandscape: Boolean,
+    val chosenApp: (CornerActionId) -> String?,
+    val pickAppFor: (CornerActionId) -> Unit,
     val motionAvailable: Boolean,
     val editCorner: (Corner) -> Unit,
     val editGesture: (HomeGesture) -> Unit,
@@ -291,6 +293,17 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 Sub("Wheel groups")
                 Chips(WheelGrouping.entries, p.wheelGrouping, { it.label }) { g -> upd { it.copy(wheelGrouping = g) } }
                 note("The wheel fans out around the corner you open it from.")
+            },
+            SettingItem.Pane(x("Open with"), Glyphs.Apps, x("Choose the app for Music, Browser…")) {
+                listOf(
+                    CornerActionId.Music, CornerActionId.Messages, CornerActionId.Browser, CornerActionId.Email, CornerActionId.Maps,
+                    CornerActionId.Calendar, CornerActionId.Gallery, CornerActionId.Contacts, CornerActionId.Calculator, CornerActionId.Camera,
+                ).forEach { id ->
+                    com.bos.sphere.feature.grid.ActionRow(
+                        label = x(id.label), summary = m.chosenApp(id) ?: x("Ask each time"), selected = false, onClick = { m.pickAppFor(id) },
+                    )
+                }
+                note("Pick any installed app — the list isn't limited to what the system suggests.")
             },
             SettingItem.Pane(x("Drawer layout"), Glyphs.Widget, "${x(p.drawerView.label)} · ${x(p.drawerSort.label)}") {
                 Sub("View")

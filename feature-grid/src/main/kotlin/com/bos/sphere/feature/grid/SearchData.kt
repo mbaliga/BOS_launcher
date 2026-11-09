@@ -153,14 +153,16 @@ internal fun buildSuggestionGroups(query: String, appCategories: List<String>, m
     val chips = suggest(query, appCategories)
     val kinds = chips.filter { it.kind == SuggestionKind.Key || it.kind == SuggestionKind.Value }
         .map { SuggItem(it.label, it.insertion, null, accent = true) }
+    // "Name contains" is already offered once under Filenames: don't repeat it per category.
+    val nameLabel = L10n.tr("Name contains “%s”", q)
     val appText = chips.filter { it.kind == SuggestionKind.Text || it.kind == SuggestionKind.Natural }
+        .filter { it.label != nameLabel && !it.label.startsWith(L10n.tr("Name contains")) }
         .map { SuggItem(it.label, it.insertion, null) }
     val all = buildList {
         add(SuggGroup(L10n.tr("Filenames"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Files))))
         add(SuggGroup(L10n.tr("Content"), listOf(SuggItem(L10n.tr("Contains “%s”", q), null, SearchCategory.Files))))
         if (kinds.isNotEmpty()) add(SuggGroup(L10n.tr("Kinds"), kinds))
         if (appText.isNotEmpty()) add(SuggGroup(L10n.tr("Refine apps"), appText))
-        add(SuggGroup(L10n.tr("Contacts"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Contacts))))
         add(web)
     }
     var left = maxRows

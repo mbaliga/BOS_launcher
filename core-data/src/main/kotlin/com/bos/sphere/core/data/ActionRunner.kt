@@ -41,6 +41,15 @@ object ActionApps {
 
     private fun category(c: String) = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, c)
 
+    /** True when the system would show its own "Complete action using" chooser (several handlers, none preferred). */
+    fun needsChoice(context: Context, id: CornerActionId): Boolean {
+        val intent = intentFor(id) ?: return false
+        val pm = context.packageManager
+        val best = pm.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo
+        if (best != null && best.packageName != "android") return false
+        return pm.queryIntentActivities(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY).size > 1
+    }
+
     /** Actions where the user may prefer to pick one specific app (the system would ask, or pick for them). */
     val appCapable: Set<CornerActionId> = setOf(
         CornerActionId.Music, CornerActionId.Camera, CornerActionId.Phone, CornerActionId.Messages, CornerActionId.Browser,
@@ -50,6 +59,10 @@ object ActionApps {
 
     /** The app that would handle [id] right now, or null when the system would show a chooser / nothing handles it. */
     fun resolve(context: Context, id: CornerActionId): ComponentName? {
+        ActionPrefs.get(context, id)?.let { key ->
+            val at = key.lastIndexOf('#')
+            if (at > 0) ComponentName.unflattenFromString(key.substring(0, at))?.let { return it }
+        }
         val intent = intentFor(id) ?: return null
         val pm = context.packageManager
         val best = pm.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo
@@ -57,6 +70,41 @@ object ActionApps {
         val info = if (best != null && best.packageName != "android") best
         else pm.queryIntentActivities(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY).firstOrNull()?.activityInfo
         return info?.let { ComponentName(it.packageName, it.name) }
+    }
+}
+
+/** The app the user picked for an app-backed action ([AppEntry.key]); null = let the system decide. */
+object ActionPrefs {
+    private fun sp(c: Context) = c.applicationContext.getSharedPreferences("action_apps", Context.MODE_PRIVATE)
+    fun get(c: Context, id: CornerActionId): String? = sp(c).getString(id.name, null)
+    fun set(c: Context, id: CornerActionId, key: String?) {
+        sp(c).edit().apply { if (key == null) remove(id.name) else putString(id.name, key) }.apply()
+    }
+}
+
+/** Which installed apps are good candidates for an app-backed action, so the picker can lead with them. */
+object ActionCandidates {
+    private val knownMusic = setOf(
+        "com.apple.android.music", "com.spotify.music", "org.videolan.vlc", "com.google.android.apps.youtube.music",
+        "com.amazon.mp3", "com.aspiro.tidal", "deezer.android.app", "com.soundcloud.android", "com.maxmpz.audioplayer",
+        "code.name.monkey.retromusic", "com.android.music", "org.lineageos.eleven", "com.google.android.music",
+    )
+
+    fun packages(context: Context, id: CornerActionId): Set<String> {
+        val pm = context.packageManager
+        val out = HashSet<String>()
+        fun add(i: Intent) = pm.queryIntentActivities(i, android.content.pm.PackageManager.MATCH_ALL).forEach { out += it.activityInfo.packageName }
+        ActionApps.intentFor(id)?.let(::add)
+        if (id == CornerActionId.Music) {
+            out += knownMusic.filter { runCatching { pm.getPackageInfo(it, 0) }.isSuccess }
+            add(Intent(Intent.ACTION_VIEW).setDataAndType(android.net.Uri.parse("content://media/external/audio/media/1"), "audio/*"))
+            // Anything that exposes a media browser or takes media buttons is a player.
+            pm.queryIntentServices(Intent("android.media.browse.MediaBrowserService"), android.content.pm.PackageManager.MATCH_ALL)
+                .forEach { out += it.serviceInfo.packageName }
+            pm.queryBroadcastReceivers(Intent(Intent.ACTION_MEDIA_BUTTON), android.content.pm.PackageManager.MATCH_ALL)
+                .forEach { out += it.activityInfo.packageName }
+        }
+        return out
     }
 }
 
@@ -77,6 +125,8 @@ class ActionRunner(
     context: Context,
     private val onInternal: (CornerActionId) -> Unit,
     private val onAppLaunched: (String) -> Unit = {},
+    /** Asked when an app-backed action has no chosen app and the system would show its own chooser. Null = let the system do it. */
+    private val onPickApp: ((CornerActionId) -> Unit)? = null,
 ) {
     private val ctx = context.applicationContext
     private val launcherApps = ctx.getSystemService(LauncherApps::class.java)
@@ -95,6 +145,10 @@ class ActionRunner(
         if (id.internal) {
             onInternal(id)
             return
+        }
+        if (id in ActionApps.appCapable) {
+            ActionPrefs.get(ctx, id)?.let { if (launchKey(it)) return }
+            if (onPickApp != null && ActionApps.needsChoice(ctx, id)) { onPickApp.invoke(id); return }
         }
         when (id) {
             CornerActionId.Music -> category(Intent.CATEGORY_APP_MUSIC, id)

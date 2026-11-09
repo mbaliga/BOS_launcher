@@ -57,6 +57,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.bos.sphere.core.data.ActionCandidates
+import com.bos.sphere.core.data.ActionPrefs
 import com.bos.sphere.feature.grid.observeBackgroundTouch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -292,8 +294,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     val internalRef by rememberUpdatedState(::internal)
+    var pickFor by remember { mutableStateOf<CornerActionId?>(null) }
+    var actionAppsRev by remember { mutableIntStateOf(0) }
+    val pickAppForRef by rememberUpdatedState({ id: CornerActionId -> pickFor = id })
     val runner = remember {
-        ActionRunner(context, onInternal = { internalRef(it, null) }, onAppLaunched = { stores.history.record(it) })
+        ActionRunner(context, onInternal = { internalRef(it, null) }, onAppLaunched = { stores.history.record(it) }, onPickApp = { pickAppForRef(it) })
     }
 
     fun runItem(item: CornerItem, anchor: Corner?) {
@@ -710,6 +715,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         val categories = buildSettingsCategories(
             SettingsModel(
+                chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
+                pickAppFor = { id -> pickFor = id },
                 prefs = prefs,
                 updatePrefs = stores.prefs::update,
                 pageIndex = settingsPage,
@@ -847,6 +854,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 dismiss = L10n.tr("Keep"),
                 onConfirm = { savePages(HomeLayoutMath.reflow(pages, capacityOf)); fillPrompt = false },
                 onDismiss = { fillPrompt = false },
+            )
+        }
+        pickFor?.let { id ->
+            val suggested = remember(id) { ActionCandidates.packages(context, id) }
+            com.bos.sphere.feature.grid.AppPickerDialog(
+                title = L10n.tr("Open %s with", L10n.tr(id.label)),
+                apps = apps, suggested = suggested,
+                onPick = { app -> ActionPrefs.set(context, id, app.key); actionAppsRev++; pickFor = null; launch(app) },
+                onDismiss = { pickFor = null },
+                resetLabel = if (ActionPrefs.get(context, id) != null) L10n.tr("Ask me each time") else null,
+                onReset = { ActionPrefs.set(context, id, null); actionAppsRev++; pickFor = null },
             )
         }
         if (!prefs.onboardingDone) {

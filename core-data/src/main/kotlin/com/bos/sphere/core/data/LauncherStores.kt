@@ -79,6 +79,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putLong("bgA", next.backgroundColorA).putLong("bgB", next.backgroundColorB)
             .putString("webEngine", next.webEngine.name)
             .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
+            .putString("searchLayout", next.searchLayout.name).putBoolean("searchBackdrop", next.searchBackdrop)
+            .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
+            .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
             .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
             .putFloat("clockSize", next.clockSize)
@@ -154,6 +157,12 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
             searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
             searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
+            searchLayout = runCatching { SearchLayout.valueOf(sp.getString("searchLayout", null) ?: "") }.getOrDefault(d.searchLayout),
+            searchBackdrop = sp.getBoolean("searchBackdrop", d.searchBackdrop),
+            searchMotion = sp.getBoolean("searchMotion", d.searchMotion),
+            searchFiles = sp.getBoolean("searchFiles", d.searchFiles),
+            searchActions = sp.getBoolean("searchActions", d.searchActions),
+            searchDeep = sp.getBoolean("searchDeep", d.searchDeep),
             // An install that already has settings saved is not a first run.
             onboardingDone = sp.getBoolean("onboardingDone", sp.contains("style") || sp.contains("pCols")),
             alwaysKeyboard = sp.getBoolean("alwaysKeyboard", d.alwaysKeyboard),

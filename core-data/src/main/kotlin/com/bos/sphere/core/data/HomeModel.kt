@@ -84,6 +84,9 @@ enum class BackgroundKind(val label: String) {
 }
 
 /** Web search engine for the "search the web" rows. DuckDuckGo is the default so !bangs work (!g, !gi, !yt, !w …). */
+/** How the search screen presents results. */
+enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
+
 enum class WebEngine(val label: String, private val template: String) {
     DuckDuckGo("DuckDuckGo", "https://duckduckgo.com/?q=%s"),
     Google("Google", "https://www.google.com/search?q=%s"),
@@ -209,6 +212,15 @@ data class LauncherPrefs(
     val webEngine: WebEngine = WebEngine.DuckDuckGo,
     val searchWeb: Boolean = true,
     val searchContacts: Boolean = true,
+    val searchLayout: SearchLayout = SearchLayout.Filmstrip,
+    /** The bundled backdrop picture behind search (off = plain black). */
+    val searchBackdrop: Boolean = true,
+    /** Filmstrip / orbit keep drifting slowly; off = still until you move them. */
+    val searchMotion: Boolean = true,
+    val searchFiles: Boolean = true,
+    val searchActions: Boolean = true,
+    /** Ask installed Fylz / Fotoz for deep (text-in-image, content) matches. */
+    val searchDeep: Boolean = true,
 
     // --- first run
     val onboardingDone: Boolean = false,

@@ -30,7 +30,6 @@ class AndroidSearchHub(context: Context) : SearchHub {
 
     override fun search(query: String, prefs: LauncherPrefs): Flow<Map<SearchCategory, List<SearchHit>>> = channelFlow {
         val q = query.trim()
-        if (q.isEmpty()) { send(emptyMap()); return@channelFlow }
         val lock = Mutex()
         var actions = emptyList<SearchHit>()
         var media = emptyList<SearchHit>()
@@ -45,9 +44,9 @@ class AndroidSearchHub(context: Context) : SearchHub {
             send(map)
         }
 
-        if (prefs.searchActions) publish { actions = ActionHits.match(q) } else send(emptyMap())
+        if (prefs.searchActions) publish { actions = ActionHits.match(q, if (q.isEmpty()) 10 else 6) } else send(emptyMap())
         if (prefs.searchFiles) launch { val r = files.search(q, SearchMerge.MAX_FILES); publish { media = r } }
-        if (prefs.searchDeep) launch { val r = deep.search(q, SearchMerge.MAX_FILES); publish { deepHits = r } }
+        if (prefs.searchDeep && q.isNotEmpty()) launch { val r = deep.search(q, SearchMerge.MAX_FILES); publish { deepHits = r } }
     }
 
     override fun hasFileAccess(): Boolean = files.hasAccess()

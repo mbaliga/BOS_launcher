@@ -75,9 +75,10 @@ object ActionHits {
 
     fun match(query: String, limit: Int = 6): List<SearchHit> {
         val q = query.trim().lowercase()
-        if (q.isEmpty() || limit <= 0) return emptyList()
+        if (limit <= 0) return emptyList()
+        // Nothing typed yet: offer the first few actions so the Actions wheel position isn't empty.
         return offered
-            .map { it to score(it, q) }
+            .map { it to (if (q.isEmpty()) 0.1f else score(it, q)) }
             .filter { it.second > 0f }
             .sortedWith(compareByDescending<Pair<CornerActionId, Float>> { it.second }.thenBy { it.first.ordinal })
             .take(limit)

@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -115,23 +116,24 @@ internal val WheelHeight = WheelRow * 5
  */
 @Composable
 internal fun CategoryWheel(
-    selected: SearchCategory,
+    selected: SearchCategory?,
     counts: Map<SearchCategory, Int>?,
-    onSelect: (SearchCategory) -> Unit,
+    onSelect: (SearchCategory?) -> Unit,
     onTick: () -> Unit,
     onTouch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val cats = SearchCategory.entries
-    val pos = remember { Animatable(selected.ordinal.toFloat()) }
+    val cats: List<SearchCategory?> = listOf(null) + SearchCategory.entries
+    fun idx(c: SearchCategory?) = cats.indexOf(c).toFloat()
+    val pos = remember { Animatable(idx(selected)) }
     val scope = rememberCoroutineScope()
     var dragging by remember { mutableStateOf(false) }
-    val raw = remember { floatArrayOf(selected.ordinal.toFloat()) }
+    val raw = remember { floatArrayOf(idx(selected)) }
     val onSelectNow by rememberUpdatedState(onSelect)
     val onTickNow by rememberUpdatedState(onTick)
     val onTouchNow by rememberUpdatedState(onTouch)
     LaunchedEffect(selected) {
-        if (!dragging) { raw[0] = selected.ordinal.toFloat(); pos.animateTo(selected.ordinal.toFloat(), spring(stiffness = 380f)) }
+        if (!dragging) { raw[0] = idx(selected); pos.animateTo(idx(selected), spring(stiffness = 380f)) }
     }
     val rowPx = with(LocalDensity.current) { WheelRow.toPx() }
     Box(
@@ -155,8 +157,8 @@ internal fun CategoryWheel(
             },
     ) {
         cats.forEachIndexed { i, cat ->
-            val n = counts?.get(cat) ?: -1
-            val empty = counts != null && n == 0 && cat != selected
+            val n = if (cat == null) -1 else counts?.get(cat) ?: -1
+            val empty = cat != null && counts != null && n == 0 && cat != selected
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -171,7 +173,7 @@ internal fun CategoryWheel(
                     },
             ) {
                 Text(
-                    cat.label.uppercase(), color = Color.White, fontSize = 16.sp, letterSpacing = 0.8.sp,
+                    (cat?.label ?: L10n.tr("Everything")).uppercase(), color = Color.White, fontSize = 16.sp, letterSpacing = 0.8.sp,
                     fontWeight = if (cat == selected) FontWeight.Medium else FontWeight.Normal, maxLines = 1,
                 )
                 if (n > 0 && cat != selected) {
@@ -358,14 +360,20 @@ internal fun HitFace(hit: SearchHit, size: Dp, modifier: Modifier = Modifier, ra
 @Composable
 internal fun ContactFace(c: ContactRow, size: Dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size)) {
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        val photo by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(ContactPhotos.peek(c.hit.id), c.hit.id) {
+            if (value == null) value = ContactPhotos.load(ctx, c.hit)
+        }
         Box(
-            Modifier.matchParentSize().clip(RoundedCornerShape(size * 0.3f))
+            Modifier.matchParentSize().clip(CircleShape)
                 .background(Brush.linearGradient(listOf(HyleColors.VioletSoft, HyleColors.Violet))),
             contentAlignment = Alignment.Center,
         ) {
-            Text(ContactLogic.initials(c.hit.name), color = HyleColors.OnAccent, fontSize = (size.value * 0.34f).sp, fontWeight = FontWeight.SemiBold)
+            val bmp = photo
+            if (bmp != null) androidx.compose.foundation.Image(bmp, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.matchParentSize())
+            else Text(ContactLogic.initials(c.hit.name), color = HyleColors.OnAccent, fontSize = (size.value * 0.34f).sp, fontWeight = FontWeight.SemiBold)
         }
-        badgeChannel(c.channels)?.let { ch ->
+        c.primary?.let { ch ->
             val telegram = ch == Channel.Telegram
             Box(
                 Modifier.align(Alignment.TopEnd).offset(size * 0.1f, -size * 0.1f).size(size * 0.38f).clip(CircleShape)
@@ -427,4 +435,29 @@ internal val FolderGlyph = sglyph("folder") {
 internal val VideoGlyph = sglyph("video") {
     moveTo(3f, 6f); lineTo(16f, 6f); lineTo(16f, 18f); lineTo(3f, 18f); close()
     moveTo(16f, 10f); lineTo(21f, 7f); lineTo(21f, 17f); lineTo(16f, 14f)
+}
+
+/** Contact photos (profile pictures), loaded off the main thread and cached; null when a contact has none. */
+internal object ContactPhotos {
+    private val cache = object : android.util.LruCache<Long, androidx.compose.ui.graphics.ImageBitmap>(4 * 1024 * 1024) {
+        override fun sizeOf(key: Long, value: androidx.compose.ui.graphics.ImageBitmap) = value.width * value.height * 4
+    }
+    private val none = java.util.Collections.synchronizedSet(HashSet<Long>())
+    fun peek(id: Long): androidx.compose.ui.graphics.ImageBitmap? = cache.get(id)
+    suspend fun load(context: android.content.Context, hit: com.bos.sphere.core.data.ContactHit): androidx.compose.ui.graphics.ImageBitmap? {
+        cache.get(hit.id)?.let { return it }
+        if (hit.id in none) return null
+        val bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val uri = android.provider.ContactsContract.Contacts.getLookupUri(hit.id, hit.lookupKey)
+                android.provider.ContactsContract.Contacts.openContactPhotoInputStream(context.contentResolver, uri)?.use {
+                    android.graphics.BitmapFactory.decodeStream(it)?.let { b ->
+                        android.graphics.Bitmap.createScaledBitmap(b, 160, 160, true).let { bb -> bb.asImageBitmap() }
+                    }
+                }
+            }.getOrNull()
+        }
+        if (bmp != null) cache.put(hit.id, bmp) else none += hit.id
+        return bmp
+    }
 }

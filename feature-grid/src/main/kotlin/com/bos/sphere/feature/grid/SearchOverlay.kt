@@ -146,14 +146,17 @@ private fun rememberContactRows(query: String, contacts: ContactSource?, want: B
     var permitted by remember { mutableStateOf(true) }
     LaunchedEffect(query, contacts, want) {
         val q = query.trim()
-        if (!want || q.length < 2 || contacts == null) {
+        if (!want || (q.isNotEmpty() && q.length < 2) || contacts == null) {
             rows = emptyList()
             return@LaunchedEffect
         }
-        delay(120)
+        if (q.isNotEmpty()) delay(120)
         val (ok, found) = withContext(Dispatchers.IO) {
             val ok = contacts.hasPermission()
-            ok to if (ok) contacts.search(q).map { ContactRow(it, ContactActions.availableChannels(context, it)) } else emptyList()
+            ok to if (ok) (if (q.isEmpty()) contacts.recent() else contacts.search(q)).map {
+                val ch = ContactActions.availableChannels(context, it)
+                ContactRow(it, ch, ContactHabits.primaryFor(context, it.id, ch))
+            } else emptyList()
         }
         permitted = ok
         rows = found
@@ -232,15 +235,15 @@ internal fun SearchScreen(
         SearchData(
             query = trimmed, apps = ranked,
             contacts = if (wantContacts) contactRows else emptyList(),
-            askContacts = wantContacts && !contactsPermitted && trimmed.length >= 2,
+            askContacts = wantContacts && !contactsPermitted && (trimmed.length >= 2 || trimmed.isEmpty()),
             web = web, webFirst = webFirst,
             hits = hubMap,
             askFiles = hub != null && prefs.searchFiles && !fileAccess,
             deepHint = hub != null && prefs.searchFiles && hub.deepSources().isEmpty(),
         )
     }
-    val selected = userCat ?: data.best
-    val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
+    val selected: SearchCategory? = userCat
+    val counts = remember(data) { SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
 
     // ---- suggestions
     val appCategories = remember(apps) { apps.map { AppSearch.categoryNameOf(it.packageName) }.distinct().sorted() }
@@ -263,7 +266,12 @@ internal fun SearchScreen(
     fun tap(tile: Tile) {
         when (tile) {
             is Tile.App -> onLaunch(tile.app)
-            is Tile.Person -> { tick(); expandedContact = if (expandedContact == tile.c.hit.id) null else tile.c.hit.id }
+            is Tile.Person -> {
+                val ch = tile.c.primary
+                val i = ch?.let { ContactActions.intentFor(it, tile.c.hit) }
+                if (ch != null && i != null) { ContactHabits.record(context, tile.c.hit.id, ch); onOpenIntent(i) }
+                else { tick(); expandedContact = if (expandedContact == tile.c.hit.id) null else tile.c.hit.id }
+            }
             is Tile.Hit -> openHit(tile.hit)
             is Tile.Web -> when (val r = tile.row) {
                 is WebRow.Open -> onOpenIntent(WebSearch.intentFor(r.url))
@@ -276,7 +284,7 @@ internal fun SearchScreen(
             is Tile.Allow -> if (tile.files) onRequestFilePermission() else onRequestContactsPermission()
         }
     }
-    val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t is Tile.App) onLongPressApp(t.app) }, onTouch = { touched = true })
+    val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t is Tile.App) onLongPressApp(t.app) else if (t is Tile.Person) { tick(); expandedContact = if (expandedContact == t.c.hit.id) null else t.c.hit.id } }, onTouch = { touched = true })
     val pickSuggestion: (SuggItem) -> Unit = { item ->
         tick()
         item.scope?.let { userCat = it }
@@ -304,37 +312,39 @@ internal fun SearchScreen(
                 )
             } else if (layout != SearchLayout.Flat) {
                 // Idle browsing: the category wheel with Filmstrip or Orbit results.
-                val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts }
+                val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts || selected == null }
                 Column(Modifier.fillMaxSize().padding(bottom = 52.dp)) {
                     Spacer(Modifier.height(52.dp))
+                    val wheelRow: @Composable () -> Unit = {
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                            QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 14.dp))
+                            CategoryWheel(
+                                selected = selected, counts = counts,
+                                onSelect = { userCat = it; touched = true; expandedContact = null },
+                                onTick = { tick() }, onTouch = { touched = true },
+                                modifier = Modifier.width(124.dp),
+                            )
+                            Spacer(Modifier.width(76.dp))
+                        }
+                    }
                     if (layout == SearchLayout.Orbit) {
-                        Orbit(
-                            tiles = data.tiles(selected), motion = prefs.searchMotion, footnote = data.footnote(selected),
-                            actions = tileActions, modifier = Modifier.weight(1f).fillMaxWidth(),
-                        )
+                        // The rings are centred on the wheel: one box holds both.
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            Orbit(
+                                tiles = data.tiles(selected), motion = prefs.searchMotion, footnote = data.footnote(selected),
+                                actions = tileActions, centreFromBottom = WheelHeight / 2 + 4.dp, modifier = Modifier.fillMaxSize(),
+                            )
+                            Box(Modifier.align(Alignment.BottomCenter)) { wheelRow() }
+                            expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = WheelHeight + 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
+                        }
                     } else {
                         Spacer(Modifier.weight(1f))
-                    }
-                    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                        QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 14.dp))
-                        CategoryWheel(
-                            selected = selected, counts = counts,
-                            onSelect = { userCat = it; touched = true; expandedContact = null },
-                            onTick = { tick() }, onTouch = { touched = true },
-                            modifier = Modifier.width(124.dp),
-                        )
-                        Spacer(Modifier.width(76.dp))
-                    }
-                    if (layout == SearchLayout.Filmstrip) {
+                        wheelRow()
                         Filmstrip(
                             tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                             expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
                             actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
                         )
-                    } else {
-                        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-                            if (expanded != null) ContactChannelBar(expanded, onOpenIntent)
-                        }
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -418,7 +428,17 @@ fun submitSearch(
     if (url != null) onOpenIntent(WebSearch.intentFor(url))
 }
 
-internal class ContactRow(val hit: ContactHit, val channels: List<Channel>)
+internal class ContactRow(val hit: ContactHit, val channels: List<Channel>, val primary: Channel? = badgeChannel(channels))
+
+/** Remembers which way you last reached each person, so their tile wears that badge (a phone bubble after a call). */
+internal object ContactHabits {
+    private fun sp(c: android.content.Context) = c.getSharedPreferences("search_habits", android.content.Context.MODE_PRIVATE)
+    fun last(c: android.content.Context, id: Long): Channel? =
+        sp(c).getString("ch:$id", null)?.let { n -> Channel.entries.firstOrNull { it.name == n } }
+    fun record(c: android.content.Context, id: Long, ch: Channel) { sp(c).edit().putString("ch:$id", ch.name).apply() }
+    fun primaryFor(c: android.content.Context, id: Long, channels: List<Channel>): Channel? =
+        last(c, id)?.takeIf { it in channels } ?: Channel.Call.takeIf { it in channels } ?: badgeChannel(channels)
+}
 
 private sealed interface Row {
     val key: String

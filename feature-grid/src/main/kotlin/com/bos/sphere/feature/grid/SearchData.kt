@@ -102,7 +102,20 @@ internal class SearchData(
             .firstOrNull { count(it) > 0 } ?: SearchCategory.Apps
     }
 
-    fun tiles(cat: SearchCategory): List<Tile> = when (cat) {
+    /** "Everything": a mix, best matches first — apps, people, actions, files, web (web first for bangs/URLs). */
+    fun tiles(cat: SearchCategory?): List<Tile> {
+        if (cat != null) return tilesFor(cat)
+        val order = listOf(SearchCategory.Apps, SearchCategory.Contacts, SearchCategory.Actions, SearchCategory.Files, SearchCategory.Web)
+            .let { if (webFirst) it.sortedBy { c -> if (c == SearchCategory.Web) 0 else 1 } else it }
+        // Round-robin so every kind of result shows up near the centre, not just the first kind.
+        val lists = order.map { tilesFor(it).filter { t -> t !is Tile.Allow && t !is Tile.Bang } }
+        val out = ArrayList<Tile>()
+        var i = 0
+        while (out.size < 40 && lists.any { i < it.size }) { lists.forEach { l -> l.getOrNull(i)?.let(out::add) }; i++ }
+        return out
+    }
+
+    private fun tilesFor(cat: SearchCategory): List<Tile> = when (cat) {
         SearchCategory.Apps -> apps.map { Tile.App(it) }
         SearchCategory.Contacts -> buildList {
             contacts.forEach { add(Tile.Person(it)) }
@@ -122,7 +135,7 @@ internal class SearchData(
     }
 
     /** A quiet hint under the Files results when no deep-search app is installed. */
-    fun footnote(cat: SearchCategory): String? =
+    fun footnote(cat: SearchCategory?): String? =
         if (cat == SearchCategory.Files && deepHint && !blank) L10n.tr("Install Fylz or Fotoz for deeper results") else null
 }
 

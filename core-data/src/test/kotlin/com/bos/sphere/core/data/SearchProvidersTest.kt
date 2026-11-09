@@ -23,7 +23,7 @@ class SearchProvidersTest {
         assertTrue(ActionHits.match("grid").none { it.actionId == CornerActionId.GridDenser })
         assertTrue(ActionHits.match("search").none { it.actionId == CornerActionId.Search })
         assertTrue(ActionHits.match("notif").any { it.actionId == CornerActionId.Notifications })
-        assertTrue(ActionHits.match("").isEmpty())
+        assertTrue(ActionHits.match("", 4).size == 4)
         assertEquals(2, ActionHits.match("a", limit = 2).size)
     }
 

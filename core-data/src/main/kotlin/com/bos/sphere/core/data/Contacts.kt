@@ -101,15 +101,30 @@ class ContactSource(context: Context) {
     fun hasPermission(): Boolean =
         app.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
 
+    /** Starred and recently contacted people, for the browse view before anything is typed. */
+    fun recent(limit: Int = 12): List<ContactHit> = load(
+        ContactsContract.Contacts.CONTENT_URI, "${ContactsContract.Contacts.HAS_PHONE_NUMBER}=1",
+        "${ContactsContract.Contacts.STARRED} DESC, ${ContactsContract.Contacts.LAST_TIME_CONTACTED} DESC, ${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE NOCASE ASC",
+        limit,
+    )
+
     fun search(query: String, limit: Int = 6): List<ContactHit> {
         val q = query.trim()
-        if (q.length < 2 || !hasPermission()) return emptyList()
+        if (q.length < 2) return emptyList()
+        return load(
+            Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_FILTER_URI, Uri.encode(q)), null,
+            "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE NOCASE ASC", limit,
+        )
+    }
+
+    private fun load(uri: Uri, selection: String?, sort: String, limit: Int): List<ContactHit> {
+        if (!hasPermission()) return emptyList()
         return try {
             val base = ArrayList<Triple<Long, String, String>>()
             app.contentResolver.query(
-                Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_FILTER_URI, Uri.encode(q)),
+                uri,
                 arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.LOOKUP_KEY, ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
-                null, null, "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE NOCASE ASC",
+                selection, null, sort,
             )?.use { c ->
                 while (c.moveToNext() && base.size < limit) {
                     val name = c.getString(2) ?: continue

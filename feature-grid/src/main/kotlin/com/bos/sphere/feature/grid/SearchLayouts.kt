@@ -92,7 +92,8 @@ internal fun ContactChannelBar(c: ContactRow, onOpen: (android.content.Intent) -
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Text(c.hit.name, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 140.dp).padding(end = 8.dp))
         c.channels.forEach { ch ->
-            ChannelButton(ch) { ContactActions.intentFor(ch, c.hit)?.let(onOpen) }
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            ChannelButton(ch) { ContactHabits.record(ctx, c.hit.id, ch); ContactActions.intentFor(ch, c.hit)?.let(onOpen) }
         }
         if (c.channels.isEmpty()) {
             ChannelButton(Channel.Call) { onOpen(ContactActions.openContact(c.hit)) }
@@ -227,6 +228,8 @@ internal fun Orbit(
     motion: Boolean,
     footnote: String?,
     actions: TileActions,
+    /** Distance from the bottom edge to the common centre of the rings (the middle of the category wheel). */
+    centreFromBottom: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
     val phase: State<Float> = if (motion) {
@@ -244,66 +247,69 @@ internal fun Orbit(
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
-        val s = min(wPx * 1.1f, hPx * 1.3f)
         val cx = wPx / 2f
-        val cy = hPx * 0.5f
-        val radii = floatArrayOf(0f, 0.24f * s, 0.46f * s, 0.68f * s)
-        val caps = intArrayOf(1, 6, 12, 18)
+        val cy = hPx - with(density) { centreFromBottom.toPx() }
+        val tileSize = 54.dp
+        val tilePx = with(density) { tileSize.toPx() }
+        val colW = 80.dp
+        val colWPx = with(density) { colW.toPx() }
+        val margin = colWPx / 2f
+        val radii = floatArrayOf(0.36f * wPx, 0.58f * wPx, 0.80f * wPx, 1.02f * wPx)
+        val spacing = colWPx * 0.95f
 
-        // Slot assignment: index -> (ring, k, count on that ring).
-        val placed = tiles.take(37)
-        val slots = remember(placed.size) {
-            val out = ArrayList<Triple<Int, Int, Int>>()
-            var left = placed.size
-            for (r in 0..3) {
-                val m = min(caps[r], left)
-                for (k in 0 until m) out += Triple(r, k, m)
-                left -= m
+        // The rings are centred on the wheel and only their upper arcs are used. Slots run from the
+        // top of each arc outward, so the best matches sit straight above the wheel.
+        val slots = remember(wPx, hPx, tiles.size) {
+            val out = ArrayList<Pair<Int, Double>>() // ring, angle
+            for (r in radii.indices) {
+                val rad = radii[r]
+                val maxCos = ((cx - margin) / rad).coerceAtMost(1f)
+                // Half-angle (from straight up) that still keeps the tile inside the screen width.
+                val clearPx = with(density) { 105.dp.toPx() } // keep tiles off the wheel text
+                val lim = min(Math.asin(maxCos.toDouble().coerceIn(0.0, 1.0)), Math.acos((clearPx / rad).toDouble().coerceIn(0.0, 1.0)))
+                val fit = (2 * lim * rad / spacing).toInt() + 1
+                val n = fit.coerceAtLeast(1)
+                val step = if (n > 1) 2 * lim / (n - 1) else 0.0
+                val order = ArrayList<Double>()
+                for (k in 0 until n) order += -PI / 2 + (if (n == 1) 0.0 else -lim + k * step)
+                order.sortBy { Math.abs(it + PI / 2) }
+                order.filter { cy + rad * sin(it) >= tilePx }.forEach { out += r to it }
             }
             out
         }
 
         Canvas(Modifier.fillMaxSize()) {
-            for (r in 1..3) drawCircle(Color.White.copy(alpha = 0.10f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
+            for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.10f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
         }
 
-        val centreSize = 66.dp
-        val tileSize = 58.dp
-        val colW = 84.dp
-        val colWPx = with(density) { colW.toPx() }
-        placed.forEachIndexed { i, tile ->
-            val (ring, k, m) = slots[i]
-            val face = if (ring == 0) centreSize else tileSize
-            val facePx = with(density) { face.toPx() }
-            val base = -PI / 2 + k * 2 * PI / m + (if (ring == 2) 0.26 else if (ring == 3) 0.12 else 0.0)
-            val dir = if (ring == 2) -1.0 else 1.0
-            val tilt = 0f
+        tiles.take(slots.size).forEachIndexed { i, tile ->
+            val (ring, baseAngle) = slots[i]
+            val dir = if (ring % 2 == 1) -1.0 else 1.0
             Column(
                 Modifier
                     .width(colW)
                     .offset {
-                        val a = base + dir * phase.value * 2 * PI
+                        val sway = if (motion) 0.10 * sin(2 * PI * phase.value * 15.0 + ring * 1.7 + i * 0.9) * dir else 0.0
+                        val a = baseAngle + sway
                         val x = cx + radii[ring] * cos(a).toFloat()
                         val y = cy + radii[ring] * sin(a).toFloat()
-                        IntOffset((x - colWPx / 2f).roundToInt(), (y - facePx / 2f).roundToInt())
+                        IntOffset((x - colWPx / 2f).roundToInt(), (y - tilePx / 2f).roundToInt())
                     },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 androidx.compose.foundation.layout.Box(
-                    Modifier.graphicsLayer { rotationZ = tilt }.clip(androidx.compose.foundation.shape.CircleShape).orbitClick(tile, actions),
-                ) { TileFace(tile, face) }
-                run {
-                    Text(
-                        tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = 10.sp, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
-                    )
-                }
+                    Modifier.clip(androidx.compose.foundation.shape.CircleShape).orbitClick(tile, actions),
+                ) { TileFace(tile, tileSize) }
+                Text(
+                    tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = 10.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
+                )
             }
         }
         if (footnote != null) {
             Text(
                 footnote, color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp, maxLines = 1,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp),
             )
         }
     }
@@ -427,7 +433,8 @@ private fun FlatTileRow(
                 ContactFace(tile.c, 34.dp)
                 Text(tile.c.hit.name, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp))
             }
-            tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
         }
         is Tile.Bang -> Text(
             "!${tile.code}  ${tile.name}", color = HyleColors.VioletSoft, fontSize = 16.sp,

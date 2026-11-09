@@ -81,7 +81,7 @@ class FileSearch(private val context: Context) : SearchProvider {
 
     override suspend fun search(query: String, limit: Int): List<SearchHit> {
         val q = query.trim()
-        if (q.isEmpty() || limit <= 0 || !hasAccess()) return emptyList()
+        if (limit <= 0 || !hasAccess()) return emptyList()
         return withContext(Dispatchers.IO) {
             try {
                 query(q, limit)

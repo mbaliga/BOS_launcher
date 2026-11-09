@@ -136,7 +136,7 @@ internal class SearchData(
 
     /** A quiet hint under the Files results when no deep-search app is installed. */
     fun footnote(cat: SearchCategory?): String? =
-        if (cat == SearchCategory.Files && deepHint && !blank) L10n.tr("Install Fylz or Fotoz for deeper results") else null
+        if (cat == SearchCategory.Files && deepHint && !blank && count(SearchCategory.Files) > 0) L10n.tr("Install Fylz or Fotoz for deeper results") else null
 }
 
 // ---- refinement suggestions (macOS Spotlight menu) ----
@@ -145,11 +145,18 @@ internal class SuggItem(val label: String, val insertion: String?, val scope: Se
 internal class SuggGroup(val header: String, val items: List<SuggItem>)
 
 /** Header + rows like the macOS suggestion menu: Filenames, Content, Kinds, Contacts, Web. */
-internal fun buildSuggestionGroups(query: String, appCategories: List<String>, maxRows: Int = Int.MAX_VALUE): List<SuggGroup> {
+internal fun buildSuggestionGroups(
+    query: String,
+    appCategories: List<String>,
+    maxRows: Int = Int.MAX_VALUE,
+    /** Only offer what can really be searched right now: no phantom rows. */
+    filesAvailable: Boolean = true,
+    deepAvailable: Boolean = true,
+    appHits: Boolean = true,
+): List<SuggGroup> {
     val q = query.trim()
     if (q.isEmpty()) return emptyList()
-    val web = SuggGroup(L10n.tr("Web"), listOf(SuggItem(L10n.tr("Search the web for “%s”", q), null, SearchCategory.Web)))
-    if (WebSearch.hasBang(q)) return listOf(web)
+    if (WebSearch.hasBang(q)) return emptyList() // the Web section already has the bang search
     val chips = suggest(query, appCategories)
     val kinds = chips.filter { it.kind == SuggestionKind.Key || it.kind == SuggestionKind.Value }
         .map { SuggItem(it.label, it.insertion, null, accent = true) }
@@ -159,11 +166,10 @@ internal fun buildSuggestionGroups(query: String, appCategories: List<String>, m
         .filter { it.label != nameLabel && !it.label.startsWith(L10n.tr("Name contains")) }
         .map { SuggItem(it.label, it.insertion, null) }
     val all = buildList {
-        add(SuggGroup(L10n.tr("Filenames"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Files))))
-        add(SuggGroup(L10n.tr("Content"), listOf(SuggItem(L10n.tr("Contains “%s”", q), null, SearchCategory.Files))))
-        if (kinds.isNotEmpty()) add(SuggGroup(L10n.tr("Kinds"), kinds))
-        if (appText.isNotEmpty()) add(SuggGroup(L10n.tr("Refine apps"), appText))
-        add(web)
+        if (filesAvailable) add(SuggGroup(L10n.tr("Filenames"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Files))))
+        if (deepAvailable) add(SuggGroup(L10n.tr("Content"), listOf(SuggItem(L10n.tr("Contains “%s”", q), null, SearchCategory.Files))))
+        if (appHits && kinds.isNotEmpty()) add(SuggGroup(L10n.tr("Kinds"), kinds))
+        if (appHits && appText.isNotEmpty()) add(SuggGroup(L10n.tr("Refine apps"), appText))
     }
     var left = maxRows
     val out = ArrayList<SuggGroup>()

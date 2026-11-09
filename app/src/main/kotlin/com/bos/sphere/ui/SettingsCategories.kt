@@ -134,7 +134,7 @@ class SystemLinks(
 const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
 
-private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.Sphere -> "Sphere"; HomeStyle.Bubbles -> "Bubbles" }
+private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.Sphere -> "Sphere"; HomeStyle.Bubbles -> "Bubbles"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
 
 /** A miniature status strip showing what is placed where. */
 @Composable
@@ -244,6 +244,15 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Pane(x("Style"), Glyphs.Apps, x(homeStyleName(p.homeStyle))) {
                 VisualChoice(HomeStyle.entries, p.homeStyle, { s -> upd { it.copy(homeStyle = s) } }, { x(homeStyleName(it)) }, previewHeight = 120.dp) { HomeStylePreview(it) }
             },
+            SettingItem.Pane(x("Scrolling"), Glyphs.Swipe, x(p.homeScroll.label)) {
+                VisualChoice(com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { v -> upd { it.copy(homeScroll = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { v ->
+                    GlyphPreview(if (v == com.bos.sphere.core.data.HomeScroll.Paged) Glyphs.Swipe else Glyphs.Down, x(v.label))
+                }
+                if (p.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous && p.homeStyle == HomeStyle.Grid) {
+                    Stepper(L10n.tr("Icons across"), p.continuousColumns, 2..8) { v -> upd { it.copy(continuousColumns = v) } }
+                }
+                note("Pages: swipe between screens. Continuous: one long scroll of every app — the DSi look uses 3 icons across.")
+            },
             SettingItem.Pane(x("Default density"), Glyphs.Widget, "${gridLabel(p.portraitGrid)} · ${gridLabel(p.landscapeGrid)}") {
                 val preset = DensityPreset.entries.firstOrNull { it.portrait == p.portraitGrid && it.landscape == p.landscapeGrid }
                 VisualChoice(DensityPreset.entries, preset ?: DensityPreset.Default, { d -> upd { it.copy(portraitGrid = d.portrait, landscapeGrid = d.landscape) } }, { x(it.label) }, previewHeight = 96.dp) {
@@ -344,7 +353,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Clock"),
         Glyphs.Clock,
         listOf(
-            SettingItem.Pane(x("Position"), Glyphs.Clock, x(p.clockPosition.label)) {
+            SettingItem.Pane(x("Clock position"), Glyphs.Clock, x(p.clockPosition.label)) {
                 VisualChoice(ClockPosition.entries, p.clockPosition, { c -> upd { it.copy(clockPosition = c) } }, { x(it.label) }, previewHeight = 96.dp) { StripPositionPreview(it) }
                 note("It can also be a tile on a page, or a corner complication.")
             },
@@ -364,10 +373,10 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     }
                 }
             },
-            SettingItem.Pane(x("Size"), Glyphs.Dial, "${p.clockSize.roundToInt()}") {
+            SettingItem.Pane(x("Clock size"), Glyphs.Dial, "${p.clockSize.roundToInt()}") {
                 LabeledSlider(L10n.tr("Size"), p.clockSize, LauncherPrefs.MIN_CLOCK_SIZE..LauncherPrefs.MAX_CLOCK_SIZE, "${p.clockSize.roundToInt()}") { v -> upd { it.copy(clockSize = v) } }
             },
-            SettingItem.Pane(x("Format"), Glyphs.Clock, x(p.clockFormat.label)) {
+            SettingItem.Pane(x("Clock format"), Glyphs.Clock, x(p.clockFormat.label)) {
                 Chips(ClockFormat.entries, p.clockFormat, { it.label }) { c -> upd { it.copy(clockFormat = c) } }
             },
             SettingItem.Toggle(x("Day"), Glyphs.Calendar, p.clockShowDay) { v -> upd { it.copy(clockShowDay = v) } },
@@ -389,7 +398,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 },
             )
             add(
-                SettingItem.Pane(x("Size"), Glyphs.Dial, "${p.cornerIconSize.roundToInt()}") {
+                SettingItem.Pane(x("Corner icon size"), Glyphs.Dial, "${p.cornerIconSize.roundToInt()}") {
                     LabeledSlider(L10n.tr("Size"), p.cornerIconSize, LauncherPrefs.MIN_CORNER_ICON..LauncherPrefs.MAX_CORNER_ICON, "${p.cornerIconSize.roundToInt()}") { v -> upd { it.copy(cornerIconSize = v) } }
                 },
             )
@@ -461,7 +470,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             if (!m.motionAvailable) add(SettingItem.Action(x("No motion sensor on this device"), Glyphs.Close, "") {})
             add(SettingItem.Toggle(x("When home isn't showing"), Glyphs.Bolt, p.motionInBackground) { v -> upd { it.copy(motionInBackground = v) } })
             add(
-                SettingItem.Pane(x("Sensitivity"), Glyphs.Dial, "${(p.motionSensitivity * 100).roundToInt()}%") {
+                SettingItem.Pane(x("Motion sensitivity"), Glyphs.Dial, "${(p.motionSensitivity * 100).roundToInt()}%") {
                     LabeledSlider(L10n.tr("Sensitivity"), p.motionSensitivity, 0f..1f, "${(p.motionSensitivity * 100).roundToInt()}%") { v -> upd { it.copy(motionSensitivity = v) } }
                     note("Higher reacts to lighter movements (and more false triggers).")
                 },
@@ -477,7 +486,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Theme"),
         Glyphs.Palette,
         listOf(
-            SettingItem.Pane(x("Mode"), Glyphs.Moon, x(p.themeMode.label)) {
+            SettingItem.Pane(x("Light / dark"), Glyphs.Moon, x(p.themeMode.label)) {
                 VisualChoice(ThemeMode.entries, p.themeMode, { v -> upd { it.copy(themeMode = v) } }, { x(it.label) }, previewHeight = 96.dp) { ThemeModePreview(it, androidx.compose.ui.graphics.Color(p.accentColor)) }
             },
             SettingItem.Pane(x("Accent"), Glyphs.Palette, "") {
@@ -541,7 +550,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         "Radar",
         Glyphs.Search,
         listOf(
-            SettingItem.Pane(x("Layout"), Glyphs.Apps, x(p.searchLayout.label)) {
+            SettingItem.Pane(x("Radar layout"), Glyphs.Apps, x(p.searchLayout.label)) {
                 VisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v) } }, { x(it.label) }, previewHeight = 140.dp) {
                     com.bos.sphere.feature.grid.SearchLayoutPreview(it)
                 }
@@ -565,20 +574,20 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Indicator"),
         Glyphs.Dial,
         listOf(
-            SettingItem.Pane(x("Measurement"), Glyphs.Dial, x(p.indicatorMetric.label)) {
+            SettingItem.Pane(x("Glow: measurement"), Glyphs.Dial, x(p.indicatorMetric.label)) {
                 Chips(IndicatorMetric.entries, p.indicatorMetric, { it.label }) { v ->
                     upd { it.copy(indicatorMetric = v, indicatorInvert = v == IndicatorMetric.Storage || v == IndicatorMetric.Memory) }
                 }
                 note("What the background reads out: low to high is red → amber → green.")
             },
-            SettingItem.Pane(x("Effects"), Glyphs.Bolt, p.indicatorEffects.size.toString()) {
+            SettingItem.Pane(x("Glow: effects"), Glyphs.Bolt, p.indicatorEffects.size.toString()) {
                 IndicatorEffect.entries.forEach { e ->
                     val on = e in p.indicatorEffects
                     ToggleRow(L10n.tr(e.label), on, { v -> upd { it.copy(indicatorEffects = if (v) it.indicatorEffects + e else it.indicatorEffects - e) } })
                 }
                 note("Combine as many as you like.")
             },
-            SettingItem.Pane(x("Colours"), Glyphs.Palette, "") {
+            SettingItem.Pane(x("Glow: colours"), Glyphs.Palette, "") {
                 var which by remember { mutableIntStateOf(0) }
                 val names = listOf("Low", "Middle", "High", "Idle")
                 val values = listOf(p.indicatorLow, p.indicatorMid, p.indicatorHigh, p.indicatorIdle)
@@ -600,10 +609,10 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 })
                 ToggleRow(L10n.tr("Flip the ramp"), p.indicatorInvert, { v -> upd { it.copy(indicatorInvert = v) } }, hint = L10n.tr("For measurements where low is good (storage used)"))
             },
-            SettingItem.Pane(x("Intensity"), Glyphs.Dial, "${(p.indicatorIntensity * 100).roundToInt()}%") {
+            SettingItem.Pane(x("Glow: intensity"), Glyphs.Dial, "${(p.indicatorIntensity * 100).roundToInt()}%") {
                 LabeledSlider(L10n.tr("Intensity"), p.indicatorIntensity, 0f..1f, "${(p.indicatorIntensity * 100).roundToInt()}%") { v -> upd { it.copy(indicatorIntensity = v) } }
             },
-            SettingItem.Pane(x("Speed"), Glyphs.Dial, "${(p.indicatorSpeed * 100).roundToInt()}%") {
+            SettingItem.Pane(x("Glow: speed"), Glyphs.Dial, "${(p.indicatorSpeed * 100).roundToInt()}%") {
                 LabeledSlider(L10n.tr("Speed"), p.indicatorSpeed, 0f..1f, "${(p.indicatorSpeed * 100).roundToInt()}%") { v -> upd { it.copy(indicatorSpeed = v) } }
             },
         ),
@@ -669,6 +678,33 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         Glyphs.Info,
         m.about.map { (k, v) -> SettingItem.Action(x(k), Glyphs.Info, v) {} },
     )
+    return reorganise(out, m)
+}
+
+/**
+ * The information architecture, as a launcher user expects it: what's on the home screen, how it
+ * looks, the clock, corners, gestures, the app drawer, search, the left page, then system.
+ * (The categories above are built by topic; this regroups them.)
+ */
+private fun reorganise(built: List<SettingCategory>, m: SettingsModel): List<SettingCategory> {
+    fun cat(title: String) = built.firstOrNull { it.title == title || it.title == x(title) }
+    fun items(vararg titles: String) = titles.flatMap { cat(it)?.items.orEmpty() }
+    val out = ArrayList<SettingCategory>()
+    built.firstOrNull()?.let { out += it } // This page
+    out += SettingCategory(x("Home screen"), Glyphs.Apps, items("Home", "Sphere"))
+    out += SettingCategory(x("Look"), Glyphs.Palette, items("Theme", "Indicator"))
+    out += SettingCategory(x("Clock & status"), Glyphs.Clock, items("Clock"))
+    out += SettingCategory(x("Corners"), Glyphs.Plus, items("Corners"))
+    out += SettingCategory(x("Gestures"), Glyphs.Pinch, items("Gestures", "Motion"))
+    out += SettingCategory(x("App drawer"), Glyphs.Widget, cat("Apps")?.items.orEmpty().let { a ->
+        // Open-the-drawer settings first, then what lives on the home screen.
+        val first = listOf(x("All apps opens as"), x("Drawer layout"))
+        a.sortedBy { if (it.title in first) 0 else 1 }
+    })
+    cat("Radar")?.let { out += it }
+    cat("Launchpad")?.let { out += it }
+    out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
+    cat("About")?.let { out += it }
     return out
 }
 

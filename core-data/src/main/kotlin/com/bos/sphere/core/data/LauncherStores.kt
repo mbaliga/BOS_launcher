@@ -53,7 +53,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
         if (next == _prefs.value) return
         _prefs.value = next
         sp.edit()
-            .putString("style", next.homeStyle.name)
+            .putString("style", next.homeStyle.name).putString("homeScroll", next.homeScroll.name).putInt("contCols", next.continuousColumns)
             .putInt("pCols", next.portraitGrid.columns).putInt("pRows", next.portraitGrid.rows)
             .putInt("lCols", next.landscapeGrid.columns).putInt("lRows", next.landscapeGrid.rows)
             .putFloat("iconScale", next.iconScale)
@@ -123,6 +123,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
         val d = LauncherPrefs()
         return LauncherPrefs(
             homeStyle = enumOr(sp.getString("style", null), d.homeStyle),
+            homeScroll = enumOr(sp.getString("homeScroll", null), d.homeScroll),
+            continuousColumns = sp.getInt("contCols", d.continuousColumns),
             portraitGrid = GridSpec(sp.getInt("pCols", d.portraitGrid.columns), sp.getInt("pRows", d.portraitGrid.rows)).coerced(),
             landscapeGrid = GridSpec(sp.getInt("lCols", d.landscapeGrid.columns), sp.getInt("lRows", d.landscapeGrid.rows)).coerced(),
             iconScale = sp.getFloat("iconScale", d.iconScale)

@@ -247,8 +247,10 @@ internal fun SearchScreen(
 
     // ---- suggestions
     val appCategories = remember(apps) { apps.map { AppSearch.categoryNameOf(it.packageName) }.distinct().sorted() }
-    val groups = remember(query, appCategories, layout) {
-        buildSuggestionGroups(query, appCategories, maxRows = if (layout == SearchLayout.Flat) 8 else 5)
+    val filesAvailable = hub != null && prefs.searchFiles && fileAccess
+    val deepAvailable = hub != null && prefs.searchDeep && hub.deepSources().isNotEmpty()
+    val groups = remember(query, appCategories, layout, filesAvailable, deepAvailable, ranked.isNotEmpty()) {
+        buildSuggestionGroups(query, appCategories, maxRows = if (layout == SearchLayout.Flat) 8 else 5, filesAvailable = filesAvailable, deepAvailable = deepAvailable, appHits = ranked.isNotEmpty())
     }
     val showSuggestions = groups.isNotEmpty() && !touched && dismissedFor != query
 

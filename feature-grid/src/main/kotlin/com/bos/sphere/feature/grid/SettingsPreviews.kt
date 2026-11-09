@@ -247,6 +247,7 @@ fun HomeStylePreview(style: HomeStyle) {
                 drawRoundRect(SampleApps.color(k + 3), Offset(size.width / 2 + k * size.width * 0.22f - w / 2, cy - w / 2), Size(w, w), CornerRadius(w * 0.25f))
             }
         }
+        HomeStyle.Psp, HomeStyle.Dsi -> Unit
         HomeStyle.Bubbles -> ComposeCanvas(Modifier.fillMaxSize().padding(4.dp)) {
             // A honeycomb of round bubbles shrinking toward the edge.
             val cx = size.width / 2; val cy = size.height / 2; val pitch = size.width * 0.27f

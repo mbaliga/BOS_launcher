@@ -75,7 +75,11 @@ fun StatusStrip(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.align(
+                modifier = if (zone == StripZone.Centre && StripItem.Time in items) {
+                    // Put the time's own line on the corner icons' centre line (the date / weather hang below it).
+                    val timeLine = (prefs.clockSize * 1.22f).dp
+                    Modifier.align(Alignment.TopCenter).padding(top = ((rowHeight - timeLine) / 2).coerceAtLeast(0.dp))
+                } else Modifier.align(
                     when (zone) {
                         StripZone.Left -> Alignment.CenterStart
                         StripZone.Centre -> Alignment.Center

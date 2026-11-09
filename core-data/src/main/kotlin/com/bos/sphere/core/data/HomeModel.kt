@@ -9,7 +9,10 @@ import kotlin.math.exp
  */
 
 /** Which home surface is shown. */
-enum class HomeStyle { Grid, Sphere, Bubbles }
+enum class HomeStyle { Grid, Sphere, Bubbles, Psp, Dsi }
+
+/** Pages (swipe between screens) or one continuous scroll. */
+enum class HomeScroll(val label: String) { Paged("Pages"), Continuous("Continuous") }
 
 /** Corner look: a bare glyph, or a quarter-circle bubble hugging the screen corner. */
 enum class CornerStyle(val label: String) { Glyph("Glyph"), Bubble("Bubble") }
@@ -173,6 +176,9 @@ enum class UiLanguage(val code: String, val label: String) {
 
 data class LauncherPrefs(
     val homeStyle: HomeStyle = HomeStyle.Grid,
+    val homeScroll: HomeScroll = HomeScroll.Paged,
+    /** Icons across the short side in the Continuous / DSi homes. */
+    val continuousColumns: Int = 4,
     val portraitGrid: GridSpec = DensityPreset.Default.portrait,
     val landscapeGrid: GridSpec = DensityPreset.Default.landscape,
     /** Icon edge as a fraction of the cell pitch. */

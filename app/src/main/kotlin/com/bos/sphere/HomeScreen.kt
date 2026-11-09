@@ -622,6 +622,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 }
             }
 
+            HomeStyle.Psp, HomeStyle.Dsi -> { Background(); Corners() } // replaced when the new homes land
             HomeStyle.Bubbles -> {
                 Background()
                 com.bos.sphere.feature.grid.BubbleField(

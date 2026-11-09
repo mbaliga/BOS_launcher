@@ -256,6 +256,7 @@ internal fun Orbit(
         val margin = colWPx / 2f
         val radii = floatArrayOf(0.36f * wPx, 0.58f * wPx, 0.80f * wPx, 1.02f * wPx)
         val spacing = colWPx * 0.95f
+        val swayPx = with(density) { 5.dp.toPx() }
 
         // The rings are centred on the wheel and only their upper arcs are used. Slots run from the
         // top of each arc outward, so the best matches sit straight above the wheel.
@@ -275,7 +276,17 @@ internal fun Orbit(
                 order.sortBy { Math.abs(it + PI / 2) }
                 order.filter { cy + rad * sin(it) >= tilePx }.forEach { out += r to it }
             }
-            out
+            // Adjacent rings come close near the screen edges: drop any slot whose tile (face +
+            // caption) would touch one already placed, keeping a gap for the gentle sway.
+            val boxW = colWPx + with(density) { 8.dp.toPx() }
+            val boxH = tilePx + with(density) { 26.dp.toPx() }
+            val kept = ArrayList<Pair<Int, Double>>()
+            val pts = ArrayList<Offset>()
+            for ((r, ang) in out) {
+                val pt = Offset(cx + radii[r] * cos(ang).toFloat(), cy + radii[r] * sin(ang).toFloat())
+                if (pts.none { abs(it.x - pt.x) < boxW && abs(it.y - pt.y) < boxH }) { kept += r to ang; pts += pt }
+            }
+            kept
         }
 
         Canvas(Modifier.fillMaxSize()) {
@@ -289,7 +300,7 @@ internal fun Orbit(
                 Modifier
                     .width(colW)
                     .offset {
-                        val sway = if (motion) 0.10 * sin(2 * PI * phase.value * 15.0 + ring * 1.7 + i * 0.9) * dir else 0.0
+                        val sway = if (motion) (swayPx / radii[ring]) * sin(2 * PI * phase.value * 15.0 + ring * 1.7 + i * 0.9) * dir else 0.0
                         val a = baseAngle + sway
                         val x = cx + radii[ring] * cos(a).toFloat()
                         val y = cy + radii[ring] * sin(a).toFloat()

@@ -201,7 +201,7 @@ internal fun BlinkingCaret(height: Dp, color: Color = Color.White, modifier: Mod
 internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier.height(WheelHeight).clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onTap), contentAlignment = Alignment.CenterEnd) {
         if (query.isEmpty()) {
-            Text(L10n.tr("SEARCH"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
+            Text(L10n.tr("RADAR"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End) {
                 Box(

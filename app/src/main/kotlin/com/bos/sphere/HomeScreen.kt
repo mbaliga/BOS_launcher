@@ -320,9 +320,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         stores.shortcuts.setCorner(c, slot)
     }
+    var pickingLeft by remember { mutableStateOf(false) }
+    var leftWidgetLabel by remember { mutableStateOf<String?>(null) }
     val widgetPicker = rememberWidgetPicker(widgetHost) { id, label ->
-        widgetFor?.let { setCorner(it, CornerSlot.Widget(id, label)) }
-        widgetFor = null
+        if (pickingLeft) {
+            val old = prefs.leftWidgetId
+            if (old >= 0 && old != id) widgetHost.deleteWidget(old)
+            leftWidgetLabel = label
+            stores.prefs.update { it.copy(leftWidgetId = id, leftPage = com.bos.sphere.core.data.LeftPage.Widget) }
+            pickingLeft = false
+        } else {
+            widgetFor?.let { setCorner(it, CornerSlot.Widget(id, label)) }
+            widgetFor = null
+        }
     }
 
     // ---- motion gestures (foreground). The background service takes over when opted in.
@@ -717,6 +727,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
                 pickAppFor = { id -> pickFor = id },
+                pickLeftWidget = { pickingLeft = true; widgetPicker.launch() },
+                leftWidgetLabel = leftWidgetLabel ?: prefs.leftWidgetId.takeIf { it >= 0 }?.let { widgetHost.providerInfo(it)?.loadLabel(context.packageManager)?.toString() },
                 prefs = prefs,
                 updatePrefs = stores.prefs::update,
                 pageIndex = settingsPage,
@@ -793,6 +805,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onClose = { settingsOpen = false },
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
+            backdrop = {
+                if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
+                else Box(Modifier.fillMaxSize()) {
+                    com.bos.sphere.feature.grid.BackgroundLayer(
+                        kind = prefs.backgroundKind, preset = prefs.backgroundPreset,
+                        colorA = prefs.backgroundColorA, colorB = prefs.backgroundColorB,
+                        modifier = Modifier.fillMaxSize(), animate = false,
+                    )
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = prefs.settingsDim.coerceIn(0f, 1f))))
+                }
+            },
         )
 
         // ---- dialogs

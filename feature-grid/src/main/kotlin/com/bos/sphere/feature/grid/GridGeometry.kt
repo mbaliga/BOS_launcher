@@ -43,16 +43,29 @@ data class GridGeometry(
     }
 
     companion object {
-        fun compute(width: Float, height: Float, columns: Int, rows: Int, verticalBias: Float, spread: Float = 0f): GridGeometry {
+        /**
+         * [spread] widens the gaps horizontally and [spreadY] vertically (default: the same). The
+         * insets are fractions of the area kept free at the sides / top / bottom before the grid is laid out.
+         */
+        fun compute(
+            width: Float, height: Float, columns: Int, rows: Int, verticalBias: Float, spread: Float = 0f,
+            spreadY: Float = spread, insetX: Float = 0f, insetTop: Float = 0f, insetBottom: Float = 0f,
+        ): GridGeometry {
             val cols = columns.coerceAtLeast(1)
             val rws = rows.coerceAtLeast(1)
-            val base = min(width / cols, height / rws).coerceAtLeast(1f)
-            val s = spread.coerceIn(0f, 1f)
-            val px = base + s * (width / cols - base)
-            val py = base + s * (height / rws - base)
-            val originX = (width - px * cols) / 2f
+            val ix = width * insetX.coerceIn(0f, 0.25f)
+            val it = height * insetTop.coerceIn(0f, 0.4f)
+            val ib = height * insetBottom.coerceIn(0f, 0.4f)
+            val aw = (width - 2 * ix).coerceAtLeast(1f)
+            val ah = (height - it - ib).coerceAtLeast(1f)
+            val base = min(aw / cols, ah / rws).coerceAtLeast(1f)
+            val sx = spread.coerceIn(0f, 1f)
+            val sy = spreadY.coerceIn(0f, 1f)
+            val px = base + sx * (aw / cols - base)
+            val py = base + sy * (ah / rws - base)
+            val originX = ix + (aw - px * cols) / 2f
             // The block's vertical slack shrinks as it spreads; the bias fades with it.
-            val originY = (height - py * rws) * verticalBias.coerceIn(0f, 1f)
+            val originY = it + (ah - py * rws) * verticalBias.coerceIn(0f, 1f)
             return GridGeometry(cols, rws, base, px, py, originX, originY)
         }
     }

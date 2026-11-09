@@ -40,7 +40,7 @@ data class GridSpec(val columns: Int, val rows: Int) {
 
     companion object {
         const val MIN_COLUMNS = 2
-        const val MAX_COLUMNS = 9
+        const val MAX_COLUMNS = 10
         const val MIN_ROWS = 1
         const val MAX_ROWS = 10
     }
@@ -86,6 +86,12 @@ enum class BackgroundKind(val label: String) {
 /** Web search engine for the "search the web" rows. DuckDuckGo is the default so !bangs work (!g, !gi, !yt, !w …). */
 /** How the search screen presents results. */
 enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
+
+/** What sits one swipe to the left of the first home page. */
+enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Widget("A widget") }
+
+/** The backdrop behind Settings. */
+enum class SettingsBackdrop(val label: String) { Wallpaper("Wallpaper, dimmed"), Black("Pitch black") }
 
 enum class WebEngine(val label: String, private val template: String) {
     DuckDuckGo("DuckDuckGo", "https://duckduckgo.com/?q=%s"),
@@ -212,6 +218,22 @@ data class LauncherPrefs(
     val webEngine: WebEngine = WebEngine.DuckDuckGo,
     val searchWeb: Boolean = true,
     val searchContacts: Boolean = true,
+    val leftPage: LeftPage = LeftPage.Launchpad,
+    /** Appwidget id hosted full-screen on the left page when [leftPage] is [LeftPage.Widget]; -1 = none. */
+    val leftWidgetId: Int = -1,
+    /** The narrow strip of unread counts at the left edge of page one. */
+    val launchpadRail: Boolean = true,
+    val settingsBackdrop: SettingsBackdrop = SettingsBackdrop.Wallpaper,
+    /** How much the wallpaper is dimmed behind Settings, 0..1. */
+    val settingsDim: Float = 0.7f,
+    /** Vertical icon spacing 0..1; negative = same as [iconSpacing]. */
+    val spacingV: Float = -1f,
+    /** Free margins around the grid, as fractions of the page (sides / top / bottom). */
+    val gridInsetX: Float = 0f,
+    val gridInsetTop: Float = 0f,
+    val gridInsetBottom: Float = 0f,
+    /** App label text scale. */
+    val labelScale: Float = 1f,
     val searchLayout: SearchLayout = SearchLayout.Filmstrip,
     /** The bundled backdrop picture behind search (off = plain black). */
     val searchBackdrop: Boolean = true,
@@ -326,7 +348,7 @@ object CornerMapping {
 enum class CornerActionId(val label: String, val internal: Boolean = false) {
     Music("Music"),
     Camera("Camera"),
-    Search("Search", internal = true),
+    Search("Radar", internal = true),
     AllApps("All apps", internal = true),
     Notifications("Notifications", internal = true),
     LauncherSettings("Home settings", internal = true),

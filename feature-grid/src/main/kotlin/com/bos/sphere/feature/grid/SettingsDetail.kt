@@ -43,8 +43,13 @@ fun DetailScreen(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier.fillMaxSize().background(HyleColors.Background.copy(alpha = 0.97f)).pointerInput(Unit) { detectTapGestures { } }) {
-        WaveField(Modifier.fillMaxSize().alpha(0.5f))
+    val customBackdrop = LocalSettingsBackdrop.current
+    Box(
+        modifier.fillMaxSize()
+            .then(if (customBackdrop == null) Modifier.background(HyleColors.Background.copy(alpha = 0.97f)) else Modifier)
+            .pointerInput(Unit) { detectTapGestures { } },
+    ) {
+        if (customBackdrop != null) customBackdrop() else WaveField(Modifier.fillMaxSize().alpha(0.5f))
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 20.dp)) {
             Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 crumbs.forEachIndexed { i, c ->

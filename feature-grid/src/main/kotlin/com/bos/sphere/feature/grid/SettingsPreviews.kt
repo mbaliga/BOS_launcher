@@ -280,9 +280,12 @@ fun PageShapePreview(shape: PageShape) {
 
 /** A grid of [cols]×[rows] with the real geometry, icon scale and spacing. */
 @Composable
-fun DensityPreview(cols: Int, rows: Int, iconScale: Float, spacing: Float, modifier: Modifier = Modifier) {
+fun DensityPreview(
+    cols: Int, rows: Int, iconScale: Float, spacing: Float, modifier: Modifier = Modifier,
+    spacingV: Float = spacing, insetX: Float = 0f, insetTop: Float = 0f, insetBottom: Float = 0f,
+) {
     ComposeCanvas(modifier.fillMaxSize().padding(4.dp)) {
-        val g = GridGeometry.compute(size.width, size.height, cols, rows, verticalBias = 0.5f, spread = spacing)
+        val g = GridGeometry.compute(size.width, size.height, cols, rows, verticalBias = 0.5f, spread = spacing, spreadY = spacingV, insetX = insetX, insetTop = insetTop, insetBottom = insetBottom)
         val icon = g.base * iconScale
         for (i in 0 until g.capacity) {
             drawRoundRect(SampleApps.color(i), Offset(g.centreX(i) - icon / 2, g.centreY(i) - icon / 2), Size(icon, icon), CornerRadius(icon * 0.24f))

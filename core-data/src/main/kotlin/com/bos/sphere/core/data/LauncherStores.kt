@@ -79,6 +79,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putLong("bgA", next.backgroundColorA).putLong("bgB", next.backgroundColorB)
             .putString("webEngine", next.webEngine.name)
             .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
+            .putString("leftPage", next.leftPage.name).putInt("leftWidgetId", next.leftWidgetId).putBoolean("launchpadRail", next.launchpadRail)
+            .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
+            .putFloat("spacingV", next.spacingV).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
+            .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
             .putString("searchLayout", next.searchLayout.name).putBoolean("searchBackdrop", next.searchBackdrop)
             .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
@@ -157,6 +161,16 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
             searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
             searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
+            leftPage = runCatching { LeftPage.valueOf(sp.getString("leftPage", null) ?: "") }.getOrDefault(d.leftPage),
+            leftWidgetId = sp.getInt("leftWidgetId", d.leftWidgetId),
+            launchpadRail = sp.getBoolean("launchpadRail", d.launchpadRail),
+            settingsBackdrop = runCatching { SettingsBackdrop.valueOf(sp.getString("settingsBackdrop", null) ?: "") }.getOrDefault(d.settingsBackdrop),
+            settingsDim = sp.getFloat("settingsDim", d.settingsDim),
+            spacingV = sp.getFloat("spacingV", d.spacingV),
+            gridInsetX = sp.getFloat("gridInsetX", d.gridInsetX),
+            gridInsetTop = sp.getFloat("gridInsetTop", d.gridInsetTop),
+            gridInsetBottom = sp.getFloat("gridInsetBottom", d.gridInsetBottom),
+            labelScale = sp.getFloat("labelScale", d.labelScale),
             searchLayout = runCatching { SearchLayout.valueOf(sp.getString("searchLayout", null) ?: "") }.getOrDefault(d.searchLayout),
             searchBackdrop = sp.getBoolean("searchBackdrop", d.searchBackdrop),
             searchMotion = sp.getBoolean("searchMotion", d.searchMotion),

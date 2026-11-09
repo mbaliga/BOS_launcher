@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -68,6 +69,7 @@ import com.bos.sphere.feature.grid.CornerStylePreview
 import com.bos.sphere.feature.grid.ThemeModePreview
 import com.bos.sphere.feature.grid.ThemedSampleIcon
 import com.bos.sphere.feature.grid.DensityPreview
+import com.bos.sphere.feature.grid.GlyphPreview
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.LabeledSlider
 import com.bos.sphere.feature.grid.SettingCategory
@@ -99,6 +101,8 @@ class SettingsModel(
     val appsByKey: Map<String, AppEntry>,
     val isLandscape: Boolean,
     val chosenApp: (CornerActionId) -> String?,
+    val pickLeftWidget: () -> Unit,
+    val leftWidgetLabel: String?,
     val pickAppFor: (CornerActionId) -> Unit,
     val motionAvailable: Boolean,
     val editCorner: (Corner) -> Unit,
@@ -169,6 +173,7 @@ private fun Sub(text: String) {
 
 fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     val p = m.prefs
+    val vSpacing = if (p.spacingV >= 0f) p.spacingV else p.iconSpacing
     val out = ArrayList<SettingCategory>()
     fun upd(f: (LauncherPrefs) -> LauncherPrefs) = m.updatePrefs(f)
 
@@ -256,10 +261,25 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
                 LabeledSlider(L10n.tr("Icon size"), p.iconScale, LauncherPrefs.MIN_ICON_SCALE..LauncherPrefs.MAX_ICON_SCALE, "${(p.iconScale * 100).roundToInt()}%") { v -> upd { it.copy(iconScale = v) } }
             },
-            SettingItem.Pane(x("Spacing"), Glyphs.Widget, "${(p.iconSpacing * 100).roundToInt()}%") {
-                DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
-                LabeledSlider(L10n.tr("Spacing"), p.iconSpacing, 0f..1f, "${(p.iconSpacing * 100).roundToInt()}%") { v -> upd { it.copy(iconSpacing = v) } }
+            SettingItem.Pane(x("Spacing"), Glyphs.Widget, "${(p.iconSpacing * 100).roundToInt()}% · ${(vSpacing * 100).roundToInt()}%") {
+                DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(170.dp),
+                    spacingV = vSpacing, insetX = p.gridInsetX, insetTop = p.gridInsetTop, insetBottom = p.gridInsetBottom)
+                ToggleRow(L10n.tr("Same both ways"), p.spacingV < 0f, { same -> upd { it.copy(spacingV = if (same) -1f else it.iconSpacing) } })
+                LabeledSlider(L10n.tr(if (p.spacingV < 0f) "Spacing" else "Across"), p.iconSpacing, 0f..1f, "${(p.iconSpacing * 100).roundToInt()}%") { v -> upd { it.copy(iconSpacing = v) } }
+                if (p.spacingV >= 0f) LabeledSlider(L10n.tr("Down"), p.spacingV, 0f..1f, "${(p.spacingV * 100).roundToInt()}%") { v -> upd { it.copy(spacingV = v) } }
                 note("Compact keeps square cells; higher spreads the icons into the free space without resizing them.")
+            },
+            SettingItem.Pane(x("Margins"), Glyphs.Widget, "${(p.gridInsetX * 100).roundToInt()} · ${(p.gridInsetTop * 100).roundToInt()} · ${(p.gridInsetBottom * 100).roundToInt()}") {
+                DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(170.dp),
+                    spacingV = vSpacing, insetX = p.gridInsetX, insetTop = p.gridInsetTop, insetBottom = p.gridInsetBottom)
+                LabeledSlider(L10n.tr("Sides"), p.gridInsetX, 0f..0.25f, "${(p.gridInsetX * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetX = v) } }
+                LabeledSlider(L10n.tr("Top"), p.gridInsetTop, 0f..0.4f, "${(p.gridInsetTop * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetTop = v) } }
+                LabeledSlider(L10n.tr("Bottom"), p.gridInsetBottom, 0f..0.4f, "${(p.gridInsetBottom * 100).roundToInt()}%") { v -> upd { it.copy(gridInsetBottom = v) } }
+                note("Free room around the icons — leave space for the clock, or keep thumbs clear at the bottom.")
+            },
+            SettingItem.Pane(x("Label size"), Glyphs.Message, "${(p.labelScale * 100).roundToInt()}%") {
+                LabeledSlider(L10n.tr("Label size"), p.labelScale, 0.7f..1.5f, "${(p.labelScale * 100).roundToInt()}%") { v -> upd { it.copy(labelScale = v) } }
+                ToggleRow(L10n.tr("Show labels"), p.showLabels, { v -> upd { it.copy(showLabels = v) } })
             },
             SettingItem.Toggle(x("App labels"), Glyphs.Message, p.showLabels) { v -> upd { it.copy(showLabels = v) } },
             SettingItem.Toggle(x("Suggested app"), Glyphs.Bolt, p.showSuggestion) { v -> upd { it.copy(showSuggestion = v) } },
@@ -384,6 +404,26 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         },
     )
 
+    // --- Launchpad ---------------------------------------------------------------------------
+    out += SettingCategory(
+        "Launchpad",
+        Glyphs.Bell,
+        listOf(
+            SettingItem.Pane(x("Left page"), Glyphs.Bell, if (p.leftPage == com.bos.sphere.core.data.LeftPage.Widget) (m.leftWidgetLabel ?: x("A widget")) else x(p.leftPage.label)) {
+                VisualChoice(com.bos.sphere.core.data.LeftPage.entries, p.leftPage, { v ->
+                    if (v == com.bos.sphere.core.data.LeftPage.Widget && p.leftWidgetId < 0) m.pickLeftWidget() else upd { it.copy(leftPage = v) }
+                }, { x(it.label) }, columns = 3, previewHeight = 80.dp) { v ->
+                    GlyphPreview(when (v) { com.bos.sphere.core.data.LeftPage.Off -> Glyphs.Close; com.bos.sphere.core.data.LeftPage.Launchpad -> Glyphs.Bell; else -> Glyphs.Widget })
+                }
+                if (p.leftPage == com.bos.sphere.core.data.LeftPage.Widget || p.leftWidgetId >= 0) {
+                    com.bos.sphere.feature.grid.ActionRow(label = x("Choose widget"), summary = m.leftWidgetLabel ?: x("None yet"), onClick = m.pickLeftWidget)
+                }
+                note("One swipe right from the first page. Pick Launchpad for your notifications, or any app's widget full-screen — Orrery, Nooz, the Google feed, anything with a widget.")
+            },
+            SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } },
+        ),
+    )
+
     // --- Gestures ----------------------------------------------------------------------------
     val paging = p.pagingFor(m.isLandscape)
     val pinchDensity = (m.gestures[HomeGesture.PinchIn] as? CornerItem.Action)?.id == CornerActionId.GridDenser &&
@@ -446,6 +486,19 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 note("Long-press an app and choose Icon colour to tint just that app.")
             },
             SettingItem.Toggle(x("Icon plate"), Glyphs.Widget, p.iconPlate, x("A tile behind transparent icons")) { v -> upd { it.copy(iconPlate = v) } },
+            SettingItem.Pane(x("Settings backdrop"), Glyphs.Moon, x(p.settingsBackdrop.label)) {
+                VisualChoice(com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { v -> upd { it.copy(settingsBackdrop = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { b ->
+                    if (b == com.bos.sphere.core.data.SettingsBackdrop.Black) androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
+                    else androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                        com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, p.backgroundPreset, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxSize(), animate = false)
+                        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = p.settingsDim)))
+                    }
+                }
+                if (p.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Wallpaper) {
+                    LabeledSlider(L10n.tr("Dimming"), p.settingsDim, 0.2f..0.95f, "${(p.settingsDim * 100).roundToInt()}%") { v -> upd { it.copy(settingsDim = v) } }
+                }
+                note("Settings use your wallpaper, dimmed — or pitch black.")
+            },
             SettingItem.Pane(x("Background"), Glyphs.Image, x(p.backgroundKind.name)) {
                 val kinds = com.bos.sphere.core.data.BackgroundKind.entries
                 VisualChoice(kinds, p.backgroundKind, { k ->
@@ -475,7 +528,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
 
     // --- Search ------------------------------------------------------------------------------
     out += SettingCategory(
-        x("Search"),
+        "Radar",
         Glyphs.Search,
         listOf(
             SettingItem.Pane(x("Layout"), Glyphs.Apps, x(p.searchLayout.label)) {

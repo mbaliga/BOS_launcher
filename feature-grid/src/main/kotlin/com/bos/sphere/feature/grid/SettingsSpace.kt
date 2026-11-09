@@ -125,6 +125,8 @@ fun SettingsSpace(
     modifier: Modifier = Modifier,
     /** Bump to reset the selection to [initialCategory] for a fresh visit. */
     session: Int = 0,
+    /** What sits behind Settings (the dimmed wallpaper, or black). Null = the built-in violet gradient and waves. */
+    backdrop: (@Composable () -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -135,6 +137,7 @@ fun SettingsSpace(
         // Physical layout: positions and hit-tests below are computed in screen coordinates.
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+            LocalSettingsBackdrop provides backdrop,
         ) {
             androidx.compose.runtime.key(session) { SettingsSpaceContent(categories, initialCategory, sounds, onClose) }
         }
@@ -209,11 +212,13 @@ private fun SettingsSpaceContent(
         used
     }
 
+    val customBackdrop = LocalSettingsBackdrop.current
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF07080D), Color(0xFF0E0C22), Color(0xFF071622)))),
+            .then(if (customBackdrop == null) Modifier.background(Brush.verticalGradient(listOf(Color(0xFF07080D), Color(0xFF0E0C22), Color(0xFF071622)))) else Modifier),
     ) {
+        if (customBackdrop != null) customBackdrop()
         val density = LocalDensity.current
         val w = constraints.maxWidth.toFloat()
         val h = constraints.maxHeight.toFloat()
@@ -232,7 +237,7 @@ private fun SettingsSpaceContent(
         maxScroll = ((list.size - 1) * rowH - (visibleBottom - firstY - rowH * 1.2f)).coerceAtLeast(0f)
         if (scrollPx > maxScroll) scrollPx = maxScroll
 
-        WaveField(Modifier.fillMaxSize())
+        if (customBackdrop == null) WaveField(Modifier.fillMaxSize())
 
         // Gestures: vertical scrolls the options (with fling), horizontal changes category, tap activates.
         var dragAcc by remember { mutableFloatStateOf(0f) }
@@ -421,6 +426,9 @@ private fun SettingsSpaceContent(
         }
     }
 }
+
+/** The Settings backdrop slot, shared with the full-screen option pages. */
+internal val LocalSettingsBackdrop = androidx.compose.runtime.compositionLocalOf<(@Composable () -> Unit)?> { null }
 
 /** Distance from the category bar to the first item row (clears the category label). */
 private val ITEMS_GAP = 104.dp

@@ -159,7 +159,9 @@ internal sealed interface PageGeometry {
                 PageShape.Grid -> {
                     val spec = layout.gridFor(landscape, prefs)
                     Grid(
-                        GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else 0.12f, spread = prefs.iconSpacing),
+                        GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else 0.12f, spread = prefs.iconSpacing,
+                            spreadY = if (prefs.spacingV >= 0f) prefs.spacingV else prefs.iconSpacing,
+                            insetX = prefs.gridInsetX, insetTop = prefs.gridInsetTop, insetBottom = prefs.gridInsetBottom),
                         prefs.iconScale,
                         prefs.showLabels,
                     )
@@ -350,7 +352,7 @@ fun GridHome(
     val safe = WindowInsets.safeDrawing
     val indicatorAtStart = indicatorAtStartEarly
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr, LocalLabelScale provides prefs.labelScale) {
     Box(modifier = modifier.fillMaxSize()) {
         StripHost(prefs, weather, health, onClockTap)
 
@@ -783,12 +785,15 @@ fun ClockTile(size: Dp, modifier: Modifier = Modifier) {
     }
 }
 
+/** Label text scale (Settings → Home → Labels). */
+val LocalLabelScale = androidx.compose.runtime.compositionLocalOf { 1f }
+
 @Composable
 private fun AppLabel(label: String, iconDp: Dp) {
     Text(
         label,
         color = HyleColors.Ink,
-        fontSize = 11.sp,
+        fontSize = (11f * LocalLabelScale.current).sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         textAlign = TextAlign.Center,

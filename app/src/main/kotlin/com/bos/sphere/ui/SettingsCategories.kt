@@ -465,11 +465,21 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Search"),
         Glyphs.Search,
         listOf(
+            SettingItem.Pane(x("Layout"), Glyphs.Apps, x(p.searchLayout.label)) {
+                VisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v) } }, { x(it.label) }, previewHeight = 140.dp) {
+                    com.bos.sphere.feature.grid.SearchLayoutPreview(it)
+                }
+                ToggleRow(L10n.tr("Backdrop picture"), p.searchBackdrop, { v -> upd { it.copy(searchBackdrop = v) } })
+                ToggleRow(L10n.tr("Keep moving"), p.searchMotion, { v -> upd { it.copy(searchMotion = v) } }, hint = L10n.tr("Filmstrip and Orbit drift slowly; off keeps them still until you move them"))
+            },
             SettingItem.Pane(x("Web engine"), Glyphs.Globe, p.webEngine.label) {
                 Chips(com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }) { v -> upd { it.copy(webEngine = v) } }
                 note("DuckDuckGo understands !bangs: type !g for Google, !gi for images, !yt for YouTube.")
             },
             SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },
+            SettingItem.Toggle(x("Actions"), Glyphs.Bolt, p.searchActions, x("Find things to do, like “flashlight”")) { v -> upd { it.copy(searchActions = v) } },
+            SettingItem.Toggle(x("Files"), Glyphs.Image, p.searchFiles, x("Documents, photos and downloads on this phone")) { v -> upd { it.copy(searchFiles = v) } },
+            SettingItem.Toggle(x("Deep results"), Glyphs.Search, p.searchDeep, x("With Fylz or Fotoz installed: text inside documents and images")) { v -> upd { it.copy(searchDeep = v) } },
             SettingItem.Toggle(x("Contacts"), Glyphs.Message, p.searchContacts, x("Call, message or email people straight from results")) { v -> upd { it.copy(searchContacts = v) } },
         ),
     )

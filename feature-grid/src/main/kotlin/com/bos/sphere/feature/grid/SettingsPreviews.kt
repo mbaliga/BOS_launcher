@@ -378,3 +378,32 @@ fun GlyphPreview(glyph: androidx.compose.ui.graphics.vector.ImageVector, caption
         if (caption != null) Text(caption, color = HyleColors.InkDim, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
     }
 }
+
+/** A miniature of a search layout: the category wheel, the query, and where the results sit. */
+@Composable
+fun SearchLayoutPreview(layout: com.bos.sphere.core.data.SearchLayout) {
+    MiniPhone(Modifier.fillMaxSize()) {
+        // category wheel + query
+        Column(Modifier.align(Alignment.Center).padding(start = 26.dp, bottom = if (layout == com.bos.sphere.core.data.SearchLayout.Flat) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            listOf(0.25f, 0.55f, 1f, 0.55f, 0.25f).forEach { a ->
+                Box(Modifier.size(width = 26.dp, height = 3.dp).background(Color.White.copy(alpha = a), RoundedCornerShape(2.dp)))
+            }
+        }
+        when (layout) {
+            com.bos.sphere.core.data.SearchLayout.Filmstrip -> Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                repeat(4) { ThemedSampleIcon(16.dp, it) }
+            }
+            com.bos.sphere.core.data.SearchLayout.Orbit -> {
+                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                    val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.3f)
+                    listOf(0.18f, 0.32f, 0.46f).forEach { r -> drawCircle(Color.White.copy(alpha = 0.25f), r * size.width, c, style = androidx.compose.ui.graphics.drawscope.Stroke(1f)) }
+                }
+                Box(Modifier.align(Alignment.TopCenter).padding(top = 20.dp)) { ThemedSampleIcon(14.dp, 3) }
+                Row(Modifier.align(Alignment.TopCenter).padding(top = 42.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) { ThemedSampleIcon(12.dp, 5); ThemedSampleIcon(12.dp, 7) }
+            }
+            com.bos.sphere.core.data.SearchLayout.Flat -> Column(Modifier.align(Alignment.TopCenter).padding(top = 14.dp, start = 8.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                repeat(4) { Box(Modifier.fillMaxWidth().height(5.dp).background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp))) }
+            }
+        }
+    }
+}

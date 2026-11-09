@@ -264,7 +264,7 @@ internal fun Orbit(
         }
 
         Canvas(Modifier.fillMaxSize()) {
-            for (r in 1..3) drawCircle(Color.White.copy(alpha = 0.16f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
+            for (r in 1..3) drawCircle(Color.White.copy(alpha = 0.10f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
         }
 
         val centreSize = 66.dp
@@ -277,7 +277,7 @@ internal fun Orbit(
             val facePx = with(density) { face.toPx() }
             val base = -PI / 2 + k * 2 * PI / m + (if (ring == 2) 0.26 else if (ring == 3) 0.12 else 0.0)
             val dir = if (ring == 2) -1.0 else 1.0
-            val tilt = if (ring == 0) 0f else (((i * 37) % 21) - 10).toFloat()
+            val tilt = 0f
             Column(
                 Modifier
                     .width(colW)
@@ -290,9 +290,9 @@ internal fun Orbit(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 androidx.compose.foundation.layout.Box(
-                    Modifier.graphicsLayer { rotationZ = tilt }.orbitClick(tile, actions),
+                    Modifier.graphicsLayer { rotationZ = tilt }.clip(androidx.compose.foundation.shape.CircleShape).orbitClick(tile, actions),
                 ) { TileFace(tile, face) }
-                if (tile !is Tile.App) {
+                run {
                     Text(
                         tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = 10.sp, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
@@ -339,12 +339,15 @@ internal fun FlatResults(
     onQueryChange: (String) -> Unit,
     onTouch: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Typing mode: no card, apps first without a header, suggestions last, "Web Suggestions". */
+    plain: Boolean = false,
 ) {
     if (data.blank) return
     val rows = remember(data, scope, suggestions) {
         buildList<FRow> {
             var si = 0
-            suggestions.forEach { g -> add(FRow.Header(g.header)); g.items.forEach { add(FRow.Sugg(it, si++)) } }
+            fun addSuggestions() { suggestions.forEach { g -> add(FRow.Header(g.header)); g.items.forEach { add(FRow.Sugg(it, si++)) } } }
+            if (!plain) addSuggestions()
             val order = listOf(
                 SearchCategory.Apps to L10n.tr("Applications"), SearchCategory.Actions to L10n.tr("Actions"),
                 SearchCategory.Contacts to L10n.tr("Contacts"), SearchCategory.Files to L10n.tr("Files"),
@@ -356,18 +359,17 @@ internal fun FlatResults(
                 val note = data.footnote(cat)
                 if (tiles.isEmpty() && note == null) continue
                 // Suggestion headers already say "Contacts"/"Web": the results get their own header below.
-                add(FRow.Header(title + "​"))
+                if (!(plain && cat == SearchCategory.Apps)) add(FRow.Header((if (plain && cat == SearchCategory.Web) L10n.tr("Web Suggestions") else title) + "​"))
                 tiles.forEach { add(FRow.Item(it)) }
                 if (note != null) add(FRow.Note(note))
             }
+            if (plain) addSuggestions()
         }
     }
     if (rows.isEmpty()) return
     LazyColumn(
         modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xE61C1D21))
-            .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(16.dp))
+            .then(if (plain) Modifier else Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xE61C1D21)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(16.dp)))
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {

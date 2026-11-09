@@ -289,44 +289,23 @@ internal fun SearchScreen(
     }
     val showKeyboard = { runCatching { focus.requestFocus(); keyboard?.show() }; Unit }
 
+    val typing = trimmed.isNotEmpty()
     Box(Modifier.fillMaxSize()) {
         SearchBackdrop(prefs.searchBackdrop, prefs.searchMotion, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
-            if (layout == SearchLayout.Flat) {
-                Column(Modifier.fillMaxSize()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)
-                            .fillMaxWidth()
-                            .background(Color(0xE61C1D21), RoundedCornerShape(12.dp))
-                            .border(2.dp, HyleColors.Violet.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
-                            .padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 9.dp),
-                    ) {
-                        Icon(Glyphs.Search, null, tint = Color(0xB3FFFFFF), modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        ScopeToken(userCat, userCat, { userCat = it })
-                        Box(Modifier.weight(1f).padding(start = 8.dp)) {
-                            if (query.isEmpty()) Text(L10n.tr("Search"), color = Color(0x80FFFFFF), fontSize = 17.sp)
-                            QueryInput(field, { field = it }, go, focus, Color.White, 17.sp, Modifier.fillMaxWidth())
-                        }
-                        Icon(
-                            Glyphs.Close, L10n.tr(if (query.isEmpty()) "Close" else "Clear"), tint = Color(0xB3FFFFFF),
-                            modifier = Modifier.size(32.dp).clip(CircleShape).clickable { if (query.isEmpty()) onDismiss() else setQuery("") }.padding(7.dp),
-                        )
-                    }
-                    FlatResults(
-                        data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
-                        onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
-                        onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
-                        modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth().weight(1f, fill = false),
-                    )
-                }
-            } else {
-                // Hidden field: the system IME types into it; the big query beside the wheel mirrors it.
-                QueryInput(field, { field = it }, go, focus, Color.Transparent, 1.sp, Modifier.size(1.dp).alpha(0f))
+            if (typing) {
+                // Typing: a plain results list on top, the query sits at the bottom above the keyboard.
+                FlatResults(
+                    data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
+                    onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
+                    onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
+                    plain = true,
+                    modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 58.dp),
+                )
+            } else if (layout != SearchLayout.Flat) {
+                // Idle browsing: the category wheel with Filmstrip or Orbit results.
                 val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts }
-                Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().padding(bottom = 52.dp)) {
                     Spacer(Modifier.height(52.dp))
                     if (layout == SearchLayout.Orbit) {
                         Orbit(
@@ -337,7 +316,7 @@ internal fun SearchScreen(
                         Spacer(Modifier.weight(1f))
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                        QueryDisplay(query, onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 14.dp))
+                        QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 14.dp))
                         CategoryWheel(
                             selected = selected, counts = counts,
                             onSelect = { userCat = it; touched = true; expandedContact = null },
@@ -358,17 +337,30 @@ internal fun SearchScreen(
                         }
                     }
                 }
-                // Top bar: the scope token and close; the suggestion card hangs under it while typing.
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ScopeToken(userCat, selected, { userCat = it; expandedContact = null })
                     Spacer(Modifier.weight(1f))
                     Icon(
                         Glyphs.Close, L10n.tr("Close"), tint = Color.White,
                         modifier = Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(9.dp),
                     )
                 }
-                if (showSuggestions) {
-                    SuggestionCard(groups, pickSuggestion, Modifier.padding(start = 16.dp, top = 56.dp).widthIn(max = 320.dp))
+            }
+            // The one text field. Invisible while browsing (it still feeds the IME); the bottom query line while typing.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .then(if (typing) Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp) else Modifier.size(1.dp).alpha(0f)),
+            ) {
+                Box(Modifier.weight(1f)) {
+                    QueryInput(field, { field = it }, go, focus, Color.White, 20.sp, Modifier.fillMaxWidth())
+                }
+                if (typing) {
+                    ScopeToken(userCat, userCat, { userCat = it; expandedContact = null }, plain = true)
+                    Icon(
+                        Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
+                        modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),
+                    )
                 }
             }
         }
@@ -391,7 +383,7 @@ private fun QueryInput(
         onValueChange = onChange,
         singleLine = true,
         textStyle = TextStyle(color = color, fontSize = size),
-        cursorBrush = SolidColor(if (color == Color.Transparent) Color.Transparent else Color.White),
+        cursorBrush = SolidColor(Color.White),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
         keyboardActions = KeyboardActions(onGo = { onGo() }),
         modifier = modifier.focusRequester(focus),

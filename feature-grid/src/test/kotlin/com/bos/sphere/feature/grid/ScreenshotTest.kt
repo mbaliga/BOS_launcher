@@ -322,10 +322,10 @@ class ScreenshotTest {
     fun searchFilmstrip() = searchShot("10-search-filmstrip", com.bos.sphere.core.data.SearchLayout.Filmstrip, "", null)
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun searchFilmstripFiles() = searchShot("10b-search-filmstrip-files", com.bos.sphere.core.data.SearchLayout.Filmstrip, "ma", com.bos.sphere.core.data.SearchCategory.Files)
+    fun searchFilmstripFiles() = searchShot("12b-search-typing", com.bos.sphere.core.data.SearchLayout.Filmstrip, "ma", null)
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun searchOrbit() = searchShot("11-search-orbit", com.bos.sphere.core.data.SearchLayout.Orbit, "m", null)
+    fun searchOrbit() = searchShot("11-search-orbit", com.bos.sphere.core.data.SearchLayout.Orbit, "", null)
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun searchFlat() = searchShot("12-search-flat", com.bos.sphere.core.data.SearchLayout.Flat, "ma", null)

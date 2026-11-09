@@ -227,10 +227,18 @@ internal fun ScopeToken(
     shown: SearchCategory?,
     onPick: (SearchCategory?) -> Unit,
     modifier: Modifier = Modifier,
+    /** Plain text with an up/down mark (the bottom query line) instead of the chip. */
+    plain: Boolean = false,
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
-        Row(
+        if (plain) Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
+        ) {
+            Text(shown?.label ?: L10n.tr("Everything"), color = Color(0xB3FFFFFF), fontSize = 16.sp, maxLines = 1)
+            Icon(Glyphs.Down, null, tint = Color(0xB3FFFFFF), modifier = Modifier.size(16.dp))
+        } else Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))

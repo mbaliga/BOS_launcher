@@ -852,7 +852,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val leftWidgetName = remember(leftWidgetLabel, prefs.leftWidgetId) {
             leftWidgetLabel ?: prefs.leftWidgetId.takeIf { it >= 0 }?.let { widgetHost.providerInfo(it)?.loadLabel(context.packageManager)?.toString() }
         }
-        val healthAvailable = remember { healthSource.available() }
+        val healthAvailable = remember(settingsOpen) { healthSource.available() }
         val about = remember {
             val pi = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
             listOf(

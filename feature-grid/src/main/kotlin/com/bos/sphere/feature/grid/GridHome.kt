@@ -240,7 +240,7 @@ fun GridHome(
     val cornerRow = prefs.cornerIconSize.dp + 22.dp
     val padTopDp = if (clockTop) maxOf(clockH + 14.dp, cornerRow) else cornerRow
     val padBottomDp = when {
-        clockBottom && !indicatorAtStartEarly -> maxOf(clockH + 50.dp, cornerRow)
+        clockBottom && !indicatorAtStartEarly -> maxOf(clockH + 76.dp, cornerRow)
         clockBottom -> maxOf(clockH + 24.dp, cornerRow)
         indicatorAtStartEarly -> cornerRow
         else -> maxOf(cornerRow, 44.dp)
@@ -600,7 +600,7 @@ fun GridHome(
                         )
                         .then(coverModifier),
                     appsByKey = appsByKey,
-                    showLabels = prefs.showLabels && page.layout.shape == PageShape.Grid,
+                    showLabels = prefs.showLabels && page.layout.shape != PageShape.Circle,
                     draggingKey = dragKey,
                     suggestion = if (index == 0 && prefs.showSuggestion && dragKey == null) suggestion else null,
                     onLaunch = onLaunch,
@@ -734,13 +734,22 @@ private fun PageView(
                 val x = if (animated) animateFloatAsState(target.x.toFloat(), spring(dampingRatio = 0.8f, stiffness = 500f), label = "x").value else target.x.toFloat()
                 val y = if (animated) animateFloatAsState(target.y.toFloat(), spring(dampingRatio = 0.8f, stiffness = 500f), label = "y").value else target.y.toFloat()
                 val isDragged = itemKey == draggingKey
-                val depth = if (geometry is PageGeometry.Coverflow) -kotlin.math.abs(index - geometry.c.position) else 0f
+                val cf = geometry is PageGeometry.Coverflow
+                val dCover = if (cf) index - (geometry as PageGeometry.Coverflow).c.position else 0f
+                val depth = if (cf) -kotlin.math.abs(dCover) else 0f
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
                         .zIndex(depth)
-                        .graphicsLayer { alpha = if (isDragged) 0.18f else 1f }
+                        .graphicsLayer {
+                            alpha = if (isDragged) 0.18f else if (cf) (1f - 0.14f * kotlin.math.min(kotlin.math.abs(dCover), 4f)) else 1f
+                            if (cf) {
+                                // Cards lean towards the centre, like a real coverflow.
+                                rotationY = -dCover.coerceIn(-1f, 1f) * 42f
+                                cameraDistance = 14f * density.density
+                            }
+                        }
                         .semantics(mergeDescendants = true) {
                             if (app != null) {
                                 contentDescription = app.label
@@ -753,7 +762,8 @@ private fun PageView(
                 ) {
                     if (app != null) {
                         AppIcon(app, itemDp, Modifier.size(itemDp))
-                        if (showLabels) AppLabel(app.label, itemDp)
+                        // Coverflow names only the focused card; the rest would just pile up their labels.
+                        if (showLabels && (!cf || kotlin.math.abs(dCover) < 0.5f)) AppLabel(app.label, itemDp)
                     } else if (itemKey == HomeTiles.SETTINGS) {
                         SettingsTile(itemDp, Modifier.size(itemDp))
                         if (showLabels) AppLabel(L10n.tr("Settings"), itemDp)

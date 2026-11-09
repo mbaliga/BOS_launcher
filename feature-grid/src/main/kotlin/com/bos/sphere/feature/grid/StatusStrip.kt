@@ -204,7 +204,8 @@ fun BoxScope.StripHost(
         )
         com.bos.sphere.core.data.ClockPosition.Bottom -> StatusStrip(
             prefs, weather, health, side, onClockTap, rowHeight = rowH,
-            modifier = Modifier.align(Alignment.BottomCenter).androidx_windowInsetsPadding(safe).padding(bottom = edge),
+            // Sits above the page dots (they live on the bottom edge) instead of on top of them.
+            modifier = Modifier.align(Alignment.BottomCenter).androidx_windowInsetsPadding(safe).padding(bottom = edge + 26.dp),
         )
         com.bos.sphere.core.data.ClockPosition.Hidden -> Unit
     }

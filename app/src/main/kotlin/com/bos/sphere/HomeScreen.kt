@@ -761,6 +761,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             view = prefs.drawerView,
             sort = prefs.drawerSort,
             rail = prefs.drawerRail,
+            railVisible = prefs.drawerRailVisible,
             onViewChange = { v -> stores.prefs.update { it.copy(drawerView = v) } },
             onSortChange = { v -> stores.prefs.update { it.copy(drawerSort = v) } },
             onLaunch = ::launch,

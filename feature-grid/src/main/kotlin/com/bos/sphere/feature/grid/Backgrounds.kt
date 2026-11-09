@@ -387,6 +387,10 @@ private fun TextureBackground(preset: String, colorA: Long, modifier: Modifier) 
     }
 }
 
+/** A *mutable* bitmap from pixels (`createBitmap(int[], …)` returns an immutable one, which a Canvas then refuses). */
+private fun mutableBitmap(px: IntArray, size: Int): Bitmap =
+    Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { it.setPixels(px, 0, size, 0, 0, size, size) }
+
 private object TextureTiles {
     private const val DARK = 0xFF0C0D12.toInt()
 
@@ -426,7 +430,7 @@ private object TextureTiles {
             px[i] = (0xFF shl 24) or ((br + d).coerceIn(0, 255) shl 16) or
                 ((bg + d).coerceIn(0, 255) shl 8) or (bb + d).coerceIn(0, 255)
         }
-        return Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+        return mutableBitmap(px, size)
     }
 
     private fun fibres(bmp: Bitmap, density: Float) {
@@ -547,7 +551,7 @@ private object TextureTiles {
             px[i] = (0xFF shl 24) or ((br + d).coerceIn(0, 255) shl 16) or
                 ((bg + d).coerceIn(0, 255) shl 8) or (bb + d).coerceIn(0, 255)
         }
-        return Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+        return mutableBitmap(px, size)
     }
 
     private fun stripes(base: Int, d: Float): Bitmap {
@@ -606,7 +610,7 @@ private object TextureTiles {
             val major = if (floor(v + 0.5f).toInt() % 3 == 0) 1f else 0.6f
             px[i] = white(base, 0.02f + 0.20f * line * line * major)
         }
-        return Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+        return mutableBitmap(px, size)
     }
 
     private fun circuit(base: Int, d: Float): Bitmap {

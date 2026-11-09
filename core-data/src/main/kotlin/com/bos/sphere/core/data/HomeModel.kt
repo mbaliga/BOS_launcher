@@ -184,6 +184,8 @@ enum class UiLanguage(val code: String, val label: String) {
 data class LauncherPrefs(
     val homeStyle: HomeStyle = HomeStyle.Grid,
     val homeScroll: HomeScroll = HomeScroll.Paged,
+    /** Show the A–Z letters of the drawer's quick-scrub strip (it still works when hidden). */
+    val drawerRailVisible: Boolean = true,
     val scrollAxis: ScrollAxis = ScrollAxis.Long,
     /** Icons across the short side in the Continuous / DSi homes. */
     val continuousColumns: Int = 4,

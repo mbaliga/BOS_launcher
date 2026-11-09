@@ -185,6 +185,15 @@ class ScreenshotTest {
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun coverflowPortrait() {
+        rule.mainClock.autoAdvance = false
+        val prefs = LauncherPrefs(showLabels = true)
+        val pages = listOf(HomePage(apps.take(9).map { it.key }, PageLayout(shape = PageShape.Coverflow)))
+        rule.setContent { Scene(prefs, landscape = false, pages = pages) }
+        shoot("03b-coverflow-portrait")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun circleBubblesPortrait() {
         rule.mainClock.autoAdvance = false
         val prefs = LauncherPrefs(cornerStyle = CornerStyle.Bubble)
@@ -283,6 +292,20 @@ class ScreenshotTest {
             )
         }
         shoot("09-drawer-details")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun drawerGrid() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            AppDrawerSpace(
+                visible = true, apps = apps, usage = emptyMap(),
+                view = DrawerView.Grid, sort = DrawerSort.Alphabetical, rail = RailSide.Right,
+                onViewChange = {}, onSortChange = {}, onLaunch = {}, onLongPress = {}, onDismiss = {},
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        shoot("09b-drawer-grid")
     }
 
     private val fakeHub = object : com.bos.sphere.core.data.SearchHub {

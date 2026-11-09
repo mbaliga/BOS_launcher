@@ -168,7 +168,7 @@ data class CircleGeometry(val center: Pt, val ringStep: Float, val rings: Int) {
  */
 data class CoverflowGeometry(val width: Float, val height: Float, val count: Int, val position: Float) {
     /** Edge of the focused icon. */
-    val focusSize: Float = min(height * 0.5f, width * 0.3f).coerceAtLeast(1f)
+    val focusSize: Float = min(height * 0.5f, width * 0.4f).coerceAtLeast(1f)
 
     /** Pixels of finger travel per item step. */
     val stepPx: Float get() = focusSize * 0.6f

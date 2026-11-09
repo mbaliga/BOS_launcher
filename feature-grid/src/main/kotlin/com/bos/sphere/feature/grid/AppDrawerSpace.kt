@@ -52,6 +52,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -209,6 +211,7 @@ fun AppDrawerSpace(
     onDismiss: () -> Unit,
     sounds: UiSounds? = null,
     modifier: Modifier = Modifier,
+    railVisible: Boolean = true,
 ) {
     BackHandler(enabled = visible) { onDismiss() }
     AnimatedVisibility(
@@ -218,7 +221,7 @@ fun AppDrawerSpace(
         modifier = modifier,
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            DrawerContent(apps, usage, view, sort, rail, onViewChange, onSortChange, onLaunch, onLongPress, onDismiss, sounds)
+            DrawerContent(apps, usage, view, sort, rail, onViewChange, onSortChange, onLaunch, onLongPress, onDismiss, sounds, railVisible)
         }
     }
 }
@@ -238,6 +241,7 @@ private fun DrawerContent(
     onLongPress: (AppEntry) -> Unit,
     onDismiss: () -> Unit,
     sounds: UiSounds?,
+    railVisible: Boolean,
 ) {
     val context = LocalContext.current
     // Categories resolve off the main thread; A–Z stands in until they are ready.
@@ -266,14 +270,14 @@ private fun DrawerContent(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF07080D), Color(0xFF0E0C22), Color(0xFF071622))))
+            .background(Color(0xF50A0B10))
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
-        DrawerHeader(view, sort, onViewChange, onSortChange, onDismiss, sounds)
+        DrawerHeader(view, sort, apps.size, onViewChange, onSortChange, onDismiss, sounds)
         Box(Modifier.fillMaxSize()) {
             val leftPad = if (rail == RailSide.Right) 0.dp else RAIL_WIDTH
             val rightPad = if (rail == RailSide.Left) 0.dp else RAIL_WIDTH
-            val padding = PaddingValues(start = leftPad + 8.dp, end = rightPad + 8.dp, top = 4.dp, bottom = 24.dp)
+            val padding = PaddingValues(start = leftPad + 14.dp, end = rightPad + 14.dp, top = 4.dp, bottom = 28.dp)
 
             var scrollTo: (Int) -> Unit = {}
             key(effectiveSort, view) {
@@ -314,8 +318,8 @@ private fun DrawerContent(
             }
             val onScrubEnd: () -> Unit = { scrub = null }
 
-            if (rail != RailSide.Right) ScrubRail(Alignment.CenterStart, true, sections, effectiveSort, onScrub, onScrubEnd)
-            if (rail != RailSide.Left) ScrubRail(Alignment.CenterEnd, false, sections, effectiveSort, onScrub, onScrubEnd)
+            if (rail != RailSide.Right) ScrubRail(Alignment.CenterStart, true, sections, effectiveSort, railVisible, onScrub, onScrubEnd)
+            if (rail != RailSide.Left) ScrubRail(Alignment.CenterEnd, false, sections, effectiveSort, railVisible, onScrub, onScrubEnd)
 
             scrub?.let { ScrubBubble(it) }
         }
@@ -355,6 +359,7 @@ private fun BoxScope.ScrubRail(
     leftSide: Boolean,
     sections: List<DrawerOrdering.Section<AppEntry>>,
     sort: DrawerSort,
+    visible: Boolean,
     onScrub: (Float, Boolean) -> Unit,
     onEnd: () -> Unit,
 ) {
@@ -381,6 +386,7 @@ private fun BoxScope.ScrubRail(
                 }
             },
     ) {
+        if (!visible) return@Box
         if (letters) {
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                 for (s in sections) {
@@ -407,50 +413,73 @@ private fun BoxScope.ScrubRail(
 private fun DrawerHeader(
     view: DrawerView,
     sort: DrawerSort,
+    count: Int,
     onViewChange: (DrawerView) -> Unit,
     onSortChange: (DrawerSort) -> Unit,
     onClose: () -> Unit,
     sounds: UiSounds?,
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("SPHERE", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
-            Text("  ·  APPS", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
-            Icon(
-                Glyphs.Close, contentDescription = "Close apps", tint = HyleColors.Ink,
-                modifier = Modifier.size(36.dp).clickable { sounds?.play(UiSound.Close); onClose() }.padding(8.dp),
+    var sortOpen by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Apps", color = HyleColors.InkBright, fontSize = 22.sp, fontWeight = FontWeight.Light)
+            Text("$count", color = HyleColors.InkDim, fontSize = 11.sp)
+        }
+        // View: one quiet segmented pill.
+        Row(
+            Modifier.clip(RoundedCornerShape(50)).background(Color(0x14FFFFFF)).padding(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            for (v in DrawerView.entries) {
+                val on = v == view
+                Text(
+                    v.label, color = if (on) HyleColors.InkBright else HyleColors.InkDim, fontSize = 12.sp,
+                    modifier = Modifier
+                        .semantics { this.selected = on; contentDescription = v.label }
+                        .clip(RoundedCornerShape(50))
+                        .background(if (on) Color(0x26FFFFFF) else Color.Transparent)
+                        .clickable { sounds?.play(UiSound.Tick); onViewChange(v) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                )
+            }
+        }
+        // Sort: one chip with a menu instead of a second row of words.
+        Box(Modifier.padding(start = 8.dp)) {
+            Text(
+                sort.label + "  ▾", color = HyleColors.InkBright, fontSize = 12.sp,
+                modifier = Modifier
+                    .semantics { contentDescription = "Sort by ${sort.label}" }
+                    .clip(RoundedCornerShape(50)).background(Color(0x14FFFFFF))
+                    .clickable { sortOpen = true }.padding(horizontal = 12.dp, vertical = 8.dp),
             )
+            androidx.compose.material3.DropdownMenu(
+                expanded = sortOpen, onDismissRequest = { sortOpen = false },
+                containerColor = Color(0xF21F2024), shape = RoundedCornerShape(12.dp),
+            ) {
+                for (s in DrawerSort.entries) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(s.label, color = if (s == sort) HyleColors.VioletSoft else Color.White, fontSize = 15.sp) },
+                        onClick = { sortOpen = false; sounds?.play(UiSound.Tick); onSortChange(s) },
+                    )
+                }
+            }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-            for (v in DrawerView.entries) Toggle(v.label, v == view) { sounds?.play(UiSound.Tick); onViewChange(v) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-            for (s in DrawerSort.entries) Toggle(s.label, s == sort) { sounds?.play(UiSound.Tick); onSortChange(s) }
-        }
+        Icon(
+            Glyphs.Close, contentDescription = "Close apps", tint = HyleColors.Ink,
+            modifier = Modifier.padding(start = 2.dp).size(48.dp).clickable { sounds?.play(UiSound.Close); onClose() }.padding(13.dp),
+        )
     }
 }
 
 @Composable
-private fun Toggle(text: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        text,
-        color = if (selected) HyleColors.VioletSoft else HyleColors.InkDim,
-        fontSize = 13.sp,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        modifier = Modifier
-            .semantics { this.selected = selected; contentDescription = text }
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-    )
-}
-
-@Composable
 private fun SectionTitle(title: String) {
-    Text(
-        title.uppercase(), color = HyleColors.Violet.copy(alpha = 0.85f), fontSize = 11.sp,
-        letterSpacing = 2.sp, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 14.dp, bottom = 4.dp),
-    )
+    Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title.uppercase(), color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Medium)
+        Box(Modifier.padding(start = 12.dp).weight(1f).height(1.dp).background(Color(0x14FFFFFF)))
+    }
 }
 
 private fun rowKey(r: DrawerRow): String = when (r) {
@@ -468,7 +497,7 @@ private fun DrawerGrid(
     onLongPress: (AppEntry) -> Unit,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(80.dp),
+        columns = GridCells.Adaptive(88.dp),
         state = state,
         contentPadding = padding,
         modifier = Modifier.fillMaxSize(),
@@ -486,13 +515,13 @@ private fun DrawerGrid(
                     modifier = Modifier
                         .fillMaxWidth()
                         .combinedClickable(onClick = { onLaunch(r.app) }, onLongClick = { onLongPress(r.app) })
-                        .padding(vertical = 8.dp, horizontal = 2.dp),
+                        .padding(vertical = 10.dp, horizontal = 2.dp),
                 ) {
-                    AppIcon(r.app, 52.dp)
+                    AppIcon(r.app, 56.dp)
                     Text(
-                        r.app.label, color = HyleColors.Ink, fontSize = 11.sp, maxLines = 1,
+                        r.app.label, color = HyleColors.Ink, fontSize = 12.sp, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
                     )
                 }
             }

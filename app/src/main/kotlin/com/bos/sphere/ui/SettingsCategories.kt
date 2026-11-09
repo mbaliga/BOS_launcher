@@ -335,6 +335,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 Chips(DrawerSort.entries, p.drawerSort, { it.label }) { v -> upd { it.copy(drawerSort = v) } }
                 Sub("Quick scrub")
                 Chips(RailSide.entries, p.drawerRail, { it.label }) { v -> upd { it.copy(drawerRail = v) } }
+                ToggleRow(L10n.tr("Show the A–Z letters"), p.drawerRailVisible, { v -> upd { it.copy(drawerRailVisible = v) } }, hint = L10n.tr("Off hides the letters; the strip still scrubs"))
                 note("Run a finger down the edge to jump through the list.")
             },
         ),

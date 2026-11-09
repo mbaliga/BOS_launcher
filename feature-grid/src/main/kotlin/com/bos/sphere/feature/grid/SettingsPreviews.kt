@@ -258,7 +258,16 @@ fun HomeStylePreview(style: HomeStyle) {
 fun PageShapePreview(shape: PageShape) {
     when (shape) {
         PageShape.Grid -> HomeStylePreview(HomeStyle.Grid)
-        PageShape.Coverflow -> HomeStylePreview(HomeStyle.Grid)
+        PageShape.Coverflow -> ComposeCanvas(Modifier.fillMaxSize().padding(4.dp)) {
+            // The focused card big in the middle, neighbours shrinking and overlapping outward.
+            val cx = size.width / 2; val cy = size.height / 2; val big = size.width * 0.3f
+            for (d in listOf(-3, 3, -2, 2, -1, 1, 0)) {
+                val a = kotlin.math.abs(d)
+                val sz = big * (1f - 0.16f * minOf(a, 1) - 0.06f * (a - 1).coerceAtLeast(0))
+                val x = cx + kotlin.math.sign(d.toFloat()) * (big * 0.62f * minOf(a, 1) + big * 0.36f * (a - 1).coerceAtLeast(0))
+                drawRoundRect(SampleApps.color(d + 4), Offset(x - sz / 2, cy - sz / 2), Size(sz, sz), CornerRadius(sz * 0.26f), alpha = 1f - 0.12f * a)
+            }
+        }
         PageShape.Circle -> ComposeCanvas(Modifier.fillMaxSize().padding(4.dp)) {
             val cx = size.width / 2; val cy = size.height / 2; val r1 = size.width * 0.27f; val ic = size.width * 0.17f
             drawCircle(Color.White.copy(alpha = 0.12f), r1, Offset(cx, cy), style = Stroke(1f))

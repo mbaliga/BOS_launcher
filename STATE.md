@@ -45,3 +45,9 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
 - More wallpapers: 24 solids, 20 gradients, 15 textures, 13 live scenes, Horizon picture and your own photo.
 - Grid: separate across/down spacing, margins, label size, up to 10 columns.
 - Not verified on a device (swipe-to-open gesture, widget hosting on the left page, notification listener behaviour).
+
+## Round 7
+- New home styles: PSP (XMB cross media bar) and Nintendo DSi (3 across, continuous scroll; lengthwise in portrait, across in landscape).
+- Pages style can scroll continuously (Settings → Home screen → Scrolling).
+- Settings regrouped; clock on the corner icons' centre line; no phantom search suggestions.
+- Not verified on a device: gestures/fling in XMB and continuous homes, edge fades.

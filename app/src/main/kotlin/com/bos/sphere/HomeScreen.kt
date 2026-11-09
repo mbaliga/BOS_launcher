@@ -587,7 +587,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
     Box(modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch)) {
         when (prefs.homeStyle) {
-            HomeStyle.Grid -> {
+            HomeStyle.Grid -> if (prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
+                Background()
+                com.bos.sphere.feature.grid.ContinuousHome(
+                    apps = apps, crossCount = prefs.continuousColumns, landscape = isLandscape, style = com.bos.sphere.feature.grid.ContinuousStyle.Plain,
+                    onLaunch = ::launch, onLongPress = { menuApp = it },
+                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
+                )
+                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                Corners()
+            } else {
                 Background()
                 Box(
                     Modifier.fillMaxSize().padding(bottom = bottomClear).leftSwipe(
@@ -622,7 +633,32 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 }
             }
 
-            HomeStyle.Psp, HomeStyle.Dsi -> { Background(); Corners() } // replaced when the new homes land
+            HomeStyle.Psp -> {
+                Background()
+                val recentForXmb = remember(history, appsByKey) { history.asReversed().map { it.key }.distinct().mapNotNull(appsByKey::get).take(12) }
+                com.bos.sphere.feature.grid.XmbHome(
+                    apps = apps, recent = recentForXmb,
+                    categoryOf = { com.bos.sphere.feature.search.AppSearch.categoryNameOf(it.packageName) },
+                    onLaunch = ::launch, onLongPress = { menuApp = it },
+                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    showLabels = prefs.showLabels, sounds = sounds,
+                )
+                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                Corners()
+            }
+            HomeStyle.Dsi -> {
+                Background()
+                com.bos.sphere.feature.grid.ContinuousHome(
+                    apps = apps, crossCount = 3, landscape = isLandscape, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
+                    onLaunch = ::launch, onLongPress = { menuApp = it },
+                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
+                )
+                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                Corners()
+            }
             HomeStyle.Bubbles -> {
                 Background()
                 com.bos.sphere.feature.grid.BubbleField(

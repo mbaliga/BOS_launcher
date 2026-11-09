@@ -186,6 +186,8 @@ fun GestureBindingDialog(
     apps: List<AppEntry>,
     onSave: (CornerItem?) -> Unit,
     onDismiss: () -> Unit,
+    /** Why the gesture cannot fire on the active home right now (shown above the picker), or null. */
+    unavailable: String? = null,
 ) {
     GlassDialog(
         title = L10n.tr(gesture.label),
@@ -196,6 +198,7 @@ fun GestureBindingDialog(
         },
     ) {
         Text(L10n.tr(gesture.hint), color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 6.dp))
+        if (unavailable != null) Text(unavailable, color = HyleColors.InkBright, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 6.dp))
         ItemPicker(apps = apps, selected = current, onPick = onSave)
     }
 }

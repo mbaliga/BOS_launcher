@@ -84,6 +84,8 @@ import com.bos.sphere.core.data.Section
 import com.bos.sphere.core.data.SphereNotificationListener
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -435,8 +437,9 @@ private fun SectionHeader(sec: Section, collapsed: Boolean, onToggle: () -> Unit
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (sec.key != LaunchpadLogic.FLAT_KEY && !sec.pinned && sec.key.startsWith("app:")) {
-                AppIcon(sec.items.first().packageName, sec.title, 20, Modifier.padding(end = 8.dp))
+            val lead = sec.items.firstOrNull()
+            if (lead != null && sec.key != LaunchpadLogic.FLAT_KEY && !sec.pinned && sec.key.startsWith("app:")) {
+                AppIcon(lead.packageName, sec.title, 20, Modifier.padding(end = 8.dp))
             }
             Text(
                 sec.title, color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
@@ -631,13 +634,15 @@ fun LaunchpadRail(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val now = rememberNow()
     val counts = remember(items, rules, read, now) { LaunchpadLogic.unreadCounts(items, rules, read, now) }
     if (!access || counts.isEmpty()) return
+    val total = counts.sumOf { it.count }
 
     Column(
         modifier
             .width(44.dp)
             .clip(RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp))
             .background(Color(0xB30B0D14))
-            .clickable(onClick = onOpen)
+            .semantics(mergeDescendants = true) { contentDescription = L10n.tr("%d unread. Launchpad", total) }
+            .clickable(onClick = onOpen, onClickLabel = L10n.tr("Open"))
             .pointerInput(Unit) {
                 var total = 0f
                 detectHorizontalDragGestures(

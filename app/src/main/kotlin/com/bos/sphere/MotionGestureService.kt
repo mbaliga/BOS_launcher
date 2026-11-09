@@ -54,7 +54,7 @@ class MotionGestureService : Service() {
             val opensUi = item is CornerItem.App || (item is CornerItem.Action && item.id.opensUi())
             // Android only lets a background service open UI for the default home app.
             if (opensUi && !isDefaultHome()) {
-                Toast.makeText(this, "Set Sphere as your home app to open things with motion gestures", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Set Liftoff as your home app to open things with motion gestures", Toast.LENGTH_SHORT).show()
             } else {
                 runner.run(item)
             }
@@ -107,7 +107,7 @@ class MotionGestureService : Service() {
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL, "Motion gestures", NotificationManager.IMPORTANCE_MIN).apply {
-                    description = "Shown while Sphere listens for motion gestures in the background"
+                    description = "Shown while Liftoff listens for motion gestures in the background"
                     setShowBadge(false)
                 },
             )

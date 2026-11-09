@@ -132,10 +132,19 @@ fun ContinuousHome(
     spacing: Float = 0.5f,
     showLabels: Boolean = true,
     sounds: UiSounds? = null,
+    /** Pinch / cross-axis swipes / double tap / long press on empty space (see [homeGestures]). */
+    gestures: HomeGestureSpec? = null,
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds)
+        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds, gestures)
     }
+}
+
+/** True when no visible grid item covers [pos] (positions relative to the grid's own bounds). */
+internal fun LazyGridState.isEmptyAt(pos: Offset): Boolean = layoutInfo.visibleItemsInfo.none { item ->
+    val o = item.offset
+    val s = item.size
+    pos.x >= o.x && pos.y >= o.y && pos.x < o.x + s.width && pos.y < o.y + s.height
 }
 
 @Composable
@@ -152,6 +161,7 @@ private fun ContinuousImpl(
     spacing: Float,
     showLabels: Boolean,
     sounds: UiSounds?,
+    gestures: HomeGestureSpec?,
 ) {
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
@@ -160,7 +170,8 @@ private fun ContinuousImpl(
     val latestSounds by rememberUpdatedState(sounds)
     val gridState = rememberLazyGridState()
 
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    // The grid fills this box, so pointer positions here are grid positions.
+    BoxWithConstraints(modifier.fillMaxSize().homeGestures(gestures) { pos -> gridState.isEmptyAt(pos) }) {
         val padL = contentPadding.calculateLeftPadding(LayoutDirection.Ltr)
         val padR = contentPadding.calculateRightPadding(LayoutDirection.Ltr)
         val padT = contentPadding.calculateTopPadding()

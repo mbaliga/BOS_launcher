@@ -27,7 +27,7 @@ import kotlinx.coroutines.delay
 
 /**
  * A whisper of a hint — one small, dim line that fades in a moment after opening and away again
- * after a few seconds, only while Sphere isn't the default home app. Tapping it opens the role
+ * after a few seconds, only while Liftoff isn't the default home app. Tapping it opens the role
  * request. (Settings → System → Set as default home is always there.)
  */
 @Composable

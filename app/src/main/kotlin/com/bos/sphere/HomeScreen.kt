@@ -7,6 +7,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
@@ -119,20 +124,19 @@ import com.bos.sphere.feature.grid.rememberLauncherWidgetHost
 import com.bos.sphere.feature.grid.rememberWidgetPicker
 import com.bos.sphere.feature.search.AppSearch
 import com.bos.sphere.feature.search.SearchKeyboard
-import com.bos.sphere.feature.sphere.LauncherSurface
-import com.bos.sphere.feature.sphere.RowMode
-import com.bos.sphere.feature.sphere.SphereParams
-import com.bos.sphere.feature.sphere.rememberLauncherSurfaceState
+import com.bos.sphere.feature.grid.HomeGestureSpec
+import com.bos.sphere.core.data.isPaged
+import com.bos.sphere.core.data.scrollsHorizontally
+import com.bos.sphere.core.data.surface
 import com.bos.sphere.ui.AppContextMenu
 import com.bos.sphere.ui.CATEGORY_HOME
 import com.bos.sphere.ui.CATEGORY_THIS_PAGE
-import com.bos.sphere.ui.Chrome
 import com.bos.sphere.ui.DefaultLauncherBanner
-import com.bos.sphere.ui.DotGridBackground
 import com.bos.sphere.ui.HubPanel
 import com.bos.sphere.ui.SettingsModel
 import com.bos.sphere.ui.SystemLinks
 import com.bos.sphere.ui.buildSettingsCategories
+import com.bos.sphere.ui.settingsCategoryIndex
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -143,13 +147,15 @@ import com.bos.sphere.core.data.Torch
 import java.util.Calendar
 
 /**
- * The home root. Two surfaces share one set of overlays:
- * - **Pages** (default): the reference grid — clock, paged icons (each page a grid of its own
- *   density, a circle, or a coverflow), four configurable corners (actions, apps, radial
- *   palettes, complications, peek widgets) and touch gestures, over the network-aware dot grid.
- * - **Sphere**: the original coverflow-equator surface.
- * Long-pressing empty space opens the settings space (on the "this page" category); motion
- * gestures run while home is resumed (or from [MotionGestureService] when opted in).
+ * The home root. Four home styles share one set of overlays (corners, status strip, Launchpad,
+ * drawer, Radar, Settings) and one gesture vocabulary:
+ * - **Pages** (default): the paged grid — each page a grid of its own density, a circle or a
+ *   coverflow — with its own gesture arbiter ([GridHome]); or, with continuous scrolling, one long grid.
+ * - **List**, **PSP** (XMB) and **DSi**: scrolling homes, which get the bound touch gestures from
+ *   the shared [com.bos.sphere.feature.grid.homeGestures] layer (pinch, swipes across the free
+ *   axis, double tap and long press on empty space).
+ * Long-pressing empty space opens Settings (page settings on the paged home); motion gestures
+ * run while home is resumed (or from [MotionGestureService] when opted in).
  */
 @Composable
 fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
@@ -276,7 +282,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // Pinch (or any bound gesture) steps the grid denser / sparser: the current page's own density
     // if it has one, otherwise the home default for this orientation. Denser also pulls icons forward.
+    // The continuous grid steps its "icons across"; List / PSP / DSi have no density to change.
     fun changeDensity(delta: Int) {
+        if (!prefs.isPaged) {
+            if (prefs.homeStyle == HomeStyle.Grid) {
+                val n = (prefs.continuousColumns + delta).coerceIn(2, 8)
+                if (n != prefs.continuousColumns) {
+                    stores.prefs.update { it.copy(continuousColumns = n) }
+                    android.widget.Toast.makeText(context, L10n.tr("%d across", n), android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                android.widget.Toast.makeText(context, L10n.tr("This home has no grid density to change"), android.widget.Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         fun step(g: GridSpec) = GridSpec(g.columns + delta, g.rows + delta).coerced()
         val idx = gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
         val page = pages.getOrNull(idx)
@@ -331,6 +350,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     fun onGesture(g: HomeGesture) {
         gestures[g]?.let { runItem(it, null) }
+    }
+    // The shared gesture layer of the scrolling homes (the paged grid has its own arbiter).
+    val surface = prefs.surface(isLandscape)
+    val gestureRefHolder = rememberUpdatedState(::onGesture)
+    val openSettingsRef = rememberUpdatedState<(Int) -> Unit> { c -> openSettings(c) }
+    val homeGestureSpec = remember(surface, gestures.keys) {
+        HomeGestureSpec(surface, gestures.keys, onGesture = { g -> gestureRefHolder.value(g) }, onEmptyLongPress = { openSettingsRef.value(CATEGORY_HOME) })
     }
 
     // ---- widgets
@@ -597,19 +623,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     // Breathing room at the sides of the scrolling homes (plus whatever "Sides" margin is set).
-    val scrollHorizontal = when (prefs.scrollAxis) {
-        com.bos.sphere.core.data.ScrollAxis.Long -> isLandscape
-        com.bos.sphere.core.data.ScrollAxis.Short -> !isLandscape
-        com.bos.sphere.core.data.ScrollAxis.Vertical -> false
-        com.bos.sphere.core.data.ScrollAxis.Horizontal -> true
-    }
+    val scrollHorizontal = prefs.scrollsHorizontally(isLandscape)
     val sideGap = 36.dp + (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * prefs.gridInsetX).dp
-    // Homes with no empty space to long-press: holding the top band (clock area) opens Settings.
+    // Scrolling homes keep clear of the status strip on whichever edge it sits, and of the corners.
+    val stripH = com.bos.sphere.feature.grid.stripHeight(prefs)
+    val cornerRowH = prefs.cornerIconSize.dp + 22.dp
+    val scrollTop = if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Top) stripH + 36.dp else cornerRowH
+    val scrollBottom = bottomClear + (if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Bottom) stripH + 36.dp else 56.dp)
+    val scrollPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = scrollTop, bottom = scrollBottom)
+    // The PSP bar has no reliable empty space to long-press: holding the top band (clock area) opens Settings.
     @Composable
     fun BoxScope.SettingsHoldBand() {
         Box(
             Modifier.align(Alignment.TopCenter).fillMaxWidth()
-                .height(com.bos.sphere.feature.grid.stripHeight(prefs) + 44.dp)
+                .height(stripH + 44.dp)
                 .pointerInput(Unit) { detectTapGestures(onLongPress = { openSettings(CATEGORY_HOME) }) },
         )
     }
@@ -630,10 +657,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     apps = apps, crossCount = prefs.continuousColumns, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Plain,
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    contentPadding = scrollPadding,
                     iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
+                    gestures = homeGestureSpec,
                 )
-                SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             } else {
@@ -677,8 +704,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     categoryOf = { com.bos.sphere.feature.search.AppSearch.categoryNameOf(it.packageName) },
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    contentPadding = scrollPadding,
                     showLabels = prefs.showLabels, sounds = sounds,
+                    gestures = homeGestureSpec,
                 )
                 SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
@@ -690,10 +718,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     apps = apps, crossCount = 3, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
                     onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    contentPadding = scrollPadding,
                     iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
+                    gestures = homeGestureSpec,
                 )
-                SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             }
@@ -702,10 +730,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.feature.grid.ListHome(
                     apps = apps, onLaunch = ::launch, onLongPress = { menuApp = it },
                     modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = com.bos.sphere.feature.grid.stripHeight(prefs) + 36.dp, bottom = bottomClear + 56.dp),
+                    contentPadding = scrollPadding,
                     iconScale = prefs.iconScale, showLabels = prefs.showLabels,
+                    gestures = homeGestureSpec,
                 )
-                SettingsHoldBand()
                 StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                 Corners()
             }
@@ -721,9 +749,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 Modifier.align(Alignment.CenterStart).padding(start = 2.dp).width(5.dp).height(64.dp)
                     .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
             )
+            // Kept narrow so it never sits over the first column of icons; tall so it is still easy to hit.
             Box(
-                Modifier.align(Alignment.CenterStart).width(22.dp).height(180.dp)
-                    .pointerInput(Unit) { detectTapGestures(onTap = { leftOpen = true }) },
+                Modifier.align(Alignment.CenterStart).width(24.dp).height(180.dp)
+                    .semantics { contentDescription = L10n.tr(prefs.leftPage.label) }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = L10n.tr("Open"),
+                        role = Role.Button,
+                    ) { leftOpen = true },
             )
         }
 
@@ -748,7 +783,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.45f * hubFraction))
                     .pointerInput(Unit) { detectTapGestures { hubOpen = false } },
-            ) { HubPanel(fraction = hubFraction) }
+            ) {
+                HubPanel(fraction = hubFraction, onRequestAccess = {
+                    hubOpen = false
+                    runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                })
+            }
             if (hubOpen) BackHandler { hubOpen = false }
         }
 
@@ -808,13 +848,33 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding(),
         )
 
-        val categories = buildSettingsCategories(
+        // Built once per relevant change, not on every recomposition of the home (it is ~100 items
+        // with lambdas, plus binder calls for the widget label and Health Connect availability).
+        val leftWidgetName = remember(leftWidgetLabel, prefs.leftWidgetId) {
+            leftWidgetLabel ?: prefs.leftWidgetId.takeIf { it >= 0 }?.let { widgetHost.providerInfo(it)?.loadLabel(context.packageManager)?.toString() }
+        }
+        val healthAvailable = remember(settingsOpen) { healthSource.available() }
+        val about = remember {
+            val pi = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
+            listOf(
+                "Version" to (pi?.versionName ?: "?"),
+                "Build number" to (pi?.longVersionCode?.toString() ?: "?"),
+                "Commit" to com.bos.sphere.BuildConfig.GIT_SHA,
+                "Commit date" to com.bos.sphere.BuildConfig.GIT_DATE,
+                "Build type" to if (com.bos.sphere.BuildConfig.DEBUG) "debug" else "release",
+                "Package" to context.packageName,
+                "Android" to "${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})",
+                "Device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+            )
+        }
+        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable) {
+            buildSettingsCategories(
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
                 pickAppFor = { id -> pickFor = id },
                 pickBackgroundPhoto = { photoPicker.launch("image/*") },
                 pickLeftWidget = { pickingLeft = true; widgetPicker.launch() },
-                leftWidgetLabel = leftWidgetLabel ?: prefs.leftWidgetId.takeIf { it >= 0 }?.let { widgetHost.providerInfo(it)?.loadLabel(context.packageManager)?.toString() },
+                leftWidgetLabel = leftWidgetName,
                 prefs = prefs,
                 updatePrefs = stores.prefs::update,
                 pageIndex = settingsPage,
@@ -844,20 +904,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 gestures = gestures,
                 setGesture = { g, item -> stores.shortcuts.setGesture(g, item) },
                 requestHealth = { requestHealth() },
-                about = remember {
-                    val pi = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
-                    listOf(
-                        "Version" to (pi?.versionName ?: "?"),
-                        "Build number" to (pi?.longVersionCode?.toString() ?: "?"),
-                        "Commit" to com.bos.sphere.BuildConfig.GIT_SHA,
-                        "Commit date" to com.bos.sphere.BuildConfig.GIT_DATE,
-                        "Build type" to if (com.bos.sphere.BuildConfig.DEBUG) "debug" else "release",
-                        "Package" to context.packageName,
-                        "Android" to "${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})",
-                        "Device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
-                    )
-                },
-                healthAvailable = healthSource.available(),
+                about = about,
+                healthAvailable = healthAvailable,
                 appsByKey = appsByKey,
                 isLandscape = isLandscape,
                 motionAvailable = motion.available,
@@ -877,11 +925,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     androidSettings = { runner.run(CornerActionId.SystemSettings) },
                 ),
             ),
-        )
+            )
+        }
         SettingsSpace(
             visible = settingsOpen,
             categories = categories,
-            initialCategory = settingsCategory,
+            initialCategory = settingsCategoryIndex(categories, settingsCategory),
             sounds = sounds,
             onClose = { settingsOpen = false },
             modifier = Modifier.fillMaxSize(),
@@ -909,10 +958,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onUninstall = { repository.requestUninstall(app); menuApp = null },
                 onToggleHidden = { hiddenStore.setHidden(app.key, app.key !in hidden); menuApp = null },
                 onIconColor = { colorApp = app; menuApp = null },
-                onHomeSettings = if (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
+                onHomeSettings = if (!prefs.isPaged) {
                     { menuApp = null; openSettings(CATEGORY_HOME) }
                 } else null,
-                isOnHome = if (prefs.homeStyle == HomeStyle.Grid) pages.any { app.key in it.keys } else null,
+                // Only the paged home has pages to add to; the scrolling homes show every app.
+                isOnHome = if (prefs.isPaged) pages.any { app.key in it.keys } else null,
                 onToggleHome = {
                     if (pages.any { app.key in it.keys }) stores.layout.removeFromHome(app.key, pages, preserve)
                     else stores.layout.addToHome(app.key, pages, gridState.currentPage, capacityOf, preserve)
@@ -938,6 +988,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 apps = apps,
                 onSave = { stores.shortcuts.setGesture(g, it); editGesture = null },
                 onDismiss = { editGesture = null },
+                unavailable = g.unavailableReason(surface)?.let { L10n.tr("Won't fire on the current home: %s. The binding is kept for other styles.", L10n.tr(it)) },
             )
         }
         colorApp?.let { app ->

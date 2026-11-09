@@ -241,7 +241,7 @@ class ActionRunner(
     }
 
     private fun requestPolicyAccess() {
-        toast("Allow Do Not Disturb access for Sphere to change silent mode")
+        toast("Allow Do Not Disturb access for Liftoff to change silent mode")
         start(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS), null)
     }
 

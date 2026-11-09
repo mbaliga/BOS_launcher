@@ -178,10 +178,15 @@ fun XmbHome(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     showLabels: Boolean = true,
     sounds: UiSounds? = null,
+    /**
+     * Pinch and double tap (see [homeGestures]); swipes are the bar's own here, both ways. Rows and
+     * category glyphs consume their taps, so "empty" is wherever nothing claimed the release.
+     */
+    gestures: HomeGestureSpec? = null,
 ) {
     // Physical coordinates: layout and swipes must not mirror under RTL.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        XmbHomeImpl(apps, recent, categoryOf, onLaunch, onLongPress, modifier, contentPadding, showLabels, sounds)
+        XmbHomeImpl(apps, recent, categoryOf, onLaunch, onLongPress, modifier.homeGestures(gestures), contentPadding, showLabels, sounds)
     }
 }
 

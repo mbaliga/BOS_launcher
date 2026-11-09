@@ -30,8 +30,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +68,8 @@ fun ListHome(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     iconScale: Float = 0.8f,
     showLabels: Boolean = true,
+    /** Pinch / horizontal swipes / double tap / long press on empty space (see [homeGestures]). */
+    gestures: HomeGestureSpec? = null,
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         val rows = remember(apps) {
@@ -85,8 +89,17 @@ fun ListHome(
         val haptic = LocalHapticFeedback.current
         var scrubLetter by remember { mutableStateOf<Char?>(null) }
         val icon = (46f * iconScale / 0.8f).coerceIn(32f, 60f).dp
+        val density = LocalDensity.current
+        // Empty = no app row under the finger (letter headers and the side margins count as empty).
+        val isEmptyAt: (Offset) -> Boolean = { pos ->
+            val left = with(density) { contentPadding.calculateLeftPadding(LayoutDirection.Ltr).toPx() }
+            val right = state.layoutInfo.viewportSize.width - with(density) { (contentPadding.calculateRightPadding(LayoutDirection.Ltr) + 28.dp).toPx() }
+            pos.x < left || pos.x >= right || state.layoutInfo.visibleItemsInfo.none { item ->
+                item.contentType != LRow.Head::class && pos.y >= item.offset && pos.y < item.offset + item.size
+            }
+        }
 
-        Box(modifier.fillMaxSize()) {
+        Box(modifier.fillMaxSize().homeGestures(gestures, isEmptyAt)) {
             LazyColumn(
                 state = state,
                 contentPadding = PaddingValues(

@@ -80,7 +80,7 @@ enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right(
 
 /** What sits behind everything on the home screen. */
 enum class BackgroundKind(val label: String) {
-    Black("Black"), System("Wallpaper"), Solid("Solid"), Gradient("Gradient"), Texture("Texture"), Live("Live"),
+    Black("Black"), System("Wallpaper"), Solid("Solid"), Gradient("Gradient"), Texture("Texture"), Live("Live"), Picture("Picture"),
 }
 
 /** Web search engine for the "search the web" rows. DuckDuckGo is the default so !bangs work (!g, !gi, !yt, !w …). */
@@ -210,6 +210,8 @@ data class LauncherPrefs(
     val backgroundKind: BackgroundKind = BackgroundKind.Black,
     /** Preset id within the kind (e.g. "aurora", "grain", "dusk"); ignored for Black / System. */
     val backgroundPreset: String = "",
+    /** App-private copy of the photo chosen as the background (Picture → "photo"); empty = none. */
+    val backgroundPicturePath: String = "",
     /** Custom colours: Solid uses A; Gradient uses A → B; textures and live scenes tint with A. */
     val backgroundColorA: Long = 0xFF0A0B10,
     val backgroundColorB: Long = 0xFF2A1B5E,

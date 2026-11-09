@@ -57,6 +57,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.positionChange
 import com.bos.sphere.core.data.ActionCandidates
 import com.bos.sphere.core.data.ActionPrefs
 import com.bos.sphere.feature.grid.observeBackgroundTouch
@@ -204,6 +208,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var wheelOpen by remember { mutableStateOf(false) }
     var wheelAnchor by remember { mutableStateOf(Corner.BottomLeft) }
     var hubOpen by remember { mutableStateOf(false) }
+    var leftOpen by remember { mutableStateOf(false) }
     var menuApp by remember { mutableStateOf<AppEntry?>(null) }
     var editCorner by remember { mutableStateOf<Corner?>(null) }
     var editGesture by remember { mutableStateOf<HomeGesture?>(null) }
@@ -287,7 +292,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             CornerActionId.GridSparser -> changeDensity(-1)
             CornerActionId.Search -> { wheelOpen = false; drawerOpen = false; searchOpen = true }
             CornerActionId.AllApps -> openAllApps(anchor)
-            CornerActionId.Notifications -> hubOpen = true
+            CornerActionId.Notifications -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true
             CornerActionId.LauncherSettings -> openSettings(CATEGORY_HOME)
             else -> Unit
         }
@@ -319,6 +324,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             widgetHost.deleteWidget(old.appWidgetId)
         }
         stores.shortcuts.setCorner(c, slot)
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val dest = java.io.File(context.filesDir, "background_${System.currentTimeMillis()}.img")
+            val ok = runCatching { context.contentResolver.openInputStream(uri)?.use { i -> dest.outputStream().use { o -> i.copyTo(o) } } }.isSuccess
+            if (ok && dest.length() > 0) {
+                val old = prefs.backgroundPicturePath
+                stores.prefs.update { it.copy(backgroundKind = com.bos.sphere.core.data.BackgroundKind.Picture, backgroundPreset = "photo", backgroundPicturePath = dest.absolutePath) }
+                if (old.isNotEmpty()) runCatching { java.io.File(old).delete() }
+            }
+        }
     }
     var pickingLeft by remember { mutableStateOf(false) }
     var leftWidgetLabel by remember { mutableStateOf<String?>(null) }
@@ -490,7 +506,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // ---- Home press: collapse everything, back to the first page.
     LaunchedEffect(homeSignal) {
         if (homeSignal > 0) {
-            settingsOpen = false; drawerOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false
+            settingsOpen = false; drawerOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false; leftOpen = false
             menuApp = null; editCorner = null; editGesture = null; tileMenu = null; expandedWidget = null
             gridState.goToPage(0)
         }
@@ -556,6 +572,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             colorB = prefs.backgroundColorB,
             modifier = Modifier.fillMaxSize(),
             touch = bgTouch,
+            picturePath = prefs.backgroundPicturePath,
         )
         IndicatorLayer(
             reading = reading,
@@ -572,7 +589,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         when (prefs.homeStyle) {
             HomeStyle.Grid -> {
                 Background()
-                Box(Modifier.fillMaxSize().padding(bottom = bottomClear)) {
+                Box(
+                    Modifier.fillMaxSize().padding(bottom = bottomClear).leftSwipe(
+                        enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen,
+                        atFirstPage = { gridState.pager.currentPage == 0 && !gridState.pager.isScrollInProgress },
+                        onOpen = { leftOpen = true },
+                    ),
+                ) {
                     GridHome(
                         pages = pages,
                         appsByKey = appsByKey,
@@ -594,6 +617,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     )
                 }
                 Corners()
+                if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && prefs.launchpadRail && !leftOpen) {
+                    com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(Alignment.CenterStart))
+                }
             }
 
             HomeStyle.Bubbles -> {
@@ -727,6 +753,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
                 pickAppFor = { id -> pickFor = id },
+                pickBackgroundPhoto = { photoPicker.launch("image/*") },
                 pickLeftWidget = { pickingLeft = true; widgetPicker.launch() },
                 leftWidgetLabel = leftWidgetLabel ?: prefs.leftWidgetId.takeIf { it >= 0 }?.let { widgetHost.providerInfo(it)?.loadLabel(context.packageManager)?.toString() },
                 prefs = prefs,
@@ -811,7 +838,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     com.bos.sphere.feature.grid.BackgroundLayer(
                         kind = prefs.backgroundKind, preset = prefs.backgroundPreset,
                         colorA = prefs.backgroundColorA, colorB = prefs.backgroundColorB,
-                        modifier = Modifier.fillMaxSize(), animate = false,
+                        modifier = Modifier.fillMaxSize(), animate = false, picturePath = prefs.backgroundPicturePath,
                     )
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = prefs.settingsDim.coerceIn(0f, 1f))))
                 }
@@ -890,6 +917,21 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onReset = { ActionPrefs.set(context, id, null); actionAppsRev++; pickFor = null },
             )
         }
+        // The left page: Launchpad (notifications) or a full-screen widget, one swipe right of page one.
+        when (prefs.leftPage) {
+            com.bos.sphere.core.data.LeftPage.Launchpad -> com.bos.sphere.ui.LaunchpadPanel(
+                visible = leftOpen,
+                onDismiss = { leftOpen = false },
+                onOpenApp = { pkg ->
+                    leftOpen = false
+                    apps.firstOrNull { it.packageName == pkg }?.let(::launch)
+                        ?: context.packageManager.getLaunchIntentForPackage(pkg)?.let { runCatching { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            com.bos.sphere.core.data.LeftPage.Widget -> if (prefs.leftWidgetId >= 0) LeftWidgetPage(leftOpen, widgetHost, prefs.leftWidgetId) { leftOpen = false }
+            else -> Unit
+        }
         if (!prefs.onboardingDone) {
             com.bos.sphere.ui.Onboarding(
                 prefs = prefs,
@@ -916,3 +958,66 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 private fun Modifier.androidx_navPadding(): Modifier = this.then(Modifier.navigationBarsPadding())
 
 private fun smooth(t: Float): Float = (t * t * (3 - 2 * t)).coerceIn(0f, 1f)
+
+/** Full-screen host for the widget chosen as the left page; slides in from the left, swipe left or Back to close. */
+@Composable
+private fun LeftWidgetPage(
+    visible: Boolean,
+    host: com.bos.sphere.feature.grid.LauncherWidgetHost,
+    appWidgetId: Int,
+    onClose: () -> Unit,
+) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.slideInHorizontally(tween(240)) { -it } + androidx.compose.animation.fadeIn(tween(160)),
+        exit = androidx.compose.animation.slideOutHorizontally(tween(200)) { -it } + androidx.compose.animation.fadeOut(tween(160)),
+    ) {
+        BackHandler(onBack = onClose)
+        var dragX by remember { mutableStateOf(0f) }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = { if (dragX < -120f) onClose(); dragX = 0f },
+                        onDragCancel = { dragX = 0f },
+                    ) { _, d -> dragX += d }
+                }
+                .androidx_navPadding(),
+        ) {
+            com.bos.sphere.feature.grid.HostedWidget(host, appWidgetId, Modifier.fillMaxSize().safeDrawingPadding())
+        }
+    }
+}
+
+/** Opens the left page on a rightward swipe that starts while the first home page is settled. */
+private fun Modifier.leftSwipe(enabled: Boolean, atFirstPage: () -> Boolean, onOpen: () -> Unit): Modifier =
+    if (!enabled) this else this.pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            if (!atFirstPage()) return@awaitEachGesture
+            val slop = viewConfiguration.touchSlop
+            var dx = 0f
+            var dy = 0f
+            while (true) {
+                val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                if (!ch.pressed) break
+                val d = ch.positionChange()
+                dx += d.x; dy += d.y
+                if (dx > slop * 3 && dx > kotlin.math.abs(dy) * 2) {
+                    ch.consume()
+                    onOpen()
+                    // Swallow the rest of this gesture so the pager doesn't also react.
+                    while (true) {
+                        val e2 = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        e2.changes.forEach { it.consume() }
+                        if (e2.changes.none { it.pressed }) break
+                    }
+                    break
+                }
+                if (kotlin.math.abs(dy) > slop * 3 && kotlin.math.abs(dy) > kotlin.math.abs(dx)) break
+            }
+        }
+    }

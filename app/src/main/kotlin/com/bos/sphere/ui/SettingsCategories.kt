@@ -102,6 +102,7 @@ class SettingsModel(
     val isLandscape: Boolean,
     val chosenApp: (CornerActionId) -> String?,
     val pickLeftWidget: () -> Unit,
+    val pickBackgroundPhoto: () -> Unit,
     val leftWidgetLabel: String?,
     val pickAppFor: (CornerActionId) -> Unit,
     val motionAvailable: Boolean,
@@ -420,6 +421,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 }
                 note("One swipe right from the first page. Pick Launchpad for your notifications, or any app's widget full-screen — Orrery, Nooz, the Google feed, anything with a widget.")
             },
+            SettingItem.Pane(x("Grouping & rules"), Glyphs.Message, x("Per app, sender, conversation")) {
+                com.bos.sphere.ui.LaunchpadRulesPane()
+            },
             SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } },
         ),
     )
@@ -490,7 +494,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 VisualChoice(com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { v -> upd { it.copy(settingsBackdrop = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { b ->
                     if (b == com.bos.sphere.core.data.SettingsBackdrop.Black) androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
                     else androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                        com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, p.backgroundPreset, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxSize(), animate = false)
+                        com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, p.backgroundPreset, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxSize(), animate = false, picturePath = p.backgroundPicturePath)
                         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = p.settingsDim)))
                     }
                 }
@@ -504,13 +508,15 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 VisualChoice(kinds, p.backgroundKind, { k ->
                     upd { it.copy(backgroundKind = k, backgroundPreset = com.bos.sphere.feature.grid.BackgroundPresets.default(k)) }
                 }, { x(it.name) }, columns = 3, previewHeight = 90.dp) { k ->
-                    com.bos.sphere.feature.grid.BackgroundLayer(k, com.bos.sphere.feature.grid.BackgroundPresets.default(k), p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false)
+                    com.bos.sphere.feature.grid.BackgroundLayer(k, com.bos.sphere.feature.grid.BackgroundPresets.default(k), p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false, picturePath = p.backgroundPicturePath)
                 }
-                val presets = com.bos.sphere.feature.grid.BackgroundPresets.of(p.backgroundKind)
+                val presets = com.bos.sphere.feature.grid.BackgroundPresets.of(p.backgroundKind).let { base ->
+                    if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Picture && p.backgroundPicturePath.isNotEmpty()) base + com.bos.sphere.feature.grid.BackgroundPreset("photo", x("My photo")) else base
+                }
                 if (presets.isNotEmpty()) {
                     Sub(p.backgroundKind.name)
                     VisualChoice(presets, presets.firstOrNull { it.id == p.backgroundPreset } ?: presets.first(), { pr -> upd { it.copy(backgroundPreset = pr.id) } }, { it.label }, columns = 3, previewHeight = 90.dp) { pr ->
-                        com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, pr.id, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false)
+                        com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, pr.id, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false, picturePath = p.backgroundPicturePath)
                     }
                 }
                 if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Solid || p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Gradient) {
@@ -520,6 +526,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                         Sub("Second colour")
                         ColorPicker(p.backgroundColorB, { v -> upd { it.copy(backgroundColorB = v, backgroundPreset = "custom") } })
                     }
+                }
+                if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Picture) {
+                    com.bos.sphere.feature.grid.ActionRow(label = x("Choose a photo…"), summary = if (p.backgroundPicturePath.isEmpty()) null else x("Replace"), onClick = m.pickBackgroundPhoto)
                 }
                 if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System) note("Your phone's wallpaper shows through.")
             },

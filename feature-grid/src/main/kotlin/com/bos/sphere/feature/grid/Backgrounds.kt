@@ -52,8 +52,18 @@ import kotlin.math.sqrt
 
 data class BackgroundPreset(val id: String, val label: String)
 
-/** Gradient stops (ARGB, 2-3 entries) and the CSS-style angle: 0 = bottom to top, 90 = left to right, 180 = top to bottom. */
-data class GradientSpec(val colors: List<Long>, val angleDeg: Float)
+/**
+ * Gradient stops (ARGB, 2-4 entries) and the CSS-style angle: 0 = bottom to top, 90 = left to right, 180 = top to bottom.
+ * With [radial] the first colour sits at ([cx], [cy]) (fractions of the width / height, may lie outside 0..1) and the
+ * last at the farthest corner; [angleDeg] is then ignored.
+ */
+data class GradientSpec(
+    val colors: List<Long>,
+    val angleDeg: Float,
+    val radial: Boolean = false,
+    val cx: Float = 0.5f,
+    val cy: Float = 0.5f,
+)
 
 object BackgroundPresets {
     private val solidMap: Map<String, Pair<String, Long>> = linkedMapOf(
@@ -71,6 +81,16 @@ object BackgroundPresets {
         "steel" to ("Steel" to 0xFF5B6674L),
         "sand" to ("Sand" to 0xFFD8C9A8L),
         "cloud" to ("Cloud" to 0xFFE6E9F0L),
+        "obsidian" to ("Obsidian" to 0xFF050506L),
+        "charcoal" to ("Charcoal" to 0xFF26282DL),
+        "indigo" to ("Indigo" to 0xFF1C1B4AL),
+        "cobalt" to ("Cobalt" to 0xFF1B3A8CL),
+        "teal" to ("Teal" to 0xFF0B4A4CL),
+        "olive" to ("Olive" to 0xFF3A3F1EL),
+        "burgundy" to ("Burgundy" to 0xFF4A0E1CL),
+        "copper" to ("Copper" to 0xFF7A4326L),
+        "mist" to ("Mist" to 0xFFB9C2CCL),
+        "ivory" to ("Ivory" to 0xFFF1EBDDL),
     )
 
     private val gradientMap: Map<String, Pair<String, GradientSpec>> = linkedMapOf(
@@ -82,16 +102,32 @@ object BackgroundPresets {
         "rose" to ("Rose" to GradientSpec(listOf(0xFF2A0F20L, 0xFFA23B64L, 0xFFF0A6B4L), 160f)),
         "steel" to ("Steel" to GradientSpec(listOf(0xFF14181FL, 0xFF3A4452L, 0xFF8793A3L), 170f)),
         "nebula" to ("Nebula" to GradientSpec(listOf(0xFF0D0630L, 0xFF4A1B7AL, 0xFF1E5AA8L), 135f)),
+        "sunrise" to ("Sunrise" to GradientSpec(listOf(0xFFFFB45AL, 0xFFE8566AL, 0xFF5B2A6EL, 0xFF140E2EL), 0f, radial = true, cx = 0.5f, cy = 1.05f)),
+        "lagoon" to ("Lagoon" to GradientSpec(listOf(0xFF042A3AL, 0xFF0E7C86L, 0xFF7FDCC8L), 170f)),
+        "peach" to ("Peach" to GradientSpec(listOf(0xFF3B1F2BL, 0xFFE0707AL, 0xFFFFC8A2L), 160f)),
+        "ultraviolet" to ("Ultraviolet" to GradientSpec(listOf(0xFF8E3BFFL, 0xFF3A1A8CL, 0xFF0A0620L), 0f, radial = true, cx = 0.5f, cy = 0f)),
+        "graphite-fade" to ("Graphite fade" to GradientSpec(listOf(0xFF2E3138L, 0xFF17181CL, 0xFF08090BL), 180f)),
+        "cherry" to ("Cherry" to GradientSpec(listOf(0xFF1C0509L, 0xFF7A0F2AL, 0xFFD6335BL), 155f)),
+        "forest-mist" to ("Forest mist" to GradientSpec(listOf(0xFF0B1C16L, 0xFF1F4A3BL, 0xFF8DB8A3L), 195f)),
+        "glacier" to ("Glacier" to GradientSpec(listOf(0xFFE3F4FFL, 0xFF7FB6DEL, 0xFF1C4A78L, 0xFF081A33L), 0f, radial = true, cx = 0.3f, cy = 0.15f)),
+        "dune" to ("Dune" to GradientSpec(listOf(0xFF2A1D14L, 0xFFA8764AL, 0xFFEBCB96L), 160f)),
+        "midnight-teal" to ("Midnight teal" to GradientSpec(listOf(0xFF050B1AL, 0xFF0B3C4CL, 0xFF14877FL), 175f)),
+        "candy" to ("Candy" to GradientSpec(listOf(0xFFFF8FB8L, 0xFFB78CFFL, 0xFF6FD3FFL), 140f)),
+        "ember-night" to ("Ember night" to GradientSpec(listOf(0xFFFF7A2EL, 0xFF9C2A14L, 0xFF2A0C10L, 0xFF0A0608L), 0f, radial = true, cx = 0.5f, cy = 1f)),
     )
 
     private val textureLabels = linkedMapOf(
         "grain" to "Grain", "grid" to "Grid", "dots" to "Dots", "linen" to "Linen",
         "carbon" to "Carbon", "paper" to "Paper", "hex" to "Hex",
+        "noise" to "Cloudy noise", "stripes" to "Stripes", "diagonal" to "Diagonal",
+        "wavelines" to "Wave lines", "topo" to "Topo", "circuit" to "Circuit",
+        "bricks" to "Bricks", "scales" to "Scales",
     )
     private val liveLabels = linkedMapOf(
         "aurora" to "Aurora", "starfield" to "Starfield", "waves" to "Waves",
         "fireflies" to "Fireflies", "nebula" to "Nebula", "rain" to "Rain",
         "ribbon" to "Ribbon", "bokeh" to "Bokeh",
+        "lava" to "Lava", "snow" to "Snow", "matrix" to "Matrix", "orbits" to "Orbits", "plasma" to "Plasma",
     )
 
     val solids: List<BackgroundPreset> = solidMap.map { BackgroundPreset(it.key, it.value.first) }
@@ -99,11 +135,18 @@ object BackgroundPresets {
     val textures: List<BackgroundPreset> = textureLabels.map { BackgroundPreset(it.key, it.value) }
     val lives: List<BackgroundPreset> = liveLabels.map { BackgroundPreset(it.key, it.value) }
 
+    /** Picture presets; the user's own photo is handled by the host through [PictureSource.File]. */
+    val pictures: List<BackgroundPreset> = listOf(BackgroundPreset("horizon", "Horizon"))
+
+    /** Preset ids of [kind] in display order (empty for Black / System). */
+    fun allIds(kind: BackgroundKind): List<String> = of(kind).map { it.id }
+
     fun of(kind: BackgroundKind): List<BackgroundPreset> = when (kind) {
         BackgroundKind.Solid -> solids
         BackgroundKind.Gradient -> gradients
         BackgroundKind.Texture -> textures
         BackgroundKind.Live -> lives
+        BackgroundKind.Picture -> pictures
         BackgroundKind.Black, BackgroundKind.System -> emptyList()
     }
 
@@ -134,6 +177,19 @@ internal object BackgroundMath {
         out[0] = cx - dx * half; out[1] = cy - dy * half
         out[2] = cx + dx * half; out[3] = cy + dy * half
         return out
+    }
+
+    /** Radius of a radial gradient centred at ([cx], [cy]) fractions of [w] x [h] that just reaches the farthest corner. */
+    fun radialRadius(cx: Float, cy: Float, w: Float, h: Float): Float {
+        val dx = max(abs(cx * w), abs(w - cx * w))
+        val dy = max(abs(cy * h), abs(h - cy * h))
+        return hypot(dx, dy)
+    }
+
+    /** Number of falling columns of the matrix scene for a canvas [wPx] wide. */
+    fun matrixColumns(wPx: Float, density: Float): Int {
+        val d = if (density > 0f) density else 1f
+        return (wPx / (14f * d)).toInt().coerceIn(10, 56)
     }
 
     /** Deterministic hash to 0..1 (stateless). */
@@ -223,6 +279,11 @@ internal object BackgroundMath {
         "fireflies" -> floatArrayOf(62f, 85f)
         "nebula" -> floatArrayOf(265f, 305f, 215f, 335f, 245f)
         "rain" -> floatArrayOf(210f, 195f)
+        "lava" -> floatArrayOf(14f, 345f, 32f, 355f, 5f)
+        "snow" -> floatArrayOf(210f, 195f)
+        "matrix" -> floatArrayOf(140f, 160f)
+        "orbits" -> floatArrayOf(200f, 280f, 160f, 330f, 45f)
+        "plasma" -> floatArrayOf(320f, 200f, 265f, 165f, 20f)
         else -> floatArrayOf(150f, 190f, 275f, 320f)
     }
 
@@ -259,8 +320,14 @@ fun BackgroundLayer(
     modifier: Modifier = Modifier,
     animate: Boolean = true,
     touch: State<TouchPoint?>? = null,
+    /** For [BackgroundKind.Picture] with preset "photo": the app-private image file. */
+    picturePath: String = "",
 ) {
     when (kind) {
+        BackgroundKind.Picture -> PictureBackground(
+            if (preset == "photo" && picturePath.isNotEmpty()) PictureSource.File(picturePath) else PictureSource.Horizon,
+            dim = 0f, modifier = modifier,
+        )
         BackgroundKind.System -> Box(modifier)
         BackgroundKind.Black -> Canvas(modifier.fillMaxSize()) { drawRect(Color.Black) }
         BackgroundKind.Solid -> {
@@ -275,8 +342,18 @@ fun BackgroundLayer(
                 ?: BackgroundPresets.gradientStops(BackgroundPresets.default(kind))!!
             val colors = remember(spec) { spec.colors.map { Color(it.toInt()) } }
             Canvas(modifier.fillMaxSize().clipToBounds()) {
-                val e = BackgroundMath.gradientEndpoints(spec.angleDeg, size.width, size.height)
-                drawRect(Brush.linearGradient(colors, Offset(e[0], e[1]), Offset(e[2], e[3])))
+                if (spec.radial) {
+                    drawRect(
+                        Brush.radialGradient(
+                            colors,
+                            center = Offset(spec.cx * size.width, spec.cy * size.height),
+                            radius = BackgroundMath.radialRadius(spec.cx, spec.cy, size.width, size.height).coerceAtLeast(1f),
+                        ),
+                    )
+                } else {
+                    val e = BackgroundMath.gradientEndpoints(spec.angleDeg, size.width, size.height)
+                    drawRect(Brush.linearGradient(colors, Offset(e[0], e[1]), Offset(e[2], e[3])))
+                }
             }
         }
         BackgroundKind.Texture -> TextureBackground(preset, colorA, modifier)
@@ -329,6 +406,14 @@ private object TextureTiles {
             "linen" -> linen(base, density)
             "carbon" -> carbon(base, density)
             "hex" -> hex(base, density)
+            "noise" -> cloudy(base)
+            "stripes" -> stripes(base, density)
+            "diagonal" -> diagonal(base, density)
+            "wavelines" -> waveLines(base, density)
+            "topo" -> topo(base, density)
+            "circuit" -> circuit(base, density)
+            "bricks" -> bricks(base, density)
+            "scales" -> scales(base, density)
             else -> noise(base, 256, 0.12f, 11)
         }
     }
@@ -428,6 +513,185 @@ private object TextureTiles {
         }
     }
 
+    private fun white(base: Int, k: Float) = BackgroundMath.lerpArgb(base, 0xFFFFFFFF.toInt(), k)
+
+    /** Tileable smooth value noise: a wrapped random lattice, smoothstep-interpolated. */
+    private fun valueField(size: Int, cells: Int, seed: Int): FloatArray {
+        val out = FloatArray(size * size)
+        val step = size.toFloat() / cells
+        for (y in 0 until size) {
+            val fy = y / step; val y0 = fy.toInt(); val ty = fy - y0
+            val sy = ty * ty * (3f - 2f * ty)
+            for (x in 0 until size) {
+                val fx = x / step; val x0 = fx.toInt(); val tx = fx - x0
+                val sx = tx * tx * (3f - 2f * tx)
+                val a = lattice(x0, y0, cells, seed); val b = lattice(x0 + 1, y0, cells, seed)
+                val c = lattice(x0, y0 + 1, cells, seed); val e = lattice(x0 + 1, y0 + 1, cells, seed)
+                out[y * size + x] = (a + (b - a) * sx) * (1f - sy) + (c + (e - c) * sx) * sy
+            }
+        }
+        return out
+    }
+
+    private fun lattice(ix: Int, iy: Int, cells: Int, seed: Int) =
+        BackgroundMath.hash01(((iy % cells) * cells + (ix % cells)) * 7919 + 13, seed)
+
+    private fun cloudy(base: Int): Bitmap {
+        val size = 192
+        val f1 = valueField(size, 6, 17); val f2 = valueField(size, 16, 23)
+        val px = IntArray(size * size)
+        val br = (base shr 16) and 0xFF; val bg = (base shr 8) and 0xFF; val bb = base and 0xFF
+        for (i in px.indices) {
+            val v = 0.65f * f1[i] + 0.35f * f2[i] - 0.5f
+            val d = (v * 0.30f * 255f + (BackgroundMath.hash01(i, 5) - 0.5f) * 0.05f * 255f).toInt()
+            px[i] = (0xFF shl 24) or ((br + d).coerceIn(0, 255) shl 16) or
+                ((bg + d).coerceIn(0, 255) shl 8) or (bb + d).coerceIn(0, 255)
+        }
+        return Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+    }
+
+    private fun stripes(base: Int, d: Float): Bitmap {
+        val sz = max(4, (12f * d).toInt())
+        val half = sz / 2f
+        return tile(sz, sz, base) { c, p ->
+            p.style = Paint.Style.FILL
+            p.color = 0x0EFFFFFF
+            c.drawRect(0f, 0f, half, sz.toFloat(), p)
+            p.color = 0x18FFFFFF
+            c.drawRect(0f, 0f, max(1f, d * 0.75f), sz.toFloat(), p)
+            p.color = 0x22000000
+            c.drawRect(half, 0f, sz.toFloat(), sz.toFloat(), p)
+        }
+    }
+
+    private fun diagonal(base: Int, d: Float): Bitmap {
+        val sz = max(6, (14f * d).toInt())
+        val s = sz.toFloat()
+        return tile(sz, sz, base) { c, p ->
+            p.style = Paint.Style.STROKE
+            for ((w, col) in listOf(3.2f * d to 0x0AFFFFFF, max(1f, 0.9f * d) to 0x1CFFFFFF)) {
+                p.strokeWidth = w; p.color = col
+                for (o in -1..1) c.drawLine(o * s, s, o * s + s, 0f, p)
+            }
+        }
+    }
+
+    private fun waveLines(base: Int, d: Float): Bitmap {
+        val w = max(16, (40f * d).toInt()); val h = max(8, (14f * d).toInt())
+        return tile(w, h, base) { c, p ->
+            p.style = Paint.Style.STROKE
+            p.strokeWidth = max(1f, d * 0.9f)
+            p.color = 0x20FFFFFF
+            val path = android.graphics.Path()
+            val amp = h * 0.22f
+            for (x in 0..w) {
+                val y = h / 2f + amp * sin(TWO_PI * x / w)
+                if (x == 0) path.moveTo(0f, y) else path.lineTo(x.toFloat(), y)
+            }
+            c.drawPath(path, p)
+        }
+    }
+
+    private fun topo(base: Int, d: Float): Bitmap {
+        val size = (170f * d).toInt().coerceIn(170, 360)
+        val f1 = valueField(size, 4, 31); val f2 = valueField(size, 8, 37)
+        val px = IntArray(size * size)
+        val levels = 7f
+        val w = 0.06f
+        for (i in px.indices) {
+            val v = (0.7f * f1[i] + 0.3f * f2[i]) * levels
+            val fr = v - floor(v)
+            val dist = min(fr, 1f - fr)
+            val line = (1f - dist / w).coerceIn(0f, 1f)
+            val major = if (floor(v + 0.5f).toInt() % 3 == 0) 1f else 0.6f
+            px[i] = white(base, 0.02f + 0.20f * line * line * major)
+        }
+        return Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+    }
+
+    private fun circuit(base: Int, d: Float): Bitmap {
+        val n = 4
+        val cell = max(8f, 12f * d)
+        val sz = (cell * n).toInt()
+        fun h(i: Int, j: Int) = BackgroundMath.hash01(((i % n) + n) % n + n * (((j % n) + n) % n), 61) < 0.42f
+        fun v(i: Int, j: Int) = BackgroundMath.hash01(((i % n) + n) % n + n * (((j % n) + n) % n), 67) < 0.42f
+        return tile(sz, sz, base) { c, p ->
+            p.style = Paint.Style.STROKE
+            p.strokeWidth = max(1f, d * 0.9f)
+            p.strokeCap = Paint.Cap.ROUND
+            p.color = 0x2AFFFFFF
+            val s = sz.toFloat()
+            for (j in 0 until n) for (i in 0 until n) {
+                val cx = (i + 0.5f) * cell; val cy = (j + 0.5f) * cell
+                if (h(i, j)) {
+                    c.drawLine(cx, cy, cx + cell, cy, p)
+                    if (i == n - 1) c.drawLine(cx - s, cy, cx - s + cell, cy, p)
+                }
+                if (v(i, j)) {
+                    c.drawLine(cx, cy, cx, cy + cell, p)
+                    if (j == n - 1) c.drawLine(cx, cy - s, cx, cy - s + cell, p)
+                }
+            }
+            for (j in 0 until n) for (i in 0 until n) {
+                val deg = (if (h(i, j)) 1 else 0) + (if (h(i - 1, j)) 1 else 0) + (if (v(i, j)) 1 else 0) + (if (v(i, j - 1)) 1 else 0)
+                val cx = (i + 0.5f) * cell; val cy = (j + 0.5f) * cell
+                if (deg == 1) {
+                    p.style = Paint.Style.STROKE; p.color = 0x3CFFFFFF
+                    c.drawCircle(cx, cy, 1.8f * d, p)
+                } else if (deg >= 3) {
+                    p.style = Paint.Style.FILL; p.color = 0x3CFFFFFF
+                    c.drawCircle(cx, cy, 1.4f * d, p)
+                }
+            }
+        }
+    }
+
+    private fun bricks(base: Int, d: Float): Bitmap {
+        val bw = max(12f, 24f * d); val bh = max(6f, 12f * d)
+        val cols = 3; val rows = 4
+        val w = (bw * cols).toInt(); val h = (bh * rows).toInt()
+        return tile(w, h, base) { c, p ->
+            p.style = Paint.Style.FILL
+            for (r in 0 until rows) for (k in -1 until cols) {
+                val x0 = k * bw + (if (r % 2 == 1) bw / 2f else 0f)
+                val kk = ((k % cols) + cols) % cols
+                p.color = ((BackgroundMath.hash01(r * 8 + kk, 73) * 14f).toInt() shl 24) or 0xFFFFFF
+                c.drawRect(x0, r * bh, x0 + bw, (r + 1) * bh, p)
+            }
+            val lw = max(1f, d * 0.9f)
+            p.color = 0x4A000000
+            for (r in 0 until rows) {
+                c.drawRect(0f, r * bh, w.toFloat(), r * bh + lw, p)
+                for (k in -1..cols) {
+                    val x = k * bw + (if (r % 2 == 1) bw / 2f else 0f)
+                    c.drawRect(x, r * bh, x + lw, (r + 1) * bh, p)
+                }
+            }
+            p.color = 0x10FFFFFF
+            for (r in 0 until rows) c.drawRect(0f, r * bh + lw, w.toFloat(), r * bh + lw * 2f, p)
+        }
+    }
+
+    private fun scales(base: Int, d: Float): Bitmap {
+        val r = max(6f, 10f * d)
+        val sz = (2f * r).toInt()
+        return tile(sz, sz, base) { c, p ->
+            // Bottom row first so the rows above overlap it: each scale shows its lower arc.
+            for (j in 2 downTo -1) for (i in -1..2) {
+                val cx = i * 2f * r + (if (((j % 2) + 2) % 2 == 1) r else 0f)
+                val cy = j * r
+                val shade = 0.025f + 0.03f * BackgroundMath.hash01(((i % 2) + 2) % 2 + 2 * (((j % 2) + 2) % 2), 79)
+                p.style = Paint.Style.FILL
+                p.color = white(base, shade)
+                c.drawCircle(cx, cy, r, p)
+                p.style = Paint.Style.STROKE
+                p.strokeWidth = max(1f, d * 0.8f)
+                p.color = white(base, 0.16f)
+                c.drawCircle(cx, cy, r - p.strokeWidth / 2f, p)
+            }
+        }
+    }
+
     private fun hex(base: Int, d: Float): Bitmap {
         val s = 14f * d
         val w = sqrt(3f) * s
@@ -503,6 +767,11 @@ private fun LiveBackground(
             "fireflies" -> drawFireflies(cache, t, density)
             "nebula" -> drawNebula(cache, t)
             "rain" -> drawRain(cache, t, density)
+            "lava" -> drawLava(cache, t)
+            "snow" -> drawSnow(cache, t, density)
+            "matrix" -> drawMatrix(cache, t, density)
+            "orbits" -> drawOrbits(cache, t, density)
+            "plasma" -> drawPlasma(cache, t)
             else -> drawAurora(cache, t)
         }
     }
@@ -527,6 +796,11 @@ private class LiveCache {
             "starfield" -> 0.18f to 0.95f
             "rain" -> 0.30f to 0.80f
             "fireflies" -> 0.65f to 0.95f
+            "lava" -> 0.85f to 0.95f
+            "snow" -> 0.10f to 1.00f
+            "matrix" -> 0.85f to 0.95f
+            "orbits" -> 0.55f to 0.95f
+            "plasma" -> 0.85f to 0.85f
             else -> 0.70f to 0.70f
         }
         pal = BackgroundMath.livePalette(scene, tint, s, v)
@@ -537,6 +811,11 @@ private class LiveCache {
             "rain" -> BackgroundMath.particleCount(w, h, density, 3500f, 30, 160)
             "nebula" -> 5
             "waves" -> 5
+            "lava" -> 6
+            "plasma" -> 5
+            "orbits" -> 7
+            "snow" -> BackgroundMath.particleCount(w, h, density, 3000f, 40, 200)
+            "matrix" -> BackgroundMath.matrixColumns(w, density)
             else -> 4
         }
         xs = FloatArray(n); ys = FloatArray(n); zs = FloatArray(n); ph = FloatArray(n); sp = FloatArray(n)
@@ -575,6 +854,20 @@ private class LiveCache {
                 val c = Color(pal[i])
                 Brush.radialGradient(
                     0f to c.copy(alpha = 0.55f), 0.35f to c.copy(alpha = 0.18f), 1f to Color.Transparent,
+                    center = Offset.Zero, radius = 1f,
+                )
+            }
+            "lava" -> Array(n) { i ->
+                val c = Color(pal[i % pal.size])
+                Brush.radialGradient(
+                    0f to c.copy(alpha = 0.70f), 0.55f to c.copy(alpha = 0.40f), 0.8f to c.copy(alpha = 0.12f), 1f to Color.Transparent,
+                    center = Offset.Zero, radius = 1f,
+                )
+            }
+            "plasma" -> Array(n) { i ->
+                val c = Color(pal[i % pal.size])
+                Brush.radialGradient(
+                    0f to c.copy(alpha = 0.30f), 0.45f to c.copy(alpha = 0.13f), 1f to Color.Transparent,
                     center = Offset.Zero, radius = 1f,
                 )
             }
@@ -742,6 +1035,102 @@ private fun DrawScope.drawRain(c: LiveCache, t: Float, dens: Float) {
             }
         }
     }
+}
+
+/** Slow metaball-like blobs: big warm radial blobs that drift and breathe, summed additively. */
+private fun DrawScope.drawLava(c: LiveCache, t: Float) {
+    val w = size.width; val h = size.height
+    val big = max(w, h)
+    val unit = Offset.Zero
+    for (i in 0 until c.n) {
+        val cx = (0.12f + 0.76f * c.xs[i]) * w + sin(t * 0.060f * c.sp[i] + c.ph[i]) * w * 0.14f
+        val cy = h * (0.5f + 0.46f * sin(t * 0.045f * c.sp[i] + c.ph[i] * 2f))
+        val r = big * (0.16f + 0.10f * c.zs[i]) * (1f + 0.18f * sin(t * 0.09f * c.sp[i] + c.ph[i]))
+        val sy = 1f + 0.30f * sin(t * 0.07f + c.ph[i] * 3f)
+        withTransform({ translate(cx, cy); scale(r, r * sy, unit) }) {
+            drawCircle(c.brushes[i], 1f, unit, blendMode = BlendMode.Plus)
+        }
+    }
+}
+
+/** Large soft colour fields drifting on Lissajous paths. */
+private fun DrawScope.drawPlasma(c: LiveCache, t: Float) {
+    val w = size.width; val h = size.height
+    val big = max(w, h)
+    val unit = Offset.Zero
+    for (i in 0 until c.n) {
+        val cx = w * (0.5f + 0.42f * sin(t * 0.070f * c.sp[i] + c.ph[i]))
+        val cy = h * (0.5f + 0.42f * sin(t * 0.055f * c.sp[i] + c.ph[i] * 1.7f + 1f))
+        val r = big * (0.50f + 0.25f * c.zs[i]) * (1f + 0.10f * sin(t * 0.08f + c.ph[i] * 2f))
+        withTransform({ translate(cx, cy); scale(r, r, unit) }) {
+            drawCircle(c.brushes[i], 1f, unit, blendMode = BlendMode.Plus)
+        }
+    }
+}
+
+private fun DrawScope.drawSnow(c: LiveCache, t: Float, dens: Float) {
+    val w = size.width; val h = size.height
+    val col = Color(c.pal[0]); val tint = Color(c.pal[1 % c.pal.size])
+    for (i in 0 until c.n) {
+        val z = c.zs[i]
+        val y = BackgroundMath.wrap01(c.ys[i] + t * (0.014f + 0.030f * z) * (0.6f + 0.2f * c.sp[i])) * h
+        val x = BackgroundMath.wrap01(c.xs[i] + sin(t * 0.25f * c.sp[i] + c.ph[i]) * 0.02f + t * 0.002f * z) * w
+        val r = (0.8f + 2.2f * z) * dens
+        val a = 0.18f + 0.62f * z
+        drawCircle((if (i % 5 == 0) tint else col).copy(alpha = a), r, Offset(x, y))
+        if (z > 0.8f) drawCircle(col.copy(alpha = a * 0.18f), r * 2.4f, Offset(x, y))
+    }
+}
+
+/** Falling glyph-like streaks (short bars of varying size, no text) with a bright head and a fading trail. */
+private fun DrawScope.drawMatrix(c: LiveCache, t: Float, dens: Float) {
+    val w = size.width; val h = size.height
+    val cols = c.n
+    val cell = w / cols
+    val rows = (h / cell).toInt() + 1
+    val body = Color(c.pal[0])
+    val head = Color(BackgroundMath.lerpArgb(c.pal[1 % c.pal.size], 0xFFFFFFFF.toInt(), 0.7f))
+    val flip = floor(t * 1.5f).toInt()
+    for (i in 0 until cols) {
+        val trail = (6 + 12 * c.zs[i]).toInt()
+        val span = rows + trail
+        val pos = BackgroundMath.wrap01(c.ph[i] / TWO_PI + t * (0.012f + 0.016f * c.sp[i])) * span
+        val headRow = pos.toInt()
+        val x0 = i * cell
+        for (k in 0 until trail) {
+            val row = headRow - k
+            if (row < 0 || row >= rows) continue
+            val f = 1f - k / trail.toFloat()
+            val seed = row * 131 + i * 17 + (if (k < 3) flip else 0)
+            val gw = cell * (0.25f + 0.45f * BackgroundMath.hash01(seed, 91))
+            val gh = cell * (0.35f + 0.45f * BackgroundMath.hash01(seed, 93))
+            val colr = if (k == 0) head.copy(alpha = 0.95f) else body.copy(alpha = f * f * 0.65f)
+            drawRect(colr, Offset(x0 + (cell - gw) / 2f, row * cell + (cell - gh) / 2f), Size(gw, max(gh, dens)))
+        }
+    }
+}
+
+private fun DrawScope.drawOrbits(c: LiveCache, t: Float, dens: Float) {
+    val w = size.width; val h = size.height
+    val cx = w / 2f; val cy = h * 0.46f
+    val diag = hypot(w, h)
+    for (i in 0 until c.n) {
+        val r = diag * (0.07f + 0.075f * i)
+        val col = Color(c.pal[i % c.pal.size])
+        drawCircle(col.copy(alpha = 0.10f), r, Offset(cx, cy), style = c.stroke)
+        val dots = 2 + i % 3
+        val dir = if (i % 2 == 0) 1f else -1f
+        val speed = (0.16f - 0.015f * i) * dir
+        val dotR = (2.2f + 0.5f * (i % 3)) * dens
+        for (k in 0 until dots) {
+            val a = t * speed + c.ph[i] + TWO_PI * k / dots
+            val x = cx + cos(a) * r; val y = cy + sin(a) * r
+            drawCircle(col.copy(alpha = 0.10f), dotR * 3f, Offset(x, y))
+            drawCircle(col.copy(alpha = 0.85f), dotR, Offset(x, y))
+        }
+    }
+    drawCircle(Color(c.pal[0]).copy(alpha = 0.9f), 3.2f * dens, Offset(cx, cy))
+    drawCircle(Color(c.pal[0]).copy(alpha = 0.12f), 12f * dens, Offset(cx, cy))
 }
 
 // ---------------------------------------------------------------------------------------------

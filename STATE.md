@@ -37,3 +37,11 @@ Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTUR
 - Search: contact rows with Call/SMS/Email/WhatsApp/Telegram/Signal, macOS-style refinement chips, web rows (DuckDuckGo default so !bangs work, Play Store), `READ_CONTACTS` requested on demand.
 - Three-card onboarding.
 - Not verified on a device. Headless screenshots don't apply per-bubble layer transforms, so the bubble field has only unit tests (math) and no picture. New strings are English-only until translated.
+
+## Round 6
+- Launchpad (notifications centre, BB10-Hub style) as the left page: one swipe right of page one, or the unread strip; can be Off or any app widget full-screen. Grouping (time/app/sender/conversation/flat) and rules per app / sender / conversation / text (hide, mute, pin, auto-clear).
+- Search is now called Radar.
+- Settings sit on the dimmed wallpaper (or pitch black).
+- More wallpapers: 24 solids, 20 gradients, 15 textures, 13 live scenes, Horizon picture and your own photo.
+- Grid: separate across/down spacing, margins, label size, up to 10 columns.
+- Not verified on a device (swipe-to-open gesture, widget hosting on the left page, notification listener behaviour).

@@ -12,14 +12,15 @@ class BackgroundTest {
     private fun ends(a: Float) = BackgroundMath.gradientEndpoints(a, 200f, 100f)
 
     @Test fun minimumCounts() {
-        assertTrue(BackgroundPresets.solids.size >= 12)
-        assertTrue(BackgroundPresets.gradients.size >= 8)
-        assertTrue(BackgroundPresets.textures.size >= 6)
-        assertTrue(BackgroundPresets.lives.size >= 6)
+        assertEquals(24, BackgroundPresets.solids.size)
+        assertEquals(20, BackgroundPresets.gradients.size)
+        assertEquals(15, BackgroundPresets.textures.size)
+        assertEquals(13, BackgroundPresets.lives.size)
+        assertEquals(listOf("horizon"), BackgroundPresets.pictures.map { it.id })
     }
 
     @Test fun idsUniqueWithinLists() {
-        for (l in listOf(BackgroundPresets.solids, BackgroundPresets.gradients, BackgroundPresets.textures, BackgroundPresets.lives)) {
+        for (l in listOf(BackgroundPresets.solids, BackgroundPresets.gradients, BackgroundPresets.textures, BackgroundPresets.lives, BackgroundPresets.pictures)) {
             assertEquals(l.size, l.map { it.id }.toSet().size)
             assertTrue(l.all { it.label.isNotBlank() && it.id != "custom" })
         }
@@ -29,7 +30,7 @@ class BackgroundTest {
         for (p in BackgroundPresets.solids) assertNotNull(BackgroundPresets.solidColor(p.id))
         for (p in BackgroundPresets.gradients) {
             val g = BackgroundPresets.gradientStops(p.id)!!
-            assertTrue(g.colors.size in 2..3)
+            assertTrue(g.colors.size in 2..4)
         }
         assertNull(BackgroundPresets.solidColor("nope"))
         assertNull(BackgroundPresets.gradientStops("nope"))
@@ -81,10 +82,52 @@ class BackgroundTest {
         assertEquals(260, BackgroundMath.particleCount(5000f, 5000f, 1f, 10f, 40, 260))
     }
 
-    @Test fun liveListHasEightIncludingPrototypes() {
+    @Test fun liveListKeepsOldIdsAndAddsNew() {
         val ids = BackgroundPresets.lives.map { it.id }
-        assertEquals(8, ids.size)
-        assertTrue(ids.containsAll(listOf("aurora", "starfield", "waves", "fireflies", "nebula", "rain", "ribbon", "bokeh")))
+        assertEquals(13, ids.size)
+        assertEquals(listOf("aurora", "starfield", "waves", "fireflies", "nebula", "rain", "ribbon", "bokeh"), ids.take(8))
+        assertEquals(listOf("lava", "snow", "matrix", "orbits", "plasma"), ids.drop(8))
+        assertEquals(ids, BackgroundPresets.allIds(BackgroundKind.Live))
+        assertTrue(BackgroundPresets.allIds(BackgroundKind.Black).isEmpty())
+    }
+
+    @Test fun existingIdsStayStable() {
+        assertEquals(listOf("ink", "graphite", "midnight", "navy", "ocean", "forest", "moss", "wine", "plum", "rust", "slate", "steel", "sand", "cloud"),
+            BackgroundPresets.allIds(BackgroundKind.Solid).take(14))
+        assertEquals(listOf("dusk", "ocean", "ember", "aurora", "mint", "rose", "steel", "nebula"),
+            BackgroundPresets.allIds(BackgroundKind.Gradient).take(8))
+        assertEquals(listOf("grain", "grid", "dots", "linen", "carbon", "paper", "hex"),
+            BackgroundPresets.allIds(BackgroundKind.Texture).take(7))
+    }
+
+    @Test fun radialGradientsAndDefaults() {
+        assertTrue(!GradientSpec(listOf(1L, 2L), 90f).radial)
+        val radial = BackgroundPresets.gradients.map { BackgroundPresets.gradientStops(it.id)!! }.filter { it.radial }
+        assertTrue(radial.size >= 4)
+        assertEquals(125f, BackgroundMath.radialRadius(0.5f, 0.5f, 200f, 150f), eps)
+        assertEquals(Math.hypot(100.0, 150.0).toFloat(), BackgroundMath.radialRadius(0.5f, 1f, 200f, 150f), eps)
+    }
+
+    @Test fun newScenesHaveHuesAndPalettes() {
+        for (id in listOf("lava", "snow", "matrix", "orbits", "plasma")) {
+            assertTrue(BackgroundMath.sceneHues(id).size >= 2)
+            assertEquals(BackgroundMath.sceneHues(id).size, BackgroundMath.livePalette(id, 0xFF2040FF.toInt(), 0.7f, 0.7f).size)
+        }
+        assertEquals(10, BackgroundMath.matrixColumns(100f, 3f))
+        assertEquals(56, BackgroundMath.matrixColumns(100000f, 1f))
+        assertEquals(30, BackgroundMath.matrixColumns(1260f, 3f))
+    }
+
+    @Test fun pictureMath() {
+        assertEquals(1, PictureMath.sampleSize(1000, 1000, 1000, 1000))
+        assertEquals(4, PictureMath.sampleSize(4000, 3000, 1000, 700))
+        assertEquals(2, PictureMath.sampleSize(4000, 3000, 1000, 1100))
+        assertEquals(1, PictureMath.sampleSize(0, 3000, 1000, 700))
+        assertEquals(0f, PictureMath.clampDim(-1f), 0f)
+        assertEquals(1f, PictureMath.clampDim(3f), 0f)
+        assertEquals(0f, PictureMath.clampDim(Float.NaN), 0f)
+        assertEquals(90, PictureMath.exifRotation(6))
+        assertEquals(0, PictureMath.exifRotation(1))
     }
 
     @Test fun prototypeFormulas() {

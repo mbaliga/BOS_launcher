@@ -79,7 +79,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putLong("bgA", next.backgroundColorA).putLong("bgB", next.backgroundColorB)
             .putString("webEngine", next.webEngine.name)
             .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
-            .putString("leftPage", next.leftPage.name).putInt("leftWidgetId", next.leftWidgetId).putBoolean("launchpadRail", next.launchpadRail)
+            .putString("bgPicture", next.backgroundPicturePath).putString("leftPage", next.leftPage.name).putInt("leftWidgetId", next.leftWidgetId).putBoolean("launchpadRail", next.launchpadRail)
             .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
             .putFloat("spacingV", next.spacingV).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
             .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
@@ -161,6 +161,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
             searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
             searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
+            backgroundPicturePath = sp.getString("bgPicture", "") ?: "",
             leftPage = runCatching { LeftPage.valueOf(sp.getString("leftPage", null) ?: "") }.getOrDefault(d.leftPage),
             leftWidgetId = sp.getInt("leftWidgetId", d.leftWidgetId),
             launchpadRail = sp.getBoolean("launchpadRail", d.launchpadRail),

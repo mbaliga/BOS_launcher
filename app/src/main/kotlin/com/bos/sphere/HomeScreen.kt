@@ -783,7 +783,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.45f * hubFraction))
                     .pointerInput(Unit) { detectTapGestures { hubOpen = false } },
-            ) { HubPanel(fraction = hubFraction) }
+            ) {
+                HubPanel(fraction = hubFraction, onRequestAccess = {
+                    hubOpen = false
+                    runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                })
+            }
             if (hubOpen) BackHandler { hubOpen = false }
         }
 
@@ -982,6 +987,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 apps = apps,
                 onSave = { stores.shortcuts.setGesture(g, it); editGesture = null },
                 onDismiss = { editGesture = null },
+                unavailable = g.unavailableReason(surface)?.let { L10n.tr("Won't fire on the current home: %s. The binding is kept for other styles.", L10n.tr(it)) },
             )
         }
         colorApp?.let { app ->

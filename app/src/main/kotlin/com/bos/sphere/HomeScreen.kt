@@ -436,6 +436,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
+    val searchHub = remember { com.bos.sphere.core.data.AndroidSearchHub(context) }
+    val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     // ---- steps need the activity-recognition permission
     val stepsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -676,6 +678,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             recent = recentApps,
             prefs = prefs,
             contacts = contactSource,
+            hub = searchHub,
+            onRunAction = { runner.run(it) },
+            onRequestFilePermission = { filePermission.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO, android.Manifest.permission.READ_MEDIA_AUDIO)) },
+            sounds = sounds,
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },
             onOpenIntent = { i -> runCatching { context.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } },

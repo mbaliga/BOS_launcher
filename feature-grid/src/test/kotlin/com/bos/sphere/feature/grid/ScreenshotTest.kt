@@ -285,14 +285,50 @@ class ScreenshotTest {
         shoot("09-drawer-details")
     }
 
-    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun searchOverlay() {
+    private val fakeHub = object : com.bos.sphere.core.data.SearchHub {
+        private val hits = mapOf(
+            com.bos.sphere.core.data.SearchCategory.Files to listOf(
+                com.bos.sphere.core.data.SearchHit("f1", com.bos.sphere.core.data.SearchCategory.Files, "Receipt March.pdf", "Documents · 212 KB", kind = com.bos.sphere.core.data.HitKind.Document, snippet = "…paid by card, total 42.50, merchant Maps Cafe…", sourcePackage = "com.example.fylz"),
+                com.bos.sphere.core.data.SearchHit("f2", com.bos.sphere.core.data.SearchCategory.Files, "IMG_2041.jpg", "Camera · 3.1 MB", kind = com.bos.sphere.core.data.HitKind.Image, snippet = "Mail address on the parcel label", sourcePackage = "com.example.fotoz"),
+                com.bos.sphere.core.data.SearchHit("f3", com.bos.sphere.core.data.SearchCategory.Files, "Music notes.txt", "Download · 4 KB", kind = com.bos.sphere.core.data.HitKind.Document),
+                com.bos.sphere.core.data.SearchHit("f4", com.bos.sphere.core.data.SearchCategory.Files, "Trip", "Documents", kind = com.bos.sphere.core.data.HitKind.Folder),
+                com.bos.sphere.core.data.SearchHit("f5", com.bos.sphere.core.data.SearchCategory.Files, "clip.mp4", "Movies · 88 MB", kind = com.bos.sphere.core.data.HitKind.Video),
+            ),
+            com.bos.sphere.core.data.SearchCategory.Actions to listOf(
+                com.bos.sphere.core.data.SearchHit("a1", com.bos.sphere.core.data.SearchCategory.Actions, "Music", kind = com.bos.sphere.core.data.HitKind.Action, actionId = CornerActionId.Music),
+                com.bos.sphere.core.data.SearchHit("a2", com.bos.sphere.core.data.SearchCategory.Actions, "Maps", kind = com.bos.sphere.core.data.HitKind.Action, actionId = CornerActionId.Maps),
+                com.bos.sphere.core.data.SearchHit("a3", com.bos.sphere.core.data.SearchCategory.Actions, "Flashlight", kind = com.bos.sphere.core.data.HitKind.Action, actionId = CornerActionId.Flashlight),
+            ),
+        )
+        override fun search(query: String, prefs: LauncherPrefs) = kotlinx.coroutines.flow.flowOf(hits)
+        override fun hasFileAccess() = true
+        override fun deepSources() = emptyList<String>()
+    }
+
+    private fun searchShot(name: String, layout: com.bos.sphere.core.data.SearchLayout, query: String, cat: com.bos.sphere.core.data.SearchCategory?) {
         rule.mainClock.autoAdvance = false
         rule.setContent {
-            SearchOverlay(visible = true, apps = apps, recent = apps.take(5), prefs = com.bos.sphere.core.data.LauncherPrefs(), contacts = null, onLaunch = {}, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {}, modifier = Modifier.fillMaxSize())
+            SearchScreen(
+                apps = apps, recent = apps.take(9), prefs = LauncherPrefs(searchLayout = layout, searchBackdrop = true, searchMotion = true), contacts = null,
+                onLaunch = {}, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {},
+                hub = fakeHub, onOpenHit = null, onRunAction = {}, onRequestFilePermission = {}, sounds = null,
+                initialQuery = query, initialCategory = cat,
+            )
         }
-        shoot("10-search")
+        shoot(name, settleMs = 800)
     }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun searchFilmstrip() = searchShot("10-search-filmstrip", com.bos.sphere.core.data.SearchLayout.Filmstrip, "", null)
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun searchFilmstripFiles() = searchShot("10b-search-filmstrip-files", com.bos.sphere.core.data.SearchLayout.Filmstrip, "ma", com.bos.sphere.core.data.SearchCategory.Files)
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun searchOrbit() = searchShot("11-search-orbit", com.bos.sphere.core.data.SearchLayout.Orbit, "m", null)
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun searchFlat() = searchShot("12-search-flat", com.bos.sphere.core.data.SearchLayout.Flat, "ma", null)
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun detailVisualHomeStyle() {

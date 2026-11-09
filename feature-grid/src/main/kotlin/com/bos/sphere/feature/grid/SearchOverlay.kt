@@ -62,6 +62,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AppEntry
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.bos.sphere.core.data.CornerActionId
+import com.bos.sphere.core.data.SearchCategory
+import com.bos.sphere.core.data.SearchHit
+import com.bos.sphere.core.data.SearchHub
+import com.bos.sphere.core.data.SearchLayout
+import kotlinx.coroutines.flow.collectLatest
 import com.bos.sphere.core.data.Channel
 import com.bos.sphere.core.data.ContactActions
 import com.bos.sphere.core.data.ContactHit
@@ -83,9 +96,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
- * Universal search: apps, people (with the ways to reach them, BlackBerry style), and the web
- * (DuckDuckGo by default so !bangs work). Refinement chips in the Spotlight manner rewrite the field.
- * Kept light so it comes up instantly; the keyboard is requested after the first frame.
+ * Universal search: apps, people (with the ways to reach them, BlackBerry style), actions, files
+ * (including Fylz / Fotoz deep hits) and the web (DuckDuckGo by default so !bangs work).
+ *
+ * The layout follows [LauncherPrefs.searchLayout]: Filmstrip, Orbit (both with the category wheel)
+ * or the macOS-style Flat list. The keyboard is the system IME; the layout reserves its space with
+ * imePadding and works the same without it.
+ *
+ * New parameters sit after [modifier] so existing callers keep compiling. [onOpenHit] is the host's
+ * chance to open a file hit (default: [openHitIntent] through [onOpenIntent]); action hits always
+ * go to [onRunAction].
  */
 @Composable
 fun SearchOverlay(
@@ -100,75 +120,282 @@ fun SearchOverlay(
     onRequestContactsPermission: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    hub: SearchHub? = null,
+    onOpenHit: ((SearchHit) -> Unit)? = null,
+    onRunAction: (CornerActionId) -> Unit = {},
+    onRequestFilePermission: () -> Unit = {},
+    sounds: UiSounds? = null,
 ) {
-    var field by remember { mutableStateOf(TextFieldValue("")) }
-    val focus = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
+    if (visible) BackHandler(onBack = onDismiss)
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        SearchScreen(
+            apps = apps, recent = recent, prefs = prefs, contacts = contacts,
+            onLaunch = onLaunch, onLongPressApp = onLongPressApp, onOpenIntent = onOpenIntent,
+            onRequestContactsPermission = onRequestContactsPermission, onDismiss = onDismiss,
+            hub = hub, onOpenHit = onOpenHit, onRunAction = onRunAction,
+            onRequestFilePermission = onRequestFilePermission, sounds = sounds,
+        )
+    }
+}
 
-    LaunchedEffect(visible) {
-        if (visible) {
-            field = TextFieldValue("")
-            delay(60) // let the overlay draw its first frame before the IME animates
-            runCatching { focus.requestFocus(); keyboard?.show() }
-        } else {
-            keyboard?.hide()
+/** Contact lookup for [query]: debounced, off the main thread, stale lookups cancelled. */
+@Composable
+private fun rememberContactRows(query: String, contacts: ContactSource?, want: Boolean): Pair<List<ContactRow>, Boolean> {
+    val context = LocalContext.current
+    var rows by remember { mutableStateOf<List<ContactRow>>(emptyList()) }
+    var permitted by remember { mutableStateOf(true) }
+    LaunchedEffect(query, contacts, want) {
+        val q = query.trim()
+        if (!want || q.length < 2 || contacts == null) {
+            rows = emptyList()
+            return@LaunchedEffect
+        }
+        delay(120)
+        val (ok, found) = withContext(Dispatchers.IO) {
+            val ok = contacts.hasPermission()
+            ok to if (ok) contacts.search(q).map { ContactRow(it, ContactActions.availableChannels(context, it)) } else emptyList()
+        }
+        permitted = ok
+        rows = found
+    }
+    return rows to permitted
+}
+
+/** The search screen proper; internal so tests can start it with a query and a category. */
+@Composable
+internal fun SearchScreen(
+    apps: List<AppEntry>,
+    recent: List<AppEntry>,
+    prefs: LauncherPrefs,
+    contacts: ContactSource?,
+    onLaunch: (AppEntry) -> Unit,
+    onLongPressApp: (AppEntry) -> Unit,
+    onOpenIntent: (Intent) -> Unit,
+    onRequestContactsPermission: () -> Unit,
+    onDismiss: () -> Unit,
+    hub: SearchHub?,
+    onOpenHit: ((SearchHit) -> Unit)?,
+    onRunAction: (CornerActionId) -> Unit,
+    onRequestFilePermission: () -> Unit,
+    sounds: UiSounds?,
+    initialQuery: String = "",
+    initialCategory: SearchCategory? = null,
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focus = remember { FocusRequester() }
+    var field by remember { mutableStateOf(TextFieldValue(initialQuery, TextRange(initialQuery.length))) }
+    var userCat by remember { mutableStateOf(initialCategory) }
+    var expandedContact by remember { mutableStateOf<Long?>(null) }
+    var dismissedFor by remember { mutableStateOf<String?>(null) }
+    var touched by remember { mutableStateOf(false) }
+    val query = field.text
+    val trimmed = query.trim()
+    val layout = prefs.searchLayout
+
+    LaunchedEffect(Unit) {
+        delay(60) // let the overlay draw its first frame before the IME animates
+        runCatching { focus.requestFocus(); keyboard?.show() }
+    }
+    DisposableEffect(Unit) { onDispose { runCatching { keyboard?.hide() } } }
+    LaunchedEffect(trimmed) {
+        touched = false
+        expandedContact = null
+        if (trimmed.isEmpty()) userCat = null // an explicit choice sticks until the query is cleared
+    }
+
+    // ---- results
+    val wantContacts = prefs.searchContacts && contacts != null
+    val (contactRows, contactsPermitted) = rememberContactRows(query, contacts, wantContacts)
+    var hubMap by remember { mutableStateOf<Map<SearchCategory, List<SearchHit>>>(emptyMap()) }
+    var fileAccess by remember { mutableStateOf(hub?.hasFileAccess() ?: true) }
+    LaunchedEffect(hub, query, prefs.searchFiles) {
+        if (hub == null) { hubMap = emptyMap(); return@LaunchedEffect }
+        if (query.isNotBlank()) delay(90)
+        fileAccess = hub.hasFileAccess()
+        hub.search(trimmed, prefs).collectLatest { hubMap = it }
+    }
+    val ranked = remember(apps, recent, trimmed) {
+        if (trimmed.isEmpty()) recent.take(24) else AppSearch.rank(apps, trimmed, limit = 24)
+    }
+    val web = remember(trimmed, prefs.webEngine, prefs.searchWeb) {
+        if (trimmed.isEmpty()) emptyList() else sections(
+            trimmed, prefs.webEngine, emptyList<AppEntry>(), emptyList<ContactRow>(),
+            searchWeb = prefs.searchWeb, searchContacts = false,
+        ).web
+    }
+    val webFirst = remember(trimmed, prefs.searchWeb) {
+        prefs.searchWeb && trimmed.isNotEmpty() && (WebSearch.bang(trimmed) != null || WebSearch.looksLikeUrl(trimmed) || WebSearch.hasBang(trimmed))
+    }
+    val data = remember(trimmed, ranked, contactRows, contactsPermitted, wantContacts, web, webFirst, hubMap, fileAccess, hub, prefs.searchFiles) {
+        SearchData(
+            query = trimmed, apps = ranked,
+            contacts = if (wantContacts) contactRows else emptyList(),
+            askContacts = wantContacts && !contactsPermitted && trimmed.length >= 2,
+            web = web, webFirst = webFirst,
+            hits = hubMap,
+            askFiles = hub != null && prefs.searchFiles && !fileAccess,
+            deepHint = hub != null && prefs.searchFiles && hub.deepSources().isEmpty(),
+        )
+    }
+    val selected = userCat ?: data.best
+    val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
+
+    // ---- suggestions
+    val appCategories = remember(apps) { apps.map { AppSearch.categoryNameOf(it.packageName) }.distinct().sorted() }
+    val groups = remember(query, appCategories, layout) {
+        buildSuggestionGroups(query, appCategories, maxRows = if (layout == SearchLayout.Flat) 8 else 5)
+    }
+    val showSuggestions = groups.isNotEmpty() && !touched && dismissedFor != query
+
+    // ---- actions
+    fun tick() { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); sounds?.play(UiSound.Tick) }
+    fun setQuery(text: String) { field = TextFieldValue(text, TextRange(text.length)) }
+    fun openHit(hit: SearchHit) {
+        val id = hit.actionId
+        when {
+            id != null -> onRunAction(id)
+            onOpenHit != null -> onOpenHit(hit)
+            else -> openHitIntent(context, hit)?.let(onOpenIntent)
         }
     }
-    if (visible) BackHandler(onBack = onDismiss)
+    fun tap(tile: Tile) {
+        when (tile) {
+            is Tile.App -> onLaunch(tile.app)
+            is Tile.Person -> { tick(); expandedContact = if (expandedContact == tile.c.hit.id) null else tile.c.hit.id }
+            is Tile.Hit -> openHit(tile.hit)
+            is Tile.Web -> when (val r = tile.row) {
+                is WebRow.Open -> onOpenIntent(WebSearch.intentFor(r.url))
+                is WebRow.BangSearch -> onOpenIntent(WebSearch.intentFor(r.url))
+                is WebRow.Search -> onOpenIntent(WebSearch.intentFor(r.url))
+                is WebRow.PlayStore -> onOpenIntent(WebSearch.intentFor(r.url))
+                is WebRow.BangHints -> Unit
+            }
+            is Tile.Bang -> setQuery(tile.rewritten)
+            is Tile.Allow -> if (tile.files) onRequestFilePermission() else onRequestContactsPermission()
+        }
+    }
+    val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t is Tile.App) onLongPressApp(t.app) }, onTouch = { touched = true })
+    val pickSuggestion: (SuggItem) -> Unit = { item ->
+        tick()
+        item.scope?.let { userCat = it }
+        item.insertion?.let { setQuery(it) }
+        dismissedFor = field.text
+    }
+    val go = {
+        val first = data.tiles(selected).firstOrNull()
+        if (first != null && first !is Tile.Person) tap(first) else submitSearch(query, apps, prefs, onLaunch, onOpenIntent)
+    }
+    val showKeyboard = { runCatching { focus.requestFocus(); keyboard?.show() }; Unit }
 
-    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(HyleColors.Background.copy(alpha = 0.96f))
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .imePadding(),
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)
-                        .fillMaxWidth()
-                        .background(HyleColors.Surface, RoundedCornerShape(14.dp))
-                        .border(1.dp, HyleColors.Hairline, RoundedCornerShape(14.dp))
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                ) {
-                    Icon(Glyphs.Search, null, tint = HyleColors.InkDim, modifier = Modifier.size(18.dp))
-                    Box(Modifier.weight(1f).padding(start = 10.dp)) {
-                        if (field.text.isEmpty()) Text(L10n.tr("Search apps, people, the web"), color = HyleColors.InkDim, fontSize = 15.sp)
-                        BasicTextField(
-                            value = field,
-                            onValueChange = { field = it },
-                            singleLine = true,
-                            textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 15.sp),
-                            cursorBrush = SolidColor(HyleColors.Violet),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                            keyboardActions = KeyboardActions(
-                                onGo = { submitSearch(field.text, apps, prefs, onLaunch, onOpenIntent) },
-                            ),
-                            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+    Box(Modifier.fillMaxSize()) {
+        SearchBackdrop(prefs.searchBackdrop, prefs.searchMotion, Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
+            if (layout == SearchLayout.Flat) {
+                Column(Modifier.fillMaxSize()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)
+                            .fillMaxWidth()
+                            .background(Color(0xE61C1D21), RoundedCornerShape(12.dp))
+                            .border(2.dp, HyleColors.Violet.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                            .padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 9.dp),
+                    ) {
+                        Icon(Glyphs.Search, null, tint = Color(0xB3FFFFFF), modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        ScopeToken(userCat, userCat, { userCat = it })
+                        Box(Modifier.weight(1f).padding(start = 8.dp)) {
+                            if (query.isEmpty()) Text(L10n.tr("Search"), color = Color(0x80FFFFFF), fontSize = 17.sp)
+                            QueryInput(field, { field = it }, go, focus, Color.White, 17.sp, Modifier.fillMaxWidth())
+                        }
+                        Icon(
+                            Glyphs.Close, L10n.tr(if (query.isEmpty()) "Close" else "Clear"), tint = Color(0xB3FFFFFF),
+                            modifier = Modifier.size(32.dp).clip(CircleShape).clickable { if (query.isEmpty()) onDismiss() else setQuery("") }.padding(7.dp),
                         )
                     }
-                    Icon(
-                        Glyphs.Close,
-                        contentDescription = "Close",
-                        tint = HyleColors.InkDim,
-                        modifier = Modifier.size(32.dp).clickable(onClick = onDismiss).padding(6.dp),
+                    FlatResults(
+                        data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
+                        onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
+                        onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
+                        modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth().weight(1f, fill = false),
                     )
                 }
-                SearchResults(
-                    query = field.text,
-                    // Chips and bang hints rewrite the text: put the caret at the end.
-                    onQueryChange = { field = TextFieldValue(it, TextRange(it.length)) },
-                    apps = apps, recent = recent, prefs = prefs, contacts = contacts,
-                    onLaunch = onLaunch, onLongPressApp = onLongPressApp,
-                    onOpenIntent = onOpenIntent, onRequestContactsPermission = onRequestContactsPermission,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
+            } else {
+                // Hidden field: the system IME types into it; the big query beside the wheel mirrors it.
+                QueryInput(field, { field = it }, go, focus, Color.Transparent, 1.sp, Modifier.size(1.dp).alpha(0f))
+                val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts }
+                Column(Modifier.fillMaxSize()) {
+                    Spacer(Modifier.height(52.dp))
+                    if (layout == SearchLayout.Orbit) {
+                        Orbit(
+                            tiles = data.tiles(selected), motion = prefs.searchMotion, footnote = data.footnote(selected),
+                            actions = tileActions, modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                        QueryDisplay(query, onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 14.dp))
+                        CategoryWheel(
+                            selected = selected, counts = counts,
+                            onSelect = { userCat = it; touched = true; expandedContact = null },
+                            onTick = { tick() }, onTouch = { touched = true },
+                            modifier = Modifier.width(124.dp),
+                        )
+                        Spacer(Modifier.width(76.dp))
+                    }
+                    if (layout == SearchLayout.Filmstrip) {
+                        Filmstrip(
+                            tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
+                            expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
+                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
+                        )
+                    } else {
+                        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                            if (expanded != null) ContactChannelBar(expanded, onOpenIntent)
+                        }
+                    }
+                }
+                // Top bar: the scope token and close; the suggestion card hangs under it while typing.
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ScopeToken(userCat, selected, { userCat = it; expandedContact = null })
+                    Spacer(Modifier.weight(1f))
+                    Icon(
+                        Glyphs.Close, L10n.tr("Close"), tint = Color.White,
+                        modifier = Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(9.dp),
+                    )
+                }
+                if (showSuggestions) {
+                    SuggestionCard(groups, pickSuggestion, Modifier.padding(start = 16.dp, top = 56.dp).widthIn(max = 320.dp))
+                }
             }
         }
     }
+}
+
+/** The one real text field. Visible in Flat, invisible (but focused, feeding the IME) elsewhere. */
+@Composable
+private fun QueryInput(
+    value: TextFieldValue,
+    onChange: (TextFieldValue) -> Unit,
+    onGo: () -> Unit,
+    focus: FocusRequester,
+    color: Color,
+    size: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        textStyle = TextStyle(color = color, fontSize = size),
+        cursorBrush = SolidColor(if (color == Color.Transparent) Color.Transparent else Color.White),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { onGo() }),
+        modifier = modifier.focusRequester(focus),
+    )
 }
 
 /**
@@ -199,7 +426,7 @@ fun submitSearch(
     if (url != null) onOpenIntent(WebSearch.intentFor(url))
 }
 
-private class ContactRow(val hit: ContactHit, val channels: List<Channel>)
+internal class ContactRow(val hit: ContactHit, val channels: List<Channel>)
 
 private sealed interface Row {
     val key: String
@@ -229,26 +456,8 @@ fun SearchResults(
     onRequestContactsPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val wantContacts = prefs.searchContacts && contacts != null
-
-    // Contacts: debounced, off the main thread; a newer keystroke cancels the stale lookup.
-    var rows by remember { mutableStateOf<List<ContactRow>>(emptyList()) }
-    var permitted by remember { mutableStateOf(true) }
-    LaunchedEffect(query, contacts, wantContacts) {
-        val q = query.trim()
-        if (!wantContacts || q.length < 2 || contacts == null) {
-            rows = emptyList()
-            return@LaunchedEffect
-        }
-        delay(120)
-        val (ok, found) = withContext(Dispatchers.IO) {
-            val ok = contacts.hasPermission()
-            ok to if (ok) contacts.search(q).map { ContactRow(it, ContactActions.availableChannels(context, it)) } else emptyList()
-        }
-        permitted = ok
-        rows = found
-    }
+    val (rows, permitted) = rememberContactRows(query, contacts, wantContacts)
 
     val trimmed = query.trim()
     val ranked = remember(apps, query) { if (trimmed.isEmpty()) emptyList() else AppSearch.rank(apps, trimmed, limit = 8) }
@@ -368,7 +577,7 @@ private fun PersonRow(c: ContactRow, onOpenIntent: (Intent) -> Unit) {
 }
 
 @Composable
-private fun ChannelButton(ch: Channel, onClick: () -> Unit) {
+internal fun ChannelButton(ch: Channel, onClick: () -> Unit) {
     val glyph = when (ch) {
         Channel.Call -> Glyphs.Phone
         Channel.Sms -> Glyphs.Message
@@ -395,7 +604,7 @@ private fun ChannelButton(ch: Channel, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SimpleRow(icon: ImageVector, text: String, dim: Boolean = false, onClick: () -> Unit) {
+internal fun SimpleRow(icon: ImageVector, text: String, dim: Boolean = false, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
@@ -447,7 +656,7 @@ private fun glyph(name: String, block: PathBuilder.() -> Unit): ImageVector =
         )
     }.build()
 
-private val WhatsAppGlyph = glyph("whatsapp") {
+internal val WhatsAppGlyph = glyph("whatsapp") {
     // Speech bubble with a tail, and a small handset curve inside.
     moveTo(4f, 20f); lineTo(5.4f, 16f)
     arcTo(8.4f, 8.4f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 8.2f, y1 = 18.6f)
@@ -456,13 +665,13 @@ private val WhatsAppGlyph = glyph("whatsapp") {
     lineTo(14.6f, 13.2f); lineTo(13.2f, 13.5f); lineTo(10.5f, 10.8f); lineTo(10.8f, 9.4f); close()
 }
 
-private val TelegramGlyph = glyph("telegram") {
+internal val TelegramGlyph = glyph("telegram") {
     moveTo(20.5f, 4f); lineTo(3.5f, 10.8f); lineTo(9f, 13f); lineTo(11.2f, 19.5f); lineTo(14f, 15.2f)
     lineTo(18.5f, 18.5f); close()
     moveTo(9f, 13f); lineTo(20.5f, 4f)
 }
 
-private val SignalGlyph = glyph("signal") {
+internal val SignalGlyph = glyph("signal") {
     moveTo(4f, 20f); lineTo(5.2f, 16.2f)
     arcTo(8.5f, 8.5f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = 8f, y1 = 18.8f)
     close()

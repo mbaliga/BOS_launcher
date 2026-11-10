@@ -256,6 +256,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         searchOpen = false
     }
 
+    var quickPage by remember { mutableStateOf<Int?>(null) }
+    var quickOpen by remember { mutableStateOf(false) }
     fun openSettings(category: Int, page: Int = gridState.currentPage) {
         settingsPage = page.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
         settingsCategory = category
@@ -639,7 +641,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         Box(
             Modifier.align(Alignment.TopCenter).fillMaxWidth()
                 .height(stripH + 44.dp)
-                .pointerInput(Unit) { detectTapGestures(onLongPress = { openSettings(CATEGORY_HOME) }) },
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { quickPage = null; quickOpen = true }) },
         )
     }
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
@@ -731,7 +733,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onLaunch = ::launch,
                             onAppLongPress = { menuApp = it },
                             onPagesChange = { savePages(it) },
-                            onEmptyLongPress = { page -> openSettings(CATEGORY_THIS_PAGE, page) },
+                            onEmptyLongPress = { page -> quickPage = page; quickOpen = true },
                             onGesture = ::onGesture,
                             onClockTap = { runner.run(CornerActionId.Clock) },
                             onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },
@@ -799,6 +801,25 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         detectHorizontalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total < -40f) leftOpen = false }) { _, d -> total += d }
                     },
             )
+        }
+
+        // Media controls: a track + prev / play / next strip while something is playing.
+        val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(prefs.mediaControls)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = mediaInfo != null && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen,
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
+            modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = 66.dp + bottomClear),
+        ) {
+            mediaInfo?.let { mi ->
+                com.bos.sphere.feature.grid.MediaStrip(
+                    info = mi,
+                    onPrev = { com.bos.sphere.core.data.MediaNow.previous() },
+                    onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() },
+                    onNext = { com.bos.sphere.core.data.MediaNow.next() },
+                    onOpen = { com.bos.sphere.core.data.MediaNow.openPlayer(context) },
+                )
+            }
         }
 
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
@@ -1086,6 +1107,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onDismiss = { pickFor = null },
                 resetLabel = if (ActionPrefs.get(context, id) != null) L10n.tr("Ask me each time") else null,
                 onReset = { ActionPrefs.set(context, id, null); actionAppsRev++; pickFor = null },
+            )
+        }
+        if (quickOpen) {
+            com.bos.sphere.ui.HomeQuickSheet(
+                prefs = prefs, update = { f -> stores.prefs.update(f) },
+                page = quickPage?.takeIf { prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged },
+                pageCount = pages.size,
+                onAddPage = { val i = quickPage ?: 0; savePages(HomeLayoutMath.insertPage(pages, i)); quickOpen = false },
+                onDeletePage = { val i = quickPage ?: 0; savePages(HomeLayoutMath.deletePage(pages, i, capacityOf)); quickOpen = false },
+                onWallpaper = { quickOpen = false; openSettings(categories.indexOfFirst { it.title == L10n.tr("Look") }.coerceAtLeast(0)) },
+                onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
+                onDismiss = { quickOpen = false },
             )
         }
         if (!prefs.onboardingDone) {

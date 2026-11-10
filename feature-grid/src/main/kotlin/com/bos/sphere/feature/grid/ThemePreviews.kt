@@ -63,11 +63,9 @@ fun DsiPreview() {
                 val x = c * cell + (cell - plate) / 2
                 val y = r * cell * 1.2f + (cell - plate) / 2
                 val rr = CornerRadius(plate * 0.22f)
-                drawRoundRect(Color.Black.copy(alpha = 0.35f), Offset(x, y + plate * 0.06f), Size(plate, plate), rr)
-                drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFFAFBFD), Color(0xFFCDD3DD)), y, y + plate), Offset(x, y), Size(plate, plate), rr)
-                val ic = plate * 0.6f
+                val ic = plate * 0.86f
                 drawRoundRect(SampleApps.color(r * cols + c), Offset(x + (plate - ic) / 2, y + (plate - ic) / 2), Size(ic, ic), CornerRadius(ic * 0.25f))
-                drawRoundRect(Color.White.copy(alpha = 0.85f), Offset(x + plate * 0.2f, y + plate + cell * 0.03f), Size(plate * 0.6f, cell * 0.1f), CornerRadius(cell * 0.05f))
+                drawRoundRect(Color.White.copy(alpha = 0.55f), Offset(x + plate * 0.2f, y + plate + cell * 0.03f), Size(plate * 0.6f, cell * 0.07f), CornerRadius(cell * 0.035f))
             }
         }
     }

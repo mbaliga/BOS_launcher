@@ -225,6 +225,10 @@ object Glyphs {
         moveTo(12f, 12f); lineTo(18.4f, 5.6f)
         moveTo(8.2f, 8.4f); lineTo(8.3f, 8.5f)
     }
+    val Sun = glyph("sun") {
+        circle(12f, 12f, 4f)
+        for (a in 0 until 8) { val r = Math.PI / 4 * a; moveTo(12f + 7f * kotlin.math.cos(r).toFloat(), 12f + 7f * kotlin.math.sin(r).toFloat()); lineTo(12f + 9.2f * kotlin.math.cos(r).toFloat(), 12f + 9.2f * kotlin.math.sin(r).toFloat()) }
+    }
     val Close = glyph("close") { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) }
     val Up = glyph("up") { moveTo(6f, 15f); lineTo(12f, 9f); lineTo(18f, 15f) }
     val Down = glyph("down") { moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f) }

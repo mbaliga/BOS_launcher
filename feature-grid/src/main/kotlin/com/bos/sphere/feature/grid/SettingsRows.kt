@@ -91,16 +91,14 @@ internal fun SettingRowFrame(
     Column(
         modifier
             .fillMaxWidth()
-            .background(HyleColors.Surface.copy(alpha = if (highlighted) 0.9f else 0.62f), RowShape)
-            .border(1.dp, if (highlighted) HyleColors.Violet.copy(alpha = 0.6f) else HyleColors.Hairline, RowShape)
+            // Flat, like the original XMB list: no card, just air between rows.
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 4.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 42.dp)) {
-            Box(
-                Modifier.size(34.dp).background(HyleColors.Violet.copy(alpha = 0.14f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) { Icon(glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size(20.dp)) }
+            Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                Icon(glyph, null, tint = if (highlighted) HyleColors.VioletSoft else HyleColors.InkBright.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+            }
             Column(Modifier.weight(1f).padding(start = 12.dp, end = 8.dp)) {
                 Text(title, color = HyleColors.InkBright, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (!hint.isNullOrEmpty()) Text(hint, color = HyleColors.InkDim, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -195,8 +193,6 @@ private fun RoundStep(text: String, enabled: Boolean, description: String, onCli
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(36.dp)
-            .background(HyleColors.Background.copy(alpha = 0.5f), CircleShape)
-            .border(1.dp, HyleColors.Hairline, CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
             .semantics { contentDescription = description },
     ) { Text(text, color = if (enabled) HyleColors.InkBright else HyleColors.InkDim.copy(alpha = 0.4f), fontSize = 18.sp) }
@@ -228,10 +224,7 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
             Box {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .background(HyleColors.Background.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                        .border(1.dp, HyleColors.Hairline, RoundedCornerShape(12.dp))
-                        .padding(start = 12.dp),
+                    modifier = Modifier.padding(start = 6.dp),
                 ) {
                     Text(
                         item.value, color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.Medium,

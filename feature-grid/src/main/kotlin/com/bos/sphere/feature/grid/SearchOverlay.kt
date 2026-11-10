@@ -347,7 +347,7 @@ internal fun SearchScreen(
                         Filmstrip(
                             tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                             expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 10.dp),
+                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 4.dp),
                         )
                     }
                 }

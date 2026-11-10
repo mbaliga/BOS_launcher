@@ -184,7 +184,7 @@ internal fun Filmstrip(
                 }
             }
         }
-        Box(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
             val focus = centreIndex?.let { if (n > 0) tiles.getOrNull(it % n) else null } ?: tiles.firstOrNull()
             when {
                 expanded != null -> ContactChannelBar(expanded, onOpenIntent)

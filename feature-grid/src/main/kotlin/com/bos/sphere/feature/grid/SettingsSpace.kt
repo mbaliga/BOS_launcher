@@ -136,7 +136,7 @@ sealed interface SettingItem {
     }
 
     /** Runs on tap (opens a dialog, adds a page …). */
-    data class Action(override val title: String, override val glyph: ImageVector, override val value: String = "", val onClick: () -> Unit) : SettingItem
+    data class Action(override val title: String, override val glyph: ImageVector, override val value: String = "", val navigates: Boolean = false, val onClick: () -> Unit) : SettingItem
 
     /** Opens a full-screen page with its own controls; the row shows the current value and a chevron. */
     class Pane(
@@ -334,7 +334,7 @@ private fun SettingsSpaceContent(
                                     @Suppress("UNCHECKED_CAST")
                                     ChoiceSettingRow(it as SettingItem.Choice<Any?>, { sounds?.play(UiSound.Tick); tick() }, { openDetail(i) })
                                 }
-                                is SettingItem.Action -> NavigationSettingRow(it, chevron = false, highlighted = false, onClick = { sounds?.play(UiSound.Select); it.onClick() })
+                                is SettingItem.Action -> NavigationSettingRow(it, chevron = it.navigates, highlighted = false, onClick = { sounds?.play(UiSound.Select); it.onClick() })
                                 is SettingItem.Pane -> NavigationSettingRow(it, chevron = true, highlighted = i == paneOpen, onClick = { openDetail(i) })
                             }
                         }

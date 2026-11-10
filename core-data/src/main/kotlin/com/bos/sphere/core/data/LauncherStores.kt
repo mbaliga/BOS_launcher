@@ -88,7 +88,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
             .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
-            .putFloat("clockSize", next.clockSize)
+            .putFloat("clockSize", next.clockSize).putString("clockLayout", next.clockLayout.name)
             .putString("clockFormat", next.clockFormat.name)
             .putBoolean("clockDate", next.clockShowDate)
             .putBoolean("clockDay", next.clockShowDay)
@@ -188,6 +188,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             // An install that already has settings saved is not a first run.
             onboardingDone = sp.getBoolean("onboardingDone", sp.contains("style") || sp.contains("pCols")),
             alwaysKeyboard = sp.getBoolean("alwaysKeyboard", d.alwaysKeyboard),
+            clockLayout = enumOr(sp.getString("clockLayout", null), d.clockLayout),
             clockSize = sp.getFloat("clockSize", d.clockSize).coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
             clockFormat = enumOr(sp.getString("clockFormat", null), d.clockFormat),
             clockShowDate = sp.getBoolean("clockDate", d.clockShowDate),

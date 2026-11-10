@@ -193,7 +193,7 @@ fun BoxScope.StripHost(
     onClockTap: () -> Unit,
 ) {
     val safe = androidx.compose.foundation.layout.WindowInsets.safeDrawing
-    val bubble = prefs.cornerStyle == com.bos.sphere.core.data.CornerStyle.Bubble
+    val bubble = prefs.cornerStyle != com.bos.sphere.core.data.CornerStyle.Glyph
     val edge = if (bubble) 10.dp else 6.dp
     val rowH = prefs.cornerIconSize.dp + 26.dp
     val side = prefs.cornerIconSize.dp + 26.dp

@@ -217,6 +217,8 @@ object Glyphs {
     val ViewDetails = glyph("viewdetails") {
         for (y in listOf(6.5f, 12.5f, 18.5f)) { moveTo(4f, y - 2f); lineTo(7f, y - 2f); lineTo(7f, y + 1.5f); lineTo(4f, y + 1.5f); close(); moveTo(10f, y - 1.5f); lineTo(20f, y - 1.5f); moveTo(10f, y + 1.2f); lineTo(16f, y + 1.2f) }
     }
+    val Menu = glyph("menu") { moveTo(5f, 7f); lineTo(19f, 7f); moveTo(5f, 12f); lineTo(19f, 12f); moveTo(5f, 17f); lineTo(19f, 17f) }
+    val Home = glyph("home", fill = true) { moveTo(12f, 4f); lineTo(21f, 12f); lineTo(18f, 12f); lineTo(18f, 19f); lineTo(6f, 19f); lineTo(6f, 12f); lineTo(3f, 12f); close() }
     val Close = glyph("close") { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) }
     val Up = glyph("up") { moveTo(6f, 15f); lineTo(12f, 9f); lineTo(18f, 15f) }
     val Down = glyph("down") { moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f) }

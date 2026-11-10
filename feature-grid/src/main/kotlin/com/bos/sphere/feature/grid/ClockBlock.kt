@@ -50,6 +50,7 @@ object ClockText {
 /** Height the block needs, for reserving layout space. */
 fun clockBlockHeight(prefs: LauncherPrefs): Dp {
     var h = (prefs.clockSize * 1.22f).dp
+    if (prefs.clockLayout == com.bos.sphere.core.data.ClockLayout.Inline) return h
     if (prefs.clockShowDay || prefs.clockShowDate || prefs.clockShowWeather) h += (prefs.clockSize * 0.42f).coerceIn(14f, 28f).dp + 2.dp
     return h
 }
@@ -77,6 +78,29 @@ fun ClockBlock(
         ClockText.dateLine(prefs.clockShowDay, prefs.clockShowDate)?.let { SimpleDateFormat(it, locale).format(now) }
     }
     val size = prefs.clockSize
+    if (prefs.clockLayout == com.bos.sphere.core.data.ClockLayout.Inline) {
+        // "23:02   18°C": everything on one line, like the mock-ups.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy((size * 0.55f).dp),
+            modifier = modifier
+                .semantics { contentDescription = "Time $time ${meridiem.orEmpty()}" }
+                .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(time, color = HyleColors.InkBright, fontSize = size.sp, fontWeight = FontWeight.Normal, maxLines = 1)
+                if (meridiem != null) Text(meridiem, color = HyleColors.InkDim, fontSize = (size * 0.4f).coerceAtLeast(10f).sp, modifier = androidx.compose.ui.Modifier.padding(start = 3.dp, bottom = (size * 0.1f).dp), maxLines = 1)
+            }
+            if (dateLine != null) Text(dateLine, color = HyleColors.InkBright, fontSize = size.sp, maxLines = 1)
+            if (prefs.clockShowWeather && weather != null) {
+                Text(
+                    weather.temperature(prefs.weatherFahrenheit) + if (prefs.weatherFahrenheit) "F" else "C",
+                    color = HyleColors.InkBright, fontSize = size.sp, maxLines = 1,
+                )
+            }
+        }
+        return
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier

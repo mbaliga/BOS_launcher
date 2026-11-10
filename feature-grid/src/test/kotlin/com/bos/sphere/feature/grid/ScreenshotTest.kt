@@ -111,6 +111,7 @@ class ScreenshotTest {
         status: IndicatorReading = IndicatorReading(ReadingKind.Live, 0.9f, ""),
         effects: Set<IndicatorEffect> = setOf(IndicatorEffect.DotsBreathe),
         prefs2: LauncherPrefs? = null,
+        weather: com.bos.sphere.core.data.WeatherInfo? = null,
     ) {
         val state = rememberGridHomeState()
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -130,6 +131,7 @@ class ScreenshotTest {
                 capacityOf = { it.capacity(landscape, prefs) },
                 onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {},
                 onClockTap = {}, onTileLongPress = { _, _ -> },
+                weather = weather,
             )
             CornerLayer(
                 placements = cornerPlacements(corners, rotation, true),
@@ -182,6 +184,24 @@ class ScreenshotTest {
         val pages = listOf(HomePage(apps.take(9).map { it.key }, PageLayout(shape = PageShape.Coverflow)))
         rule.setContent { Scene(prefs, landscape = true, pages = pages) }
         shoot("03-coverflow-landscape")
+    }
+
+    private val mockPages get() = (0 until 4).map { p -> HomePage(apps.drop(p * 3).take(9).map { it.key }) }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun mockupPortrait() {
+        rule.mainClock.autoAdvance = false
+        val prefs = LauncherPrefs(clockShowWeather = true)
+        rule.setContent { Scene(prefs, landscape = false, pages = mockPages, weather = com.bos.sphere.core.data.WeatherInfo(18f, 0, 0)) }
+        shoot("00-mockup-portrait")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
+    fun mockupLandscape() {
+        rule.mainClock.autoAdvance = false
+        val prefs = LauncherPrefs(clockShowWeather = true)
+        rule.setContent { Scene(prefs, landscape = true, pages = mockPages, weather = com.bos.sphere.core.data.WeatherInfo(18f, 0, 0)) }
+        shoot("00-mockup-landscape")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")

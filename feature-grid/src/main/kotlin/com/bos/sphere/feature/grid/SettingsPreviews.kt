@@ -335,6 +335,9 @@ fun CornerStylePreview(style: CornerStyle) {
         for (al in listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd)) {
             Box(Modifier.align(al)) {
                 if (style == CornerStyle.Bubble) {
+                    Box(Modifier.padding(3.dp).size(20.dp).background(HyleColors.SurfaceTranslucent, CircleShape).border(1.dp, HyleColors.InsetHighlight, CircleShape))
+                }
+                if (style == CornerStyle.Quarter) {
                     ComposeCanvas(Modifier.size(26.dp)) {
                         val c = Offset(if (al == Alignment.TopStart || al == Alignment.BottomStart) 0f else size.width, if (al == Alignment.TopStart || al == Alignment.TopEnd) 0f else size.height)
                         drawCircle(HyleColors.SurfaceTranslucent, size.width, c); drawCircle(HyleColors.InsetHighlight, size.width, c, style = Stroke(1f))

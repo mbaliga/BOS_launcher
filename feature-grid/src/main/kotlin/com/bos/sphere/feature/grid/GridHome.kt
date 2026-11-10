@@ -238,15 +238,17 @@ fun GridHome(
     val clockBottom = prefs.clockPosition == ClockPosition.Bottom
     val clockH = stripHeight(prefs)
     val cornerRow = prefs.cornerIconSize.dp + 22.dp
+    // The apps area is the same inset on every side, in either orientation; the corner icons, the
+    // clock and the page dots live in that margin band (see the mock-ups).
     val padTopDp = if (clockTop) maxOf(clockH + 14.dp, cornerRow) else cornerRow
     val padBottomDp = when {
         clockBottom && !indicatorAtStartEarly -> maxOf(clockH + 76.dp, cornerRow)
         clockBottom -> maxOf(clockH + 24.dp, cornerRow)
         indicatorAtStartEarly -> cornerRow
         else -> maxOf(cornerRow, 44.dp)
-    }
-    val padStartDp = if (indicatorAtStartEarly) 38.dp else 14.dp
-    val padEndDp = 14.dp
+    }.coerceAtLeast(cornerRow)
+    val padStartDp = maxOf(cornerRow, if (indicatorAtStartEarly) 38.dp else 14.dp)
+    val padEndDp = cornerRow
     val insetLeft = with(density) { safeInsets.getLeft(this, dir).toDp() }
     val insetRight = with(density) { safeInsets.getRight(this, dir).toDp() }
     val insetTop = with(density) { safeInsets.getTop(this).toDp() }
@@ -652,6 +654,7 @@ fun GridHome(
             current = pagerState.currentPage,
             vertical = indicatorAtStart,
             onSelect = { scope.launch { pagerState.animateScrollToPage(it) } },
+            onMenu = { onEmptyLongPress(pagerState.currentPage) },
             modifier = if (indicatorAtStart) {
                 Modifier.align(Alignment.CenterStart).windowInsetsPadding(safe).padding(start = 14.dp)
             } else {
@@ -871,11 +874,26 @@ fun PageIndicator(
     vertical: Boolean,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    onMenu: (() -> Unit)? = null,
 ) {
     if (count <= 1) return
     val content: @Composable () -> Unit = {
+        // ≡ then ⌂ then the dots: the menu opens this page's options, the house is the first page.
+        if (onMenu != null) {
+            Icon(
+                Glyphs.Menu, contentDescription = "Page options", tint = HyleColors.InkDim,
+                modifier = Modifier.padding(horizontal = 2.dp).size(20.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.padding(3.dp),
+            )
+        }
         for (i in 0 until count) {
             val active = i == current
+            if (i == 0) {
+                Icon(
+                    Glyphs.Home, contentDescription = "Home page", tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 20.dp else 16.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
+                )
+                continue
+            }
             val long by animateDpAsState(if (active) 20.dp else 6.dp, label = "pill")
             Box(
                 Modifier

@@ -430,7 +430,8 @@ private fun CornerSlotView(
     val corner = placement.screen
     val slot = placement.slot
     val align = corner.absoluteAlignment()
-    val bubble = style == CornerStyle.Bubble
+    val bubble = style == CornerStyle.Quarter
+    val round = style == CornerStyle.Bubble
     val haptics = LocalHapticFeedback.current
 
     Box(Modifier.fillMaxSize()) {
@@ -438,11 +439,18 @@ private fun CornerSlotView(
             CornerBubble(corner, Modifier.align(align))
         }
         val safe = WindowInsets.safeDrawing
+        // Round bubbles: a glass disc behind the icon, floating a little in from the edges.
+        if (round && (slot is CornerSlot.Single || slot is CornerSlot.Palette)) {
+            Box(
+                Modifier.align(align).padding(safeInsetsFor(corner, safe)).padding(8.dp).size(iconSize + 26.dp)
+                    .clip(CircleShape).background(HyleColors.SurfaceTranslucent).border(1.dp, HyleColors.InsetHighlight, CircleShape),
+            )
+        }
         var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
         val boxModifier = Modifier
             .align(align)
             .padding(safeInsetsFor(corner, safe))
-            .padding(if (bubble) 10.dp else 6.dp)
+            .padding(if (bubble) 10.dp else if (round) 8.dp else 6.dp)
             .onGloballyPositioned { coords = it }
 
         when (slot) {

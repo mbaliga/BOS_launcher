@@ -20,7 +20,8 @@ enum class ScrollAxis(val label: String) {
 enum class HomeScroll(val label: String) { Paged("Pages"), Continuous("Continuous") }
 
 /** Corner look: a bare glyph, or a quarter-circle bubble hugging the screen corner. */
-enum class CornerStyle(val label: String) { Glyph("Glyph"), Bubble("Bubble") }
+/** Holo = bare glyphs; Quarter = Sony-style quarter discs in the corners; Bubble = round floating bubbles. */
+enum class CornerStyle(val label: String) { Glyph("Holo"), Quarter("Sony quarter discs"), Bubble("Bubbles") }
 
 /** Where the home clock sits. It can also be a page tile ([HomeTiles.CLOCK]) or a corner Time complication. */
 enum class ClockPosition(val label: String) { Top("Top"), Bottom("Bottom"), Hidden("Hidden") }
@@ -101,6 +102,9 @@ enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbi
 enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Widget("A widget") }
 
 /** The backdrop behind Settings. */
+/** The clock as one line ("23:02   18°C") or time over a second line. */
+enum class ClockLayout(val label: String) { Inline("One line"), Stacked("Two lines") }
+
 /** How a small segmented switcher labels its options. */
 enum class SwitchStyle(val label: String) { IconText("Icons + text"), TextOnly("Text only"), IconsOnly("Icons only") }
 
@@ -209,7 +213,7 @@ data class LauncherPrefs(
     val cornersFollowDevice: Boolean = true,
     /** Which way pages turn, per orientation. Swipes on the other axis are free for gestures. */
     val portraitPaging: PagingAxis = PagingAxis.Horizontal,
-    val landscapePaging: PagingAxis = PagingAxis.Vertical,
+    val landscapePaging: PagingAxis = PagingAxis.Horizontal,
     /** Motion gestures (shake / flick / flip …) are listened for while home is showing. */
     val motionEnabled: Boolean = true,
     /** Keep listening for motion gestures from a foreground service when home is not showing. */
@@ -283,7 +287,8 @@ data class LauncherPrefs(
 
     // --- clock
     /** Clock text size in sp. */
-    val clockSize: Float = 34f,
+    val clockSize: Float = 26f,
+    val clockLayout: ClockLayout = ClockLayout.Inline,
     val clockFormat: ClockFormat = ClockFormat.System,
     val clockShowDate: Boolean = false,
     val clockShowDay: Boolean = false,

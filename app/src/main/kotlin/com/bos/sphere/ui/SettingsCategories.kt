@@ -448,6 +448,10 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     }
                 }
             },
+            SettingItem.Pane(x("Clock layout"), Glyphs.Clock, x(p.clockLayout.label)) {
+                Chips(com.bos.sphere.core.data.ClockLayout.entries, p.clockLayout, { it.label }) { v -> upd { it.copy(clockLayout = v) } }
+                note("One line: time, date and temperature side by side in the top band. Two lines: time over the details.")
+            },
             SettingItem.Pane(x("Clock size"), Glyphs.Dial, "${p.clockSize.roundToInt()}") {
                 LabeledSlider(L10n.tr("Size"), p.clockSize, LauncherPrefs.MIN_CLOCK_SIZE..LauncherPrefs.MAX_CLOCK_SIZE, "${p.clockSize.roundToInt()}") { v -> upd { it.copy(clockSize = v) } }
             },
@@ -468,8 +472,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         buildList {
             add(
                 SettingItem.Pane(x("Corner style"), Glyphs.Palette, x(p.cornerStyle.label)) {
-                    VisualChoice(CornerStyle.entries, p.cornerStyle, { c -> upd { it.copy(cornerStyle = c) } }, { x(it.label) }, columns = 2, previewHeight = 96.dp) { CornerStylePreview(it) }
-                    note("Bubble draws a quarter-circle at each corner.")
+                    VisualChoice(CornerStyle.entries, p.cornerStyle, { c -> upd { it.copy(cornerStyle = c) } }, { x(it.label) }, columns = 3, previewHeight = 96.dp) { CornerStylePreview(it) }
+                    note("Holo: just the icons. Sony: a quarter-disc in each corner. Bubbles: a round bubble behind each icon.")
                 },
             )
             add(

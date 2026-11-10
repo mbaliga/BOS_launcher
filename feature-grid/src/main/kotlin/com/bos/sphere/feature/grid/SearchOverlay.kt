@@ -315,7 +315,7 @@ internal fun SearchScreen(
             } else if (layout != SearchLayout.Flat) {
                 // Idle browsing: the category wheel with Filmstrip or Orbit results.
                 val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts || selected == null }
-                Column(Modifier.fillMaxSize().padding(bottom = 52.dp)) {
+                Column(Modifier.fillMaxSize()) {
                     Spacer(Modifier.height(52.dp))
                     val wheelRow: @Composable () -> Unit = {
                         // "SEARCH" ends just left of the screen's centre line and the wheel starts just right of it.
@@ -347,7 +347,7 @@ internal fun SearchScreen(
                         Filmstrip(
                             tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                             expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 8.dp),
+                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 10.dp),
                         )
                     }
                 }

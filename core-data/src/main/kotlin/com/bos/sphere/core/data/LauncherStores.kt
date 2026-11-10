@@ -53,7 +53,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
         if (next == _prefs.value) return
         _prefs.value = next
         sp.edit()
-            .putString("style", next.homeStyle.name).putString("homeScroll", next.homeScroll.name).putBoolean("drawerRailVisible", next.drawerRailVisible).putString("scrollAxis", next.scrollAxis.name).putInt("contCols", next.continuousColumns)
+            .putString("style", next.homeStyle.name).putString("homeScroll", next.homeScroll.name).putBoolean("drawerRailVisible", next.drawerRailVisible).putString("drawerViewSwitch", next.drawerViewSwitch.name).putString("scrollAxis", next.scrollAxis.name).putInt("contCols", next.continuousColumns)
             .putInt("pCols", next.portraitGrid.columns).putInt("pRows", next.portraitGrid.rows)
             .putInt("lCols", next.landscapeGrid.columns).putInt("lRows", next.landscapeGrid.rows)
             .putFloat("iconScale", next.iconScale)
@@ -125,6 +125,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             homeStyle = enumOr(sp.getString("style", null), d.homeStyle),
             homeScroll = enumOr(sp.getString("homeScroll", null), d.homeScroll),
             drawerRailVisible = sp.getBoolean("drawerRailVisible", d.drawerRailVisible),
+            drawerViewSwitch = enumOr(sp.getString("drawerViewSwitch", null), d.drawerViewSwitch),
             scrollAxis = enumOr(sp.getString("scrollAxis", null), d.scrollAxis),
             continuousColumns = sp.getInt("contCols", d.continuousColumns),
             portraitGrid = GridSpec(sp.getInt("pCols", d.portraitGrid.columns), sp.getInt("pRows", d.portraitGrid.rows)).coerced(),

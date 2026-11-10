@@ -52,6 +52,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.geometry.Offset
@@ -212,6 +214,7 @@ fun AppDrawerSpace(
     sounds: UiSounds? = null,
     modifier: Modifier = Modifier,
     railVisible: Boolean = true,
+    viewSwitch: com.bos.sphere.core.data.SwitchStyle = com.bos.sphere.core.data.SwitchStyle.IconText,
 ) {
     BackHandler(enabled = visible) { onDismiss() }
     AnimatedVisibility(
@@ -221,7 +224,7 @@ fun AppDrawerSpace(
         modifier = modifier,
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            DrawerContent(apps, usage, view, sort, rail, onViewChange, onSortChange, onLaunch, onLongPress, onDismiss, sounds, railVisible)
+            DrawerContent(apps, usage, view, sort, rail, onViewChange, onSortChange, onLaunch, onLongPress, onDismiss, sounds, railVisible, viewSwitch)
         }
     }
 }
@@ -242,6 +245,7 @@ private fun DrawerContent(
     onDismiss: () -> Unit,
     sounds: UiSounds?,
     railVisible: Boolean,
+    viewSwitch: com.bos.sphere.core.data.SwitchStyle,
 ) {
     val context = LocalContext.current
     // Categories resolve off the main thread; A–Z stands in until they are ready.
@@ -273,7 +277,7 @@ private fun DrawerContent(
             .background(Color(0xF50A0B10))
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
-        DrawerHeader(view, sort, apps.size, onViewChange, onSortChange, onDismiss, sounds)
+        DrawerHeader(view, sort, apps.size, viewSwitch, onViewChange, onSortChange, onDismiss, sounds)
         Box(Modifier.fillMaxSize()) {
             val leftPad = if (rail == RailSide.Right) 0.dp else RAIL_WIDTH
             val rightPad = if (rail == RailSide.Left) 0.dp else RAIL_WIDTH
@@ -414,6 +418,7 @@ private fun DrawerHeader(
     view: DrawerView,
     sort: DrawerSort,
     count: Int,
+    viewSwitch: com.bos.sphere.core.data.SwitchStyle,
     onViewChange: (DrawerView) -> Unit,
     onSortChange: (DrawerSort) -> Unit,
     onClose: () -> Unit,
@@ -425,7 +430,7 @@ private fun DrawerHeader(
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Apps", color = HyleColors.InkBright, fontSize = 22.sp, fontWeight = FontWeight.Light)
+            Text("Apps", color = HyleColors.InkBright, fontSize = 22.sp, fontWeight = FontWeight.Light, maxLines = 1, softWrap = false)
             Text("$count", color = HyleColors.InkDim, fontSize = 11.sp)
         }
         // View: one quiet segmented pill.
@@ -435,15 +440,29 @@ private fun DrawerHeader(
         ) {
             for (v in DrawerView.entries) {
                 val on = v == view
-                Text(
-                    v.label, color = if (on) HyleColors.InkBright else HyleColors.InkDim, fontSize = 12.sp,
+                val tint = if (on) HyleColors.InkBright else HyleColors.InkDim
+                val showIcon = viewSwitch != com.bos.sphere.core.data.SwitchStyle.TextOnly
+                // Icons + text: only the active option spells itself out, which keeps the row narrow.
+                val showText = viewSwitch == com.bos.sphere.core.data.SwitchStyle.TextOnly || (viewSwitch == com.bos.sphere.core.data.SwitchStyle.IconText && on)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .semantics { this.selected = on; contentDescription = v.label }
                         .clip(RoundedCornerShape(50))
                         .background(if (on) Color(0x26FFFFFF) else Color.Transparent)
                         .clickable { sounds?.play(UiSound.Tick); onViewChange(v) }
-                        .padding(horizontal = 12.dp, vertical = 7.dp),
-                )
+                        .defaultMinSize(minWidth = 40.dp, minHeight = 36.dp)
+                        .padding(horizontal = if (showText) 12.dp else 10.dp, vertical = 7.dp),
+                ) {
+                    if (showIcon) {
+                        Icon(
+                            when (v) { DrawerView.Grid -> Glyphs.Apps; DrawerView.List -> Glyphs.ViewList; DrawerView.Details -> Glyphs.ViewDetails },
+                            contentDescription = null, tint = tint, modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    if (showIcon && showText) Spacer(Modifier.width(6.dp))
+                    if (showText) Text(v.label, color = tint, fontSize = 12.sp)
+                }
             }
         }
         // Sort: one chip with a menu instead of a second row of words.

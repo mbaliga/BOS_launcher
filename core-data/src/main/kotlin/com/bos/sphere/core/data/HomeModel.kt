@@ -101,6 +101,9 @@ enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbi
 enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Widget("A widget") }
 
 /** The backdrop behind Settings. */
+/** How a small segmented switcher labels its options. */
+enum class SwitchStyle(val label: String) { IconText("Icons + text"), TextOnly("Text only"), IconsOnly("Icons only") }
+
 /** Light or dark Launchpad (System follows the phone). */
 enum class LaunchpadTheme(val label: String) { Dark("Dark"), Light("Light"), System("Follow the phone") }
 
@@ -189,6 +192,8 @@ data class LauncherPrefs(
     val homeScroll: HomeScroll = HomeScroll.Paged,
     /** Show the A–Z letters of the drawer's quick-scrub strip (it still works when hidden). */
     val drawerRailVisible: Boolean = true,
+    /** Grid / List / Details switcher in the app drawer. */
+    val drawerViewSwitch: SwitchStyle = SwitchStyle.IconText,
     val scrollAxis: ScrollAxis = ScrollAxis.Long,
     /** Icons across the short side in the Continuous / DSi homes. */
     val continuousColumns: Int = 4,

@@ -408,6 +408,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             add(
             SettingItem.Pane(x("Drawer layout"), Glyphs.Widget, "${x(p.drawerView.label)} · ${x(p.drawerSort.label)}") {
+                Sub("View switcher shows")
+                Chips(com.bos.sphere.core.data.SwitchStyle.entries, p.drawerViewSwitch, { it.label }) { v -> upd { it.copy(drawerViewSwitch = v) } }
                 Sub("View")
                 VisualChoice(DrawerView.entries, p.drawerView, { v -> upd { it.copy(drawerView = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { DrawerViewPreview(it) }
                 Sub("Sort by")

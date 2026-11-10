@@ -209,6 +209,14 @@ object Glyphs {
         circle(12f, 12f, 9f); moveTo(12f, 11f); lineTo(12f, 17f); moveTo(12f, 7.4f); lineTo(12.1f, 7.4f)
     }
     val Plus = glyph("plus") { moveTo(12f, 5f); lineTo(12f, 19f); moveTo(5f, 12f); lineTo(19f, 12f) }
+    /** Rows with a bullet and a line each. */
+    val ViewList = glyph("viewlist") {
+        for (y in listOf(7f, 12f, 17f)) { moveTo(4.5f, y); lineTo(4.6f, y); moveTo(9f, y); lineTo(20f, y) }
+    }
+    /** Taller rows: a title line over a shorter detail line, with a tile on the left. */
+    val ViewDetails = glyph("viewdetails") {
+        for (y in listOf(6.5f, 12.5f, 18.5f)) { moveTo(4f, y - 2f); lineTo(7f, y - 2f); lineTo(7f, y + 1.5f); lineTo(4f, y + 1.5f); close(); moveTo(10f, y - 1.5f); lineTo(20f, y - 1.5f); moveTo(10f, y + 1.2f); lineTo(16f, y + 1.2f) }
+    }
     val Close = glyph("close") { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) }
     val Up = glyph("up") { moveTo(6f, 15f); lineTo(12f, 9f); lineTo(18f, 15f) }
     val Down = glyph("down") { moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f) }

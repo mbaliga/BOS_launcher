@@ -254,7 +254,7 @@ internal fun Orbit(
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
         val cx = wPx / 2f
-        val cy = hPx - with(density) { centreFromBottom.toPx() }
+        val cy = with(density) { centreFromBottom.toPx() } // (named for history: this is the centre's distance from the top)
         val tileSize = 54.dp
         val tilePx = with(density) { tileSize.toPx() }
         val colW = 80.dp
@@ -262,49 +262,36 @@ internal fun Orbit(
         val margin = colWPx / 2f
         // Ring gaps stay wider than a tile (face + caption) so rings revolving past each other never touch.
         val gap = max(0.22f * wPx, with(density) { 92.dp.toPx() })
-        val radii = FloatArray(4) { 0.36f * wPx + it * gap }
+        val radii = FloatArray(4) { 0.42f * wPx + it * gap }
         val spacing = colWPx * 0.95f
 
-        // The rings are centred on the wheel and only their upper arcs are used. Slots run from the
-        // top of each arc outward, so the best matches sit straight above the wheel.
-        val slots = remember(wPx, hPx, tiles.size, motion) {
+        // The rings are centred on the "SEARCH EVERYTHING" wheel at the screen's vertical middle and
+        // run all the way round. Slots start at the top of each ring and alternate outward, so the
+        // best matches sit straight above the wheel.
+        val wheelZoneW = with(density) { 150.dp.toPx() }
+        val wheelZoneH = with(density) { (WheelHeight / 2 + 8.dp).toPx() }
+        val slots = remember(wPx, hPx, tiles.size, motion, cy) {
             val out = ArrayList<Pair<Int, Double>>() // ring, angle
-            if (motion) {
-                // Moving: whole rings, tiles spread round the full circle, so they revolve like planets
-                // (the lower half passes behind the wheel and keyboard). Best matches start at the top.
-                for (r in radii.indices) {
-                    val rad = radii[r]
-                    val n = max(1, (2 * PI * rad / spacing).toInt())
-                    val order = ArrayList<Double>()
-                    for (k in 0 until n) order += -PI / 2 + k * 2 * PI / n + (if (r % 2 == 1) PI / n else 0.0)
-                    order.sortBy { Math.abs(Math.atan2(sin(it + PI / 2), cos(it + PI / 2))) }
-                    order.forEach { out += r to it }
-                }
-                return@remember out
-            }
             for (r in radii.indices) {
                 val rad = radii[r]
-                val maxCos = ((cx - margin) / rad).coerceAtMost(1f)
-                // Half-angle (from straight up) that still keeps the tile inside the screen width.
-                val clearPx = with(density) { 105.dp.toPx() } // keep tiles off the wheel text
-                val lim = min(Math.asin(maxCos.toDouble().coerceIn(0.0, 1.0)), Math.acos((clearPx / rad).toDouble().coerceIn(0.0, 1.0)))
-                val fit = (2 * lim * rad / spacing).toInt() + 1
-                val n = fit.coerceAtLeast(1)
-                val step = if (n > 1) 2 * lim / (n - 1) else 0.0
+                val n = max(1, (2 * PI * rad / spacing).toInt())
                 val order = ArrayList<Double>()
-                for (k in 0 until n) order += -PI / 2 + (if (n == 1) 0.0 else -lim + k * step)
-                order.sortBy { Math.abs(it + PI / 2) }
-                order.filter { cy + rad * sin(it) >= tilePx }.forEach { out += r to it }
+                for (k in 0 until n) order += -PI / 2 + k * 2 * PI / n + (if (r % 2 == 1) PI / n else 0.0)
+                order.sortBy { Math.abs(Math.atan2(sin(it + PI / 2), cos(it + PI / 2))) }
+                order.forEach { out += r to it }
             }
-            // Adjacent rings come close near the screen edges: drop any slot whose tile (face +
-            // caption) would touch one already placed, keeping a gap for the gentle sway.
+            // Moving: every slot stays, the tiles revolve through the whole screen like planets.
+            if (motion) return@remember out
+            // Still: keep only slots that are on screen, clear of the wheel text and of each other.
             val boxW = colWPx + with(density) { 8.dp.toPx() }
             val boxH = tilePx + with(density) { 26.dp.toPx() }
             val kept = ArrayList<Pair<Int, Double>>()
             val pts = ArrayList<Offset>()
             for ((r, ang) in out) {
                 val pt = Offset(cx + radii[r] * cos(ang).toFloat(), cy + radii[r] * sin(ang).toFloat())
-                if (pts.none { abs(it.x - pt.x) < boxW && abs(it.y - pt.y) < boxH }) { kept += r to ang; pts += pt }
+                val onScreen = pt.x in margin..(wPx - margin) && pt.y in (tilePx * 0.6f)..(hPx - tilePx * 1.1f)
+                val onText = abs(pt.x - cx) < wheelZoneW + margin * 0.4f && abs(pt.y - cy) < wheelZoneH + tilePx * 0.6f
+                if (onScreen && !onText && pts.none { abs(it.x - pt.x) < boxW && abs(it.y - pt.y) < boxH }) { kept += r to ang; pts += pt }
             }
             kept
         }

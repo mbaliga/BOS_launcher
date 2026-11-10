@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -315,11 +316,17 @@ internal fun SearchScreen(
             } else if (layout != SearchLayout.Flat) {
                 // Idle browsing: the category wheel with Filmstrip or Orbit results.
                 val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts || selected == null }
-                Column(Modifier.fillMaxSize()) {
-                    Spacer(Modifier.height(52.dp))
+                // "SEARCH EVERYTHING" sits on the screen's vertical middle (as in the mock-ups), clamped so
+                // it never slips under the keyboard; the results orbit it or run in a strip beneath.
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val availH = maxHeight
+                    val fullH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+                    val safeTop = with(androidx.compose.ui.platform.LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
+                    val below = if (layout == SearchLayout.Orbit) 14.dp else 182.dp // room the strip needs under the wheel
+                    val centre = (fullH / 2 - safeTop).coerceIn(WheelHeight / 2 + 20.dp, (availH - WheelHeight / 2 - below).coerceAtLeast(WheelHeight / 2 + 20.dp))
                     val wheelRow: @Composable () -> Unit = {
                         // "SEARCH" ends just left of the screen's centre line and the wheel starts just right of it.
-                        Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                        Row(Modifier.fillMaxWidth()) {
                             QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp))
                             Box(Modifier.weight(1f)) {
                                 CategoryWheel(
@@ -332,23 +339,22 @@ internal fun SearchScreen(
                         }
                     }
                     if (layout == SearchLayout.Orbit) {
-                        // The rings are centred on the wheel: one box holds both.
-                        Box(Modifier.weight(1f).fillMaxWidth()) {
-                            Orbit(
-                                tiles = data.tiles(selected), motion = prefs.searchMotion, footnote = data.footnote(selected),
-                                actions = tileActions, centreFromBottom = WheelHeight / 2 + 4.dp, modifier = Modifier.fillMaxSize(),
-                            )
-                            Box(Modifier.align(Alignment.BottomCenter)) { wheelRow() }
-                            expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = WheelHeight + 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
-                        }
-                    } else {
-                        Spacer(Modifier.weight(1f))
-                        wheelRow()
-                        Filmstrip(
-                            tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
-                            expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                            actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 4.dp),
+                        Orbit(
+                            tiles = data.tiles(selected), motion = prefs.searchMotion, footnote = data.footnote(selected),
+                            actions = tileActions, centreFromBottom = centre, modifier = Modifier.fillMaxSize(),
                         )
+                        Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
+                        expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
+                    } else {
+                        Column(Modifier.fillMaxSize()) {
+                            Spacer(Modifier.height(centre - WheelHeight / 2))
+                            wheelRow()
+                            Filmstrip(
+                                tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
+                                expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
+                                actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 44.dp, bottom = 4.dp),
+                            )
+                        }
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -133,11 +133,18 @@ internal object WheelGeometry {
     /** Screen angle where [anchor]'s visible quadrant begins (TopLeft 0, TopRight 90, BottomRight 180, BottomLeft 270). */
     fun quadrantStart(anchor: Corner): Float = anchor.ordinal * QUADRANT
 
+    /**
+     * How far in from the two screen edges the wheel's centre sits (about a centimetre), so the hub
+     * and its controls are fully on screen instead of being cut by the corner, like Concepts' wheel.
+     * Set from the density by the drawer before the wheel is laid out.
+     */
+    @Volatile var insetPx: Float = 0f
+
     fun cornerX(anchor: Corner, width: Float): Float =
-        if (anchor == Corner.TopRight || anchor == Corner.BottomRight) width else 0f
+        if (anchor == Corner.TopRight || anchor == Corner.BottomRight) width - insetPx else insetPx
 
     fun cornerY(anchor: Corner, height: Float): Float =
-        if (anchor == Corner.BottomRight || anchor == Corner.BottomLeft) height else 0f
+        if (anchor == Corner.BottomRight || anchor == Corner.BottomLeft) height - insetPx else insetPx
 
     fun polarToScreen(anchor: Corner, width: Float, height: Float, radius: Float, angleDeg: Float): WheelPoint {
         val rad = Math.toRadians(angleDeg.toDouble())
@@ -449,6 +456,8 @@ fun WheelDrawer(
         label = "wheelOpen",
     )
     BackHandler(enabled = visible) { onDismiss() }
+    // About a centimetre in from both edges (160dp per inch), set before anything reads the geometry.
+    WheelGeometry.insetPx = with(androidx.compose.ui.platform.LocalDensity.current) { 63.dp.toPx() }
     val visibleNow by rememberUpdatedState(visible)
     val shown by remember { derivedStateOf { visibleNow || progress.value > 0.002f } }
     if (!shown) return

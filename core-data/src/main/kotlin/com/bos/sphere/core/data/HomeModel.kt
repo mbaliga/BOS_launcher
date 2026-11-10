@@ -101,6 +101,9 @@ enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbi
 enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Widget("A widget") }
 
 /** The backdrop behind Settings. */
+/** Light or dark Launchpad (System follows the phone). */
+enum class LaunchpadTheme(val label: String) { Dark("Dark"), Light("Light"), System("Follow the phone") }
+
 enum class SettingsBackdrop(val label: String) { Wallpaper("Wallpaper, dimmed"), Black("Pitch black") }
 
 enum class WebEngine(val label: String, private val template: String) {
@@ -241,6 +244,7 @@ data class LauncherPrefs(
     val leftWidgetId: Int = -1,
     /** The narrow strip of unread counts at the left edge of page one. */
     val launchpadRail: Boolean = true,
+    val launchpadTheme: LaunchpadTheme = LaunchpadTheme.Dark,
     val settingsBackdrop: SettingsBackdrop = SettingsBackdrop.Wallpaper,
     /** How much the wallpaper is dimmed behind Settings, 0..1. */
     val settingsDim: Float = 0.7f,

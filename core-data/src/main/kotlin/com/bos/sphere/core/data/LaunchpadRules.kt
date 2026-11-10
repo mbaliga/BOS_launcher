@@ -371,6 +371,65 @@ object LaunchpadJson {
  * the in-memory set of notification keys the user has opened. Call [init] once with any
  * context before use (the Launchpad composables do this themselves).
  */
+/** Things you can do to the Launchpad itself, each bindable to a [LaunchpadAction]. */
+enum class LaunchpadGesture(val label: String, val hint: String) {
+    PinchIn("Pinch in", "Two fingers together on the list"),
+    PinchOut("Pinch out", "Two fingers apart on the list"),
+    SwipeItemRight("Slide an item right", "Drag a notification to the right"),
+    SwipeItemLeft("Slide an item left", "Drag a notification to the left"),
+    LongPressItem("Long-press an item", "Hold a notification"),
+    DoubleTapHeader("Double-tap the header", "Tap the blue bar twice"),
+}
+
+enum class LaunchpadAction(val label: String, val needsItem: Boolean) {
+    None("Nothing", false),
+    ShowUnread("Show unread only", false),
+    ShowAll("Show everything", false),
+    ToggleUnread("Switch unread / everything", false),
+    NextGrouping("Next grouping", false),
+    CollapseAll("Collapse / expand groups", false),
+    ClearAll("Clear all", false),
+    Dismiss("Dismiss", true),
+    MarkRead("Mark as read", true),
+    OpenApp("Open the app", true),
+    MoreOptions("More options…", true),
+    MuteApp("Mute this app", true),
+    HideApp("Hide this app", true),
+    PinSender("Pin this sender", true),
+}
+
+object LaunchpadGestures {
+    val defaults: Map<LaunchpadGesture, LaunchpadAction> = mapOf(
+        LaunchpadGesture.PinchIn to LaunchpadAction.ShowUnread,
+        LaunchpadGesture.PinchOut to LaunchpadAction.ShowAll,
+        LaunchpadGesture.SwipeItemRight to LaunchpadAction.Dismiss,
+        LaunchpadGesture.SwipeItemLeft to LaunchpadAction.MarkRead,
+        LaunchpadGesture.LongPressItem to LaunchpadAction.MoreOptions,
+        LaunchpadGesture.DoubleTapHeader to LaunchpadAction.NextGrouping,
+    )
+
+    /** Which actions make sense for [g]: item actions need an item under the finger. */
+    fun allowed(g: LaunchpadGesture): List<LaunchpadAction> = when (g) {
+        LaunchpadGesture.PinchIn, LaunchpadGesture.PinchOut, LaunchpadGesture.DoubleTapHeader ->
+            LaunchpadAction.entries.filter { !it.needsItem }
+        LaunchpadGesture.SwipeItemRight, LaunchpadGesture.SwipeItemLeft, LaunchpadGesture.LongPressItem ->
+            LaunchpadAction.entries.filter { it != LaunchpadAction.ShowUnread && it != LaunchpadAction.ShowAll && it != LaunchpadAction.ToggleUnread }
+    }
+
+    fun encode(m: Map<LaunchpadGesture, LaunchpadAction>): String = m.entries.joinToString(";") { "${it.key.name}=${it.value.name}" }
+
+    fun decode(raw: String?): Map<LaunchpadGesture, LaunchpadAction> {
+        val out = LinkedHashMap(defaults)
+        raw.orEmpty().split(';').forEach { part ->
+            val (k, v) = part.split('=').takeIf { it.size == 2 } ?: return@forEach
+            val g = LaunchpadGesture.entries.firstOrNull { it.name == k } ?: return@forEach
+            val a = LaunchpadAction.entries.firstOrNull { it.name == v } ?: return@forEach
+            if (a in allowed(g)) out[g] = a
+        }
+        return out
+    }
+}
+
 object LaunchpadSettings {
     private const val FILE = "launchpad_rules"
     private var sp: android.content.SharedPreferences? = null
@@ -378,6 +437,20 @@ object LaunchpadSettings {
     private val _rules = MutableStateFlow<List<Rule>>(emptyList())
     private val _prefs = MutableStateFlow(LaunchpadPrefs())
     private val _read = MutableStateFlow<Set<String>>(emptySet())
+
+    private val _gestures = MutableStateFlow(LaunchpadGestures.defaults)
+    val gestures: StateFlow<Map<LaunchpadGesture, LaunchpadAction>> = _gestures.asStateFlow()
+
+    fun setGesture(g: LaunchpadGesture, a: LaunchpadAction) {
+        val m = _gestures.value.toMutableMap().also { it[g] = a }
+        _gestures.value = m
+        sp?.edit()?.putString("gestures", LaunchpadGestures.encode(m))?.apply()
+    }
+
+    fun resetGestures() {
+        _gestures.value = LaunchpadGestures.defaults
+        sp?.edit()?.remove("gestures")?.apply()
+    }
 
     val rules: StateFlow<List<Rule>> = _rules.asStateFlow()
     val prefs: StateFlow<LaunchpadPrefs> = _prefs.asStateFlow()
@@ -391,6 +464,7 @@ object LaunchpadSettings {
         sp = s
         _rules.value = LaunchpadJson.decodeRules(s.getString("rules", null))
         _prefs.value = LaunchpadJson.decodePrefs(s.getString("prefs", null))
+        _gestures.value = LaunchpadGestures.decode(s.getString("gestures", null))
     }
 
     /** Adds [rule], replacing an existing rule with identical matchers and action. */

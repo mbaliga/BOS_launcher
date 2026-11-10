@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AppEntry
@@ -502,6 +503,39 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     com.bos.sphere.feature.grid.ActionRow(label = x("Choose widget"), summary = m.leftWidgetLabel ?: x("None yet"), onClick = m.pickLeftWidget)
                 }
                 note("One swipe right from the first page. Pick Launchpad for your notifications, or any app's widget full-screen — Orrery, Nooz, the Google feed, anything with a widget.")
+            },
+            SettingItem.Pane(x("Launchpad theme"), Glyphs.Moon, x(p.launchpadTheme.label)) {
+                VisualChoice(com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { v -> upd { it.copy(launchpadTheme = v) } }, { x(it.label) }, columns = 3, previewHeight = 96.dp) { t ->
+                    val dark = t == com.bos.sphere.core.data.LaunchpadTheme.Dark
+                    val both = t == com.bos.sphere.core.data.LaunchpadTheme.System
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+                        for (isDark in if (both) listOf(true, false) else listOf(dark)) {
+                            androidx.compose.foundation.layout.Column(
+                                Modifier.weight(1f).fillMaxSize().background(if (isDark) androidx.compose.ui.graphics.Color(0xFF0B0D12) else androidx.compose.ui.graphics.Color(0xFFF7F8FA)),
+                            ) {
+                                androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(14.dp).background(androidx.compose.ui.graphics.Color(0xFF0A7CBF)))
+                                repeat(3) {
+                                    androidx.compose.foundation.layout.Box(
+                                        Modifier.padding(horizontal = 6.dp, vertical = 5.dp).fillMaxWidth().height(6.dp)
+                                            .background(if (isDark) androidx.compose.ui.graphics.Color(0x66FFFFFF) else androidx.compose.ui.graphics.Color(0x66000000), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                note("Dark suits the rest of the launcher; Light is the classic hub look.")
+            },
+            SettingItem.Pane(x("Launchpad gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {
+                val bound by com.bos.sphere.core.data.LaunchpadSettings.gestures.collectAsState()
+                com.bos.sphere.core.data.LaunchpadGesture.entries.forEach { g ->
+                    Sub(g.label)
+                    Text(L10n.tr(g.hint), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(bottom = 2.dp))
+                    Chips(com.bos.sphere.core.data.LaunchpadGestures.allowed(g), bound[g] ?: com.bos.sphere.core.data.LaunchpadAction.None, { it.label }) { a ->
+                        com.bos.sphere.core.data.LaunchpadSettings.setGesture(g, a)
+                    }
+                }
+                com.bos.sphere.feature.grid.TextButtonPill(L10n.tr("Reset to defaults"), onClick = { com.bos.sphere.core.data.LaunchpadSettings.resetGestures() })
             },
             SettingItem.Pane(x("Grouping & rules"), Glyphs.Message, x("Per app, sender, conversation")) {
                 com.bos.sphere.ui.LaunchpadRulesPane()

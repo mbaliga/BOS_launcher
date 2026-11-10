@@ -60,6 +60,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -96,6 +98,12 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
+
+/** Launchpad palette: dark by default, or the light BB10-hub look. */
+internal class LpColors(val bg: Color, val surface: Color, val ink: Color, val ink2: Color, val dim: Color, val line: Color)
+private val LpDark = LpColors(Color(0xFF0B0D12), Color(0xFF1B1E27), Color(0xFFF1F3F8), Color(0xFFC9CED9), Color(0xFF8A91A3), Color(0x22FFFFFF))
+private val LpLight = LpColors(Color(0xFFF7F8FA), Color(0xFFE4E8EF), Color(0xFF14171F), Color(0xFF3B4150), Color(0xFF6C7384), Color(0x1F000000))
+private val LocalLp = androidx.compose.runtime.compositionLocalOf { LpDark }
 
 private val BlueDark = Color(0xFF0A5C95)
 private val BlueLight = Color(0xFF0BA6E0)
@@ -149,9 +157,9 @@ private fun AppIcon(pkg: String, label: String, size: Int, modifier: Modifier = 
     if (icon != null) {
         Image(icon, null, modifier.size(size.dp).clip(shape))
     } else {
-        Box(modifier.size(size.dp).clip(shape).background(HyleColors.Surface), Alignment.Center) {
+        Box(modifier.size(size.dp).clip(shape).background(LocalLp.current.surface), Alignment.Center) {
             Text(
-                label.take(1).uppercase(), color = HyleColors.InkDim,
+                label.take(1).uppercase(), color = LocalLp.current.dim,
                 fontSize = (size * 0.42f).sp, fontWeight = FontWeight.SemiBold,
             )
         }
@@ -188,13 +196,25 @@ fun LaunchpadPanel(
     onDismiss: () -> Unit,
     onOpenApp: (packageName: String) -> Unit,
     modifier: Modifier = Modifier,
+    theme: com.bos.sphere.core.data.LaunchpadTheme = com.bos.sphere.core.data.LaunchpadTheme.Dark,
+    /**
+     * True when the home screen slides away to uncover the Launchpad beneath it (the host moves the
+     * home and casts the shadow): the panel then just sits there instead of sliding in itself.
+     */
+    underlay: Boolean = false,
 ) {
     rememberLaunchpadInit()
+    val dark = when (theme) {
+        com.bos.sphere.core.data.LaunchpadTheme.Dark -> true
+        com.bos.sphere.core.data.LaunchpadTheme.Light -> false
+        com.bos.sphere.core.data.LaunchpadTheme.System -> androidx.compose.foundation.isSystemInDarkTheme()
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalLp provides if (dark) LpDark else LpLight) {
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = slideInHorizontally { -it } + fadeIn(),
-        exit = slideOutHorizontally { -it } + fadeOut(),
+        enter = if (underlay) androidx.compose.animation.EnterTransition.None else slideInHorizontally { -it } + fadeIn(),
+        exit = if (underlay) androidx.compose.animation.ExitTransition.None else slideOutHorizontally { -it } + fadeOut(),
     ) {
         BackHandler(onBack = onDismiss)
         val ctx = LocalContext.current
@@ -204,10 +224,12 @@ fun LaunchpadPanel(
         val read by LaunchpadSettings.readKeys.collectAsStateWithLifecycle()
         val access = rememberNotificationAccess()
         val now = rememberNow()
+        val gestures by LaunchpadSettings.gestures.collectAsStateWithLifecycle()
         LaunchedEffect(items) { LaunchpadSettings.pruneRead(items.map { it.key }.toSet()) }
 
         LaunchpadContent(
             items = items, rules = rules, prefs = prefs, readKeys = read, hasAccess = access, now = now,
+            gestures = gestures,
             onClose = onDismiss,
             onOpenItem = { n ->
                 LaunchpadSettings.markRead(n.key)
@@ -226,6 +248,7 @@ fun LaunchpadPanel(
                 }
             },
         )
+    }
     }
 }
 
@@ -251,6 +274,7 @@ fun LaunchpadContent(
     onSetDefaultMode: (GroupMode) -> Unit,
     onRequestAccess: () -> Unit,
     modifier: Modifier = Modifier,
+    gestures: Map<com.bos.sphere.core.data.LaunchpadGesture, com.bos.sphere.core.data.LaunchpadAction> = com.bos.sphere.core.data.LaunchpadGestures.defaults,
 ) {
     val ctx = LocalContext.current
     val zone = remember { ZoneId.systemDefault() }
@@ -258,14 +282,44 @@ fun LaunchpadContent(
     var filter by remember { mutableStateOf<String?>(null) }
     var collapsed by remember { mutableStateOf(setOf<String>()) }
     var menuFor by remember { mutableStateOf<HubNotification?>(null) }
+    var unreadOnly by remember { mutableStateOf(false) }
+    val shown = remember(items, readKeys, unreadOnly) { if (unreadOnly) items.filter { it.key !in readKeys } else items }
+    val toast = remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(toast.value) { if (toast.value != null) { delay(1400); toast.value = null } }
+
+    fun perform(action: com.bos.sphere.core.data.LaunchpadAction, n: HubNotification?, sections: List<Section>) {
+        val a = com.bos.sphere.core.data.LaunchpadAction.entries
+        val pkg = n?.packageName.orEmpty()
+        when (action) {
+            com.bos.sphere.core.data.LaunchpadAction.None -> Unit
+            com.bos.sphere.core.data.LaunchpadAction.ShowUnread -> { unreadOnly = true; toast.value = L10n.tr("Unread only") }
+            com.bos.sphere.core.data.LaunchpadAction.ShowAll -> { unreadOnly = false; toast.value = L10n.tr("Showing everything") }
+            com.bos.sphere.core.data.LaunchpadAction.ToggleUnread -> { unreadOnly = !unreadOnly; toast.value = L10n.tr(if (unreadOnly) "Unread only" else "Showing everything") }
+            com.bos.sphere.core.data.LaunchpadAction.NextGrouping -> {
+                val next = GroupMode.entries[(prefs.defaultMode.ordinal + 1) % GroupMode.entries.size]
+                onSetDefaultMode(next); toast.value = L10n.tr("Grouped: %s", L10n.tr(groupModeLabel(next)))
+            }
+            com.bos.sphere.core.data.LaunchpadAction.CollapseAll ->
+                collapsed = if (collapsed.size >= sections.size) emptySet() else sections.map { it.key }.toSet()
+            com.bos.sphere.core.data.LaunchpadAction.ClearAll -> onClearAll()
+            com.bos.sphere.core.data.LaunchpadAction.Dismiss -> n?.takeIf { !it.isOngoing }?.let(onDismissItem)
+            com.bos.sphere.core.data.LaunchpadAction.MarkRead -> n?.let { LaunchpadSettings.markRead(it.key); toast.value = L10n.tr("Marked as read") }
+            com.bos.sphere.core.data.LaunchpadAction.OpenApp -> if (pkg.isNotBlank()) onOpenApp(pkg)
+            com.bos.sphere.core.data.LaunchpadAction.MoreOptions -> menuFor = n
+            com.bos.sphere.core.data.LaunchpadAction.MuteApp -> if (pkg.isNotBlank()) { onAddRule(Rule.create(RuleAction.Silent, packageName = pkg)); toast.value = L10n.tr("Muted") }
+            com.bos.sphere.core.data.LaunchpadAction.HideApp -> if (pkg.isNotBlank()) { onAddRule(Rule.create(RuleAction.Hide, packageName = pkg)); toast.value = L10n.tr("Hidden") }
+            com.bos.sphere.core.data.LaunchpadAction.PinSender -> n?.let { LaunchpadLogic.senderOf(it).takeIf { s -> s.isNotBlank() }?.let { s -> onAddRule(Rule.create(RuleAction.Pin, pkg.ifBlank { null }, s)); toast.value = L10n.tr("Pinned") } }
+        }
+        @Suppress("UNUSED_VARIABLE") val unused = a
+    }
 
     // Counts for the filter menu reflect what the user can actually see.
     val visible = remember(items, rules, now) { LaunchpadLogic.visible(items, rules, now) }
     val counts = remember(visible) { LaunchpadLogic.countsBySource(visible) }
     val activeFilter = filter?.takeIf { f -> counts.any { it.packageName == f } }
-    val sections = remember(items, rules, prefs, now, activeFilter) {
+    val sections = remember(shown, rules, prefs, now, activeFilter) {
         LaunchpadLogic.apply(
-            LaunchpadLogic.filter(items, activeFilter), rules, prefs, now, zone,
+            LaunchpadLogic.filter(shown, activeFilter), rules, prefs, now, zone,
             labelFor = { d: LocalDate -> LaunchpadLogic.defaultDayLabel(d) },
             todayLabel = L10n.tr("Today"), yesterdayLabel = L10n.tr("Yesterday"),
             pinnedLabel = L10n.tr("Pinned"), flatLabel = L10n.tr("All"),
@@ -275,7 +329,7 @@ fun LaunchpadContent(
     Column(
         modifier
             .fillMaxSize()
-            .background(HyleColors.Background.copy(alpha = 0.95f))
+            .background(LocalLp.current.bg)
             .pointerInput(Unit) { detectTapGestures { } }
             .pointerInput(Unit) {
                 var total = 0f
@@ -283,17 +337,25 @@ fun LaunchpadContent(
                     onDragStart = { total = 0f },
                     onDragEnd = { if (total < -80f) onClose() },
                 ) { _, dx -> total += dx }
+            }
+            .lpPinch { zoomIn ->
+                perform(
+                    gestures[if (zoomIn) com.bos.sphere.core.data.LaunchpadGesture.PinchOut else com.bos.sphere.core.data.LaunchpadGesture.PinchIn]
+                        ?: com.bos.sphere.core.data.LaunchpadAction.None,
+                    null, sections,
+                )
             },
     ) {
         LaunchpadHeader(
             counts = counts, filter = activeFilter, mode = prefs.defaultMode,
             onFilter = { filter = it }, onMode = onSetDefaultMode, onClearAll = onClearAll,
             canClear = items.isNotEmpty(), onClose = onClose,
+            onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
         )
         when {
             !hasAccess -> AccessCard(onRequestAccess)
             sections.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text(L10n.tr("All caught up"), color = HyleColors.InkDim, fontSize = 18.sp, fontWeight = FontWeight.Light)
+                Text(L10n.tr(if (unreadOnly) "No unread notifications" else "All caught up"), color = LocalLp.current.dim, fontSize = 18.sp, fontWeight = FontWeight.Light)
             }
             else -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
                 sections.forEach { sec ->
@@ -310,9 +372,10 @@ fun LaunchpadContent(
                                 important = LaunchpadLogic.isImportant(n, rules),
                                 pinned = sec.pinned,
                                 onClick = { onOpenItem(n) },
-                                onLongClick = { menuFor = n },
-                                onSwipeDismiss = { onDismissItem(n) },
-                                onSwipeClose = onClose,
+                                onLongClick = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.LongPressItem] ?: com.bos.sphere.core.data.LaunchpadAction.MoreOptions, n, sections) },
+                                rightAction = gestures[com.bos.sphere.core.data.LaunchpadGesture.SwipeItemRight] ?: com.bos.sphere.core.data.LaunchpadAction.Dismiss,
+                                leftAction = gestures[com.bos.sphere.core.data.LaunchpadGesture.SwipeItemLeft] ?: com.bos.sphere.core.data.LaunchpadAction.MarkRead,
+                                onSwipe = { act -> perform(act, n, sections) },
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -322,6 +385,14 @@ fun LaunchpadContent(
         }
     }
 
+    toast.value?.let { t ->
+        Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 24.dp), Alignment.BottomCenter) {
+            Text(
+                t, color = Color.White, fontSize = 13.sp,
+                modifier = Modifier.background(Color(0xE6202228), RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 9.dp),
+            )
+        }
+    }
     menuFor?.let { n ->
         RowMenuSheet(
             n = n,
@@ -343,10 +414,12 @@ private fun LaunchpadHeader(
     onClearAll: () -> Unit,
     canClear: Boolean,
     onClose: () -> Unit,
+    onDoubleTap: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box(
-        Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(BlueDark, BlueLight))),
+        Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(BlueDark, BlueLight)))
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleTap() }) },
     ) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(start = 20.dp, end = 8.dp),
@@ -354,7 +427,7 @@ private fun LaunchpadHeader(
         ) {
             Text(
                 L10n.tr("LAUNCHPAD"), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Light,
-                letterSpacing = 1.sp, modifier = Modifier.weight(1f).clickable(onClick = onClose),
+                letterSpacing = 1.sp, modifier = Modifier.weight(1f),
             )
             if (filter != null) {
                 Text(
@@ -411,7 +484,7 @@ private fun LaunchpadHeader(
 private fun MenuLabel(text: String) {
     if (text.isNotEmpty()) {
         Text(
-            text.uppercase(), color = HyleColors.InkDim, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+            text.uppercase(), color = LocalLp.current.dim, fontSize = 11.sp, fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 2.dp),
         )
     }
@@ -442,18 +515,18 @@ private fun SectionHeader(sec: Section, collapsed: Boolean, onToggle: () -> Unit
                 AppIcon(lead.packageName, sec.title, 20, Modifier.padding(end = 8.dp))
             }
             Text(
-                sec.title, color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                sec.title, color = LocalLp.current.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
             )
             if (sec.subtitle.isNotEmpty()) {
                 Text(
-                    "  ${sec.subtitle}", color = HyleColors.InkDim, fontSize = 12.sp, maxLines = 1,
+                    "  ${sec.subtitle}", color = LocalLp.current.dim, fontSize = 12.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                 )
             }
             Spacer(Modifier.weight(1f))
-            Text("${sec.items.size}", color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
-            Chevron(HyleColors.InkDim, down = !collapsed, size = 14)
+            Text("${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+            Chevron(LocalLp.current.dim, down = !collapsed, size = 14)
         }
         Box(Modifier.fillMaxWidth().height(2.dp).background(BlueLight))
     }
@@ -471,26 +544,36 @@ private fun NotificationRow(
     pinned: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onSwipeDismiss: () -> Unit,
-    onSwipeClose: () -> Unit,
+    rightAction: com.bos.sphere.core.data.LaunchpadAction,
+    leftAction: com.bos.sphere.core.data.LaunchpadAction,
+    onSwipe: (com.bos.sphere.core.data.LaunchpadAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var dx by remember { mutableFloatStateOf(0f) }
     var widthPx by remember { mutableFloatStateOf(1f) }
     val weight = if (unread) FontWeight.Bold else FontWeight.Normal
     Column(modifier) {
+      Box(Modifier.fillMaxWidth()) {
+        // What the slide will do, uncovered behind the row as you drag.
+        val reveal = if (dx > 0f) rightAction else leftAction
+        if (dx != 0f && reveal != com.bos.sphere.core.data.LaunchpadAction.None) {
+            Box(
+                Modifier.matchParentSize().background(if (dx > 0f) Color(0xFFB3261E) else BlueDark).padding(horizontal = 20.dp),
+                contentAlignment = if (dx > 0f) Alignment.CenterStart else Alignment.CenterEnd,
+            ) { Text(L10n.tr(reveal.label), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+        }
         Row(
             Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(dx.roundToInt(), 0) }
-                .alpha((1f - (kotlin.math.abs(dx) / widthPx)).coerceIn(0.2f, 1f))
-                .pointerInput(n.key) {
+                .background(LocalLp.current.bg)
+                .pointerInput(n.key, rightAction, leftAction) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             val d = dx
                             dx = 0f
-                            if (d > widthPx * 0.35f && !n.isOngoing) onSwipeDismiss()
-                            else if (d < -widthPx * 0.25f) onSwipeClose()
+                            if (d > widthPx * 0.3f) onSwipe(rightAction)
+                            else if (d < -widthPx * 0.3f) onSwipe(leftAction)
                         },
                         onDragCancel = { dx = 0f },
                     ) { _, delta -> dx += delta }
@@ -516,23 +599,24 @@ private fun NotificationRow(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    n.title, color = HyleColors.InkBright, fontSize = 16.sp, fontWeight = weight,
+                    n.title, color = LocalLp.current.ink, fontSize = 16.sp, fontWeight = weight,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (n.summary.isNotEmpty()) {
                     Text(
-                        n.summary, color = if (unread) HyleColors.Ink else HyleColors.InkDim, fontSize = 13.sp,
+                        n.summary, color = if (unread) LocalLp.current.ink2 else LocalLp.current.dim, fontSize = 13.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
             Spacer(Modifier.width(10.dp))
             Text(
-                formatStamp(n.timestamp, now, is24, zone), color = HyleColors.InkDim, fontSize = 12.sp,
+                formatStamp(n.timestamp, now, is24, zone), color = LocalLp.current.dim, fontSize = 12.sp,
                 fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal,
             )
         }
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(HyleColors.Hairline))
+      }
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
     }
 }
 
@@ -542,14 +626,14 @@ private fun AccessCard(onRequestAccess: () -> Unit) {
         Column(
             Modifier
                 .clip(RoundedCornerShape(20.dp))
-                .background(HyleColors.SurfaceTranslucent)
+                .background(LocalLp.current.surface)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 L10n.tr("Allow notification access to see everything here"),
-                color = HyleColors.InkBright, fontSize = 16.sp, textAlign = TextAlign.Center,
+                color = LocalLp.current.ink, fontSize = 16.sp, textAlign = TextAlign.Center,
             )
             Box(
                 Modifier
@@ -595,19 +679,19 @@ private fun RowMenuSheet(
             add(L10n.tr("Auto-clear after 1 day for %s", app) to { onAddRule(Rule.create(RuleAction.AutoClear, pkg, minutes = 1440)) })
         }
     }
-    ModalBottomSheet(onDismissRequest = onDismissSheet, containerColor = HyleColors.Surface) {
+    ModalBottomSheet(onDismissRequest = onDismissSheet, containerColor = LocalLp.current.surface) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
             Row(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(pkg, app, 32)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(n.title, color = HyleColors.InkBright, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(app, color = HyleColors.InkDim, fontSize = 12.sp)
+                    Text(n.title, color = LocalLp.current.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(app, color = LocalLp.current.dim, fontSize = 12.sp)
                 }
             }
             entries.forEach { (label, act) ->
                 Text(
-                    label, color = HyleColors.Ink, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    label, color = LocalLp.current.ink2, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().clickable { act() }.padding(horizontal = 20.dp, vertical = 13.dp),
                 )
             }
@@ -670,6 +754,33 @@ fun LaunchpadRail(onOpen: () -> Unit, modifier: Modifier = Modifier) {
                         fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1,
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Two-finger pinch on the list: reports [zoomIn] true for fingers apart, false for together, once per
+ * gesture, and only after the spread has changed by more than ~18%. One-finger input is never
+ * touched, so scrolling and swipes are unaffected.
+ */
+private fun Modifier.lpPinch(onPinch: (zoomIn: Boolean) -> Unit): Modifier = this.pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+        var start = 0f
+        var fired = false
+        while (true) {
+            val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            val down = ev.changes.filter { it.pressed }
+            if (down.isEmpty()) break
+            if (down.size >= 2) {
+                val d = (down[0].position - down[1].position).getDistance()
+                if (start == 0f) start = d
+                else if (!fired && start > 1f) {
+                    val r = d / start
+                    if (r > 1.18f || r < 0.82f) { fired = true; onPinch(r > 1f); down.forEach { it.consume() } }
+                }
+                if (fired) down.forEach { it.consume() }
             }
         }
     }

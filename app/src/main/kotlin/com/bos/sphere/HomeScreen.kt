@@ -66,6 +66,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.layout.fillMaxHeight
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.ActionApps
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -650,93 +652,153 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             edgeDp = 28f,
         ),
     ) {
-        when (prefs.homeStyle) {
-            HomeStyle.Grid -> if (prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
-                Background()
-                com.bos.sphere.feature.grid.ContinuousHome(
-                    apps = apps, crossCount = prefs.continuousColumns, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Plain,
-                    onLaunch = ::launch, onLongPress = { menuApp = it },
-                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = scrollPadding,
-                    iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
-                    gestures = homeGestureSpec,
-                )
-                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                Corners()
-            } else {
-                Background()
-                Box(
-                    Modifier.fillMaxSize().padding(bottom = bottomClear).leftSwipe(
-                        enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen,
-                        atFirstPage = { gridState.pager.currentPage == 0 && !gridState.pager.isScrollInProgress },
-                        onOpen = { leftOpen = true },
-                    ),
-                ) {
-                    GridHome(
-                        pages = pages,
-                        appsByKey = appsByKey,
-                        prefs = prefs,
-                        isLandscape = isLandscape,
-                        state = gridState,
-                        suggestion = suggestion,
-                        gesturesBound = gestures.keys,
-                        capacityOf = capacityOf,
-                        onLaunch = ::launch,
-                        onAppLongPress = { menuApp = it },
-                        onPagesChange = { savePages(it) },
-                        onEmptyLongPress = { page -> openSettings(CATEGORY_THIS_PAGE, page) },
-                        onGesture = ::onGesture,
-                        onClockTap = { runner.run(CornerActionId.Clock) },
-                        onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },
-                        onTileLongPress = { key, _ -> tileMenu = key },
-                        weather = weather,
-                        health = health,
-                    )
+        // The left page lies UNDER the home: the home slides right, casting a shadow onto it.
+        val leftProgress by animateFloatAsState(if (leftOpen) 1f else 0f, tween(300), label = "leftPage")
+        val leftActive = leftOpen || leftProgress > 0.001f
+        when (prefs.leftPage) {
+            com.bos.sphere.core.data.LeftPage.Launchpad -> if (leftActive) com.bos.sphere.ui.LaunchpadPanel(
+                visible = true,
+                onDismiss = { leftOpen = false },
+                onOpenApp = { pkg ->
+                    leftOpen = false
+                    apps.firstOrNull { it.packageName == pkg }?.let(::launch)
+                        ?: context.packageManager.getLaunchIntentForPackage(pkg)?.let { runCatching { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+                },
+                modifier = Modifier.fillMaxSize(),
+                theme = prefs.launchpadTheme,
+                underlay = true,
+            )
+            com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
+            else -> Unit
+        }
+        val slideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.86f
+        Box(
+            Modifier.fillMaxSize().graphicsLayer {
+                translationX = leftProgress * slideDp * density
+                if (leftProgress > 0.001f) {
+                    shadowElevation = 40.dp.toPx()
+                    shape = androidx.compose.ui.graphics.RectangleShape
+                    clip = false
+                    ambientShadowColor = Color.Black
+                    spotShadowColor = Color.Black
                 }
-                Corners()
+            }
+                .then(if (leftActive) Modifier.background(Color.Black) else Modifier)
+                // A soft dark edge on the home's left side so it reads as sitting above the page beneath.
+                .drawBehind {
+                    if (leftProgress > 0.001f) {
+                        val w = 36.dp.toPx()
+                        drawRect(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f * leftProgress)), startX = -w, endX = 0f,
+                            ),
+                            topLeft = androidx.compose.ui.geometry.Offset(-w, 0f), size = androidx.compose.ui.geometry.Size(w, size.height),
+                        )
+                    }
+                },
+        ) {
+            when (prefs.homeStyle) {
+                HomeStyle.Grid -> if (prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
+                    Background()
+                    com.bos.sphere.feature.grid.ContinuousHome(
+                        apps = apps, crossCount = prefs.continuousColumns, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Plain,
+                        onLaunch = ::launch, onLongPress = { menuApp = it },
+                        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                        contentPadding = scrollPadding,
+                        iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
+                        gestures = homeGestureSpec,
+                    )
+                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                    Corners()
+                } else {
+                    Background()
+                    Box(
+                        Modifier.fillMaxSize().padding(bottom = bottomClear).leftSwipe(
+                            enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen,
+                            atFirstPage = { gridState.pager.currentPage == 0 && !gridState.pager.isScrollInProgress },
+                            onOpen = { leftOpen = true },
+                        ),
+                    ) {
+                        GridHome(
+                            pages = pages,
+                            appsByKey = appsByKey,
+                            prefs = prefs,
+                            isLandscape = isLandscape,
+                            state = gridState,
+                            suggestion = suggestion,
+                            gesturesBound = gestures.keys,
+                            capacityOf = capacityOf,
+                            onLaunch = ::launch,
+                            onAppLongPress = { menuApp = it },
+                            onPagesChange = { savePages(it) },
+                            onEmptyLongPress = { page -> openSettings(CATEGORY_THIS_PAGE, page) },
+                            onGesture = ::onGesture,
+                            onClockTap = { runner.run(CornerActionId.Clock) },
+                            onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },
+                            onTileLongPress = { key, _ -> tileMenu = key },
+                            weather = weather,
+                            health = health,
+                        )
+                    }
+                    Corners()
+                }
+
+                HomeStyle.Psp -> {
+                    Background()
+                    val recentForXmb = remember(history, appsByKey) { history.asReversed().map { it.key }.distinct().mapNotNull(appsByKey::get).take(12) }
+                    com.bos.sphere.feature.grid.XmbHome(
+                        apps = apps, recent = recentForXmb,
+                        categoryOf = { com.bos.sphere.feature.search.AppSearch.categoryNameOf(it.packageName) },
+                        onLaunch = ::launch, onLongPress = { menuApp = it },
+                        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                        contentPadding = scrollPadding,
+                        showLabels = prefs.showLabels, sounds = sounds,
+                        gestures = homeGestureSpec,
+                    )
+                    SettingsHoldBand()
+                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                    Corners()
+                }
+                HomeStyle.Dsi -> {
+                    Background()
+                    com.bos.sphere.feature.grid.ContinuousHome(
+                        apps = apps, crossCount = 3, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
+                        onLaunch = ::launch, onLongPress = { menuApp = it },
+                        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                        contentPadding = scrollPadding,
+                        iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
+                        gestures = homeGestureSpec,
+                    )
+                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                    Corners()
+                }
+                HomeStyle.List -> {
+                    Background()
+                    com.bos.sphere.feature.grid.ListHome(
+                        apps = apps, onLaunch = ::launch, onLongPress = { menuApp = it },
+                        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                        contentPadding = scrollPadding,
+                        iconScale = prefs.iconScale, showLabels = prefs.showLabels,
+                        gestures = homeGestureSpec,
+                    )
+                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                    Corners()
+                }
             }
 
-            HomeStyle.Psp -> {
-                Background()
-                val recentForXmb = remember(history, appsByKey) { history.asReversed().map { it.key }.distinct().mapNotNull(appsByKey::get).take(12) }
-                com.bos.sphere.feature.grid.XmbHome(
-                    apps = apps, recent = recentForXmb,
-                    categoryOf = { com.bos.sphere.feature.search.AppSearch.categoryNameOf(it.packageName) },
-                    onLaunch = ::launch, onLongPress = { menuApp = it },
-                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = scrollPadding,
-                    showLabels = prefs.showLabels, sounds = sounds,
-                    gestures = homeGestureSpec,
-                )
-                SettingsHoldBand()
-                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                Corners()
-            }
-            HomeStyle.Dsi -> {
-                Background()
-                com.bos.sphere.feature.grid.ContinuousHome(
-                    apps = apps, crossCount = 3, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
-                    onLaunch = ::launch, onLongPress = { menuApp = it },
-                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = scrollPadding,
-                    iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
-                    gestures = homeGestureSpec,
-                )
-                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                Corners()
-            }
-            HomeStyle.List -> {
-                Background()
-                com.bos.sphere.feature.grid.ListHome(
-                    apps = apps, onLaunch = ::launch, onLongPress = { menuApp = it },
-                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-                    contentPadding = scrollPadding,
-                    iconScale = prefs.iconScale, showLabels = prefs.showLabels,
-                    gestures = homeGestureSpec,
-                )
-                StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                Corners()
-            }
+        }
+        // The strip of home still showing: tap it, or drag it left, to bring the home back.
+        if (leftOpen) {
+            Box(
+                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width((androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.14f).dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = { leftOpen = false })
+                    }
+                    .pointerInput(Unit) {
+                        var total = 0f
+                        detectHorizontalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total < -40f) leftOpen = false }) { _, d -> total += d }
+                    },
+            )
         }
 
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
@@ -1025,21 +1087,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onReset = { ActionPrefs.set(context, id, null); actionAppsRev++; pickFor = null },
             )
         }
-        // The left page: Launchpad (notifications) or a full-screen widget, one swipe right of page one.
-        when (prefs.leftPage) {
-            com.bos.sphere.core.data.LeftPage.Launchpad -> com.bos.sphere.ui.LaunchpadPanel(
-                visible = leftOpen,
-                onDismiss = { leftOpen = false },
-                onOpenApp = { pkg ->
-                    leftOpen = false
-                    apps.firstOrNull { it.packageName == pkg }?.let(::launch)
-                        ?: context.packageManager.getLaunchIntentForPackage(pkg)?.let { runCatching { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-            com.bos.sphere.core.data.LeftPage.Widget -> if (prefs.leftWidgetId >= 0) LeftWidgetPage(leftOpen, widgetHost, prefs.leftWidgetId) { leftOpen = false }
-            else -> Unit
-        }
         if (!prefs.onboardingDone) {
             com.bos.sphere.ui.Onboarding(
                 prefs = prefs,
@@ -1075,11 +1122,7 @@ private fun LeftWidgetPage(
     appWidgetId: Int,
     onClose: () -> Unit,
 ) {
-    androidx.compose.animation.AnimatedVisibility(
-        visible = visible,
-        enter = androidx.compose.animation.slideInHorizontally(tween(240)) { -it } + androidx.compose.animation.fadeIn(tween(160)),
-        exit = androidx.compose.animation.slideOutHorizontally(tween(200)) { -it } + androidx.compose.animation.fadeOut(tween(160)),
-    ) {
+    if (visible) {
         BackHandler(onBack = onClose)
         var dragX by remember { mutableStateOf(0f) }
         Box(

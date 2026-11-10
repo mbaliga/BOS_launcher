@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -220,7 +221,6 @@ private fun StripTileView(tile: Tile, actions: TileActions) {
 
 // ---------------------------------------------------------------- orbit
 
-private const val ORBIT_PERIOD_MS = 150_000
 
 /**
  * Results floating on concentric rings (like the old AirDrop screen): the best match at the
@@ -238,9 +238,27 @@ internal fun Orbit(
     centreFromBottom: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
-    val phase: State<Float> = if (motion) {
-        rememberInfiniteTransition(label = "orbit").animateFloat(0f, 1f, infiniteRepeatable(tween(ORBIT_PERIOD_MS, easing = LinearEasing)), label = "ph")
-    } else remember { mutableFloatStateOf(0f) }
+    // Arc length travelled (px). It creeps along very slowly by itself; a sideways drag turns the
+    // rings directly and a fling leaves extra speed that eases back to the creep.
+    val travel = remember { mutableFloatStateOf(0f) }
+    val extra = remember { floatArrayOf(0f) } // px/s added by the user
+    val dragging = remember { booleanArrayOf(false) }
+    val creepPx = with(LocalDensity.current) { 5.dp.toPx() }
+    androidx.compose.runtime.LaunchedEffect(motion) {
+        var last = 0L
+        while (true) {
+            androidx.compose.runtime.withFrameNanos { now ->
+                val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.05f)
+                last = now
+                if (!dragging[0]) {
+                    val base = if (motion) creepPx else 0f
+                    travel.floatValue += (base + extra[0]) * dt
+                    extra[0] *= (1f - 1.6f * dt).coerceAtLeast(0f)
+                    if (kotlin.math.abs(extra[0]) < 1f) extra[0] = 0f
+                }
+            }
+        }
+    }
 
     BoxWithConstraints(modifier.clipToBounds().pointerInput(Unit) {
         awaitPointerEventScope {
@@ -248,6 +266,16 @@ internal fun Orbit(
                 val e = awaitPointerEvent(PointerEventPass.Initial)
                 if (e.changes.any { it.pressed }) actions.onTouch()
             }
+        }
+    }.pointerInput(Unit) {
+        detectHorizontalDragGestures(
+            onDragStart = { dragging[0] = true },
+            onDragEnd = { dragging[0] = false },
+            onDragCancel = { dragging[0] = false },
+        ) { change, dx ->
+            change.consume()
+            travel.floatValue += dx
+            extra[0] = (dx / 0.016f).coerceIn(-2400f, 2400f)
         }
     }) {
         val density = LocalDensity.current
@@ -296,10 +324,6 @@ internal fun Orbit(
             kept
         }
 
-        // Whole revolutions per animation period at about 18 dp/s, so the loop has no jump.
-        val revs = IntArray(radii.size) { r ->
-            max(1, ((ORBIT_PERIOD_MS / 1000.0) * with(density) { 18.dp.toPx() } / (2 * PI * radii[r])).roundToInt())
-        }
         Canvas(Modifier.fillMaxSize()) {
             for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.10f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
         }
@@ -311,7 +335,7 @@ internal fun Orbit(
                 Modifier
                     .width(colW)
                     .offset {
-                        val sway = if (motion) dir * phase.value * 2 * PI * revs[ring] else 0.0
+                        val sway = dir * travel.floatValue / radii[ring].toDouble()
                         val a = baseAngle + sway
                         val x = cx + radii[ring] * cos(a).toFloat()
                         val y = cy + radii[ring] * sin(a).toFloat()

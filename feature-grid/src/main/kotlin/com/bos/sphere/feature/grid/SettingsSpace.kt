@@ -325,8 +325,8 @@ private fun SettingsSpaceContent(
                 val anchor = (boxW * (if (boxW > boxH) 0.2f else 0.28f)) - 15.dp
                 LazyColumn(
                     state = listState,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = anchor.coerceAtLeast(14.dp), end = 20.dp, top = 12.dp, bottom = 32.dp),
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = anchor.coerceAtLeast(14.dp), end = 20.dp, top = 56.dp, bottom = 32.dp),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(0.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(list, key = { i, s -> "${s.origin}|$i|${s.item.title}" }) { i, s ->
@@ -379,8 +379,8 @@ private fun CategoryTabs(categories: List<SettingCategory>, selected: Int, onSel
     LaunchedEffect(selected) { state.animateScrollToItem((selected - 1).coerceAtLeast(0)) }
     LazyRow(
         state = state,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(30.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         itemsIndexed(categories, key = { i, c -> "$i|${c.title}" }) { i, c ->

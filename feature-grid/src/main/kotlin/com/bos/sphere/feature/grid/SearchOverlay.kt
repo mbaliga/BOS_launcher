@@ -346,15 +346,13 @@ internal fun SearchScreen(
                         Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
                         expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
                     } else {
-                        Column(Modifier.fillMaxSize()) {
-                            Spacer(Modifier.height(centre - WheelHeight / 2))
-                            wheelRow()
-                            Filmstrip(
-                                tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
-                                expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                                actions = tileActions, modifier = Modifier.fillMaxWidth().padding(top = 44.dp, bottom = 4.dp),
-                            )
-                        }
+                        Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
+                        // The strip rides the top of the keyboard so nothing is left hanging under its caption.
+                        Filmstrip(
+                            tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
+                            expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
+                            actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp),
+                        )
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -93,7 +93,7 @@ internal fun SettingRowFrame(
             .fillMaxWidth()
             // Flat, like the original XMB list: no card, just air between rows.
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 4.dp, vertical = 12.dp),
+            .padding(horizontal = 4.dp, vertical = 17.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 42.dp)) {
             Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {

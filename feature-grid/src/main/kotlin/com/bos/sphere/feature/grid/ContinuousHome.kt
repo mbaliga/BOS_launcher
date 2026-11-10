@@ -309,15 +309,10 @@ private fun ContinuousCell(
             DsiTile(app, plate)
             if (showLabels) {
                 Text(
-                    app.label,
-                    color = Color(0xFF3B4150), fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+                    app.label, color = HyleColors.Ink, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .padding(top = 5.dp)
-                        .widthIn(max = plate)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.88f))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, 1f), 4f)),
+                    modifier = Modifier.padding(top = 4.dp).widthIn(max = plate + 8.dp),
                 )
             }
         } else {
@@ -334,42 +329,10 @@ private fun ContinuousCell(
     }
 }
 
-/** A large soft rounded plate (light glass, bottom drop shadow, thin highlight) carrying the icon. */
+/** The DSi look is big, bare icons (no plate behind them): just the icon, a touch larger than Plain. */
 @Composable
 private fun DsiTile(app: AppEntry, plate: Dp) {
-    Box(
-        Modifier
-            .size(plate)
-            .drawWithCache {
-                val r = size.minDimension * 0.22f
-                val corner = CornerRadius(r)
-                val body = Brush.verticalGradient(listOf(Color(0xFFFAFBFD), Color(0xFFD5DAE3)))
-                val gloss = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.0f)), 0f, size.height * 0.5f)
-                val edge = Brush.verticalGradient(listOf(Color.White, Color(0xFFB9C0CC)))
-                val sw = 1.2.dp.toPx()
-                val glossSize = Size(size.width - sw * 2, size.height * 0.5f)
-                val shadowDy = 3.dp.toPx()
-                val shadowSteps = 4
-                val shadowGrow = 1.5.dp.toPx()
-                onDrawBehind {
-                    // Soft drop shadow: stacked, growing, fading plates pushed down.
-                    for (k in shadowSteps downTo 1) {
-                        val g = shadowGrow * k
-                        drawRoundRect(
-                            Color.Black.copy(alpha = 0.075f),
-                            Offset(-g, shadowDy - g + g * 0.6f), Size(size.width + 2 * g, size.height + 2 * g),
-                            CornerRadius(r + g),
-                        )
-                    }
-                    drawRoundRect(body, size = size, cornerRadius = corner)
-                    drawRoundRect(gloss, Offset(sw, sw), glossSize, CornerRadius(r - sw))
-                    drawRoundRect(edge, size = size, cornerRadius = corner, style = Stroke(sw))
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        AppIcon(app, plate * 0.72f)
-    }
+    Box(Modifier.size(plate), contentAlignment = Alignment.Center) { AppIcon(app, plate * 0.92f) }
 }
 
 /** Thin DSi-style position bar on the trailing edge (bottom edge in landscape). */

@@ -301,7 +301,7 @@ internal fun SearchScreen(
 
     val typing = trimmed.isNotEmpty()
     Box(Modifier.fillMaxSize()) {
-        SearchBackdrop(prefs.searchBackdrop, prefs.searchMotion, Modifier.fillMaxSize())
+        SearchBackdrop(if (prefs.searchBackdrop) prefs.searchBackdropStyle else com.bos.sphere.core.data.SearchBackdropStyle.None, prefs.searchMotion, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
             if (typing) {
                 // Typing: a plain results list on top, the query sits at the bottom above the keyboard.

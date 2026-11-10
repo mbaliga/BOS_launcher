@@ -105,6 +105,12 @@ enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Wid
 /** The clock as one line ("23:02   18°C") or time over a second line. */
 enum class ClockLayout(val label: String) { Inline("One line"), Stacked("Two lines") }
 
+/** What fills the background of Radar (search). */
+enum class SearchBackdropStyle(val label: String) { Picture("Picture"), None("Plain black"), Radar("Radar sweep") }
+
+/** How pages change when you swipe between them. */
+enum class PageTransition(val label: String) { Slide("Slide"), Fade("Fade"), Zoom("Zoom"), Cube("Cube"), Flip("Flip"), Stack("Stack") }
+
 /** How a small segmented switcher labels its options. */
 enum class SwitchStyle(val label: String) { IconText("Icons + text"), TextOnly("Text only"), IconsOnly("Icons only") }
 
@@ -270,6 +276,13 @@ data class LauncherPrefs(
     val searchLayout: SearchLayout = SearchLayout.Filmstrip,
     /** The bundled backdrop picture behind search (off = plain black). */
     val searchBackdrop: Boolean = true,
+    /** Picture / plain black / animated radar sweep behind Radar. [searchBackdrop] = false still forces plain black. */
+    val searchBackdropStyle: SearchBackdropStyle = SearchBackdropStyle.Picture,
+    /** The page the Home button returns to. */
+    val homePage: Int = 0,
+    val pageTransition: PageTransition = PageTransition.Slide,
+    /** A track + prev / play / next strip on the home while something is playing. */
+    val mediaControls: Boolean = false,
     /** Filmstrip / orbit keep drifting slowly; off = still until you move them. */
     val searchMotion: Boolean = true,
     val searchFiles: Boolean = true,

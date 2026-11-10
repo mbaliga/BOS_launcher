@@ -44,6 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
@@ -81,8 +84,10 @@ import kotlin.math.roundToInt
 
 /** Black, or the bundled picture (cropped, gently scrimmed, drifting slowly when [motion]). */
 @Composable
-internal fun SearchBackdrop(picture: Boolean, motion: Boolean, modifier: Modifier = Modifier) {
+internal fun SearchBackdrop(style: com.bos.sphere.core.data.SearchBackdropStyle, motion: Boolean, modifier: Modifier = Modifier) {
+    val picture = style == com.bos.sphere.core.data.SearchBackdropStyle.Picture
     Box(modifier.background(Color.Black)) {
+        if (style == com.bos.sphere.core.data.SearchBackdropStyle.Radar) RadarSweep(motion, Modifier.fillMaxSize())
         if (picture) {
             val drift = if (motion) {
                 rememberInfiniteTransition(label = "backdrop").animateFloat(
@@ -102,6 +107,47 @@ internal fun SearchBackdrop(picture: Boolean, motion: Boolean, modifier: Modifie
                 },
             )
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x66000000), Color(0x33000000), Color(0x80000000)))))
+        }
+    }
+}
+
+/**
+ * An animated radar scope: faint rings and crosshair, a green sweep that turns once every few
+ * seconds, and blips that flare when the sweep passes over them and fade after.
+ */
+@Composable
+internal fun RadarSweep(motion: Boolean, modifier: Modifier = Modifier) {
+    val angle = if (motion) {
+        rememberInfiniteTransition(label = "radar").animateFloat(0f, 360f, infiniteRepeatable(tween(6000, easing = LinearEasing)), label = "sweep").value
+    } else 40f
+    androidx.compose.foundation.Canvas(modifier) {
+        val c = Offset(size.width / 2f, size.height * 0.82f)
+        val maxR = kotlin.math.hypot(size.width, size.height) * 0.62f
+        drawRect(Brush.radialGradient(listOf(Color(0xFF06150F), Color(0xFF020706), Color.Black), center = c, radius = maxR))
+        val green = Color(0xFF3CFF9A)
+        for (i in 1..5) drawCircle(green.copy(alpha = 0.13f), radius = maxR * i / 5f * 0.78f, center = c, style = Stroke(1.dp.toPx()))
+        drawLine(green.copy(alpha = 0.10f), Offset(c.x - maxR, c.y), Offset(c.x + maxR, c.y), 1.dp.toPx())
+        drawLine(green.copy(alpha = 0.10f), Offset(c.x, c.y - maxR), Offset(c.x, c.y + maxR), 1.dp.toPx())
+        // The sweep: a trailing wedge ending at the leading line.
+        rotate(angle, c) {
+            drawCircle(
+                Brush.sweepGradient(0.78f to Color.Transparent, 1f to green.copy(alpha = 0.34f), center = c),
+                radius = maxR, center = c,
+            )
+            drawLine(green.copy(alpha = 0.75f), c, Offset(c.x + maxR, c.y), 1.6.dp.toPx())
+        }
+        // Blips: fixed pseudo-random spots, bright just after the sweep passes.
+        for (i in 0 until 9) {
+            val a = ((i * 137.5f) % 360f)
+            val r = maxR * (0.18f + ((i * 53) % 60) / 100f) * 0.8f
+            val rad = Math.toRadians(a.toDouble())
+            val p = Offset(c.x + r * kotlin.math.cos(rad).toFloat(), c.y + r * kotlin.math.sin(rad).toFloat())
+            val since = ((angle - a) % 360f + 360f) % 360f
+            val glow = (1f - since / 200f).coerceIn(0f, 1f)
+            if (glow > 0f) {
+                drawCircle(green.copy(alpha = 0.55f * glow), radius = 4.dp.toPx(), center = p)
+                drawCircle(green.copy(alpha = 0.18f * glow), radius = 11.dp.toPx(), center = p)
+            }
         }
     }
 }

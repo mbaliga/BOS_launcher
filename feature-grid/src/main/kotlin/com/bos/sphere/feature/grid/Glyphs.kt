@@ -219,6 +219,12 @@ object Glyphs {
     }
     val Menu = glyph("menu") { moveTo(5f, 7f); lineTo(19f, 7f); moveTo(5f, 12f); lineTo(19f, 12f); moveTo(5f, 17f); lineTo(19f, 17f) }
     val Home = glyph("home", fill = true) { moveTo(12f, 4f); lineTo(21f, 12f); lineTo(18f, 12f); lineTo(18f, 19f); lineTo(6f, 19f); lineTo(6f, 12f); lineTo(3f, 12f); close() }
+    /** Radar: rings, a sweep line and a blip. */
+    val Radar = glyph("radar") {
+        circle(12f, 12f, 9f); circle(12f, 12f, 5.2f)
+        moveTo(12f, 12f); lineTo(18.4f, 5.6f)
+        moveTo(8.2f, 8.4f); lineTo(8.3f, 8.5f)
+    }
     val Close = glyph("close") { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) }
     val Up = glyph("up") { moveTo(6f, 15f); lineTo(12f, 9f); lineTo(18f, 15f) }
     val Down = glyph("down") { moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f) }
@@ -243,7 +249,7 @@ object Glyphs {
     fun forAction(id: CornerActionId): ImageVector = when (id) {
         CornerActionId.Music -> Music
         CornerActionId.Camera -> Camera
-        CornerActionId.Search -> Search
+        CornerActionId.Search -> Radar
         CornerActionId.AllApps -> Apps
         CornerActionId.Notifications -> Bell
         CornerActionId.LauncherSettings -> Sliders

@@ -356,11 +356,11 @@ class ScreenshotTest {
         override fun deepSources() = emptyList<String>()
     }
 
-    private fun searchShot(name: String, layout: com.bos.sphere.core.data.SearchLayout, query: String, cat: com.bos.sphere.core.data.SearchCategory?) {
+    private fun searchShot(name: String, layout: com.bos.sphere.core.data.SearchLayout, query: String, cat: com.bos.sphere.core.data.SearchCategory?, style: com.bos.sphere.core.data.SearchBackdropStyle = com.bos.sphere.core.data.SearchBackdropStyle.Picture) {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             SearchScreen(
-                apps = apps, recent = apps.take(9), prefs = LauncherPrefs(searchLayout = layout, searchBackdrop = true, searchMotion = true), contacts = null,
+                apps = apps, recent = apps.take(9), prefs = LauncherPrefs(searchLayout = layout, searchBackdrop = true, searchBackdropStyle = style, searchMotion = true), contacts = null,
                 onLaunch = {}, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {},
                 hub = fakeHub, onOpenHit = null, onRunAction = {}, onRequestFilePermission = {}, sounds = null,
                 initialQuery = query, initialCategory = cat,
@@ -377,6 +377,9 @@ class ScreenshotTest {
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun searchOrbit() = searchShot("11-search-orbit", com.bos.sphere.core.data.SearchLayout.Orbit, "", null)
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun searchRadar() = searchShot("11b-search-radar", com.bos.sphere.core.data.SearchLayout.Orbit, "", null, com.bos.sphere.core.data.SearchBackdropStyle.Radar)
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun searchFlat() = searchShot("12-search-flat", com.bos.sphere.core.data.SearchLayout.Flat, "ma", null)

@@ -618,14 +618,14 @@ fun GridHome(
                         userScrollEnabled = dragKey == null,
                         beyondViewportPageCount = 1,
                         modifier = Modifier.fillMaxSize(),
-                    ) { pageContent(it) }
+                    ) { page -> Box(Modifier.fillMaxSize().pageEffect(prefs.pageTransition, vertical = false) { pagerState.getOffsetDistanceInPages(page) }) { pageContent(page) } }
                 } else {
                     VerticalPager(
                         state = pagerState,
                         userScrollEnabled = dragKey == null,
                         beyondViewportPageCount = 1,
                         modifier = Modifier.fillMaxSize(),
-                    ) { pageContent(it) }
+                    ) { page -> Box(Modifier.fillMaxSize().pageEffect(prefs.pageTransition, vertical = true) { pagerState.getOffsetDistanceInPages(page) }) { pageContent(page) } }
                 }
             }
 
@@ -655,6 +655,7 @@ fun GridHome(
             vertical = indicatorAtStart,
             onSelect = { scope.launch { pagerState.animateScrollToPage(it) } },
             onMenu = { onEmptyLongPress(pagerState.currentPage) },
+            homeIndex = prefs.homePage.coerceIn(0, (pageCount - 1).coerceAtLeast(0)),
             modifier = if (indicatorAtStart) {
                 Modifier.align(Alignment.CenterStart).windowInsetsPadding(safe).padding(start = 14.dp)
             } else {
@@ -867,6 +868,40 @@ private fun BoxScope.SuggestionSlot(app: AppEntry, geometry: PageGeometry, index
     }
 }
 
+/**
+ * The page-change effect. [offset] is this page's distance from the settled page in pages
+ * (0 = in view, ±1 = one page away). Read inside graphicsLayer so scrolling never recomposes.
+ */
+private fun Modifier.pageEffect(t: com.bos.sphere.core.data.PageTransition, vertical: Boolean, offset: () -> Float): Modifier =
+    if (t == com.bos.sphere.core.data.PageTransition.Slide) this else this.graphicsLayer {
+        val o = offset().coerceIn(-1f, 1f)
+        val a = kotlin.math.abs(o)
+        val dist = if (vertical) size.height else size.width
+        when (t) {
+            com.bos.sphere.core.data.PageTransition.Fade -> alpha = 1f - a
+            com.bos.sphere.core.data.PageTransition.Zoom -> { val s = 1f - 0.28f * a; scaleX = s; scaleY = s; alpha = 1f - 0.8f * a }
+            com.bos.sphere.core.data.PageTransition.Cube -> {
+                cameraDistance = 18f * density
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (vertical) 0.5f else if (o > 0f) 0f else 1f, if (vertical) (if (o > 0f) 0f else 1f) else 0.5f)
+                if (vertical) rotationX = o * 60f else rotationY = -o * 60f
+                alpha = 1f - 0.5f * a
+            }
+            com.bos.sphere.core.data.PageTransition.Flip -> {
+                cameraDistance = 18f * density
+                if (vertical) rotationX = o * 90f else rotationY = -o * 90f
+                alpha = if (a > 0.5f) 0f else 1f
+            }
+            com.bos.sphere.core.data.PageTransition.Stack -> {
+                // The page being left stays put and recedes while the next one slides over it.
+                if (o < 0f) {
+                    if (vertical) translationY = -o * dist else translationX = -o * dist
+                    val s = 1f - 0.1f * a; scaleX = s; scaleY = s; alpha = 1f - 0.5f * a
+                }
+            }
+            com.bos.sphere.core.data.PageTransition.Slide -> Unit
+        }
+    }
+
 @Composable
 fun PageIndicator(
     count: Int,
@@ -875,6 +910,8 @@ fun PageIndicator(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     onMenu: (() -> Unit)? = null,
+    /** Which page carries the house (the one the Home button returns to). */
+    homeIndex: Int = 0,
 ) {
     if (count <= 1) return
     val content: @Composable () -> Unit = {
@@ -887,7 +924,7 @@ fun PageIndicator(
         }
         for (i in 0 until count) {
             val active = i == current
-            if (i == 0) {
+            if (i == homeIndex) {
                 Icon(
                     Glyphs.Home, contentDescription = "Home page", tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
                     modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 20.dp else 16.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },

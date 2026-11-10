@@ -83,7 +83,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
             .putFloat("spacingV", next.spacingV).putFloat("gridBias", next.gridBias).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
             .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
-            .putString("searchLayout", next.searchLayout.name).putBoolean("searchBackdrop", next.searchBackdrop)
+            .putString("searchLayout", next.searchLayout.name).putBoolean("searchBackdrop", next.searchBackdrop).putString("searchBdStyle", next.searchBackdropStyle.name).putInt("homePage", next.homePage).putString("pageTransition", next.pageTransition.name).putBoolean("mediaControls", next.mediaControls)
             .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
@@ -181,6 +181,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             labelScale = sp.getFloat("labelScale", d.labelScale),
             searchLayout = runCatching { SearchLayout.valueOf(sp.getString("searchLayout", null) ?: "") }.getOrDefault(d.searchLayout),
             searchBackdrop = sp.getBoolean("searchBackdrop", d.searchBackdrop),
+            searchBackdropStyle = enumOr(sp.getString("searchBdStyle", null), d.searchBackdropStyle),
+            homePage = sp.getInt("homePage", d.homePage).coerceAtLeast(0),
+            pageTransition = enumOr(sp.getString("pageTransition", null), d.pageTransition),
+            mediaControls = sp.getBoolean("mediaControls", d.mediaControls),
             searchMotion = sp.getBoolean("searchMotion", d.searchMotion),
             searchFiles = sp.getBoolean("searchFiles", d.searchFiles),
             searchActions = sp.getBoolean("searchActions", d.searchActions),

@@ -555,7 +555,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (homeSignal > 0) {
             settingsOpen = false; drawerOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false; leftOpen = false
             menuApp = null; editCorner = null; editGesture = null; tileMenu = null; expandedWidget = null
-            gridState.goToPage(0)
+            gridState.goToPage(prefs.homePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))
         }
     }
     LaunchedEffect(externalAction) { externalAction?.let { internal(it.id, null) } }

@@ -657,7 +657,7 @@ fun GridHome(
             } else {
                 // Lift the dots above a bottom clock.
                 Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe)
-                    .padding(bottom = if (prefs.clockPosition == ClockPosition.Bottom) 46.dp else 26.dp)
+                    .padding(bottom = if (prefs.clockPosition == ClockPosition.Bottom) 14.dp else 26.dp)
             },
         )
     }

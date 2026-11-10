@@ -185,6 +185,14 @@ class ScreenshotTest {
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun clockBottomPortrait() {
+        rule.mainClock.autoAdvance = false
+        val prefs = LauncherPrefs(clockPosition = com.bos.sphere.core.data.ClockPosition.Bottom, clockShowWeather = true)
+        rule.setContent { Scene(prefs, landscape = false, pages = pagesFor(prefs, false)) }
+        shoot("01b-clock-bottom")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun coverflowPortrait() {
         rule.mainClock.autoAdvance = false
         val prefs = LauncherPrefs(showLabels = true)

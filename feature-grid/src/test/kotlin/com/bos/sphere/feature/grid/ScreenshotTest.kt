@@ -271,28 +271,70 @@ class ScreenshotTest {
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
     fun settingsSpace() {
         rule.mainClock.autoAdvance = false
-        val cats = listOf(
+        rule.setContent { SettingsSpace(visible = true, categories = sampleCategories(), initialCategory = 1, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) }
+        shoot("07-settings-space")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun settingsHomePortrait() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent { SettingsSpace(visible = true, categories = sampleCategories(), initialCategory = 1, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) }
+        shoot("30-settings-home-portrait")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun settingsCornersPortrait() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent { SettingsSpace(visible = true, categories = sampleCategories(), initialCategory = 2, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) }
+        shoot("31-settings-corners-portrait")
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
+    fun settingsCornersLandscape() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent { SettingsSpace(visible = true, categories = sampleCategories(), initialCategory = 2, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) }
+        shoot("32-settings-corners-landscape")
+    }
+
+    private fun sampleCategories(): List<SettingCategory> {
+        val styles = listOf("Pages", "List", "PSP", "DSi")
+        val corners = listOf("Holo", "Sony quarter discs", "Bubbles")
+        return listOf(
             SettingCategory("Page 1", Glyphs.Widget, listOf(SettingItem.Action("Layout", Glyphs.Apps, "Grid") {})),
             SettingCategory(
-                "Home", Glyphs.Apps,
+                "Home screen", Glyphs.Apps,
                 listOf(
-                    SettingItem.Pane("Style", Glyphs.Apps, "Pages") { Text("…") },
-                    SettingItem.Pane("Default density", Glyphs.Widget, "Portrait 3 × 6 · Landscape 5 × 2") { Text("…") },
-                    SettingItem.Pane("Icon size", Glyphs.Apps, "82% of the cell") { Text("…") },
-                    SettingItem.Toggle("App labels", Glyphs.Message, false) {},
-                    SettingItem.Toggle("Suggested app", Glyphs.Bolt, true) {},
-                    SettingItem.Pane("Page turning", Glyphs.Swipe, "Portrait Sideways · Landscape Up / down") { Text("…") },
+                    SettingItem.Choice("Style", Glyphs.Apps, styles, "DSi", { it }, preview = { Text("…") }) {},
+                    SettingItem.Choice("Scroll direction", Glyphs.Swipe, listOf("Along the long side", "Top to bottom"), "Top to bottom", { it }) {},
+                    SettingItem.Slider("Icon size", Glyphs.Apps, 0.82f, 0.5f..0.95f, "82%") {},
+                    SettingItem.Slider("Spacing", Glyphs.Widget, 0.35f, 0f..1f, "35%", "Room between the rows of icons.") {},
+                    SettingItem.Stepper("Icons across", Glyphs.Apps, 4, 2..8) {},
+                    SettingItem.Toggle("App labels", Glyphs.Message, true) {},
+                    SettingItem.Toggle("Always-on keyboard", Glyphs.Message, false, "A keyboard that's always open: type to find an app") {},
+                    SettingItem.Toggle("Hide status bar", Glyphs.Up, true, "The clock and corner icons sit flush to the top") {},
+                    SettingItem.Pane("Status strip", Glyphs.Dial, "3") { Text("…") },
                 ),
             ),
-            SettingCategory("Corners", Glyphs.Palette, emptyList()),
+            SettingCategory(
+                "Corners", Glyphs.Plus,
+                listOf(
+                    SettingItem.Choice("Corner style", Glyphs.Palette, corners, "Bubbles", { it }, hint = "Holo: just the icons. Sony: a quarter-disc in each corner.", preview = { Text("…") }) {},
+                    SettingItem.Slider("Corner icon size", Glyphs.Dial, 40f, 20f..72f, "40", step = 1f) {},
+                    SettingItem.Choice("Icon type", Glyphs.Apps, listOf("Glyph", "App icon"), "Glyph", { it }) {},
+                    SettingItem.Toggle("Follow device rotation", Glyphs.Flip, true, "Each corner stays under the same physical corner") {},
+                    SettingItem.Action("Top left", Glyphs.Palette, "Messages", navigates = true) {},
+                    SettingItem.Action("Top right", Glyphs.Palette, "Search", navigates = true) {},
+                ),
+            ),
+            SettingCategory("Look", Glyphs.Palette, emptyList()),
+            SettingCategory("Clock & status", Glyphs.Clock, emptyList()),
             SettingCategory("Gestures", Glyphs.Pinch, emptyList()),
-            SettingCategory("Motion", Glyphs.Shake, emptyList()),
-            SettingCategory("Look", Glyphs.Image, emptyList()),
-            SettingCategory("Sound", Glyphs.Music, emptyList()),
-            SettingCategory("System", Glyphs.Gear, emptyList()),
+            SettingCategory("App drawer", Glyphs.Widget, emptyList()),
+            SettingCategory("Radar", Glyphs.Search, emptyList()),
+            SettingCategory("Launchpad", Glyphs.Bell, emptyList()),
+            SettingCategory("System & sound", Glyphs.Gear, emptyList()),
+            SettingCategory("About", Glyphs.Info, emptyList()),
         )
-        rule.setContent { SettingsSpace(visible = true, categories = cats, initialCategory = 1, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) }
-        shoot("07-settings-space")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -423,8 +465,8 @@ class ScreenshotTest {
                             ChipRow(zones, if (name == "Time") "Centre" else null, { it ?: "Off" }) {}
                         }
                     },
-                    SettingItem.Pane("Size", Glyphs.Dial, "34") { Text("slider") },
-                    SettingItem.Pane("Format", Glyphs.Clock, "System") { ChipRow(listOf("System", "12-hour", "24-hour"), "System", { it }) {} },
+                    SettingItem.Slider("Size", Glyphs.Dial, 34f, 14f..96f, "34", step = 1f) {},
+                    SettingItem.Choice("Format", Glyphs.Clock, listOf("System", "12-hour", "24-hour"), "System", { it }) {},
                     SettingItem.Toggle("Day", Glyphs.Calendar, false) {},
                     SettingItem.Toggle("Date", Glyphs.Calendar, false) {},
                 ),

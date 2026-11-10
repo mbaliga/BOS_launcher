@@ -631,7 +631,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     // --- Search ------------------------------------------------------------------------------
     out += SettingCategory(
         "Radar",
-        Glyphs.Search,
+        Glyphs.Radar,
         listOf(
             SettingItem.Choice(
                 x("Radar layout"), Glyphs.Apps, com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { x(it.label) },
@@ -641,7 +641,11 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     }
                 },
             ) { v -> upd { it.copy(searchLayout = v) } },
-            SettingItem.Toggle(x("Backdrop picture"), Glyphs.Image, p.searchBackdrop) { v -> upd { it.copy(searchBackdrop = v) } },
+            SettingItem.Choice(
+                x("Background"), Glyphs.Image, com.bos.sphere.core.data.SearchBackdropStyle.entries,
+                if (p.searchBackdrop) p.searchBackdropStyle else com.bos.sphere.core.data.SearchBackdropStyle.None, { x(it.label) },
+                hint = x("A picture, plain black, or a radar scope with a turning sweep"),
+            ) { v -> upd { it.copy(searchBackdropStyle = v, searchBackdrop = true) } },
             SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly; off keeps them still until you move them")) { v -> upd { it.copy(searchMotion = v) } },
             SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("DuckDuckGo understands !bangs: type !g for Google, !gi for images, !yt for YouTube.")) { v -> upd { it.copy(webEngine = v) } },
             SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },

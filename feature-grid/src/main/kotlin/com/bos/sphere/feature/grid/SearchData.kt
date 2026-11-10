@@ -108,7 +108,10 @@ internal class SearchData(
         val order = listOf(SearchCategory.Apps, SearchCategory.Contacts, SearchCategory.Actions, SearchCategory.Files, SearchCategory.Web)
             .let { if (webFirst) it.sortedBy { c -> if (c == SearchCategory.Web) 0 else 1 } else it }
         // Round-robin so every kind of result shows up near the centre, not just the first kind.
-        val lists = order.map { tilesFor(it).filter { t -> t !is Tile.Allow && t !is Tile.Bang } }
+        // Before anything is typed, "Everything" is only what you really used: recent apps and people.
+        // Actions, files and web rows are suggestions, not recents, so they wait for their own category.
+        val usable = if (blank) order.filter { it == SearchCategory.Apps || it == SearchCategory.Contacts } else order
+        val lists = usable.map { tilesFor(it).filter { t -> t !is Tile.Allow && t !is Tile.Bang } }
         val out = ArrayList<Tile>()
         var i = 0
         while (out.size < 40 && lists.any { i < it.size }) { lists.forEach { l -> l.getOrNull(i)?.let(out::add) }; i++ }

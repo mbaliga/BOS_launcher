@@ -103,10 +103,23 @@ class ContactSource(context: Context) {
 
     /** Starred and recently contacted people, for the browse view before anything is typed. */
     fun recent(limit: Int = 12): List<ContactHit> = load(
-        ContactsContract.Contacts.CONTENT_URI, "${ContactsContract.Contacts.HAS_PHONE_NUMBER}=1",
+        ContactsContract.Contacts.CONTENT_URI,
+        // Only people you actually have a history with — never just the alphabet.
+        "${ContactsContract.Contacts.HAS_PHONE_NUMBER}=1 AND (${ContactsContract.Contacts.STARRED}=1 OR ${ContactsContract.Contacts.LAST_TIME_CONTACTED}>0)",
         "${ContactsContract.Contacts.STARRED} DESC, ${ContactsContract.Contacts.LAST_TIME_CONTACTED} DESC, ${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE NOCASE ASC",
         limit,
     )
+
+    /** These specific contacts (the ones you reached through Radar), most recent first as given. */
+    fun byIds(ids: List<Long>): List<ContactHit> {
+        if (ids.isEmpty()) return emptyList()
+        val found = load(
+            ContactsContract.Contacts.CONTENT_URI, "${ContactsContract.Contacts._ID} IN (${ids.joinToString(",")})",
+            "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE NOCASE ASC", ids.size,
+        )
+        val order = ids.withIndex().associate { it.value to it.index }
+        return found.sortedBy { order[it.id] ?: Int.MAX_VALUE }
+    }
 
     fun search(query: String, limit: Int = 6): List<ContactHit> {
         val q = query.trim()

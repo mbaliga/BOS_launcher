@@ -153,7 +153,7 @@ private fun rememberContactRows(query: String, contacts: ContactSource?, want: B
         if (q.isNotEmpty()) delay(120)
         val (ok, found) = withContext(Dispatchers.IO) {
             val ok = contacts.hasPermission()
-            ok to if (ok) (if (q.isEmpty()) contacts.recent() else contacts.search(q)).map {
+            ok to if (ok) (if (q.isEmpty()) (contacts.byIds(ContactHabits.recentIds(context)) + contacts.recent()).distinctBy { it.id }.take(12) else contacts.search(q)).map {
                 val ch = ContactActions.availableChannels(context, it)
                 ContactRow(it, ch, ContactHabits.primaryFor(context, it.id, ch))
             } else emptyList()
@@ -243,7 +243,7 @@ internal fun SearchScreen(
         )
     }
     val selected: SearchCategory? = userCat
-    val counts = remember(data) { SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
+    val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
 
     // ---- suggestions
     val appCategories = remember(apps) { apps.map { AppSearch.categoryNameOf(it.packageName) }.distinct().sorted() }
@@ -439,7 +439,13 @@ internal object ContactHabits {
     private fun sp(c: android.content.Context) = c.getSharedPreferences("search_habits", android.content.Context.MODE_PRIVATE)
     fun last(c: android.content.Context, id: Long): Channel? =
         sp(c).getString("ch:$id", null)?.let { n -> Channel.entries.firstOrNull { it.name == n } }
-    fun record(c: android.content.Context, id: Long, ch: Channel) { sp(c).edit().putString("ch:$id", ch.name).apply() }
+    fun record(c: android.content.Context, id: Long, ch: Channel) {
+        sp(c).edit().putString("ch:$id", ch.name).putLong("at:$id", System.currentTimeMillis()).apply()
+    }
+    /** People reached through Radar, newest first. */
+    fun recentIds(c: android.content.Context): List<Long> =
+        sp(c).all.keys.filter { it.startsWith("at:") }.mapNotNull { k -> (sp(c).getLong(k, 0L)).takeIf { it > 0 }?.let { k.removePrefix("at:").toLongOrNull()?.to(it) } }
+            .sortedByDescending { it.second }.map { it.first }
     fun primaryFor(c: android.content.Context, id: Long, channels: List<Channel>): Channel? =
         last(c, id)?.takeIf { it in channels } ?: Channel.Call.takeIf { it in channels } ?: badgeChannel(channels)
 }

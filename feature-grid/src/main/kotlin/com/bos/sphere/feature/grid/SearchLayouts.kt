@@ -243,7 +243,7 @@ internal fun Orbit(
     val travel = remember { mutableFloatStateOf(0f) }
     val extra = remember { floatArrayOf(0f) } // px/s added by the user
     val dragging = remember { booleanArrayOf(false) }
-    val creepPx = with(LocalDensity.current) { 5.dp.toPx() }
+    val creepPx = with(LocalDensity.current) { 2.5.dp.toPx() }
     androidx.compose.runtime.LaunchedEffect(motion) {
         var last = 0L
         while (true) {
@@ -253,7 +253,7 @@ internal fun Orbit(
                 if (!dragging[0]) {
                     val base = if (motion) creepPx else 0f
                     travel.floatValue += (base + extra[0]) * dt
-                    extra[0] *= (1f - 1.6f * dt).coerceAtLeast(0f)
+                    extra[0] *= (1f - 3f * dt).coerceAtLeast(0f)
                     if (kotlin.math.abs(extra[0]) < 1f) extra[0] = 0f
                 }
             }
@@ -275,7 +275,7 @@ internal fun Orbit(
         ) { change, dx ->
             change.consume()
             travel.floatValue += dx
-            extra[0] = (dx / 0.016f).coerceIn(-2400f, 2400f)
+            extra[0] = (extra[0] * 0.8f + dx / 0.016f * 0.2f * 0.3f).coerceIn(-700f, 700f)
         }
     }) {
         val density = LocalDensity.current

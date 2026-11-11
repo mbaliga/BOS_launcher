@@ -924,6 +924,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },
             onSearch = { wheelOpen = false; searchOpen = true },
+            actions = listOf(
+                com.bos.sphere.feature.grid.PuckAction("Home settings", com.bos.sphere.feature.grid.Glyphs.Gear) { wheelOpen = false; runner.run(CornerActionId.LauncherSettings) },
+                com.bos.sphere.feature.grid.PuckAction("Notifications", com.bos.sphere.feature.grid.Glyphs.Bell) { wheelOpen = false; runner.run(CornerActionId.Notifications) },
+                com.bos.sphere.feature.grid.PuckAction("Flashlight", com.bos.sphere.feature.grid.Glyphs.Flashlight) { runner.run(CornerActionId.Flashlight) },
+                com.bos.sphere.feature.grid.PuckAction("Do not disturb", com.bos.sphere.feature.grid.Glyphs.Moon) { runner.run(CornerActionId.DoNotDisturb) },
+            ),
             onDismiss = { wheelOpen = false },
             modifier = Modifier.fillMaxSize(),
         )

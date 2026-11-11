@@ -1,5 +1,8 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import android.content.ComponentName
 import android.graphics.Canvas
 import android.graphics.ColorFilter
@@ -131,7 +134,7 @@ fun MiniPhone(modifier: Modifier = Modifier, content: @Composable BoxScope.() ->
     )
 }
 
-/** A selectable card: a live preview over a caption; the selected one glows in the accent colour. */
+/** A selectable card: a real render in a dark rounded tile, caption below; the chosen one gets the violet outline. */
 @Composable
 fun PreviewCard(
     label: String,
@@ -141,32 +144,38 @@ fun PreviewCard(
     previewHeight: Dp = 84.dp,
     preview: @Composable BoxScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(20.dp)
     Column(
         modifier
-            .clip(shape)
-            .background(if (selected) HyleColors.Violet.copy(alpha = 0.14f) else HyleColors.Surface.copy(alpha = 0.7f))
-            .border(if (selected) 2.dp else 1.dp, if (selected) HyleColors.Violet else HyleColors.Hairline, shape)
+            .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
-            .semantics { role = Role.RadioButton; this.selected = selected; contentDescription = label }
-            .padding(8.dp),
+            .semantics { role = Role.RadioButton; this.selected = selected; contentDescription = label },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.fillMaxWidth().height(previewHeight), contentAlignment = Alignment.Center, content = preview)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(previewHeight + 16.dp)
+                .clip(shape)
+                .background(Color(0xFF101018))
+                .border(if (selected) 2.dp else 1.dp, if (selected) HyleColors.Violet else Color(0x1FFFFFFF), shape)
+                .padding(8.dp),
+            contentAlignment = Alignment.Center,
+            content = preview,
+        )
         Text(
             label,
-            color = if (selected) HyleColors.InkBright else HyleColors.Ink,
-            fontSize = 12.sp,
+            color = if (selected) HyleColors.VioletSoft else HyleColors.InkDim,
+            fontSize = 13.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
         )
     }
 }
 
-/** A grid of [PreviewCard]s for a single-choice setting. */
-@OptIn(ExperimentalLayoutApi::class)
+/** A sideways-scrolling rail of [PreviewCard]s for a single-choice setting. */
 @Composable
 fun <T> VisualChoice(
     options: List<T>,
@@ -177,16 +186,13 @@ fun <T> VisualChoice(
     previewHeight: Dp = 84.dp,
     preview: @Composable BoxScope.(T) -> Unit,
 ) {
-    FlowRow(
-        maxItemsInEachRow = columns,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
     ) {
         options.forEach { o ->
-            PreviewCard(label(o), o == selected, { onSelect(o) }, Modifier.weight(1f), previewHeight) { preview(o) }
+            PreviewCard(label(o), o == selected, { onSelect(o) }, Modifier.width(if (columns <= 2) 148.dp else 118.dp), previewHeight) { preview(o) }
         }
-        repeat((columns - options.size % columns) % columns) { Spacer(Modifier.weight(1f)) }
     }
 }
 

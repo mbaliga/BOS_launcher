@@ -449,6 +449,8 @@ fun WheelDrawer(
     onSearch: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    /** More buttons for the hub, like the tool puck in Concepts. */
+    actions: List<PuckAction> = emptyList(),
 ) {
     val progress = animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
@@ -476,6 +478,7 @@ fun WheelDrawer(
         onLaunch = onLaunch,
         onLongPressApp = onLongPressApp,
         onSearch = onSearch,
+        actions = actions,
         onDismiss = onDismiss,
         interactive = visible,
         progress = progress,
@@ -495,6 +498,7 @@ private fun WheelContent(
     onLaunch: (AppEntry) -> Unit,
     onLongPressApp: (AppEntry) -> Unit,
     onSearch: () -> Unit,
+    actions: List<PuckAction>,
     onDismiss: () -> Unit,
     interactive: Boolean,
     progress: State<Float>,
@@ -828,6 +832,20 @@ private fun WheelContent(
                 }
                 val sp = WheelGeometry.polarToScreen(anchor, w, h, metrics.searchRadius, qs + WheelGeometry.MID)
                 SearchButton(onClick = onSearch, modifier = Modifier.centeredAt { Offset(sp.x, sp.y) })
+                // The rest of the puck: a ring of one-tap actions between the search glyph and the group labels.
+                val ringR = metrics.hubRadius * 0.58f
+                actions.forEachIndexed { i, a ->
+                    val ang = qs + if (actions.size == 1) WheelGeometry.MID else 15f + i * (60f / (actions.size - 1).coerceAtLeast(1))
+                    val pt = WheelGeometry.polarToScreen(anchor, w, h, ringR, ang)
+                    Box(
+                        Modifier
+                            .centeredAt { Offset(pt.x, pt.y) }
+                            .size(46.dp)
+                            .semantics { contentDescription = a.label }
+                            .clickable(role = Role.Button) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); a.onClick() },
+                        contentAlignment = Alignment.Center,
+                    ) { androidx.compose.material3.Icon(a.glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size(24.dp)) }
+                }
             }
 
             // Spokes (only those near the visible quadrant are composed).
@@ -979,3 +997,6 @@ private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/** One extra button on the all-apps puck. */
+class PuckAction(val label: String, val glyph: androidx.compose.ui.graphics.vector.ImageVector, val onClick: () -> Unit)

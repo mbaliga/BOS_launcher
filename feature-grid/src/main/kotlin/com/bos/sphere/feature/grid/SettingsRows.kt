@@ -126,17 +126,7 @@ internal fun ToggleSettingRow(item: SettingItem.Toggle, onToggle: (Boolean) -> U
             stateDescription = item.value
         },
         trailing = {
-            Switch(
-                checked = item.checked,
-                onCheckedChange = null,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = HyleColors.OnAccent,
-                    checkedTrackColor = HyleColors.Violet,
-                    uncheckedThumbColor = HyleColors.Ink,
-                    uncheckedTrackColor = HyleColors.Background.copy(alpha = 0.6f),
-                    uncheckedBorderColor = HyleColors.Hairline,
-                ),
-            )
+            TactileToggle(item.checked)
         },
     )
 }
@@ -149,21 +139,16 @@ internal fun SliderSettingRow(item: SettingItem.Slider, onTick: () -> Unit) {
         item.glyph, item.title, hint = item.hint,
         trailing = { Text(item.valueText, color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
         below = {
-            Slider(
-                value = SettingsMath.snap(item.amount, item.range, step),
-                onValueChange = { raw ->
-                    val v = SettingsMath.snap(raw, item.range, step)
+            val span = (item.range.endInclusive - item.range.start).coerceAtLeast(1e-6f)
+            TactileSlider(
+                fraction = (item.amount - item.range.start) / span,
+                onFraction = { f ->
+                    val v = SettingsMath.snap(item.range.start + f * span, item.range, step)
                     val b = SettingsMath.tickBand(v, item.range)
                     if (b != band) { band = b; onTick() }
                     if (v != item.amount) item.onChange(v)
                 },
-                valueRange = item.range,
-                colors = SliderDefaults.colors(
-                    thumbColor = HyleColors.Violet,
-                    activeTrackColor = HyleColors.Violet,
-                    inactiveTrackColor = HyleColors.Hairline,
-                ),
-                modifier = Modifier.padding(start = 46.dp).semantics { contentDescription = "${item.title}, ${item.valueText}" },
+                modifier = Modifier.padding(start = 42.dp).semantics { contentDescription = "${item.title}, ${item.valueText}" },
             )
         },
     )
@@ -209,6 +194,23 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
     fun step(delta: Int) {
         val n = SettingsMath.stepIndex(item.options.size, index, delta)
         if (item.options.isNotEmpty() && n != index) { onTick(); item.onSelect(item.options[n]) }
+    }
+    val pv0 = item.preview
+    if (pv0 != null) {
+        // The real renders, always on show: scroll the cards, tap one, and it applies live.
+        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
+            TactileLabel(item.title, Modifier.padding(start = 4.dp, bottom = 10.dp))
+            pv0()
+            Text(item.value, color = HyleColors.InkBright, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
+        }
+        return
+    }
+    if (!dropdown && item.options.size >= 2 && item.options.all { item.label(it).length <= 11 }) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
+            TactileLabel(item.title, Modifier.padding(start = 4.dp, bottom = 10.dp))
+            SegmentSlab(item.options.map { item.label(it) }, index, { i -> if (i != index) { onTick(); item.onSelect(item.options[i]) } })
+        }
+        return
     }
     var showPreview by remember { mutableStateOf(false) }
     Column {

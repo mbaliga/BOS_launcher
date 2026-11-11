@@ -1,5 +1,8 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -418,9 +421,30 @@ internal fun FlatResults(
             if (plain) addSuggestions()
         }
     }
+    val ctx0 = androidx.compose.ui.platform.LocalContext.current
+    val scale = remember { mutableFloatStateOf(RadarPrefs.scale(ctx0)) }
+    var previewTile by remember { mutableStateOf<Tile?>(null) }
     if (rows.isEmpty()) return
+    androidx.compose.runtime.CompositionLocalProvider(LocalResultScale provides scale.floatValue) {
     LazyColumn(
         modifier
+            // Pinch in / out anywhere on the results to shrink or grow the text; the size is remembered.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    do {
+                        val ev = awaitPointerEvent(PointerEventPass.Initial)
+                        if (ev.changes.count { it.pressed } >= 2) {
+                            val z = ev.calculateZoom()
+                            if (z != 1f) {
+                                scale.floatValue = (scale.floatValue * z).coerceIn(0.8f, 2.2f)
+                                ev.changes.forEach { it.consume() }
+                            }
+                        }
+                    } while (ev.changes.any { it.pressed })
+                    RadarPrefs.setScale(ctx0, scale.floatValue)
+                }
+            }
             .then(if (plain) Modifier else Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xE61C1D21)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(16.dp)))
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -433,26 +457,29 @@ internal fun FlatResults(
         contentPadding = PaddingValues(bottom = 8.dp),
     ) {
         itemsIndexed(rows, key = { _, r -> r.key }) { idx, row ->
+            val z = LocalResultScale.current
             when (row) {
                 is FRow.Header -> Text(
-                    row.title.removeSuffix("​"), color = Color(0x99FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    row.title.removeSuffix("​"), color = Color(0x99FFFFFF), fontSize = (15 * z).sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 3.dp),
                 )
-                is FRow.Note -> Text(row.text, color = Color(0x80FFFFFF), fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                is FRow.Note -> Text(row.text, color = Color(0x80FFFFFF), fontSize = (15 * z).sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 is FRow.Sugg -> {
                     Text(
-                        row.item.label, color = if (row.item.accent) HyleColors.VioletSoft else Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        row.item.label, color = if (row.item.accent) HyleColors.VioletSoft else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth().clickable { onPickSuggestion(row.item) }.padding(horizontal = 16.dp, vertical = 9.dp),
                     )
                     if (rows.getOrNull(idx + 1) is FRow.Sugg) Divider()
                 }
                 is FRow.Item -> {
-                    FlatTileRow(row.tile, data.query, onTileTap, onLongPressApp, onOpenIntent, onQueryChange)
+                    FlatTileRow(row.tile, data.query, onTileTap, { previewTile = it }, onOpenIntent, onQueryChange)
                     if (rows.getOrNull(idx + 1) is FRow.Item) Divider()
                 }
             }
         }
     }
+    }
+    previewTile?.let { t -> ResultPreview(t, data.query, onDismiss = { previewTile = null }, onOpen = { previewTile = null; onTileTap(t) }, onLongPressApp = { previewTile = null; onLongPressApp(it) }) }
 }
 
 @Composable
@@ -466,24 +493,25 @@ private fun FlatTileRow(
     tile: Tile,
     query: String,
     onTap: (Tile) -> Unit,
-    onLongPressApp: (com.bos.sphere.core.data.AppEntry) -> Unit,
+    onPreview: (Tile) -> Unit,
     onOpenIntent: (android.content.Intent) -> Unit,
     onQueryChange: (String) -> Unit,
 ) {
+    val z = LocalResultScale.current
     when (tile) {
         is Tile.Person -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f).clickable { onOpenIntent(ContactActions.openContact(tile.c.hit)) },
             ) {
-                ContactFace(tile.c, 34.dp)
-                Text(tile.c.hit.name, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp))
+                ContactFace(tile.c, 38.dp * z)
+                Text(tile.c.hit.name, color = Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp))
             }
             val ctx = androidx.compose.ui.platform.LocalContext.current
             tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
         }
         is Tile.Bang -> Text(
-            "!${tile.code}  ${tile.name}", color = HyleColors.VioletSoft, fontSize = 16.sp,
+            "!${tile.code}  ${tile.name}", color = HyleColors.VioletSoft, fontSize = (18 * z).sp,
             modifier = Modifier.fillMaxWidth().clickable { onQueryChange(tile.rewritten) }.padding(horizontal = 16.dp, vertical = 11.dp),
         )
         else -> Row(
@@ -492,25 +520,65 @@ private fun FlatTileRow(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = { onTap(tile) },
-                    onLongClick = { if (tile is Tile.App) onLongPressApp(tile.app) },
+                    onLongClick = { onPreview(tile) },
                 )
                 .padding(vertical = 7.dp, horizontal = 16.dp),
         ) {
-            TileFace(tile, if (tile is Tile.Hit && tile.hit.snippet != null) 40.dp else 32.dp)
+            TileFace(tile, if (tile is Tile.Hit && tile.hit.snippet != null) 44.dp * z else 36.dp * z)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(
                     if (tile is Tile.Hit) highlight(tile.hit.title, query, Color(0xFFB9A8FF)) else AnnotatedString(tile.caption()),
-                    color = if (tile is Tile.Allow) Color(0x99FFFFFF) else Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = if (tile is Tile.Allow) Color(0x99FFFFFF) else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (tile is Tile.Hit) {
-                    tile.hit.subtitle?.let { Text(it, color = Color(0x99FFFFFF), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    tile.hit.subtitle?.let { Text(it, color = Color(0x99FFFFFF), fontSize = (12 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     tile.hit.snippet?.let {
-                        Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xCCFFFFFF), fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                        Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xCCFFFFFF), fontSize = (15 * z).sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
                     }
                 }
             }
             if (tile is Tile.Hit) sourceBadge(tile.hit.sourcePackage)?.let {
-                Text(it, color = Color(0xCCFFFFFF), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp).background(Color(0x33FFFFFF), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                Text(it, color = Color(0xCCFFFFFF), fontSize = (10 * z).sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp).background(Color(0x33FFFFFF), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+            }
+        }
+    }
+}
+
+
+/** Radar result text scale (1 = default), kept across visits. */
+internal val LocalResultScale = androidx.compose.runtime.compositionLocalOf { 1f }
+
+internal object RadarPrefs {
+    private fun sp(c: android.content.Context) = c.getSharedPreferences("radar_ui", android.content.Context.MODE_PRIVATE)
+    fun scale(c: android.content.Context): Float = runCatching { sp(c).getFloat("resultScale", 1.15f) }.getOrDefault(1.15f)
+    fun setScale(c: android.content.Context, v: Float) { runCatching { sp(c).edit().putFloat("resultScale", v).apply() } }
+}
+
+/** Long-press preview: the result at full size, with everything it knows, and the way to open it. */
+@Composable
+private fun ResultPreview(
+    tile: Tile,
+    query: String,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onLongPressApp: (com.bos.sphere.core.data.AppEntry) -> Unit,
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.foundation.layout.Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color(0xF2101018)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(24.dp)).padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            TileFace(tile, 84.dp)
+            Text(tile.caption(), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
+            if (tile is Tile.Hit) {
+                tile.hit.subtitle?.let { Text(it, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp)) }
+                tile.hit.snippet?.let { Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xE6FFFFFF), fontSize = 16.sp, maxLines = 12, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp)) }
+            }
+            Row(Modifier.padding(top = 20.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                if (tile is Tile.App) Text("OPTIONS", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF241F37)).clickable { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
+                Text("OPEN", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
             }
         }
     }

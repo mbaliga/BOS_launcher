@@ -20,6 +20,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
@@ -295,7 +297,15 @@ private fun SettingsSpaceContent(
                 )
             }
 
-            if (!searching) CategoryTabs(categories, cat, ::moveCategory)
+            val landscape = boxW > boxH
+            val anchorX = boxW * (if (landscape) 0.24f else 0.3f)
+            if (!searching) {
+                // The category bar sits a fifth of the way down (a little lower in landscape), the lit
+                // category on the anchor line and its neighbours 104dp apart on either side.
+                val barTop = (boxH * (if (landscape) 0.24f else 0.2f) - 44.dp - 56.dp).coerceAtLeast(0.dp)
+                Spacer(Modifier.height(barTop))
+                CategoryTabs(categories, cat, anchorX, ::moveCategory)
+            }
 
             // The list: full width, swipe sideways for the neighbouring category.
             val listState = rememberLazyListState()
@@ -322,10 +332,10 @@ private fun SettingsSpaceContent(
             ) {
                 // The original placement: the list hangs under the lit category (about 30% in on a phone held
                 // upright, a little less in landscape), with the labels flowing to its right.
-                val anchor = (boxW * (if (boxW > boxH) 0.2f else 0.28f)) - 15.dp
+                val anchor = anchorX - 24.dp
                 LazyColumn(
                     state = listState,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = anchor.coerceAtLeast(14.dp), end = 20.dp, top = 56.dp, bottom = 32.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = anchor.coerceAtLeast(14.dp), end = 20.dp, top = if (landscape) 40.dp else 80.dp, bottom = 32.dp),
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(0.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
@@ -374,29 +384,30 @@ private fun SettingsSpaceContent(
 
 /** Horizontally scrolling category tabs: every one shows its icon and its name; the selected one is lit and underlined. */
 @Composable
-private fun CategoryTabs(categories: List<SettingCategory>, selected: Int, onSelect: (Int) -> Unit) {
-    val state = rememberLazyListState()
-    LaunchedEffect(selected) { state.animateScrollToItem((selected - 1).coerceAtLeast(0)) }
-    LazyRow(
-        state = state,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(30.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        itemsIndexed(categories, key = { i, c -> "$i|${c.title}" }) { i, c ->
+private fun CategoryTabs(categories: List<SettingCategory>, selected: Int, anchorX: androidx.compose.ui.unit.Dp, onSelect: (Int) -> Unit) {
+    val pos by androidx.compose.animation.core.animateFloatAsState(selected.toFloat(), androidx.compose.animation.core.tween(260), label = "catpos")
+    val pitch = 104.dp
+    val itemW = 96.dp
+    Box(Modifier.fillMaxWidth().height(88.dp)) {
+        categories.forEachIndexed { i, c ->
             val sel = i == selected
+            val dist = kotlin.math.abs(i - pos)
+            if (dist > 4.2f) return@forEachIndexed
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset((anchorX + pitch * (i - pos) - itemW / 2).roundToPx(), 0) }
+                    .width(itemW)
+                    .alpha((1f - dist * 0.16f).coerceIn(0.2f, 1f))
                     .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) { onSelect(i) }
                     .drawBehind {
                         // The soft glow behind the lit category (as in the original bar).
-                        if (sel) drawCircle(Brush.radialGradient(listOf(HyleColors.Violet.copy(alpha = 0.38f), Color.Transparent), center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f), radius = size.width * 0.7f), radius = size.width * 0.7f, center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f))
+                        if (sel) drawCircle(Brush.radialGradient(listOf(HyleColors.Violet.copy(alpha = 0.38f), Color.Transparent), center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f), radius = size.width * 0.5f), radius = size.width * 0.5f, center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f))
                     }
                     .semantics { contentDescription = c.title; this.selected = sel }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(vertical = 8.dp),
             ) {
-                Icon(c.glyph, null, tint = if (sel) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.72f), modifier = Modifier.size(24.dp))
+                Icon(c.glyph, null, tint = if (sel) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.72f), modifier = Modifier.size(if (sel) 30.dp else 26.dp))
                 Text(
                     c.title,
                     color = if (sel) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.72f),
@@ -406,7 +417,6 @@ private fun CategoryTabs(categories: List<SettingCategory>, selected: Int, onSel
                     softWrap = false,
                     modifier = Modifier.padding(top = 4.dp),
                 )
-
             }
         }
     }

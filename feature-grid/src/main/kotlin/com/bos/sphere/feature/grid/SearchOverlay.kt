@@ -311,7 +311,7 @@ internal fun SearchScreen(
                     onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
                     onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
                     plain = true,
-                    modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 58.dp),
+                    modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 58.dp),
                 )
             } else if (layout != SearchLayout.Flat) {
                 // Idle browsing: the category wheel with Filmstrip or Orbit results.

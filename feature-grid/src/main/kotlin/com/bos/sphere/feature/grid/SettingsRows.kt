@@ -210,14 +210,16 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
         val n = SettingsMath.stepIndex(item.options.size, index, delta)
         if (item.options.isNotEmpty() && n != index) { onTick(); item.onSelect(item.options[n]) }
     }
+    var showPreview by remember { mutableStateOf(false) }
+    Column {
     SettingRowFrame(
         item.glyph, item.title, hint = item.hint,
         onClick = { if (dropdown) menu = true else step(1) },
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${item.title}, ${item.value}" },
         hintExtra = if (item.preview != null) ({
             Text(
-                com.bos.sphere.core.design.L10n.tr("Preview…"), color = HyleColors.VioletSoft, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable(onClick = onPreview).padding(top = 3.dp, bottom = 1.dp),
+                com.bos.sphere.core.design.L10n.tr(if (showPreview) "Hide previews ⌃" else "Show previews ⌄"), color = HyleColors.VioletSoft, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.clickable { showPreview = !showPreview }.padding(top = 3.dp, bottom = 1.dp),
             )
         }) else null,
         trailing = {
@@ -256,6 +258,10 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
             }
         },
     )
+    // The real renders, live under the row: tapping a card applies it and the rest of the screen follows.
+    val pv = item.preview
+    if (pv != null && showPreview) Column(Modifier.padding(start = 34.dp, bottom = 10.dp, end = 4.dp)) { pv() }
+    }
 }
 
 @Composable

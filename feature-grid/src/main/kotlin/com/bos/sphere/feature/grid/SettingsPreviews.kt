@@ -188,7 +188,7 @@ fun <T> VisualChoice(
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = LocalRailInset.current, end = 20.dp, top = 4.dp, bottom = 4.dp),
     ) {
         options.forEach { o ->
             PreviewCard(label(o), o == selected, { onSelect(o) }, Modifier.width(if (columns <= 2) 148.dp else 118.dp), previewHeight) { preview(o) }

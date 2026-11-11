@@ -335,12 +335,15 @@ private fun SettingsSpaceContent(
                 val anchor = anchorX - 24.dp
                 LazyColumn(
                     state = listState,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = anchor.coerceAtLeast(14.dp), end = 20.dp, top = if (landscape) 40.dp else 80.dp, bottom = 32.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 0.dp, end = 0.dp, top = if (landscape) 40.dp else 80.dp, bottom = 32.dp),
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(0.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(list, key = { i, s -> "${s.origin}|$i|${s.item.title}" }) { i, s ->
-                        Column {
+                        val isRail = (s.item as? SettingItem.Choice<*>)?.preview != null
+                        val inset = anchor.coerceAtLeast(14.dp)
+                        androidx.compose.runtime.CompositionLocalProvider(LocalRailInset provides inset) {
+                        Column(Modifier.padding(start = if (isRail) 0.dp else inset, end = if (isRail) 0.dp else 20.dp)) {
                             if (s.origin != null) Text(s.origin.uppercase(), color = HyleColors.InkDim, fontSize = 10.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 4.dp, bottom = 3.dp))
                             when (val it = s.item) {
                                 is SettingItem.Toggle -> ToggleSettingRow(it) { v -> it.onChange(v); sounds?.play(UiSound.Tick); tick() }
@@ -353,6 +356,7 @@ private fun SettingsSpaceContent(
                                 is SettingItem.Action -> NavigationSettingRow(it, chevron = it.navigates, highlighted = false, onClick = { sounds?.play(UiSound.Select); it.onClick() })
                                 is SettingItem.Pane -> NavigationSettingRow(it, chevron = true, highlighted = i == paneOpen, onClick = { openDetail(i) })
                             }
+                        }
                         }
                     }
                 }
@@ -465,3 +469,6 @@ internal fun WaveField(modifier: Modifier) {
         }
     }
 }
+
+/** Left inset a full-bleed sideways rail uses as its own start padding, so its cards line up with the list but scroll to the edge. */
+internal val LocalRailInset = androidx.compose.runtime.compositionLocalOf { 0.dp }

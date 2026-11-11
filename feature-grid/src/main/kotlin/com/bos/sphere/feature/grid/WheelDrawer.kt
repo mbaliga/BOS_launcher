@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.ui.draw.drawBehind
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import androidx.activity.compose.BackHandler
@@ -830,21 +831,24 @@ private fun WheelContent(
                             ) { if (g != grouping) onGroupingChange(g) },
                     )
                 }
-                val sp = WheelGeometry.polarToScreen(anchor, w, h, metrics.searchRadius, qs + WheelGeometry.MID)
-                SearchButton(onClick = onSearch, modifier = Modifier.centeredAt { Offset(sp.x, sp.y) })
-                // The rest of the puck: a ring of one-tap actions between the search glyph and the group labels.
-                val ringR = metrics.hubRadius * 0.58f
-                actions.forEachIndexed { i, a ->
-                    val ang = qs + if (actions.size == 1) WheelGeometry.MID else 15f + i * (60f / (actions.size - 1).coerceAtLeast(1))
-                    val pt = WheelGeometry.polarToScreen(anchor, w, h, ringR, ang)
-                    Box(
-                        Modifier
-                            .centeredAt { Offset(pt.x, pt.y) }
-                            .size(46.dp)
-                            .semantics { contentDescription = a.label }
-                            .clickable(role = Role.Button) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); a.onClick() },
-                        contentAlignment = Alignment.Center,
-                    ) { androidx.compose.material3.Icon(a.glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size(24.dp)) }
+                // The puck: Radar at the very centre, a ring of crater buttons around it, group labels outside.
+                val sp = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
+                Crater(56.dp, accent = true, modifier = Modifier.centeredAt { Offset(sp.x, sp.y) }) {
+                    SearchButton(onClick = onSearch, modifier = Modifier.size(56.dp))
+                }
+                val slots = listOf(0.40f to 22f, 0.40f to 68f, 0.64f to 14f, 0.64f to 45f, 0.64f to 76f)
+                actions.take(slots.size).forEachIndexed { i, a ->
+                    val (rf, deg) = slots[i]
+                    val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.hubRadius * rf, qs + deg)
+                    Crater(42.dp, modifier = Modifier.centeredAt { Offset(pt.x, pt.y) }) {
+                        Box(
+                            Modifier
+                                .size(42.dp)
+                                .semantics { contentDescription = a.label }
+                                .clickable(role = Role.Button) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); a.onClick() },
+                            contentAlignment = Alignment.Center,
+                        ) { androidx.compose.material3.Icon(a.glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size(22.dp)) }
+                    }
                 }
             }
 
@@ -1000,3 +1004,22 @@ private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 
 /** One extra button on the all-apps puck. */
 class PuckAction(val label: String, val glyph: androidx.compose.ui.graphics.vector.ImageVector, val onClick: () -> Unit)
+
+/** A tactile "crater" button: a dark concave dish with a lit lower lip (the Hyle kit's crater), optionally ringed in the accent. */
+@Composable
+private fun Crater(size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, accent: Boolean = false, content: @Composable () -> Unit) {
+    Box(
+        modifier
+            .size(size)
+            .drawBehind {
+                val r = this.size.minDimension / 2f
+                drawCircle(Brush.radialGradient(listOf(Color(0xFF06060A), Color(0xFF14141C)), center = Offset(this.size.width / 2f, this.size.height * 0.42f), radius = r), radius = r)
+                drawCircle(
+                    Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent, Color(0x40FFFFFF))),
+                    radius = r - 0.5.dp.toPx(), style = Stroke(1.5.dp.toPx()),
+                )
+                if (accent) drawCircle(HyleColors.Violet.copy(alpha = 0.55f), radius = r, style = Stroke(1.5.dp.toPx()))
+            },
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}

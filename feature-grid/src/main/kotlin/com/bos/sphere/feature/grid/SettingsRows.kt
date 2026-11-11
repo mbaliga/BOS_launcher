@@ -199,7 +199,7 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
     if (pv0 != null) {
         // The real renders, always on show: scroll the cards, tap one, and it applies live.
         Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
-            TactileLabel(item.title, Modifier.padding(start = 4.dp, bottom = 10.dp))
+            TactileLabel(item.title, Modifier.padding(start = LocalRailInset.current + 4.dp, bottom = 10.dp))
             pv0()
             Text(item.value, color = HyleColors.InkBright, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
         }
@@ -207,7 +207,7 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
     }
     if (!dropdown && item.options.size >= 2 && item.options.all { item.label(it).length <= 11 }) {
         Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
-            TactileLabel(item.title, Modifier.padding(start = 4.dp, bottom = 10.dp))
+            TactileLabel(item.title, Modifier.padding(start = LocalRailInset.current + 4.dp, bottom = 10.dp))
             SegmentSlab(item.options.map { item.label(it) }, index, { i -> if (i != index) { onTick(); item.onSelect(item.options[i]) } })
         }
         return

@@ -628,12 +628,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // Breathing room at the sides of the scrolling homes (plus whatever "Sides" margin is set).
     val scrollHorizontal = prefs.scrollsHorizontally(isLandscape)
-    val sideGap = 36.dp + (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * prefs.gridInsetX).dp
-    // Scrolling homes keep clear of the status strip on whichever edge it sits, and of the corners.
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    // One frame on every side, in either orientation (about 15% of the short side): apps live inside it;
+    // the corner icons, clock and page dots sit in the margin band around it.
+    val frame = (minOf(cfg.screenWidthDp, cfg.screenHeightDp) * 0.148f).dp
+    val sideGap = frame + (cfg.screenWidthDp * prefs.gridInsetX).dp
     val stripH = com.bos.sphere.feature.grid.stripHeight(prefs)
-    val cornerRowH = prefs.cornerIconSize.dp + 22.dp
-    val scrollTop = if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Top) stripH + 36.dp else cornerRowH
-    val scrollBottom = bottomClear + (if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Bottom) stripH + 36.dp else 56.dp)
+    val scrollTop = if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Top) maxOf(frame, stripH + 14.dp) else frame
+    val scrollBottom = bottomClear + frame
     val scrollPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = scrollTop, bottom = scrollBottom)
     // The PSP bar has no reliable empty space to long-press: holding the top band (clock area) opens Settings.
     @Composable

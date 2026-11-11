@@ -240,15 +240,21 @@ fun GridHome(
     val cornerRow = prefs.cornerIconSize.dp + 22.dp
     // The apps area is the same inset on every side, in either orientation; the corner icons, the
     // clock and the page dots live in that margin band (see the mock-ups).
-    val padTopDp = if (clockTop) maxOf(clockH + 14.dp, cornerRow) else cornerRow
-    val padBottomDp = when {
+    val padTopDpRaw = if (clockTop) maxOf(clockH + 14.dp, cornerRow) else cornerRow
+    val padBottomDpRaw = when {
         clockBottom && !indicatorAtStartEarly -> maxOf(clockH + 76.dp, cornerRow)
         clockBottom -> maxOf(clockH + 24.dp, cornerRow)
         indicatorAtStartEarly -> cornerRow
         else -> maxOf(cornerRow, 44.dp)
     }.coerceAtLeast(cornerRow)
-    val padStartDp = maxOf(cornerRow, if (indicatorAtStartEarly) 38.dp else 14.dp)
-    val padEndDp = cornerRow
+    val padStartDpRaw = maxOf(cornerRow, if (indicatorAtStartEarly) 38.dp else 14.dp)
+    val padEndDpRaw = cornerRow
+    // The same frame as the scrolling homes: about 15% of the short side on every side, in either orientation.
+    val frameDp = with(density) { (minOf(fullSize.width, fullSize.height) * 0.148f).toDp() }
+    val padTopDp = maxOf(padTopDpRaw, frameDp)
+    val padBottomDp = maxOf(padBottomDpRaw, frameDp)
+    val padStartDp = maxOf(padStartDpRaw, frameDp)
+    val padEndDp = maxOf(padEndDpRaw, frameDp)
     val insetLeft = with(density) { safeInsets.getLeft(this, dir).toDp() }
     val insetRight = with(density) { safeInsets.getRight(this, dir).toDp() }
     val insetTop = with(density) { safeInsets.getTop(this).toDp() }

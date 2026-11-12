@@ -251,10 +251,10 @@ fun GridHome(
     val padEndDpRaw = cornerRow
     // The same frame as the scrolling homes: about 15% of the short side on every side, in either orientation.
     val frameDp = with(density) { (minOf(fullSize.width, fullSize.height) * 0.148f).toDp() }
-    val padTopDp = maxOf(padTopDpRaw, frameDp)
-    val padBottomDp = maxOf(padBottomDpRaw, frameDp)
-    val padStartDp = maxOf(padStartDpRaw, frameDp)
-    val padEndDp = maxOf(padEndDpRaw, frameDp)
+    val padTopDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padBottomDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padStartDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padEndDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
     val insetLeft = with(density) { safeInsets.getLeft(this, dir).toDp() }
     val insetRight = with(density) { safeInsets.getRight(this, dir).toDp() }
     val insetTop = with(density) { safeInsets.getTop(this).toDp() }

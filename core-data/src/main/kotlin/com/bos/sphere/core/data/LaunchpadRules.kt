@@ -375,7 +375,7 @@ object LaunchpadJson {
 enum class LaunchpadGesture(val label: String, val hint: String) {
     PinchIn("Pinch in", "Two fingers together on the list"),
     PinchOut("Pinch out", "Two fingers apart on the list"),
-    SwipeItemRight("Slide an item right", "Drag a notification to the right"),
+    SwipeItemRight("Slide an item right", "Opens the palette of actions (fixed)"),
     SwipeItemLeft("Slide an item left", "Drag a notification to the left"),
     LongPressItem("Long-press an item", "Hold a notification"),
     DoubleTapHeader("Double-tap the header", "Tap the blue bar twice"),
@@ -403,7 +403,7 @@ object LaunchpadGestures {
         LaunchpadGesture.PinchIn to LaunchpadAction.ShowUnread,
         LaunchpadGesture.PinchOut to LaunchpadAction.ShowAll,
         LaunchpadGesture.SwipeItemRight to LaunchpadAction.Dismiss,
-        LaunchpadGesture.SwipeItemLeft to LaunchpadAction.MarkRead,
+        LaunchpadGesture.SwipeItemLeft to LaunchpadAction.Dismiss,
         LaunchpadGesture.LongPressItem to LaunchpadAction.MoreOptions,
         LaunchpadGesture.DoubleTapHeader to LaunchpadAction.NextGrouping,
     )

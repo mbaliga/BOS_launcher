@@ -671,6 +671,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 modifier = Modifier.fillMaxSize(),
                 theme = prefs.launchpadTheme,
                 underlay = true,
+                endInset = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.14f).dp,
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
@@ -678,28 +679,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val slideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.86f
         Box(
             Modifier.fillMaxSize().graphicsLayer {
+                // Home is the floating surface: it slides right, shrinks a touch and rounds its corners,
+                // casting a shadow on the notifications layer beneath.
                 translationX = leftProgress * slideDp * density
+                val sc = 1f - 0.05f * leftProgress
+                scaleX = sc; scaleY = sc
                 if (leftProgress > 0.001f) {
-                    shadowElevation = 40.dp.toPx()
-                    shape = androidx.compose.ui.graphics.RectangleShape
-                    clip = false
+                    shadowElevation = 36.dp.toPx()
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape((30f * leftProgress).dp)
+                    clip = true
                     ambientShadowColor = Color.Black
                     spotShadowColor = Color.Black
                 }
             }
-                .then(if (leftActive) Modifier.background(Color.Black) else Modifier)
-                // A soft dark edge on the home's left side so it reads as sitting above the page beneath.
-                .drawBehind {
-                    if (leftProgress > 0.001f) {
-                        val w = 36.dp.toPx()
-                        drawRect(
-                            androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f * leftProgress)), startX = -w, endX = 0f,
-                            ),
-                            topLeft = androidx.compose.ui.geometry.Offset(-w, 0f), size = androidx.compose.ui.geometry.Size(w, size.height),
-                        )
-                    }
-                },
+                .then(if (leftActive) Modifier.background(Color.Black) else Modifier),
         ) {
             when (prefs.homeStyle) {
                 HomeStyle.Grid -> if (prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {

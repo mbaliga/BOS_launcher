@@ -1,5 +1,6 @@
 package com.bos.sphere.ui
 
+import androidx.compose.foundation.layout.fillMaxHeight
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateFormat
@@ -202,6 +203,8 @@ fun LaunchpadPanel(
      * home and casts the shadow): the panel then just sits there instead of sliding in itself.
      */
     underlay: Boolean = false,
+    /** Room on the right that the floating home still covers; the list lays out in what is left. */
+    endInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     rememberLaunchpadInit()
     val dark = when (theme) {
@@ -230,6 +233,7 @@ fun LaunchpadPanel(
         LaunchpadContent(
             items = items, rules = rules, prefs = prefs, readKeys = read, hasAccess = access, now = now,
             gestures = gestures,
+            endInset = endInset,
             onClose = onDismiss,
             onOpenItem = { n ->
                 LaunchpadSettings.markRead(n.key)
@@ -275,6 +279,7 @@ fun LaunchpadContent(
     onRequestAccess: () -> Unit,
     modifier: Modifier = Modifier,
     gestures: Map<com.bos.sphere.core.data.LaunchpadGesture, com.bos.sphere.core.data.LaunchpadAction> = com.bos.sphere.core.data.LaunchpadGestures.defaults,
+    endInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val ctx = LocalContext.current
     val zone = remember { ZoneId.systemDefault() }
@@ -344,7 +349,8 @@ fun LaunchpadContent(
                         ?: com.bos.sphere.core.data.LaunchpadAction.None,
                     null, sections,
                 )
-            },
+            }
+            .padding(end = endInset),
     ) {
         LaunchpadHeader(
             counts = counts, filter = activeFilter, mode = prefs.defaultMode,
@@ -374,7 +380,7 @@ fun LaunchpadContent(
                                 onClick = { onOpenItem(n) },
                                 onLongClick = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.LongPressItem] ?: com.bos.sphere.core.data.LaunchpadAction.MoreOptions, n, sections) },
                                 rightAction = gestures[com.bos.sphere.core.data.LaunchpadGesture.SwipeItemRight] ?: com.bos.sphere.core.data.LaunchpadAction.Dismiss,
-                                leftAction = gestures[com.bos.sphere.core.data.LaunchpadGesture.SwipeItemLeft] ?: com.bos.sphere.core.data.LaunchpadAction.MarkRead,
+                                leftAction = gestures[com.bos.sphere.core.data.LaunchpadGesture.SwipeItemLeft] ?: com.bos.sphere.core.data.LaunchpadAction.Dismiss,
                                 onSwipe = { act -> perform(act, n, sections) },
                                 modifier = Modifier.animateItem(),
                             )
@@ -550,35 +556,65 @@ private fun NotificationRow(
     modifier: Modifier = Modifier,
 ) {
     var dx by remember { mutableFloatStateOf(0f) }
+    var base by remember { mutableFloatStateOf(0f) } // 0, or the palette's width while it is held open
     var widthPx by remember { mutableFloatStateOf(1f) }
     val weight = if (unread) FontWeight.Bold else FontWeight.Normal
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val palette = listOf(
+        com.bos.sphere.core.data.LaunchpadAction.MarkRead to Color(0xFF0B7BB8),
+        com.bos.sphere.core.data.LaunchpadAction.OpenApp to Color(0xFF0A6296),
+        com.bos.sphere.core.data.LaunchpadAction.MuteApp to Color(0xFF3B4A5A),
+        com.bos.sphere.core.data.LaunchpadAction.PinSender to Color(0xFF2F6F4F),
+        com.bos.sphere.core.data.LaunchpadAction.MoreOptions to Color(0xFF55486F),
+    )
+    val cellPx = minOf(with(density) { 72.dp.toPx() }, widthPx * 0.9f / palette.size)
+    val paletteW = cellPx * palette.size
+    val offsetPx = (base + dx).coerceIn(-widthPx, paletteW * 1.1f)
     Column(modifier) {
       Box(Modifier.fillMaxWidth()) {
-        // What the slide will do, uncovered behind the row as you drag.
-        val reveal = if (dx > 0f) rightAction else leftAction
-        if (dx != 0f && reveal != com.bos.sphere.core.data.LaunchpadAction.None) {
+        if (offsetPx > 0f) {
+            // Slide right: a whole palette of actions, held open until one is chosen or the row is tapped.
+            Row(Modifier.matchParentSize()) {
+                palette.forEach { (act, color) ->
+                    val label = when (act) {
+                        com.bos.sphere.core.data.LaunchpadAction.MarkRead -> "Read"
+                        com.bos.sphere.core.data.LaunchpadAction.OpenApp -> "Open"
+                        com.bos.sphere.core.data.LaunchpadAction.MuteApp -> "Mute"
+                        com.bos.sphere.core.data.LaunchpadAction.PinSender -> "Pin"
+                        else -> "More"
+                    }
+                    Box(
+                        Modifier.width(with(density) { cellPx.toDp() }).fillMaxHeight().background(color)
+                            .clickable { base = 0f; dx = 0f; onSwipe(act) },
+                        contentAlignment = Alignment.Center,
+                    ) { Text(L10n.tr(label), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
+                }
+            }
+        } else if (offsetPx < 0f && leftAction != com.bos.sphere.core.data.LaunchpadAction.None) {
+            // Slide left: the one action, uncovered behind the row.
             Box(
-                Modifier.matchParentSize().background(if (dx > 0f) Color(0xFFB3261E) else BlueDark).padding(horizontal = 20.dp),
-                contentAlignment = if (dx > 0f) Alignment.CenterStart else Alignment.CenterEnd,
-            ) { Text(L10n.tr(reveal.label), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+                Modifier.matchParentSize().background(Color(0xFFB3261E)).padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) { Text(L10n.tr(leftAction.label), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
         }
         Row(
             Modifier
                 .fillMaxWidth()
-                .offset { IntOffset(dx.roundToInt(), 0) }
+                .offset { IntOffset(offsetPx.roundToInt(), 0) }
                 .background(LocalLp.current.bg)
-                .pointerInput(n.key, rightAction, leftAction) {
+                .pointerInput(n.key, leftAction) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
-                            val d = dx
+                            val total = base + dx
                             dx = 0f
-                            if (d > widthPx * 0.3f) onSwipe(rightAction)
-                            else if (d < -widthPx * 0.3f) onSwipe(leftAction)
+                            if (total < -widthPx * 0.3f) { base = 0f; onSwipe(leftAction) }
+                            else if (total > paletteW * 0.4f) base = paletteW
+                            else base = 0f
                         },
                         onDragCancel = { dx = 0f },
                     ) { _, delta -> dx += delta }
                 }
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .combinedClickable(onClick = { if (base > 0f) base = 0f else onClick() }, onLongClick = onLongClick)
                 .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
                 .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,

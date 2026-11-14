@@ -48,13 +48,14 @@ object VoiceInputManager {
      * or RECORD_AUDIO permission is not granted.
      */
     fun startListening(context: Context): Boolean {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        // INP-13: on-device only. The default recogniser may send audio to a server, so it is never used.
+        if (android.os.Build.VERSION.SDK_INT < 33 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
             return false
         }
 
         try {
             if (speechRecognizer == null) {
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+                speechRecognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             }
 
             val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {

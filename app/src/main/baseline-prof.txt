@@ -1,0 +1,19 @@
+# Hand-written baseline profile for the home render path (NFR-01, NFR-02, NFR-05).
+# Covers cold start (Application, MainActivity, theme), the first home frame and the palette open path.
+# Replace or extend with generated rules from benchmark/ (BaselineProfileGenerator) once it can be run on a device.
+HSPLcom/bos/sphere/LiftoffApplication;-><init>()V
+HSPLcom/bos/sphere/LiftoffApplication;->onCreate()V
+HSPLcom/bos/sphere/MainActivity;->**(**)**
+HSPLcom/bos/sphere/HomeScreenKt;->**(**)**
+HSPLcom/bos/sphere/HomeScreenKt$**;->**(**)**
+HSPLcom/bos/sphere/core/design/**;->**(**)**
+HSPLcom/bos/sphere/core/data/LauncherStores;->**(**)**
+HSPLcom/bos/sphere/core/data/Prefs**;->**(**)**
+HSPLcom/bos/sphere/core/data/CrashLoopGuard;->**(**)**
+HSPLcom/bos/sphere/feature/grid/GridHome**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/SearchOverlay**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/WheelDrawer**;->**(**)**
+HSPLcom/bos/sphere/feature/search/**;->**(**)**
+Lcom/bos/sphere/MainActivity;
+Lcom/bos/sphere/LiftoffApplication;
+Lcom/bos/sphere/HomeScreenKt;

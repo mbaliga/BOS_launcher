@@ -64,6 +64,7 @@ dependencies {
     implementation(project(":core-capabilities"))
     implementation(project(":core-launch"))
     implementation(project(":core-input"))
+    implementation(project(":core-quality"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.health.connect.client)
@@ -79,3 +80,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+// NFR-08: fail when the release APK is over the download budget (see apk-size.gradle.kts).
+apply(from = "apk-size.gradle.kts")

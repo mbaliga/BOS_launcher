@@ -58,8 +58,10 @@ object DesktopDockProvider : DesktopDock {
             controllers[state.displayId] = controller
             val manager = com.bos.sphere.feature.dock.WorkspaceRepository.get(context)
             controller.bindWorkspaceStep { d -> if (d > 0) manager.next() else manager.previous() }
-            onDispose { if (controllers[state.displayId] === controller) controllers.remove(state.displayId); scope.cancel() }
+            onDispose { if (controllers[state.displayId] === controller) controllers.remove(state.displayId) }
         }
+        // The scope outlives a display change of the same surface; it ends only when the dock leaves the screen.
+        DisposableEffect(scope) { onDispose { scope.cancel() } }
         Box(modifier.fillMaxSize()) {
             DockHost(
                 apps = apps, launcher = launcher, controller = controller, refreshKey = 0,

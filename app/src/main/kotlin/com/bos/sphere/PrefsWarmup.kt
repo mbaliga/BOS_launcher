@@ -10,7 +10,8 @@ import android.content.Context
  */
 object PrefsWarmup {
     /** Preference files read while home is built (see LauncherStores, HiddenAppsStore, CrashLoopGuard). */
-    val FILES = listOf("launcher_prefs", "home_layout", "shortcuts", "launch_history", "icon_colors", "hidden_apps", "crash_loop")
+    val FILES = listOf("launcher_prefs", "home_layout", "shortcuts", "launch_history", "icon_colors", "hidden_apps", "crash_loop",
+        "liftoff_misc", "theming", "home_tags", "home_icons", "home_badges", "home_state", "palette", "desktop_surface")
 
     fun start(context: Context) {
         val app = context.applicationContext

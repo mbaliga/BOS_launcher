@@ -25,9 +25,13 @@ Not in this list: NFR-13 (input stream), NFR-16 stays unmet (`docs/decisions/NFR
 
 ## Build and test state
 
-- `./gradlew assembleRelease --offline` builds. Every unit test passes except one that fails at the base commit too: `TranslationCoverageTest.CFG_19_everyLiteralUsedInTheSourceExistsInAllEightLanguages` lists 132 new English-only strings from other streams (BackupPane, Dock, Desktop, palette menus and others) plus 7 from `CrashReportsPane`. Translating them is the CFG-19 stream's job and is not done here.
+- `./gradlew assembleRelease --offline` builds. Every unit test passes except one that fails at the base commit too: `TranslationCoverageTest.CFG_19_everyLiteralUsedInTheSourceExistsInAllEightLanguages` lists 132 new English-only strings from other streams (BackupPane, Dock, Desktop, palette menus and others) (the 7 from `CrashReportsPane` are now translated in `L10nNfr.kt`). The rest are the CFG-19 stream's job and are not done here, so the full test task is red.
 - New tests: `NfrWiringTest` (core-quality, 24 JVM tests named NFR_xx), `ReducedMotionUiTest` (feature-grid, Robolectric), the strengthened `CompatibilityAuditTest`. `tools/spec_coverage.py` now counts names that chain several IDs (`NFR_03_NFR_04_...`) and regenerated `docs/TEST_COVERAGE.md`.
 
 ## Shared-file edits (all small, additive)
 
 `HomeScreen.kt` (scrim in `Background()`, hub reduced-motion lines, photo copy on IO, `HomeTiming` effect), `SettingsSpace.kt`, `AppDrawerSpace.kt`, `WheelDrawer.kt`, `SearchOverlay.kt` (one line), `SearchLayouts.kt` (exclusion removed), `LaunchpadReveal.kt`, `BackupPane.kt` (one list entry), `AppRepository.kt` (background handler), `app/build.gradle.kts` (`benchmark` build type), `core-design/build.gradle.kts` (api on core-quality), `baseline-prof.txt`.
+
+## Review pass (wave 2, adversarial)
+
+Fixed: palette trace sections now end in `finally` (a cancelled effect left async sections open); app drawer read the motion prefs twice (two observers), now once; prefs warm-up list extended to the other files read at startup; CrashReportsPane strings translated into all eight languages (`L10nNfr.kt`). No status was raised. All rows above stay as written: nothing is device-verified, so NFR-20 "built" means only that code never intercepts.

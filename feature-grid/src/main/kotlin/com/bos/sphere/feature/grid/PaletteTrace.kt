@@ -22,15 +22,15 @@ fun PaletteTraceEffects(query: String) {
         val c = seq.intValue++
         Trace.beginAsyncSection(TraceSections.PALETTE_OPEN, c)
         Trace.beginAsyncSection(TraceSections.PALETTE_FIRST_RESULTS, c)
-        withFrameNanos { }
-        Trace.endAsyncSection(TraceSections.PALETTE_FIRST_RESULTS, c)
-        Trace.endAsyncSection(TraceSections.PALETTE_OPEN, c)
+        try { withFrameNanos { } } finally { // balanced even when the overlay leaves before the frame
+            Trace.endAsyncSection(TraceSections.PALETTE_FIRST_RESULTS, c)
+            Trace.endAsyncSection(TraceSections.PALETTE_OPEN, c)
+        }
     }
     LaunchedEffect(query) {
         if (query.isEmpty() && seq.intValue <= 1) return@LaunchedEffect // the initial empty query is the open, not a keystroke
         val c = seq.intValue++
         Trace.beginAsyncSection(TraceSections.PALETTE_KEYSTROKE, c)
-        withFrameNanos { }
-        Trace.endAsyncSection(TraceSections.PALETTE_KEYSTROKE, c)
+        try { withFrameNanos { } } finally { Trace.endAsyncSection(TraceSections.PALETTE_KEYSTROKE, c) }
     }
 }

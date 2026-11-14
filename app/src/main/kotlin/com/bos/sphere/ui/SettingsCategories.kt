@@ -110,7 +110,15 @@ class SettingsModel(
     val editCorner: (Corner) -> Unit,
     val editGesture: (HomeGesture) -> Unit,
     val system: SystemLinks,
+    /** CFG-08: every capability with its state on this device. */
+    val capabilities: List<com.bos.sphere.core.capabilities.Capability> = emptyList(),
+    val copyText: (String) -> Unit = {},
+    /** CFG-17: the Lab spikes, each with its last result. */
+    val lab: List<LabEntry> = emptyList(),
 )
+
+/** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
+class LabEntry(val id: String, val title: String, val result: String, val run: (() -> Unit)?)
 
 class SystemLinks(
     val setDefaultHome: () -> Unit,
@@ -721,6 +729,27 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Action(x("Android settings"), Glyphs.Gear, "", navigates = true, onClick = m.system.androidSettings),
         ),
     )
+    // --- Capabilities (CFG-08) and Lab (CFG-17) ----------------------------------------------------
+    if (m.capabilities.isNotEmpty()) {
+        val report = m.capabilities.joinToString("\n") { c -> "${c.title}: ${c.state}" + (c.reason?.let { " - $it" } ?: "") + (c.fix?.let { " ($it)" } ?: "") }
+        out += SettingCategory(
+            x("Capabilities"), Glyphs.Info,
+            listOf<SettingItem>(SettingItem.Action(x("Copy report"), Glyphs.Info, "", onClick = { m.copyText(report) })) +
+                m.capabilities.map { c ->
+                    SettingItem.Action(
+                        c.title, if (c.state == com.bos.sphere.core.capabilities.CapState.On) Glyphs.Bolt else Glyphs.Info,
+                        listOfNotNull(c.state.name, c.reason, c.fix?.let { "→ $it" }).joinToString(" · "),
+                    ) {}
+                },
+        )
+    }
+    if (m.lab.isNotEmpty()) {
+        out += SettingCategory(
+            x("Lab"), Glyphs.Sliders,
+            listOf<SettingItem>(SettingItem.Action(x("Copy all results"), Glyphs.Info, "", onClick = { m.copyText(m.lab.joinToString("\n\n") { "${it.title}\n${it.result}" }) })) +
+                m.lab.map { e -> SettingItem.Action(e.title, Glyphs.Bolt, e.result, navigates = e.run != null, onClick = { e.run?.invoke() }) },
+        )
+    }
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(
         x("About"),
@@ -761,6 +790,8 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     cat("Radar")?.let { out += it }
     cat("Launchpad")?.let { out += it }
     out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
+    cat("Capabilities")?.let { out += it }
+    cat("Lab")?.let { out += it }
     cat("About")?.let { out += it }
     return out
 }

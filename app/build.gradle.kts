@@ -61,6 +61,9 @@ dependencies {
     implementation(project(":feature-search"))
     implementation(project(":feature-grid"))
     implementation(project(":shaders"))
+    implementation(project(":core-capabilities"))
+    implementation(project(":core-launch"))
+    implementation(project(":core-input"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.health.connect.client)

@@ -673,7 +673,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 underlay = true,
                 endInset = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.14f).dp,
             )
-            com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
+            com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
         }
         val slideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.86f
@@ -933,6 +933,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         DefaultLauncherBanner(
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding(),
         )
+        var safeDismissed by remember { mutableStateOf(false) }
+        if (com.bos.sphere.core.data.CrashLoopGuard.safeMode && !safeDismissed) {
+            androidx.compose.material3.Text(
+                L10n.tr("Safe mode: Liftoff restarted twice in a row, so widgets are off. Tap to carry on."),
+                color = Color.White, fontSize = 13f.let { androidx.compose.ui.unit.TextUnit(it, androidx.compose.ui.unit.TextUnitType.Sp) },
+                modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(12.dp)
+                    .background(Color(0xE6B3261E), androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                    .clickable { com.bos.sphere.core.data.CrashLoopGuard.clear(context); safeDismissed = true }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+        }
 
         // Built once per relevant change, not on every recomposition of the home (it is ~100 items
         // with lambdas, plus binder calls for the widget label and Health Connect availability).
@@ -953,7 +964,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 "Device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
             )
         }
-        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable) {
+        val capInputs = remember(settingsOpen, isLandscape) { com.bos.sphere.core.capabilities.CapabilityRegistry(context).snapshot() }
+        val capabilityRows = remember(capInputs) { com.bos.sphere.core.capabilities.CapabilityEvaluator.evaluate(capInputs) }
+        val labResults = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
+        val labEntries = com.bos.sphere.ui.rememberLabEntries(capInputs, labResults)
+        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }) {
             buildSettingsCategories(
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
@@ -991,6 +1006,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 setGesture = { g, item -> stores.shortcuts.setGesture(g, item) },
                 requestHealth = { requestHealth() },
                 about = about,
+                capabilities = capabilityRows,
+                copyText = { t -> (context.getSystemService(android.content.ClipboardManager::class.java)).setPrimaryClip(android.content.ClipData.newPlainText("Liftoff", t)) },
+                lab = labEntries,
                 healthAvailable = healthAvailable,
                 appsByKey = appsByKey,
                 isLandscape = isLandscape,

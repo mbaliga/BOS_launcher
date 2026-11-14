@@ -37,6 +37,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleAction(intent)
+        com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
+        window.decorView.postDelayed({ com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext) }, com.bos.sphere.core.data.CrashLoopMath.WINDOW_MS)
         // Apply theme and language before the first frame so there is no flash of defaults.
         LauncherStores.get(this).prefs.prefs.value.let { p ->
             HyleTheme.apply(

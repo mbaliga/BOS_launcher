@@ -44,10 +44,17 @@ fun SphereTheme(
             outline = HyleColors.Hairline,
         )
     }
-    MaterialTheme(
-        colorScheme = scheme,
-        typography = HyleTypography,
-        shapes = HyleShapes,
-        content = content,
-    )
+    // CFG-10: density and type scale apply to everything below, independently of each other.
+    val base = androidx.compose.ui.platform.LocalDensity.current
+    val (dk, fk) = ThemeScaleMath.factors(HyleScale.density, HyleScale.type)
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(base.density * dk, base.fontScale * fk),
+    ) {
+        MaterialTheme(
+            colorScheme = scheme,
+            typography = HyleTypography,
+            shapes = HyleShapes,
+            content = content,
+        )
+    }
 }

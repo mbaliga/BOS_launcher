@@ -69,6 +69,7 @@ dependencies {
     implementation(project(":core-signals"))
     implementation(project(":feature-dock"))
     implementation(project(":feature-desktop"))
+    implementation(project(":feature-launchpad"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.health.connect.client)

@@ -580,6 +580,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 ) { v -> upd { it.copy(themeMode = v) } },
             )
             add(SettingItem.Pane(x("Accent"), Glyphs.Palette, "") { ColorPicker(p.accentColor, { v -> upd { it.copy(accentColor = v) } }) })
+            add(SettingItem.Pane(x("Wallpaper palette, density and text size"), Glyphs.Dial, "") { ThemingPane() })
             add(
                 SettingItem.Choice(
                     x("Icon shape"), Glyphs.Apps, IconShape.entries, p.iconShape, { x(it.label) },

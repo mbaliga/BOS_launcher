@@ -1,6 +1,11 @@
 package com.bos.sphere
 
 import android.content.Intent
+import com.bos.sphere.feature.grid.SettingsPreviewDock
+import com.bos.sphere.feature.grid.captureHome
+import com.bos.sphere.ui.launchpadCloseDrag
+import com.bos.sphere.ui.launchpadEdgeDrag
+import com.bos.sphere.ui.launchpadShortcut
 import android.content.res.Configuration
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -458,6 +463,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         )
         L10n.setLanguage(prefs.language.code)
     }
+    com.bos.sphere.ui.ApplyTheming(prefs.themeMode, prefs.accentColor)
     val iconColors by stores.iconColors.colors.collectAsStateWithLifecycle()
     // HOM-16: with home over the system wallpaper, the accent is derived from it.
     val homeAccent = com.bos.sphere.feature.grid.rememberHomeAccent(prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, prefs.accentColor)
@@ -668,9 +674,21 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 .pointerInput(Unit) { detectTapGestures(onLongPress = { quickPage = null; quickOpen = true }) },
         )
     }
+    // STR-01: the home card follows a drag from the left edge, peeks and springs back, or opens Launchpad.
+    val reveal = com.bos.sphere.ui.rememberLaunchpadReveal(leftOpen) { leftOpen = it }
+    val revealLayout = com.bos.sphere.ui.RevealLayout.forWindow(
+        androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat(),
+        androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.toFloat(),
+    )
+    val revealSlideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * revealLayout.slideFraction
+    val launchpadShortcuts = remember { com.bos.sphere.core.input.ShortcutRegistry() }
+    val grantPrompter = com.bos.sphere.ui.rememberGrantPrompter()
+    val homeCapture = com.bos.sphere.feature.grid.rememberHomeCapture()
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
     Box(
-        modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController).leftSwipe(
+        modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
+            .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
+            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off, revealSlideDp).leftSwipe(
             enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen &&
                 (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous),
             atFirstPage = { true },
@@ -679,7 +697,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         ),
     ) {
         // The left page lies UNDER the home: the home slides right, casting a shadow onto it.
-        val leftProgress by animateFloatAsState(if (leftOpen) 1f else 0f, tween(300), label = "leftPage")
+        val leftProgress = reveal.progress
         val leftActive = leftOpen || leftProgress > 0.001f
         when (prefs.leftPage) {
             com.bos.sphere.core.data.LeftPage.Launchpad -> if (leftActive) com.bos.sphere.ui.LaunchpadPanel(
@@ -693,12 +711,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 modifier = Modifier.fillMaxSize(),
                 theme = prefs.launchpadTheme,
                 underlay = true,
-                endInset = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.14f).dp,
+                endInset = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * revealLayout.homeStripFraction).dp,
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
         }
-        val slideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.86f
+        val slideDp = revealSlideDp
         Box(
             Modifier.fillMaxSize().graphicsLayer {
                 // Home is the floating surface: it slides right, shrinks a touch and rounds its corners,
@@ -714,7 +732,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     spotShadowColor = Color.Black
                 }
             }
-                .then(if (leftActive) Modifier.background(Color.Black) else Modifier),
+                .then(if (leftActive) Modifier.background(Color.Black) else Modifier)
+                .captureHome(homeCapture),
         ) {
             when (prefs.homeStyle) {
                 HomeStyle.Grid -> if (prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
@@ -809,14 +828,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // The strip of home still showing: tap it, or drag it left, to bring the home back.
         if (leftOpen) {
             Box(
-                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width((androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.14f).dp)
+                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width((androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * revealLayout.homeStripFraction).dp)
                     .pointerInput(Unit) {
                         detectTapGestures(onTap = { leftOpen = false })
                     }
-                    .pointerInput(Unit) {
-                        var total = 0f
-                        detectHorizontalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total < -40f) leftOpen = false }) { _, d -> total += d }
-                    },
+                    .launchpadCloseDrag(reveal, revealSlideDp),
             )
         }
 
@@ -846,11 +862,22 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
         )
 
+        // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
+        com.bos.sphere.ui.MediaStripGrantPrompt(
+            visible = prefs.mediaControls && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen,
+            modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = 66.dp + bottomClear),
+        )
+
+        grantPrompter.Host()
+
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
         // (tap it, or swipe in from the left edge) so it is always discoverable.
         if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen) {
             if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && prefs.launchpadRail) {
                 com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(Alignment.CenterStart))
+            }
+            if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && !prefs.launchpadRail) {
+                com.bos.sphere.ui.LaunchpadWaitingIndicator(onOpen = { leftOpen = true }, modifier = Modifier.align(Alignment.CenterStart).padding(bottom = 260.dp))
             }
             Box(
                 Modifier.align(Alignment.CenterStart).padding(start = 2.dp).width(5.dp).height(64.dp)
@@ -936,7 +963,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },
             onOpenIntent = { i -> runCatching { context.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } },
-            onRequestContactsPermission = { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) },
+            onRequestContactsPermission = { grantPrompter.ask(com.bos.sphere.core.design.GrantKind.Contacts) { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) } },
             onDismiss = { searchOpen = false },
             modifier = Modifier.fillMaxSize(),
             settingsSource = settingsSource,
@@ -1074,6 +1101,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onClose = { settingsOpen = false },
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
+            previewDock = { SettingsPreviewDock(homeCapture) },
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {
@@ -1264,3 +1292,4 @@ private fun Modifier.leftSwipe(enabled: Boolean, atFirstPage: () -> Boolean, onO
             }
         }
     }
+

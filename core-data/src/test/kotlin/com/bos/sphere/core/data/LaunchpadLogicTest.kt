@@ -25,7 +25,7 @@ class LaunchpadLogicTest {
     )
 
     private fun apply(
-        list: List<HubNotification>, rules: List<Rule> = emptyList(), prefs: LaunchpadPrefs = LaunchpadPrefs(),
+        list: List<HubNotification>, rules: List<Rule> = emptyList(), prefs: LaunchpadPrefs = LaunchpadPrefs(GroupMode.Time),
     ) = LaunchpadLogic.apply(list, rules, prefs, now, zone, labelFor)
 
     // ---- groupByDay / counts / filter ----

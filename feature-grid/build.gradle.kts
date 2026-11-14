@@ -4,10 +4,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val robolectricRuntime: Configuration by configurations.creating { isTransitive = false }
+// One configuration per Android runtime: both artifacts share a module name, so a single configuration would
+// resolve only the newest and the other SDK's jar would be missing offline.
+val robolectricRuntime14: Configuration by configurations.creating { isTransitive = false }
+val robolectricRuntime15: Configuration by configurations.creating { isTransitive = false }
 val robolectricJarDir = layout.buildDirectory.dir("robolectric-jars")
 val robolectricJars = tasks.register<Copy>("robolectricJars") {
-    from(robolectricRuntime)
+    from(robolectricRuntime14)
+    from(robolectricRuntime15)
     into(robolectricJarDir)
 }
 
@@ -63,8 +67,8 @@ dependencies {
     // JVM screenshot smoke tests (Robolectric native graphics) — see ScreenshotTest.
     testImplementation(libs.robolectric)
     // The SDK the tests run on (34) and the one Robolectric loads the app package with (targetSdk 35).
-    robolectricRuntime("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
-    robolectricRuntime("org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
+    robolectricRuntime14("org.robolectric:android-all-instrumented:14-robolectric-10818077-i7")
+    robolectricRuntime15("org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

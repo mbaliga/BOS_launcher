@@ -99,9 +99,11 @@ object SystemStateLogic {
         return SystemSnapshot(now, pct, charging, conn, sound)
     }
 
-    /** An intent for [kind]'s panel, or null when nothing on the device handles it (the tile then stays display-only). */
-    fun intentFor(ctx: Context, kind: SystemTileKind): Intent? {
-        val i = Intent(panelFor(kind)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return i.takeIf { ctx.packageManager.queryIntentActivities(it, 0).isNotEmpty() }
-    }
+    /**
+     * An intent for [kind]'s panel. It is not pre-checked with queryIntentActivities: package visibility (Android 11+)
+     * would make that return nothing for system settings screens. The caller starts it inside runCatching, so a device
+     * with no handler simply does nothing.
+     */
+    fun intentFor(@Suppress("UNUSED_PARAMETER") ctx: Context, kind: SystemTileKind): Intent? =
+        Intent(panelFor(kind)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }

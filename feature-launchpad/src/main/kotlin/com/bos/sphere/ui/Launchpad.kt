@@ -269,7 +269,8 @@ fun LaunchpadPanel(
         val sys = rememberSystemSnapshot()
         LaunchedEffect(items) {
             LaunchpadSettings.pruneRead(items.map { it.key }.toSet())
-            LaunchpadSettings.pruneSnoozed(items.map { it.key }.toSet(), System.currentTimeMillis())
+            // An empty feed can be the listener reconnecting; do not forget snoozes because of it.
+            if (items.isNotEmpty()) LaunchpadSettings.pruneSnoozed(items.map { it.key }.toSet(), System.currentTimeMillis())
         }
 
         LaunchpadContent(

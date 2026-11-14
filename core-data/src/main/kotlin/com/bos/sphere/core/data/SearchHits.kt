@@ -27,6 +27,10 @@ data class SearchHit(
     val sourcePackage: String? = null,
     /** 0..1, higher is better; only used to order hits inside a category. */
     val score: Float = 0f,
+    /** What the primary action copies to the clipboard (calculator answers), if anything. */
+    val copyText: String? = null,
+    /** Provider-specific data for the runner (shortcut id, launcher command ...). Empty for ordinary hits. */
+    val extras: Map<String, String> = emptyMap(),
 )
 
 enum class HitKind { Action, Document, Image, Video, Audio, Archive, Folder, Web, Other }

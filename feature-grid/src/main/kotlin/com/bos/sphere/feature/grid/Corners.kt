@@ -127,7 +127,7 @@ fun rememberDisplayRotation(): Int {
 /** Label for a corner item (action name or app label). */
 fun itemLabel(item: CornerItem, appsByKey: Map<String, AppEntry>): String = when (item) {
     is CornerItem.Action -> com.bos.sphere.core.design.L10n.tr(item.id.label)
-    is CornerItem.App -> appsByKey[item.key]?.label ?: "Missing app"
+    is CornerItem.App -> com.bos.sphere.core.data.CornerShortcuts.parse(item.key)?.label?.takeIf { it.isNotBlank() } ?: appsByKey[item.key]?.label ?: "Missing app"
 }
 
 /** Glyph for an action, or the app's icon. */
@@ -154,7 +154,8 @@ fun ItemGlyph(
                 Icon(Glyphs.forAction(item.id), contentDescription = null, tint = tint, modifier = Modifier.size(size))
             }
         }
-        is CornerItem.App -> appsByKey[item.key]?.let { AppIcon(it, size) }
+        // A shortcut wears its app's icon.
+        is CornerItem.App -> (appsByKey[item.key] ?: com.bos.sphere.core.data.CornerShortcuts.parse(item.key)?.let { p -> appsByKey.values.firstOrNull { it.packageName == p.packageName } })?.let { AppIcon(it, size) }
             ?: Box(Modifier.size(size).background(HyleColors.Surface, CircleShape))
     }
 }

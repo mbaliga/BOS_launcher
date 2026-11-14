@@ -186,8 +186,17 @@ class ActionRunner(
         }
     }
 
+    private fun startShortcutKey(key: String): Boolean {
+        val p = CornerShortcuts.parse(key) ?: return false
+        val user = userManager.userProfiles.firstOrNull { it.hashCode() == p.userHash } ?: return false
+        return runCatching { launcherApps.startShortcut(p.packageName, p.shortcutId, null, null, user) }
+            .isSuccess.also { if (!it) toast("Shortcut not available") }
+    }
+
     /** Launches the app behind an [AppEntry.key] (`component#userHash`). */
     fun launchKey(key: String): Boolean {
+        // INP-15: an app shortcut assigned to a corner or gesture.
+        if (CornerShortcuts.isShortcut(key)) return startShortcutKey(key)
         launchHook?.let { hook -> return hook(key).also { if (it) onAppLaunched(key) else toast("App not available") } }
         val hashAt = key.lastIndexOf('#')
         if (hashAt <= 0) return false

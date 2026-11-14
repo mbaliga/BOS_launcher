@@ -57,6 +57,8 @@ fun HomeQuickSheet(
     onWallpaper: () -> Unit,
     onGroundControl: () -> Unit,
     onDismiss: () -> Unit,
+    /** Widgets, folders, links, icon pack and hidden apps (HOM-02 to HOM-07). */
+    onHomeItems: (() -> Unit)? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = HyleColors.Surface) {
         Column(Modifier.navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
@@ -98,6 +100,10 @@ fun HomeQuickSheet(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 BigButton(Modifier.weight(1f), Glyphs.Image, "Wallpaper", onWallpaper)
                 BigButton(Modifier.weight(1f), Glyphs.Gear, "Ground Control", onGroundControl)
+            }
+            if (onHomeItems != null) {
+                Spacer(Modifier.height(10.dp))
+                BigButton(Modifier.fillMaxWidth(), Glyphs.Plus, "Widgets, folders and icons", onHomeItems)
             }
         }
     }

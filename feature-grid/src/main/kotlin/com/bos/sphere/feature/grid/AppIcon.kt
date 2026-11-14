@@ -97,7 +97,8 @@ fun AppIcon(
     size: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val cacheKey = app.key
+    val sources = LocalIconSources.current
+    val cacheKey = sources.cacheKey(app)
     // One bitmap per app: a reused slot never shows the previous app's bitmap, and no size or
     // theme change ever re-rasterises.
     var bitmap by remember(app, cacheKey) { mutableStateOf(IconCache.get(cacheKey)) }
@@ -105,7 +106,7 @@ fun AppIcon(
         if (bitmap == null) {
             bitmap = withContext(Dispatchers.Default) {
                 runCatching {
-                    app.loadIcon()?.let { IconCache.rasterize(it, ICON_PX, cacheKey).asImageBitmap() }
+                    sources.rasterize(app, ICON_PX, cacheKey)?.asImageBitmap()
                 }.getOrNull()?.also { IconCache.put(cacheKey, it) }
             }
         }

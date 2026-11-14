@@ -14,6 +14,8 @@ import kotlin.math.roundToInt
 class IconPackMap(val packageName: String, private val entries: Map<String, String>) {
     val size: Int get() = entries.size
     fun drawableFor(component: String): String? = entries[component]
+    /** Every distinct drawable the pack maps, sorted (for the per-item icon picker). */
+    fun drawables(): List<String> = entries.values.distinct().sorted()
     fun drawableFor(packageName: String, className: String): String? = entries["$packageName/$className"]
 
     companion object {

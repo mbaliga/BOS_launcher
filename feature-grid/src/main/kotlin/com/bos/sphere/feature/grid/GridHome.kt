@@ -83,6 +83,7 @@ import com.bos.sphere.core.data.HomeTiles
 import com.bos.sphere.core.data.HomeGesture
 import com.bos.sphere.core.data.HomeLayoutMath
 import com.bos.sphere.core.data.HomePage
+import com.bos.sphere.core.catalog.SpanGrid
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.PageLayout
 import com.bos.sphere.core.data.PageShape
@@ -216,8 +217,11 @@ fun GridHome(
     onTileLongPress: (key: String, page: Int) -> Unit,
     weather: com.bos.sphere.core.data.WeatherInfo? = null,
     health: com.bos.sphere.core.data.HealthToday? = null,
+    /** HOM-01 / HOM-02 / HOM-08: folders, shortcuts, links and widget tiles that share the pages with apps. */
+    extras: HomeExtras? = null,
     modifier: Modifier = Modifier,
 ) {
+    val ex by rememberUpdatedState(extras)
     val paging = prefs.pagingFor(isLandscape)
     val pagerState = state.pager
     // The whole surface is laid out in physical (LTR) coordinates — geometry, hit-testing and
@@ -302,7 +306,7 @@ fun GridHome(
         val base = dragBase.getOrNull(tp)
         val remaining = base?.keys?.count { it != key } ?: 0
         val local = dragPos - contentOffset
-        val idx = geomFor(tp, base?.copy(keys = base.keys.filter { it != key })).nearest(local.x, local.y).coerceAtMost(remaining)
+        val idx = dropIndex(geomFor(tp, base?.copy(keys = base.keys.filter { it != key })), base?.keys?.filter { it != key }.orEmpty(), key, extras, local.x, local.y).coerceAtMost(remaining)
         return tp to idx
     }
 
@@ -342,7 +346,12 @@ fun GridHome(
         GestureInputs(pages, appsByKey, suggestion, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl, contentOffset),
     )
     val cb by rememberUpdatedState(
-        GestureCallbacks(onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap, onTileTap, onTileLongPress, capacityOf, ::focusCover),
+        GestureCallbacks(
+            onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap,
+            { k -> ex?.takeIf { it.owns(k) }?.onTap(k) ?: onTileTap(k) },
+            { k, p -> ex?.takeIf { it.owns(k) }?.onLongPress(k) ?: onTileLongPress(k, p) },
+            capacityOf, ::focusCover,
+        ),
     )
 
     fun hitTest(page: Int, screenPos: Offset): Hit {
@@ -354,7 +363,7 @@ fun GridHome(
         val slot = geom.slotAt(pos.x, pos.y)
         if (slot < 0) return Hit.Empty
         if (geom is PageGeometry.Coverflow && slot != kotlin.math.round(coverPosition).toInt()) return Hit.Focus(page, slot)
-        p.keys.getOrNull(slot)?.let { return if (HomeTiles.isTile(it)) Hit.Tile(it) else Hit.App(it) }
+        keyAtSlot(p, geom, slot, ex)?.let { return if (HomeTiles.isTile(it) || ex?.owns(it) == true) Hit.Tile(it) else Hit.App(it) }
         val sug = s.suggestion
         if (page == 0 && sug != null && s.prefs.showSuggestion && slot == p.keys.size) return Hit.Suggested(sug)
         return Hit.Empty
@@ -381,7 +390,7 @@ fun GridHome(
                         val rest = base?.keys?.filter { it != key }.orEmpty()
                         val geom = PageGeometry.of(base?.layout ?: PageLayout(), s.areaSize, s.prefs, s.landscape, rest.size, clampedCover(s.coverPos, tp, base))
                         val local = dragPos - s.contentOffset
-                        return tp to geom.nearest(local.x, local.y).coerceAtMost(rest.size)
+                        return tp to dropIndex(geom, rest, key, ex, local.x, local.y).coerceAtMost(rest.size)
                     }
                     val slop = viewConfiguration.touchSlop
                     val swipeMin = 56.dp.toPx()
@@ -513,7 +522,7 @@ fun GridHome(
                                     is Hit.Focus -> st.pages.getOrNull(hit.page)?.keys?.getOrNull(hit.index)
                                         ?.let { if (HomeTiles.isTile(it)) Hit.Tile(it) else Hit.App(it) } ?: Hit.Empty
                                     else -> hit
-                                }
+                                }.let { h -> if (h is Hit.Tile && ex?.owns(h.key) == true && ex?.isWidget(h.key) == false) Hit.App(h.key) else h }
                                 when (pressed) {
                                     is Hit.Focus -> Unit
                                     Hit.Empty -> {
@@ -568,12 +577,19 @@ fun GridHome(
                                             val key = dragKey
                                             if (key != null) {
                                                 val (tp, idx) = dropTargetNow()
-                                                cb.onPagesChange(HomeLayoutMath.move(dragBase, key, tp, idx, cb.capacityOf, dropEmpty = true))
+                                                // HOM-04: ending on another item's centre files into a folder instead of reordering.
+                                                val onto = dropOntoTarget(
+                                                    ex, dragBase.getOrNull(tp),
+                                                    PageGeometry.of(dragBase.getOrNull(tp)?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, dragBase.getOrNull(tp)?.keys?.size ?: 0, clampedCover(st.coverPos, tp, dragBase.getOrNull(tp))),
+                                                    dragPos - st.contentOffset, key,
+                                                )
+                                                if (onto != null) ex?.onDropOnto?.invoke(key, onto)
+                                                else cb.onPagesChange(HomeLayoutMath.move(dragBase, key, tp, idx, cb.capacityOf, dropEmpty = true))
                                             }
                                             dragKey = null
                                             dragBase = emptyList()
                                         } else {
-                                            st.apps[pressed.key]?.let(cb.onAppLongPress)
+                                            st.apps[pressed.key]?.let(cb.onAppLongPress) ?: ex?.onLongPress?.invoke(pressed.key)
                                         }
                                     }
                                 }
@@ -617,6 +633,7 @@ fun GridHome(
                     onLaunch = onLaunch,
                     onLongPress = onAppLongPress,
                     onItemFocused = { if (pagerState.currentPage != index) scope.launch { pagerState.animateScrollToPage(index) } },
+                    extras = extras,
                 )
             }
             GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.animateScrollToPage(it) } })
@@ -654,6 +671,7 @@ fun GridHome(
                     ghost != null -> AppIcon(ghost, iconDp, ghostModifier)
                     key == HomeTiles.CLOCK -> ClockTile(iconDp, ghostModifier)
                     key == HomeTiles.SETTINGS -> SettingsTile(iconDp, ghostModifier)
+                    extras?.owns(key) == true -> ExtraItemFace(key, extras, iconDp, ghostModifier)
                 }
             }
         }
@@ -725,8 +743,10 @@ private fun PageView(
     modifier: Modifier = Modifier,
     /** Keyboard focus reached an item: bring its page into view. */
     onItemFocused: () -> Unit = {},
+    extras: HomeExtras? = null,
 ) {
     val density = LocalDensity.current
+    val packed = spanPacked(page, geometry, extras)
     Box(modifier.fillMaxSize()) {
         if (geometry is PageGeometry.Circle) {
             // Faint ring guides for circular pages.
@@ -738,14 +758,21 @@ private fun PageView(
             }
         }
         page.keys.forEachIndexed { index, itemKey ->
-            if (index >= geometry.capacity) return@forEachIndexed
+            val extra = extras?.takeIf { it.owns(itemKey) }
+            val place = packed?.placed?.firstOrNull { it.key == itemKey }
+            if (packed != null && place == null) return@forEachIndexed // packed off this page: it reflows to the next
+            if (packed == null && index >= geometry.capacity) return@forEachIndexed
+            val slot = if (place != null) SpanGrid.cellOf(place, (geometry as PageGeometry.Grid).g.columns) else index
             val app = appsByKey[itemKey]
-            if (app == null && !HomeTiles.isTile(itemKey)) return@forEachIndexed
+            if (app == null && extra == null && !HomeTiles.isTile(itemKey)) return@forEachIndexed
             if (geometry is PageGeometry.Coverflow && !geometry.c.visible(index)) return@forEachIndexed
             key(itemKey) {
+                if (extra != null && extra.isWidget(itemKey) && place != null && geometry is PageGeometry.Grid) {
+                    WidgetSlot(itemKey, extra, place, geometry, onItemFocused)
+                } else {
                 val itemPx = if (geometry is PageGeometry.Coverflow) geometry.c.sizeAt(index) else geometry.iconPx
                 val itemDp = with(density) { itemPx.toDp() }
-                val center = geometry.center(index)
+                val center = geometry.center(slot)
                 val target = IntOffset((center.x - itemPx / 2).roundToInt(), (center.y - itemPx / 2).roundToInt())
                 // Coverflow follows the finger directly; grid/circle items glide to new slots.
                 val animated = geometry !is PageGeometry.Coverflow
@@ -770,14 +797,18 @@ private fun PageView(
                         }
                         .launcherItem(
                             "grid.$itemKey", onFocused = onItemFocused,
-                            onActivate = app?.let { a -> { onLaunch(a) } },
-                            onMenu = app?.let { a -> { onLongPress(a) } },
+                            onActivate = app?.let { a -> { onLaunch(a) } } ?: extra?.let { e -> { e.onTap(itemKey) } },
+                            onMenu = app?.let { a -> { onLongPress(a) } } ?: extra?.let { e -> { e.onLongPress(itemKey) } },
                         )
                         .semantics(mergeDescendants = true) {
                             if (app != null) {
                                 contentDescription = app.label
                                 onClick { onLaunch(app); true }
                                 customActions = listOf(CustomAccessibilityAction("Options") { onLongPress(app); true })
+                            } else if (extra != null) {
+                                contentDescription = extraLabel(itemKey, extra)
+                                onClick { extra.onTap(itemKey); true }
+                                customActions = listOf(CustomAccessibilityAction("Options") { extra.onLongPress(itemKey); true })
                             } else {
                                 contentDescription = "Clock"
                             }
@@ -790,9 +821,13 @@ private fun PageView(
                     } else if (itemKey == HomeTiles.SETTINGS) {
                         SettingsTile(itemDp, Modifier.size(itemDp))
                         if (showLabels) AppLabel(L10n.tr("Settings"), itemDp)
+                    } else if (extra != null) {
+                        ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp))
+                        if (showLabels && !cf) AppLabel(extraLabel(itemKey, extra), itemDp)
                     } else {
                         ClockTile(itemDp, Modifier.size(itemDp))
                     }
+                }
                 }
             }
         }
@@ -1005,5 +1040,24 @@ fun HomeClock(onTap: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .semantics { contentDescription = "Time $text" }
             .pointerInput(Unit) { detectTapGesturesSimple(onTap) },
+    )
+}
+
+/** HOM-08: a widget tile in its span box on a grid page. */
+@Composable
+private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit) {
+    val density = LocalDensity.current
+    val g = geometry.g
+    val slot = com.bos.sphere.core.catalog.SpanGrid.cellOf(place, g.columns)
+    val pad = g.base * 0.04f
+    val wPx = place.span.cols * g.pitchX - 2 * pad
+    val hPx = place.span.rows * g.pitchY - 2 * pad
+    val left = g.cellLeft(slot) + pad
+    val top = g.cellTop(slot) + pad
+    HomeWidgetCell(
+        itemKey, extra, g.pitchX, g.pitchY,
+        Modifier.offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+            .size(with(density) { wPx.toDp() }, with(density) { hPx.toDp() })
+            .launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) }, focusable = false),
     )
 }

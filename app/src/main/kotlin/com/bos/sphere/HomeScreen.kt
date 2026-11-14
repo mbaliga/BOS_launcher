@@ -209,8 +209,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // INP-15: one set of corner assignments, or a separate landscape set; every corner style draws whichever is active.
     val corners = com.bos.sphere.core.data.CornerSets.select(portraitCorners, landscapeCorners, prefs.cornersPerOrientation, isLandscape)
     val capacityOf: (PageLayout) -> Int = { it.capacity(isLandscape, prefs) }
-    val allPages = remember(layout, apps, isLandscape, prefs) {
-        HomeLayoutMath.visualPages(layout, apps.map { it.key }, capacityOf, autoPlace = prefs.appsOnHome == AppsOnHome.Everything)
+    // HOM-01 / HOM-02: folders, shortcuts, links and widget tiles share the pages with apps on every home style.
+    val extrasStore = remember { com.bos.sphere.core.catalog.HomeExtrasStore(context) }
+    val extrasState by extrasStore.state.collectAsStateWithLifecycle()
+    val allPages = remember(layout, apps, isLandscape, prefs, extrasState) {
+        com.bos.sphere.core.catalog.SpanReflow.reflow(
+            HomeLayoutMath.visualPages(
+                com.bos.sphere.core.catalog.HomeResolve.layoutFor(layout, extrasState),
+                com.bos.sphere.core.catalog.HomeResolve.available(apps.map { it.key }, extrasState),
+                capacityOf, autoPlace = prefs.appsOnHome == AppsOnHome.Everything,
+            ),
+            extrasState::spanOf,
+        ) { l -> l.gridFor(isLandscape, prefs).let { it.columns to it.rows } }
     }
     // A fresh "only the ones I add" home isn't blank: Settings, Phone and Messages are put there once.
     LaunchedEffect(prefs.appsOnHome, apps.isNotEmpty()) {
@@ -230,9 +240,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val pages = remember(allPages, prefs.pageMode) { if (prefs.pageMode == PageMode.Single) allPages.take(1) else allPages }
     // Stored keys that can't be drawn right now (hidden apps, a paused work profile, pages hidden by
     // "one page"): every save keeps them.
-    val preserve = remember(layout, apps, allPages, pages) {
-        layout.pages.flatMapTo(HashSet()) { it.keys } - appsByKey.keys - HomeTiles.ALL.toSet() +
-            allPages.drop(pages.size).flatMap { it.keys }
+    val preserve = remember(layout, apps, allPages, pages, extrasState) {
+        com.bos.sphere.core.catalog.HomeResolve.preserve(
+            layout.pages.flatMapTo(HashSet()) { it.keys } - appsByKey.keys - HomeTiles.ALL.toSet() +
+                allPages.drop(pages.size).flatMap { it.keys },
+            extrasState,
+            allPages.drop(pages.size).flatMapTo(HashSet()) { it.keys },
+        )
     }
     fun savePages(visual: List<com.bos.sphere.core.data.HomePage>) = stores.layout.setPages(visual, preserve)
 
@@ -441,6 +455,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
     }
     var pickingLeft by remember { mutableStateOf(false) }
+    val homeItems = rememberHomeItems(
+        store = extrasStore, pages = pages, savePages = ::savePages, capacityOf = capacityOf, currentPage = { gridState.currentPage },
+        host = widgetHost, allApps = allApps, appsByKey = appsByKey, launchApp = ::launch, accentArgb = prefs.accentColor.toInt(),
+        gridDims = { pages.getOrNull(gridState.currentPage)?.layout?.gridFor(isLandscape, prefs)?.let { it.columns to it.rows } ?: (prefs.gridFor(isLandscape).let { it.columns to it.rows }) },
+    )
     var leftWidgetLabel by remember { mutableStateOf<String?>(null) }
     val widgetPicker = rememberWidgetPicker(widgetHost) { id, label ->
         if (pickingLeft) {
@@ -698,7 +717,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val stripH = com.bos.sphere.feature.grid.stripHeight(prefs)
     val scrollTop = if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Top) maxOf(frame, stripH + 14.dp) else frame
     val scrollBottom = bottomClear + frame
-    val scrollPadding = androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = scrollTop, bottom = scrollBottom)
+    val scrollPadding = homeItems.padFor(
+        androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = scrollTop, bottom = scrollBottom),
+        cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), homeItems.topLevelKeys(layout.pages), prefs.homeStyle,
+    )
     // The PSP bar has no reliable empty space to long-press: holding the top band (clock area) opens Settings.
     @Composable
     fun BoxScope.SettingsHoldBand() {
@@ -718,7 +740,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val launchpadShortcuts = remember { com.bos.sphere.core.input.ShortcutRegistry() }
     val grantPrompter = com.bos.sphere.ui.rememberGrantPrompter()
     val homeCapture = com.bos.sphere.feature.grid.rememberHomeCapture()
-    CompositionLocalProvider(LocalIconTheme provides iconTheme) {
+    CompositionLocalProvider(LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources) {
     Box(
         modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
@@ -810,6 +832,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onTileLongPress = { key, _ -> tileMenu = key },
                             weather = weather,
                             health = health,
+                            extras = homeItems.homeExtras,
                         )
                     }
                     Corners()
@@ -856,6 +879,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
                 }
+            }
+            // HOM-08: widgets and the item strip live in a band on the scrolling homes, never over their tiles.
+            if (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
+                homeItems.Band(layout.pages, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), prefs.homeStyle)
             }
 
         }
@@ -1160,7 +1187,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onToggleHidden = { hiddenStore.setHidden(app.key, app.key !in hidden); menuApp = null },
                 onIconColor = { colorApp = app; menuApp = null },
                 extraEntries = com.bos.sphere.feature.dock.AppActionList.build(appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect()) { menuApp = null }
-                    .map { it.label to it.run },
+                    .map { it.label to it.run } + homeItems.appMenuEntries(app) { menuApp = null },
                 onHomeSettings = if (!prefs.isPaged) {
                     { menuApp = null; openSettings(CATEGORY_HOME) }
                 } else null,
@@ -1238,6 +1265,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onWallpaper = { quickOpen = false; openSettings(categories.indexOfFirst { it.title == L10n.tr("Look") }.coerceAtLeast(0)) },
                 onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
                 onDismiss = { quickOpen = false },
+                onHomeItems = { quickOpen = false; homeItems.openSheet() },
             )
         }
         if (!prefs.onboardingDone) {
@@ -1251,6 +1279,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onDone = { stores.prefs.update { it.copy(onboardingDone = true) } },
             )
         }
+        homeItems.Overlays(hiddenStore, hidden)
         tileMenu?.let { key ->
             TileMenuDialog(
                 title = if (key == HomeTiles.CLOCK) "Clock tile" else "Tile",

@@ -27,7 +27,7 @@ object L10n {
     fun effectiveLanguage(): String = language.ifEmpty { Locale.getDefault().language }
 
     /** Every English key that has a translation. */
-    val englishKeys: Set<String> get() = L10nEnglish + L10nMoreEnglish + L10nMore2English + L10nMore3English + L10nLaunchpadEnglish + L10nInputEnglish + L10nStateEnglish + L10nBackupEnglish + L10nStrWave2English + L10nNfrEnglish
+    val englishKeys: Set<String> get() = L10nEnglish + L10nMoreEnglish + L10nMore2English + L10nMore3English + L10nLaunchpadEnglish + L10nInputEnglish + L10nStateEnglish + L10nBackupEnglish + L10nStrWave2English + L10nNfrEnglish + L10nWave2FillEnglish
 
     /** The translation table for a language code, or null for English / unknown codes. */
     fun tableFor(code: String): Map<String, String>? = merged[code]
@@ -36,7 +36,7 @@ object L10n {
         mapOf(
             "es" to L10nEs, "fr" to L10nFr, "de" to L10nDe, "pt" to L10nPt,
             "hi" to L10nHi, "zh" to L10nZh, "ja" to L10nJa, "ar" to L10nAr,
-        ).mapValues { (code, base) -> base + (L10nMore[code] ?: emptyMap()) + (L10nMore2[code] ?: emptyMap()) + (L10nMore3[code] ?: emptyMap()) + (L10nLaunchpad[code] ?: emptyMap()) + (L10nState[code] ?: emptyMap()) + (L10nBackup[code] ?: emptyMap()) + (L10nInput[code] ?: emptyMap()) + (L10nStrWave2[code] ?: emptyMap()) + (L10nNfr[code] ?: emptyMap()) }
+        ).mapValues { (code, base) -> base + (L10nMore[code] ?: emptyMap()) + (L10nMore2[code] ?: emptyMap()) + (L10nMore3[code] ?: emptyMap()) + (L10nLaunchpad[code] ?: emptyMap()) + (L10nState[code] ?: emptyMap()) + (L10nBackup[code] ?: emptyMap()) + (L10nInput[code] ?: emptyMap()) + (L10nStrWave2[code] ?: emptyMap()) + (L10nNfr[code] ?: emptyMap()) + (L10nWave2Fill[code] ?: emptyMap()) }
     }
 
     /** Translate [english] (reads [language], so it is snapshot-aware). */

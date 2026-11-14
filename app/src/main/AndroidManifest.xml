@@ -98,7 +98,10 @@
             android:taskAffinity="com.bos.sphere.desktop"
             android:windowSoftInputMode="adjustNothing"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection"
-            android:theme="@style/Theme.SphereLauncher" />
+            android:theme="@style/Theme.SphereLauncher">
+            <!-- EXT-05: a sensible freeform window, never smaller than the compact layout is tested for. -->
+            <layout android:defaultWidth="960dp" android:defaultHeight="600dp" android:minWidth="360dp" android:minHeight="320dp" android:gravity="center" />
+        </activity>
 
         <!-- The phone as trackpad and keyboard for the desktop surface (EXT-10). -->
         <activity

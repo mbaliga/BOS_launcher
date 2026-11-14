@@ -123,7 +123,7 @@ object AutomationIntents {
 
     /** Resolves a target given by id or by name against the saved state; null when nothing matches. */
     fun resolve(t: RunTarget, s: DockWorkspaceState): RunTarget? = when (t.kind) {
-        RunKind.Workspace -> s.workspaces.firstOrNull { it.id == t.id || it.name.equals(t.id, true) }?.let { RunTarget(t.kind, it.id) }
+        RunKind.Workspace -> if (t.id == WorkspaceRefs.NEXT || t.id == WorkspaceRefs.PREVIOUS) t else s.workspaces.firstOrNull { it.id == t.id || it.name.equals(t.id, true) }?.let { RunTarget(t.kind, it.id) }
         RunKind.Group -> s.groups.firstOrNull { it.id == t.id || it.name.equals(t.id, true) }?.let { RunTarget(t.kind, it.id) }
         RunKind.Session -> s.sessions.firstOrNull { it.id == t.id || it.name.equals(t.id, true) }?.let { RunTarget(t.kind, it.id) }
         RunKind.App -> t

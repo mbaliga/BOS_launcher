@@ -3,6 +3,9 @@ package com.bos.sphere.feature.dock
 import android.content.res.Configuration
 import android.os.SystemClock
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -50,6 +53,9 @@ class DockController {
         internal set
     internal var launchNth: (Int) -> Boolean = { false }
     internal var step: (Int) -> Boolean = { false }
+
+    /** Lets a host that has no dock on screen still step workspaces from the shortcut keys (WSP-07). */
+    fun bindWorkspaceStep(f: (Int) -> Boolean) { step = f }
     private val dock = DockCommandHandler(focusDock = { focusRequest++ }, launchNth = { launchNth(it) })
 
     /** True when the command was the dock's (or a workspace switch) and has been handled. */
@@ -94,6 +100,10 @@ fun DockHost(
     labelOfOther: (DockItemRef) -> String? = { null },
     onLaunchOther: (DockItemRef) -> Unit = {},
     onRunGroup: (com.bos.sphere.core.launch.AppGroup) -> Unit = {},
+    /** A desktop surface always shows its dock; the tier default only decides for the phone's home (DCK-04, DCK-07). */
+    forceEnabled: Boolean = false,
+    /** The edge the host surface reserved for this rail; the desktop surface decides its own (EXT-09). */
+    edgeOverride: DockEdge? = null,
 ) {
     val context = LocalContext.current
     val manager = remember { WorkspaceRepository.get(context) }
@@ -101,7 +111,7 @@ fun DockHost(
     val configuration = LocalConfiguration.current
     val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val tier = remember(configuration.screenWidthDp, refreshKey) { CapabilityEvaluator.tier(launcher.inputs()) }
-    if (!state.dock.isEnabled(tier)) return
+    if (!forceEnabled && !state.dock.isEnabled(tier)) return
 
     val hub = remember { DockHubHolder.hub(manager) }
     val instance = remember(displayId) { hub.forDisplay(displayId) }
@@ -167,7 +177,7 @@ fun DockHost(
             onMediaOpen = { MediaSignals.open(context) },
         )
     }
-    val edge = state.dock.edgeFor(landscape)
+    val edge = edgeOverride ?: state.dock.edgeFor(landscape)
     DockRail(
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
         focusRequest = controller.focusRequest, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge),
@@ -187,6 +197,27 @@ private fun DockIcon(item: DockItem, byKey: Map<String, AppEntry>, size: Dp) {
     val bmp by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, item.ref) {
         value = entry?.let { e -> withContext(Dispatchers.Default) { runCatching { e.loadIcon()?.toBitmap(96, 96)?.asImageBitmap() }.getOrNull() } }
     }
-    Box(Modifier.size(size)) { bmp?.let { Image(it, item.label, Modifier.size(size)) } }
+    Box(Modifier.size(size), contentAlignment = androidx.compose.ui.Alignment.Center) {
+        if (entry != null) bmp?.let { Image(it, item.label, Modifier.size(size)) }
+        else {
+            // Groups, shortcuts and the desktop item have no app icon: a tile with the label's initials, so they are never blank (WSP-05).
+            Box(
+                Modifier.size(size).clip(androidx.compose.foundation.shape.RoundedCornerShape(size / 4)).background(com.bos.sphere.core.design.HyleColors.Violet.copy(alpha = 0.85f)),
+                contentAlignment = androidx.compose.ui.Alignment.Center,
+            ) { androidx.compose.material3.Text(DockInitials.of(item.label), color = com.bos.sphere.core.design.HyleColors.OnAccent, fontSize = (size.value * 0.36f).sp) }
+        }
+    }
+}
+
+object DockInitials {
+    /** One or two capitals from the label; "?" for an empty one. */
+    fun of(label: String): String {
+        val words = label.trim().split(' ', '-', '_').filter { it.isNotEmpty() }
+        return when {
+            words.isEmpty() -> "?"
+            words.size == 1 -> words[0].take(2).replaceFirstChar { it.uppercase() }
+            else -> (words[0].take(1) + words[1].take(1)).uppercase()
+        }
+    }
 }
 

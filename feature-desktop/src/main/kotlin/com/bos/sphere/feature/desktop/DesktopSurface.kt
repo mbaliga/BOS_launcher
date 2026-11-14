@@ -79,8 +79,10 @@ private class Target(val rect: FRect, val layer: Int, val action: () -> Unit, va
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity: String, displayName: String) {
+fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity: String, displayName: String, token: Any? = null) {
     val context = LocalContext.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    var settingsOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val repo = remember { LauncherAppsAppRepository(context) }
@@ -155,12 +157,16 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
     LaunchedEffect(sizePx) { cursor.resize(sizePx.width.toFloat().coerceAtLeast(1f), sizePx.height.toFloat().coerceAtLeast(1f)) }
     LaunchedEffect(Unit) {
         DesktopInputBus.commands.collect { cmd ->
+            // Only the focused surface reacts, so two displays never both follow the phone's trackpad (EXT-03).
+            if (!DesktopSurfaces.isFocused(token)) return@collect
             val layer = if (drawerOpen) 1 else 0
             fun hit() = HitTest.itemAt(cursor.x, cursor.y, targets.filter { it.value.layer == layer }.map { it.key to it.value.rect })
             when (cmd) {
                 is InputCommand.Move -> { cursor.move(cmd.dx, cmd.dy); cursorPos = Offset(cursor.x, cursor.y) }
-                InputCommand.Click -> { menuKey = null; hit()?.let { targets[it]?.action?.invoke() } ?: run { if (drawerOpen) drawerOpen = false } }
-                InputCommand.SecondaryClick -> hit()?.let { k -> targets[k]?.secondary?.invoke() }
+                // Anything the surface registered is clicked directly; everything else (the dock, menus) gets a real touch at the cursor,
+                // delivered to this window's own views only (EXT-10).
+                InputCommand.Click -> { menuKey = null; hit()?.let { targets[it]?.action?.invoke() } ?: run { if (drawerOpen) drawerOpen = false else SyntheticTouch.tap(view, cursor.x, cursor.y) } }
+                InputCommand.SecondaryClick -> hit()?.let { k -> targets[k]?.secondary?.invoke() } ?: run { if (!drawerOpen) SyntheticTouch.longPress(view, cursor.x, cursor.y) }
                 is InputCommand.Scroll -> if (drawerOpen) scope.launch { gridState.scrollBy(cmd.dy * 3f) }
                 is InputCommand.Text -> { if (!drawerOpen) drawerOpen = true; query += cmd.text }
                 is InputCommand.Key -> when (cmd.key) {
@@ -257,7 +263,22 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
             }
         }
         AllAppsButton(layout, density, onClick = { drawerOpen = true }) { c -> targets["allapps"] = Target(c, 0, { drawerOpen = true }, null) }
-        StatusChip(displayName, layout.sizeClass, Modifier.align(Alignment.TopEnd).padding(top = with(density) { insets.top.toDp() } + 8.dp, end = with(density) { insets.right.toDp() } + 12.dp))
+        StatusChip(displayName, layout.sizeClass, Modifier.align(Alignment.TopEnd).padding(top = with(density) { insets.top.toDp() } + 8.dp, end = with(density) { insets.right.toDp() } + 12.dp)
+            .clip(RoundedCornerShape(8.dp)).combinedClickable(onClick = { settingsOpen = !settingsOpen })
+            .onGloballyPositioned { c -> targets["status"] = Target(c.boundsInRoot().let { FRect(it.left, it.top, it.right, it.bottom) }, 0, { settingsOpen = !settingsOpen }, null) })
+        if (settingsOpen) {
+            DisposableEffect(Unit) { onDispose { targets.remove("status-close") } }
+            // EXT-09: density and dock position of this display, remembered per display identity.
+            Column(
+                Modifier.align(Alignment.TopEnd).padding(top = with(density) { insets.top.toDp() } + 40.dp, end = with(density) { insets.right.toDp() } + 12.dp)
+                    .clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface).padding(14.dp),
+            ) {
+                DisplayProfileEditor(displayName, profile, { commit(it) })
+                Text(L10n.tr("Close"), color = MaterialTheme.colorScheme.primary, fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 8.dp).combinedClickable(onClick = { settingsOpen = false })
+                        .onGloballyPositioned { c -> targets["status-close"] = Target(c.boundsInRoot().let { FRect(it.left, it.top, it.right, it.bottom) }, 0, { settingsOpen = false }, null) })
+            }
+        }
 
         if (drawerOpen) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).combinedClickable(onClick = { drawerOpen = false; query = "" })) {

@@ -21,16 +21,25 @@ import kotlinx.coroutines.launch
 object RunTargets {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    fun run(context: Context, target: RunTarget, launcher: AppLauncher = AppLauncher(context), onDone: () -> Unit = {}) {
+    fun run(context: Context, target: RunTarget, launcherIn: AppLauncher? = null, onDone: () -> Unit = {}) {
+        val launcher by lazy { launcherIn ?: AppLauncher(context) }
         val mgr = WorkspaceRepository.get(context)
         val state = mgr.current
         when (target.kind) {
-            RunKind.Workspace -> { mgr.switchTo(target.id); onDone() }
+            RunKind.Workspace -> {
+                when (target.id) { WorkspaceRefs.NEXT -> mgr.next(); WorkspaceRefs.PREVIOUS -> mgr.previous(); else -> mgr.switchTo(target.id) }
+                onDone()
+            }
             RunKind.Group -> state.groups.firstOrNull { it.id == target.id }?.let { g -> scope.launch { try { launcher.runGroup(g) } finally { onDone() } } } ?: onDone()
             RunKind.Session -> state.sessions.firstOrNull { it.id == target.id }?.let { s -> scope.launch { try { launcher.restore(s) } finally { onDone() } } } ?: onDone()
             RunKind.App -> { AppKeys.target(target.id)?.let { launcher.launch(LaunchRequest(it)) }; onDone() }
         }
     }
+}
+
+/** The explicit intent that runs a target through [RunActivity]; also what palette results use. */
+object ScheduleNotificationsApi {
+    fun runIntent(context: Context, target: RunTarget): Intent = ScheduleNotifications.runIntent(context, target)
 }
 
 internal object ScheduleNotifications {
@@ -110,7 +119,7 @@ class AutomationReceiver : BroadcastReceiver() {
         ) ?: return
         val mgr = WorkspaceRepository.get(context)
         val target = AutomationIntents.resolve(raw, mgr.current) ?: return
-        if (target.kind == RunKind.Workspace) mgr.switchTo(target.id)
+        if (target.kind == RunKind.Workspace) RunTargets.run(context, target)
         else ScheduleNotifications.post(context, "Open " + (intent.getStringExtra(AutomationIntents.EXTRA_NAME) ?: target.id), target)
     }
 }

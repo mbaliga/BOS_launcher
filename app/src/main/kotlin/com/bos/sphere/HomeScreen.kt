@@ -264,7 +264,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // Launch control and dock (WSP-01, WSP-06, DCK): every launch goes through the launch layer.
     val rootView = androidx.compose.ui.platform.LocalView.current
     val appLauncher = remember { com.bos.sphere.feature.dock.AppLauncher(context, rootView = { rootView }) }
-    val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch { IntArray(2).also { rootView.getLocationOnScreen(it) }.let { it[0] to it[1] } } }
+    val lastTouch = remember { com.bos.sphere.ui.homeLastTouch { rootView } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.core.input.ShortcutRegistry() }
     fun launch(app: AppEntry) {
@@ -402,10 +402,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.input.LauncherCommand.OpenPuck -> { drawerOpen = false; wheelAnchor = Corner.BottomLeft; wheelOpen = true; true }
                 com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
-                // Workspaces do not exist yet (WSP): the home pages stand in.
-                com.bos.sphere.core.input.LauncherCommand.NextWorkspace -> { scope.launch { gridState.goToPage((gridState.currentPage + 1).coerceAtMost((pages.size - 1).coerceAtLeast(0))) }; true }
-                com.bos.sphere.core.input.LauncherCommand.PreviousWorkspace -> { scope.launch { gridState.goToPage((gridState.currentPage - 1).coerceAtLeast(0)) }; true }
-                else -> false
+                // Workspace switching and the dock's focus and number shortcuts belong to the dock controller (DCK-05, WSP-07).
+                else -> dockController.handle(c)
             }
         },
         onEmptyMenu = { quickPage = gridState.currentPage; quickOpen = true },
@@ -577,7 +575,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val searchHub = remember {
         val palette = com.bos.sphere.feature.search.palette.AndroidPalette(context)
         com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)
-        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders())
+        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders() + com.bos.sphere.ui.dockSearchProvider(context))
     }
     val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }

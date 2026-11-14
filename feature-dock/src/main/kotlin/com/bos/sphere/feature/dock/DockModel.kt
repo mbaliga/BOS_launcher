@@ -31,6 +31,8 @@ data class DockSettings(
     val enabled: Boolean? = null,
     val mode: DockMode = DockMode.PinnedPlusRecent,
     val edge: DockEdge = DockEdge.Bottom,
+    /** Saved app groups shown as chips on the home (WSP-05). */
+    val groupShelf: Boolean = true,
 ) {
     /** Off by default in T1, on by default in T2 and T3 (spec section 9). */
     fun isEnabled(tier: Tier): Boolean = enabled ?: (tier != Tier.T1)

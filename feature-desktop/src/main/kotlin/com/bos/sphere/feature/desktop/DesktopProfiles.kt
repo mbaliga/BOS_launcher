@@ -56,11 +56,14 @@ object ProfileCodec {
 interface KeyValue {
     fun get(key: String): String?
     fun put(key: String, value: String)
+    /** Every stored key; lets the settings list the displays that have a profile (EXT-09). */
+    fun keys(): Set<String> = emptySet()
 }
 
 class MapKeyValue(val map: MutableMap<String, String> = mutableMapOf()) : KeyValue {
     override fun get(key: String) = map[key]
     override fun put(key: String, value: String) { map[key] = value }
+    override fun keys(): Set<String> = map.keys.toSet()
 }
 
 /**
@@ -70,6 +73,8 @@ class MapKeyValue(val map: MutableMap<String, String> = mutableMapOf()) : KeyVal
 class DesktopProfileRepository(private val kv: KeyValue) {
     fun load(identity: String): DesktopProfile = ProfileCodec.decode(kv.get(PREFIX + identity)) ?: DesktopProfile()
     fun save(identity: String, profile: DesktopProfile) = kv.put(PREFIX + identity, ProfileCodec.encode(profile))
+    /** Identities that have a stored profile, sorted, for the settings list (EXT-09). */
+    fun identities(): List<String> = kv.keys().filter { it.startsWith(PREFIX) }.map { it.removePrefix(PREFIX) }.sorted()
     fun update(identity: String, f: (DesktopProfile) -> DesktopProfile): DesktopProfile = f(load(identity)).also { save(identity, it) }
     companion object { const val PREFIX = "profile:" }
 }

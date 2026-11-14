@@ -31,6 +31,7 @@ class CapabilityRegistry(private val context: Context) {
             contactsGranted = app.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED,
             folderGranted = app.checkSelfPermission(android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED,
             speechOnDevice = runCatching { if (Build.VERSION.SDK_INT >= 31) SpeechRecognizer.isOnDeviceRecognitionAvailable(app) else null }.getOrNull(),
+            manufacturer = Build.MANUFACTURER.orEmpty(),
             pinShortcutsSupported = runCatching {
                 app.getSystemService(android.content.pm.LauncherApps::class.java)?.hasShortcutHostPermission() == true
             }.getOrDefault(false),

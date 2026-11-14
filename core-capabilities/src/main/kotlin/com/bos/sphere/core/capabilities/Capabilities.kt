@@ -45,6 +45,8 @@ data class CapabilityInputs(
     val folderGranted: Boolean = false,
     val speechOnDevice: Boolean? = null,
     val pinShortcutsSupported: Boolean = false,
+    /** Used only to pick the text of the OEM notes row (NFR-21), never to gate a feature. */
+    val manufacturer: String = "",
 )
 
 object CapabilityEvaluator {
@@ -122,6 +124,7 @@ object CapabilityEvaluator {
             Capability("keyboard", "Hardware keyboard", Access.Yes, if (i.hasKeyboard) CapState.On else CapState.Off),
             Capability("pointer", "Mouse or trackpad", Access.Yes, if (i.hasPointer) CapState.On else CapState.Off),
             Capability("controller", "Game controller", Access.Yes, if (i.hasController) CapState.On else CapState.Off),
+            OemNotes.row(i.manufacturer),
         )
     }
 

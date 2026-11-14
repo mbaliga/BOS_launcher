@@ -212,6 +212,8 @@ class DesktopController private constructor(private val app: Application) {
     /** Applies a choice made on the offer notification. */
     internal fun applyOfferChoice(setting: OfferSetting, displayId: Int) {
         offerSetting = setting
+        // The receiver may run in a fresh process with no display state yet; start tracking so Always can open.
+        start()
         runCatching { nm.cancel(OFFER_ID_BASE + displayId) }
         if (setting == OfferSetting.Always) _state.value.displays[displayId]?.takeIf { it.eligible && !DesktopSurfaces.openOn(it.id) }?.let { openSurface(it.id) }
         refreshReopen()

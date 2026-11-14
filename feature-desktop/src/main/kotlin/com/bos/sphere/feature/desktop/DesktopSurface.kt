@@ -33,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -180,6 +181,8 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
             val live = drag?.takeIf { it.first == item.id }?.second ?: FreeformPlacement.clamp(item.rect(), container)
             val entry = if (item.isWidget) null else appFor(item.id)
             if (!item.isWidget && entry == null) continue
+            // A removed or recomposed-away item must not stay clickable through the phone trackpad.
+            DisposableEffect(item.id) { onDispose { targets.remove(item.id) } }
             Box(
                 Modifier
                     .offset { IntOffset((live.left * layout.scale).roundToInt(), (live.top * layout.scale).roundToInt()) }
@@ -268,7 +271,7 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp),
                         decorationBox = { inner -> if (query.isEmpty()) Text(L10n.tr("Search apps"), color = MaterialTheme.colorScheme.onSurfaceVariant); inner() },
                     )
-                    DrawerGrid(filtered(apps, query), layout, gridState, ::launchHere, onLong = { menuKey = "drawer:" + it.key }, menuKey, { menuKey = null }, ::placeApp, ::launchOnOther) { k, r, a, sec ->
+                    DrawerGrid(filtered(apps, query), layout, gridState, ::launchHere, onLong = { menuKey = "drawer:" + it.key }, menuKey, { menuKey = null }, ::placeApp, ::launchOnOther, unregister = { k -> targets.remove("drawer:$k") }) { k, r, a, sec ->
                         targets["drawer:$k"] = Target(r, 1, a, sec)
                     }
                 }
@@ -307,10 +310,12 @@ private fun DrawerGrid(
     list: List<AppEntry>, layout: DesktopLayout, state: LazyGridState,
     onLaunch: (AppEntry) -> Unit, onLong: (AppEntry) -> Unit, menuKey: String?, dismiss: () -> Unit,
     place: (AppEntry) -> Unit, openOther: (AppEntry) -> Unit,
+    unregister: (String) -> Unit,
     register: (String, FRect, () -> Unit, (() -> Unit)?) -> Unit,
 ) {
     LazyVerticalGrid(GridCells.Adaptive(layout.cellDp.dp), state = state, modifier = Modifier.padding(top = 12.dp)) {
         items(list, key = { it.key }) { a ->
+            DisposableEffect(a.key) { onDispose { unregister(a.key) } }
             Box(
                 Modifier.padding(4.dp)
                     .onGloballyPositioned { c -> c.boundsInRoot().let { register(a.key, FRect(it.left, it.top, it.right, it.bottom), { onLaunch(a) }, { onLong(a) }) } }

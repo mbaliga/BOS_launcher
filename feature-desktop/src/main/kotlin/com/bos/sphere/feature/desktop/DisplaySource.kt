@@ -22,7 +22,7 @@ class DisplaySource(context: Context) {
 
     private fun read(d: Display): TrackedDisplay {
         val m = android.util.DisplayMetrics().also { @Suppress("DEPRECATION") d.getRealMetrics(it) }
-        val info = runCatching { d.deviceProductInfo }.getOrNull()
+        val info = if (android.os.Build.VERSION.SDK_INT >= 34) runCatching { d.deviceProductInfo }.getOrNull() else null
         val isDefault = d.displayId == Display.DEFAULT_DISPLAY
         return TrackedDisplay(
             id = d.displayId,

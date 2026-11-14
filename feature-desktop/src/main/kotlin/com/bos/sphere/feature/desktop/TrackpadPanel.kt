@@ -38,10 +38,12 @@ import kotlin.math.abs
  * secondary click, two fingers scroll. It talks only to the launcher's own desktop surface through
  * [DesktopInputBus]; it cannot move the system pointer or type into other apps.
  */
+private const val SENTINEL = "\u200B"
+
 @Composable
 fun TrackpadPanel(modifier: Modifier = Modifier) {
     val focused by DesktopInputBus.focused.collectAsState()
-    var typed by remember { mutableStateOf("") }
+    var typed by remember { mutableStateOf(SENTINEL) }
     Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             if (focused) L10n.tr("Controlling the desktop surface") else L10n.tr("Open the desktop surface on the external display to use the trackpad"),
@@ -87,17 +89,17 @@ fun TrackpadPanel(modifier: Modifier = Modifier) {
                 ) { Text(label, color = MaterialTheme.colorScheme.onSurface) }
             }
         }
+        Text(L10n.tr("Type here"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         BasicTextField(
             value = typed,
             onValueChange = { new ->
                 // Send only what was added; keep the field short so it never grows.
                 if (new.length > typed.length) DesktopInputBus.send(InputCommand.Text(new.substring(typed.length)))
                 else if (new.length < typed.length) DesktopInputBus.send(InputCommand.Key(PanelKey.Backspace))
-                typed = new.takeLast(1)
+                typed = SENTINEL // always keep one invisible char so Backspace still registers on an empty field
             },
             textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp),
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(14.dp),
-            decorationBox = { inner -> if (typed.isEmpty()) Text(L10n.tr("Type here"), color = MaterialTheme.colorScheme.onSurfaceVariant); inner() },
         )
     }
 }

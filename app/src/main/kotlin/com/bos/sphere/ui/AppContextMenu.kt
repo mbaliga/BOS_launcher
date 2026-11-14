@@ -68,7 +68,13 @@ fun AppContextMenu(
                     Text(app.packageName, color = HyleColors.InkDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
+            // HOM-09: notifications of this app, when notification access is granted.
+            com.bos.sphere.feature.grid.NotificationPreview(app)
             Divider()
+            // HOM-05: user tags.
+            val tagsOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            if (tagsOpen.value) com.bos.sphere.feature.grid.TagDialog(app) { tagsOpen.value = false }
+            MenuItem(Glyphs.Plus, L10n.tr("Tags"), { tagsOpen.value = true })
             if (isOnHome != null) MenuItem(if (isOnHome) Glyphs.Close else Glyphs.Plus, L10n.tr(if (isOnHome) "Remove from home" else "Add to home"), onToggleHome)
             if (onIconColor != null) MenuItem(Glyphs.Palette, L10n.tr("Icon colour"), onIconColor)
             MenuItem(Glyphs.Info, L10n.tr("App info"), onAppInfo)

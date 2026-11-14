@@ -272,10 +272,31 @@ private fun WidgetPickerDialog(onDismiss: () -> Unit, onSelect: (WidgetChoice) -
             )
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
-            val list = choices
+            // HOM-07: searchable picker (app name or widget name).
+            var query by remember { mutableStateOf("") }
+            androidx.compose.foundation.text.BasicTextField(
+                value = query, onValueChange = { query = it }, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = HyleColors.InkBright, fontSize = 14.sp),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(HyleColors.InkBright),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                    .background(HyleColors.Hairline, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+                decorationBox = { inner ->
+                    Box { if (query.isEmpty()) Text("Search widgets", color = HyleColors.InkDim, fontSize = 14.sp); inner() }
+                },
+            )
+            val all = choices
+            val list = remember(all, query) {
+                all?.let { l ->
+                    fun id(c: WidgetChoice) = c.info.provider.flattenToString() + "#" + c.info.profile.hashCode()
+                    val order = com.bos.sphere.core.catalog.WidgetPickerSearch
+                        .filter(l.map { com.bos.sphere.core.catalog.WidgetChoiceRef(id(it), it.appLabel, it.label) }, query).map { it.provider }
+                    val byId = l.associateBy(::id)
+                    order.mapNotNull { byId[it] }
+                }
+            }
             when {
                 list == null -> CenteredNote("Loading widgets…")
-                list.isEmpty() -> CenteredNote("No widgets installed")
+                list.isEmpty() -> CenteredNote(if (query.isEmpty()) "No widgets installed" else "No widget matches")
                 else -> LazyColumn(Modifier.fillMaxSize().padding(vertical = 6.dp)) {
                     items(list, key = { "${it.info.provider.flattenToString()}#${it.info.profile.hashCode()}" }) { choice ->
                         WidgetChoiceRow(choice, onClick = { onSelect(choice) })

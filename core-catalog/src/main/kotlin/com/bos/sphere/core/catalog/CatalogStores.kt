@@ -32,6 +32,14 @@ class IconOverrideStore(context: Context) {
         sp.edit().putString("overrides", IconOverrideCodec.encode(_overrides.value)).apply()
     }
 
+    private val _themed = MutableStateFlow(sp.getBoolean("themed", false))
+    /** Themed (monochrome) icons on or off (HOM-03). */
+    val themed: StateFlow<Boolean> = _themed.asStateFlow()
+    fun setThemed(on: Boolean) {
+        _themed.value = on
+        sp.edit().putBoolean("themed", on).apply()
+    }
+
     fun setPack(packageName: String?) {
         _pack.value = packageName
         sp.edit().putString("pack", packageName).apply()

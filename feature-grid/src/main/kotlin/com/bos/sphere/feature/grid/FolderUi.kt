@@ -46,12 +46,17 @@ import com.bos.sphere.core.design.L10n
 
 /** HOM-04: a folder on home: up to four of its icons on a rounded tile. Tap, click or Enter opens it. */
 @Composable
-fun FolderTile(folder: Folder, resolve: (String) -> AppEntry?, size: Dp, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun FolderTile(folder: Folder, resolve: (String) -> AppEntry?, size: Dp, onOpen: () -> Unit, modifier: Modifier = Modifier, interactive: Boolean = true) {
     val shape = RoundedCornerShape(22)
     Box(
         modifier.size(size).clip(shape).background(Color(0x26FFFFFF), shape)
-            .onKeyEvent { if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.NumPadEnter)) { onOpen(); true } else false }
-            .focusable().clickable(onClick = onOpen).padding(size * 0.12f),
+            .then(
+                if (interactive) Modifier
+                    .onKeyEvent { if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.NumPadEnter)) { onOpen(); true } else false }
+                    .focusable().clickable(onClick = onOpen)
+                else Modifier,
+            )
+            .padding(size * 0.12f),
     ) {
         val mini = size * 0.36f
         val apps = folder.keys.mapNotNull(resolve).take(4)

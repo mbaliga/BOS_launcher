@@ -42,6 +42,13 @@ android {
                 "proguard-rules.pro",
             )
         }
+        // NFR-01 to NFR-05: the variant the macrobenchmarks (benchmark/, not in the offline build) install: release code,
+        // debug key, profileable (src/benchmark/AndroidManifest.xml). Never shipped.
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += "release"
+            isDebuggable = false
+        }
     }
 
     buildFeatures {

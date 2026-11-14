@@ -177,10 +177,12 @@ fun SettingsSpace(
     /** CFG-18: the always-visible live preview of the home (see [SettingsPreviewDock]). */
     previewDock: (@Composable androidx.compose.foundation.layout.BoxScope.() -> Unit)? = null,
 ) {
+    // NFR-14: the scale morph becomes a plain cross-fade when animations are off.
+    val reducedMotion = com.bos.sphere.core.design.rememberMotionPrefs().reduced
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(220)) + scaleIn(initialScale = 1.06f, animationSpec = tween(260)),
-        exit = fadeOut(tween(180)) + scaleOut(targetScale = 1.04f, animationSpec = tween(180)),
+        enter = if (reducedMotion) fadeIn(tween(90)) else fadeIn(tween(220)) + scaleIn(initialScale = 1.06f, animationSpec = tween(260)),
+        exit = if (reducedMotion) fadeOut(tween(90)) else fadeOut(tween(180)) + scaleOut(targetScale = 1.04f, animationSpec = tween(180)),
         modifier = modifier,
     ) {
         androidx.compose.runtime.CompositionLocalProvider(

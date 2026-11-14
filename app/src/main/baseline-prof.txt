@@ -8,7 +8,7 @@ HSPLcom/bos/sphere/HomeScreenKt;->**(**)**
 HSPLcom/bos/sphere/HomeScreenKt$**;->**(**)**
 HSPLcom/bos/sphere/core/design/**;->**(**)**
 HSPLcom/bos/sphere/core/data/LauncherStores;->**(**)**
-HSPLcom/bos/sphere/core/data/Prefs**;->**(**)**
+HSPLcom/bos/sphere/core/data/LauncherPrefs**;->**(**)**
 HSPLcom/bos/sphere/core/data/CrashLoopGuard;->**(**)**
 HSPLcom/bos/sphere/feature/grid/GridHome**;->**(**)**
 HSPLcom/bos/sphere/feature/grid/SearchOverlay**;->**(**)**
@@ -17,3 +17,10 @@ HSPLcom/bos/sphere/feature/search/**;->**(**)**
 Lcom/bos/sphere/MainActivity;
 Lcom/bos/sphere/LiftoffApplication;
 Lcom/bos/sphere/HomeScreenKt;
+HSPLcom/bos/sphere/HomeTiming;->**(**)**
+HSPLcom/bos/sphere/PrefsWarmup;->**(**)**
+HSPLcom/bos/sphere/PrefsWarmup$**;->**(**)**
+HSPLcom/bos/sphere/core/quality/**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/PaletteTraceKt**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/HomeLegibilityKt**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/WallpaperSamples;->**(**)**

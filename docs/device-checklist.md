@@ -26,8 +26,8 @@ Record with: `adb logcat -b all -d > run.txt` after each section, and look for `
 - [ ] Update Liftoff itself over the top (`adb install -r`): all settings, layout and workspaces survive.
 
 ## 4. Process death and reboot (NFR-11)
-- [ ] `adb shell am kill com.bos.sphere` from home, then press Home: restored to the same page, layout and open state of settings.
-- [ ] Same with the palette open and text typed, and with the drawer open.
+- [ ] `adb shell am kill com.bos.sphere` from home, then press Home: layout, settings, widgets, workspaces and hidden apps are intact. Open surfaces (palette, drawer, settings) are closed by design (`stateNotNeeded`, and Home always resets them); if the owner wants the open surface restored too, that is a decision to record against NFR-11.
+- [ ] Same with the palette open and text typed, and with the drawer open: the launcher returns to a clean home; nothing durable is lost.
 - [ ] Developer options "Don't keep activities" on: navigate through palette, drawer, settings and back. No state lost.
 - [ ] Reboot. Liftoff is still the default home app; state intact.
 - [ ] Force three crashes in under a minute (debug build) and confirm safe mode appears (no fallback to the stock launcher).

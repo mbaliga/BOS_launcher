@@ -72,6 +72,8 @@ data class RevealLayout(val slideFraction: Float, val homeStripFraction: Float, 
 class LaunchpadRevealState internal constructor(private val scope: CoroutineScope) {
     private val anim = Animatable(0f)
     internal var onOpenChange: (Boolean) -> Unit = {}
+    /** NFR-14: with animations off the card settles in a short linear tween instead of a bouncing spring. */
+    internal var reducedMotion: Boolean = false
     var open by mutableStateOf(false)
         internal set
     var dragging by mutableStateOf(false)
@@ -91,6 +93,7 @@ class LaunchpadRevealState internal constructor(private val scope: CoroutineScop
     }
 
     internal suspend fun animateTo(open: Boolean) {
+        if (reducedMotion) { anim.animateTo(if (open) 1f else 0f, androidx.compose.animation.core.tween(90)); return }
         anim.animateTo(if (open) 1f else 0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
     }
 }
@@ -102,6 +105,7 @@ fun rememberLaunchpadReveal(open: Boolean, onOpenChange: (Boolean) -> Unit): Lau
     val latest by rememberUpdatedState(onOpenChange)
     state.onOpenChange = { latest(it) }
     state.open = open
+    state.reducedMotion = com.bos.sphere.core.design.rememberMotionPrefs().reduced
     LaunchedEffect(open) { if (!state.dragging) state.animateTo(open) }
     return state
 }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOn
 
 /**
  * Source of truth for the launchable-app inventory.
@@ -66,11 +67,14 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
             override fun onPackagesUnsuspended(packageNames: Array<out String>?, user: UserHandle?) = emitSnapshot()
         }
 
-        launcherApps.registerCallback(callback)
+        // NFR-12: the package callbacks and the inventory (binder calls to LauncherApps) run on a background thread,
+        // never on the main thread the collector lives on.
+        val thread = android.os.HandlerThread("liftoff-apps").apply { start() }
+        launcherApps.registerCallback(callback, android.os.Handler(thread.looper))
         emitSnapshot() // initial inventory
-        awaitClose { launcherApps.unregisterCallback(callback) }
+        awaitClose { launcherApps.unregisterCallback(callback); thread.quitSafely() }
         // A burst of callbacks (bulk install) collapses to the newest snapshot, still well inside 1 s.
-    }.conflate()
+    }.conflate().flowOn(kotlinx.coroutines.Dispatchers.Default)
 
     private fun loadAll(): List<AppEntry> =
         userManager.userProfiles.flatMap { user ->

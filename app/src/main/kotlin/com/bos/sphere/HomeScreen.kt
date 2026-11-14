@@ -180,6 +180,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val allApps by repository.apps.collectAsStateWithLifecycle(initialValue = emptyList())
     val hidden by hiddenStore.hidden.collectAsStateWithLifecycle()
     val apps = remember(allApps, hidden) { allApps.filter { it.key !in hidden } }
+    // NFR-01 / NFR-02: interactive home = the first frame drawn once the app list is in; tells the benchmarks (time to full display).
+    LaunchedEffect(apps.isNotEmpty()) { if (apps.isNotEmpty()) HomeTiming.homeDrawn(context) }
     val appsByKey = remember(apps) { apps.associateBy { it.key } }
     // Package changes can change icons and categories; uninstalled apps forget "removed from home".
     val liveReconcile = remember { com.bos.sphere.core.catalog.LiveReconcile() }
@@ -473,11 +475,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             val dest = java.io.File(context.filesDir, "background_${System.currentTimeMillis()}.img")
-            val ok = runCatching { context.contentResolver.openInputStream(uri)?.use { i -> dest.outputStream().use { o -> i.copyTo(o) } } }.isSuccess
-            if (ok && dest.length() > 0) {
-                val old = prefs.backgroundPicturePath
-                stores.prefs.update { it.copy(backgroundKind = com.bos.sphere.core.data.BackgroundKind.Picture, backgroundPreset = "photo", backgroundPicturePath = dest.absolutePath) }
-                if (old.isNotEmpty()) runCatching { java.io.File(old).delete() }
+            // NFR-12: the copy runs on the IO dispatcher; only the preference update comes back to the main thread.
+            scope.launch {
+                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { context.contentResolver.openInputStream(uri)?.use { i -> dest.outputStream().use { o -> i.copyTo(o) } } }.isSuccess }
+                if (ok && dest.length() > 0) {
+                    val old = prefs.backgroundPicturePath
+                    stores.prefs.update { it.copy(backgroundKind = com.bos.sphere.core.data.BackgroundKind.Picture, backgroundPreset = "photo", backgroundPicturePath = dest.absolutePath) }
+                    if (old.isNotEmpty()) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { java.io.File(old).delete() } }
+                }
             }
         }
     }
@@ -727,6 +732,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             touch = bgTouch,
             picturePath = prefs.backgroundPicturePath,
+        )
+        // NFR-15: keeps clock and labels at WCAG AA over whatever wallpaper is behind them.
+        com.bos.sphere.feature.grid.HomeScrim(
+            com.bos.sphere.feature.grid.rememberHomeScrim(prefs.backgroundKind, prefs.backgroundPreset, prefs.backgroundColorA, prefs.backgroundColorB, prefs.backgroundPicturePath),
         )
         IndicatorLayer(
             reading = reading,
@@ -1014,12 +1023,15 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
 
         // Notifications hub (grid style opens it from a corner / gesture).
-        val hubFraction by animateFloatAsState(if (hubOpen) 1f else 0f, tween(260), label = "hub")
+        val hubMotion = com.bos.sphere.core.design.rememberMotionPrefs()
+        val hubRaw by animateFloatAsState(if (hubOpen) 1f else 0f, tween(com.bos.sphere.core.quality.MorphPolicy.progressMs(hubMotion, 260)), label = "hub")
+        // NFR-14: with animations off the panel does not slide; it is placed and the scrim cross-fades.
+        val hubFraction = if (hubMotion.reduced && hubRaw > 0.001f) 1f else hubRaw
         if (hubFraction > 0.001f) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f * hubFraction))
+                    .background(Color.Black.copy(alpha = 0.45f * hubRaw))
                     .pointerInput(Unit) { detectTapGestures { hubOpen = false } },
             ) {
                 HubPanel(fraction = hubFraction, onRequestAccess = {

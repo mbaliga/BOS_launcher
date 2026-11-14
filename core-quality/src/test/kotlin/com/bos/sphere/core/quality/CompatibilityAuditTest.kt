@@ -19,14 +19,35 @@ class CompatibilityAuditTest {
         assertTrue("legacy back handling in $offenders", offenders.isEmpty())
     }
 
+    /**
+     * Every BackHandler is either gated on its surface (`enabled = ...` or an enclosing `if (...)`) or is the body of a
+     * composable that only exists while its surface is open. The second kind is an audited allow-list with exact counts, so
+     * a new bare handler fails here until someone audits it.
+     */
     @Test fun NFR_19_backHandlersAreEnabledOnlyWhileTheirSurfaceIsOpen() {
-        // Audit list: every BackHandler is conditional on an open surface, or is the body of a modal screen that only exists while open.
-        val conditional = Regex("""BackHandler\s*(\(\s*enabled\s*=|\{|\(\s*onBack)""")
+        val modalOnly = mapOf("Corners.kt" to 1, "SettingsSpace.kt" to 1, "Launchpad.kt" to 1)
+        val bare = HashMap<String, Int>()
         Repo.mainSources().forEach { f ->
-            f.readLines().withIndex().filter { (_, l) -> l.contains("BackHandler") && !l.contains("import") }.forEach { (i, l) ->
-                assertTrue("${f.name}:${i + 1} $l", conditional.containsMatchIn(l))
+            f.readLines().filter { it.contains("BackHandler") && !it.contains("import") }.forEach { l ->
+                val gated = l.contains("enabled =") || Regex("""\bif \(""").containsMatchIn(l)
+                if (!gated) bare.merge(f.name, 1, Int::plus)
             }
         }
+        // HomeScreen.kt: LeftWidgetPage wraps its handler in `if (visible)` on the preceding line.
+        val homeLeftPage = Repo.file("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt").readLines()
+        val i = homeLeftPage.indexOfFirst { it.contains("BackHandler(onBack = onClose)") }
+        if (i > 0 && homeLeftPage[i - 1].contains("if (visible)")) bare.remove("HomeScreen.kt")
+        assertEquals(modalOnly, bare)
+    }
+
+    @Test fun NFR_19_everyEdgeToEdgeActivityDrawsBehindTheBars() {
+        // The home host and the desktop-mode host both opt in; neither sets a fixed bar colour or fits system windows.
+        listOf("MainActivity.kt", "DesktopActivity.kt").forEach { n ->
+            val t = Repo.file("app/src/main/kotlin/com/bos/sphere/$n").readText()
+            assertTrue("$n enableEdgeToEdge", t.contains("enableEdgeToEdge()") || t.contains("setDecorFitsSystemWindows(false)"))
+        }
+        val all = Repo.mainSources().filter { it.readText().contains("setDecorFitsSystemWindows(true)") }
+        assertTrue("fits-system-windows opt-out in $all", all.isEmpty())
     }
 
     /**
@@ -34,8 +55,9 @@ class CompatibilityAuditTest {
      * horizontal drags would otherwise lose to the back gesture. Android caps an exclusion at 200 dp of height per edge,
      * so it cannot disable back navigation, but it is listed here so adding another one is a conscious decision.
      */
-    @Test fun NFR_20_systemGestureExclusionUsageIsAllowlisted() {
-        val allowed = mapOf("SearchLayouts.kt" to 1)
+    @Test fun NFR_20_noSystemGestureExclusionAnywhere() {
+        // The Orbit carousel exclusion was removed (it kept 200 dp of an edge away from the back gesture); none is allowed now.
+        val allowed = emptyMap<String, Int>()
         val found = Repo.mainSources().associate { it.name to it.readLines().count { l -> l.contains("systemGestureExclusion") && !l.contains("import") } }.filterValues { it > 0 }
         assertEquals(allowed, found)
     }

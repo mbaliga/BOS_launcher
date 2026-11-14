@@ -2,8 +2,10 @@ package com.bos.sphere.benchmark
 
 import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.FrameTimingMetric
+import androidx.benchmark.macro.ExperimentalMetricApi
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
+import androidx.benchmark.macro.TraceSectionMetric
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -14,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** INACTIVE sources, see README.md. Budgets come from spec section 13 and core-quality Budgets. */
+@OptIn(ExperimentalMetricApi::class)
 @RunWith(AndroidJUnit4::class)
 class HomeBenchmarks {
     @get:Rule val rule = MacrobenchmarkRule()
@@ -22,7 +25,8 @@ class HomeBenchmarks {
 
     /** NFR-02: cold start to interactive home, 700 ms p95. Read the p95 of timeToInitialDisplayMs from the report. */
     @Test fun NFR_02_coldStart() = rule.measureRepeated(
-        packageName = pkg, metrics = listOf(StartupTimingMetric()), iterations = 20,
+        // Liftoff.homeInteractive runs from process start to the first frame with the app list drawn (HomeTiming).
+        packageName = pkg, metrics = listOf(StartupTimingMetric(), TraceSectionMetric("Liftoff.homeInteractive")), iterations = 20,
         startupMode = StartupMode.COLD, compilationMode = CompilationMode.Partial(),
     ) { pressHome(); startActivityAndWait() }
 

@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -72,13 +73,15 @@ fun BadgeDot(label: String, modifier: Modifier = Modifier, size: Dp = 12.dp) {
 @Composable
 fun BadgedAppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val settings = remember(context) { BadgeSettings(context) }
+    val prefs by remember(context) { com.bos.sphere.core.data.LauncherStores.get(context).prefs.prefs }.collectAsState()
     Box(modifier) {
-        AppIcon(app, size, Modifier.size(size))
-        if (settings.enabled && app.user == Process.myUserHandle()) {
+        // HOM-10: a suspended app stays on home, dimmed.
+        AppIcon(app, size, Modifier.size(size).then(if (app.suspended) Modifier.alpha(0.45f) else Modifier))
+        if (prefs.badgesOn) {
+            // HOM-09: the notification feed is per profile, so a work app is badged by its own profile's notifications.
             val map by BadgeFeed.badges.collectAsState()
-            map[Badges.keyFor(app.packageName, 0)]?.let { b ->
-                BadgeDot(b.label(settings.showCount), Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp))
+            map[Badges.keyFor(app.packageName, app.user.hashCode())]?.let { b ->
+                BadgeDot(b.label(prefs.badgeCount), Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp))
             }
         }
     }
@@ -91,7 +94,7 @@ fun BadgedAppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier) {
 @Composable
 fun NotificationPreview(app: AppEntry, modifier: Modifier = Modifier) {
     val all by BadgeFeed.notifications.collectAsState()
-    val list = remember(all, app.packageName) { if (app.user == Process.myUserHandle()) Badges.preview(all, app.packageName, 4) else emptyList() }
+    val list = remember(all, app.packageName) { Badges.previewFor(all, app.packageName, app.user.hashCode(), 4) }
     if (list.isEmpty()) return
     Column(modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp)) {
         Text(L10n.tr("Notifications"), color = HyleColors.InkDim, fontSize = 11.sp)

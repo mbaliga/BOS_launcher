@@ -308,6 +308,14 @@ data class LauncherPrefs(
     val clockShowWeather: Boolean = false,
     val weatherFahrenheit: Boolean = false,
 
+    // --- badges and adaptive grid (HOM-09, HOM-11)
+    val badgesOn: Boolean = true,
+    val badgeCount: Boolean = true,
+    /** Derive the grid from the window size instead of the fixed portrait and landscape grids. */
+    val adaptiveGrid: Boolean = false,
+    /** Density for the adaptive grid: 1 is the default, above 1 packs more. */
+    val gridDensity: Float = 1f,
+
     // --- corners
     /** Corner icon edge in dp. */
     val cornerIconSize: Float = 32f,

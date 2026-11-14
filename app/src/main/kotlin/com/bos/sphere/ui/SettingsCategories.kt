@@ -290,6 +290,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     hint = x("\"Long side\" keeps scrolling along the phone's longer edge however you hold it. Swipes across the other way are free for gestures."),
                 ) { v -> upd { it.copy(scrollAxis = v) } },
             )
+            add(SettingItem.Toggle(x("Grid follows window size"), Glyphs.Widget, p.adaptiveGrid, x("Columns and rows come from the window (rotation, folding, split screen) and the density below, instead of the fixed grids")) { v -> upd { it.copy(adaptiveGrid = v) } })
+            if (p.adaptiveGrid) add(SettingItem.Slider(x("Grid density"), Glyphs.Widget, p.gridDensity, 0.5f..2f, pct(p.gridDensity)) { v -> upd { it.copy(gridDensity = v) } })
             if (paged) {
                 val preset = DensityPreset.entries.firstOrNull { it.portrait == p.portraitGrid && it.landscape == p.landscapeGrid }
                 val densityOptions: List<DensityPreset?> = if (preset == null) listOf<DensityPreset?>(null) + DensityPreset.entries else DensityPreset.entries
@@ -337,6 +339,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             }
             if (paged) add(SettingItem.Slider(x("Label size"), Glyphs.Message, p.labelScale, 0.7f..1.5f, pct(p.labelScale)) { v -> upd { it.copy(labelScale = v) } })
             add(SettingItem.Toggle(x("App labels"), Glyphs.Message, p.showLabels, if (p.homeStyle == HomeStyle.Psp) x("Off shows only the focused app's name") else null) { v -> upd { it.copy(showLabels = v) } })
+            add(SettingItem.Toggle(x("Notification badges"), Glyphs.Bell, p.badgesOn, x("A dot on apps with unread notifications. Needs notification access; work apps use their own profile's notifications")) { v -> upd { it.copy(badgesOn = v) } })
+            if (p.badgesOn) add(SettingItem.Toggle(x("Count in badges"), Glyphs.Bell, p.badgeCount, x("Off shows a plain dot")) { v -> upd { it.copy(badgeCount = v) } })
             if (paged) add(SettingItem.Toggle(x("Suggested app"), Glyphs.Bolt, p.showSuggestion, x("A predicted app in the first free slot of page one")) { v -> upd { it.copy(showSuggestion = v) } })
             if (paged) {
                 add(

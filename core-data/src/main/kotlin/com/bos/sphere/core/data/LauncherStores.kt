@@ -94,6 +94,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putBoolean("clockDay", next.clockShowDay)
             .putBoolean("clockWeather", next.clockShowWeather)
             .putBoolean("weatherF", next.weatherFahrenheit)
+            .putBoolean("badgesOn", next.badgesOn).putBoolean("badgeCount", next.badgeCount)
+            .putBoolean("adaptiveGrid", next.adaptiveGrid).putFloat("gridDensity", next.gridDensity)
             .putFloat("cornerIconSize", next.cornerIconSize)
             .putString("cornerIconMode", next.cornerIconMode.name)
             .putBoolean("hideStatusBar", next.hideStatusBar)
@@ -202,6 +204,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             clockShowDay = sp.getBoolean("clockDay", d.clockShowDay),
             clockShowWeather = sp.getBoolean("clockWeather", d.clockShowWeather),
             weatherFahrenheit = sp.getBoolean("weatherF", d.weatherFahrenheit),
+            badgesOn = sp.getBoolean("badgesOn", d.badgesOn),
+            badgeCount = sp.getBoolean("badgeCount", d.badgeCount),
+            adaptiveGrid = sp.getBoolean("adaptiveGrid", d.adaptiveGrid),
+            gridDensity = sp.getFloat("gridDensity", d.gridDensity).coerceIn(0.5f, 2f),
             cornerIconSize = sp.getFloat("cornerIconSize", d.cornerIconSize).coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
             cornerIconMode = enumOr(sp.getString("cornerIconMode", null), d.cornerIconMode),
             hideStatusBar = sp.getBoolean("hideStatusBar", d.hideStatusBar),

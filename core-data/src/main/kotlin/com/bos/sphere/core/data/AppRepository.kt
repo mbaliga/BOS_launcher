@@ -80,6 +80,8 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
                     componentName = info.componentName,
                     label = info.label.toString(),
                     user = user,
+                    suspended = (info.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SUSPENDED) != 0,
+                    versionStamp = runCatching { java.io.File(info.applicationInfo.sourceDir).lastModified() }.getOrDefault(0L),
                     iconLoader = {
                         // Density 0 → let the system pick; LauncherApps badges for the profile.
                         runCatching { info.getBadgedIcon(0) }.getOrNull()

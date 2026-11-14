@@ -671,7 +671,8 @@ fun GridHome(
             } else {
                 // Lift the dots above a bottom clock.
                 Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe)
-                    .padding(bottom = if (prefs.clockPosition == ClockPosition.Bottom) 14.dp else 26.dp)
+                    .padding(bottom = if (prefs.clockPosition == ClockPosition.Bottom) ClockBandFit.DOTS_BOTTOM_DP.dp else 26.dp)
+                    .then(if (prefs.clockPosition == ClockPosition.Bottom) Modifier.height(ClockBandFit.DOTS_DP.dp) else Modifier)
             },
         )
     }
@@ -936,7 +937,7 @@ fun PageIndicator(
         if (onMenu != null) {
             Icon(
                 Glyphs.Menu, contentDescription = "Page options", tint = HyleColors.InkDim,
-                modifier = Modifier.padding(horizontal = 2.dp).size(20.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.padding(3.dp),
+                modifier = Modifier.padding(horizontal = 2.dp).size(16.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.padding(1.dp),
             )
         }
         for (i in 0 until count) {
@@ -944,7 +945,7 @@ fun PageIndicator(
             if (i == homeIndex) {
                 Icon(
                     Glyphs.Home, contentDescription = "Home page", tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
-                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 20.dp else 16.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
+                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 16.dp else 14.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
                 )
                 continue
             }

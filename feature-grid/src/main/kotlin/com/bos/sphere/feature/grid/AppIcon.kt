@@ -51,6 +51,9 @@ object IconCache {
     /** Drop everything (e.g. after a package update changed icons). */
     fun clear() = cache.evictAll()
 
+    /** HOM-10: drop only the icons of [keys] (updated or removed apps). */
+    fun evict(keys: Set<String>) { keys.forEach { cache.remove(it); plates.remove(it) } }
+
     internal fun rasterize(drawable: Drawable, px: Int, plateKey: String? = null): Bitmap {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)

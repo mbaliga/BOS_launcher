@@ -17,6 +17,10 @@ data class AppEntry(
     val componentName: ComponentName,
     val label: String,
     val user: UserHandle,
+    /** HOM-10: the package is suspended (shown dimmed). */
+    val suspended: Boolean = false,
+    /** Bumped when the package is updated so cached icons are noticed as stale. */
+    val versionStamp: Long = 0L,
     private val iconLoader: () -> Drawable?,
 ) {
     /** Stable identity across reorders / refreshes (component + profile). */

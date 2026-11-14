@@ -15,13 +15,21 @@ How each budget is measured and what exists today. Nothing has been measured on 
 | NFR-09 | 99.8% crash-free sessions | local ledger in `CrashReports` (session start and crash counts); aggregated by the owner from shared reports | built (local only), no cohort yet |
 | NFR-10 | No ANR in a 2-hour soak | `tools/soak.sh` (default 7200 s, run nightly) | script written, not run |
 
+## Wave 2 wiring (what now exists in the app)
+
+- Trace sections: `PaletteTraceEffects` (feature-grid, called from the palette screen) emits `Liftoff.paletteOpen`, `Liftoff.paletteFirstResults` and `Liftoff.paletteKeystroke` as `android.os.Trace` async sections; `HomeTiming` emits `Liftoff.homeInteractive` from process start to the first frame with the app list drawn and calls `reportFullyDrawn()`. Names live in `TraceSections` and a test pins them against `benchmark/`. The palette sections end at the next drawn frame, so they include layout and draw but not RenderThread time.
+- A `benchmark` build type of `:app` (release code, debug key, `src/benchmark/AndroidManifest.xml` makes it profileable) is what the macrobenchmark installs; it is never shipped.
+- `PrefsWarmup` loads the SharedPreferences files home reads from a background thread at `Application.onCreate` (NFR-02, NFR-12). The package callbacks and inventory of `LauncherAppsAppRepository` now run on a background handler and dispatcher (they ran on the main thread).
+- Bitmap caches are bounded (a test sums the byte-sized `LruCache` limits against a quarter of the 180 MB PSS budget).
+- None of this is measured. Every number still needs the device run.
+
 ## Why the macrobenchmark module is inactive
 
 `androidx.benchmark:benchmark-macro-junit4`, `androidx.test.uiautomator` and the baseline-profile Gradle plugin cannot be resolved offline here, so `benchmark/` holds the sources and a build file that is not in `settings.gradle.kts`. See `benchmark/README.md` for enabling it. The "enforced by macrobenchmark tests in CI" sentence of the spec section 13 is therefore not met yet.
 
 ## Crash reporting policy (NFR-09, NFR-17)
 
-Crash reports are written by `CrashReports` to `files/crash-reports/` in app-private storage, chained in front of whatever uncaught-exception handler already exists. There is no upload. A report leaves the device only if the user shares its text by an explicit action. The share control in Ground Control is not built yet (status: partial). A per-session ledger in the same directory gives the crash-free percentage locally.
+Crash reports are written by `CrashReports` to `files/crash-reports/` in app-private storage, chained in front of whatever uncaught-exception handler already exists. There is no upload. A report leaves the device only if the user shares its text by an explicit action. Ground Control > Backup > Crash reports lists the saved reports and the crash-free percentage; each report has a share row that opens the system share sheet with the report text (the only way one leaves the device), and a delete-all row. A per-session ledger in the same directory gives the crash-free percentage locally.
 
 ## Soak loop (Soak row of the test plan)
 

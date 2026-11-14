@@ -463,9 +463,12 @@ fun WheelDrawer(
     /** More buttons for the hub, like the tool puck in Concepts. */
     actions: List<PuckAction> = emptyList(),
 ) {
+    // NFR-14: with animations off the wheel does not unfold; it cross-fades in place.
+    val motion = com.bos.sphere.core.design.rememberMotionPrefs()
     val progress = animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = if (motion.reduced) androidx.compose.animation.core.tween(com.bos.sphere.core.quality.MorphPolicy.progressMs(motion, 120))
+        else spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
         label = "wheelOpen",
     )
     BackHandler(enabled = visible) { onDismiss() }
@@ -474,6 +477,7 @@ fun WheelDrawer(
     val visibleNow by rememberUpdatedState(visible)
     val shown by remember { derivedStateOf { visibleNow || progress.value > 0.002f } }
     if (!shown) return
+    val geometry = remember(motion) { derivedStateOf { com.bos.sphere.core.quality.MorphPolicy.geometry(motion, progress.value, visibleNow) } }
 
     // The wheel is physical geometry around a screen corner: lay it out LTR so RTL locales don't
     // shift every positioned child away from where its hit-test expects it.
@@ -492,8 +496,8 @@ fun WheelDrawer(
         actions = actions,
         onDismiss = onDismiss,
         interactive = visible,
-        progress = progress,
-        modifier = modifier,
+        progress = if (motion.reduced) geometry else progress,
+        modifier = if (motion.reduced) modifier.graphicsLayer { alpha = com.bos.sphere.core.quality.MorphPolicy.alpha(motion, progress.value) } else modifier,
     )
     }
 }

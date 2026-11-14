@@ -46,6 +46,7 @@ fun backupCategory(): SettingCategory = SettingCategory(
     Glyphs.Info,
     listOf(
         SettingItem.Pane(L10n.tr("Export, import and restore"), Glyphs.Info, L10n.tr("One file, or the last five snapshots")) { BackupPane() },
+        crashReportsItem(),
     ),
 )
 

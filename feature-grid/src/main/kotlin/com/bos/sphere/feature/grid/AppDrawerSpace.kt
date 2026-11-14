@@ -219,8 +219,8 @@ fun AppDrawerSpace(
     BackHandler(enabled = visible) { onDismiss() }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(160)),
-        exit = fadeOut(tween(120)),
+        enter = fadeIn(tween(com.bos.sphere.core.design.rememberMotionPrefs().crossFadeMs(160))),
+        exit = fadeOut(tween(com.bos.sphere.core.design.rememberMotionPrefs().crossFadeMs(120))),
         modifier = modifier,
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {

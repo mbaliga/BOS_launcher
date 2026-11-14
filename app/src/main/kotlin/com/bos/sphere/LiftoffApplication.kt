@@ -14,6 +14,8 @@ class LiftoffApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         DebugStrictMode.installIfDebuggable(applicationInfo)
+        HomeTiming.processStarted()
+        PrefsWarmup.start(this)
         runCatching {
             val reports = CrashReports(File(filesDir, "crash-reports"))
             // Disk write kept off the main thread so process start stays clean under StrictMode (NFR-02, NFR-12).

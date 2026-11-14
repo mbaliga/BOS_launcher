@@ -221,6 +221,7 @@ internal fun SearchScreen(
     var orbitVisible by remember { mutableStateOf(Int.MAX_VALUE) }
     val typing = trimmed.isNotEmpty()
 
+    PaletteTraceEffects(query) // NFR-03 / NFR-04: trace sections for the macrobenchmarks
     LaunchedEffect(Unit) {
         delay(60) // let the overlay draw its first frame before the IME animates
         runCatching { focus.requestFocus(); keyboard?.show() }

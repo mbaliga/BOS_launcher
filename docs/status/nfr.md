@@ -26,7 +26,7 @@ Not in this list: NFR-13 (input stream), NFR-16 stays unmet (`docs/decisions/NFR
 ## Build and test state
 
 - `./gradlew assembleRelease --offline` builds. Every unit test passes except one that fails at the base commit too: `TranslationCoverageTest.CFG_19_everyLiteralUsedInTheSourceExistsInAllEightLanguages` lists 132 new English-only strings from other streams (BackupPane, Dock, Desktop, palette menus and others) plus 7 from `CrashReportsPane`. Translating them is the CFG-19 stream's job and is not done here.
-- New tests: `NfrWiringTest` (core-quality, 22 JVM tests named NFR_xx), `ReducedMotionUiTest` (feature-grid, Robolectric), the strengthened `CompatibilityAuditTest`. `tools/spec_coverage.py` now counts names that chain several IDs (`NFR_03_NFR_04_...`) and regenerated `docs/TEST_COVERAGE.md`.
+- New tests: `NfrWiringTest` (core-quality, 24 JVM tests named NFR_xx), `ReducedMotionUiTest` (feature-grid, Robolectric), the strengthened `CompatibilityAuditTest`. `tools/spec_coverage.py` now counts names that chain several IDs (`NFR_03_NFR_04_...`) and regenerated `docs/TEST_COVERAGE.md`.
 
 ## Shared-file edits (all small, additive)
 

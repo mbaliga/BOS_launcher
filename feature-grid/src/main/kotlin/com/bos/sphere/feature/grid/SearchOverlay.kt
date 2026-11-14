@@ -86,6 +86,15 @@ import com.bos.sphere.core.data.WebSearch
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.AppSearch
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import com.bos.sphere.core.input.InputMode
+import com.bos.sphere.core.input.InputModeTracker
+import com.bos.sphere.core.input.MenuAction
 import com.bos.sphere.feature.search.SectionKind
 import com.bos.sphere.feature.search.Suggestion
 import com.bos.sphere.feature.search.SuggestionKind
@@ -126,6 +135,8 @@ fun SearchOverlay(
     onRunAction: (CornerActionId) -> Unit = {},
     onRequestFilePermission: () -> Unit = {},
     sounds: UiSounds? = null,
+    /** CFG-05: Ground Control's settings as Radar results; null = none. */
+    settingsSource: SettingsResultSource? = null,
 ) {
     if (visible) BackHandler(onBack = onDismiss)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
@@ -134,7 +145,7 @@ fun SearchOverlay(
             onLaunch = onLaunch, onLongPressApp = onLongPressApp, onOpenIntent = onOpenIntent,
             onRequestContactsPermission = onRequestContactsPermission, onDismiss = onDismiss,
             hub = hub, onOpenHit = onOpenHit, onRunAction = onRunAction,
-            onRequestFilePermission = onRequestFilePermission, sounds = sounds,
+            onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
         )
     }
 }
@@ -184,6 +195,7 @@ internal fun SearchScreen(
     sounds: UiSounds?,
     initialQuery: String = "",
     initialCategory: SearchCategory? = null,
+    settingsSource: SettingsResultSource? = null,
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -195,8 +207,19 @@ internal fun SearchScreen(
     var dismissedFor by remember { mutableStateOf<String?>(null) }
     var touched by remember { mutableStateOf(false) }
     val query = field.text
-    val trimmed = query.trim()
-    val layout = prefs.searchLayout
+    // PAL-19: a typed prefix ("f budget") and the wheel are one setting; the search itself sees only the rest.
+    val searchText = ScopePrefixes.parse(query).second
+    val trimmed = searchText.trim()
+    // PAL-18: a keyboard or pointer in use means Flat, unless the user pinned a layout.
+    val hostMode = LocalInputMode.current
+    val tracker = remember { InputModeTracker(hostMode) }
+    val inputMode by tracker.mode.collectAsState()
+    val layout = RadarLayoutPolicy.effective(prefs.searchLayout, prefs.searchLayoutPinned, inputMode)
+    val scale = rememberRadarScale()
+    var previewTile by remember { mutableStateOf<Tile?>(null) }
+    var nav by remember { mutableStateOf(RadarNav(0)) }
+    var orbitVisible by remember { mutableStateOf(Int.MAX_VALUE) }
+    val typing = trimmed.isNotEmpty()
 
     LaunchedEffect(Unit) {
         delay(60) // let the overlay draw its first frame before the IME animates
@@ -211,7 +234,7 @@ internal fun SearchScreen(
 
     // ---- results
     val wantContacts = prefs.searchContacts && contacts != null
-    val (contactRows, contactsPermitted) = rememberContactRows(query, contacts, wantContacts)
+    val (contactRows, contactsPermitted) = rememberContactRows(searchText, contacts, wantContacts)
     var hubMap by remember { mutableStateOf<Map<SearchCategory, List<SearchHit>>>(emptyMap()) }
     var fileAccess by remember { mutableStateOf(hub?.hasFileAccess() ?: true) }
     LaunchedEffect(hub, query, prefs.searchFiles) {
@@ -232,7 +255,10 @@ internal fun SearchScreen(
     val webFirst = remember(trimmed, prefs.searchWeb) {
         prefs.searchWeb && trimmed.isNotEmpty() && (WebSearch.bang(trimmed) != null || WebSearch.looksLikeUrl(trimmed) || WebSearch.hasBang(trimmed))
     }
-    val data = remember(trimmed, ranked, contactRows, contactsPermitted, wantContacts, web, webFirst, hubMap, fileAccess, hub, prefs.searchFiles) {
+    val settingEntries = remember(settingsSource, trimmed, prefs.searchActions) {
+        if (settingsSource == null || !prefs.searchActions || trimmed.length < 2) emptyList() else settingsSource.results(trimmed, 8)
+    }
+    val data = remember(trimmed, ranked, contactRows, contactsPermitted, wantContacts, web, webFirst, hubMap, fileAccess, hub, prefs.searchFiles, settingEntries) {
         SearchData(
             query = trimmed, apps = ranked,
             contacts = if (wantContacts) contactRows else emptyList(),
@@ -241,17 +267,18 @@ internal fun SearchScreen(
             hits = hubMap,
             askFiles = hub != null && prefs.searchFiles && !fileAccess,
             deepHint = hub != null && prefs.searchFiles && hub.deepSources().isEmpty(),
+            settings = settingEntries,
         )
     }
-    val selected: SearchCategory? = userCat
+    val selected: SearchCategory? = ScopePrefixes.effectiveScope(query, userCat)
     val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
 
     // ---- suggestions
     val appCategories = remember(apps) { apps.map { AppSearch.categoryNameOf(it.packageName) }.distinct().sorted() }
     val filesAvailable = hub != null && prefs.searchFiles && fileAccess
     val deepAvailable = hub != null && prefs.searchDeep && hub.deepSources().isNotEmpty()
-    val groups = remember(query, appCategories, layout, filesAvailable, deepAvailable, ranked.isNotEmpty()) {
-        buildSuggestionGroups(query, appCategories, maxRows = if (layout == SearchLayout.Flat) 8 else 5, filesAvailable = filesAvailable, deepAvailable = deepAvailable, appHits = ranked.isNotEmpty())
+    val groups = remember(searchText, appCategories, layout, filesAvailable, deepAvailable, ranked.isNotEmpty()) {
+        buildSuggestionGroups(searchText, appCategories, maxRows = if (layout == SearchLayout.Flat) 8 else 5, filesAvailable = filesAvailable, deepAvailable = deepAvailable, appHits = ranked.isNotEmpty())
     }
     val showSuggestions = groups.isNotEmpty() && !touched && dismissedFor != query
 
@@ -285,9 +312,49 @@ internal fun SearchScreen(
             }
             is Tile.Bang -> setQuery(tile.rewritten)
             is Tile.Allow -> if (tile.files) onRequestFilePermission() else onRequestContactsPermission()
+            is Tile.Setting -> settingsSource?.open(tile.entry)
         }
     }
-    val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t is Tile.App) onLongPressApp(t.app) else if (t is Tile.Person) { tick(); expandedContact = if (expandedContact == t.c.hit.id) null else t.c.hit.id } }, onTouch = { touched = true })
+    // PAL-20: long-press and right-click open the same preview on every result, in all three layouts.
+    val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }, onTouch = { touched = true })
+    val onPreview: (Tile) -> Unit = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }
+    val setWheel: (SearchCategory?) -> Unit = { c -> userCat = c; setQuery(ScopePrefixes.applyWheel(field.text, c)); expandedContact = null }
+
+    // ---- keyboard (PAL-07): the same model walks Flat, Orbit and Filmstrip results.
+    val navTiles = remember(data, selected, typing, layout, orbitVisible) {
+        if (typing || layout == SearchLayout.Flat) flatTiles(data, selected)
+        else data.tiles(selected).let { if (layout == SearchLayout.Orbit) it.take(orbitVisible) else it }
+    }
+    val navNow = nav.withCount(navTiles.size)
+    LaunchedEffect(trimmed, selected) { nav = RadarNav(navTiles.size) }
+    val selectedKey = if (inputMode == InputMode.Keyboard && navNow.active) navTiles.getOrNull(navNow.selected)?.key else null
+    fun runMenu(tile: Tile, entry: ResultMenuEntry) {
+        when {
+            entry.preview -> previewTile = tile
+            entry.action == MenuAction.Open -> tap(tile)
+            entry.action == MenuAction.AppInfo && tile is Tile.App -> onOpenIntent(appInfoIntent(tile.app.packageName))
+            tile is Tile.App -> onLongPressApp(tile.app) // dock, workspace, uninstall: the host's own sheet
+        }
+    }
+    val onRadarKey: (KeyEvent) -> Boolean = handler@{ ev ->
+        if (previewTile != null) return@handler false
+        if (ev.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && RadarKeyMap.hardware(ev)) tracker.onKey()
+        val key = RadarKeyMap.radarKey(ev) ?: return@handler false
+        val sel = field.selection
+        val caret = CaretContext(queryBlank = query.isBlank(), atStart = sel.collapsed && sel.start == 0, atEnd = sel.collapsed && sel.end == query.length)
+        val r = RadarKeyboard.reduce(navNow, key, caret) { i -> ResultMenus.forKind(navTiles.getOrNull(i)?.let(::tileKind) ?: ResultKind.Other).size }
+        nav = r.nav
+        when (val e = r.effect) {
+            is RadarEffect.Run -> navTiles.getOrNull(e.index)?.let { tap(it) }
+            is RadarEffect.RunMenu -> navTiles.getOrNull(e.index)?.let { t -> ResultMenus.forKind(tileKind(t)).getOrNull(e.menuIndex)?.let { runMenu(t, it) } }
+            RadarEffect.Dismiss -> onDismiss()
+            is RadarEffect.WheelMove -> { val to = ScopeWheel.step(selected, e.delta); if (to != selected) { tick(); setWheel(to) } }
+            else -> Unit
+        }
+        r.consumed
+    }
+    // The field keeps focus: after a preview closes, or if something steals it, it comes back.
+    LaunchedEffect(previewTile) { if (previewTile == null) { delay(80); runCatching { focus.requestFocus() } } }
     val pickSuggestion: (SuggItem) -> Unit = { item ->
         tick()
         item.scope?.let { userCat = it }
@@ -296,12 +363,12 @@ internal fun SearchScreen(
     }
     val go = {
         val first = data.tiles(selected).firstOrNull()
-        if (first != null && first !is Tile.Person) tap(first) else submitSearch(query, apps, prefs, onLaunch, onOpenIntent)
+        if (first != null && first !is Tile.Person) tap(first) else submitSearch(searchText, apps, prefs, onLaunch, onOpenIntent)
     }
     val showKeyboard = { runCatching { focus.requestFocus(); keyboard?.show() }; Unit }
 
-    val typing = trimmed.isNotEmpty()
-    Box(Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalResultScale provides scale.floatValue, LocalRadarSelection provides selectedKey) {
+    Box(Modifier.fillMaxSize().radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey)) {
         SearchBackdrop(if (prefs.searchBackdrop) prefs.searchBackdropStyle else com.bos.sphere.core.data.SearchBackdropStyle.None, prefs.searchMotion, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
             if (typing) {
@@ -310,7 +377,7 @@ internal fun SearchScreen(
                     data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
                     onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
                     onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
-                    plain = true,
+                    plain = true, onPreview = onPreview,
                     modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 58.dp),
                 )
             } else if (layout != SearchLayout.Flat) {
@@ -331,7 +398,7 @@ internal fun SearchScreen(
                             Box(Modifier.weight(1f)) {
                                 CategoryWheel(
                                     selected = selected, counts = counts,
-                                    onSelect = { userCat = it; touched = true; expandedContact = null },
+                                    onSelect = { setWheel(it); touched = true },
                                     onTick = { tick() }, onTouch = { touched = true },
                                     modifier = Modifier.fillMaxWidth(),
                                 )
@@ -342,6 +409,7 @@ internal fun SearchScreen(
                         Orbit(
                             tiles = data.tiles(selected), motion = prefs.searchMotion, footnote = data.footnote(selected),
                             actions = tileActions, centreFromBottom = centre, modifier = Modifier.fillMaxSize(),
+                            onVisibleCount = { orbitVisible = it },
                         )
                         Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
                         expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
@@ -374,7 +442,7 @@ internal fun SearchScreen(
                     QueryInput(field, { field = it }, go, focus, Color.White, 20.sp, Modifier.fillMaxWidth())
                 }
                 if (typing) {
-                    ScopeToken(userCat, userCat, { userCat = it; expandedContact = null }, plain = true, webLabel = prefs.webEngine.label)
+                    ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label)
                     Icon(
                         Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
                         modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),
@@ -382,6 +450,18 @@ internal fun SearchScreen(
                 }
             }
         }
+        // The action list of the keyboard-selected result (Tab / Right / Menu).
+        if (navNow.menuOpen) navTiles.getOrNull(navNow.selected)?.let { t ->
+            RadarActionList(
+                ResultMenus.forKind(tileKind(t)), navNow.menuIndex,
+                onPick = { i -> nav = navNow.copy(menuOpen = false); ResultMenus.forKind(tileKind(t)).getOrNull(i)?.let { runMenu(t, it) } },
+                modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(end = 16.dp, bottom = 64.dp),
+            )
+        }
+        previewTile?.let { t ->
+            ResultPreview(t, trimmed, onDismiss = { previewTile = null }, onOpen = { previewTile = null; tap(t) }, onLongPressApp = { previewTile = null; onLongPressApp(it) }, onOpenIntent = onOpenIntent)
+        }
+    }
     }
 }
 

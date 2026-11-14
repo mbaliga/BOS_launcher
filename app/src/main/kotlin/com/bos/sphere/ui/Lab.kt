@@ -61,6 +61,13 @@ fun rememberLabEntries(inputs: CapabilityInputs, results: SnapshotStateMap<Strin
                 put("spk06", "${Build.MANUFACTURER} · ignoring battery optimisation=${pm.isIgnoringBatteryOptimizations(app.packageName)}. Note whether gesture navigation worked with Liftoff as home and whether it was killed in the background.")
             }),
             LabEntry("spk07", "SPK-07 On-device speech", "present=${inputs.speechOnDevice ?: "unknown"}", null),
+            // PAL-23: the Orbit's feel constants; a tap steps each to its next value (wrapping), "reset" restores the defaults.
+        ) + com.bos.sphere.feature.grid.OrbitFeel.labHooks(app).map { h ->
+            LabEntry("feel:${h.id}", h.title, results["feel:${h.id}"] ?: h.label(), { h.set(h.next()); put("feel:${h.id}", h.label()) })
+        } + LabEntry("feel:reset", "Orbit feel: reset to defaults", "Tap to restore the committed defaults", {
+            com.bos.sphere.feature.grid.OrbitFeel.reset(app)
+            com.bos.sphere.feature.grid.OrbitFeel.labHooks(app).forEach { put("feel:${it.id}", it.label()) }
+        }) + listOf(
             LabEntry("input", "Input devices", "keyboard=${inputs.hasKeyboard} pointer=${inputs.hasPointer} controller=${inputs.hasController}", null),
         )
     }

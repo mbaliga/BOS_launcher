@@ -56,6 +56,8 @@ internal sealed interface Tile {
     data class Web(val row: WebRow, val index: Int) : Tile { override val key get() = "w:$index" }
     data class Bang(val code: String, val name: String, val rewritten: String) : Tile { override val key get() = "b:$code" }
     data class Allow(val files: Boolean) : Tile { override val key get() = if (files) "allow:files" else "allow:contacts" }
+    /** A Ground Control setting as a Radar result (CFG-05); it opens Ground Control on that row. */
+    data class Setting(val entry: SettingEntry) : Tile { override val key get() = "set:${entry.id}" }
 }
 
 internal fun Tile.caption(): String = when (this) {
@@ -71,6 +73,7 @@ internal fun Tile.caption(): String = when (this) {
     }
     is Tile.Bang -> "!$code  $name"
     is Tile.Allow -> if (files) L10n.tr("Allow file access") else L10n.tr("Allow contacts to find people")
+    is Tile.Setting -> entry.title
 }
 
 /** Everything the three layouts draw, computed once per query/result change. */
@@ -84,6 +87,8 @@ internal class SearchData(
     val hits: Map<SearchCategory, List<SearchHit>>,
     val askFiles: Boolean,
     val deepHint: Boolean,
+    /** Settings that match the query (CFG-05); shown with the Actions. */
+    val settings: List<SettingEntry> = emptyList(),
 ) {
     val blank = query.isBlank()
 
@@ -91,6 +96,7 @@ internal class SearchData(
         SearchCategory.Apps -> apps.size
         SearchCategory.Contacts -> contacts.size
         SearchCategory.Web -> web.count { it !is WebRow.BangHints } + (hits[cat]?.size ?: 0)
+        SearchCategory.Actions -> (hits[cat]?.size ?: 0) + settings.size
         else -> hits[cat]?.size ?: 0
     }
 
@@ -134,7 +140,7 @@ internal class SearchData(
             }
             hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
         }
-        SearchCategory.Actions -> hits[cat].orEmpty().map { Tile.Hit(it) }
+        SearchCategory.Actions -> hits[cat].orEmpty().map<SearchHit, Tile> { Tile.Hit(it) } + settings.map { Tile.Setting(it) }
     }
 
     /** A quiet hint under the Files results when no deep-search app is installed. */

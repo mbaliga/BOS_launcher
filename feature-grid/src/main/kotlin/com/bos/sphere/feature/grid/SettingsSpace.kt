@@ -76,6 +76,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -208,7 +211,12 @@ private fun SettingsSpaceContent(
     var query by remember { mutableStateOf("") }
     val latestCategories by rememberUpdatedState(categories)
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val rootFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    // CFG-13: the keyboard / controller cursor. -1 = on the category bar. The ring only shows once a key has been used.
+    var kbItem by remember { mutableIntStateOf(-1) }
+    var kbEditing by remember { mutableStateOf(false) }
+    var kbMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { sounds?.play(UiSound.Open) }
 
@@ -217,9 +225,8 @@ private fun SettingsSpaceContent(
     fun shown(): List<Shown> {
         val q = query.trim()
         if (!searching || q.isEmpty()) return latestCategories.getOrNull(cat)?.items.orEmpty().map { Shown(it, null) }
-        return latestCategories.flatMap { c ->
-            c.items.filter { i -> i.title.contains(q, true) || i.value.contains(q, true) || c.title.contains(q, true) }.map { Shown(it, c.title) }
-        }
+        // CFG-14: the same index Radar queries, by name and description.
+        return SettingsIndex.fromCategories(latestCategories).search(q).map { e -> Shown(latestCategories[e.categoryIndex].items[e.itemIndex], e.category) }
     }
 
     fun moveCategory(to: Int) {
@@ -227,6 +234,7 @@ private fun SettingsSpaceContent(
         if (next == cat) { sounds?.play(UiSound.Nope); return }
         cat = next
         paneOpen = -1
+        kbEditing = false
         sounds?.play(UiSound.Move)
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
@@ -234,7 +242,7 @@ private fun SettingsSpaceContent(
     fun openDetail(index: Int) { paneOpen = index; sounds?.play(UiSound.Select) }
     fun tick() { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
 
-    fun closeSearch() { searching = false; query = ""; paneOpen = -1; keyboard?.hide() }
+    fun closeSearch() { searching = false; query = ""; paneOpen = -1; kbItem = -1; keyboard?.hide(); runCatching { rootFocus.requestFocus() } }
 
     BackHandler {
         when {
@@ -244,10 +252,47 @@ private fun SettingsSpaceContent(
         }
     }
 
+    // CFG-13: one handler for keyboard, D-pad and controller buttons; touch and pointer reach the same actions through the rows themselves.
+    val onGcKey: (androidx.compose.ui.input.key.KeyEvent) -> Boolean = handler@{ ev ->
+        if (ev.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && RadarKeyMap.hardware(ev)) kbMode = true
+        val key = RadarKeyMap.groundKey(ev) ?: return@handler false
+        // A page owns its own controls; only Esc leaves it. The search field keeps Left/Right for its caret.
+        if (paneOpen >= 0 && key != GKey.Escape) return@handler false
+        if (searching && (key == GKey.Left || key == GKey.Right)) return@handler false
+        kbMode = true
+        val list = shown()
+        val st = GState(cat, kbItem, kbEditing, paneOpen >= 0, searching)
+        val r = GroundControlNav.reduce(st, key, latestCategories.size, list.size) { i -> GroundControlNav.kindOf(list[i].item) }
+        kbItem = r.state.item
+        kbEditing = r.state.editing
+        if (r.state.category != cat) moveCategory(r.state.category)
+        when (val e = r.effect) {
+            GEffect.Close -> { sounds?.play(UiSound.Close); onClose() }
+            GEffect.Rejected -> sounds?.play(UiSound.Nope)
+            GEffect.ClosePane -> { paneOpen = -1; sounds?.play(UiSound.Back) }
+            GEffect.CloseSearch -> { closeSearch(); sounds?.play(UiSound.Back) }
+            is GEffect.Flip -> list.getOrNull(e.item)?.item?.let { GroundControlNav.adjust(it, 1); sounds?.play(UiSound.Tick); tick() }
+            is GEffect.Adjust -> list.getOrNull(e.item)?.item?.let { if (GroundControlNav.adjust(it, e.delta)) { sounds?.play(UiSound.Tick); tick() } else sounds?.play(UiSound.Nope) }
+            is GEffect.Activate -> list.getOrNull(e.item)?.item?.let { item ->
+                when (item) {
+                    is SettingItem.Action -> { sounds?.play(UiSound.Select); item.onClick() }
+                    else -> if (item.detail() != null) openDetail(e.item)
+                }
+            }
+            else -> Unit
+        }
+        true
+    }
+
     val customBackdrop = LocalSettingsBackdrop.current
+    LaunchedEffect(Unit) { runCatching { rootFocus.requestFocus() } }
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent(onGcKey)
+            .focusRequester(rootFocus)
+            .focusable()
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) { val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial); if (e.changes.any { it.pressed }) kbMode = false } } }
             .then(if (customBackdrop == null) Modifier.background(Brush.verticalGradient(listOf(Color(0xFF07080D), Color(0xFF0E0C22), Color(0xFF071622)))) else Modifier),
     ) {
         val boxW = maxWidth
@@ -267,7 +312,7 @@ private fun SettingsSpaceContent(
                         if (query.isEmpty()) Text(com.bos.sphere.core.design.L10n.tr("Search settings"), color = HyleColors.InkDim, fontSize = 15.sp)
                         androidx.compose.foundation.text.BasicTextField(
                             value = query,
-                            onValueChange = { query = it; paneOpen = -1 },
+                            onValueChange = { query = it; paneOpen = -1; kbItem = -1 },
                             singleLine = true,
                             textStyle = androidx.compose.ui.text.TextStyle(color = HyleColors.InkBright, fontSize = 15.sp),
                             cursorBrush = androidx.compose.ui.graphics.SolidColor(HyleColors.Violet),
@@ -343,7 +388,12 @@ private fun SettingsSpaceContent(
                         val isRail = (s.item as? SettingItem.Choice<*>)?.preview != null
                         val inset = anchor.coerceAtLeast(14.dp)
                         androidx.compose.runtime.CompositionLocalProvider(LocalRailInset provides inset) {
-                        Column(Modifier.padding(start = if (isRail) 0.dp else inset, end = if (isRail) 0.dp else 20.dp)) {
+                        val onCursor = kbMode && kbItem == i
+                        Column(
+                            Modifier.padding(start = if (isRail) 0.dp else inset, end = if (isRail) 0.dp else 20.dp)
+                                .then(if (onCursor) Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = if (kbEditing) 0.30f else 0.16f)).border(1.5.dp, HyleColors.VioletSoft.copy(alpha = 0.8f), RoundedCornerShape(14.dp)) else Modifier)
+                                .semantics { if (onCursor) selected = true },
+                        ) {
                             if (s.origin != null) Text(s.origin.uppercase(), color = HyleColors.InkDim, fontSize = 10.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 4.dp, bottom = 3.dp))
                             when (val it = s.item) {
                                 is SettingItem.Toggle -> ToggleSettingRow(it) { v -> it.onChange(v); sounds?.play(UiSound.Tick); tick() }

@@ -144,9 +144,13 @@ fun settingsCategoryIndex(categories: List<SettingCategory>, which: Int): Int {
         CATEGORY_HOME -> home
         // No page category (a scrolling home): fall through to Home screen.
         CATEGORY_THIS_PAGE -> if (home == 0) 0 else CATEGORY_THIS_PAGE
+        // 1000 + n: the category at list index n exactly (a Radar settings result opens its own category).
+        in CATEGORY_INDEX_BASE until CATEGORY_INDEX_BASE + 1000 -> (which - CATEGORY_INDEX_BASE).coerceIn(0, (categories.size - 1).coerceAtLeast(0))
         else -> which.coerceIn(0, (categories.size - 1).coerceAtLeast(0))
     }
 }
+
+const val CATEGORY_INDEX_BASE = 1000
 
 private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
 
@@ -644,11 +648,12 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Choice(
                 x("Radar layout"), Glyphs.Apps, com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { x(it.label) },
                 preview = {
-                    VisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v) } }, { x(it.label) }, previewHeight = 140.dp) {
+                    VisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } }, { x(it.label) }, previewHeight = 140.dp) {
                         com.bos.sphere.feature.grid.SearchLayoutPreview(it)
                     }
                 },
-            ) { v -> upd { it.copy(searchLayout = v) } },
+            ) { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } },
+            SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: Radar opens as a flat list while a keyboard or mouse is in use")) { v -> upd { it.copy(searchLayoutPinned = v) } },
             SettingItem.Choice(
                 x("Background"), Glyphs.Image, com.bos.sphere.core.data.SearchBackdropStyle.entries,
                 if (p.searchBackdrop) p.searchBackdropStyle else com.bos.sphere.core.data.SearchBackdropStyle.None, { x(it.label) },

@@ -347,6 +347,10 @@ data class LauncherPrefs(
 
     // --- language
     val language: UiLanguage = UiLanguage.System,
+
+    // --- Radar (PAL-18)
+    /** The user chose a Radar layout on purpose: it is kept even when a keyboard or pointer is in use (which otherwise means Flat). */
+    val searchLayoutPinned: Boolean = false,
 ) {
     fun gridFor(landscape: Boolean): GridSpec = if (landscape) landscapeGrid else portraitGrid
     fun pagingFor(landscape: Boolean): PagingAxis = if (landscape) landscapePaging else portraitPaging

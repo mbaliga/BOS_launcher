@@ -890,6 +890,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
         )
 
+        // CFG-05: every Ground Control setting is also a Radar result; the list is filled once the categories are built below.
+        val settingsForRadar = remember { androidx.compose.runtime.mutableStateOf(emptyList<com.bos.sphere.feature.grid.SettingCategory>()) }
+        val settingsSource = remember { com.bos.sphere.feature.grid.CategorySettingsSource({ settingsForRadar.value }) { e -> searchOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_INDEX_BASE + e.categoryIndex) } }
         val recentApps = remember(history, appsByKey) { history.asReversed().map { it.key }.distinct().mapNotNull(appsByKey::get) }
         SearchOverlay(
             visible = searchOpen,
@@ -907,6 +910,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onRequestContactsPermission = { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) },
             onDismiss = { searchOpen = false },
             modifier = Modifier.fillMaxSize(),
+            settingsSource = settingsSource,
         )
 
         WheelDrawer(
@@ -1032,6 +1036,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             ),
             )
         }
+        androidx.compose.runtime.SideEffect { settingsForRadar.value = categories }
         SettingsSpace(
             visible = settingsOpen,
             categories = categories,

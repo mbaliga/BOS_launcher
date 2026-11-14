@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -88,6 +89,8 @@ internal class TileActions(
     val onLongPress: (Tile) -> Unit,
     /** The user touched the results: hide the suggestion card. */
     val onTouch: () -> Unit,
+    /** Right-click: defaults to what long-press does (PAL-20). */
+    val onSecondary: (Tile) -> Unit = onLongPress,
 )
 
 // ---------------------------------------------------------------- contact channel bar
@@ -128,6 +131,8 @@ internal fun Filmstrip(
     actions: TileActions,
     modifier: Modifier = Modifier,
 ) {
+    val z = LocalResultScale.current
+    val selectedKey = LocalRadarSelection.current
     val n = tiles.size
     val loop = motion && n >= 5
     val state = remember(loop, n, tiles.firstOrNull()?.key) {
@@ -149,6 +154,15 @@ internal fun Filmstrip(
             acc += speedPx * dt.coerceAtMost(0.1f)
             if (acc >= 1f) { state.scrollBy(acc); acc = 0f }
         }
+    }
+    // The keyboard selection scrolls into the middle.
+    LaunchedEffect(selectedKey, n) {
+        val target = tiles.indexOfFirst { it.key == selectedKey }
+        if (target < 0) return@LaunchedEffect
+        if (loop) {
+            val base = state.firstVisibleItemIndex - state.firstVisibleItemIndex % n
+            runCatching { state.animateScrollToItem(base + target) }
+        } else runCatching { state.animateScrollToItem(target) }
     }
     val centreIndex by remember(state) {
         derivedStateOf {
@@ -189,19 +203,19 @@ internal fun Filmstrip(
                 }
             }
         }
-        Box(Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().heightIn(min = 26.dp).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
             val focus = centreIndex?.let { if (n > 0) tiles.getOrNull(it % n) else null } ?: tiles.firstOrNull()
             when {
                 expanded != null -> ContactChannelBar(expanded, onOpenIntent)
                 focus != null -> Text(
-                    tileCaption(focus, query), color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp, maxLines = 1,
+                    tileCaption(focus, query), color = Color.White.copy(alpha = 0.92f), fontSize = (14 * z).sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                 )
-                footnote != null -> Text(footnote, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1)
+                footnote != null -> Text(footnote, color = Color.White.copy(alpha = 0.6f), fontSize = (12 * z).sp, maxLines = 1)
             }
         }
         if (footnote != null && n > 0 && expanded == null) {
-            Text(footnote, color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp, maxLines = 1, modifier = Modifier.padding(bottom = 4.dp))
+            Text(footnote, color = Color.White.copy(alpha = 0.55f), fontSize = (11 * z).sp, maxLines = 1, modifier = Modifier.padding(bottom = 4.dp))
         }
     }
 }
@@ -219,6 +233,8 @@ private fun StripTileView(tile: Tile, actions: TileActions) {
     Box(
         Modifier
             .size(StripTile)
+            .radarSelectedRing(LocalRadarSelection.current == tile.key, RoundedCornerShape(14.dp))
+            .secondaryClick { actions.onSecondary(tile) }
             .combinedClickable(onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
     ) { TileFace(tile, StripTile) }
 }
@@ -241,13 +257,20 @@ internal fun Orbit(
     /** Distance from the bottom edge to the common centre of the rings (the middle of the category wheel). */
     centreFromBottom: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    /** Reports how many of [tiles] have a slot on screen, so the keyboard never selects one that is not drawn. */
+    onVisibleCount: (Int) -> Unit = {},
 ) {
+    val z = LocalResultScale.current
+    val selectedKey = LocalRadarSelection.current
     // Arc length travelled (px). It creeps along very slowly by itself; a sideways drag turns the
     // rings directly and a fling leaves extra speed that eases back to the creep.
     val travel = remember { mutableFloatStateOf(0f) }
     val extra = remember { floatArrayOf(0f) } // px/s added by the user
     val dragging = remember { booleanArrayOf(false) }
-    val creepPx = with(LocalDensity.current) { 2.5.dp.toPx() }
+    val density0 = LocalDensity.current
+    val appCtx = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    // PAL-23: tuned values persist; load them once so the Orbit uses them without the Lab page being opened first.
+    androidx.compose.runtime.LaunchedEffect(Unit) { OrbitFeel.load(appCtx) }
     androidx.compose.runtime.LaunchedEffect(motion) {
         var last = 0L
         while (true) {
@@ -255,10 +278,11 @@ internal fun Orbit(
                 val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.05f)
                 last = now
                 if (!dragging[0]) {
-                    val base = if (motion) creepPx else 0f
+                    // PAL-23: the feel constants are read live, so the Lab page retunes a running Orbit.
+                    val feel = OrbitFeel.current
+                    val base = if (motion) with(density0) { feel.creepDp.dp.toPx() } else 0f
                     travel.floatValue += (base + extra[0]) * dt
-                    extra[0] *= (1f - 3f * dt).coerceAtLeast(0f)
-                    if (kotlin.math.abs(extra[0]) < 1f) extra[0] = 0f
+                    extra[0] = OrbitMotion.decay(extra[0], dt, feel)
                 }
             }
         }
@@ -279,7 +303,7 @@ internal fun Orbit(
         ) { change, dx ->
             change.consume()
             travel.floatValue += dx
-            extra[0] = (extra[0] * 0.8f + dx / 0.016f * 0.2f * 0.3f).coerceIn(-700f, 700f)
+            extra[0] = OrbitMotion.flingSpeed(extra[0], dx, OrbitFeel.current)
         }
     }) {
         val density = LocalDensity.current
@@ -330,11 +354,13 @@ internal fun Orbit(
             kept
         }
 
+        val shown = tiles.take(slots.size)
+        androidx.compose.runtime.SideEffect { onVisibleCount(shown.size) }
         Canvas(Modifier.fillMaxSize()) {
             for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.10f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
         }
 
-        tiles.take(slots.size).forEachIndexed { i, tile ->
+        shown.forEachIndexed { i, tile ->
             val (ring, baseAngle) = slots[i]
             val dir = if (ring % 2 == 1) -1.0 else 1.0
             Column(
@@ -350,17 +376,17 @@ internal fun Orbit(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 androidx.compose.foundation.layout.Box(
-                    Modifier.clip(androidx.compose.foundation.shape.CircleShape).orbitClick(tile, actions),
+                    Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape).secondaryClick { actions.onSecondary(tile) }.orbitClick(tile, actions),
                 ) { TileFace(tile, tileSize) }
                 Text(
-                    tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = 10.sp, maxLines = 1,
+                    tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
                 )
             }
         }
         if (footnote != null) {
             Text(
-                footnote, color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp, maxLines = 1,
+                footnote, color = Color.White.copy(alpha = 0.55f), fontSize = (11 * z).sp, maxLines = 1,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp),
             )
         }
@@ -399,6 +425,8 @@ internal fun FlatResults(
     modifier: Modifier = Modifier,
     /** Typing mode: no card, apps first without a header, suggestions last, "Web Suggestions". */
     plain: Boolean = false,
+    /** Long-press / right-click on a result (the host shows the preview, the same one in all layouts). */
+    onPreview: (Tile) -> Unit = {},
 ) {
     if (data.blank) return
     val rows = remember(data, scope, suggestions) {
@@ -406,12 +434,7 @@ internal fun FlatResults(
             var si = 0
             fun addSuggestions() { suggestions.forEach { g -> add(FRow.Header(g.header)); g.items.forEach { add(FRow.Sugg(it, si++)) } } }
             if (!plain) addSuggestions()
-            val order = listOf(
-                SearchCategory.Apps to L10n.tr("Applications"), SearchCategory.Actions to L10n.tr("Actions"),
-                SearchCategory.Contacts to L10n.tr("Contacts"), SearchCategory.Files to L10n.tr("Files"),
-                SearchCategory.Web to L10n.tr("Web"),
-            ).let { if (data.webFirst) it.sortedBy { p -> if (p.first == SearchCategory.Web) 0 else 1 } else it }
-            for ((cat, title) in order) {
+            for ((cat, title) in flatSections(data)) {
                 if (scope != null && scope != cat) continue
                 val tiles = data.tiles(cat)
                 val note = data.footnote(cat)
@@ -424,30 +447,20 @@ internal fun FlatResults(
             if (plain) addSuggestions()
         }
     }
-    val ctx0 = androidx.compose.ui.platform.LocalContext.current
-    val scale = remember { mutableFloatStateOf(RadarPrefs.scale(ctx0)) }
-    var previewTile by remember { mutableStateOf<Tile?>(null) }
     if (rows.isEmpty()) return
-    androidx.compose.runtime.CompositionLocalProvider(LocalResultScale provides scale.floatValue) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val selectedKey = LocalRadarSelection.current
+    // The keyboard selection stays in view.
+    LaunchedEffect(selectedKey) {
+        val at = rows.indexOfFirst { it is FRow.Item && it.tile.key == selectedKey }
+        if (at >= 0) {
+            val vis = listState.layoutInfo.visibleItemsInfo
+            if (vis.isEmpty() || at <= vis.first().index || at >= vis.last().index) runCatching { listState.animateScrollToItem((at - 1).coerceAtLeast(0)) }
+        }
+    }
+    // Pinch and Ctrl+scroll live on the whole Radar screen (PAL-20), so the scale comes from LocalResultScale.
     LazyColumn(
         modifier
-            // Pinch in / out anywhere on the results to shrink or grow the text; the size is remembered.
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    do {
-                        val ev = awaitPointerEvent(PointerEventPass.Initial)
-                        if (ev.changes.count { it.pressed } >= 2) {
-                            val z = ev.calculateZoom()
-                            if (z != 1f) {
-                                scale.floatValue = (scale.floatValue * z).coerceIn(0.8f, 2.2f)
-                                ev.changes.forEach { it.consume() }
-                            }
-                        }
-                    } while (ev.changes.any { it.pressed })
-                    RadarPrefs.setScale(ctx0, scale.floatValue)
-                }
-            }
             .then(if (plain) Modifier else Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xE61C1D21)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(16.dp)))
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -457,6 +470,7 @@ internal fun FlatResults(
                     }
                 }
             },
+        state = listState,
         contentPadding = PaddingValues(bottom = 8.dp),
     ) {
         itemsIndexed(rows, key = { _, r -> r.key }) { idx, row ->
@@ -475,15 +489,24 @@ internal fun FlatResults(
                     if (rows.getOrNull(idx + 1) is FRow.Sugg) Divider()
                 }
                 is FRow.Item -> {
-                    FlatTileRow(row.tile, data.query, onTileTap, { previewTile = it }, onOpenIntent, onQueryChange)
+                    FlatTileRow(row.tile, data.query, onTileTap, onPreview, onOpenIntent, onQueryChange)
                     if (rows.getOrNull(idx + 1) is FRow.Item) Divider()
                 }
             }
         }
     }
-    }
-    previewTile?.let { t -> ResultPreview(t, data.query, onDismiss = { previewTile = null }, onOpen = { previewTile = null; onTileTap(t) }, onLongPressApp = { previewTile = null; onLongPressApp(it) }) }
 }
+
+/** The sections of the flat list, in order: Applications, Actions, Contacts, Files, Web (web first for bangs and URLs). */
+internal fun flatSections(data: SearchData): List<Pair<SearchCategory, String>> = listOf(
+    SearchCategory.Apps to L10n.tr("Applications"), SearchCategory.Actions to L10n.tr("Actions"),
+    SearchCategory.Contacts to L10n.tr("Contacts"), SearchCategory.Files to L10n.tr("Files"),
+    SearchCategory.Web to L10n.tr("Web"),
+).let { if (data.webFirst) it.sortedBy { p -> if (p.first == SearchCategory.Web) 0 else 1 } else it }
+
+/** The results the keyboard walks in the flat list (PAL-07), top to bottom as they are drawn. */
+internal fun flatTiles(data: SearchData, scope: SearchCategory?): List<Tile> =
+    if (data.blank) emptyList() else flatSections(data).filter { scope == null || scope == it.first }.flatMap { data.tiles(it.first) }
 
 @Composable
 private fun Divider() {
@@ -501,11 +524,13 @@ private fun FlatTileRow(
     onQueryChange: (String) -> Unit,
 ) {
     val z = LocalResultScale.current
+    val sel = LocalRadarSelection.current == tile.key
+    val selBg = if (sel) Modifier.background(Color(0x33B9A8FF)).radarSelectedRing(true, RoundedCornerShape(10.dp)) else Modifier
     when (tile) {
-        is Tile.Person -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 16.dp)) {
+        is Tile.Person -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().then(selBg).padding(vertical = 6.dp, horizontal = 16.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f).clickable { onOpenIntent(ContactActions.openContact(tile.c.hit)) },
+                modifier = Modifier.weight(1f).secondaryClick { onPreview(tile) }.combinedClickable(onClick = { onOpenIntent(ContactActions.openContact(tile.c.hit)) }, onLongClick = { onPreview(tile) }),
             ) {
                 ContactFace(tile.c, 38.dp * z)
                 Text(tile.c.hit.name, color = Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp))
@@ -515,12 +540,14 @@ private fun FlatTileRow(
         }
         is Tile.Bang -> Text(
             "!${tile.code}  ${tile.name}", color = HyleColors.VioletSoft, fontSize = (18 * z).sp,
-            modifier = Modifier.fillMaxWidth().clickable { onQueryChange(tile.rewritten) }.padding(horizontal = 16.dp, vertical = 11.dp),
+            modifier = Modifier.fillMaxWidth().then(selBg).clickable { onQueryChange(tile.rewritten) }.padding(horizontal = 16.dp, vertical = 11.dp),
         )
         else -> Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                .then(selBg)
+                .secondaryClick { onPreview(tile) }
                 .combinedClickable(
                     onClick = { onTap(tile) },
                     onLongClick = { onPreview(tile) },
@@ -559,12 +586,13 @@ internal object RadarPrefs {
 
 /** Long-press preview: the result at full size, with everything it knows, and the way to open it. */
 @Composable
-private fun ResultPreview(
+internal fun ResultPreview(
     tile: Tile,
     query: String,
     onDismiss: () -> Unit,
     onOpen: () -> Unit,
     onLongPressApp: (com.bos.sphere.core.data.AppEntry) -> Unit,
+    onOpenIntent: ((android.content.Intent) -> Unit)? = null,
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         androidx.compose.foundation.layout.Column(
@@ -576,6 +604,16 @@ private fun ResultPreview(
             if (tile is Tile.Hit) {
                 tile.hit.subtitle?.let { Text(it, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp)) }
                 tile.hit.snippet?.let { Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xE6FFFFFF), fontSize = 16.sp, maxLines = 12, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp)) }
+            }
+            if (tile is Tile.Setting) {
+                Text(tile.entry.category, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                if (tile.entry.description.isNotEmpty()) Text(tile.entry.description, color = Color(0xE6FFFFFF), fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
+            }
+            if (tile is Tile.Person && onOpenIntent != null) {
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                Row(Modifier.padding(top = 14.dp)) {
+                    tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
+                }
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
                 if (tile is Tile.App) Text("OPTIONS", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,

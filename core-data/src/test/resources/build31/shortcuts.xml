@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="corner.TopLeft">{&quot;t&quot;:&quot;single&quot;,&quot;i&quot;:&quot;app:com.example.mail/.Main#0&quot;}</string>
+    <string name="corner.TopRight">{&quot;t&quot;:&quot;widget&quot;,&quot;id&quot;:77,&quot;n&quot;:&quot;Weather&quot;}</string>
+    <string name="corner.BottomLeft">{&quot;t&quot;:&quot;palette&quot;,&quot;n&quot;:&quot;Quick&quot;,&quot;i&quot;:[&quot;action:Camera&quot;,&quot;app:com.example.maps/.Main#0&quot;]}</string>
+    <string name="gesture.DoubleTap">action:AllApps</string>
+    <string name="gesture.PinchIn"></string>
+</map>

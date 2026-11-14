@@ -4,6 +4,16 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Build identity shown in Settings → About, taken from git so every APK is traceable to a commit.
+fun git(vararg args: String): String = providers.exec {
+    commandLine("git", *args)
+    workingDir = rootDir
+    isIgnoreExitValue = true
+}.standardOutput.asText.get().trim()
+val gitSha = git("rev-parse", "--short", "HEAD").ifEmpty { "unknown" }
+val gitDate = git("show", "-s", "--format=%cs", "HEAD").ifEmpty { "unknown" }
+val gitCount = git("rev-list", "--count", "HEAD").toIntOrNull() ?: 1
+
 android {
     namespace = "com.bos.sphere"
     compileSdk = 35
@@ -12,13 +22,18 @@ android {
         applicationId = "com.bos.sphere"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-m1"
+        versionCode = gitCount
+        versionName = "0.2.0"
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("String", "GIT_DATE", "\"$gitDate\"")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Optimised (R8) build for daily use; signed with the debug key so it installs without a keystore.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -27,6 +42,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
@@ -42,11 +58,21 @@ android {
 dependencies {
     implementation(project(":core-design"))
     implementation(project(":core-data"))
-    implementation(project(":feature-sphere"))
     implementation(project(":feature-search"))
+    implementation(project(":feature-grid"))
     implementation(project(":shaders"))
+    implementation(project(":core-capabilities"))
+    implementation(project(":core-launch"))
+    implementation(project(":core-input"))
+    implementation(project(":core-quality"))
+    implementation(project(":core-catalog"))
+    implementation(project(":core-signals"))
+    implementation(project(":feature-dock"))
+    implementation(project(":feature-desktop"))
+    implementation(project(":feature-launchpad"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.health.connect.client)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
@@ -59,3 +85,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+// NFR-08: fail when the release APK is over the download budget (see apk-size.gradle.kts).
+apply(from = "apk-size.gradle.kts")

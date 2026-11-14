@@ -28,10 +28,15 @@ android {
 dependencies {
     implementation(project(":core-design"))
     implementation(project(":core-data"))
+    implementation(project(":search-engine"))
+    implementation(project(":core-input"))
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
+
+    testImplementation(libs.junit)
 }

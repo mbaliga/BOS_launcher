@@ -171,6 +171,8 @@ fun SettingsSpace(
     session: Int = 0,
     /** What sits behind Settings (the dimmed wallpaper, or black). Null = the built-in violet gradient and waves. */
     backdrop: (@Composable () -> Unit)? = null,
+    /** CFG-18: the always-visible live preview of the home (see [SettingsPreviewDock]). */
+    previewDock: (@Composable androidx.compose.foundation.layout.BoxScope.() -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -182,7 +184,10 @@ fun SettingsSpace(
             androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
             LocalSettingsBackdrop provides backdrop,
         ) {
-            androidx.compose.runtime.key(session) { SettingsSpaceContent(categories, initialCategory, sounds, onClose) }
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                androidx.compose.runtime.key(session) { SettingsSpaceContent(categories, initialCategory, sounds, onClose) }
+                previewDock?.invoke(this)
+            }
         }
     }
 }

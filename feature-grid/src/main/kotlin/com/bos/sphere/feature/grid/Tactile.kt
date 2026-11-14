@@ -52,10 +52,10 @@ import kotlin.math.roundToInt
  * segments, pill-thumb fader): recessed dark grooves, lit rims, one violet accent.
  */
 
-internal val Groove = Color(0xFF15131D)
-internal val GrooveSel = Color(0xFF241F37)
-private val RimLight = Color(0x33FFFFFF)
-private val RimDark = Color(0xCC000000)
+internal val Groove: Color get() = TactileTokens.groove
+internal val GrooveSel: Color get() = TactileTokens.grooveSel
+private val RimLight: Color get() = TactileTokens.rimLight
+private val RimDark: Color get() = TactileTokens.rimDark
 
 /** The kit's toggle: a recessed groove with a machined knob that slides and lights the accent. */
 @Composable
@@ -110,7 +110,7 @@ internal fun TactileSlider(
             val tw = size.width - thumbW
             val x = thumbW / 2 + tw * fraction.coerceIn(0f, 1f)
             val h = 3.dp.toPx()
-            drawRoundRect(Color(0xFF3A3550), Offset(thumbW / 2, cy - h / 2), Size(tw, h), CornerRadius(h))
+            drawRoundRect(TactileTokens.track, Offset(thumbW / 2, cy - h / 2), Size(tw, h), CornerRadius(h))
             drawRoundRect(Color(0x55000000), Offset(thumbW / 2, cy - h / 2), Size(tw, h / 2), CornerRadius(h))
             drawRoundRect(HyleColors.Violet, Offset(thumbW / 2, cy - h / 2), Size(x - thumbW / 2, h), CornerRadius(h))
             if (defaultFraction != null) {
@@ -145,7 +145,7 @@ internal fun SegmentSlab(labels: List<String>, selected: Int, onSelect: (Int) ->
             labels.forEachIndexed { i, label ->
                 if (i > 0) Box(
                     Modifier.width(3.dp).fillMaxHeight(0.62f).clip(RoundedCornerShape(2.dp))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFF55555F), Color(0xFFD8D8E0), Color(0xFF55555F)))),
+                        .background(TactileTokens.chrome),
                 )
                 val sel = i == selected
                 Box(
@@ -158,7 +158,7 @@ internal fun SegmentSlab(labels: List<String>, selected: Int, onSelect: (Int) ->
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        label.uppercase(), color = if (sel) Color.White else HyleColors.InkDim,
+                        label.uppercase(), color = if (sel) TactileTokens.onSelected else HyleColors.InkDim,
                         fontSize = 11.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                         maxLines = 1, softWrap = false, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 2.dp),
                     )

@@ -159,15 +159,10 @@ internal fun StepperSettingRow(item: SettingItem.Stepper, onTick: () -> Unit) {
     SettingRowFrame(
         item.glyph, item.title, hint = item.hint,
         trailing = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RoundStep("−", item.count > item.range.first, "Decrease ${item.title}") { onTick(); item.onChange(item.count - 1) }
-                Text(
-                    item.value.toString(), color = HyleColors.InkBright, fontSize = 15.sp, fontWeight = FontWeight.Medium,
-                    modifier = Modifier.widthIn(min = 34.dp).padding(horizontal = 6.dp).semantics { contentDescription = "${item.title} ${item.count}" },
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                RoundStep("+", item.count < item.range.last, "Increase ${item.title}") { onTick(); item.onChange(item.count + 1) }
-            }
+            TactileStepper(
+                item.value.toString(), item.count > item.range.first, item.count < item.range.last,
+                { onTick(); item.onChange(item.count - 1) }, { onTick(); item.onChange(item.count + 1) }, item.title,
+            )
         },
     )
 }

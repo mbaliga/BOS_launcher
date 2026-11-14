@@ -1,0 +1,24 @@
+# Launchpad stream status
+
+Status words: built = compiles and is unit or Robolectric tested; partial; not started; unmet. Nothing is
+device-confirmed. The device steps are in `docs/device-checklist-launchpad.md`.
+
+| ID | Status | Note |
+| --- | --- | --- |
+| STR-01 | partial | Live edge drag with peek and spring-back, fling and hysteresis, handle, click, rebindable Ctrl+N shortcut, landscape strip and portrait takeover are built and tested (RevealMath, gesture tests). Not device-checked. The shortcut only fires while a launcher surface holds focus (spec section 3); no global dispatcher exists yet |
+| STR-02 | partial | Grouping by app then conversation, newest first (new AppConversation mode, now the default); dismiss goes to the system listener; plain actions and an inline reply row built (RemoteInput through the notification's own PendingIntent). The reply send path and RemoteInput parsing need a real notification on a device |
+| STR-03 | built | Slide left runs the per-app primary action (default Dismiss), slide right opens the palette with Snooze, Read, Mute, Open, Rule. Buttons on hover and focus, long-press, right-click, Menu key, Delete and TalkBack custom actions, all from one entry list (tested for parity) |
+| STR-04 | built | Per-app delivery (immediately, digest at chosen times, silent in Launchpad) persisted in the Launchpad store; LaunchpadRulesSnapshot (rules, grouping, gestures, delivery, unknown fields kept) is exposed for the state store. The state stream must call `LaunchpadSettings.snapshot()` and `restore()` for the export; no export wiring was done here. The rules page states the scope |
+| STR-05 | built | GrantGate/GrantScreen in core-design; Launchpad shows it without access (explanation, on-device promise, enable button, a still-off line after the first ask); the media strip shows a grant chip that opens the same screen |
+| STR-06 | not started | Not in this stream (dock feed) |
+| STR-07 | partial | Robolectric screenshots in portrait and landscape for no grant, empty, grouped, digest, light and dark, with luminance assertions; device checklist written. The screenshots are not compared against golden images |
+| STR-08 | partial | Arrow keys walk groups and rows, Left and Right collapse and expand, Home and End, Esc closes, focus moves to the neighbour after a removal, focus ring only in keyboard mode. Esc restoring focus to the exact home element needs home elements to opt in with `trackedForLaunchpad` (the focus graph is the input stream's work); the mechanism is built and tested |
+| STR-09 | built | Left-edge waiting indicator: counts waiting items under the rules, widens for a new one, never focusable. It replaces the unread strip only when that strip is off |
+| STR-10 | built | Time, battery, connectivity and sound tiles, each opening a public system panel; no tile claims to toggle anything |
+| STR-11 | not started | Home widget needs an AppWidgetProvider and RemoteViews; not cheap, left out |
+| STR-12 | unmet | No stable public route: opening the shade needs StatusBarManager.expandNotificationsPanel, which is hidden API, so it is excluded from the core build. SPK-04 has no device result to override that |
+| CFG-07 | built | One reusable GrantGate with texts and decision logic for notification, usage, contacts, folders and microphone. Wired for notifications (Launchpad, media strip) and contacts (search row). Usage, folders and microphone have the screen, checks and settings routes in GrantSupport but their feature entry points belong to other streams |
+| CFG-10 | partial | Wallpaper-derived palette (WallpaperColors, contrast-checked), light/dark, density and type scale with a Ground Control page. Launchpad keeps its own two palette pairs rather than reading the shared tokens |
+| CFG-16 | built | Stepper, section header, chips and pill added to the tactile kit, the kit made light/dark aware, and the older-page helpers (SectionHeader, ToggleRow, Stepper, ChipRow, LabeledSlider, TextButtonPill) now draw it. Screenshot test per control type in light and dark |
+| CFG-18 | partial | Live preview dock: the real home records itself into a GraphicsLayer and Ground Control draws that layer scaled. Wiring and sizing are tested; the pixels of the dock are device-only because Robolectric's software canvas cannot draw a GraphicsLayer. The blank-rail defect did not reproduce with the real VisualChoice inside SettingsSpace (portrait and landscape); regression tests now assert the rail cards are drawn |
+| CFG-19 | built | All strings reached through L10n.tr, t() and the settings helper x() in the source tree, plus the enum labels of this stream, exist in all 8 languages (279 strings added in L10nLaunchpad.kt). A unit test scans the source and fails on a missing key. Other streams adding new strings will fail it until they translate |

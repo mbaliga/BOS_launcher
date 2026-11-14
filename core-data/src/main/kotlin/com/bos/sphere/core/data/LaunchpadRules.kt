@@ -41,7 +41,12 @@ enum class RuleAction {
         }
 }
 
-enum class GroupMode { Time, App, Sender, Conversation, Flat }
+enum class GroupMode {
+    Time, App, Sender, Conversation, Flat,
+
+    /** STR-02: by app, then by conversation inside the app; apps and conversations newest first. */
+    AppConversation,
+}
 
 /**
  * A user rule. Every non-null matcher must match (case-insensitive; [text] is "contains" over
@@ -123,7 +128,7 @@ data class Rule(
 }
 
 data class LaunchpadPrefs(
-    val defaultMode: GroupMode = GroupMode.Time,
+    val defaultMode: GroupMode = GroupMode.AppConversation,
     /** Per-app (package name) grouping override. */
     val perApp: Map<String, GroupMode> = emptyMap(),
 )
@@ -259,10 +264,11 @@ object LaunchpadLogic {
         }
 
         // key -> (title, subtitle, items), insertion-ordered
-        class Bucket(val title: String, val subtitle: String, val items: MutableList<HubNotification> = mutableListOf())
+        class Bucket(val title: String, val subtitle: String, val cluster: String? = null, val items: MutableList<HubNotification> = mutableListOf())
         val buckets = LinkedHashMap<String, Bucket>()
         for (n in rest) {
-            val (key, title, sub) = when (effectiveMode(n, rules, prefs)) {
+            val mode = effectiveMode(n, rules, prefs)
+            val (key, title, sub) = when (mode) {
                 GroupMode.Time -> {
                     val d = dayOf(n, zone)
                     val label = when (d) {
@@ -278,11 +284,20 @@ object LaunchpadLogic {
                 GroupMode.Conversation ->
                     Triple("conv:${n.packageName}:${conversationOf(n).lowercase()}", conversationOf(n), appNameOf(n))
                 GroupMode.Flat -> Triple(FLAT_KEY, flatLabel, "")
+                GroupMode.AppConversation ->
+                    Triple("appconv:${n.packageName}:${conversationOf(n).lowercase()}", conversationOf(n), appNameOf(n))
             }
-            buckets.getOrPut(key) { Bucket(title, sub) }.items += n
+            buckets.getOrPut(key) { Bucket(title, sub, if (mode == GroupMode.AppConversation) n.packageName else null) }.items += n
         }
-        sections += buckets.map { (k, b) -> Section(b.title, k, b.items.sortedWith(itemOrder), false, b.subtitle) }
-            .sortedByDescending { s -> s.items.maxOf { it.timestamp } }
+        // Conversations of one app stay together, apps ordered by their newest item, conversations by theirs.
+        val appNewest = HashMap<String, Long>()
+        for (b in buckets.values) b.cluster?.let { c -> appNewest[c] = maxOf(appNewest[c] ?: 0L, b.items.maxOf { it.timestamp }) }
+        sections += buckets.map { (k, b) -> Triple(Section(b.title, k, b.items.sortedWith(itemOrder), false, b.subtitle), b.cluster, b) }
+            .sortedWith(
+                compareByDescending<Triple<Section, String?, Bucket>> { (sec, c, _) -> c?.let { appNewest[it] } ?: sec.items.maxOf { it.timestamp } }
+                    .thenBy { (_, c, _) -> c ?: "" }
+                    .thenByDescending { (sec, _, _) -> sec.items.maxOf { it.timestamp } },
+            ).map { it.first }
         return sections
     }
 
@@ -452,6 +467,45 @@ object LaunchpadSettings {
         sp?.edit()?.remove("gestures")?.apply()
     }
 
+    private val _policies = MutableStateFlow<List<AppPolicy>>(emptyList())
+    /** STR-04: per-app delivery (immediate, digest, silent in Launchpad) and the per-app left-slide action. */
+    val policies: StateFlow<List<AppPolicy>> = _policies.asStateFlow()
+
+    private val _snoozed = MutableStateFlow<Map<String, Long>>(emptyMap())
+    /** Notification key to the time it comes back. Held in memory: it follows the notification, not the config. */
+    val snoozed: StateFlow<Map<String, Long>> = _snoozed.asStateFlow()
+
+    fun snooze(key: String, until: Long) { _snoozed.value = _snoozed.value + (key to until) }
+    fun unsnooze(key: String) { _snoozed.value = _snoozed.value - key }
+    fun pruneSnoozed(activeKeys: Set<String>, now: Long) {
+        val p = SnoozeLogic.prune(_snoozed.value, activeKeys, now)
+        if (p.size != _snoozed.value.size) _snoozed.value = p
+    }
+
+    fun setPolicy(policy: AppPolicy) {
+        val kept = _policies.value.filterNot { it.packageName.equals(policy.packageName, ignoreCase = true) }
+        savePolicies(if (policy == AppPolicy(policy.packageName)) kept else kept + policy)
+    }
+
+    private var unknownExtra = "{}"
+
+    /** The whole persisted state as one document, for the state store and the config export. */
+    fun snapshot(): LaunchpadRulesSnapshot =
+        LaunchpadRulesSnapshot(rules = _rules.value, prefs = _prefs.value, gestures = _gestures.value, policies = _policies.value, extra = unknownExtra)
+
+    /** Replaces everything from [snap] (an import or a restore) and writes it through. */
+    fun restore(snap: LaunchpadRulesSnapshot) {
+        unknownExtra = snap.extra
+        saveRules(snap.rules); savePrefs(snap.prefs); savePolicies(snap.policies)
+        _gestures.value = snap.gestures
+        sp?.edit()?.putString("gestures", LaunchpadGestures.encode(snap.gestures))?.apply()
+    }
+
+    private fun savePolicies(p: List<AppPolicy>) {
+        _policies.value = p
+        sp?.edit()?.putString("policies", PolicyJson.encode(p).toString())?.apply()
+    }
+
     val rules: StateFlow<List<Rule>> = _rules.asStateFlow()
     val prefs: StateFlow<LaunchpadPrefs> = _prefs.asStateFlow()
     /** Keys of notifications the user has opened (not persisted). */
@@ -465,6 +519,7 @@ object LaunchpadSettings {
         _rules.value = LaunchpadJson.decodeRules(s.getString("rules", null))
         _prefs.value = LaunchpadJson.decodePrefs(s.getString("prefs", null))
         _gestures.value = LaunchpadGestures.decode(s.getString("gestures", null))
+        _policies.value = PolicyJson.decode(s.getString("policies", null))
     }
 
     /** Adds [rule], replacing an existing rule with identical matchers and action. */

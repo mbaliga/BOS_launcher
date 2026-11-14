@@ -50,7 +50,50 @@ data class HubNotification(
 data class HubAction(
     val label: String,
     val action: suspend () -> Unit = {},
+    /** The notification's own PendingIntent for this action (null when it has none). */
+    val intent: PendingIntent? = null,
+    /** Set when the action takes inline text (a RemoteInput): Launchpad shows a reply row for it. */
+    val reply: ReplyTarget? = null,
 )
+
+/** The text field a notification action offers. [inputs] are the platform RemoteInputs the answer is written into. */
+class ReplyTarget(
+    val inputs: Array<out android.app.RemoteInput>,
+    val resultKey: String,
+    val hint: String?,
+    val freeForm: Boolean = true,
+)
+
+/** Pure choice and validation for inline replies (STR-02). */
+object ReplyLogic {
+    /** The action to offer as the reply row: the first free-form one, else the first with any input. */
+    fun pick(actions: List<HubAction>): HubAction? =
+        actions.firstOrNull { it.reply?.freeForm == true && it.intent != null } ?: actions.firstOrNull { it.reply != null && it.intent != null }
+
+    fun canSend(text: String) = text.isNotBlank()
+
+    /** Actions other than the reply, in the notification's own order, that can actually be sent. */
+    fun plain(actions: List<HubAction>): List<HubAction> = actions.filter { it.reply == null && it.intent != null }
+
+    /**
+     * Sends [text] through [action]'s own PendingIntent using the platform RemoteInput result route.
+     * Returns false when the intent is gone (the app cancelled the notification meanwhile).
+     */
+    fun send(context: Context, action: HubAction, text: String): Boolean {
+        val target = action.reply ?: return false
+        val pi = action.intent ?: return false
+        if (!canSend(text)) return false
+        return runCatching {
+            val fill = Intent()
+            val results = android.os.Bundle().apply { putCharSequence(target.resultKey, text) }
+            android.app.RemoteInput.addResultsToIntent(target.inputs, fill, results)
+            pi.send(context, 0, fill)
+        }.isSuccess
+    }
+
+    /** Runs a non-reply action through its own PendingIntent. */
+    fun run(action: HubAction): Boolean = action.intent?.let { runCatching { it.send() }.isSuccess } ?: false
+}
 
 /**
  * Singleton provider for the notification stream. The actual service runs in the system
@@ -239,7 +282,13 @@ class SphereNotificationListener : NotificationListenerService() {
 
     private fun parseActions(n: Notification): List<HubAction> =
         n.actions?.mapNotNull { action ->
-            action.title?.toString()?.let { HubAction(label = it) }
+            val label = action.title?.toString() ?: return@mapNotNull null
+            val inputs = action.remoteInputs?.filter { it.resultKey != null }
+            val reply = inputs?.firstOrNull { it.allowFreeFormInput }?.let { first ->
+                ReplyTarget(action.remoteInputs.orEmpty(), first.resultKey, first.label?.toString())
+            }
+            val pi = action.actionIntent
+            HubAction(label = label, action = { runCatching { pi?.send() } }, intent = pi, reply = reply)
         } ?: emptyList()
 
     companion object {

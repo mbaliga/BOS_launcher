@@ -46,16 +46,7 @@ import com.bos.sphere.core.design.HyleColors
 /* Small Hyle-styled controls shared by the editors and the settings panel. */
 
 @Composable
-fun SectionHeader(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text.uppercase(),
-        color = HyleColors.InkDim,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.2.sp,
-        modifier = modifier.padding(top = 14.dp, bottom = 6.dp),
-    )
-}
+fun SectionHeader(text: String, modifier: Modifier = Modifier) = TactileSectionHeader(text, modifier)
 
 @Composable
 fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, hint: String? = null) {
@@ -74,15 +65,7 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, hint
             Text(label, color = HyleColors.Ink, fontSize = 13.sp)
             if (hint != null) Text(hint, color = HyleColors.InkDim, fontSize = 11.sp)
         }
-        Box(
-            Modifier
-                .size(width = 36.dp, height = 20.dp)
-                .background(if (checked) HyleColors.Violet else HyleColors.Surface, RoundedCornerShape(10.dp))
-                .border(1.dp, HyleColors.Hairline, RoundedCornerShape(10.dp)),
-            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
-        ) {
-            Box(Modifier.padding(3.dp).size(14.dp).background(HyleColors.InkBright, CircleShape))
-        }
+        TactileToggle(checked)
     }
 }
 
@@ -90,60 +73,13 @@ fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, hint
 fun Stepper(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(label, color = HyleColors.Ink, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        StepButton("−", enabled = value > range.first, description = "Decrease $label") { onChange(value - 1) }
-        Text(
-            "$value",
-            color = HyleColors.InkBright,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.widthIn(min = 30.dp).padding(horizontal = 8.dp).semantics { contentDescription = "$label $value" },
-        )
-        StepButton("+", enabled = value < range.last, description = "Increase $label") { onChange(value + 1) }
-    }
-}
-
-@Composable
-private fun StepButton(text: String, enabled: Boolean, description: String, onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(30.dp)
-            .background(HyleColors.Surface, CircleShape)
-            .border(1.dp, HyleColors.Hairline, CircleShape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .semantics { contentDescription = description },
-    ) {
-        Text(text, color = if (enabled) HyleColors.InkBright else HyleColors.InkDim.copy(alpha = 0.4f), fontSize = 16.sp)
+        TactileStepper("$value", value > range.first, value < range.last, { onChange(value - 1) }, { onChange(value + 1) }, label)
     }
 }
 
 @Composable
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
-    // Whole chips wrap onto the next line; a chip's own text never breaks.
-    androidx.compose.foundation.layout.FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.padding(vertical = 4.dp),
-    ) {
-        options.forEach { opt ->
-            val sel = opt == selected
-            Text(
-                label(opt),
-                color = if (sel) HyleColors.Background else HyleColors.Ink,
-                fontSize = 12.sp,
-                maxLines = 1,
-                softWrap = false,
-                modifier = Modifier
-                    .background(if (sel) HyleColors.Violet else HyleColors.Surface, RoundedCornerShape(8.dp))
-                    .border(1.dp, HyleColors.Hairline, RoundedCornerShape(8.dp))
-                    .clickable { onSelect(opt) }
-                    .semantics { role = Role.RadioButton; stateDescription = if (sel) "Selected" else "" }
-                    .padding(horizontal = 11.dp, vertical = 6.dp),
-            )
-        }
-    }
-}
+fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) = TactileChipRow(options, selected, label, onSelect)
 
 @Composable
 fun LabeledSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, display: String, onChange: (Float) -> Unit) {
@@ -152,15 +88,11 @@ fun LabeledSlider(label: String, value: Float, range: ClosedFloatingPointRange<F
             Text(label, color = HyleColors.Ink, fontSize = 13.sp)
             Text(display, color = HyleColors.InkBright, fontSize = 12.sp)
         }
-        Slider(
-            value = value,
-            onValueChange = onChange,
-            valueRange = range,
-            colors = SliderDefaults.colors(
-                thumbColor = HyleColors.Violet,
-                activeTrackColor = HyleColors.Violet,
-                inactiveTrackColor = HyleColors.Hairline,
-            ),
+        val span = (range.endInclusive - range.start).coerceAtLeast(1e-6f)
+        TactileSlider(
+            fraction = (value - range.start) / span,
+            onFraction = { f -> onChange(range.start + f * span) },
+            modifier = Modifier.semantics { contentDescription = "$label, $display" },
         )
     }
 }
@@ -195,24 +127,7 @@ fun ActionRow(
 }
 
 @Composable
-fun TextButtonPill(text: String, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    Text(
-        text,
-        color = when {
-            !enabled -> HyleColors.InkDim
-            primary -> HyleColors.Background
-            else -> HyleColors.InkBright
-        },
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier
-            .background(if (primary && enabled) HyleColors.Violet else HyleColors.Surface, RoundedCornerShape(18.dp))
-            .border(1.dp, HyleColors.Hairline, RoundedCornerShape(18.dp))
-            .clickable(enabled = enabled, onClick = onClick)
-            .semantics { role = Role.Button }
-            .padding(horizontal = 16.dp, vertical = 9.dp),
-    )
-}
+fun TextButtonPill(text: String, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) = TactilePill(text, primary, enabled, onClick)
 
 /**
  * A full-screen sheet in the settings space's look (gradient, waves, spaced-caps header) used for

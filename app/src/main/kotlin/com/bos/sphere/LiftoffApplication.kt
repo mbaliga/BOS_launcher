@@ -16,7 +16,8 @@ class LiftoffApplication : Application() {
         DebugStrictMode.installIfDebuggable(applicationInfo)
         runCatching {
             val reports = CrashReports(File(filesDir, "crash-reports"))
-            reports.sessionStarted()
+            // Disk write kept off the main thread so process start stays clean under StrictMode (NFR-02, NFR-12).
+            Thread { runCatching { reports.sessionStarted() } }.apply { name = "liftoff-session-ledger"; isDaemon = true }.start()
             CrashReports.install(reports)
         }
     }

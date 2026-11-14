@@ -32,5 +32,6 @@ while [ $(( $(date +%s) - start )) -lt "$DURATION" ]; do
   [ $((iter % 50)) -eq 0 ] && $ADB shell am kill "$PKG" && sleep 2 && go_home      # process death restore
 done
 $ADB shell settings put system user_rotation 0
+$ADB shell settings put system accelerometer_rotation 1
 check
 echo "SOAK PASS: $iter iterations in $(( $(date +%s) - start )) s with no ANR or crash (device run; record the date in docs/TEST_COVERAGE.md notes)."

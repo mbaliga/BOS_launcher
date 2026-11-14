@@ -9,10 +9,9 @@ import java.io.File
  */
 class CrashReports(private val dir: File, private val maxReports: Int = 20) {
 
-    init { dir.mkdirs() }
-
     /** Saves [t] as a text report and returns the file; keeps only the newest [maxReports]. */
     fun record(t: Throwable, thread: String = "main", nowMs: Long = System.currentTimeMillis()): File {
+        dir.mkdirs()
         val f = File(dir, "crash-$nowMs.txt")
         f.writeText(format(t, thread, nowMs))
         markSessionCrashed()
@@ -31,8 +30,8 @@ class CrashReports(private val dir: File, private val maxReports: Int = 20) {
 
     private val ledger get() = File(dir, "sessions.txt")
 
-    fun sessionStarted() { ledger.appendText("S\n") }
-    private fun markSessionCrashed() { ledger.appendText("C\n") }
+    fun sessionStarted() { dir.mkdirs(); ledger.appendText("S\n") }
+    private fun markSessionCrashed() { dir.mkdirs(); ledger.appendText("C\n") }
 
     /** Crash-free session rate in percent from the local ledger; 100 when no session was recorded. */
     fun crashFreePercent(): Double = crashFreePercent(ledger.takeIf { it.exists() }?.readLines().orEmpty())

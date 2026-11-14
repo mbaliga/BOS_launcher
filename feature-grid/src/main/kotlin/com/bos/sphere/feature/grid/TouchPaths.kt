@@ -31,10 +31,12 @@ object TouchPaths {
     /** Every menu entry is a row in the long-press menu, which is the touch way in. */
     fun forMenu(a: MenuAction): String = when (a) {
         MenuAction.Open, MenuAction.OpenOnDisplay, MenuAction.OpenBeside, MenuAction.AppInfo, MenuAction.AddToDock,
-        MenuAction.AddToWorkspace, MenuAction.Uninstall, MenuAction.Rename, MenuAction.Remove, MenuAction.MoveToFolder,
-        MenuAction.Tags, MenuAction.AddToHome, MenuAction.IconColour, MenuAction.Hide, MenuAction.Unhide, MenuAction.HomeSettings ->
+        MenuAction.AddToWorkspace, MenuAction.Uninstall, MenuAction.Rename, MenuAction.Remove, MenuAction.MoveToFolder ->
             "Long-press the item, then choose ${a.label}"
     }
+
+    /** The home-only rows of the app menu are rows of the same long-press menu. */
+    fun forHomeMenu(a: com.bos.sphere.core.input.HomeMenuAction): String = "Long-press the app, then choose ${a.label}"
 
     /** Corner actions run by tapping the corner they are assigned to; the corner editor (long-press a corner) offers each of them. */
     fun forCornerAction(a: CornerActionId): String = when (a) {

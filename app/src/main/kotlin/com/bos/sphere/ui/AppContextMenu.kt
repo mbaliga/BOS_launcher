@@ -43,6 +43,7 @@ import com.bos.sphere.feature.grid.AppIcon
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.AppMenuModel
 import com.bos.sphere.feature.grid.DialogControllerKeys
+import com.bos.sphere.core.input.HomeMenuAction
 import com.bos.sphere.core.input.MenuAction
 
 /**
@@ -97,20 +98,24 @@ fun AppContextMenu(
             val tagsOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             if (tagsOpen.value) com.bos.sphere.feature.grid.TagDialog(app) { tagsOpen.value = false }
             for (row in rows) {
-                val label = L10n.tr(row.action.label)
-                when (row.action) {
+                val label = L10n.tr(row.label)
+                row.home?.let { h ->
+                    when (h) {
+                        HomeMenuAction.Tags -> MenuItem(Glyphs.Plus, label, { tagsOpen.value = true })
+                        HomeMenuAction.AddToHome -> MenuItem(Glyphs.Plus, label, onToggleHome)
+                        HomeMenuAction.IconColour -> onIconColor?.let { MenuItem(Glyphs.Palette, label, it) }
+                        HomeMenuAction.Hide, HomeMenuAction.Unhide -> MenuItem(Glyphs.Image, label, onToggleHidden)
+                        HomeMenuAction.HomeSettings -> onHomeSettings?.let { MenuItem(Glyphs.Gear, label, it) }
+                    }
+                }
+                when (row.shared) {
                     MenuAction.Open -> {
                         MenuItem(Glyphs.Plus, label, onOpen)
                         // The dock stream's group sits right after Open: display, beside, bounds, dock pinning.
                         extraEntries.forEach { (l, run) -> MenuItem(Glyphs.Plus, l, run) }
                     }
-                    MenuAction.Tags -> MenuItem(Glyphs.Plus, label, { tagsOpen.value = true })
-                    MenuAction.AddToHome -> MenuItem(Glyphs.Plus, label, onToggleHome)
                     MenuAction.Remove -> MenuItem(Glyphs.Close, label, onToggleHome)
-                    MenuAction.IconColour -> onIconColor?.let { MenuItem(Glyphs.Palette, label, it) }
                     MenuAction.AppInfo -> MenuItem(Glyphs.Info, label, onAppInfo)
-                    MenuAction.Hide, MenuAction.Unhide -> MenuItem(Glyphs.Image, label, onToggleHidden)
-                    MenuAction.HomeSettings -> onHomeSettings?.let { MenuItem(Glyphs.Gear, label, it) }
                     MenuAction.Uninstall -> MenuItem(Glyphs.Close, label, onUninstall, destructive = true)
                     // Not offered by this menu's context (see AppMenuModel.context).
                     else -> Unit

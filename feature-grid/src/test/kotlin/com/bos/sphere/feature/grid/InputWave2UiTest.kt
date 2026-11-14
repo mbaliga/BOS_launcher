@@ -72,14 +72,13 @@ class InputWave2UiTest {
     @Test @Config(sdk = [35], qualifiers = "w411dp-h900dp-port-xhdpi")
     fun INP_07_every_menu_entry_is_a_row_a_finger_can_tap_and_it_chooses_that_action() {
         val ctx = com.bos.sphere.core.input.MenuContext(
-            otherDisplays = 1, adjacentSupported = true, onHome = true, canMoveToFolder = true, canTag = true, homeMembership = false,
-            canPickIconColour = true, hidden = false, canOpenHomeSettings = true,
+            otherDisplays = 1, adjacentSupported = true, onHome = true, canMoveToFolder = true,
         )
         val chosen = mutableListOf<com.bos.sphere.core.input.MenuAction>()
         rule.setContent { InputMenu(ctx, MenuTrigger.LongPress, onChoose = { chosen += it }, onDismiss = {}) }
         rule.waitForIdle()
         val entries = InputMenuModel.entries(MenuTrigger.LongPress, ctx)
-        assertTrue(entries.size >= 10)
+        assertTrue(entries.size >= 8)
         for (e in entries) {
             rule.onNodeWithText(e.action.label).assertHasClickAction().performClick()
         }

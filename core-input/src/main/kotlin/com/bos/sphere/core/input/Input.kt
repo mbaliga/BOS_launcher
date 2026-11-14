@@ -120,8 +120,21 @@ enum class MenuAction(val label: String) {
     Open("Open"), OpenOnDisplay("Open on another display"), OpenBeside("Open beside"), AppInfo("App info"),
     AddToDock("Add to dock"), AddToWorkspace("Add to workspace"), Uninstall("Uninstall"),
     Rename("Rename"), Remove("Remove from home"), MoveToFolder("Move to folder"),
-    // Rows the long-press app menu has always had; they are model entries now so touch, right-click and the Menu key share them (INP-03).
+}
+
+/**
+ * Rows only the home's app menu has (the palette's action list does not). They live in their own enum so the palette,
+ * which maps every [MenuAction] to an engine action by name, is not affected (INP-03).
+ */
+enum class HomeMenuAction(val label: String) {
     Tags("Tags"), AddToHome("Add to home"), IconColour("Icon colour"), Hide("Hide"), Unhide("Unhide"), HomeSettings("Home settings"),
+}
+
+/** One row of the home's app menu: a shared [MenuAction] or a [HomeMenuAction]. */
+sealed interface AppMenuEntry {
+    val label: String
+    data class Shared(val entry: MenuEntry) : AppMenuEntry { override val label get() = entry.action.label }
+    data class Home(val action: HomeMenuAction) : AppMenuEntry { override val label get() = action.label }
 }
 
 data class MenuEntry(val action: MenuAction, val enabled: Boolean = true)
@@ -157,15 +170,31 @@ object ContextMenus {
         if (c.isApp) add(MenuEntry(MenuAction.AppInfo))
         if (!c.inDock) add(MenuEntry(MenuAction.AddToDock))
         if (c.workspacesSupported) add(MenuEntry(MenuAction.AddToWorkspace))
-        if (c.canTag) add(MenuEntry(MenuAction.Tags))
-        if (c.homeMembership == false) add(MenuEntry(MenuAction.AddToHome))
-        if (c.canPickIconColour) add(MenuEntry(MenuAction.IconColour))
-        if (c.onHome && c.canMoveToFolder) add(MenuEntry(MenuAction.MoveToFolder))
-        if (c.onHome || c.homeMembership == true) add(MenuEntry(MenuAction.Remove))
-        if (c.hidden == false) add(MenuEntry(MenuAction.Hide))
-        if (c.hidden == true) add(MenuEntry(MenuAction.Unhide))
-        if (c.canOpenHomeSettings) add(MenuEntry(MenuAction.HomeSettings))
+        if (c.onHome) { if (c.canMoveToFolder) add(MenuEntry(MenuAction.MoveToFolder)); add(MenuEntry(MenuAction.Remove)) }
         if (c.isApp && c.canUninstall) add(MenuEntry(MenuAction.Uninstall))
+    }
+
+    /**
+     * The home's app menu: the shared entries of [forItem] with the home-only rows (tags, add to home, icon colour,
+     * hide, home settings) placed before the closing group (move, remove, uninstall). Every trigger uses this one list.
+     */
+    fun forApp(c: MenuContext): List<AppMenuEntry> {
+        val shared = forItem(c)
+        val closing = setOf(MenuAction.MoveToFolder, MenuAction.Remove, MenuAction.Uninstall)
+        val head = shared.filter { it.action !in closing }
+        val tail = shared.filter { it.action in closing }.toMutableList()
+        // On the paged home "remove from home" is offered for an app that is on a page, without the folder entry.
+        if (c.homeMembership == true && tail.none { it.action == MenuAction.Remove }) tail.add(0, MenuEntry(MenuAction.Remove))
+        return buildList {
+            head.forEach { add(AppMenuEntry.Shared(it)) }
+            if (c.canTag) add(AppMenuEntry.Home(HomeMenuAction.Tags))
+            if (c.homeMembership == false) add(AppMenuEntry.Home(HomeMenuAction.AddToHome))
+            if (c.canPickIconColour) add(AppMenuEntry.Home(HomeMenuAction.IconColour))
+            if (c.hidden == false) add(AppMenuEntry.Home(HomeMenuAction.Hide))
+            if (c.hidden == true) add(AppMenuEntry.Home(HomeMenuAction.Unhide))
+            if (c.canOpenHomeSettings) add(AppMenuEntry.Home(HomeMenuAction.HomeSettings))
+            tail.forEach { add(AppMenuEntry.Shared(it)) }
+        }
     }
 
     fun onLongPress(c: MenuContext) = forItem(c)

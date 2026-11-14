@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         handleAction(intent)
         // CFG-09: the start is recorded first, so a crash below counts towards safe mode.
+        com.bos.sphere.feature.desktop.DesktopController.get(this).start()
         com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
         // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
         runCatching { StateService.bridgeBuild31(applicationContext) }
@@ -91,5 +92,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (!handleAction(intent)) homeSignal++
+    }
+
+    // EXT-02: tell the desktop feature where this home activity runs, so the offer is skipped where the platform gives home.
+    override fun onStart() {
+        super.onStart()
+        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStarted(this, display?.displayId ?: 0)
+    }
+
+    override fun onStop() {
+        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStopped(this)
+        super.onStop()
     }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Handles the Always / Never actions of the "open the desktop here?" notification (EXT-02). -->
+        <receiver
+            android:name="com.bos.sphere.feature.desktop.DesktopOfferReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

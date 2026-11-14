@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleAction(intent)
+        com.bos.sphere.feature.grid.LauncherShortcuts.reload(this) // INP-10: saved key bindings, read off the main thread
         // CFG-09: the start is recorded first, so a crash below counts towards safe mode.
         com.bos.sphere.feature.desktop.DesktopController.get(this).start()
         com.bos.sphere.core.data.CrashLoopGuard.onStart(this)

@@ -31,7 +31,8 @@ object TouchPaths {
     /** Every menu entry is a row in the long-press menu, which is the touch way in. */
     fun forMenu(a: MenuAction): String = when (a) {
         MenuAction.Open, MenuAction.OpenOnDisplay, MenuAction.OpenBeside, MenuAction.AppInfo, MenuAction.AddToDock,
-        MenuAction.AddToWorkspace, MenuAction.Uninstall, MenuAction.Rename, MenuAction.Remove, MenuAction.MoveToFolder ->
+        MenuAction.AddToWorkspace, MenuAction.Uninstall, MenuAction.Rename, MenuAction.Remove, MenuAction.MoveToFolder,
+        MenuAction.Tags, MenuAction.AddToHome, MenuAction.IconColour, MenuAction.Hide, MenuAction.Unhide, MenuAction.HomeSettings ->
             "Long-press the item, then choose ${a.label}"
     }
 

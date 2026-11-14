@@ -80,6 +80,7 @@ fun FolderSheet(
 ) {
     var name by remember(folder.id) { mutableStateOf(folder.name) }
     Dialog(onDismissRequest = { onRename(name); onDismiss() }) {
+        DialogControllerKeys()
         Column(Modifier.clip(RoundedCornerShape(24.dp)).background(HyleColors.Surface.copy(alpha = 0.97f)).border(1.dp, HyleColors.Hairline, RoundedCornerShape(24.dp)).padding(16.dp)) {
             BasicTextField(
                 value = name, onValueChange = { name = it }, singleLine = true,

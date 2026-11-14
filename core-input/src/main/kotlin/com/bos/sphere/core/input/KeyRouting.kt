@@ -90,3 +90,16 @@ object KeyLabels {
     /** The sentence the shortcut sheet shows about the system's own Meta shortcuts. */
     const val META_NOTE = "Shortcuts that use the Meta (Windows or Command) key belong to the system. Liftoff never claims them."
 }
+
+/**
+ * INP-20 for dialogs: a dialog is its own window and never sees the activity's key hook, so the same controller
+ * buttons are translated at the dialog window instead. Back and Esc both become the system Back key, which every
+ * dialog already closes on; the other buttons use [ControllerKeys].
+ */
+object DialogKeys {
+    fun translate(keyCode: Int): Int = when (keyCode) {
+        Keys.BUTTON_B, Keys.ESCAPE -> Keys.BACK
+        else -> ControllerKeys.translate(keyCode)
+    }
+    fun shiftFor(keyCode: Int) = ControllerKeys.shiftFor(keyCode)
+}

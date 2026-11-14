@@ -147,6 +147,7 @@ fun GlassDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        DialogControllerKeys()
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
         ) {
@@ -208,6 +209,7 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        DialogControllerKeys()
         Column(
             Modifier
                 .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.98f), RoundedCornerShape(20.dp))

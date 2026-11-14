@@ -595,6 +595,7 @@ internal fun ResultPreview(
     onOpenIntent: ((android.content.Intent) -> Unit)? = null,
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        DialogControllerKeys()
         androidx.compose.foundation.layout.Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color(0xF2101018)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(24.dp)).padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

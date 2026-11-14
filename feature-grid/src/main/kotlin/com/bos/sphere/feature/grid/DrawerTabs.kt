@@ -135,6 +135,7 @@ fun TagDialog(app: AppEntry, onDismiss: () -> Unit) {
     var draft by remember { mutableStateOf("") }
     val mine = tags[app.key].orEmpty()
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        DialogControllerKeys()
         androidx.compose.foundation.layout.Column(
             Modifier.clip(RoundedCornerShape(20.dp)).background(HyleColors.Surface).padding(16.dp),
         ) {

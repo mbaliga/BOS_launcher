@@ -1155,6 +1155,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 app = app,
                 isHidden = app.key in hidden,
                 onDismiss = { menuApp = null },
+                onOpen = { menuApp = null; launch(app) },
                 onAppInfo = { repository.openAppDetails(app); menuApp = null },
                 onUninstall = { repository.requestUninstall(app); menuApp = null },
                 onToggleHidden = { hiddenStore.setHidden(app.key, app.key !in hidden); menuApp = null },

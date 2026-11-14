@@ -92,6 +92,8 @@ object DigestWidget {
         return DigestWidgetLogic.model(view, now, zone, L10n.tr("Digest")) { k, a -> L10n.tr(k, *a) }
     }
 
+    internal fun launchIo(block: suspend () -> Unit) { scope.launch { block() } }
+
     fun ids(context: Context, manager: AppWidgetManager = AppWidgetManager.getInstance(context)): IntArray =
         manager.getAppWidgetIds(ComponentName(context, DigestWidgetProvider::class.java))
 
@@ -123,12 +125,18 @@ object DigestWidget {
 }
 
 class DigestWidgetProvider : AppWidgetProvider() {
-    override fun onEnabled(context: Context) { DigestWidget.start(context) }
+    override fun onEnabled(context: Context) { val app = context.applicationContext; DigestWidget.launchIo { DigestWidget.start(app) } }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        DigestWidget.start(context)
-        // First paint now; the collector refreshes it as the feed and rules change.
-        DigestWidget.update(context, appWidgetManager, appWidgetIds, NotificationProviderSnapshot.items())
+        // First paint off the main thread (settings read from disk); the collector refreshes it afterwards.
+        val pending = runCatching { goAsync() }.getOrNull()
+        val app = context.applicationContext
+        val paint = {
+            DigestWidget.start(app)
+            DigestWidget.update(app, appWidgetManager, appWidgetIds, NotificationProviderSnapshot.items())
+        }
+        if (pending == null) paint() // not delivered by a broadcast (direct call): paint inline
+        else DigestWidget.launchIo { try { paint() } finally { pending.finish() } }
     }
 }
 

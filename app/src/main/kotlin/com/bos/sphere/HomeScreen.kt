@@ -579,7 +579,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)
         com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders())
     }
-    val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+    val appCtx = androidx.compose.ui.platform.LocalContext.current
+    val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        r.data?.data?.let { runCatching { com.bos.sphere.feature.search.palette.FileGrants.persist(appCtx, it) } }
+    }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     // ---- steps need the activity-recognition permission
     val stepsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -1004,7 +1007,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             contacts = contactSource,
             hub = searchHub,
             onRunAction = { runner.run(it) },
-            onRequestFilePermission = { grantPrompter.ask(com.bos.sphere.core.design.GrantKind.Folders) { filePermission.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO, android.Manifest.permission.READ_MEDIA_AUDIO)) } },
+            onRequestFilePermission = { grantPrompter.ask(com.bos.sphere.core.design.GrantKind.Folders) { filePermission.launch(com.bos.sphere.feature.search.palette.FileGrants.pickerIntent()) } },
             sounds = sounds,
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },

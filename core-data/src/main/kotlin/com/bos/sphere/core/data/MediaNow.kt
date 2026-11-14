@@ -20,6 +20,8 @@ data class MediaInfo(
     val playing: Boolean,
     val canPrev: Boolean,
     val canNext: Boolean,
+    /** STR-06: album art or the player's display icon, scaled to [MediaLogic.ART_PX] at most; null when the player gives none. */
+    val artwork: android.graphics.Bitmap? = null,
 )
 
 /** Android-free rules for mapping a playback state and choosing among sessions. */
@@ -49,6 +51,17 @@ object MediaLogic {
     fun choose(states: List<Int>): Int? =
         states.indexOfFirst { isPlaying(it) }.takeIf { it >= 0 }
             ?: states.indexOfFirst { isActive(it) }.takeIf { it >= 0 }
+
+    const val ART_PX = 160
+
+    /** Size to scale artwork to so its longest side is at most [ART_PX]; unchanged when already small. */
+    fun artSize(w: Int, h: Int): Pair<Int, Int> {
+        if (w <= 0 || h <= 0) return 0 to 0
+        val longest = maxOf(w, h)
+        if (longest <= ART_PX) return w to h
+        val f = ART_PX.toFloat() / longest
+        return maxOf(1, (w * f).toInt()) to maxOf(1, (h * f).toInt())
+    }
 
     /** Title shown when the player gives none. */
     fun displayTitle(title: String?, fallback: String): String = title?.takeIf { it.isNotBlank() } ?: fallback
@@ -161,6 +174,23 @@ object MediaNow {
             playing = MediaLogic.isPlaying(st?.state ?: MediaLogic.STATE_NONE),
             canPrev = MediaLogic.canPrev(st?.actions ?: 0L),
             canNext = MediaLogic.canNext(st?.actions ?: 0L),
+            artwork = artworkOf(md),
         )
+    }
+
+    private var lastArtSource: android.graphics.Bitmap? = null
+    private var lastArt: android.graphics.Bitmap? = null
+
+    /** Album art, else art, else the display icon; scaled down once per source bitmap. */
+    private fun artworkOf(md: MediaMetadata?): android.graphics.Bitmap? {
+        val src = md?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            ?: md?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+            ?: md?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+            ?: return null
+        if (src === lastArtSource) return lastArt
+        val (w, h) = MediaLogic.artSize(src.width, src.height)
+        val out = if (w == src.width && h == src.height) src else runCatching { android.graphics.Bitmap.createScaledBitmap(src, w, h, true) }.getOrDefault(src)
+        lastArtSource = src; lastArt = out
+        return out
     }
 }

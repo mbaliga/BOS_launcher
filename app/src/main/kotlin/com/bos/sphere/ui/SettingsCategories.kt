@@ -492,23 +492,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     hint = x("Dark suits the rest of the launcher; Light is the classic hub look."),
                     preview = {
                         VisualChoice(com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { v -> upd { it.copy(launchpadTheme = v) } }, { x(it.label) }, columns = 3, previewHeight = 96.dp) { t ->
-                            val dark = t == com.bos.sphere.core.data.LaunchpadTheme.Dark
-                            val both = t == com.bos.sphere.core.data.LaunchpadTheme.System
-                            androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
-                                for (isDark in if (both) listOf(true, false) else listOf(dark)) {
-                                    androidx.compose.foundation.layout.Column(
-                                        Modifier.weight(1f).fillMaxSize().background(if (isDark) androidx.compose.ui.graphics.Color(0xFF0B0D12) else androidx.compose.ui.graphics.Color(0xFFF7F8FA)),
-                                    ) {
-                                        androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(14.dp).background(androidx.compose.ui.graphics.Color(0xFF0A7CBF)))
-                                        repeat(3) {
-                                            androidx.compose.foundation.layout.Box(
-                                                Modifier.padding(horizontal = 6.dp, vertical = 5.dp).fillMaxWidth().height(6.dp)
-                                                    .background(if (isDark) androidx.compose.ui.graphics.Color(0x66FFFFFF) else androidx.compose.ui.graphics.Color(0x66000000), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                            com.bos.sphere.ui.LaunchpadThemePreview(t)
                         }
                     },
                 ) { v -> upd { it.copy(launchpadTheme = v) } },
@@ -528,6 +512,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 },
             )
             add(SettingItem.Pane(x("Grouping & rules"), Glyphs.Message, x("Per app, sender, conversation")) { com.bos.sphere.ui.LaunchpadRulesPane() })
+            add(SettingItem.Pane(x("Access Liftoff asks for"), Glyphs.Gear, x("Turn on or review what Liftoff may read")) { com.bos.sphere.ui.AccessPane() })
         },
     )
 

@@ -11,6 +11,9 @@ interface LaunchpadSink {
     fun perApp(): Map<String, GroupMode>
     fun setAppMode(pkg: String, m: GroupMode?)
     fun setGesture(g: LaunchpadGesture, a: LaunchpadAction)
+    /** STR-04 delivery policies; defaults keep older sinks compiling. */
+    fun policies(): List<AppPolicy> = emptyList()
+    fun setPolicies(list: List<AppPolicy>) {}
 
     object Live : LaunchpadSink {
         override fun rules() = LaunchpadSettings.rules.value
@@ -20,6 +23,8 @@ interface LaunchpadSink {
         override fun perApp() = LaunchpadSettings.prefs.value.perApp
         override fun setAppMode(pkg: String, m: GroupMode?) = LaunchpadSettings.setAppMode(pkg, m)
         override fun setGesture(g: LaunchpadGesture, a: LaunchpadAction) = LaunchpadSettings.setGesture(g, a)
+        override fun policies() = LaunchpadSettings.policies.value
+        override fun setPolicies(list: List<AppPolicy>) = LaunchpadSettings.replacePolicies(list)
     }
 }
 
@@ -53,6 +58,7 @@ class StateApplier(
             launchpadRules = launchpad.rules(),
             launchpadPrefs = launchpadPrefs(),
             launchpadGestures = launchpadGestures(),
+            launchpadPolicies = launchpad.policies(),
             extras = extras(),
         )
     }
@@ -99,6 +105,7 @@ class StateApplier(
             launchpad.perApp().keys.forEach { launchpad.setAppMode(it, null) }
             parts.launchpadPrefs.perApp.forEach { (k, v) -> launchpad.setAppMode(k, v) }
             parts.launchpadGestures.forEach { (g, a) -> launchpad.setGesture(g, a) }
+            launchpad.setPolicies(parts.launchpadPolicies)
         }
         val cur = extras()
         val ex = parts.extras

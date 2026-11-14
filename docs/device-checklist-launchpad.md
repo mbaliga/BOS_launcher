@@ -83,3 +83,16 @@ and layout only. The items below need real fingers, a real window and real notif
 | 4 | Move Density and Text size | Density scales everything, text size scales only words |
 | 5 | Steppers, section headers and the older pages (corner editor, app picker) | Use the groove and key look, in light and dark |
 | 6 | Style row: the preview rails | Show real renders, not empty frames |
+
+## Wave 2 additions (STR-01, STR-06, STR-08, STR-11, CFG-07)
+
+| # | Step | Expected |
+| --- | --- | --- |
+| 1 | With a hardware keyboard, focus any home element and press Ctrl+N | Launchpad opens. With another app in front, nothing happens (spec section 3) |
+| 2 | With a hardware keyboard, focus a home element with Tab, open Launchpad, press Esc | Launchpad closes and the same element has focus again |
+| 3 | Play music in any player | The media strip shows the cover (or a plain tile), title, artist and prev, play or pause, next. The dock media item shows the same session |
+| 4 | Long-press the home, Widgets, add the Liftoff digest widget | It shows the released digest items (up to four) and a line with the number held and their release time. Tapping it opens the launcher |
+| 5 | Change a digest time or snooze an item | The widget follows within a second while the launcher is running, and at the next system refresh otherwise |
+| 6 | Revoke usage access, tap the enable row in the dock | The explanation screen first, then the system usage access page |
+| 7 | Ground Control, Launchpad, Access Liftoff asks for | Five rows, each showing On or Off. Each row opens the explanation, then the system route (contacts and microphone prompt, folders picker, the two settings pages) |
+| 8 | Reply inline to a messaging notification from Launchpad | The text arrives in the other app and the notification updates |

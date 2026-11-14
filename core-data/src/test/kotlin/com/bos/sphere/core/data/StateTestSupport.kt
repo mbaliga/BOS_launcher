@@ -54,6 +54,9 @@ object StateTestSupport {
         override fun perApp() = per.toMap()
         override fun setAppMode(pkg: String, m: GroupMode?) { if (m == null) per.remove(pkg) else per[pkg] = m }
         override fun setGesture(g: LaunchpadGesture, a: LaunchpadAction) { gestures[g] = a }
+        var held: List<AppPolicy> = emptyList()
+        override fun policies() = held
+        override fun setPolicies(list: List<AppPolicy>) { held = list }
     }
 
     /** A complete set of stores over in-memory preferences, standing in for one app process. */

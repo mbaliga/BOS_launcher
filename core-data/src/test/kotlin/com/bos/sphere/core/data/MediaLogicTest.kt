@@ -47,3 +47,12 @@ class MediaLogicTest {
         assertEquals("Song", MediaLogic.displayTitle("Song", "Spotify"))
     }
 }
+
+class MediaArtworkTest {
+    @org.junit.Test fun STR_06_artworkIsScaledToTheLimitKeepingAspect() {
+        assertEquals(160 to 80, MediaLogic.artSize(1600, 800))
+        assertEquals(40 to 160, MediaLogic.artSize(400, 1600))
+        assertEquals(100 to 100, MediaLogic.artSize(100, 100))
+        assertEquals(0 to 0, MediaLogic.artSize(0, 10))
+    }
+}

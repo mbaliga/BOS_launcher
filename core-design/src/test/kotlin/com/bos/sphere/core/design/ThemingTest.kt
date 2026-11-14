@@ -72,3 +72,17 @@ class ThemingTest {
         HyleTheme.apply(ThemeVariant.Dark, 0xFF8E7BFF)
     }
 }
+
+class SharedTokensTest {
+    @Test fun CFG_10_liveColoursAreReadFromTheSharedTokenTable() {
+        for (v in ThemeVariant.entries) {
+            HyleTheme.apply(v, 0xFF8E7BFF)
+            val t = HyleColors.tokens(v)
+            assertEquals(t.background, HyleColors.Background); assertEquals(t.surface, HyleColors.Surface)
+            assertEquals(t.surfaceTranslucent, HyleColors.SurfaceTranslucent)
+            assertEquals(t.ink, HyleColors.Ink); assertEquals(t.inkBright, HyleColors.InkBright)
+            assertEquals(t.inkDim, HyleColors.InkDim); assertEquals(t.hairline, HyleColors.Hairline)
+        }
+        HyleTheme.apply(ThemeVariant.Dark, 0xFF8E7BFF)
+    }
+}

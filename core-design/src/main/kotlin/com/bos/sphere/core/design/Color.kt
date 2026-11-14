@@ -34,6 +34,12 @@ object HyleTheme {
  * Hyle / Aarso palette (build brief §4). Every property is a live getter over [HyleTheme], so
  * call sites stay unchanged and recompose on theme change. Dark equals the original brand tokens.
  */
+/** The substrate, ink and hairline colours of one [ThemeVariant]. */
+class HyleTokens(
+    val background: Color, val surface: Color, val surfaceTranslucent: Color,
+    val ink: Color, val inkBright: Color, val inkDim: Color, val hairline: Color,
+)
+
 object HyleColors {
     // Accent
     val Violet: Color get() = HyleTheme.accent
@@ -44,37 +50,34 @@ object HyleColors {
     /** Readable text/icon colour to put on top of [Violet]. */
     val OnAccent: Color get() = if (HyleTheme.accent.luminance() > 0.45f) Color(0xFF0A0B10) else Color.White
 
-    // Substrate
-    val Background: Color
-        get() = when (HyleTheme.variant) {
-            ThemeVariant.Dark -> Color(0xFF0A0B10)
-            ThemeVariant.Amoled -> Color(0xFF000000)
-            ThemeVariant.Light -> Color(0xFFF3F4F8)
-        }
-    val Surface: Color
-        get() = when (HyleTheme.variant) {
-            ThemeVariant.Dark -> Color(0xFF161922)
-            ThemeVariant.Amoled -> Color(0xFF0B0C10)
-            ThemeVariant.Light -> Color(0xFFFFFFFF)
-        }
-    val SurfaceTranslucent: Color // glass panels (~0.86 alpha)
-        get() = when (HyleTheme.variant) {
-            ThemeVariant.Dark -> Color(0xCC12141C)
-            ThemeVariant.Amoled -> Color(0xDD040508)
-            ThemeVariant.Light -> Color(0xDDFFFFFF)
-        }
+    // Substrate, ink and hairlines: one table per variant, read live below and by surfaces that choose their own
+    // light or dark (Launchpad), so no surface keeps a private palette (CFG-10).
+    fun tokens(variant: ThemeVariant): HyleTokens = when (variant) {
+        ThemeVariant.Dark -> HyleTokens(
+            background = Color(0xFF0A0B10), surface = Color(0xFF161922), surfaceTranslucent = Color(0xCC12141C),
+            ink = Color(0xFFC9CDD6), inkBright = Color(0xFFE7E9F0), inkDim = Color(0xFF7D8496), hairline = Color(0x1AFFFFFF),
+        )
+        ThemeVariant.Amoled -> HyleTokens(
+            background = Color(0xFF000000), surface = Color(0xFF0B0C10), surfaceTranslucent = Color(0xDD040508),
+            ink = Color(0xFFC9CDD6), inkBright = Color(0xFFE7E9F0), inkDim = Color(0xFF7D8496), hairline = Color(0x1AFFFFFF),
+        )
+        ThemeVariant.Light -> HyleTokens(
+            background = Color(0xFFF3F4F8), surface = Color(0xFFFFFFFF), surfaceTranslucent = Color(0xDDFFFFFF),
+            ink = Color(0xFF2A2E3A), inkBright = Color(0xFF0E1018), inkDim = Color(0xFF666C7C), hairline = Color(0x1F000000),
+        )
+    }
+
+    val Background: Color get() = tokens(HyleTheme.variant).background
+    val Surface: Color get() = tokens(HyleTheme.variant).surface
+    val SurfaceTranslucent: Color get() = tokens(HyleTheme.variant).surfaceTranslucent // glass panels (~0.86 alpha)
 
     // Ink
-    val Ink: Color
-        get() = if (HyleTheme.isLight) Color(0xFF2A2E3A) else Color(0xFFC9CDD6)
-    val InkBright: Color
-        get() = if (HyleTheme.isLight) Color(0xFF0E1018) else Color(0xFFE7E9F0)
-    val InkDim: Color
-        get() = if (HyleTheme.isLight) Color(0xFF666C7C) else Color(0xFF7D8496)
+    val Ink: Color get() = tokens(HyleTheme.variant).ink
+    val InkBright: Color get() = tokens(HyleTheme.variant).inkBright
+    val InkDim: Color get() = tokens(HyleTheme.variant).inkDim
 
     // Hairlines / inset highlights (key light = upper-left)
-    val Hairline: Color
-        get() = if (HyleTheme.isLight) Color(0x1F000000) else Color(0x1AFFFFFF)
+    val Hairline: Color get() = tokens(HyleTheme.variant).hairline
     val InsetHighlight: Color
         get() = if (HyleTheme.isLight) Color(0x99FFFFFF) else Color(0x2EFFFFFF)
 

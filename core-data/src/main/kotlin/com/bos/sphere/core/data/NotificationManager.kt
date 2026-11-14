@@ -287,16 +287,7 @@ class SphereNotificationListener : NotificationListenerService() {
         }
     }
 
-    private fun parseActions(n: Notification): List<HubAction> =
-        n.actions?.mapNotNull { action ->
-            val label = action.title?.toString() ?: return@mapNotNull null
-            val inputs = action.remoteInputs?.filter { it.resultKey != null }
-            val reply = inputs?.firstOrNull { it.allowFreeFormInput }?.let { first ->
-                ReplyTarget(action.remoteInputs.orEmpty(), first.resultKey, first.label?.toString())
-            }
-            val pi = action.actionIntent
-            HubAction(label = label, action = { runCatching { pi?.send() } }, intent = pi, reply = reply)
-        } ?: emptyList()
+    private fun parseActions(n: Notification): List<HubAction> = NotificationActions.parse(n)
 
     companion object {
         /** True when the user has granted this app notification access. */

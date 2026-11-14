@@ -52,35 +52,36 @@ data class ShortcutDef(val command: LauncherCommand, val default: KeyChord?)
 class ShortcutRegistry(private val defs: List<ShortcutDef> = DefaultShortcuts.all) {
     private val overrides = mutableMapOf<LauncherCommand, KeyChord?>()
 
-    fun binding(c: LauncherCommand): KeyChord? =
+    @Synchronized fun binding(c: LauncherCommand): KeyChord? =
         if (c in overrides) overrides[c] else defs.firstOrNull { it.command == c }?.default
 
-    fun all(): List<Pair<LauncherCommand, KeyChord?>> = defs.map { it.command to binding(it.command) }
+    @Synchronized fun all(): List<Pair<LauncherCommand, KeyChord?>> = defs.map { it.command to binding(it.command) }
 
-    fun commandFor(chord: KeyChord): LauncherCommand? = all().firstOrNull { it.second == chord }?.first
+    @Synchronized fun commandFor(chord: KeyChord): LauncherCommand? = all().firstOrNull { it.second == chord }?.first
 
     /** The command that already uses [chord], other than [except]. */
-    fun conflictFor(chord: KeyChord, except: LauncherCommand): LauncherCommand? = all().firstOrNull { it.second == chord && it.first != except }?.first
+    @Synchronized fun conflictFor(chord: KeyChord, except: LauncherCommand): LauncherCommand? = all().firstOrNull { it.second == chord && it.first != except }?.first
 
     sealed interface Rebind { data object Ok : Rebind; data class Conflict(val with: LauncherCommand) : Rebind }
 
-    fun rebind(c: LauncherCommand, chord: KeyChord?): Rebind {
+    @Synchronized fun rebind(c: LauncherCommand, chord: KeyChord?): Rebind {
         if (chord != null) conflictFor(chord, c)?.let { return Rebind.Conflict(it) }
         overrides[c] = chord
         return Rebind.Ok
     }
 
-    fun reset(c: LauncherCommand) { overrides.remove(c) }
+    @Synchronized fun reset(c: LauncherCommand) { overrides.remove(c) }
 
     /** Only the user's changes, for the exported configuration. */
-    fun export(): String = overrides.entries.joinToString(";") { "${it.key.name}=${it.value?.encode() ?: "-"}" }
+    @Synchronized fun export(): String = overrides.entries.joinToString(";") { "${it.key.name}=${it.value?.encode() ?: "-"}" }
 
-    fun import(raw: String) {
+    @Synchronized fun import(raw: String) {
         overrides.clear()
         raw.split(";").filter { it.isNotBlank() }.forEach { part ->
             val (k, v) = part.split("=", limit = 2).takeIf { it.size == 2 } ?: return@forEach
             val cmd = runCatching { LauncherCommand.valueOf(k) }.getOrNull() ?: return@forEach
-            overrides[cmd] = if (v == "-") null else KeyChord.decode(v)
+            // A part that does not parse is ignored; it must never unbind a command by accident.
+            overrides[cmd] = if (v == "-") null else (KeyChord.decode(v) ?: return@forEach)
         }
     }
 }
@@ -121,6 +122,21 @@ enum class MenuAction(val label: String) {
     Rename("Rename"), Remove("Remove from home"), MoveToFolder("Move to folder"),
 }
 
+/**
+ * Rows only the home's app menu has (the palette's action list does not). They live in their own enum so the palette,
+ * which maps every [MenuAction] to an engine action by name, is not affected (INP-03).
+ */
+enum class HomeMenuAction(val label: String) {
+    Tags("Tags"), AddToHome("Add to home"), IconColour("Icon colour"), Hide("Hide"), Unhide("Unhide"), HomeSettings("Home settings"),
+}
+
+/** One row of the home's app menu: a shared [MenuAction] or a [HomeMenuAction]. */
+sealed interface AppMenuEntry {
+    val label: String
+    data class Shared(val entry: MenuEntry) : AppMenuEntry { override val label get() = entry.action.label }
+    data class Home(val action: HomeMenuAction) : AppMenuEntry { override val label get() = action.label }
+}
+
 data class MenuEntry(val action: MenuAction, val enabled: Boolean = true)
 
 /** What the item can do right now; the menu is derived from this alone. */
@@ -131,6 +147,18 @@ data class MenuContext(
     val adjacentSupported: Boolean = false,
     val onHome: Boolean = false,
     val inDock: Boolean = false,
+    /** Whether "Move to folder" is offered; folders on the home are filed from the menu only where they exist. */
+    val canMoveToFolder: Boolean = onHome,
+    /** Tags (HOM-05) apply to apps. */
+    val canTag: Boolean = false,
+    /** null: the home has no pages to add to; true: the app is on the home; false: it is not. */
+    val homeMembership: Boolean? = null,
+    val canPickIconColour: Boolean = false,
+    /** null: hiding is not offered; true: the app is hidden now; false: it is visible. */
+    val hidden: Boolean? = null,
+    val canOpenHomeSettings: Boolean = false,
+    /** False where the launcher has no per-workspace app membership to add to (the app menu says so instead of showing a dead row). */
+    val workspacesSupported: Boolean = true,
 )
 
 /** Long-press, right-click and the Menu key all call this, so the three can never differ. */
@@ -141,9 +169,32 @@ object ContextMenus {
         if (c.adjacentSupported) add(MenuEntry(MenuAction.OpenBeside))
         if (c.isApp) add(MenuEntry(MenuAction.AppInfo))
         if (!c.inDock) add(MenuEntry(MenuAction.AddToDock))
-        add(MenuEntry(MenuAction.AddToWorkspace))
-        if (c.onHome) { add(MenuEntry(MenuAction.MoveToFolder)); add(MenuEntry(MenuAction.Remove)) }
+        if (c.workspacesSupported) add(MenuEntry(MenuAction.AddToWorkspace))
+        if (c.onHome) { if (c.canMoveToFolder) add(MenuEntry(MenuAction.MoveToFolder)); add(MenuEntry(MenuAction.Remove)) }
         if (c.isApp && c.canUninstall) add(MenuEntry(MenuAction.Uninstall))
+    }
+
+    /**
+     * The home's app menu: the shared entries of [forItem] with the home-only rows (tags, add to home, icon colour,
+     * hide, home settings) placed before the closing group (move, remove, uninstall). Every trigger uses this one list.
+     */
+    fun forApp(c: MenuContext): List<AppMenuEntry> {
+        val shared = forItem(c)
+        val closing = setOf(MenuAction.MoveToFolder, MenuAction.Remove, MenuAction.Uninstall)
+        val head = shared.filter { it.action !in closing }
+        val tail = shared.filter { it.action in closing }.toMutableList()
+        // On the paged home "remove from home" is offered for an app that is on a page, without the folder entry.
+        if (c.homeMembership == true && tail.none { it.action == MenuAction.Remove }) tail.add(0, MenuEntry(MenuAction.Remove))
+        return buildList {
+            head.forEach { add(AppMenuEntry.Shared(it)) }
+            if (c.canTag) add(AppMenuEntry.Home(HomeMenuAction.Tags))
+            if (c.homeMembership == false) add(AppMenuEntry.Home(HomeMenuAction.AddToHome))
+            if (c.canPickIconColour) add(AppMenuEntry.Home(HomeMenuAction.IconColour))
+            if (c.hidden == false) add(AppMenuEntry.Home(HomeMenuAction.Hide))
+            if (c.hidden == true) add(AppMenuEntry.Home(HomeMenuAction.Unhide))
+            if (c.canOpenHomeSettings) add(AppMenuEntry.Home(HomeMenuAction.HomeSettings))
+            tail.forEach { add(AppMenuEntry.Shared(it)) }
+        }
     }
 
     fun onLongPress(c: MenuContext) = forItem(c)

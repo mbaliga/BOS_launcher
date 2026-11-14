@@ -77,6 +77,9 @@ object LauncherInput {
     /** Set by the paged home while it is composed; returns true when it consumed the move. */
     @Volatile var moveHook: ((FocusDir) -> Boolean)? = null
 
+    /** INP-12: Radar or the drawer is open and the prefs ask for the keyboard in this orientation; text fields on those surfaces take focus. */
+    val keyboardWanted = mutableStateOf(false)
+
     /** The shortcut sheet is open (F1, or from settings). */
     val sheetOpen = mutableStateOf(false)
 

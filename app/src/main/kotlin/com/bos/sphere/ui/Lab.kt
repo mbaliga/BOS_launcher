@@ -65,7 +65,7 @@ fun rememberLabEntries(inputs: CapabilityInputs, results: SnapshotStateMap<Strin
             LabEntry("spk03_yes", "SPK-03 · It worked", recorded("spk03_rec", SpikeResults.SPK_BOUNDS) + ". Bounds presets show in action lists only when proven or when desktop windowing is reported.", { mark("spk03_rec", SpikeResults.SPK_BOUNDS, SpikeOutcome.Proven) }),
             LabEntry("spk03_no", "SPK-03 · It did not", "Records that the window did not take the requested bounds.", { mark("spk03_rec", SpikeResults.SPK_BOUNDS, SpikeOutcome.NotProven) }),
             LabEntry("spk04", "SPK-04 Notification shade", "No stable public route is probed in the core build; the curtain renders listener data instead (STR-12 stays elevated-tier).", null),
-            LabEntry("spk05", "SPK-05 Drops onto home", "Not built yet: needs a drop target on home (INP-11).", null),
+            LabEntry("spk05", "SPK-05 Drops onto home", com.bos.sphere.feature.grid.LauncherDrops.report ?: "Drag text, a link or a file from another app onto the home (split screen or a desktop display), then reopen this page. It lists what the platform delivered. Note the Android version and the app you dragged from.", null),
             LabEntry("spk06", "SPK-06 OEM limits", results["spk06"] ?: "Tap to read battery-optimisation state", {
                 val pm = app.getSystemService(PowerManager::class.java)
                 put("spk06", "${Build.MANUFACTURER} · ignoring battery optimisation=${pm.isIgnoringBatteryOptimizations(app.packageName)}. Note whether gesture navigation worked with Liftoff as home and whether it was killed in the background.")

@@ -450,6 +450,8 @@ internal fun SearchScreen(
                 }
             }
         }
+        // INP-13: push-to-talk, drawn only where an on-device recogniser exists; nothing listens until it is pressed.
+        PushToTalkButton(onText = { setQuery(it) }, modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).padding(end = 16.dp, bottom = 8.dp))
         // The action list of the keyboard-selected result (Tab / Right / Menu).
         if (navNow.menuOpen) navTiles.getOrNull(navNow.selected)?.let { t ->
             RadarActionList(

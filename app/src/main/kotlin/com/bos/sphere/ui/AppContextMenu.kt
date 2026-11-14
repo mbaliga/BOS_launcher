@@ -3,6 +3,16 @@ package com.bos.sphere.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,10 +41,16 @@ import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.grid.AppIcon
 import com.bos.sphere.feature.grid.Glyphs
+import com.bos.sphere.feature.grid.AppMenuModel
+import com.bos.sphere.feature.grid.DialogControllerKeys
+import com.bos.sphere.core.input.HomeMenuAction
+import com.bos.sphere.core.input.MenuAction
 
 /**
- * Long-press app menu: the app's icon and name on top, then one row per action with a glyph.
- * App info + uninstall route to the system; hide is persisted locally.
+ * The app menu: the app's icon and name on top, then one row per entry of the shared menu model (INP-03). The rows
+ * come from `AppMenuModel.rows`, which asks `ContextMenus`, so a long-press, a right-click and the Menu key can never
+ * show different rows. App info + uninstall route to the system; hide is persisted locally. Arrows, Tab and Enter
+ * work through normal focus, hover washes a row, Back or a controller's B closes it.
  */
 @Composable
 fun AppContextMenu(
@@ -51,9 +67,14 @@ fun AppContextMenu(
     onHomeSettings: (() -> Unit)? = null,
     /** Launch-control and dock entries from the dock stream: "Open on <display>", "Open beside", bounds, dock pinning. */
     extraEntries: List<Pair<String, () -> Unit>> = emptyList(),
+    /** The "Open" row. */
+    onOpen: () -> Unit = onDismiss,
 ) {
     Dialog(onDismissRequest = onDismiss) {
+        DialogControllerKeys()
         val shape = RoundedCornerShape(24.dp)
+        val ctx = AppMenuModel.context(isHidden, isOnHome, hasIconColour = onIconColor != null, hasHomeSettings = onHomeSettings != null)
+        val rows = AppMenuModel.rows(ctx)
         Column(
             modifier = Modifier
                 .width(300.dp)
@@ -76,14 +97,30 @@ fun AppContextMenu(
             // HOM-05: user tags.
             val tagsOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             if (tagsOpen.value) com.bos.sphere.feature.grid.TagDialog(app) { tagsOpen.value = false }
-            MenuItem(Glyphs.Plus, L10n.tr("Tags"), { tagsOpen.value = true })
-            if (isOnHome != null) MenuItem(if (isOnHome) Glyphs.Close else Glyphs.Plus, L10n.tr(if (isOnHome) "Remove from home" else "Add to home"), onToggleHome)
-            if (onIconColor != null) MenuItem(Glyphs.Palette, L10n.tr("Icon colour"), onIconColor)
-            extraEntries.forEach { (label, run) -> MenuItem(Glyphs.Plus, label, run) }
-            MenuItem(Glyphs.Info, L10n.tr("App info"), onAppInfo)
-            MenuItem(Glyphs.Image, L10n.tr(if (isHidden) "Unhide" else "Hide"), onToggleHidden)
-            if (onHomeSettings != null) MenuItem(Glyphs.Gear, L10n.tr("Home settings"), onHomeSettings)
-            MenuItem(Glyphs.Close, L10n.tr("Uninstall"), onUninstall, destructive = true)
+            for (row in rows) {
+                val label = L10n.tr(row.label)
+                row.home?.let { h ->
+                    when (h) {
+                        HomeMenuAction.Tags -> MenuItem(Glyphs.Plus, label, { tagsOpen.value = true })
+                        HomeMenuAction.AddToHome -> MenuItem(Glyphs.Plus, label, onToggleHome)
+                        HomeMenuAction.IconColour -> onIconColor?.let { MenuItem(Glyphs.Palette, label, it) }
+                        HomeMenuAction.Hide, HomeMenuAction.Unhide -> MenuItem(Glyphs.Image, label, onToggleHidden)
+                        HomeMenuAction.HomeSettings -> onHomeSettings?.let { MenuItem(Glyphs.Gear, label, it) }
+                    }
+                }
+                when (row.shared) {
+                    MenuAction.Open -> {
+                        MenuItem(Glyphs.Plus, label, onOpen)
+                        // The dock stream's group sits right after Open: display, beside, bounds, dock pinning.
+                        extraEntries.forEach { (l, run) -> MenuItem(Glyphs.Plus, l, run) }
+                    }
+                    MenuAction.Remove -> MenuItem(Glyphs.Close, label, onToggleHome)
+                    MenuAction.AppInfo -> MenuItem(Glyphs.Info, label, onAppInfo)
+                    MenuAction.Uninstall -> MenuItem(Glyphs.Close, label, onUninstall, destructive = true)
+                    // Not offered by this menu's context (see AppMenuModel.context).
+                    else -> Unit
+                }
+            }
         }
     }
 }
@@ -96,8 +133,17 @@ private fun Divider() {
 @Composable
 private fun MenuItem(glyph: ImageVector, label: String, onClick: () -> Unit, destructive: Boolean = false) {
     val tint = if (destructive) Color(0xFFFF7A7A) else HyleColors.Ink
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp).height(52.dp),
+        Modifier
+            .fillMaxWidth()
+            .hoverable(hover)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .background(if (hovered) Color.White.copy(alpha = 0.10f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .semantics { role = Role.Button }
+            .padding(horizontal = 18.dp).height(52.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(glyph, null, tint = if (destructive) tint else HyleColors.InkDim, modifier = Modifier.size(20.dp))

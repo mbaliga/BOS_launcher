@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.grid
 
+import com.bos.sphere.core.input.FocusKind
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
@@ -411,6 +412,8 @@ fun PeekWidget(
                         .fillMaxSize()
                         .graphicsLayer { alpha = (1f - progress.value * 2f).coerceIn(0f, 1f) }
                         .drawBehind { drawRect(innerVeil(anchor, size)) }
+                        // INP-17: the collapsed peek is the widget corner's node in the focus graph; Enter opens it.
+                        .launcherItem("corner.${anchor.name}", FocusKind.Corner, onActivate = { if (available) onChange(true) else onRemoveNow() }, ringRadiusDp = PeekCorner.value)
                         .pointerInput(available) {
                             detectTapGestures {
                                 if (available) onChange(true) else onRemoveNow()

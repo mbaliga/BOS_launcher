@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -91,12 +92,19 @@ fun DrawerFilterBar(state: DrawerFilterState, modifier: Modifier = Modifier) {
     val profiles = remember { visibleProfiles(context, catalog) }
     val tabs = ProfilePolicy.tabs(profiles)
     val allTags = remember(tags) { com.bos.sphere.core.catalog.TagCodec.allTags(tags) }
+    // INP-12: with "raise the keyboard" on for this orientation, the filter field takes focus when the drawer opens.
+    val filterFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        if (LauncherInput.keyboardWanted.value) runCatching { filterFocus.requestFocus() }
+    }
     androidx.compose.foundation.layout.Column(modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
         BasicTextField(
             value = state.filter, onValueChange = { state.filter = it }, singleLine = true,
             textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 14.sp),
             cursorBrush = SolidColor(HyleColors.InkBright),
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x14FFFFFF)).padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x14FFFFFF)).padding(horizontal = 12.dp, vertical = 10.dp)
+                .focusRequester(filterFocus),
             decorationBox = { inner -> Box { if (state.filter.isEmpty()) Text(L10n.tr("Type to filter apps"), color = HyleColors.InkDim, fontSize = 14.sp); inner() } },
         )
         if (tabs.size > 1 || allTags.isNotEmpty()) {
@@ -135,6 +143,7 @@ fun TagDialog(app: AppEntry, onDismiss: () -> Unit) {
     var draft by remember { mutableStateOf("") }
     val mine = tags[app.key].orEmpty()
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        DialogControllerKeys()
         androidx.compose.foundation.layout.Column(
             Modifier.clip(RoundedCornerShape(20.dp)).background(HyleColors.Surface).padding(16.dp),
         ) {

@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.grid
 
+import com.bos.sphere.core.input.FocusKind
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -194,6 +195,9 @@ private sealed interface DrawerRow {
 
 private val RAIL_WIDTH = 28.dp
 
+/** Focus layer of the drawer: above the home (0), below the puck (3), Radar's palette (5) and menus (8). */
+internal const val DRAWER_FOCUS_LAYER = 2
+
 /**
  * The app drawer as its own full-screen space: view (grid / list / details) and sort toggles in
  * a Hyle-style header, plus a quick-scrub rail on the chosen edge(s).
@@ -224,7 +228,10 @@ fun AppDrawerSpace(
         modifier = modifier,
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            DrawerContent(apps, usage, view, sort, rail, onViewChange, onSortChange, onLaunch, onLongPress, onDismiss, sounds, railVisible, viewSwitch)
+            // INP-01: the drawer sits above the home, so only its rows take arrows and Tab while it is open.
+            FocusLayer(layer = DRAWER_FOCUS_LAYER) {
+                DrawerContent(apps, usage, view, sort, rail, onViewChange, onSortChange, onLaunch, onLongPress, onDismiss, sounds, railVisible, viewSwitch)
+            }
         }
     }
 }
@@ -293,12 +300,12 @@ private fun DrawerContent(
                     DrawerView.Grid -> {
                         val st = rememberLazyGridState()
                         scrollTo = { st.requestScrollToItem(it) }
-                        DrawerGrid(st, rows, padding, onLaunch, onLongPress)
+                        DrawerGrid(st, rows, padding, onLaunch, onLongPress, onDragStart = onDismiss)
                     }
                     else -> {
                         val st = rememberLazyListState()
                         scrollTo = { st.requestScrollToItem(it) }
-                        DrawerList(st, rows, padding, view == DrawerView.Details, categories, usage, now, onLaunch, onLongPress)
+                        DrawerList(st, rows, padding, view == DrawerView.Details, categories, usage, now, onLaunch, onLongPress, onDragStart = onDismiss)
                     }
                 }
             }
@@ -518,6 +525,7 @@ private fun DrawerGrid(
     padding: PaddingValues,
     onLaunch: (AppEntry) -> Unit,
     onLongPress: (AppEntry) -> Unit,
+    onDragStart: () -> Unit = {},
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(88.dp),
@@ -537,6 +545,8 @@ private fun DrawerGrid(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .launcherItem("drawer.${r.app.key}", FocusKind.Item, layer = DRAWER_FOCUS_LAYER, focusable = false, onActivate = { onLaunch(r.app) }, onMenu = { onLongPress(r.app) }, ringRadiusDp = 12f)
+                        .appDragSource(r.app.key, onDragStart) // INP-11: a mouse drag carries the app to the home
                         .combinedClickable(onClick = { onLaunch(r.app) }, onLongClick = { onLongPress(r.app) })
                         .padding(vertical = 10.dp, horizontal = 2.dp),
                 ) {
@@ -564,6 +574,7 @@ private fun DrawerList(
     now: Long,
     onLaunch: (AppEntry) -> Unit,
     onLongPress: (AppEntry) -> Unit,
+    onDragStart: () -> Unit = {},
 ) {
     LazyColumn(state = state, contentPadding = padding, modifier = Modifier.fillMaxSize()) {
         items(rows, key = { rowKey(it) }, contentType = { if (it is DrawerRow.Header) 0 else 1 }) { r ->
@@ -573,6 +584,8 @@ private fun DrawerList(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .launcherItem("drawer.${r.app.key}", FocusKind.Item, layer = DRAWER_FOCUS_LAYER, focusable = false, onActivate = { onLaunch(r.app) }, onMenu = { onLongPress(r.app) }, ringRadiusDp = 12f)
+                        .appDragSource(r.app.key, onDragStart) // INP-11: a mouse drag carries the app to the home
                         .combinedClickable(onClick = { onLaunch(r.app) }, onLongClick = { onLongPress(r.app) })
                         .padding(horizontal = 8.dp, vertical = if (details) 8.dp else 6.dp),
                 ) {

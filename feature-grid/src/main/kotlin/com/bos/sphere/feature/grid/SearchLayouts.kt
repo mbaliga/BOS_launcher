@@ -1,5 +1,8 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -288,7 +291,7 @@ internal fun Orbit(
         }
     }
 
-    BoxWithConstraints(modifier.clipToBounds().systemGestureExclusion().pointerInput(Unit) {
+    BoxWithConstraints(modifier.linearTraversal().clipToBounds().systemGestureExclusion().pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
                 val e = awaitPointerEvent(PointerEventPass.Initial)
@@ -366,6 +369,8 @@ internal fun Orbit(
             Column(
                 Modifier
                     .width(colW)
+                    // NFR-13: the tiles circle the screen, so geometry means nothing to TalkBack; they read in rank order, best match first.
+                    .semantics(mergeDescendants = true) { traversalIndex = i.toFloat(); contentDescription = tile.caption() }
                     .offset {
                         val sway = dir * travel.floatValue / radii[ring].toDouble()
                         val a = baseAngle + sway
@@ -595,6 +600,7 @@ internal fun ResultPreview(
     onOpenIntent: ((android.content.Intent) -> Unit)? = null,
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        DialogControllerKeys()
         androidx.compose.foundation.layout.Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color(0xF2101018)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(24.dp)).padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

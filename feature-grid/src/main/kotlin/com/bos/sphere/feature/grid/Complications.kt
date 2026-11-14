@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.grid
 
+import com.bos.sphere.core.input.FocusKind
 import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -508,6 +509,8 @@ fun ComplicationCluster(
     radius: Dp,
     onClick: (ComplicationKind) -> Unit,
     modifier: Modifier = Modifier,
+    /** INP-17: when set, every dial is a focus-graph node named "<prefix>.<kind>", in cluster order. */
+    focusIdPrefix: String? = null,
 ) {
     val shown = kinds.distinct().take(CornerSlot.MAX_CLUSTER)
     val density = LocalDensity.current
@@ -534,6 +537,10 @@ fun ComplicationCluster(
                     onClick = { currentOnClick(kind) },
                     modifier = Modifier
                         .offset { IntOffset((c.x - itemPx / 2f).roundToInt(), (c.y - itemPx / 2f).roundToInt()) }
+                        .then(
+                            if (focusIdPrefix == null) Modifier
+                            else Modifier.launcherItem("$focusIdPrefix.${kind.name}", FocusKind.Corner, order = i, focusable = false, onActivate = { currentOnClick(kind) }, ringRadiusDp = itemSize.value / 2f),
+                        )
                         .graphicsLayer {
                             val p = appear.value
                             alpha = p.coerceIn(0f, 1f)

@@ -48,12 +48,15 @@ import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.AppSearch
 
 private enum class SlotKind(val label: String) {
-    Action("Action"), App("App"), Palette("Palette"), Complication("Complication"), Cluster("Cluster"), Widget("Widget"), None("Nothing")
+    Action("Action"), App("App"), Shortcut("Shortcut"), Palette("Palette"), Complication("Complication"), Cluster("Cluster"), Widget("Widget"), None("Nothing")
 }
 
 private fun kindOf(slot: CornerSlot): SlotKind = when (slot) {
     CornerSlot.Empty -> SlotKind.None
-    is CornerSlot.Single -> if (slot.item is CornerItem.App) SlotKind.App else SlotKind.Action
+    is CornerSlot.Single -> when (val i = slot.item) {
+        is CornerItem.App -> if (com.bos.sphere.core.data.CornerShortcuts.isShortcut(i.key)) SlotKind.Shortcut else SlotKind.App
+        else -> SlotKind.Action
+    }
     is CornerSlot.Palette -> SlotKind.Palette
     is CornerSlot.Complication -> SlotKind.Complication
     is CornerSlot.ComplicationCluster -> SlotKind.Cluster
@@ -117,6 +120,7 @@ fun CornerEditorDialog(
             SlotKind.App -> AppList(apps, selected = ((current as? CornerSlot.Single)?.item as? CornerItem.App)?.key) {
                 onSave(CornerSlot.Single(CornerItem.App(it.key)))
             }
+            SlotKind.Shortcut -> ShortcutPicker(apps) { onSave(CornerSlot.Single(CornerItem.App(it))) }
             SlotKind.Palette -> {
                 Text(L10n.tr("A palette is a folder: its items fan out in arcs from the corner."), color = HyleColors.InkDim, fontSize = 11.5.sp)
                 NameField(paletteName) { paletteName = it.take(24) }
@@ -313,6 +317,32 @@ fun TileMenuDialog(title: String, onRemove: () -> Unit, onDismiss: () -> Unit) {
         Text(L10n.tr("Long-press and drag to move it."), color = HyleColors.InkDim, fontSize = 12.sp)
         Row(horizontalArrangement = Arrangement.Start, modifier = Modifier.padding(top = 10.dp).semantics { contentDescription = "Remove tile" }) {
             TextButtonPill(L10n.tr("Remove from page"), primary = true, onClick = onRemove)
+        }
+    }
+}
+
+/**
+ * INP-15: pick an app, then one of its shortcuts (dynamic, manifest and pinned). Needs Liftoff to be the home app, which
+ * is the only time the system lists shortcuts to a launcher; with none listed it says so instead of showing an empty page.
+ */
+@Composable
+private fun ShortcutPicker(apps: List<AppEntry>, onPick: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val catalog = remember(context) { com.bos.sphere.core.catalog.AppCatalog(context) }
+    var app by remember { mutableStateOf<AppEntry?>(null) }
+    val chosen = app
+    if (chosen == null) {
+        Text(L10n.tr("Pick the app that owns the shortcut."), color = HyleColors.InkDim, fontSize = 11.5.sp)
+        AppList(apps, selected = null) { app = it }
+        return
+    }
+    val shortcuts = remember(chosen) { catalog.shortcuts(chosen.packageName, chosen.user) }
+    ActionRow(label = L10n.tr("‹  Back"), onClick = { app = null })
+    if (shortcuts.isEmpty()) Text(L10n.tr("This app lists no shortcuts to Liftoff."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+    shortcuts.forEach { sc ->
+        val label = (sc.shortLabel ?: sc.longLabel ?: sc.id).toString()
+        ActionRow(label = label, leading = { AppIcon(chosen, 28.dp, Modifier.size(28.dp)) }) {
+            onPick(com.bos.sphere.core.data.CornerShortcuts.make(sc.`package`, sc.id, sc.userHandle.hashCode(), label))
         }
     }
 }

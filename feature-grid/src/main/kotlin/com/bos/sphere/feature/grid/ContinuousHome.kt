@@ -1,5 +1,7 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -194,9 +196,11 @@ private fun ContinuousImpl(
         val fadeStart = with(density) { (if (landscape) padL else padT).toPx() }
         val fadeEnd = with(density) { (if (landscape) padR else padB).toPx() }
 
+        // NFR-13: one linear reading order for TalkBack, by item index, whichever way the grid flows.
         Box(
             Modifier
                 .fillMaxSize()
+                .linearTraversal()
                 .edgeFades(landscape, fadeStart, fadeEnd, with(density) { 14.dp.toPx() })
         ) {
             if (!landscape) {
@@ -206,8 +210,8 @@ private fun ContinuousImpl(
                     contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(apps, key = { it.key }, contentType = { "app" }) { app ->
-                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxWidth().height(extentDp))
+                    itemsIndexed(apps, key = { _, a -> a.key }, contentType = { _, _ -> "app" }) { index, app ->
+                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxWidth().height(extentDp).semantics { traversalIndex = index.toFloat() })
                     }
                 }
             } else {
@@ -217,8 +221,8 @@ private fun ContinuousImpl(
                     contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(apps, key = { it.key }, contentType = { "app" }) { app ->
-                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxHeight().width(extentDp))
+                    itemsIndexed(apps, key = { _, a -> a.key }, contentType = { _, _ -> "app" }) { index, app ->
+                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxHeight().width(extentDp).semantics { traversalIndex = index.toFloat() })
                     }
                 }
             }

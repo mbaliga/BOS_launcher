@@ -35,6 +35,9 @@ object TouchPaths {
             "Long-press the item, then choose ${a.label}"
     }
 
+    /** The home-only rows of the app menu are rows of the same long-press menu. */
+    fun forHomeMenu(a: com.bos.sphere.core.input.HomeMenuAction): String = "Long-press the app, then choose ${a.label}"
+
     /** Corner actions run by tapping the corner they are assigned to; the corner editor (long-press a corner) offers each of them. */
     fun forCornerAction(a: CornerActionId): String = when (a) {
         CornerActionId.Music, CornerActionId.Camera, CornerActionId.Phone, CornerActionId.Messages, CornerActionId.Browser,

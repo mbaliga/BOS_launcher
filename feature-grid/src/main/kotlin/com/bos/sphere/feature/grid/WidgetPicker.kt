@@ -248,6 +248,7 @@ private fun WidgetPickerDialog(onDismiss: () -> Unit, onSelect: (WidgetChoice) -
     }
     val shape = RoundedCornerShape(24.dp)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        DialogControllerKeys()
         Column(
             Modifier
                 .fillMaxWidth(0.92f)

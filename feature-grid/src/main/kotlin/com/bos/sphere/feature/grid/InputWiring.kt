@@ -50,6 +50,7 @@ fun LauncherInputWiring(
     val latestCorner by rememberUpdatedState(onCornerActivate)
     val latestLabel by rememberUpdatedState(cornerLabel)
     SideEffectOverlay(overlayOpen)
+    androidx.compose.runtime.SideEffect { LauncherInput.keyboardWanted.value = surfaceOpen && raiseKeyboard }
     LaunchedEffect(Unit) {
         LauncherInput.commands.collect { c ->
             when (c) {

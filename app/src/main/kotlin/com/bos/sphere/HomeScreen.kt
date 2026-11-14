@@ -182,8 +182,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val apps = remember(allApps, hidden) { allApps.filter { it.key !in hidden } }
     val appsByKey = remember(apps) { apps.associateBy { it.key } }
     // Package changes can change icons and categories; uninstalled apps forget "removed from home".
+    val liveReconcile = remember { com.bos.sphere.core.catalog.LiveReconcile() }
     LaunchedEffect(allApps) {
-        IconCache.clear()
+        // HOM-10: only the icons of updated or removed apps are dropped; the surface follows the snapshot at once.
+        val diff = liveReconcile.onSnapshot(allApps)
+        if (allApps.isEmpty()) IconCache.clear() else IconCache.evict(diff.iconKeysToEvict())
         WheelCategoryCache.invalidate()
         if (allApps.isNotEmpty()) stores.layout.pruneRemoved(allApps.mapTo(HashSet()) { it.key })
     }
@@ -196,8 +199,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
     }
 
-    val prefs by stores.prefs.prefs.collectAsStateWithLifecycle()
+    val storedPrefs by stores.prefs.prefs.collectAsStateWithLifecycle()
+    // HOM-11: with the adaptive grid on, the grids follow the window size class and the density setting.
+    val windowCfg = LocalConfiguration.current
+    val prefs = remember(storedPrefs, windowCfg.screenWidthDp, windowCfg.screenHeightDp) {
+        com.bos.sphere.core.catalog.AdaptivePrefs.effective(storedPrefs, windowCfg.screenWidthDp, windowCfg.screenHeightDp)
+    }
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
+    SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }) // HOM-11: one arrangement per window size class
+    val homeEdit = rememberHomeEdit(stores.layout) // HOM-12
+    var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18
     val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()
     val landscapeCorners by stores.shortcuts.landscapeCorners.collectAsStateWithLifecycle()
     val gestures by stores.shortcuts.gestures.collectAsStateWithLifecycle()
@@ -1262,10 +1273,22 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 pageCount = pages.size,
                 onAddPage = { val i = quickPage ?: 0; savePages(HomeLayoutMath.insertPage(pages, i)); quickOpen = false },
                 onDeletePage = { val i = quickPage ?: 0; com.bos.sphere.core.data.StateService.beforeDestructive(context, "delete page"); savePages(HomeLayoutMath.deletePage(pages, i, capacityOf)); quickOpen = false },
+                onEdit = { quickOpen = false; homeEdit.enter() },
+                onPanels = { quickOpen = false; panelsOpen = true },
                 onWallpaper = { quickOpen = false; openSettings(categories.indexOfFirst { it.title == L10n.tr("Look") }.coerceAtLeast(0)) },
                 onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
                 onDismiss = { quickOpen = false },
                 onHomeItems = { quickOpen = false; homeItems.openSheet() },
+            )
+        }
+        if (panelsOpen) HomePanelsSheet(history, appsByKey) { panelsOpen = false }
+        if (homeEdit.active) {
+            BackHandler { homeEdit.exit() }
+            com.bos.sphere.feature.grid.HomeEditBar(
+                undoDepth = homeEdit.undoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
+                onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
+                onAddPage = { savePages(HomeLayoutMath.insertPage(pages, gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))) },
+                onDone = { homeEdit.exit() },
             )
         }
         if (!prefs.onboardingDone) {

@@ -48,6 +48,9 @@ class EditSession<T>(initial: T, limit: Int = UndoStack.DEFAULT_LIMIT) {
     val canUndo: Boolean get() = stack.canUndo
     val canRedo: Boolean get() = stack.canRedo
 
+    /** Number of changes that can be undone (at most the stack limit). */
+    val undoDepth: Int get() = stack.size
+
     fun enter() { editing = true; stack.clear() }
     fun exit() { editing = false; stack.clear() }
 

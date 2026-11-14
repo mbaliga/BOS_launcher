@@ -27,8 +27,13 @@ object Badges {
 
     fun keyFor(packageName: String, profileId: Int) = "$packageName#$profileId"
 
-    fun forHub(list: List<HubNotification>, profileId: Int = 0): List<NoteRef> =
-        list.map { NoteRef(it.packageName, it.unread, it.isOngoing, profileId) }
+    /** One [NoteRef] per notification, carrying its own profile (work-profile badges) unless [profileId] forces one. */
+    fun forHub(list: List<HubNotification>, profileId: Int? = null): List<NoteRef> =
+        list.map { NoteRef(it.packageName, it.unread, it.isOngoing, profileId ?: it.profileId) }
+
+    /** The notifications of one app in one profile, newest first, for the preview. */
+    fun previewFor(list: List<HubNotification>, packageName: String, profileId: Int, limit: Int = 5): List<HubNotification> =
+        preview(list.filter { it.profileId == profileId }, packageName, limit)
 
     /** Badge for a folder: the sum of its children. */
     fun forFolder(folder: Folder, badgeOf: (String) -> Badge?): Badge? =

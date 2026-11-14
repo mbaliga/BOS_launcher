@@ -54,6 +54,8 @@ fun HomeQuickSheet(
     pageCount: Int,
     onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onPanels: (() -> Unit)? = null,
     onWallpaper: () -> Unit,
     onGroundControl: () -> Unit,
     onDismiss: () -> Unit,
@@ -97,6 +99,14 @@ fun HomeQuickSheet(
             }
 
             Spacer(Modifier.height(18.dp))
+            if (onEdit != null) {
+                BigButton(Modifier.fillMaxWidth(), Glyphs.Apps, "Edit home", onEdit)
+                Spacer(Modifier.height(10.dp))
+            }
+            if (onPanels != null) {
+                BigButton(Modifier.fillMaxWidth(), Glyphs.Clock, "Files, usage and timeline", onPanels)
+                Spacer(Modifier.height(10.dp))
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 BigButton(Modifier.weight(1f), Glyphs.Image, "Wallpaper", onWallpaper)
                 BigButton(Modifier.weight(1f), Glyphs.Gear, "Ground Control", onGroundControl)

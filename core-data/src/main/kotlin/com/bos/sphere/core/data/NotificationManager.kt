@@ -30,6 +30,8 @@ data class HubNotification(
     val appLabel: String = "",
     val unread: Boolean = true,
     val contentIntent: PendingIntent? = null,
+    /** HOM-09: the profile (user id) the notification belongs to, 0 for the owner. */
+    val profileId: Int = 0,
     val isOngoing: Boolean = false,
     val category: String? = null,
     val channelId: String? = null,
@@ -243,6 +245,7 @@ class SphereNotificationListener : NotificationListenerService() {
             packageName = pkg,
             appLabel = appLabelOf(pkg),
             unread = true,
+            profileId = sbn.user.hashCode(),
             contentIntent = n.contentIntent,
             isOngoing = ongoing,
             category = cat,

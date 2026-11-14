@@ -88,3 +88,18 @@ class HomeFrameTest {
         assertFalse(ClockBandFit.compute(20f, 80f, 70f).fits)
     }
 }
+
+class ClockBandReserveTest {
+    @org.junit.Test
+    fun HOM_20_placementUsesTheSameReserveAsTheFit() {
+        // The dots row sits EDGE above the band's bottom, the clock sits right above the dots row: the three add up to the fit's reserve.
+        assertEquals(ClockBandFit.EDGE_DP + ClockBandFit.DOTS_DP + ClockBandFit.GAP_DP, ClockBandFit.clockBottomDp(true), 0f)
+        assertEquals(ClockBandFit.DOTS_BOTTOM_DP, ClockBandFit.EDGE_DP, 0f)
+        assertEquals(ClockBandFit.EDGE_DP, ClockBandFit.clockBottomDp(false), 0f)
+        for (short in 320..1200 step 40) {
+            val band = HomeFrame.band(short.toFloat(), short * 2f)
+            val fit = ClockBandFit.compute(band, 60f, 40f)
+            assertTrue(ClockBandFit.clockBottomDp(true) + (fit.usedDp - ClockBandFit.clockBottomDp(true)) <= band + 0.01f)
+        }
+    }
+}

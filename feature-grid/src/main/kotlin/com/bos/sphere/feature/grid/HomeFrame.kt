@@ -41,9 +41,18 @@ object HomeFrame {
 data class ClockBandFit(val showWeather: Boolean, val clockScale: Float, val usedDp: Float, val fits: Boolean) {
     companion object {
         const val MIN_CLOCK_SCALE = 0.4f
-        const val EDGE_DP = 4f
-        const val DOTS_DP = 10f
-        const val GAP_DP = 4f
+        /** Gap between the dots row and the bottom edge of the band. */
+        const val EDGE_DP = 1f
+        /** Height of the page-dot row (its icons are at most this tall). */
+        const val DOTS_DP = 16f
+        /** Gap between the dots row and the clock above it. */
+        const val GAP_DP = 1f
+
+        /** Bottom padding of the dots row when it shares the bottom band with the clock. */
+        const val DOTS_BOTTOM_DP = EDGE_DP
+
+        /** Bottom padding of the clock block: the same reserve the fit uses (zero dots reserve when the dots sit on the start edge). */
+        fun clockBottomDp(dotsAtBottom: Boolean): Float = EDGE_DP + if (dotsAtBottom) DOTS_DP + GAP_DP else 0f
 
         /**
          * @param bandDp thickness of the bottom band

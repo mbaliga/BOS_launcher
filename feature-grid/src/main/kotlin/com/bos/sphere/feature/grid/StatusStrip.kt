@@ -207,7 +207,7 @@ fun BoxScope.StripHost(
             // HOM-20: weather line dropped, then the clock scaled, so clock and dots fit the margin band.
             bottomClockFit(prefs).let { f -> prefs.copy(clockSize = prefs.clockSize * f.clockScale, clockShowWeather = prefs.clockShowWeather && f.showWeather) },
             weather, health, side, onClockTap, rowHeight = 0.dp,
-            modifier = Modifier.align(Alignment.BottomCenter).androidx_windowInsetsPadding(safe).padding(bottom = edge + 34.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).androidx_windowInsetsPadding(safe).padding(bottom = ClockBandFit.clockBottomDp(prefs.pagingFor(androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }) != com.bos.sphere.core.data.PagingAxis.Vertical).dp),
         )
         com.bos.sphere.core.data.ClockPosition.Hidden -> Unit
     }

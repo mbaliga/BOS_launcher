@@ -5,5 +5,12 @@
         <receiver
             android:name="com.bos.sphere.feature.desktop.DesktopOfferReceiver"
             android:exported="false" />
+        <!-- Reopens the desktop surface from a Radar result or the dock item (EXT-02). -->
+        <activity
+            android:name="com.bos.sphere.feature.desktop.DesktopOpenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>

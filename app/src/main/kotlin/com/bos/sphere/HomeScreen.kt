@@ -289,7 +289,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // Launch control and dock (WSP-01, WSP-06, DCK): every launch goes through the launch layer.
     val rootView = androidx.compose.ui.platform.LocalView.current
     val appLauncher = remember { com.bos.sphere.feature.dock.AppLauncher(context, rootView = { rootView }) }
-    val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch { IntArray(2).also { rootView.getLocationOnScreen(it) }.let { it[0] to it[1] } } }
+    val lastTouch = remember { com.bos.sphere.ui.homeLastTouch { rootView } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.feature.grid.LauncherInput.registry }
     val puckActionIds by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).actions }.collectAsStateWithLifecycle()
@@ -445,10 +445,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.input.LauncherCommand.OpenPuck -> { drawerOpen = false; wheelAnchor = Corner.BottomLeft; wheelOpen = true; true }
                 com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
-                // Workspaces do not exist yet (WSP): the home pages stand in.
-                com.bos.sphere.core.input.LauncherCommand.NextWorkspace -> if (dockController.handle(c)) true else { scope.launch { gridState.goToPage((gridState.currentPage + 1).coerceAtMost((pages.size - 1).coerceAtLeast(0))) }; true }
-                com.bos.sphere.core.input.LauncherCommand.PreviousWorkspace -> if (dockController.handle(c)) true else { scope.launch { gridState.goToPage((gridState.currentPage - 1).coerceAtLeast(0)) }; true }
-                // Dock items 1 to 9 and "focus the dock" (INP-05, DCK-04): the dock stream's controller handles them.
+                // Workspace switching and the dock's focus and number shortcuts belong to the dock controller (DCK-05, WSP-07).
                 else -> dockController.handle(c)
             }
         },
@@ -626,7 +623,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val searchHub = remember {
         val palette = com.bos.sphere.feature.search.palette.PaletteHost.get(context)
         com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)
-        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders()) { palette.prefs.approvedSources() }
+        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders() + com.bos.sphere.ui.dockSearchProvider(context)) { palette.prefs.approvedSources() }
     }
     val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }

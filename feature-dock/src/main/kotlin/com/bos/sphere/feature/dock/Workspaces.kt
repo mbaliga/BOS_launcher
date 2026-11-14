@@ -48,6 +48,10 @@ interface WorkspaceHooks {
     fun captureHome(): String? = null
     fun applyHome(arrangement: String?) {}
     fun applyNotificationScope(allowed: Set<String>?) {}
+    /** The widget slots of the home being left, as opaque ids (WSP-07); null when this host has none to save. */
+    fun captureWidgets(): List<String>? = null
+    /** Puts the entered workspace's widget slots on the home. Called only when that workspace has a saved snapshot. */
+    fun applyWidgets(widgets: List<String>) {}
     fun onSwitched(workspace: Workspace) {}
 }
 
@@ -136,13 +140,18 @@ class WorkspaceManager(
         if (id == current.activeId) return true
         val h = hooks()
         val leaving = h.captureHome()
+        val leavingWidgets = h.captureWidgets()
         update { s ->
             s.copy(
                 activeId = id,
-                workspaces = s.workspaces.map { if (it.id == s.activeId && leaving != null) it.copy(homeArrangement = leaving) else it },
+                workspaces = s.workspaces.map {
+                    if (it.id != s.activeId) it
+                    else it.copy(homeArrangement = leaving ?: it.homeArrangement, widgets = leavingWidgets ?: it.widgets)
+                },
             )
         }
         h.applyHome(target.homeArrangement)
+        if (target.widgets.isNotEmpty()) h.applyWidgets(target.widgets)
         h.applyNotificationScope(target.notificationApps)
         h.onSwitched(target)
         return true
@@ -161,6 +170,7 @@ class WorkspaceManager(
     fun applyActive() {
         val a = current.active
         hooks().applyHome(a.homeArrangement)
+        if (a.widgets.isNotEmpty()) hooks().applyWidgets(a.widgets)
         hooks().applyNotificationScope(a.notificationApps)
     }
 

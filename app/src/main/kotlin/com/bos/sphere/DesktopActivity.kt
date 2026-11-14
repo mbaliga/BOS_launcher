@@ -48,6 +48,8 @@ class DesktopActivity : ComponentActivity() {
         // One desktop surface per display: a second launch on the same display just closes itself.
         if (DesktopSurfaces.list().any { it.ownerDisplayId == ownerDisplayId || it.currentDisplayId == ownerDisplayId }) { finish(); return }
         DesktopSurfaces.register(token, SurfaceInfo(ownerDisplayId, ownerDisplayId, identity))
+        // The dock stream's rail replaces the basic recents dock on this display (DCK-07).
+        com.bos.sphere.feature.desktop.DesktopDockSlot.provider = com.bos.sphere.ui.DesktopDockProvider
 
         LauncherStores.get(this).prefs.prefs.value.let { p ->
             HyleTheme.apply(
@@ -57,7 +59,7 @@ class DesktopActivity : ComponentActivity() {
             L10n.setLanguage(p.language.code)
         }
         setContent {
-            SphereTheme { DesktopSurface(controller, { display?.displayId ?: ownerDisplayId }, identity, displayName) }
+            SphereTheme { DesktopSurface(controller, { display?.displayId ?: ownerDisplayId }, identity, displayName, token) }
         }
 
         // EXT-06: close cleanly or migrate when the display this surface was opened on goes away; reconnect yields a migrated surface.
@@ -93,6 +95,22 @@ class DesktopActivity : ComponentActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         display?.displayId?.let { DesktopSurfaces.moved(token, it) }
+    }
+
+    /** Window focus decides which surface the phone's trackpad drives when two displays each show one (EXT-03). */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        DesktopSurfaces.setWindowFocus(token, hasFocus)
+    }
+
+    /** Dock shortcuts reach this display's dock even when nothing in the surface holds focus (DCK-05). Other keys are untouched. */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        val dockId = display?.displayId ?: ownerDisplayId
+        val command = com.bos.sphere.feature.grid.LauncherInput.registry.commandFor(
+            com.bos.sphere.core.input.KeyChord(keyCode, event.isCtrlPressed, event.isAltPressed, event.isShiftPressed, event.isMetaPressed),
+        )
+        if (command != null && com.bos.sphere.ui.DesktopDockProvider.handle(dockId, command)) return true
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onResume() {

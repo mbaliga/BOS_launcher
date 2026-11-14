@@ -66,12 +66,21 @@ fun DockPanel(
     onSchedule: (RunTarget, String, Long) -> Unit,
     onDismiss: () -> Unit,
     now: () -> Long = System::currentTimeMillis,
+    /** Launcher actions the palette can pin per workspace (id, title); empty hides the section (WSP-07). */
+    paletteActionChoices: List<Pair<String, String>> = emptyList(),
+    /** Groups on the home as a shelf of chips (WSP-05). */
+    groupShelfOn: Boolean = true,
+    onGroupShelf: (Boolean) -> Unit = {},
+    /** Extra sections from other streams, drawn after the sessions (the desktop's dock item, for one). */
+    extra: @Composable () -> Unit = {},
 ) {
     val state by manager.state.collectAsState()
     var editingGroup by remember { mutableStateOf(false) }
     var pickingNotify by remember { mutableStateOf(false) }
     var sessionFor by remember { mutableStateOf<AppGroup?>(null) }
     var newWorkspace by remember { mutableStateOf("") }
+    var scheduleFor by remember { mutableStateOf<Pair<RunTarget, String>?>(null) }
+    var pickingScheduleApp by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         val shape = RoundedCornerShape(24.dp)
@@ -123,11 +132,31 @@ fun DockPanel(
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Btn("Save session") { sessionFor = g }
-                    Btn("Remind in 1 h") { onSchedule(RunTarget(RunKind.Group, g.id), g.name, now() + 3_600_000L) }
+                    Btn("Remind me") { scheduleFor = RunTarget(RunKind.Group, g.id) to g.name }
                     Btn("Delete") { manager.deleteGroup(g.id) }
                 }
             }
             Btn("New group") { editingGroup = true }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(L10n.tr("Show groups on the home"), color = HyleColors.Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Switch(groupShelfOn, onGroupShelf)
+            }
+            Btn("Schedule an app") { pickingScheduleApp = true }
+            Hint(L10n.tr("A scheduled launch posts a notification with an Open action at the chosen time. Nothing opens on its own."))
+
+            if (paletteActionChoices.isNotEmpty()) {
+                Heading("Radar actions for this workspace")
+                Hint(L10n.tr("Pinned actions show in Radar before you type, only while this workspace is active."))
+                paletteActionChoices.forEach { (id, title) ->
+                    val on = id in active.paletteActions
+                    Row(Modifier.fillMaxWidth().clickable { manager.setPaletteActions(active.id, if (on) active.paletteActions - id else active.paletteActions + id) }.padding(vertical = 6.dp).semantics { role = Role.Checkbox }, verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (on) "✓" else "", color = HyleColors.Violet, modifier = Modifier.width(24.dp))
+                        Text(L10n.tr(title), color = HyleColors.InkBright, fontSize = 14.sp)
+                    }
+                }
+            }
+            val widgetCount = active.widgets.count { it != WorkspaceWidgets.MARKER }
+            Hint(if (active.widgets.isEmpty()) L10n.tr("Widgets: saved with this workspace the first time you leave it.") else L10n.tr("Widgets: %d saved with this workspace.", widgetCount))
 
             Heading("Sessions")
             if (state.sessions.isEmpty()) Hint(L10n.tr("A session saves where a group's apps were placed."))
@@ -139,10 +168,19 @@ fun DockPanel(
                 }
             }
             Hint(L10n.tr(SessionRestorer.APPS_ONLY_NOTICE))
+            extra()
             Box(Modifier.align(Alignment.End)) { Btn("Done", onDismiss) }
         }
     }
 
+    scheduleFor?.let { (t, label) ->
+        ScheduleDialog(label, now(), onDismiss = { scheduleFor = null }, onPick = { at -> onSchedule(t, label, at); scheduleFor = null })
+    }
+    if (pickingScheduleApp) AppPicker(
+        L10n.tr("Which app?"), apps, emptySet(), max = 1, min = 1,
+        onDone = { picked -> pickingScheduleApp = false; apps.firstOrNull { it.key in picked }?.let { scheduleFor = RunTarget(RunKind.App, it.key) to it.label } },
+        onDismiss = { pickingScheduleApp = false },
+    )
     if (editingGroup) GroupEditor(apps, onSave = { manager.saveGroup(it); editingGroup = false }, onDismiss = { editingGroup = false })
     if (pickingNotify) AppPicker(
         L10n.tr("Apps shown in the calm centre"), apps, state.active.notificationApps ?: emptySet(), max = Int.MAX_VALUE, min = 0,
@@ -219,17 +257,17 @@ private fun SessionDialog(group: AppGroup, displays: List<DisplayRef>, onSave: (
     }
 }
 
-@Composable private fun Heading(text: String) = Text(L10n.tr(text), color = HyleColors.InkBright, fontSize = 17.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 8.dp))
-@Composable private fun Hint(text: String) = Text(text, color = HyleColors.InkDim, fontSize = 12.sp)
+@Composable fun Heading(text: String) = Text(L10n.tr(text), color = HyleColors.InkBright, fontSize = 17.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 8.dp))
+@Composable fun Hint(text: String) = Text(text, color = HyleColors.InkDim, fontSize = 12.sp)
 
 @Composable
-private fun Btn(label: String, onClick: () -> Unit) {
+fun Btn(label: String, onClick: () -> Unit) {
     Text(L10n.tr(label), color = HyleColors.Violet, fontSize = 14.sp, fontWeight = FontWeight.Medium,
         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp).semantics { role = Role.Button })
 }
 
 @Composable
-private fun Chips(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+fun Chips(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         labels.forEachIndexed { i, l ->
             Text(L10n.tr(l), color = if (i == selected) HyleColors.OnAccent else HyleColors.Ink, fontSize = 13.sp,

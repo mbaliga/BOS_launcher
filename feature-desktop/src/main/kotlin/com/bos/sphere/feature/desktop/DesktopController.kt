@@ -35,6 +35,7 @@ class DesktopController private constructor(private val app: Application) {
     val profiles = DesktopProfileRepository(object : KeyValue {
         override fun get(key: String) = sp.getString(key, null)
         override fun put(key: String, value: String) { sp.edit().putString(key, value).apply() }
+        override fun keys(): Set<String> = sp.all.keys.toSet()
     })
     private val executor = LaunchExecutor(app, caps = { currentCaps() })
 
@@ -108,6 +109,9 @@ class DesktopController private constructor(private val app: Application) {
         val d = _state.value.eligible.firstOrNull { !DesktopSurfaces.openOn(it.id) } ?: return null
         return ReopenAction(L10n.tr("Open desktop on %s", d.name)) { openSurface(d.id) }
     }
+
+    /** The explicit intent behind the palette result for [reopenAction]; it runs through [DesktopOpenActivity]. */
+    fun openIntent(): Intent = Intent().setComponent(ComponentName(app.packageName, OPEN_CLASS)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     data class ReopenAction(val label: String, val run: () -> Unit)
 
@@ -228,6 +232,7 @@ class DesktopController private constructor(private val app: Application) {
         private const val REOPEN_ID_BASE = 7400
         private const val PAD_ID_BASE = 7500
         const val PAD_CLASS = "com.bos.sphere.PhoneInputActivity"
+        const val OPEN_CLASS = "com.bos.sphere.feature.desktop.DesktopOpenActivity"
         private const val KEY_SETTING = "offer_setting"
         private const val KEY_MIGRATE = "migrate_on_disconnect"
         private const val KEY_OFFERED = "offered_identities"

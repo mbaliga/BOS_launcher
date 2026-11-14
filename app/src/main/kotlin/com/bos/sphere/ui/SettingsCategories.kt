@@ -773,6 +773,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
     out += com.bos.sphere.ui.backupCategory()
     out += com.bos.sphere.ui.puckCategory()
+    out += com.bos.sphere.ui.desktopCategory()
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(
         x("About"),
@@ -814,6 +815,7 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     cat("Launchpad")?.let { out += it }
     out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
     cat("Backup")?.let { out += it }
+    cat("Desktop & dock")?.let { out += it }
     cat("Capabilities")?.let { out += it }
     cat("Lab")?.let { out += it }
     cat("About")?.let { out += it }

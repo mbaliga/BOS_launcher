@@ -100,10 +100,18 @@ fun Modifier.homeDropTarget(): Modifier {
 
 /** Adds dropped items to the home arrangement of the current size class. */
 object HomeDropStore {
+    private val io = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "home-drop-io").apply { isDaemon = true } }
+
+    /** Reads and writes the store off the main thread (it loads every saved arrangement from disk). */
     fun add(context: Context, sc: SizeClass, result: DropResult) {
-        val store = HomeStateStore(context)
-        val state = store.arrangements.value.stateFor(sc) ?: HomeState()
-        store.save(sc, apply(state, result))
+        val app = context.applicationContext
+        io.execute {
+            runCatching {
+                val store = HomeStateStore(app)
+                val state = store.arrangements.value.stateFor(sc) ?: HomeState()
+                store.save(sc, apply(state, result))
+            }
+        }
     }
 
     /** Pure part, tested: each item goes on the first page unless it is already somewhere on the home. */

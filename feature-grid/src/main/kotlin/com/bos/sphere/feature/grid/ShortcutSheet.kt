@@ -5,6 +5,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,7 @@ fun ShortcutSheet(registry: ShortcutRegistry, onDismiss: () -> Unit) {
     GlassDialog(title = L10n.tr("Keyboard shortcuts"), onDismiss = onDismiss, width = 640.dp) {
         Text(L10n.tr(KeyLabels.META_NOTE), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
         message?.let { Text(it, color = HyleColors.InkBright, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp).semantics { liveRegion = LiveRegionMode.Polite }) }
+        DisposableEffect(capturing != null) { DialogKeyGate.passThrough = capturing != null; onDispose { DialogKeyGate.passThrough = false } }
         capturing?.let { c ->
             val focus = remember { FocusRequester() }
             LaunchedEffect(c) { runCatching { focus.requestFocus() } }

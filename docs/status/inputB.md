@@ -21,6 +21,13 @@ Nothing here is device-confirmed. "built" means it compiles and is covered by JV
 | NFR-13 | partial | New: Orbit tiles are merged semantics nodes with the result name as description and a rank-order traversal index inside a traversal group (best match first, because the tiles circle the screen); Continuous and DSi cells carry a traversal index by item order in both orientations, checked by a Robolectric test that reads the semantics tree. XMB and the puck were done in wave 1. No TalkBack run, and the Orbit order is not checked by a test |
 | INP-04 | built | (for the record) Rebinding and persistence: `ShortcutPersistence` stores only the user's changes in the state file's keyboard slot (`extras.json`, key `keyboard`), loaded off the main thread at start and when the sheet opens, written when the sheet changes something. A garbled slot is ignored and never unbinds a command. Export and import of the state file carry it as before; a restore or import is picked up on the next start or sheet open |
 
+## Review fixes (adversarial pass)
+
+* Shortcut sheet: Esc while capturing a new chord was turned into Back by the dialog key hook and closed the whole sheet; the hook now stands aside while a capture is on (`DialogKeyGate`).
+* Dropped items were written to the arrangement store on the main thread (the store reads every saved arrangement in its constructor); the write now runs on a background executor.
+* Push-to-talk button stayed drawn as "listening" after a final result or error; `PushToTalk` now reports state changes (tested).
+* Still true: nothing renders dropped link items (the home does not read `HomeStateStore`), so INP-11 stays partial.
+
 ## Not done in this stream
 
 * Dock rail and panel dialogs (dock stream files) do not get the controller window hook.

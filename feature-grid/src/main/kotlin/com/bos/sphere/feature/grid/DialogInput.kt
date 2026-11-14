@@ -8,9 +8,13 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import com.bos.sphere.core.input.DialogKeys
 
+/** While a dialog is capturing a key chord (the shortcut sheet), Esc and the controller buttons must reach it untranslated. */
+object DialogKeyGate { @Volatile var passThrough: Boolean = false }
+
 /** Wraps a dialog window's callback so controller buttons and Esc act as arrows, Enter, Menu and Back (INP-20). */
 private class ControllerWindowCallback(private val base: Window.Callback) : Window.Callback by base {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (DialogKeyGate.passThrough) return base.dispatchKeyEvent(event)
         val mapped = DialogKeys.translate(event.keyCode)
         if (mapped == event.keyCode) return base.dispatchKeyEvent(event)
         val meta = if (DialogKeys.shiftFor(event.keyCode)) event.metaState or KeyEvent.META_SHIFT_ON else event.metaState

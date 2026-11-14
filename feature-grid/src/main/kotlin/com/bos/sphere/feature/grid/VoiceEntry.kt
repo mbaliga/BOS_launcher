@@ -68,9 +68,10 @@ class PushToTalk(
     private val hasPermission: () -> Boolean,
     private val askPermission: () -> Unit,
     private val onText: (String) -> Unit,
+    private val onListening: (Boolean) -> Unit = {},
 ) {
     var listening = false
-        private set
+        private set(v) { if (field != v) { field = v; onListening(v) } }
 
     fun press() {
         if (listening) return
@@ -154,6 +155,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier) {
             hasPermission = { context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED },
             askPermission = { permission.launch(Manifest.permission.RECORD_AUDIO) },
             onText = { latestText(it) },
+            onListening = { listening = it },
         )
     }
     DisposableEffect(ptt) { onDispose { ptt.dispose() } }

@@ -59,4 +59,11 @@ class VoiceEntryTest {
         ptt.toggle(); assertFalse(ptt.listening)
         ptt.toggle(); assertTrue(ptt.listening); assertEquals(2, rec.starts)
     }
+
+    @Test fun INP_13_the_ui_is_told_when_listening_ends_by_itself() {
+        val seen = mutableListOf<Boolean>(); val rec = Fake()
+        val ptt = PushToTalk(rec, { true }, {}, {}, { seen += it })
+        ptt.press(); rec.final("x"); ptt.press(); rec.err()
+        assertEquals(listOf(true, false, true, false), seen)
+    }
 }

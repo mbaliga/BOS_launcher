@@ -4,7 +4,7 @@ Source: [Spec.md](Spec.md). Status per requirement: **not started**, **partial**
 
 Requirement texts are in Spec.md; this table is the single place that says how far each one is.
 
-Counts: built 45, partial 89, not started 12, unmet 2 (of 148).
+Counts: built 46, partial 90, not started 10, unmet 2 (of 148).
 
 | ID | P | Status | Note |
 | --- | --- | --- | --- |
@@ -14,7 +14,7 @@ Counts: built 45, partial 89, not started 12, unmet 2 (of 148).
 | PAL-04 | M | built | `SettingsIndex` (40 public `android.settings.*` actions), hidden when `resolveActivity` is null. Handler visibility on Android 11+ depends on package visibility; unverified on device. |
 | PAL-05 | M | partial | Calculator and Units are built and tested, and the hub carries `copyText`; Enter-to-copy needs the UI to call `PaletteHitRunner.run`, which nothing does yet. |
 | PAL-06 | M | partial | Engine row is built and always last, tested; the engine is not yet what the Radar UI renders (it keeps its own web row), so the guarantee holds for the engine only. |
-| PAL-07 | M | not started | Not in this stream (keyboard operation of the UI). |
+| PAL-07 | M | built | Radar keyboard operation (RadarKeyboard, tested); not run on a device |
 | PAL-08 | M | partial | List derivation is built and tested against `ContextMenus`; the Radar UI does not display it yet. |
 | PAL-09 | M | partial | `Ranker` and `UsageStore` are built and tested; nothing in the app calls `onSelected` or `PalettePrefs.saveUsage` yet, so no selection is learned on device until the Radar stream wires it. |
 | PAL-10 | S | partial | Engine provider built and tested (call, message, email, open; one enable row without permission). The Android `ContactSource` lookup is not wired into `AndroidPalette`. |
@@ -108,7 +108,7 @@ Counts: built 45, partial 89, not started 12, unmet 2 (of 148).
 | STR-03 | M | built | Slide left runs the per-app primary action (default Dismiss), slide right opens the palette with Snooze, Read, Mute, Open, Rule. Buttons on hover and focus, long-press, right-click, Menu key, Delete and TalkBack custom actions, all from one entry list (tested for parity) |
 | STR-04 | M | partial | Per-app delivery (immediately, digest at chosen times, silent in Launchpad) persisted in the Launchpad store; LaunchpadRulesSnapshot (rules, grouping, gestures, delivery, unknown fields kept) is exposed for the state store. The state stream must call `LaunchpadSettings.snapshot()` and `restore()` for the export; no export wiring was done here, so the config export does not yet carry delivery rules (downgraded from built in review). The rules page states the scope |
 | STR-05 | M | built | GrantGate/GrantScreen in core-design; Launchpad shows it without access (explanation, on-device promise, enable button, a still-off line after the first ask); the media strip shows a grant chip that opens the same screen |
-| STR-06 | M | not started | Not in this stream (dock feed) |
+| STR-06 | M | partial | Dock media item built and fed by the media session; grant flow is STR-05 |
 | STR-07 | M | partial | Robolectric screenshots in portrait and landscape for no grant, empty, grouped, digest, light and dark, with luminance assertions; device checklist written. The screenshots are not compared against golden images |
 | STR-08 | M | partial | Arrow keys walk groups and rows, Left and Right collapse and expand, Home and End, Esc closes, focus moves to the neighbour after a removal, focus ring only in keyboard mode. Esc restoring focus to the exact home element needs home elements to opt in with `trackedForLaunchpad` (the focus graph is the input stream's work); the mechanism is built and tested |
 | STR-09 | S | built | Left-edge waiting indicator: counts waiting items under the rules, widens for a new one, never focusable. It replaces the unread strip only when that strip is off |

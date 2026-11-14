@@ -3,7 +3,6 @@ package com.bos.sphere.feature.grid
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -291,7 +290,7 @@ internal fun Orbit(
         }
     }
 
-    BoxWithConstraints(modifier.linearTraversal().clipToBounds().systemGestureExclusion().pointerInput(Unit) {
+    BoxWithConstraints(modifier.linearTraversal().clipToBounds().pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
                 val e = awaitPointerEvent(PointerEventPass.Initial)

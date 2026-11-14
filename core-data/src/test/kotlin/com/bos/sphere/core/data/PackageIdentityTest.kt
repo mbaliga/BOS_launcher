@@ -40,7 +40,9 @@ class PackageIdentityTest {
         for (m in manifests) {
             val t = m.readText()
             assertFalse("${m.path} declares an authority", t.contains("android:authorities"))
-            assertFalse("${m.path} declares a permission", Regex("""<permission\b""").containsMatchIn(t))
+            // PAL-17: the one documented, app-ID-independent permission third-party providers guard with (a public contract; see docs/decisions/CFG-20.md).
+            val declared = Regex("""<permission\b[^>]*android:name="([^"]+)"""").findAll(t).map { it.groupValues[1] }.toSet()
+            assertTrue("${m.path} declares a permission: $declared", declared.all { it == "com.bos.sphere.permission.READ_SEARCH" })
         }
     }
 

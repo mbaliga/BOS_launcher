@@ -131,7 +131,8 @@ class NfrWiringTest {
 
     @Test fun NFR_12_iconsAreRasterisedOffTheMainThread() {
         val t = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/AppIcon.kt")
-        assertTrue(t.indexOf("Dispatchers.Default") in 0 until t.indexOf("IconCache.rasterize("))
+        assertTrue(t.indexOf("Dispatchers.Default") in 0 until t.indexOf("sources.rasterize("))
+        assertTrue(text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/IconSources.kt").contains("IconCache.rasterize("))
     }
 
     // ---- NFR-01 to NFR-04
@@ -194,7 +195,8 @@ class NfrWiringTest {
             assertTrue("${f.name} not periodic or expedited-free", !t.contains("setExpedited") && !t.contains("setImportantWhileForeground"))
         }
         val callers = Repo.mainSources().filter { it.readText().contains("FileIndexer.reconcile(") }.map { it.name }
-        assertEquals(listOf("FileIndexAndroid.kt"), callers)
+        // The job, plus the explicit "Index now" / "Rebuild" buttons in the search settings (user-triggered, on Dispatchers.IO).
+        assertEquals(setOf("FileIndexAndroid.kt", "PaletteSettingsPanes.kt"), callers.toSet())
         val svc = text("feature-search/src/main/kotlin/com/bos/sphere/feature/search/palette/FileIndexAndroid.kt")
         assertTrue(svc.indexOf("FileIndexer.reconcile(applicationContext)") > svc.indexOf("class FileIndexJobService"))
     }

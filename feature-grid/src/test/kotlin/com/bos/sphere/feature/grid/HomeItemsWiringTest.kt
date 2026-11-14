@@ -40,7 +40,7 @@ class HomeItemsWiringTest {
     private val w = ItemKeys.widget(4)
 
     private fun app(pkg: String, icon: () -> android.graphics.drawable.Drawable?) =
-        AppEntry(pkg, ComponentName(pkg, "$pkg.Main"), pkg, Process.myUserHandle(), icon)
+        AppEntry(pkg, ComponentName(pkg, "$pkg.Main"), pkg, Process.myUserHandle(), iconLoader = icon)
 
     private fun extras(state: HomeState) = HomeExtras(state, { null }, { null }, { _, _ -> })
 

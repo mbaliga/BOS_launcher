@@ -115,6 +115,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putString("iconTint", next.iconTint.name)
             .putBoolean("iconPlate", next.iconPlate)
             .putString("language", next.language.name)
+            .putBoolean("kbOpenP", next.keyboardOnOpenPortrait).putBoolean("kbOpenL", next.keyboardOnOpenLandscape)
+            .putBoolean("cornersPerOri", next.cornersPerOrientation)
+            .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name)
             .apply()
     }
@@ -224,6 +227,11 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             iconTint = enumOr(sp.getString("iconTint", null), d.iconTint),
             iconPlate = sp.getBoolean("iconPlate", d.iconPlate),
             language = enumOr(sp.getString("language", null), d.language),
+            keyboardOnOpenPortrait = sp.getBoolean("kbOpenP", d.keyboardOnOpenPortrait),
+            keyboardOnOpenLandscape = sp.getBoolean("kbOpenL", d.keyboardOnOpenLandscape),
+            cornersPerOrientation = sp.getBoolean("cornersPerOri", d.cornersPerOrientation),
+            hotCornersOn = sp.getBoolean("hotCornersOn", d.hotCornersOn),
+            hotCornerDwellMs = sp.getInt("hotCornerDwell", d.hotCornerDwellMs).coerceIn(0, 1000),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
         )
     }
@@ -340,6 +348,19 @@ class ShortcutStore internal constructor(private val sp: SharedPreferences) {
         val next = _corners.value + (corner to slot)
         _corners.value = next
         sp.edit().putString("corner.${corner.name}", ShortcutCodec.encodeSlot(slot)).apply()
+    }
+
+    /** Landscape-only assignments (INP-15), used when the prefs ask for a separate set per orientation. Unset corners follow portrait. */
+    private val _landscapeCorners = MutableStateFlow(readLandscapeCorners())
+    val landscapeCorners: StateFlow<Map<Corner, CornerSlot>> = _landscapeCorners.asStateFlow()
+
+    fun setLandscapeCorner(corner: Corner, slot: CornerSlot) {
+        _landscapeCorners.value = _landscapeCorners.value + (corner to slot)
+        sp.edit().putString("lcorner.${corner.name}", ShortcutCodec.encodeSlot(slot)).apply()
+    }
+
+    private fun readLandscapeCorners(): Map<Corner, CornerSlot> = Corner.entries.associateWith { c ->
+        sp.getString("lcorner.${c.name}", null)?.let(ShortcutCodec::decodeSlot) ?: readCorners()[c] ?: CornerSlot.Empty
     }
 
     fun setGesture(gesture: HomeGesture, item: CornerItem?) {

@@ -78,6 +78,7 @@ import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerItem
 import com.bos.sphere.core.data.CornerMapping
 import com.bos.sphere.core.data.CornerSlot
+import com.bos.sphere.core.input.FocusKind
 import com.bos.sphere.core.data.CornerStyle
 import com.bos.sphere.core.design.HyleColors
 import kotlinx.coroutines.launch
@@ -324,9 +325,11 @@ private fun PaletteOverlay(
     val p = progress.coerceIn(0f, 1f)
     val glass = HyleColors.SurfaceTranslucent
     val accent = HyleColors.Violet
+    FocusLayer(layer = 5) {
     Box(
         Modifier
             .fillMaxSize()
+            .linearTraversal()
             .background(Color.Black.copy(alpha = 0.55f * p))
             .pointerInput(open, slots) {
                 detectTapGestures { pos ->
@@ -377,6 +380,7 @@ private fun PaletteOverlay(
                         val sc = (if (isHover) 1.15f else 1f) * local
                         scaleX = sc; scaleY = sc; alpha = local
                     }
+                    .launcherItem("palette.${slot.index}", FocusKind.Item, order = slot.index, layer = 5, onActivate = { onItem(slot.index) }, ringRadiusDp = 16f)
                     .semantics(mergeDescendants = true) {
                         contentDescription = itemLabel(item, appsByKey)
                         onClick { onItem(slot.index); true }
@@ -407,6 +411,7 @@ private fun PaletteOverlay(
                 },
             textAlign = if (onRight) TextAlign.End else TextAlign.Start,
         )
+    }
     }
 }
 
@@ -468,6 +473,16 @@ private fun CornerSlotView(
                         contentDescription = "${slot.name} palette"
                         onLongClick { onEdit(); true }
                     }
+                    .launcherItem(
+                        "corner.${corner.name}", FocusKind.Corner,
+                        onActivate = {
+                            val c = coords; val l = layerCoords()
+                            if (c != null && l != null && c.isAttached && l.isAttached) {
+                                onPaletteOpen(slot, l.localPositionOf(c, Offset(c.size.width / 2f, c.size.height / 2f)))
+                            }
+                        },
+                        onMenu = onEdit, ringRadiusDp = 22f,
+                    )
                     .pointerInput(slot) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
@@ -530,6 +545,7 @@ private fun CornerSlotView(
                         onClick { onTap(slot.item); true }
                         onLongClick { onEdit(); true }
                     }
+                    .launcherItem("corner.${corner.name}", FocusKind.Corner, onActivate = { onTap(slot.item) }, onMenu = onEdit, ringRadiusDp = 22f)
                     .pointerInput(slot) {
                         detectTapGestures(
                             onTap = { onTap(slot.item) },
@@ -544,6 +560,7 @@ private fun CornerSlotView(
                 modifier = boxModifier
                     .size(iconSize + 26.dp)
                     .semantics { contentDescription = "Empty corner"; onLongClick { onEdit(); true } }
+                    .launcherItem("corner.${corner.name}", FocusKind.Corner, onActivate = onEdit, onMenu = onEdit, ringRadiusDp = 22f)
                     .pointerInput(Unit) {
                         detectTapGestures(onLongPress = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onEdit() })
                     },

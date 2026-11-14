@@ -475,7 +475,8 @@ fun GridHome(
                                         if (total.x < 0) HomeGesture.SwipeLeft else HomeGesture.SwipeRight
                                     else -> null
                                 }
-                                if (g != null && g in st.bound) cb.onGesture(g)
+                                // INP-08: a swipe that starts in the system's gesture bands is the system's, not ours.
+                                if (g != null && g in st.bound && !swipeStartsInSystemZone(down.position, st.areaSize, g)) cb.onGesture(g)
                             }
 
                             Early.Pinch -> {
@@ -615,8 +616,10 @@ fun GridHome(
                     suggestion = if (index == 0 && prefs.showSuggestion && dragKey == null) suggestion else null,
                     onLaunch = onLaunch,
                     onLongPress = onAppLongPress,
+                    onItemFocused = { scope.launch { pagerState.animateScrollToPage(index) } },
                 )
             }
+            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange)
             if (areaSize != IntSize.Zero) {
                 if (paging == PagingAxis.Horizontal) {
                     HorizontalPager(
@@ -719,6 +722,8 @@ private fun PageView(
     onLaunch: (AppEntry) -> Unit,
     onLongPress: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
+    /** Keyboard focus reached an item: bring its page into view. */
+    onItemFocused: () -> Unit = {},
 ) {
     val density = LocalDensity.current
     Box(modifier.fillMaxSize()) {
@@ -762,6 +767,11 @@ private fun PageView(
                                 cameraDistance = 14f * density.density
                             }
                         }
+                        .launcherItem(
+                            "grid.$itemKey", onFocused = onItemFocused,
+                            onActivate = app?.let { a -> { onLaunch(a) } },
+                            onMenu = app?.let { a -> { onLongPress(a) } },
+                        )
                         .semantics(mergeDescendants = true) {
                             if (app != null) {
                                 contentDescription = app.label

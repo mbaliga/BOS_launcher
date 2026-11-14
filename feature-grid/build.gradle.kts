@@ -44,6 +44,7 @@ android {
 dependencies {
     implementation(project(":core-design"))
     implementation(project(":core-data"))
+    implementation(project(":core-input"))
     implementation(project(":feature-search"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

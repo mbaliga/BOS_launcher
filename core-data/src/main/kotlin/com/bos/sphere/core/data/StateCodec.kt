@@ -28,6 +28,8 @@ data class StateParts(
     val launchpadRules: List<Rule> = emptyList(),
     val launchpadPrefs: LaunchpadPrefs = LaunchpadPrefs(),
     val launchpadGestures: Map<LaunchpadGesture, LaunchpadAction> = LaunchpadGestures.defaults,
+    /** STR-04: per-app delivery policies. */
+    val launchpadPolicies: List<AppPolicy> = emptyList(),
     val extras: StateExtras = StateExtras(),
 )
 
@@ -126,7 +128,8 @@ object StateCodec {
             JSONObject()
                 .put("rules", JSONArray(LaunchpadJson.encodeRules(parts.launchpadRules)))
                 .put("prefs", JSONObject(LaunchpadJson.encodePrefs(parts.launchpadPrefs)))
-                .put("gestures", LaunchpadGestures.encode(parts.launchpadGestures)),
+                .put("gestures", LaunchpadGestures.encode(parts.launchpadGestures))
+                .put("policies", PolicyJson.encode(parts.launchpadPolicies)),
         )
         for (s in StateSchema.OPAQUE_SECTIONS) o.put(s, parts.extras.opaque[s] ?: JSONArray())
         o.put(
@@ -188,6 +191,7 @@ object StateCodec {
                 launchpadRules = LaunchpadJson.decodeRules(lp?.optJSONArray("rules")?.toString()),
                 launchpadPrefs = LaunchpadJson.decodePrefs(lp?.optJSONObject("prefs")?.toString()),
                 launchpadGestures = LaunchpadGestures.decode(lp?.optString("gestures")),
+                launchpadPolicies = PolicyJson.decode(lp?.optJSONArray("policies")),
                 extras = StateExtras(
                     opaque = opaque,
                     unknownTop = mig.doc.unknownTop(),

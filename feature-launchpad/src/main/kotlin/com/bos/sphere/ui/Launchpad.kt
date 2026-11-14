@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -135,12 +136,25 @@ import kotlin.math.roundToInt
 
 /** Launchpad palette: dark by default, or the light BB10-hub look. */
 internal class LpColors(val bg: Color, val surface: Color, val ink: Color, val ink2: Color, val dim: Color, val line: Color)
-internal val LpDark = LpColors(Color(0xFF0B0D12), Color(0xFF1B1E27), Color(0xFFF1F3F8), Color(0xFFC9CED9), Color(0xFF8A91A3), Color(0x22FFFFFF))
-internal val LpLight = LpColors(Color(0xFFF7F8FA), Color(0xFFE4E8EF), Color(0xFF14171F), Color(0xFF3B4150), Color(0xFF6C7384), Color(0x1F000000))
+/** CFG-10: Launchpad's two looks come from the shared design tokens (dark and light variants), not a private palette. */
+internal fun lpColorsFor(variant: com.bos.sphere.core.design.ThemeVariant): LpColors =
+    com.bos.sphere.core.design.HyleColors.tokens(variant).let { LpColors(it.background, it.surface, it.inkBright, it.ink, it.inkDim, it.hairline) }
+internal val LpDark = lpColorsFor(com.bos.sphere.core.design.ThemeVariant.Dark)
+internal val LpLight = lpColorsFor(com.bos.sphere.core.design.ThemeVariant.Light)
 internal val LocalLp = androidx.compose.runtime.compositionLocalOf { LpDark }
 
-internal val BlueDark = Color(0xFF0A5C95)
-internal val BlueLight = Color(0xFF0BA6E0)
+/** The shared accent, and the same accent darkened until white text on it reads (contrast 4.5 or more). */
+internal val BlueLight: Color get() = com.bos.sphere.core.design.HyleColors.Violet
+internal val BlueDark: Color get() = lpAccentFill(com.bos.sphere.core.design.HyleColors.Violet)
+
+internal fun lpAccentFill(accent: Color): Color {
+    var c = accent
+    var n = 0
+    while (n < 20 && com.bos.sphere.core.design.WallpaperPalette.contrast(c.toArgb(), 0xFFFFFFFF.toInt()) < 4.5) {
+        c = androidx.compose.ui.graphics.lerp(c, Color.Black, 0.12f); n++
+    }
+    return c
+}
 
 // ---------------------------------------------------------------------------------------------
 // Shared state helpers
@@ -149,7 +163,7 @@ internal val BlueLight = Color(0xFF0BA6E0)
 @Composable
 private fun rememberLaunchpadInit() {
     val ctx = LocalContext.current
-    remember(ctx) { LaunchpadSettings.init(ctx); true }
+    remember(ctx) { LaunchpadSettings.init(ctx); DigestWidget.start(ctx); true }
 }
 
 /** True while the user has granted notification access; re-checked every time the app resumes. */

@@ -158,7 +158,7 @@ fun DockHost(
             onReorder = { from, to -> instance.reorder(from, to) },
             onUnpin = { instance.unpin(it.ref) },
             onPin = { instance.pin(it.ref) },
-            onEnableUsage = { runCatching { context.startActivity(usage.settingsIntent()) } },
+            onEnableUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(usage.settingsIntent()) } } },
             onOpenPanel = onOpenPanel,
             onSwitchWorkspace = { d -> if (d > 0) manager.next() else manager.previous() },
             onToggleExpanded = { expanded = !expanded },

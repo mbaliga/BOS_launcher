@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="digest_widget_label">Liftoff ダイジェスト</string>
+    <string name="digest_widget_description">ダイジェストにまとめた通知をホーム画面に表示します。</string>
+</resources>

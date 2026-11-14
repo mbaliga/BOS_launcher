@@ -34,6 +34,10 @@ fun VoiceAssistantButton(
     val context = LocalContext.current
     var isListening by remember { mutableStateOf(false) }
     val voiceResults by VoiceInputManager.voiceResults.collectAsStateWithLifecycle(initialValue = null)
+    // CFG-07: the microphone is asked for on the first press, after the one-screen explanation.
+    val micPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) isListening = VoiceInputManager.startListening(context)
+    }
 
     // Feed voice results to the callback (search/launch)
     LaunchedEffect(voiceResults) {
@@ -63,8 +67,10 @@ fun VoiceAssistantButton(
                 if (isListening) {
                     VoiceInputManager.stopListening()
                     isListening = false
-                } else {
+                } else if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     isListening = VoiceInputManager.startListening(context)
+                } else {
+                    com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.Microphone) { micPermission.launch(android.Manifest.permission.RECORD_AUDIO) }
                 }
             },
         contentAlignment = Alignment.Center,

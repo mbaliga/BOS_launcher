@@ -718,7 +718,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val launchpadShortcuts = remember { com.bos.sphere.core.input.ShortcutRegistry() }
     val grantPrompter = com.bos.sphere.ui.rememberGrantPrompter()
     val homeCapture = com.bos.sphere.feature.grid.rememberHomeCapture()
-    CompositionLocalProvider(LocalIconTheme provides iconTheme) {
+    // CFG-07: features in other modules ask for grants through GrantHooks; the home shows the explanation first.
+    DisposableEffect(grantPrompter) {
+        com.bos.sphere.core.design.GrantHooks.interceptor = { kind, proceed -> grantPrompter.ask(kind, proceed) }
+        onDispose { com.bos.sphere.core.design.GrantHooks.interceptor = null }
+    }
+    // STR-08: Esc in Launchpad gives focus back to the home element that held it (the input stream's focus registry).
+    val launchpadFocusTrail = remember {
+        com.bos.sphere.ui.LaunchpadFocusTrail().also {
+            it.currentId = { com.bos.sphere.feature.grid.LauncherInput.focus.currentId }
+            it.requestId = { id -> com.bos.sphere.feature.grid.LauncherInput.focus.request(id) }
+        }
+    }
+    CompositionLocalProvider(LocalIconTheme provides iconTheme, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail) {
     Box(
         modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
@@ -992,7 +1004,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             contacts = contactSource,
             hub = searchHub,
             onRunAction = { runner.run(it) },
-            onRequestFilePermission = { filePermission.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO, android.Manifest.permission.READ_MEDIA_AUDIO)) },
+            onRequestFilePermission = { grantPrompter.ask(com.bos.sphere.core.design.GrantKind.Folders) { filePermission.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO, android.Manifest.permission.READ_MEDIA_AUDIO)) } },
             sounds = sounds,
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },

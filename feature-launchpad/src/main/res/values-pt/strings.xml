@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="digest_widget_label">Resumo do Liftoff</string>
+    <string name="digest_widget_description">Notificações agrupadas no seu resumo, na tela inicial.</string>
+</resources>

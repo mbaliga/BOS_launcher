@@ -487,6 +487,9 @@ object LaunchpadSettings {
         savePolicies(if (policy == AppPolicy(policy.packageName)) kept else kept + policy)
     }
 
+    /** STR-04: replaces every per-app policy (import, restore). */
+    fun replacePolicies(list: List<AppPolicy>) = savePolicies(list)
+
     private var unknownExtra = "{}"
 
     /** The whole persisted state as one document, for the state store and the config export. */

@@ -28,6 +28,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,18 +59,21 @@ fun MediaStrip(
         border = BorderStroke(1.dp, HyleColors.Hairline),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, end = 8.dp)) {
-            Column(
-                verticalArrangement = Arrangement.Center,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .clickable(onClickLabel = "Open player", onClick = onOpen)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 8.dp),
             ) {
-                Text(info.title, color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (info.artist.isNotBlank()) {
-                    Text(info.artist, color = HyleColors.InkDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                MediaArtwork(info.artwork, info.title)
+                Column(verticalArrangement = Arrangement.Center, modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                    Text(info.title, color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (info.artist.isNotBlank()) {
+                        Text(info.artist, color = HyleColors.InkDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
             MediaButton(MediaGlyphs.Previous, "Previous track", onPrev, enabled = info.canPrev)
@@ -78,6 +83,24 @@ fun MediaStrip(
                 onPlayPause, emphasised = true,
             )
             MediaButton(MediaGlyphs.Next, "Next track", onNext, enabled = info.canNext)
+        }
+    }
+}
+
+/** STR-06: the cover or the player's icon in a rounded tile; a plain glyph tile when the player supplies none. */
+@Composable
+fun MediaArtwork(bitmap: android.graphics.Bitmap?, description: String, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(8.dp)
+    val base = modifier.size(40.dp).clip(shape)
+    if (bitmap != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bitmap.asImageBitmap(), contentDescription = description,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = base.semantics { testTag = "media-artwork" },
+        )
+    } else {
+        androidx.compose.foundation.layout.Box(base.background(HyleColors.Hairline).semantics { testTag = "media-artwork-none" }, contentAlignment = Alignment.Center) {
+            Icon(MediaGlyphs.Play, null, tint = HyleColors.InkDim, modifier = Modifier.size(16.dp))
         }
     }
 }

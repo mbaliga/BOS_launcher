@@ -19,7 +19,10 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bos.sphere"
+        // CFG-20: the application ID is an open owner decision (docs/decisions/CFG-20.md). The default is unchanged; a trial
+        // build can use another one with -Pliftoff.applicationId=<id> without editing this file. Code never reads the literal
+        // (it uses packageName), so the Kotlin namespace stays com.bos.sphere either way.
+        applicationId = (findProperty("liftoff.applicationId") as String?)?.takeIf { it.isNotBlank() } ?: "com.bos.sphere"
         minSdk = 31
         targetSdk = 35
         versionCode = gitCount

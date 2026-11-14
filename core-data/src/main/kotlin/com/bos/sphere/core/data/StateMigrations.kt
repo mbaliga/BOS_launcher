@@ -67,9 +67,8 @@ object StateMigrations {
                 .put("gestures", old.optJSONObject("gestures") ?: JSONObject()),
         )
         old.optJSONArray("launchpadRules")?.let { out.put(StateSchema.K_LAUNCHPAD, JSONObject().put("rules", it)) }
-        // New in v2: empty placeholders that later streams fill.
-        for (s in StateSchema.OPAQUE_SECTIONS) if (!out.has(s)) out.put(s, JSONArray())
-        if (!out.has(StateSchema.K_WIDGETS)) out.put(StateSchema.K_WIDGETS, JSONArray())
+        // New in v2: workspaces, sessions, palette aliases and widgets. A v1 file never carried them, so they are left
+        // absent (not written as empty): importing it must not wipe the ones already on this install.
         return out
     }
 }

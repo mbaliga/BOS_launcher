@@ -267,6 +267,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch { IntArray(2).also { rootView.getLocationOnScreen(it) }.let { it[0] to it[1] } } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.core.input.ShortcutRegistry() }
+    val puckActionIds by remember { com.bos.sphere.core.data.PuckActionsStore(context.getSharedPreferences("puck_actions", android.content.Context.MODE_PRIVATE)).actions }.collectAsStateWithLifecycle()
     fun launch(app: AppEntry) {
         com.bos.sphere.feature.dock.SessionUse.mark(app.key)
         appLauncher.launch(app, lastTouch.sourceRect())
@@ -982,7 +983,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // CFG-05: every Ground Control setting is also a Radar result; the list is filled once the categories are built below.
         val settingsForRadar = remember { androidx.compose.runtime.mutableStateOf(emptyList<com.bos.sphere.feature.grid.SettingCategory>()) }
-        val settingsSource = remember { com.bos.sphere.feature.grid.CategorySettingsSource({ settingsForRadar.value }) { e -> searchOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_INDEX_BASE + e.categoryIndex) } }
+        val settingsSource = remember { com.bos.sphere.feature.grid.CategorySettingsSource({ settingsForRadar.value }) { e -> searchOpen = false; com.bos.sphere.feature.grid.SettingsFocus.request(e.itemIndex); openSettings(com.bos.sphere.ui.CATEGORY_INDEX_BASE + e.categoryIndex) } }
         val recentApps = remember(history, appsByKey) { history.asReversed().map { it.key }.distinct().mapNotNull(appsByKey::get) }
         SearchOverlay(
             visible = searchOpen,
@@ -1013,13 +1014,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },
             onSearch = { wheelOpen = false; searchOpen = true },
-            actions = listOf(
-                com.bos.sphere.feature.grid.PuckAction("Home settings", com.bos.sphere.feature.grid.Glyphs.Gear) { wheelOpen = false; runner.run(CornerActionId.LauncherSettings) },
-                com.bos.sphere.feature.grid.PuckAction("Notifications", com.bos.sphere.feature.grid.Glyphs.Bell) { wheelOpen = false; runner.run(CornerActionId.Notifications) },
-                com.bos.sphere.feature.grid.PuckAction("Flashlight", com.bos.sphere.feature.grid.Glyphs.Flashlight) { runner.run(CornerActionId.Flashlight) },
-                com.bos.sphere.feature.grid.PuckAction("Ring, vibrate, silent", com.bos.sphere.feature.grid.Glyphs.Ring) { runner.run(CornerActionId.RingerCycle) },
-                com.bos.sphere.feature.grid.PuckAction("Do not disturb", com.bos.sphere.feature.grid.Glyphs.Moon) { runner.run(CornerActionId.DoNotDisturb) },
-            ),
+            // CFG-15: the ring shows what the user chose in Ground Control > Puck (default: the shipped five).
+            actions = puckActionIds.map { id ->
+                com.bos.sphere.feature.grid.PuckAction(L10n.tr(id.label), com.bos.sphere.feature.grid.Glyphs.forAction(id)) {
+                    if (id.internal) wheelOpen = false
+                    runner.run(id)
+                }
+            },
             onDismiss = { wheelOpen = false },
             modifier = Modifier.fillMaxSize(),
         )

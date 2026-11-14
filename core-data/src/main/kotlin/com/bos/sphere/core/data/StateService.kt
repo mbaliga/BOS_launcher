@@ -1,5 +1,6 @@
 package com.bos.sphere.core.data
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import org.json.JSONObject
 import java.io.File
@@ -27,15 +28,32 @@ class StateService private constructor(context: Context) {
     val snapshots = SnapshotStore(File(root, "snapshots"))
     val extras = StateExtrasStore(File(root, "extras.json"))
 
+    /** Palette aliases and the dock stream's workspaces, sessions and groups are read from and written to their own storage (CFG-01). */
+    private val live = LiveExtras(
+        extras,
+        listOf(
+            PaletteAliasSource({ app.getSharedPreferences("palette", Context.MODE_PRIVATE).getString("aliases", null) }) {
+                app.getSharedPreferences("palette", Context.MODE_PRIVATE).edit().putString("aliases", it).apply()
+            },
+            WorkspaceFileSource(File(app.filesDir, "liftoff_workspaces.json")),
+            PrefFilesSource({ app.getSharedPreferences(it, Context.MODE_PRIVATE) }),
+        ),
+    )
+
     private val applier by lazy {
         LaunchpadSettings.init(app)
         val s = LauncherStores.get(app)
-        StateApplier(s.prefs, s.layout, s.shortcuts, LaunchpadSink.Live, extras::read, extras::write)
+        StateApplier(s.prefs, s.layout, s.shortcuts, LaunchpadSink.Live, live::read, live::write,
+            hiddenApps = object : HiddenSink {
+                private val sp get() = app.getSharedPreferences("hidden_apps", Context.MODE_PRIVATE)
+                override fun get(): Set<String> = sp.getStringSet("keys", emptySet())!!.toSet()
+                override fun set(keys: Set<String>) { sp.edit().putStringSet("keys", keys).apply() }
+            })
     }
 
     fun currentParts(): StateParts = applier.current()
 
-    fun exportDocument(): StateDocument = StateCodec.export(currentParts(), System.currentTimeMillis(), appTag())
+    fun exportDocument(): StateDocument = StateCodec.export(currentParts(), System.currentTimeMillis(), appTag(), ::widgetProvider)
 
     fun exportText(): String = exportDocument().encode()
 
@@ -64,6 +82,17 @@ class StateService private constructor(context: Context) {
         )
     }
 
+    /**
+     * CFG-12: replaces the home layout with one read from another launcher ([LauncherImport]). Snapshots first; hidden apps,
+     * corners, settings and everything else stay as they are.
+     */
+    fun importLauncherLayout(layout: HomeLayout): String? {
+        val snap = snapshot("before launcher import", force = true)
+        val cur = currentParts()
+        applier.apply(cur.copy(layout = layout, extras = cur.extras.copy(nested = org.json.JSONObject())), setOf(StateSchema.K_LAYOUT))
+        return snap?.id
+    }
+
     /** One-tap restore (CFG-04): snapshots the current state first so a restore can itself be undone. */
     fun restore(id: String, installedKeys: Set<String> = emptySet()): ImportReport {
         val text = snapshots.read(id) ?: throw StateFormatException("That snapshot no longer exists")
@@ -80,6 +109,27 @@ class StateService private constructor(context: Context) {
         val last = snapshots.latest()
         if (last != null && System.currentTimeMillis() - last.takenAt < DESTRUCTIVE_MIN_GAP_MS) return
         snapshots.take(reason, text)
+    }
+
+    /** The component of the widget provider bound to [appWidgetId], so an export can say what to re-add (CFG-02). Public API only. */
+    private fun widgetProvider(appWidgetId: Int): String? =
+        runCatching { AppWidgetManager.getInstance(app).getAppWidgetInfo(appWidgetId)?.provider?.flattenToString() }.getOrNull()
+
+    /** Widgets an import could not carry and that are still waiting to be re-added (CFG-02). */
+    fun pendingWidgets(): List<PendingWidget> = extras.read().widgets
+
+    /** Called once a pending widget has been re-bound (or dismissed). */
+    fun clearPendingWidget(slot: String) {
+        val cur = extras.read()
+        extras.write(cur.copy(widgets = cur.widgets.filterNot { it.slot == slot }))
+    }
+
+    /** The keyboard shortcut overrides (`ShortcutRegistry.export()` text) that are part of the setup (CFG-01). */
+    fun keyboardOverrides(): String = extras.read().keyboardShortcuts.orEmpty()
+
+    fun saveKeyboardOverrides(raw: String) {
+        val cur = extras.read()
+        if ((cur.keyboardShortcuts.orEmpty()) != raw) extras.write(cur.copy(keyboardShortcuts = raw.takeIf { it.isNotEmpty() }))
     }
 
     private fun appTag() = "liftoff"

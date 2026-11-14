@@ -21,6 +21,7 @@ class HiddenAppsStore(context: Context) {
     fun isHidden(key: String): Boolean = key in _hidden.value
 
     fun setHidden(key: String, hidden: Boolean) {
+        if (hidden && key !in _hidden.value) DestructiveEdits.before("hide app")
         val next = _hidden.value.toMutableSet().apply {
             if (hidden) add(key) else remove(key)
         }

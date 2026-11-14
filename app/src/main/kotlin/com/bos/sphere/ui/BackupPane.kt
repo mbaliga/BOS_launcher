@@ -19,6 +19,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.ImportReport
+import com.bos.sphere.core.data.LauncherImport
+import com.bos.sphere.core.data.LauncherStores
+import com.bos.sphere.core.data.PendingWidget
+import com.bos.sphere.core.data.WidgetRebind
+import com.bos.sphere.feature.grid.LauncherWidgetHost
+import com.bos.sphere.feature.grid.RebindOutcome
+import com.bos.sphere.feature.grid.rememberWidgetRebinder
 import com.bos.sphere.core.data.LauncherAppsAppRepository
 import com.bos.sphere.core.data.SnapshotStore
 import com.bos.sphere.core.data.StateCodec
@@ -50,6 +57,14 @@ fun backupCategory(): SettingCategory = SettingCategory(
 )
 
 private const val MAX_FILE_BYTES = 8 * 1024 * 1024
+private const val MAX_LAUNCHER_BACKUP_BYTES = 64 * 1024 * 1024
+
+/** Where a pending widget will go, for the list. */
+private fun widgetPlace(w: PendingWidget): String = when (val t = WidgetRebind.parseSlot(w.slot)) {
+    is WidgetRebind.Target.CornerTarget -> if (t.landscape) L10n.tr("Corner %s, landscape", t.corner.name) else L10n.tr("Corner %s", t.corner.name)
+    WidgetRebind.Target.LeftPageTarget -> L10n.tr("Left page")
+    null -> w.slot
+}
 
 private fun readText(context: Context, uri: Uri): String {
     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw StateFormatException("Could not open the file")
@@ -78,6 +93,32 @@ fun ColumnScope.BackupPane() {
     var snapshots by remember { mutableStateOf(service.snapshots.list()) }
     var message by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<Pair<String, String>?>(null) } // (file text, summary)
+    var widgetsLeft by remember { mutableStateOf(service.pendingWidgets()) }
+    var needsReload by remember { mutableStateOf(false) }
+    var launcherImport by remember { mutableStateOf<LauncherImport.Result?>(null) }
+    val widgetHost = remember { LauncherWidgetHost(context) }
+    val stores = remember { LauncherStores.get(context) }
+
+    /** After an import or restore: tell the parts that keep their own in-memory copy to re-read what was written (CFG-02). */
+    fun reloaded() {
+        reloadAfterStateChange(context)
+        widgetsLeft = service.pendingWidgets()
+        snapshots = service.snapshots.list()
+        needsReload = true
+    }
+
+    val rebinder = rememberWidgetRebinder(widgetHost) { w, outcome, id, label ->
+        message = when (outcome) {
+            RebindOutcome.Done -> {
+                WidgetRebind.place(w, id, label, stores.shortcuts, stores.prefs)
+                service.clearPendingWidget(w.slot)
+                widgetsLeft = service.pendingWidgets()
+                L10n.tr("Widget added: %s.", label.ifBlank { w.label })
+            }
+            RebindOutcome.ProviderMissing -> L10n.tr("%s: the widget's app is not installed here yet.", w.label)
+            else -> L10n.tr("The widget was not added.")
+        }
+    }
 
     fun fail(e: Throwable) { message = L10n.tr("That did not work: %s", e.message ?: e.javaClass.simpleName) }
 
@@ -106,11 +147,39 @@ fun ColumnScope.BackupPane() {
         }
     }
 
+    val pickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw StateFormatException("Could not open the file")
+                    if (bytes.size > MAX_LAUNCHER_BACKUP_BYTES) throw StateFormatException("The file is too large to be a launcher backup")
+                    val installed = runCatching { LauncherAppsAppRepository(context).apps.first().mapTo(HashSet()) { it.key } }.getOrDefault(emptySet())
+                    LauncherImport.parse(bytes, installed, context.cacheDir)
+                }
+            }.onSuccess { launcherImport = it }.onFailure(::fail)
+        }
+    }
+
     Column(Modifier.padding(horizontal = 4.dp)) {
-        note(L10n.tr("Your whole setup is one file: layout, settings, corners, gestures, Launchpad rules. Notifications, usage history, search indexes and contacts are never included."))
+        note(L10n.tr("Your whole setup is one file: layout, settings, corners, gestures, Launchpad rules, workspaces, sessions, shortcuts and palette aliases. Notifications, usage history, search indexes and contacts are never included."))
         ActionRow(L10n.tr("Export setup…"), L10n.tr("Everything in one file"), Glyphs.Info) { exportAll.launch("liftoff-setup.json") }
         ActionRow(L10n.tr("Export settings only…"), L10n.tr("A separate settings document"), Glyphs.Info) { exportSettings.launch("liftoff-settings.json") }
         ActionRow(L10n.tr("Import setup…"), L10n.tr("From a Liftoff file; snapshots first"), Glyphs.Info) { pick.launch(arrayOf("application/json", "text/plain", "*/*")) }
+
+        ActionRow(L10n.tr("Import layout from another launcher…"), L10n.tr("A Launcher3-style database or a backup zip that holds one; apps only"), Glyphs.Info) {
+            pickLauncher.launch(arrayOf("application/octet-stream", "application/zip", "application/x-sqlite3", "*/*"))
+        }
+        launcherImport?.let { r ->
+            note(L10n.tr("Layout found: %d apps on %d pages. %d folders flattened, %d widgets and %d shortcuts left out, %d apps not installed here.", r.apps, r.pages, r.foldersFlattened, r.widgetsSkipped, r.shortcutsSkipped, r.placeholders.size))
+            TextButtonPill(L10n.tr("Replace home layout"), primary = true) {
+                launcherImport = null
+                scope.launch {
+                    runCatching { withContext(Dispatchers.IO) { service.importLauncherLayout(r.layout) } }
+                        .onSuccess { message = L10n.tr("Layout imported. A snapshot of the previous one was taken first."); reloaded() }.onFailure(::fail)
+                }
+            }
+            TextButtonPill(L10n.tr("Cancel")) { launcherImport = null }
+        }
 
         pending?.let { (text, summary) ->
             note(summary)
@@ -122,12 +191,23 @@ fun ColumnScope.BackupPane() {
                             val installed = runCatching { LauncherAppsAppRepository(context).apps.first().mapTo(HashSet()) { it.key } }.getOrDefault(emptySet())
                             service.import(text, installed)
                         }
-                    }.onSuccess { message = describe(it); snapshots = service.snapshots.list() }.onFailure(::fail)
+                    }.onSuccess { message = describe(it); reloaded() }.onFailure(::fail)
                 }
             }
             TextButtonPill(L10n.tr("Cancel")) { pending = null }
         }
         message?.let { note(it) }
+        if (needsReload) {
+            note(L10n.tr("Reload Liftoff so workspaces and options from the file take effect."))
+            TextButtonPill(L10n.tr("Reload now"), primary = true) { needsReload = false; (context as? android.app.Activity)?.recreate() }
+        }
+        if (widgetsLeft.isNotEmpty()) {
+            Text(L10n.tr("Widgets to add again"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
+            note(L10n.tr("These widgets were in the file. Each needs one confirmation from Android."))
+            widgetsLeft.forEach { w ->
+                ActionRow(w.label.ifBlank { widgetPlace(w) }, widgetPlace(w), Glyphs.Widget) { rebinder.start(w) }
+            }
+        }
 
         Text(L10n.tr("Snapshots"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
         note(L10n.tr("The last 5 are kept on this device: before every import, before deleting a page, and after each stable start."))
@@ -144,7 +224,7 @@ fun ColumnScope.BackupPane() {
                 L10n.tr("Restore %s", DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(s.takenAt))),
                 s.reason.replaceFirstChar { it.uppercase() },
                 Glyphs.Bolt,
-            ) { restore(scope, service, s, context, { message = it }, { snapshots = service.snapshots.list() }) }
+            ) { restore(scope, service, s, context, { message = it }, { reloaded() }) }
         }
     }
 }

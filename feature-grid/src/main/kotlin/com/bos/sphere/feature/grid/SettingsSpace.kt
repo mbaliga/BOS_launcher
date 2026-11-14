@@ -360,6 +360,12 @@ private fun SettingsSpaceContent(
             // The list: full width, swipe sideways for the neighbouring category.
             val listState = rememberLazyListState()
             LaunchedEffect(cat, query, searching) { listState.scrollToItem(0) }
+            // CFG-05: arriving from a Radar settings result lands on the exact row.
+            LaunchedEffect(Unit) {
+                val want = SettingsFocus.take()
+                val count = latestCategories.getOrNull(cat)?.items?.size ?: 0
+                if (want in 0 until count) { kbItem = want; kbMode = true; listState.scrollToItem(want) }
+            }
             var dragAcc by remember { mutableFloatStateOf(0f) }
             Box(
                 Modifier

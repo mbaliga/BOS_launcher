@@ -56,6 +56,11 @@ class MainActivity : ComponentActivity() {
         com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
         // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
         runCatching { StateService.bridgeBuild31(applicationContext) }
+        // CFG-04 / CFG-01: destructive edits snapshot first; the user's keyboard shortcut overrides come back from the state store.
+        runCatching {
+            com.bos.sphere.core.data.DestructiveEdits.install { StateService.beforeDestructive(applicationContext, it) }
+            LauncherInput.registry.import(StateService.get(this).keyboardOverrides())
+        }
         window.decorView.postDelayed({
             com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext)
             // A stable start is the last known good state: snapshot it so safe mode has something to restore (CFG-04).
@@ -139,6 +144,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         com.bos.sphere.feature.desktop.DesktopSurfaces.homeStopped(this)
+        runCatching { StateService.get(this).saveKeyboardOverrides(LauncherInput.registry.export()) }
         super.onStop()
     }
 }

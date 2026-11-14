@@ -84,6 +84,12 @@ class WorkspaceManager(
         return (decoded as? WorkspaceJson.Decoded.Ok)?.state ?: DockWorkspaceState()
     }
 
+    /** Re-reads the stored document after another writer replaced it (a state import, CFG-02). */
+    fun reload() {
+        persist = true
+        _state.value = load()
+    }
+
     private fun update(f: (DockWorkspaceState) -> DockWorkspaceState) {
         val next = f(_state.value)
         if (next == _state.value) return

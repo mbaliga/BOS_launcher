@@ -75,7 +75,7 @@ object WorkspaceJson {
                     AppGroup(g.getString("name"), g.getJSONArray("members").objs().map(::request), layoutOf(g.optString("layout")), g.getString("id"))
                 }.getOrNull()
             }
-            val sessions = o.optJSONArray("sessions").objs().map { x ->
+            val sessions = o.optJSONArray("sessions").objs().mapNotNull { x -> runCatching {
                 Session(
                     x.getString("id"), x.getString("name"),
                     x.getJSONArray("entries").objs().map { e ->
@@ -86,7 +86,7 @@ object WorkspaceJson {
                     },
                     layoutOf(x.optString("layout")), x.optLong("savedAt"),
                 )
-            }
+            }.getOrNull() }
             val schedules = o.optJSONArray("schedules").objs().mapNotNull { c ->
                 val kind = RunKind.entries.firstOrNull { it.name == c.optString("kind") } ?: return@mapNotNull null
                 ScheduledLaunch(c.getString("id"), c.optString("label"), c.getLong("at"), RunTarget(kind, c.getString("target")))

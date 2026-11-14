@@ -34,6 +34,7 @@ import com.bos.sphere.core.signals.NotificationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -75,13 +76,14 @@ fun BoxScope.DockLayer(
     val stores = remember { LauncherStores.get(context) }
     val manager = remember { WorkspaceRepository.get(context) }
     DisposableEffect(Unit) {
-        WorkspaceRepository.hooks = AppWorkspaceHooks(stores)
+        val hooks = AppWorkspaceHooks(stores)
+        WorkspaceRepository.hooks = hooks
         manager.applyActive()
-        onDispose { }
+        onDispose { if (WorkspaceRepository.hooks === hooks) WorkspaceRepository.hooks = object : WorkspaceHooks {} }
     }
     var panelOpen by remember { mutableStateOf(false) }
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
-    DisposableEffect(Unit) { onDispose { } }
+    DisposableEffect(Unit) { onDispose { scope.cancel() } }
 
     if (visible) DockHost(
         apps = apps, launcher = launcher, controller = controller, refreshKey = homeSignal,

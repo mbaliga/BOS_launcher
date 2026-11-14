@@ -98,6 +98,22 @@ class WorkspaceTest {
         assertTrue(WorkspaceJson.decode("{\"x\":1}") is WorkspaceJson.Decoded.Corrupt)
     }
 
+    @Test fun WSP_07_newerOrCorruptDocumentIsNeverWrittenOver() {
+        for (text in listOf("{\"schemaVersion\":99,\"x\":1}", "not json")) {
+            val store = InMemoryWorkspaceStore(text)
+            val m = manager(store)
+            m.create("W"); m.setPins(listOf(DockItemRef.app("a")))
+            assertEquals(text, store.text)
+        }
+    }
+
+    @Test fun WSP_09_oneBadSessionDoesNotDiscardTheRest() {
+        val good = WorkspaceJson.encode(DockWorkspaceState(sessions = listOf(Session("s1", "One", listOf(SessionEntry(LaunchTarget("p")))))))
+        val broken = good.replace("\"sessions\":[", "\"sessions\":[{\"id\":\"bad\"},")
+        val s = (WorkspaceJson.decode(broken) as WorkspaceJson.Decoded.Ok).state
+        assertEquals(listOf("s1"), s.sessions.map { it.id })
+    }
+
     @Test fun WSP_07_stateSurvivesProcessDeathThroughTheStore() {
         val store = InMemoryWorkspaceStore()
         val m1 = manager(store); m1.setPins(listOf(DockItemRef.app("a"))); m1.saveGroup(group); m1.create("W")

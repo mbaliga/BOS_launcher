@@ -21,14 +21,14 @@ import kotlinx.coroutines.launch
 object RunTargets {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    fun run(context: Context, target: RunTarget, launcher: AppLauncher = AppLauncher(context)) {
+    fun run(context: Context, target: RunTarget, launcher: AppLauncher = AppLauncher(context), onDone: () -> Unit = {}) {
         val mgr = WorkspaceRepository.get(context)
         val state = mgr.current
         when (target.kind) {
-            RunKind.Workspace -> mgr.switchTo(target.id)
-            RunKind.Group -> state.groups.firstOrNull { it.id == target.id }?.let { g -> scope.launch { launcher.runGroup(g) } }
-            RunKind.Session -> state.sessions.firstOrNull { it.id == target.id }?.let { s -> scope.launch { launcher.restore(s) } }
-            RunKind.App -> AppKeys.target(target.id)?.let { launcher.launch(LaunchRequest(it)) }
+            RunKind.Workspace -> { mgr.switchTo(target.id); onDone() }
+            RunKind.Group -> state.groups.firstOrNull { it.id == target.id }?.let { g -> scope.launch { try { launcher.runGroup(g) } finally { onDone() } } } ?: onDone()
+            RunKind.Session -> state.sessions.firstOrNull { it.id == target.id }?.let { s -> scope.launch { try { launcher.restore(s) } finally { onDone() } } } ?: onDone()
+            RunKind.App -> { AppKeys.target(target.id)?.let { launcher.launch(LaunchRequest(it)) }; onDone() }
         }
     }
 }
@@ -75,7 +75,11 @@ object Scheduler {
     }
 
     fun rescheduleAll(context: Context, now: Long = System.currentTimeMillis()) {
-        WorkspaceRepository.get(context).current.schedules.filter { it.atMillis > now }.forEach { schedule(context, it) }
+        val mgr = WorkspaceRepository.get(context)
+        val (future, missed) = mgr.current.schedules.partition { it.atMillis > now }
+        future.forEach { schedule(context, it) }
+        // A schedule that came due while the device was off is announced now instead of being kept forever.
+        missed.forEach { ScheduleNotifications.post(context, it.label, it.target); mgr.removeSchedule(it.id) }
     }
 }
 
@@ -120,8 +124,8 @@ class RunActivity : Activity() {
             intent.getStringExtra(AutomationIntents.EXTRA_KIND), intent.getStringExtra(AutomationIntents.EXTRA_ID),
         )
         val target = raw?.let { AutomationIntents.resolve(it, WorkspaceRepository.get(this).current) }
-        if (target == null) Toast.makeText(this, "Nothing to open", Toast.LENGTH_SHORT).show()
-        else RunTargets.run(this, target)
-        finish()
+        // Stay in the foreground until the sequence has run: later steps of a group are blocked once this activity is gone.
+        if (target == null) { Toast.makeText(this, "Nothing to open", Toast.LENGTH_SHORT).show(); finish() }
+        else RunTargets.run(this, target, onDone = { if (!isFinishing) finish() })
     }
 }

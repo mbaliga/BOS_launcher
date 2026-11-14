@@ -71,19 +71,24 @@ class WorkspaceManager(
     private val io: (() -> Unit) -> Unit = { it() },
     private val newId: () -> String = { java.util.UUID.randomUUID().toString().take(8) },
 ) {
+    /** False when the stored document is from a newer version or unreadable: it is left untouched on disk (WSP-07). */
+    private var persist = true
     private val _state = MutableStateFlow(load())
     val state: StateFlow<DockWorkspaceState> = _state.asStateFlow()
     val current: DockWorkspaceState get() = _state.value
 
     private fun load(): DockWorkspaceState {
         val text = runCatching { store.read() }.getOrNull() ?: return DockWorkspaceState()
-        return (WorkspaceJson.decode(text) as? WorkspaceJson.Decoded.Ok)?.state ?: DockWorkspaceState()
+        val decoded = WorkspaceJson.decode(text)
+        if (decoded !is WorkspaceJson.Decoded.Ok) persist = false
+        return (decoded as? WorkspaceJson.Decoded.Ok)?.state ?: DockWorkspaceState()
     }
 
     private fun update(f: (DockWorkspaceState) -> DockWorkspaceState) {
         val next = f(_state.value)
         if (next == _state.value) return
         _state.value = next
+        if (!persist) return
         val text = WorkspaceJson.encode(next)
         io { runCatching { store.write(text) } }
     }

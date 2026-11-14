@@ -254,7 +254,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // Launch control and dock (WSP-01, WSP-06, DCK): every launch goes through the launch layer.
     val rootView = androidx.compose.ui.platform.LocalView.current
     val appLauncher = remember { com.bos.sphere.feature.dock.AppLauncher(context, rootView = { rootView }) }
-    val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch() }
+    val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch { IntArray(2).also { rootView.getLocationOnScreen(it) }.let { it[0] to it[1] } } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.core.input.ShortcutRegistry() }
     fun launch(app: AppEntry) {

@@ -90,7 +90,7 @@ object HomeEdit {
         var s = state
         for (k in fileable) {
             val other = s.folders.values.firstOrNull { k in it.keys }
-            if (other != null) s = removeFromFolderKeys(s, other.id, k, dissolveSingle = false)
+            if (other != null) s = removeFromFolderKeys(s, other.id, k)
         }
         val pageAnchor = fileable.firstOrNull { k -> s.pages.any { k in it.keys } }
         val dockAnchor = if (pageAnchor == null) fileable.firstOrNull { it in s.dock } else null

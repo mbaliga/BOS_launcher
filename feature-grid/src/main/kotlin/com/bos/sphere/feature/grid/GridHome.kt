@@ -616,10 +616,10 @@ fun GridHome(
                     suggestion = if (index == 0 && prefs.showSuggestion && dragKey == null) suggestion else null,
                     onLaunch = onLaunch,
                     onLongPress = onAppLongPress,
-                    onItemFocused = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    onItemFocused = { if (pagerState.currentPage != index) scope.launch { pagerState.animateScrollToPage(index) } },
                 )
             }
-            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange)
+            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.animateScrollToPage(it) } })
             if (areaSize != IntSize.Zero) {
                 if (paging == PagingAxis.Horizontal) {
                     HorizontalPager(

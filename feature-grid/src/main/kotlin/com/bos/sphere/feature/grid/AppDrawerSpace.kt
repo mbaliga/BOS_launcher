@@ -233,7 +233,7 @@ private data class ScrubState(val tag: Int, val text: String, val fraction: Floa
 
 @Composable
 private fun DrawerContent(
-    apps: List<AppEntry>,
+    allApps: List<AppEntry>,
     usage: Map<String, UsageStats.Usage>,
     view: DrawerView,
     sort: DrawerSort,
@@ -248,6 +248,9 @@ private fun DrawerContent(
     viewSwitch: com.bos.sphere.core.data.SwitchStyle,
 ) {
     val context = LocalContext.current
+    // HOM-05 / HOM-06: tab, type-to-filter and tag filter apply before sorting into sections.
+    val drawerFilter = rememberDrawerFilter()
+    val apps = rememberFilteredApps(allApps, drawerFilter)
     // Categories resolve off the main thread; A–Z stands in until they are ready.
     val categories by produceState(
         initialValue = WheelCategoryCache.cachedFor(apps.map { it.packageName }),
@@ -278,6 +281,7 @@ private fun DrawerContent(
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         DrawerHeader(view, sort, apps.size, viewSwitch, onViewChange, onSortChange, onDismiss, sounds)
+        DrawerFilterBar(drawerFilter)
         Box(Modifier.fillMaxSize()) {
             val leftPad = if (rail == RailSide.Right) 0.dp else RAIL_WIDTH
             val rightPad = if (rail == RailSide.Left) 0.dp else RAIL_WIDTH

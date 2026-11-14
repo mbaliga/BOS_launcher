@@ -41,13 +41,17 @@ object IconCache {
         override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
     }
 
+    /** HOM-03: tile colour behind a legacy (non-adaptive) icon, from the icon's own colours; absent for adaptive icons. */
+    private val plates = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    fun plateFor(key: String): Int? = plates[key]
+
     fun get(key: String): ImageBitmap? = cache.get(key)
     fun put(key: String, bmp: ImageBitmap) { cache.put(key, bmp) }
 
     /** Drop everything (e.g. after a package update changed icons). */
     fun clear() = cache.evictAll()
 
-    internal fun rasterize(drawable: Drawable, px: Int): Bitmap {
+    internal fun rasterize(drawable: Drawable, px: Int, plateKey: String? = null): Bitmap {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         if (drawable is AdaptiveIconDrawable) {
@@ -60,9 +64,28 @@ object IconCache {
             val pad = (px * 0.14f).roundToInt()
             drawable.setBounds(pad, pad, px - pad, px - pad)
             drawable.draw(canvas)
+            if (plateKey != null) plates[plateKey] = com.bos.sphere.core.catalog.IconPlate.forLegacy(averageColor(bmp))
         }
         return bmp
     }
+}
+
+/** Mean colour of the opaque pixels of [bmp], sampled on a coarse grid. */
+private fun averageColor(bmp: Bitmap): Int {
+    var r = 0L; var g = 0L; var b = 0L; var n = 0L
+    val step = (bmp.width / 24).coerceAtLeast(1)
+    var y = 0
+    while (y < bmp.height) {
+        var x = 0
+        while (x < bmp.width) {
+            val c = bmp.getPixel(x, y)
+            if ((c ushr 24) > 200) { r += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF; n++ }
+            x += step
+        }
+        y += step
+    }
+    if (n == 0L) return 0xFF808080.toInt()
+    return (0xFF shl 24) or ((r / n).toInt() shl 16) or ((g / n).toInt() shl 8) or (b / n).toInt()
 }
 
 /** Edge of the one shared bitmap kept per app; every display size scales this down at draw time. */
@@ -82,7 +105,7 @@ fun AppIcon(
         if (bitmap == null) {
             bitmap = withContext(Dispatchers.Default) {
                 runCatching {
-                    app.loadIcon()?.let { IconCache.rasterize(it, ICON_PX).asImageBitmap() }
+                    app.loadIcon()?.let { IconCache.rasterize(it, ICON_PX, cacheKey).asImageBitmap() }
                 }.getOrNull()?.also { IconCache.put(cacheKey, it) }
             }
         }
@@ -95,7 +118,8 @@ fun AppIcon(
     var box = modifier.size(size)
     if (shape != null) {
         box = box.clip(shape)
-        if (theme.plate) box = box.background(HyleColors.Surface, shape)
+        // HOM-03: the plate comes from the icon's own colours (legacy icons only), never a dark tile.
+        if (theme.plate) IconCache.plateFor(cacheKey)?.let { box = box.background(androidx.compose.ui.graphics.Color(it), shape) }
     }
     Box(modifier = box) {
         bitmap?.let {

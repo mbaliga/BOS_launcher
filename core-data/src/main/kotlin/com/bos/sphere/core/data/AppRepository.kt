@@ -11,6 +11,7 @@ import android.os.UserManager
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.conflate
 
 /**
  * Source of truth for the launchable-app inventory.
@@ -59,12 +60,17 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
                 user: UserHandle?,
                 replacing: Boolean,
             ) = emitSnapshot()
+
+            // HOM-10: suspend / unsuspend change an app's state without add or remove.
+            override fun onPackagesSuspended(packageNames: Array<out String>?, user: UserHandle?) = emitSnapshot()
+            override fun onPackagesUnsuspended(packageNames: Array<out String>?, user: UserHandle?) = emitSnapshot()
         }
 
         launcherApps.registerCallback(callback)
         emitSnapshot() // initial inventory
         awaitClose { launcherApps.unregisterCallback(callback) }
-    }
+        // A burst of callbacks (bulk install) collapses to the newest snapshot, still well inside 1 s.
+    }.conflate()
 
     private fun loadAll(): List<AppEntry> =
         userManager.userProfiles.flatMap { user ->

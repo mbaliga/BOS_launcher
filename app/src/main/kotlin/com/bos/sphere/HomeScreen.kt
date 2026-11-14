@@ -443,8 +443,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         L10n.setLanguage(prefs.language.code)
     }
     val iconColors by stores.iconColors.colors.collectAsStateWithLifecycle()
-    val iconTheme = remember(prefs.iconShape, prefs.iconTint, prefs.iconPlate, prefs.accentColor, iconColors) {
-        IconTheme(prefs.iconShape, prefs.iconTint, prefs.iconPlate, prefs.accentColor, iconColors)
+    // HOM-16: with home over the system wallpaper, the accent is derived from it.
+    val homeAccent = com.bos.sphere.feature.grid.rememberHomeAccent(prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, prefs.accentColor)
+    val iconTheme = remember(prefs.iconShape, prefs.iconTint, prefs.iconPlate, prefs.accentColor, iconColors, homeAccent) {
+        IconTheme(prefs.iconShape, prefs.iconTint, prefs.iconPlate, homeAccent, iconColors)
     }
 
     // ---- indicator: the background dots / effects read out any measurement
@@ -631,7 +633,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val cfg = androidx.compose.ui.platform.LocalConfiguration.current
     // One frame on every side, in either orientation (about 15% of the short side): apps live inside it;
     // the corner icons, clock and page dots sit in the margin band around it.
-    val frame = (minOf(cfg.screenWidthDp, cfg.screenHeightDp) * 0.148f).dp
+    val frame = com.bos.sphere.feature.grid.HomeFrame.band(cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()).dp
     val sideGap = frame + (cfg.screenWidthDp * prefs.gridInsetX).dp
     val stripH = com.bos.sphere.feature.grid.stripHeight(prefs)
     val scrollTop = if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Top) maxOf(frame, stripH + 14.dp) else frame

@@ -250,7 +250,7 @@ fun GridHome(
     val padStartDpRaw = maxOf(cornerRow, if (indicatorAtStartEarly) 38.dp else 14.dp)
     val padEndDpRaw = cornerRow
     // The same frame as the scrolling homes: about 15% of the short side on every side, in either orientation.
-    val frameDp = with(density) { (minOf(fullSize.width, fullSize.height) * 0.148f).toDp() }
+    val frameDp = with(density) { HomeFrame.band(fullSize.width.toFloat(), fullSize.height.toFloat()).toDp() }
     val padTopDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
     val padBottomDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
     val padStartDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
@@ -655,6 +655,7 @@ fun GridHome(
             }
         }
 
+        WallpaperScrollEffect(prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, pagerState.currentPage + pagerState.currentPageOffsetFraction, pageCount)
         PageIndicator(
             count = pageCount,
             current = pagerState.currentPage,
@@ -773,7 +774,7 @@ private fun PageView(
                         },
                 ) {
                     if (app != null) {
-                        AppIcon(app, itemDp, Modifier.size(itemDp))
+                        BadgedAppIcon(app, itemDp, Modifier.size(itemDp))
                         // Coverflow names only the focused card; the rest would just pile up their labels.
                         if (showLabels && (!cf || kotlin.math.abs(dCover) < 0.5f)) AppLabel(app.label, itemDp)
                     } else if (itemKey == HomeTiles.SETTINGS) {

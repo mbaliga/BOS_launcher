@@ -204,7 +204,9 @@ fun BoxScope.StripHost(
         )
         com.bos.sphere.core.data.ClockPosition.Bottom -> StatusStrip(
             // Not centred on the corner icons here: it stacks above the page dots, which sit on the bottom edge.
-            prefs, weather, health, side, onClockTap, rowHeight = 0.dp,
+            // HOM-20: weather line dropped, then the clock scaled, so clock and dots fit the margin band.
+            bottomClockFit(prefs).let { f -> prefs.copy(clockSize = prefs.clockSize * f.clockScale, clockShowWeather = prefs.clockShowWeather && f.showWeather) },
+            weather, health, side, onClockTap, rowHeight = 0.dp,
             modifier = Modifier.align(Alignment.BottomCenter).androidx_windowInsetsPadding(safe).padding(bottom = edge + 34.dp),
         )
         com.bos.sphere.core.data.ClockPosition.Hidden -> Unit
@@ -213,3 +215,14 @@ fun BoxScope.StripHost(
 
 private fun Modifier.androidx_windowInsetsPadding(insets: androidx.compose.foundation.layout.WindowInsets): Modifier =
     this.then(Modifier.windowInsetsPadding(insets))
+
+/** HOM-20: how the bottom clock fits the bottom margin band at the current window size. */
+@Composable
+internal fun bottomClockFit(prefs: LauncherPrefs): ClockBandFit {
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    val band = HomeFrame.band(cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat())
+    val dotsAtBottom = prefs.pagingFor(cfg.screenWidthDp > cfg.screenHeightDp) != com.bos.sphere.core.data.PagingAxis.Vertical
+    return ClockBandFit.compute(
+        band, clockBlockHeight(prefs).value, clockBlockHeight(prefs.copy(clockShowWeather = false)).value, dotsAtBottom,
+    )
+}

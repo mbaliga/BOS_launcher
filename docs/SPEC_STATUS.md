@@ -4,155 +4,155 @@ Source: [Spec.md](Spec.md). Status per requirement: **not started**, **partial**
 
 Requirement texts are in Spec.md; this table is the single place that says how far each one is.
 
-Counts: built 9, not started 102, partial 36, unmet 1 (of 148).
+Counts: built 45, partial 89, not started 12, unmet 2 (of 148).
 
 | ID | P | Status | Note |
 | --- | --- | --- | --- |
-| PAL-01 | M | partial | Search affordance and swipe exist; typing on home and the keyboard shortcut are not wired |
-| PAL-02 | M | partial | App search exists; speed target, alias, typo tolerance and initials not verified |
-| PAL-03 | M | partial | Launcher actions are searchable; app shortcuts are not |
-| PAL-04 | M | not started |  |
-| PAL-05 | M | not started |  |
-| PAL-06 | M | partial | Web row exists; check NFR-16 (INTERNET permission is declared) |
-| PAL-07 | M | not started |  |
-| PAL-08 | M | partial | Menu model built and tested in core-input; not yet shown by Radar |
-| PAL-09 | M | not started |  |
-| PAL-10 | S | partial | Contacts search exists with channel buttons; enable row for no-permission not verified |
-| PAL-11 | S | partial | Media file search exists; incremental index, folder grants not built |
-| PAL-12 | S | not started |  |
-| PAL-13 | S | not started |  |
-| PAL-14 | S | not started |  |
-| PAL-15 | C | not started |  |
-| PAL-16 | C | not started |  |
-| PAL-17 | C | not started |  |
-| PAL-18 | M | partial | Three layouts exist; keyboard operation and keyboard-default Flat not built |
-| PAL-19 | M | not started |  |
-| PAL-20 | S | partial | Preview and pinch only in the typed results list |
-| PAL-21 | M | partial | Browser hand-off exists; INTERNET permission still declared (weather), see NFR-16 |
-| PAL-22 | S | partial | Provider contract documented (docs/SEARCH_PROVIDER.md); deep results empty until sibling apps ship it |
-| PAL-23 | S | not started |  |
-| INP-01 | M | not started |  |
-| INP-02 | M | not started |  |
-| INP-03 | M | built | ContextMenus in core-input, tested; not yet wired to long-press / right-click / Menu key |
-| INP-04 | M | built | ShortcutRegistry with defaults in core-input, tested; no shortcut sheet or key handling yet |
-| INP-05 | M | built | Default set declared for every command; not yet dispatched on any surface |
-| INP-06 | M | built | InputModeTracker in core-input, tested; not yet fed by real events |
-| INP-07 | M | not started |  |
-| INP-08 | M | partial | Home gestures are assignable; defaults not audited against system gestures |
-| INP-09 | M | not started |  |
+| PAL-01 | M | partial | `TypeToSearch.onKey(...)` (feature-search) returns `PaletteEntry.Open(char)` for a printable key and `Open("")` for the rebindable OpenPalette chord; tested. The input stream still has to call it from home key dispatch. |
+| PAL-02 | M | partial | `AppMatcher`/`AppProvider`: label, package, alias, initials, one typo, profiles; JVM bound test (500 apps, avg under 50 ms per keystroke). The Radar UI still uses its own `AppSearchCore`; wiring `AppProvider` into the UI belongs to the Radar stream. |
+| PAL-03 | M | partial | Providers and hub mapping exist and are tested at engine level; nothing in the UI calls `PaletteHitRunner.run` yet, so running a shortcut or a launcher command is not wired end to end. (Review fix: shortcut hits were mapped to the Apps category, which the hub drops; they now surface as Actions.) |
+| PAL-04 | M | built | `SettingsIndex` (40 public `android.settings.*` actions), hidden when `resolveActivity` is null. Handler visibility on Android 11+ depends on package visibility; unverified on device. |
+| PAL-05 | M | partial | Calculator and Units are built and tested, and the hub carries `copyText`; Enter-to-copy needs the UI to call `PaletteHitRunner.run`, which nothing does yet. |
+| PAL-06 | M | partial | Engine row is built and always last, tested; the engine is not yet what the Radar UI renders (it keeps its own web row), so the guarantee holds for the engine only. |
+| PAL-07 | M | not started | Not in this stream (keyboard operation of the UI). |
+| PAL-08 | M | partial | List derivation is built and tested against `ContextMenus`; the Radar UI does not display it yet. |
+| PAL-09 | M | partial | `Ranker` and `UsageStore` are built and tested; nothing in the app calls `onSelected` or `PalettePrefs.saveUsage` yet, so no selection is learned on device until the Radar stream wires it. |
+| PAL-10 | S | partial | Engine provider built and tested (call, message, email, open; one enable row without permission). The Android `ContactSource` lookup is not wired into `AndroidPalette`. |
+| PAL-11 | S | partial | `FileIndex` (incremental `reconcile`, encode/decode), `FileIndexer` (MediaStore and SAF persisted trees), `FileIndexJobService` (periodic, battery and storage not low) and `FileIndexScheduler` (called from HomeScreen). Not persisted via JobScheduler across reboot (needs RECEIVE_BOOT_COMPLETED); the index is on disk and the job is re-armed at launcher start. No UI yet to add a folder (`FileGrants.pickerIntent/persist` are ready). |
+| PAL-12 | S | partial | `PaletteSession` and `StableMerge` built and tested with virtual time; no UI drives the session yet. |
+| PAL-13 | S | partial | `PrefixTable` built and tested; the empty-state list and the editor UI do not exist yet. |
+| PAL-14 | S | built | `PaletteProvider` interface (query, suggestions, cancel, results with actions) and `ProviderRegistry`; test adds a provider with no other change. |
+| PAL-15 | C | partial | Row builder and provider tested; neither is registered in the app or shown. |
+| PAL-16 | C | not started | Not requested. |
+| PAL-17 | C | not started | C priority; the documented contract is read-only content provider (PAL-22). No permission-guarded registration API. |
+| PAL-18 | M | partial | `RadarLayoutPolicy.effective` (tested): keyboard or pointer in use means Flat unless `LauncherPrefs.searchLayoutPinned` (new, last field, persisted). Picking a layout in Ground Control pins it; a "Keep this layout with a keyboard" toggle unpins. `LocalInputMode` (default Touch) is provided for the host; Radar also tracks key and pointer events itself (soft-keyboard key events do not count). The host does not yet provide the real tracker value, so Radar opened by a shortcut starts in Touch until the first key or mouse event |
+| PAL-19 | M | partial | `ScopePrefixes` (parse, prefixFor, applyWheel, effectiveScope, editable `Mapping`) and `ScopeWheel` in feature-grid. Prefix text and wheel update each other; Left/Right move the wheel (caret keeps Left/Right while typing until it is at an end). Defaults a, c, f, s (actions and settings), w (web). The prefix editor UI and the empty-state prefix list (PAL-13) belong to the palette stream; the mapping is editable in code but not yet persisted or shown in Ground Control |
+| PAL-20 | S | built | One text size state (`rememberRadarScale`) for the whole Radar screen: pinch and Ctrl+scroll in all layouts, remembered. Long-press and right-click (`secondaryClick`) open the same preview in Flat, Orbit and Filmstrip, for every result type (people show their channel buttons in it). Orbit and Filmstrip captions scale with it. Behaviour change: long-press on an app or person in Orbit/Filmstrip now opens the preview (its OPTIONS button leads to the old app sheet) |
+| PAL-21 | M | built | Radar and the engine fetch nothing. The "Web Suggestions" header in `SearchLayouts.kt` only labels the Web category rows (the hand-off row and bang hints), which are built locally from the typed text; no suggestion request exists anywhere in feature-grid or feature-search. No change needed. |
+| PAL-22 | S | built | Existing `DeepSearch` implements `docs/SEARCH_PROVIDER.md`; added contract tests and `SearchMerge.categories`, which omits empty categories when Fylz and Fotoz are absent. |
+| PAL-23 | S | partial | `OrbitFeel` (SharedPreferences, defaults equal the old constants, tested against the old formulas) read live by the Orbit; `OrbitFeel.labHooks` listed on the Lab page as tap-to-step rows plus a reset row (`app/ui/Lab.kt`, additive). Final values still have to be tuned on a device and committed as defaults |
+| INP-01 | M | partial | Pure focus graph (`FocusGraph`, `FocusRegistry`, `launcherItem`) drives arrows and Tab on Grid, List, Continuous, DSi and XMB (categories then rows), the four corners (single, palette, empty), palette items, the puck (its own key contract, see INP-18) and the Menu popup. Focus ring only in keyboard mode. Not covered: Radar Orbit and Radar layouts (radarkb stream), Launchpad, drawer rows, settings and dialogs (a Dialog is its own window and never sees the activity key hook), complication, cluster and widget corners |
+| INP-02 | M | partial | Hover wash and hand pointer in pointer mode, secondary click on every home item (Grid, List, Continuous, DSi, XMB rows, corners, puck app icons); wheel and trackpad scroll the puck and the native lazy lists. Drawer, Radar and Launchpad rows are not wired |
+| INP-03 | M | partial | `InputMenuModel` and `InputMenu` popup built; test asserts long-press, secondary click and Menu key give identical entries for six contexts. On the home, secondary click and Menu key call the very same `onLongPress` callback the long-press calls, so the legacy `AppContextMenu` dialog opens for all three. That dialog's rows are not yet generated from `ContextMenus` |
+| INP-04 | M | built | One registry, F1 sheet (`ShortcutSheet`) and a Settings row open it; it lists every binding and states that Meta shortcuts belong to the system (never claimed, tested). `onProvideKeyboardShortcuts` publishes the registry to the system helper |
+| INP-05 | M | partial | Dispatched on the home host (works over every launcher surface that is inside the activity): open Radar, drawer, settings, Launchpad, puck, shortcut sheet, corners 1 to 4, dismiss (closes sheet, edit mode, else Back), edit mode, move item (arrows). "Switch workspace" moves between home pages until WSP exists. Dock 1 to 9 and focus dock are registered and routed but there is no dock to receive them yet |
+| INP-06 | M | built | `InputModeTracker` is fed by real events: keys in `MainActivity.dispatchKeyEvent`, mouse and touch by `inputSensing()` at the root. Mode changes only redraw affordances; a Robolectric test shows focus stays put across mode flips |
+| INP-07 | M | partial | `TouchPaths` uses exhaustive `when` over `LauncherCommand`, `MenuAction` and `CornerActionId` (a new entry does not compile without a touch path) and `InputAuditTest` also rejects paths that rely on hover, right-click or keys /. Downgraded in review: the touch-path strings are hand-written claims checked for presence and wording, not derived from the real UI, so the audit cannot prove a path exists |
+| INP-08 | M | built | Swipe, pinch, double tap and a new long-press gesture (`HomeGesture.LongPress`, unbound by default so the quick sheet stays) are assignable. Defaults audit: swipe up (drawer), down (notifications) and left (Radar) clash with the system home, shade and back gestures only when they start at a screen edge, so every launcher swipe is now ignored when it starts in the system bands (bottom 32 dp, sides 24 dp, top 24 dp, `SystemGestureZones`). Old tests that listed the usable gestures were updated to include `LongPress` |
+| INP-09 | M | partial | Keyboard: Ctrl+E turns on edit mode, arrows move the focused icon (across pages at the edges, `KeyboardMove`, `GridKeyboardMove` hook in GridHome), Esc ends it. Drag already existed. Widget resize and filing into folders by keyboard are not built (no folders or widget resize on home yet) |
 | INP-10 | S | built | Rebind, conflict detection and export/import in core-input, tested; no UI |
 | INP-11 | S | not started |  |
-| INP-12 | S | partial | alwaysKeyboard preference exists; per-orientation option not built |
+| INP-12 | S | partial | Two prefs (portrait, landscape) with Settings rows; the home asks for the keyboard when Radar or the drawer opens in an orientation that has it on. The Radar text field takes focus itself; the drawer has no text field in this branch so there the request has nothing to attach to |
 | INP-13 | S | partial | VoiceInputManager exists; on-device-only rule and hidden control not verified |
 | INP-14 | C | not started |  |
-| INP-15 | M | partial | Corner assignments exist; per-orientation sets and group targets not built |
-| INP-16 | M | not started |  |
-| INP-17 | M | not started |  |
-| INP-18 | M | not started |  |
-| INP-19 | M | not started |  |
-| INP-20 | S | not started |  |
-| HOM-01 | M | partial | Four styles, paged or continuous; contract adapters and frame budget not built |
-| HOM-02 | M | not started |  |
-| HOM-03 | M | partial | Adaptive icons and themed icon plates exist; icon packs and per-item overrides not verified |
-| HOM-04 | M | not started |  |
-| HOM-05 | M | partial | Drawer with A-Z index exists; tags, work tab not built |
-| HOM-06 | M | not started |  |
-| HOM-07 | M | not started |  |
-| HOM-08 | M | not started |  |
-| HOM-09 | M | not started |  |
-| HOM-10 | M | not started |  |
-| HOM-11 | M | partial | Grid derives from window metrics; per-size-class arrangements not built |
-| HOM-12 | M | not started |  |
-| HOM-13 | S | not started |  |
-| HOM-14 | S | not started |  |
-| HOM-15 | S | not started |  |
-| HOM-16 | S | not started | Built-in backgrounds only |
+| INP-15 | M | partial | Four corners take app, launcher action, app group (palette) or nothing, with an optional landscape set (`cornersPerOrientation`, `landscapeCorners` store); Holo, Sony and Bubbles all draw the same `CornerSlotView`, so all three honour it. The "shortcut" kind is modelled (`CornerAssignKind.Shortcut`) but nothing launches an app shortcut from a corner yet and the editor does not offer it |
+| INP-16 | M | built | `HotCornerTracker` (150 ms default, adjustable 50 to 600 ms in Settings, off by a toggle, never while a button is held) plus the `hotCorners()` pointer layer with a reveal bubble; a click on a revealed corner runs its action. Whether hover events reach the activity at the corners needs the device spike |
+| INP-17 | M | partial | Each corner has a default shortcut (Ctrl+Shift+Q/W/A/S) that runs it, and single, palette and empty corners are focus-graph nodes reachable by arrows from the nearest edge item (graph test with corner nodes). Complication, cluster and widget corners are not nodes yet |
+| INP-18 | M | built | Ctrl+P opens the puck; Left and Right or the scroll wheel rotate by group; a typed letter jumps; Tab and Shift+Tab cycle A-Z, Category, Recent; Up and Down walk the group; Enter launches; Esc closes; "/" starts Radar and 1 to 9 run the hub actions. Pure `PuckKeys` contract is unit tested and the open puck takes keys before the global shortcuts |
+| INP-19 | M | built | `PuckLayout.compute(minSideDp, actionCount)` derives hub, Radar button and ring sizes and slots from the window; tests show no overlap and no clipping from a 240 dp window up, and give `capacity` for the CFG-15 count limit. `WheelDrawer` uses it for the hub ring and the label arc (its old fixed slots overlapped below about 330 dp) |
+| INP-20 | S | partial | A, B, X and the shoulder buttons are translated to Enter, Esc, Menu and Tab in `MainActivity` before dispatch; the D-pad is arrows already. Unit tested; not tried with a real controller /. Downgraded in review: the spec says every surface; dialogs are their own windows and do not see the activity key hook, Y, Start and Select are unmapped, and no controller was tried |
+| HOM-01 | M | partial | `HomeSurfaceContract` (plan, focus targets, item actions) with Grid, List, XMB and DSi adapters; tests show every surface accounts for the same items, focus reaches every item, actions give the same state on every surface. The existing composables are not yet driven by the plan objects |
+| HOM-02 | M | partial | All five item kinds plus dock modelled, edited and persisted (`HomeState`, `HomeEdit`, `HomeStateCodec`, `HomeStateStore`); tested. GridHome and HomeScreen do not yet render or store shortcut, folder, widget-tile or link keys, so none can be placed from the UI yet |
+| HOM-03 | M | partial | Done: no dark tile behind legacy icons (plate derived from the icon's own colours, wired in `AppIcon`), icon-pack `appfilter.xml` parsing and loader, precedence rules, override codec and store, themed-icon colours (all tested). Not wired: icon-pack picker UI, per-item override UI, monochrome (themed) layer rasterisation in `AppIcon` |
+| HOM-04 | M | partial | Folder model, create by drop or from list, rename, reorder, take out, dissolve, search by name: pure and tested. `FolderTile` and `FolderSheet` (tap, click, Enter) are built but not placed into GridHome, and drag-onto-item is not hooked to `dropOnto` |
+| HOM-05 | M | partial | Wired into the drawer: type-to-filter bar, personal and work tabs, tag chips, tags editor from the app menu, hidden apps still excluded. Alphabetical index is the existing rail. "Show hidden apps" view is not built. Rules tested in `Drawer.kt` tests |
+| HOM-06 | M | partial | Profile rules, tabs, work pause or resume chip (`requestQuietModeEnabled`) and private-space gate (API 35+, `private_space` capability, unlocked only) built and tested. Work badge relies on the system badge in `getBadgedIcon`. Before Android 15 any secondary profile is treated as work. Not device-checked |
+| HOM-07 | M | partial | Searchable picker wired into `WidgetPicker`; resize by handles and Shift+arrows built as `WidgetResizeFrame` (not placed into a screen); span maths and clamping tested; restore plan (keep, rebind, placeholder) tested but not called at startup; reconfigure and remove are the existing flows |
+| HOM-08 | M | partial | Shared tile layout (`TilePacker`) and widget band for List, XMB, DSi (`WidgetBand`) built, tested for no overlap at several window sizes; not yet used by the live composables |
+| HOM-09 | M | partial | Badges (dot with optional count) on grid app icons from `NotificationProvider`; notification preview list in the app menu (long-press or right-click when the menu opens). Work-profile badges not shown (the feed carries no profile). Settings toggle not added (`BadgeSettings` exists without UI) |
+| HOM-10 | M | partial | `PackageReconcile` (diff, prune from pages, dock, folders; coalescer under 1 s) tested; `LauncherApps.Callback` now also reacts to suspend and unsuspend and the flow is conflated. Archived state is not read separately (the system keeps listing the app). The live home still uses its existing refresh path |
+| HOM-11 | M | partial | Size classes, adaptive grid dimensions, per-size-class arrangements with nearest-class seeding and a persisted store: pure and tested. GridHome still derives its grid from window metrics as before and does not yet load per-class arrangements |
+| HOM-12 | M | partial | `UndoStack` and `EditSession` (last 20 changes, redo) and the pure move, resize, file-into-folder, remove operations are tested. There is no explicit edit-mode screen yet |
+| HOM-13 | S | partial | Model and maths only (snap guides, widget no-overlap, clamp); no desktop surface exists to host it |
+| HOM-14 | S | partial | `WidgetStack` (swipe, wheel, keys, add, remove) tested; no stack UI |
+| HOM-15 | S | partial | `RecentFilesModel` and `RecentFilesSource` (granted folder trees only) built; model tested; no home panel UI |
+| HOM-16 | S | built | System-wallpaper background already existed; added scroll-offset forwarding from the pager and an accent derived from the wallpaper colours (icon accent); maths tested. Not device-checked |
 | HOM-17 | C | not started |  |
 | HOM-18 | C | not started |  |
-| HOM-19 | M | built | Uniform frame (about 15% of short side) for paged and scrolling homes; screenshot tests do not assert it yet |
-| HOM-20 | M | not started |  |
-| HOM-21 | M | partial | Quick sheet exists on long-press; right-click and Menu key not wired |
-| DCK-01 | M | not started |  |
-| DCK-02 | M | not started |  |
-| DCK-03 | M | not started |  |
-| DCK-04 | M | not started |  |
-| DCK-05 | M | not started |  |
-| DCK-06 | M | not started |  |
-| DCK-07 | S | not started |  |
-| DCK-08 | S | not started |  |
-| WSP-01 | M | built | LaunchRequest / LaunchResolver / LaunchExecutor in core-launch, tested; HomeScreen still launches via the old path |
-| WSP-02 | M | partial | Resolver and offered-displays logic built; no menu entry yet |
-| WSP-03 | M | partial | Resolver gates on SPK-02; no menu entry yet; spike button in Lab |
-| WSP-04 | M | partial | Bounds presets and resolver built; no UI; spike button in Lab |
-| WSP-05 | M | partial | AppGroup and sequential launch built; no saving UI or home item |
-| WSP-06 | M | not started |  |
-| WSP-07 | S | not started |  |
-| WSP-08 | S | not started |  |
-| WSP-09 | S | not started |  |
-| WSP-10 | S | not started |  |
-| WSP-11 | C | not started |  |
-| WSP-12 | C | not started |  |
-| EXT-01 | M | partial | Displays are read by CapabilityRegistry; live hot-plug listener not built |
-| EXT-02 | M | not started |  |
-| EXT-03 | M | not started |  |
-| EXT-04 | M | not started |  |
-| EXT-05 | M | not started |  |
-| EXT-06 | M | not started |  |
-| EXT-07 | M | not started |  |
-| EXT-08 | M | not started |  |
-| EXT-09 | S | not started |  |
-| EXT-10 | S | not started |  |
-| EXT-11 | C | not started |  |
-| STR-01 | M | partial | Home floats as a rounded card and slides; peek, handle and shortcut not built; portrait takeover not built |
-| STR-02 | M | partial | Grouping and dismiss exist; inline reply and pass-through actions not verified |
-| STR-03 | M | partial | Slide left = one action, slide right = palette built; hover/focus buttons, menu entries and keys not built |
-| STR-04 | M | partial | Rules exist; digest scheduling and export not built |
-| STR-05 | M | not started |  |
-| STR-06 | M | partial | Media strip exists; grant flow and dock feed not built |
-| STR-07 | M | not started |  |
-| STR-08 | M | not started |  |
-| STR-09 | S | not started |  |
-| STR-10 | S | not started |  |
-| STR-11 | C | not started |  |
-| STR-12 | C | not started |  |
-| CFG-01 | M | not started |  |
-| CFG-02 | M | not started |  |
-| CFG-03 | M | not started |  |
-| CFG-04 | M | not started |  |
-| CFG-05 | M | partial | Cross-media-bar settings exist; keyboard operation and settings-as-Radar-results not built |
-| CFG-06 | M | partial | Onboarding exists; scope not verified against spec |
-| CFG-07 | M | not started |  |
+| HOM-19 | M | partial | `HomeFrame` extracted and used by GridHome and HomeScreen; tests for equal band in both orientations, same app area rotated, band strips never overlapping the app area. Only GridHome, HomeScreen and the bottom clock use it; List, XMB and DSi layouts and the dock rail are not verified against the frame (corrected from built after review) |
+| HOM-20 | M | partial | `ClockBandFit` (drop weather line first, then scale the clock, never drop the dots) applied to the bottom clock in `StripHost`; tests over short sides 320 to 1200 dp. The weather line is dropped rather than scaled separately. Review: the model assumes the clock sits 18 dp above the bottom edge, but `StripHost` still places it `edge + 34.dp` up (page-dot touch targets are 16 to 20 dp), so the real placement can still overrun the band on small windows; the model and the placement need to share one reserve (corrected from built after review) |
+| HOM-21 | M | partial | Menu key with nothing focused and a right-click on empty home (an unclaimed secondary press) open the same quick sheet as the long-press, by the same state variable. The long-press quick sheet is a fixed set of tiles (not built from `ContextMenus`) |
+| DCK-01 | M | built | Pins are generic refs (app, shortcut, folder, group); reorder by long-press drag, by Alt+arrow, and by accessibility actions; tests DockLogicTest. Folder and shortcut items render only when the home stream supplies labels through `labelOfOther` / `onLaunchOther`. |
+| DCK-02 | M | built | Recent section from UsageStatsManager, newest first, excludes pinned, refreshed on resume; labelled "Recent" (asserted in a test). Needs usage access on a device to prove. |
+| DCK-03 | M | built | Dot marker on pinned apps used this session (launched here, or seen in usage since process start); help dialog states the meaning (info button). |
+| DCK-04 | M | built | Collapsed band and pinned-plus-recent modes; off by default in T1, on in T2 and T3 via core-capabilities tier; edge bottom, or left/right in landscape. Settings in the dock panel. |
+| DCK-05 | M | partial | `DockController.handle(LauncherCommand)` handles FocusDock and Dock1..9 (and workspace next/previous); `Modifier.dockShortcuts` is applied to the home root. Compose delivers keys only when something in the home holds focus, so global delivery on the plain home depends on the INP stream's focus graph and key dispatch. Inside the dock, arrows, Alt+arrows, Enter and Esc work. |
+| DCK-06 | M | built | Without usage access the Recent section is replaced by one enable row that opens the usage access screen; pinned items work in full. |
+| DCK-07 | S | partial | `DockHub` gives one instance per display id sharing the active workspace's pins; `DockHost(displayId = ...)` is the per-display entry. Only the main display hosts one today: the external-display surface (EXT stream) must place a `DockHost`. |
+| DCK-08 | S | built | Compact prev / play-pause / next item shown when `MediaNow` reports a session; fed by `MediaSignals` (wraps `MediaNow`). Needs notification access. |
+| WSP-01 | M | built | `AppLauncher` wraps `LaunchExecutor`; `HomeScreen.launch` and `ActionRunner.launchKey` (new `launchHook`) now go through it. Drop notices are shown once per session per reason as a toast. Other direct `startActivity` calls (system intents, shortcuts, widgets, search deep results) are not app launches and were left alone. |
+| WSP-02 | M | built | "Open on <display name>" entries in the app action list, one per other task-hosting display (from `LaunchResolver.offeredDisplays`). Not proven on a second display. |
+| WSP-03 | M | built | "Open beside" only when SPK-02 is recorded as proven; Lab has "It worked" / "It did not" entries that write the result (`SpikeResults`). |
+| WSP-04 | M | built | Left half, right half, centred and full entries appear only where desktop windowing is reported or SPK-03 is recorded as proven; elsewhere WSP-01's notice covers saved requests with bounds. |
+| WSP-05 | M | partial | Groups of 2 to 4 with a layout preset (tiled, full, centred); planner picks bounds, split, or first-app plus quick switcher (a notification with one action per remaining app on T1); sequential launch re-checks each result and retries once. Appears as a dock item and palette result (`GroupPaletteProvider`, to be registered by the search stream; `dockPaletteProviders` in the app). Group as a home item is not done: it needs the home stream's item model; the generic ref `group:<id>` is ready. |
+| WSP-06 | M | partial | `LaunchRequest.source` drives `ActivityOptions.makeClipRevealAnimation` plus the source bounds of `startMainActivity`. The source is the last press position (`LastTouch`), not the item's own rectangle, because the home styles do not pass one; so the app opens out of where the finger went down. |
+| WSP-07 | S | partial | Workspaces with own dock pins, home arrangement snapshot (pages and removed apps, applied through `HomeLayoutStore.replace`), widget and palette-action id lists, and notification filter; switch is in memory (tested under 150 ms with slow storage), by keys (`NextWorkspace`/`PreviousWorkspace` via the controller), by swiping the workspace chip, from the panel and from the palette provider. Widgets and palette pinned actions are stored per workspace but nothing applies them yet (those belong to the home and search streams). The arrangement keeps page contents, not per-page density. |
+| WSP-08 | S | built | Per-workspace app allow-list applied as a display filter through `NotificationProvider.displayFilter` (the Launchpad feed); system notification settings are untouched. |
+| WSP-09 | S | built | Sessions capture a group plus a display per member; restore reopens apps only and says so in the panel and in a toast. |
+| WSP-10 | S | built | Restore matches displays by name then id; a missing display falls back to the current one and the report names it (shown as toasts). |
+| WSP-11 | C | partial | Schedules (inexact alarm, no exact-alarm permission) post a notification with an Open action that runs the target; reboot reschedules. The panel offers "Remind in 1 h" for groups only; no time picker. |
+| WSP-12 | C | partial | Exported `AutomationReceiver` (switch workspace, launch group, restore session by id or name) and `RunActivity`. Workspace switching runs directly; group and session requests from a background broadcast post the Open notification, because the system blocks background launches. |
+| EXT-01 | M | built | `DisplayTracker` state machine plus `DisplaySource` (public `DisplayManager.DisplayListener`); each callback is one synchronous reduce, duplicates and missed callbacks are safe. The 1 second figure is by construction, not measured on a device |
+| EXT-02 | M | partial | Offer policy (once, then always/ask/never), notification with Open/Always/Never, open through core-launch `LaunchExecutor` with the display id, skipped where this launcher's home already runs on that display (both SPK-01 paths). Reopen notification while connected is built. Missing: a Ground Control row for the setting (shared file not edited), palette action and dock item wiring (`DesktopController.reopenAction()` is the hook), SPK-01 results |
+| EXT-03 | M | partial | Arrangement, density override and dock mode live in a per-display profile; the dock state is its own instance per surface; phone stores are never written. Focus is one process-wide "some surface is visible" flag, not per display, so with two surfaces the phone panel would drive both; real window focus semantics across displays are unverified |
+| EXT-04 | M | built | `DesktopMetrics.compute` from the window's own pixels, density and insets; tests at 1080p and 4K across common densities, no clipped dock or oversized icons. Not verified on hardware |
+| EXT-05 | M | partial | Layout is size-class based and tested from maximised down to a 360x400 pane; activity declares `resizeableActivity` and handles resize without recreation. Freeform and split behaviour on a device is not verified |
+| EXT-06 | M | partial | Pure close/migrate/yield policy tested (never two surfaces on the primary display); `DesktopActivity` applies it; profile kept per display and restored on reconnect. Default is close; migrate is a stored flag with no settings row yet. Platform task migration timing unverified |
+| EXT-07 | M | partial | Desktop items and drawer have "Open on phone"; launches use core-launch with the WSP-01 notice once per reason (tested fallbacks for missing and non-hosting displays). Phone-side "Open on desktop" belongs to the WSP-02 UI: `DesktopController.launchApp` / `DesktopLaunch.otherDisplay` are ready for it |
+| EXT-08 | M | built | Dock rect computed inside system insets (taskbar shows as an inset) with extra clearance when the system home is present; tested on bottom, left, right and top insets. Whether a given system taskbar reports insets is a device question |
+| EXT-09 | S | partial | `DisplayIdentity` (product info where public API gives it, else resolution and name, rotation-proof) and per-key profile store tested. Density override and dock mode are stored and honoured but there is no UI to change them yet |
+| EXT-10 | S | partial | Phone panel (trackpad with move, tap, long press, two-finger scroll, keys and text) drives only the launcher's desktop surface through an in-process bus; no accessibility service. Opened from an ongoing notification while a surface is open; no palette entry. Cursor math and drop-when-unfocused tested. The cursor cannot click dock entries (dock is not a hit target) |
+| EXT-11 | C | partial | Mirrored displays never get an offer or surface (tested), but mirroring has no public API, so detection is a heuristic (same size as the phone, cannot host tasks). Not verified |
+| STR-01 | M | partial | Live edge drag with peek and spring-back, fling and hysteresis, handle, click, rebindable Ctrl+N shortcut, landscape strip and portrait takeover are built and tested (RevealMath, gesture tests). Not device-checked. The shortcut only fires while a launcher surface holds focus (spec section 3); no global dispatcher exists yet |
+| STR-02 | M | partial | Grouping by app then conversation, newest first (new AppConversation mode, now the default); dismiss goes to the system listener; plain actions and an inline reply row built (RemoteInput through the notification's own PendingIntent). The reply send path and RemoteInput parsing need a real notification on a device |
+| STR-03 | M | built | Slide left runs the per-app primary action (default Dismiss), slide right opens the palette with Snooze, Read, Mute, Open, Rule. Buttons on hover and focus, long-press, right-click, Menu key, Delete and TalkBack custom actions, all from one entry list (tested for parity) |
+| STR-04 | M | partial | Per-app delivery (immediately, digest at chosen times, silent in Launchpad) persisted in the Launchpad store; LaunchpadRulesSnapshot (rules, grouping, gestures, delivery, unknown fields kept) is exposed for the state store. The state stream must call `LaunchpadSettings.snapshot()` and `restore()` for the export; no export wiring was done here, so the config export does not yet carry delivery rules (downgraded from built in review). The rules page states the scope |
+| STR-05 | M | built | GrantGate/GrantScreen in core-design; Launchpad shows it without access (explanation, on-device promise, enable button, a still-off line after the first ask); the media strip shows a grant chip that opens the same screen |
+| STR-06 | M | not started | Not in this stream (dock feed) |
+| STR-07 | M | partial | Robolectric screenshots in portrait and landscape for no grant, empty, grouped, digest, light and dark, with luminance assertions; device checklist written. The screenshots are not compared against golden images |
+| STR-08 | M | partial | Arrow keys walk groups and rows, Left and Right collapse and expand, Home and End, Esc closes, focus moves to the neighbour after a removal, focus ring only in keyboard mode. Esc restoring focus to the exact home element needs home elements to opt in with `trackedForLaunchpad` (the focus graph is the input stream's work); the mechanism is built and tested |
+| STR-09 | S | built | Left-edge waiting indicator: counts waiting items under the rules, widens for a new one, never focusable. It replaces the unread strip only when that strip is off |
+| STR-10 | S | built | Time, battery, connectivity and sound tiles, each opening a public system panel; no tile claims to toggle anything |
+| STR-11 | C | not started | Home widget needs an AppWidgetProvider and RemoteViews; not cheap, left out |
+| STR-12 | C | unmet | No stable public route: opening the shade needs StatusBarManager.expandNotificationsPanel, which is hidden API, so it is excluded from the core build. SPK-04 has no device result to override that |
+| CFG-01 | M | partial | Review: keyboard shortcuts, palette aliases, workspaces and sessions are empty placeholders, so the file does not yet carry everything CFG-01 lists. `StateCodec.export` writes one versioned JSON file (layout, settings, corners, gestures, Launchpad rules, palette-alias / workspace / session placeholders). Written through SAF `CreateDocument` from Ground Control > Backup. Contains no notifications, history, contacts, weather location (tested with sentinel data). Keyboard-shortcut overrides (core-input `ShortcutRegistry.export`) have a slot in the file but nothing persists that registry yet, so nothing is written to it. Palette aliases, workspaces and sessions are empty placeholders until their streams fill `StateExtrasStore` |
+| CFG-02 | M | partial | Import via SAF `OpenDocument` (Backup pane and onboarding) restores on a clean install; layout keys for missing apps stay in the layout and resolve when installed (tested at model level). Widgets are not carried: they are listed as pending and the corner/left-page slot restarts empty. The one-consent-per-widget re-bind UI is not built |
+| CFG-03 | M | partial | Review: unknown fields nested inside known sections are lost through the live stores (import then export), so preservation on a real round trip is incomplete. `schemaVersion` plus `StateMigrations` (v1 to v2, fixture-enforced for every prior version). Unknown top-level fields, unknown settings keys and the opaque sections survive file to model to file; a file from a newer build is read, flagged and its unknown fields kept. Limit: unknown fields nested inside known sections (e.g. inside a layout page) are kept only in document-to-document round trips, not through the live stores. v1 was the first writer in this stream (never shipped); there is no older released format |
+| CFG-04 | M | partial | Review: only delete-page is hooked as a destructive edit; hide, remove and similar edits do not snapshot yet. `SnapshotStore`: last 5 in `filesDir/state/snapshots`, taken before every import and restore, before delete-page (hooked in HomeScreen, 5 s rate limit), after each stable start, and on demand; one-tap restore in the Backup pane. Other destructive edits (hide, remove-from-home, etc.) are not hooked yet: `StateService.beforeDestructive` is the call for them |
+| CFG-05 | M | partial | Keyboard operation of Ground Control is built (see CFG-13). Every row is a `SettingsIndex` entry (built from the live category list) and `SettingsResultSource` / `CategorySettingsSource` expose them; `SearchScreen` shows matches as Settings results under Actions (needs 2+ characters and the Actions search switch) and opens Ground Control on the result's category. It does not yet scroll to or highlight the exact row. Note for the palette stream: the interface lives in feature-grid, not search-engine |
+| CFG-06 | M | built | Onboarding is exactly: set as default home, choose home style, optional import (`OnboardingFlow`). No permission is requested. UI is compile-checked only, no screenshot test |
+| CFG-07 | M | partial | One reusable GrantGate with texts and decision logic for notification, usage, contacts, folders and microphone. Wired for notifications (Launchpad, media strip) and contacts (search row). Usage, folders and microphone have the screen, checks and settings routes in GrantSupport but their feature entry points belong to other streams (downgraded from built in review: three of five grants have no entry point yet) |
 | CFG-08 | M | built | Ground Control "Capabilities" category lists every capability with reason and fix, with Copy report |
-| CFG-09 | M | partial | Crash-loop detection and a safe-mode banner (widgets off) built and tested; minimal grid surface and snapshot restore not built |
-| CFG-10 | S | not started |  |
-| CFG-11 | S | not started |  |
+| CFG-09 | M | built | The existing `CrashLoopGuard` detector now boots `SafeModeScreen` instead of `HomeScreen`: alphabetical app grid, no widgets, no wallpaper layers, no Radar/Launchpad; offers "Restore last snapshot" (`SafeMode.plan`) and "Carry on". Detector and plan are unit-tested; the screen is not exercised on a device |
+| CFG-10 | S | partial | Wallpaper-derived palette (WallpaperColors, contrast-checked), light/dark, density and type scale with a Ground Control page. Launchpad keeps its own two palette pairs rather than reading the shared tokens |
+| CFG-11 | S | built | The `settings` section is a standalone document (`format: liftoff-settings`, own `settingsVersion`); exportable alone and importable alone (touches nothing but settings). Tested |
 | CFG-12 | C | not started |  |
-| CFG-13 | M | partial | Category and row navigation by touch only |
-| CFG-14 | M | partial | Settings search exists; shared index with Radar not built |
+| CFG-13 | M | built | `GroundControlNav` (pure, tested) plus handler in `SettingsSpace`: Left/Right category, Up/Down rows, Enter flips a toggle, runs an action, opens a page or starts adjusting (arrows then adjust, Enter/Esc ends), Esc backs out (edit, page, search, then close). D-pad, A and B map to the same keys. Cursor ring shows only after a hardware key. Same model in both orientations (no orientation logic). Touch and pointer use the existing rows and swipe |
+| CFG-14 | M | built | Ground Control search uses `SettingsIndex.search` (name, description, category, exact value; every word must match; ranked) instead of the old substring filter. Same index that Radar queries |
 | CFG-15 | M | not started |  |
-| CFG-16 | M | partial | Toggles, sliders, segments, preview rails done; steppers, headers, older pages not |
+| CFG-16 | M | built | Stepper, section header, chips and pill added to the tactile kit, the kit made light/dark aware, and the older-page helpers (SectionHeader, ToggleRow, Stepper, ChipRow, LabeledSlider, TextButtonPill) now draw it. Screenshot test per control type in light and dark |
 | CFG-17 | M | built | Lab category with spikes SPK-01 to SPK-07 (SPK-05 not built); shown in release builds too during alpha, spec says debug only |
-| CFG-18 | S | not started | Live preview dock not built; headless rail render still blank |
-| CFG-19 | S | not started |  |
+| CFG-18 | S | partial | Live preview dock: the real home records itself into a GraphicsLayer and Ground Control draws that layer scaled. Wiring and sizing are tested; the pixels of the dock are device-only because Robolectric's software canvas cannot draw a GraphicsLayer. The blank-rail defect did not reproduce with the real VisualChoice inside SettingsSpace (portrait and landscape); regression tests now assert the rail cards are drawn |
+| CFG-19 | S | built | All strings reached through L10n.tr, t() and the settings helper x() in the source tree, plus the enum labels of this stream, exist in all 8 languages (279 strings added in L10nLaunchpad.kt). A unit test scans the source and fails on a missing key. Other streams adding new strings will fail it until they translate |
 | CFG-20 | M | not started | Application ID decision pending (open decision) |
-| NFR-01 | M | not started |  |
-| NFR-02 | M | not started |  |
-| NFR-03 | M | not started |  |
-| NFR-04 | M | not started |  |
-| NFR-05 | M | not started |  |
-| NFR-06 | M | not started |  |
-| NFR-07 | M | not started |  |
-| NFR-08 | M | not started |  |
-| NFR-09 | M | not started |  |
-| NFR-10 | M | not started |  |
-| NFR-11 | M | not started |  |
-| NFR-12 | M | not started |  |
-| NFR-13 | M | not started |  |
-| NFR-14 | M | not started |  |
-| NFR-15 | M | not started |  |
-| NFR-16 | M | unmet | The manifest declares INTERNET (weather via open-meteo); the spec requires none in the core flavour |
-| NFR-17 | M | not started |  |
-| NFR-18 | M | not started |  |
-| NFR-19 | M | not started |  |
-| NFR-20 | M | not started |  |
-| NFR-21 | M | not started |  |
+| NFR-01 | M | partial | Budget and p95 judging built and tested (`Budgets`); macrobenchmark source written in `benchmark/` but not in the build (androidx.benchmark not resolvable offline); `tools/perf.sh` adb probe written; hand-written baseline profile ships in the release APK; nothing measured |
+| NFR-02 | M | partial | As NFR-01 (cold start 700 ms) |
+| NFR-03 | M | partial | Benchmark source written (inactive); needs `Liftoff.paletteFirstResults` trace sections in the palette, which belongs to the palette stream |
+| NFR-04 | M | partial | As NFR-03 (`Liftoff.paletteKeystroke`) |
+| NFR-05 | M | partial | Jank percent math built and tested; frame benchmark and `tools/perf.sh` gfxinfo check written, not run |
+| NFR-06 | M | partial | `tools/measure_pss.sh` written (median vs 180 MB), not run; no widgets were measured |
+| NFR-07 | M | partial | No wake locks in sources or manifest (tested); `tools/measure_battery.sh` written; the 0.5% per day figure is not measured; indexing-in-constrained-jobs not audited here |
+| NFR-08 | M | built | `./gradlew :app:checkReleaseApkSize --offline` fails at 25 MB; release APK is 4.43 MB; the APK stands in for download size (no AAB built) |
+| NFR-09 | M | partial | Local crash reports and a session ledger with crash-free percent built and tested; installed from `LiftoffApplication`; no beta cohort, so the 99.8% figure is not measured |
+| NFR-10 | M | partial | `tools/soak.sh` (7200 s loop with ANR and crash checks) written; never run |
+| NFR-11 | M | partial | All surfaces already restore from the SharedPreferences stores; a test builds a second set of stores over the same persisted data and checks identical state and identical re-export. Reboot, package update, profile toggle and display hot-plug are not verified (no device); workspaces/sessions persistence belongs to other streams |
+| NFR-12 | M | partial | StrictMode (disk read, write, network; VM leaks) installed for debuggable builds only; grep tests find no blocking calls in MainActivity and HomeScreen; the real "StrictMode clean" check needs a debug run on a device. Known: the photo-picker callback in HomeScreen copies a file on the main thread (user action, not the render path) |
+| NFR-13 | M | partial | Generic helpers (48 dp target, reading order, clockwise orbit order) and a `contentDescription = null` ratchet built; XMB, DSi, puck and Orbit linear order is owned by other streams and not wired or verified; no TalkBack run |
+| NFR-14 | M | partial | `MotionPrefs` (animator, transition, window scales to cross-fade mode) built and Robolectric-tested; Robolectric tests at 200% font scale for toggle, action, stepper rows and the media strip; surfaces do not yet call `MotionPrefs`, so morphs are not yet cross-fades |
+| NFR-15 | M | partial | WCAG contrast and scrim-alpha math built and tested; not yet applied to the clock or labels |
+| NFR-16 | M | unmet | INTERNET stays declared for weather; options and costs in `docs/decisions/NFR-16.md`; current state pinned by a test |
+| NFR-17 | M | partial | Reviewed: downgraded from built because the user-initiated share action is not built, so "shared only by explicit user action" has no implementation. No analytics or crash-upload SDK in sources, build files or manifest (tested); only Weather.kt opens a connection; crash reports are local; the share action in Ground Control is not built |
+| NFR-18 | M | built | `data_extraction_rules.xml` (cloud backup and device transfer) and `backup_rules.xml` (`fullBackupContent`) exclude launch history, search habits, steps, weather, crash-loop, icon colours, databases, snapshots, index/notification/usage directories; manifest points to both. Exporter reads none of those stores. Verified by file-content tests, not by an actual backup run |
+| NFR-19 | M | partial | `enableOnBackInvokedCallback` set in the manifest, `enableEdgeToEdge()` before `setContent`, no legacy back interception, every `BackHandler` conditional (tested); not checked on a device or per surface for insets |
+| NFR-20 | M | partial | Audit tests: no window-level gesture control; one `systemGestureExclusion` (Orbit carousel in SearchLayouts.kt) allow-listed; this still claims a screen region from the system back gesture (OS caps it at 200 dp per edge), so the "never intercepts" wording is not fully met until that is removed or accepted |
+| NFR-21 | M | built | `OemNotes` and the "OEM notes" capability row (additive `manufacturer` input), `docs/oem-notes.md`; text is unconfirmed until SPK-06 runs on devices |

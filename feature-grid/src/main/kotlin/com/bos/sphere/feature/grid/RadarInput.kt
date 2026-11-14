@@ -9,8 +9,6 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import com.bos.sphere.core.input.InputMode
 
-/** The active input as the host knows it (INP-06). The default is Touch; the host provides the real value, and Radar also tracks it itself from the events it sees. */
-val LocalInputMode = compositionLocalOf { InputMode.Touch }
 
 /** Mouse and trackpad events count as pointer; a finger never does. */
 internal fun PointerType.toInputMode(): InputMode = if (this == PointerType.Mouse) InputMode.Pointer else InputMode.Touch

@@ -211,7 +211,7 @@ internal fun SearchScreen(
     val searchText = ScopePrefixes.parse(query).second
     val trimmed = searchText.trim()
     // PAL-18: a keyboard or pointer in use means Flat, unless the user pinned a layout.
-    val hostMode = LocalInputMode.current
+    val hostMode = LocalInputMode.current.value
     val tracker = remember { InputModeTracker(hostMode) }
     val inputMode by tracker.mode.collectAsState()
     val layout = RadarLayoutPolicy.effective(prefs.searchLayout, prefs.searchLayoutPinned, inputMode)

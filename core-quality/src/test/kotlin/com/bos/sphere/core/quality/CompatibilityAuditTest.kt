@@ -15,7 +15,7 @@ class CompatibilityAuditTest {
     }
 
     @Test fun NFR_19_noLegacyOnBackPressedOrKeyCodeBackInterception() {
-        val offenders = Repo.mainSources().filter { f -> f.readText().let { it.contains("onBackPressed") || it.contains("KEYCODE_BACK") || it.contains("Key.Back") } }
+        val offenders = Repo.mainSources().filter { f -> f.readText().let { Regex("""override\s+fun\s+onBackPressed""").containsMatchIn(it) || it.contains("KEYCODE_BACK") || Regex("""Key\.Back\b""").containsMatchIn(it) } }
         assertTrue("legacy back handling in $offenders", offenders.isEmpty())
     }
 

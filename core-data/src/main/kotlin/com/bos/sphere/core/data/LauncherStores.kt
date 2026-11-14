@@ -114,7 +114,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putString("iconShape", next.iconShape.name)
             .putString("iconTint", next.iconTint.name)
             .putBoolean("iconPlate", next.iconPlate)
-            .putString("language", next.language.name)
+            .putString("language", next.language.name).putBoolean("searchLayoutPinned", next.searchLayoutPinned)
             .putString("wheelGrouping", next.wheelGrouping.name)
             .apply()
     }
@@ -224,6 +224,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             iconTint = enumOr(sp.getString("iconTint", null), d.iconTint),
             iconPlate = sp.getBoolean("iconPlate", d.iconPlate),
             language = enumOr(sp.getString("language", null), d.language),
+            searchLayoutPinned = sp.getBoolean("searchLayoutPinned", d.searchLayoutPinned),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
         )
     }

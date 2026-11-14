@@ -509,6 +509,7 @@ internal fun TileFace(tile: Tile, size: Dp, modifier: Modifier = Modifier) {
             Text("!${tile.code}", color = Color(0xFF9CC4FF), fontSize = (size.value * 0.28f).sp, fontWeight = FontWeight.SemiBold)
         }
         is Tile.Allow -> WebFace(if (tile.files) FolderGlyph else Glyphs.Person, size, modifier)
+        is Tile.Setting -> WebFace(Glyphs.Sliders, size, modifier)
     }
 }
 

@@ -26,6 +26,8 @@ data class LaunchRequest(
     val displayId: Int? = null,
     val bounds: Bounds? = null,
     val placement: Placement = Placement.Default,
+    /** Screen rectangle of the item the launch came from; the app opens out of it (WSP-06). */
+    val source: Bounds? = null,
 )
 
 /** Why a requested option was not applied. The UI shows each reason at most once per session (WSP-01). */
@@ -85,6 +87,11 @@ class DropNotices {
 }
 
 /** A saved group of 2 to 4 apps (WSP-05) with a layout preset. */
-data class AppGroup(val name: String, val members: List<LaunchRequest>) {
+data class AppGroup(
+    val name: String,
+    val members: List<LaunchRequest>,
+    val layout: GroupLayout = GroupLayout.Tile,
+    val id: String = name,
+) {
     init { require(members.size in 2..4) { "a group has 2 to 4 apps" } }
 }

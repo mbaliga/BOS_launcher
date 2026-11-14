@@ -61,7 +61,11 @@ object NotificationProvider {
     private val _state = MutableStateFlow<List<HubNotification>>(emptyList())
 
     /** Current notifications (newest first). Replays the latest value to new collectors. */
-    val notifications: Flow<List<HubNotification>> get() = _state.asStateFlow()
+    val notifications: Flow<List<HubNotification>> get() =
+        kotlinx.coroutines.flow.combine(_state, displayFilter) { list, allowed -> if (allowed == null) list else list.filter { it.packageName in allowed } }
+
+    /** Display-only filter set by the active workspace (WSP-08): the apps allowed to show; null shows everything. */
+    val displayFilter = MutableStateFlow<Set<String>?>(null)
 
     internal fun onNotificationsChanged(notifs: List<HubNotification>) {
         _state.value = notifs

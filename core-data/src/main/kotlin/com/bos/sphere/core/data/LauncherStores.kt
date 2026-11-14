@@ -243,6 +243,11 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
         write(cur.copy(pages = HomeLayoutMath.toStored(visual, cur.pages, preserve), seeded = true))
     }
 
+    /** Replaces the whole arrangement, used when a workspace is switched (WSP-07). */
+    fun replace(pages: List<HomePage>, removed: Set<String>) {
+        write(HomeLayout(pages = HomeLayoutMath.normalizeIds(pages), removed = removed, seeded = true))
+    }
+
     /** Takes [key] off the home pages (it stays in the drawer). */
     fun removeFromHome(key: String, visual: List<HomePage>, preserve: Set<String> = emptySet()) {
         val cur = _layout.value

@@ -77,6 +77,9 @@ import androidx.compose.ui.input.pointer.positionChange
 import com.bos.sphere.core.data.ActionCandidates
 import com.bos.sphere.core.data.ActionPrefs
 import com.bos.sphere.feature.grid.observeBackgroundTouch
+import com.bos.sphere.feature.dock.dockShortcuts
+import com.bos.sphere.ui.DockLayer
+import com.bos.sphere.feature.dock.trackLastTouch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -248,8 +251,15 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     sounds.enabled = prefs.uiSounds
     sounds.volume = prefs.uiSoundVolume
 
+    // Launch control and dock (WSP-01, WSP-06, DCK): every launch goes through the launch layer.
+    val rootView = androidx.compose.ui.platform.LocalView.current
+    val appLauncher = remember { com.bos.sphere.feature.dock.AppLauncher(context, rootView = { rootView }) }
+    val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch() }
+    val dockController = remember { com.bos.sphere.feature.dock.DockController() }
+    val shortcutRegistry = remember { com.bos.sphere.core.input.ShortcutRegistry() }
     fun launch(app: AppEntry) {
-        repository.launch(app)
+        com.bos.sphere.feature.dock.SessionUse.mark(app.key)
+        appLauncher.launch(app, lastTouch.sourceRect())
         stores.history.record(app.key)
         drawerOpen = false
         wheelOpen = false
@@ -346,6 +356,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val pickAppForRef by rememberUpdatedState({ id: CornerActionId -> pickFor = id })
     val runner = remember {
         ActionRunner(context, onInternal = { internalRef(it, null) }, onAppLaunched = { stores.history.record(it) }, onPickApp = { pickAppForRef(it) })
+    }
+    runner.launchHook = { key ->
+        com.bos.sphere.feature.dock.AppKeys.target(key)?.let { t ->
+            com.bos.sphere.feature.dock.SessionUse.mark(key)
+            appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(t, source = lastTouch.sourceRect()?.let { com.bos.sphere.core.launch.Bounds(it.left, it.top, it.right, it.bottom) })).started
+        } ?: false
     }
 
     fun runItem(item: CornerItem, anchor: Corner?) {
@@ -648,7 +664,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     CompositionLocalProvider(LocalIconTheme provides iconTheme) {
     Box(
-        modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).leftSwipe(
+        modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController).leftSwipe(
             enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen &&
                 (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous),
             atFirstPage = { true },
@@ -816,6 +832,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 )
             }
         }
+
+        // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
+        DockLayer(
+            apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
+            visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen,
+            keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
+        )
 
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
         // (tap it, or swipe in from the left edge) so it is always discoverable.
@@ -1062,6 +1085,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onUninstall = { repository.requestUninstall(app); menuApp = null },
                 onToggleHidden = { hiddenStore.setHidden(app.key, app.key !in hidden); menuApp = null },
                 onIconColor = { colorApp = app; menuApp = null },
+                extraEntries = com.bos.sphere.feature.dock.AppActionList.build(appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect()) { menuApp = null }
+                    .map { it.label to it.run },
                 onHomeSettings = if (!prefs.isPaged) {
                     { menuApp = null; openSettings(CATEGORY_HOME) }
                 } else null,

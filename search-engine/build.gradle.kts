@@ -16,6 +16,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+// Palette engine (dev.aarso.search.palette) streams providers with coroutines; resolved from the same
+// version as the rest of the build. No Android, no network client (see PAL_06 test).
+dependencies {
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    testImplementation(libs.junit)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)

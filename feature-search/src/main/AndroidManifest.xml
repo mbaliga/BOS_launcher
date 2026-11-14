@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- PAL-11: reconciles the on-device file index in the background (constrained, not persisted across reboot;
+             the index itself is on disk and the job is rescheduled whenever the launcher starts). -->
+        <service
+            android:name="com.bos.sphere.feature.search.palette.FileIndexJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+    </application>
+</manifest>

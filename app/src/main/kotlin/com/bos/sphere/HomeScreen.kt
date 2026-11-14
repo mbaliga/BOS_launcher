@@ -516,7 +516,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
-    val searchHub = remember { com.bos.sphere.core.data.AndroidSearchHub(context) }
+    val searchHub = remember {
+        val palette = com.bos.sphere.feature.search.palette.AndroidPalette(context)
+        com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)
+        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders())
+    }
     val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     // ---- steps need the activity-recognition permission

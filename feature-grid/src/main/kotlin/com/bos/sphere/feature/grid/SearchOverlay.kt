@@ -86,6 +86,8 @@ import com.bos.sphere.core.data.WebSearch
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.AppSearch
+import com.bos.sphere.feature.search.palette.PaletteHitRunner
+import com.bos.sphere.feature.search.palette.PaletteHost
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.focus.onFocusChanged
@@ -137,6 +139,10 @@ fun SearchOverlay(
     sounds: UiSounds? = null,
     /** CFG-05: Ground Control's settings as Radar results; null = none. */
     settingsSource: SettingsResultSource? = null,
+    /** PAL-01: text already typed when Radar opens (type-to-search from home). */
+    initialQuery: String = "",
+    /** PAL-03: a launcher command a result asked for (a core-input LauncherCommand name, and a workspace index if any). */
+    onRunCommand: (String, Int?) -> Unit = { _, _ -> },
 ) {
     if (visible) BackHandler(onBack = onDismiss)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
@@ -146,6 +152,7 @@ fun SearchOverlay(
             onRequestContactsPermission = onRequestContactsPermission, onDismiss = onDismiss,
             hub = hub, onOpenHit = onOpenHit, onRunAction = onRunAction,
             onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
+            initialQuery = initialQuery, onRunCommand = onRunCommand,
         )
     }
 }
@@ -196,8 +203,18 @@ internal fun SearchScreen(
     initialQuery: String = "",
     initialCategory: SearchCategory? = null,
     settingsSource: SettingsResultSource? = null,
+    onRunCommand: (String, Int?) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
+    // PAL-02, PAL-09: plain app queries also match aliases, initials and a typo, and learn from selections.
+    androidx.compose.runtime.SideEffect { AppSearch.appContext = context.applicationContext }
+    val palette = remember { PaletteHost.get(context) }
+    // PAL-13, PAL-19: the editable scope prefixes, read once per open (Ground Control edits them).
+    val mapping = remember { ScopePrefixes.Mapping.decode(palette.prefs.scopeMapping()) }
+    var aliasRev by remember { mutableStateOf(0) }
+    var aliasFor by remember { mutableStateOf<AppEntry?>(null) }
+    val otherDisplays = remember { runCatching { com.bos.sphere.core.capabilities.CapabilityEvaluator.externalDisplays(com.bos.sphere.core.capabilities.CapabilityRegistry(context).snapshot()).count { it.canHostTasks == true } }.getOrDefault(0) }
+    val selectedHitHolder = remember { arrayOfNulls<String>(1) }
     val haptic = LocalHapticFeedback.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
@@ -208,10 +225,10 @@ internal fun SearchScreen(
     var touched by remember { mutableStateOf(false) }
     val query = field.text
     // PAL-19: a typed prefix ("f budget") and the wheel are one setting; the search itself sees only the rest.
-    val searchText = ScopePrefixes.parse(query).second
+    val searchText = ScopePrefixes.parse(query, mapping).second
     val trimmed = searchText.trim()
     // PAL-18: a keyboard or pointer in use means Flat, unless the user pinned a layout.
-    val hostMode = LocalInputMode.current.value
+    val hostMode = LocalInputMode.current.value.let { m -> if (m == InputMode.Touch) LauncherInput.tracker.mode.value else m }
     val tracker = remember { InputModeTracker(hostMode) }
     val inputMode by tracker.mode.collectAsState()
     val layout = RadarLayoutPolicy.effective(prefs.searchLayout, prefs.searchLayoutPinned, inputMode)
@@ -220,6 +237,7 @@ internal fun SearchScreen(
     var nav by remember { mutableStateOf(RadarNav(0)) }
     var orbitVisible by remember { mutableStateOf(Int.MAX_VALUE) }
     val typing = trimmed.isNotEmpty()
+    val flatMode = typing || layout == SearchLayout.Flat
 
     LaunchedEffect(Unit) {
         delay(60) // let the overlay draw its first frame before the IME animates
@@ -241,9 +259,16 @@ internal fun SearchScreen(
         if (hub == null) { hubMap = emptyMap(); return@LaunchedEffect }
         if (query.isNotBlank()) delay(90)
         fileAccess = hub.hasFileAccess()
-        hub.search(trimmed, prefs).collectLatest { hubMap = it }
+        // PAL-12: same query as before restores its results at once; late providers never move the selected row; closing cancels this collector.
+        RadarMemory.hits.get(trimmed)?.let { hubMap = it }
+        val ranker = PaletteHost.ranker(context)
+        hub.search(trimmed, prefs).collectLatest { fresh ->
+            val ordered = HubOrdering.order(hubMap, fresh, selectedHitHolder[0], ranker)
+            hubMap = ordered
+            RadarMemory.hits.put(trimmed, ordered)
+        }
     }
-    val ranked = remember(apps, recent, trimmed) {
+    val ranked = remember(apps, recent, trimmed, aliasRev) {
         if (trimmed.isEmpty()) recent.take(24) else AppSearch.rank(apps, trimmed, limit = 24)
     }
     val web = remember(trimmed, prefs.webEngine, prefs.searchWeb) {
@@ -270,7 +295,7 @@ internal fun SearchScreen(
             settings = settingEntries,
         )
     }
-    val selected: SearchCategory? = ScopePrefixes.effectiveScope(query, userCat)
+    val selected: SearchCategory? = ScopePrefixes.effectiveScope(query, userCat, mapping)
     val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
 
     // ---- suggestions
@@ -286,6 +311,13 @@ internal fun SearchScreen(
     fun tick() { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); sounds?.play(UiSound.Tick) }
     fun setQuery(text: String) { field = TextFieldValue(text, TextRange(text.length)) }
     fun openHit(hit: SearchHit) {
+        PaletteHost.learnHit(context, hit)
+        // PAL-05 copy, PAL-03 app shortcut and launcher command run here; plain files and web hits fall through to the host.
+        when (val o = PaletteHitRunner.run(context, hit, palette)) {
+            PaletteHitRunner.Outcome.Done -> { if (hit.copyText != null) copiedToast(context); return }
+            is PaletteHitRunner.Outcome.Command -> { onDismiss(); onRunCommand(o.name, o.index); return }
+            PaletteHitRunner.Outcome.NotHandled -> Unit
+        }
         val id = hit.actionId
         when {
             id != null -> onRunAction(id)
@@ -295,8 +327,9 @@ internal fun SearchScreen(
     }
     fun tap(tile: Tile) {
         when (tile) {
-            is Tile.App -> onLaunch(tile.app)
+            is Tile.App -> { PaletteHost.learn(context, "app:${tile.app.key}"); onLaunch(tile.app) }
             is Tile.Person -> {
+                PaletteHost.learn(context, "contact:${tile.c.hit.id}")
                 val ch = tile.c.primary
                 val i = ch?.let { ContactActions.intentFor(it, tile.c.hit) }
                 if (ch != null && i != null) { ContactHabits.record(context, tile.c.hit.id, ch); onOpenIntent(i) }
@@ -307,7 +340,10 @@ internal fun SearchScreen(
                 is WebRow.Open -> onOpenIntent(WebSearch.intentFor(r.url))
                 is WebRow.BangSearch -> onOpenIntent(WebSearch.intentFor(r.url))
                 is WebRow.Search -> onOpenIntent(WebSearch.intentFor(r.url))
-                is WebRow.PlayStore -> onOpenIntent(WebSearch.intentFor(r.url))
+                // PAL-15: the installed app store first (market link); the store's web page when none is visible to us.
+                is WebRow.PlayStore -> onOpenIntent(
+                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse(r.marketUri)).takeIf { it.resolveActivity(context.packageManager) != null } ?: WebSearch.intentFor(r.url),
+                )
                 is WebRow.BangHints -> Unit
             }
             is Tile.Bang -> setQuery(tile.rewritten)
@@ -318,7 +354,7 @@ internal fun SearchScreen(
     // PAL-20: long-press and right-click open the same preview on every result, in all three layouts.
     val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }, onTouch = { touched = true })
     val onPreview: (Tile) -> Unit = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }
-    val setWheel: (SearchCategory?) -> Unit = { c -> userCat = c; setQuery(ScopePrefixes.applyWheel(field.text, c)); expandedContact = null }
+    val setWheel: (SearchCategory?) -> Unit = { c -> userCat = c; setQuery(ScopePrefixes.applyWheel(field.text, c, mapping)); expandedContact = null }
 
     // ---- keyboard (PAL-07): the same model walks Flat, Orbit and Filmstrip results.
     val navTiles = remember(data, selected, typing, layout, orbitVisible) {
@@ -328,12 +364,16 @@ internal fun SearchScreen(
     val navNow = nav.withCount(navTiles.size)
     LaunchedEffect(trimmed, selected) { nav = RadarNav(navTiles.size) }
     val selectedKey = if (inputMode == InputMode.Keyboard && navNow.active) navTiles.getOrNull(navNow.selected)?.key else null
+    selectedHitHolder[0] = selectedKey?.takeIf { it.startsWith("h:") }?.removePrefix("h:")
+    fun menuFor(t: Tile) = ResultMenus.forKind(tileKind(t), otherDisplays = otherDisplays)
     fun runMenu(tile: Tile, entry: ResultMenuEntry) {
         when {
             entry.preview -> previewTile = tile
+            entry.alias && tile is Tile.App -> aliasFor = tile.app
             entry.action == MenuAction.Open -> tap(tile)
             entry.action == MenuAction.AppInfo && tile is Tile.App -> onOpenIntent(appInfoIntent(tile.app.packageName))
-            tile is Tile.App -> onLongPressApp(tile.app) // dock, workspace, uninstall: the host's own sheet
+            entry.action == MenuAction.Uninstall && tile is Tile.App -> onOpenIntent(appUninstallIntent(tile.app))
+            tile is Tile.App -> onLongPressApp(tile.app) // display, split, dock, workspace, more: the host's own sheet
         }
     }
     val onRadarKey: (KeyEvent) -> Boolean = handler@{ ev ->
@@ -342,11 +382,11 @@ internal fun SearchScreen(
         val key = RadarKeyMap.radarKey(ev) ?: return@handler false
         val sel = field.selection
         val caret = CaretContext(queryBlank = query.isBlank(), atStart = sel.collapsed && sel.start == 0, atEnd = sel.collapsed && sel.end == query.length)
-        val r = RadarKeyboard.reduce(navNow, key, caret) { i -> ResultMenus.forKind(navTiles.getOrNull(i)?.let(::tileKind) ?: ResultKind.Other).size }
+        val r = RadarKeyboard.reduce(navNow, key, caret) { i -> ResultMenus.forKind(navTiles.getOrNull(i)?.let(::tileKind) ?: ResultKind.Other, otherDisplays = otherDisplays).size }
         nav = r.nav
         when (val e = r.effect) {
             is RadarEffect.Run -> navTiles.getOrNull(e.index)?.let { tap(it) }
-            is RadarEffect.RunMenu -> navTiles.getOrNull(e.index)?.let { t -> ResultMenus.forKind(tileKind(t)).getOrNull(e.menuIndex)?.let { runMenu(t, it) } }
+            is RadarEffect.RunMenu -> navTiles.getOrNull(e.index)?.let { t -> menuFor(t).getOrNull(e.menuIndex)?.let { runMenu(t, it) } }
             RadarEffect.Dismiss -> onDismiss()
             is RadarEffect.WheelMove -> { val to = ScopeWheel.step(selected, e.delta); if (to != selected) { tick(); setWheel(to) } }
             else -> Unit
@@ -362,7 +402,7 @@ internal fun SearchScreen(
         dismissedFor = field.text
     }
     val go = {
-        val first = data.tiles(selected).firstOrNull()
+        val first = data.enterTile(selected)
         if (first != null && first !is Tile.Person) tap(first) else submitSearch(searchText, apps, prefs, onLaunch, onOpenIntent)
     }
     val showKeyboard = { runCatching { focus.requestFocus(); keyboard?.show() }; Unit }
@@ -371,16 +411,16 @@ internal fun SearchScreen(
     Box(Modifier.fillMaxSize().radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey)) {
         SearchBackdrop(if (prefs.searchBackdrop) prefs.searchBackdropStyle else com.bos.sphere.core.data.SearchBackdropStyle.None, prefs.searchMotion, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
-            if (typing) {
-                // Typing: a plain results list on top, the query sits at the bottom above the keyboard.
+            if (flatMode) {
+                // Typing, or the Flat layout at rest (recent apps and people): a plain results list on top, the query sits at the bottom above the keyboard.
                 FlatResults(
                     data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
                     onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
                     onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
                     plain = true, onPreview = onPreview,
-                    modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 58.dp),
+                    modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = if (typing) 64.dp else 112.dp, bottom = 58.dp),
                 )
-            } else if (layout != SearchLayout.Flat) {
+            } else {
                 // Idle browsing: the category wheel with Filmstrip or Orbit results.
                 val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts || selected == null }
                 // "SEARCH EVERYTHING" sits on the screen's vertical middle (as in the mock-ups), clamped so
@@ -436,12 +476,12 @@ internal fun SearchScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .then(if (typing) Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp) else Modifier.size(1.dp).alpha(0f)),
+                    .then(if (flatMode) Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp) else Modifier.size(1.dp).alpha(0f)),
             ) {
                 Box(Modifier.weight(1f)) {
                     QueryInput(field, { field = it }, go, focus, Color.White, 20.sp, Modifier.fillMaxWidth())
                 }
-                if (typing) {
+                if (flatMode) {
                     ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label)
                     Icon(
                         Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
@@ -450,11 +490,16 @@ internal fun SearchScreen(
                 }
             }
         }
+        // PAL-13: the empty state lists the scope prefixes.
+        if (!typing && query.isBlank()) PrefixHints(mapping, onPick = { setQuery(it) }, modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(start = 16.dp, end = 64.dp, top = 52.dp))
+        aliasFor?.let { a ->
+            AliasDialog(a, PaletteHost.aliases(context)[a.packageName].orEmpty(), onSave = { v -> PaletteHost.setAlias(context, a.packageName, v); aliasRev++; aliasFor = null }, onDismiss = { aliasFor = null })
+        }
         // The action list of the keyboard-selected result (Tab / Right / Menu).
         if (navNow.menuOpen) navTiles.getOrNull(navNow.selected)?.let { t ->
             RadarActionList(
-                ResultMenus.forKind(tileKind(t)), navNow.menuIndex,
-                onPick = { i -> nav = navNow.copy(menuOpen = false); ResultMenus.forKind(tileKind(t)).getOrNull(i)?.let { runMenu(t, it) } },
+                menuFor(t), navNow.menuIndex,
+                onPick = { i -> nav = navNow.copy(menuOpen = false); menuFor(t).getOrNull(i)?.let { runMenu(t, it) } },
                 modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(end = 16.dp, bottom = 64.dp),
             )
         }

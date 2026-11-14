@@ -361,6 +361,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     val internalRef by rememberUpdatedState(::internal)
+    // PAL-01: a printable key on the home opens Radar with that character typed.
+    var typedQuery by remember { mutableStateOf("") }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val hook: (android.view.KeyEvent) -> Boolean = { e ->
+            val entry = com.bos.sphere.feature.search.palette.TypeToSearch.onKey(
+                e.keyCode, e.unicodeChar, e.isCtrlPressed, e.isAltPressed, e.isShiftPressed, e.isMetaPressed, com.bos.sphere.feature.grid.LauncherInput.registry,
+            )
+            if (entry is com.bos.sphere.feature.search.palette.PaletteEntry.Open) { typedQuery = entry.initial; internalRef(CornerActionId.Search, null); true } else false
+        }
+        com.bos.sphere.feature.grid.LauncherInput.typeHook = hook
+        onDispose { if (com.bos.sphere.feature.grid.LauncherInput.typeHook === hook) com.bos.sphere.feature.grid.LauncherInput.typeHook = null }
+    }
+    LaunchedEffect(searchOpen) { if (!searchOpen) typedQuery = "" }
     var pickFor by remember { mutableStateOf<CornerActionId?>(null) }
     var actionAppsRev by remember { mutableIntStateOf(0) }
     val pickAppForRef by rememberUpdatedState({ id: CornerActionId -> pickFor = id })
@@ -575,9 +588,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
     val searchHub = remember {
-        val palette = com.bos.sphere.feature.search.palette.AndroidPalette(context)
+        val palette = com.bos.sphere.feature.search.palette.PaletteHost.get(context)
         com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)
-        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders())
+        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders()) { palette.prefs.approvedSources() }
     }
     val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -1001,6 +1014,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onDismiss = { searchOpen = false },
             modifier = Modifier.fillMaxSize(),
             settingsSource = settingsSource,
+            initialQuery = typedQuery,
+            onRunCommand = { name, _ -> runCatching { com.bos.sphere.core.input.LauncherCommand.valueOf(name) }.getOrNull()?.let { com.bos.sphere.feature.grid.LauncherInput.dispatch(it) } },
         )
 
         WheelDrawer(

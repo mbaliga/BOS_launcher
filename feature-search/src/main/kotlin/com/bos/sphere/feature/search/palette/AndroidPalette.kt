@@ -53,6 +53,17 @@ class PalettePrefs(context: Context) {
     fun saveUsage(s: UsageStore) = sp.edit().putString("usage", s.encode()).apply()
     fun resetUsage() = sp.edit().remove("usage").apply()
 
+    /** The Radar scope-prefix mapping as stored by feature-grid's `ScopePrefixes.Mapping.encode` (PAL-13); null = defaults. */
+    fun scopeMapping(): String? = sp.getString("scopeMapping", null)
+    fun setScopeMapping(raw: String?) = sp.edit().apply { if (raw == null) remove("scopeMapping") else putString("scopeMapping", raw) }.apply()
+
+    /** Packages of third-party search providers the user approved (PAL-17). */
+    fun approvedSources(): Set<String> = sp.getStringSet("approvedSources", emptySet()).orEmpty().toSet()
+    fun setApproved(pkg: String, on: Boolean) {
+        val n = approvedSources().toMutableSet().also { if (on) it += pkg else it -= pkg }
+        sp.edit().putStringSet("approvedSources", n).apply()
+    }
+
     fun loadPrefixes(): PrefixTable = PrefixTable.deserialize(sp.getString("prefixes", null))
     fun savePrefixes(t: PrefixTable) = sp.edit().putString("prefixes", t.serialize()).apply()
     fun aliases(): Map<String, String> = sp.getString("aliases", "").orEmpty().lineSequence().mapNotNull { l -> l.split('\t', limit = 2).takeIf { it.size == 2 } }.associate { it[0] to it[1] }

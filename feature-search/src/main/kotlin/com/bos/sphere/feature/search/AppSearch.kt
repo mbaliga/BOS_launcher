@@ -52,12 +52,37 @@ object AppSearch {
         return index!!
     }
 
-    /** Apps matching [query], best first. */
+    /**
+     * Set by the Radar screen so plain queries also match user aliases, initials and one typo (PAL-02) and learn from
+     * selections (PAL-09). Null (pickers, the always-on keyboard) keeps the query-language search alone.
+     */
+    @Volatile var appContext: android.content.Context? = null
+
+    private var recordsFor: Pair<List<AppEntry>, List<dev.aarso.search.palette.AppRecord>>? = null
+
+    @Synchronized
+    private fun records(apps: List<AppEntry>): List<dev.aarso.search.palette.AppRecord> {
+        recordsFor?.let { if (it.first === apps) return it.second }
+        val self = android.os.Process.myUserHandle()
+        return apps.map { a -> dev.aarso.search.palette.AppRecord(a.key, a.label, a.packageName, 0, work = a.user != self) }
+            .also { recordsFor = apps to it }
+    }
+
+    /** Apps matching [query], best first. Plain queries: label, alias, package, initials and one typo first, then the query-language hits. */
     fun rank(apps: List<AppEntry>, query: String, limit: Int = 14): List<AppEntry> {
         if (query.isBlank()) return emptyList()
         val byKey = apps.associateBy { it.key }
-        return runCatching { indexFor(apps).search(query, limit = limit) }
+        val core = runCatching { indexFor(apps).search(query, limit = limit) }
             .getOrDefault(emptyList())
             .mapNotNull(byKey::get)
+        val ctx = appContext
+        if (ctx == null || com.bos.sphere.feature.search.palette.AppRanking.isOperatorQuery(query)) return core
+        val fuzzy = runCatching {
+            val rec = records(apps)
+            val history = usage.mapValues { (_, u) -> dev.aarso.search.palette.UsageRecord(u.count, u.lastMillis) }
+            val ranker = com.bos.sphere.feature.search.palette.PaletteHost.ranker(ctx, history)
+            com.bos.sphere.feature.search.palette.AppRanking.rank(com.bos.sphere.feature.search.palette.PaletteHost.matcher(ctx, rec), query, ranker, limit)
+        }.getOrDefault(emptyList()).mapNotNull(byKey::get)
+        return (fuzzy + core).distinctBy { it.key }.take(limit)
     }
 }

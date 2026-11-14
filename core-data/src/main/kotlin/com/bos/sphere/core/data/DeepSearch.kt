@@ -52,11 +52,11 @@ object DeepSearchLogic {
 }
 
 /** Queries Fylz / Fotoz (or any app following the contract) for content-level matches. Never throws. */
-class DeepSearch(private val context: Context) : SearchProvider {
+class DeepSearch(private val context: Context, private val approvedExtra: () -> Set<String> = { emptySet() }) : SearchProvider {
     private val unavailable = ConcurrentHashMap.newKeySet<String>()
 
     /** Packages whose provider resolves right now. Ones that denied us earlier are left out. */
-    fun installedSources(): List<String> = DeepSearchLogic.knownSources.filter { it !in unavailable && providerPresent(it) }
+    fun installedSources(): List<String> = (DeepSearchLogic.knownSources + approvedExtra().sorted()).distinct().filter { it !in unavailable && providerPresent(it) }
 
     /** Sources that refused access (SecurityException) during this process's lifetime. */
     fun unavailableSources(): Set<String> = unavailable.toSet()

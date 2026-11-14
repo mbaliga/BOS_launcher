@@ -50,6 +50,7 @@ dependencies {
     implementation(project(":core-data"))
     implementation(project(":core-input"))
     implementation(project(":feature-search"))
+    implementation(project(":search-engine"))
     implementation(project(":core-catalog"))
     implementation(project(":core-capabilities"))
     implementation(project(":core-input"))

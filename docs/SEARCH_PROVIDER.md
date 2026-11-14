@@ -86,3 +86,19 @@ Manifest (both apps):
     android:authorities="${applicationId}.search"
     android:exported="true" />
 ```
+
+
+## Registering as a third-party provider (PAL-17)
+
+Any app, not only Fylz and Fotoz, can offer results to Radar with the same contract:
+
+1. Declare the read-only content provider with authority `<applicationId>.search`, `android:exported="true"` and
+   `android:readPermission="com.bos.sphere.permission.READ_SEARCH"` (a normal permission the launcher declares).
+2. Add an intent filter with the action `com.bos.sphere.action.SEARCH_PROVIDER` to that provider declaration so the
+   launcher can find it.
+3. The user sees the app under Ground Control, Radar, "Search providers from other apps" and switches it on. Radar asks
+   nothing until then, and only after the user types.
+
+A provider that is not exported, not guarded by that permission or whose authority does not follow the rule is ignored
+(`ThirdPartyProviders.acceptable`, tested). Rows appear in Files with the source badge; a `SecurityException` marks the
+source unavailable, as for Fylz and Fotoz. Not verified against a real third-party app on a device.

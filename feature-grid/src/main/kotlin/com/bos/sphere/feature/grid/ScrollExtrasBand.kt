@@ -110,7 +110,8 @@ fun ScrollExtrasBand(extras: HomeExtras, items: List<String>, widgets: List<Stri
         widgets.zip(r.widgets).forEach { (k, b) ->
             HomeWidgetCell(
                 k, extras, b.width, b.height,
-                Modifier.offset(x(b).dp, y(b).dp).size(b.width.dp, b.height.dp),
+                Modifier.offset(x(b).dp, y(b).dp).size(b.width.dp, b.height.dp)
+                    .launcherItem("band.$k", onMenu = { extras.onLongPress(k) }),
             )
         }
     }
@@ -120,7 +121,7 @@ fun ScrollExtrasBand(extras: HomeExtras, items: List<String>, widgets: List<Stri
 @Composable
 private fun BandItem(key: String, extras: HomeExtras, tile: Dp) {
     Column(
-        Modifier.launcherItem("band.$key", focusable = false, onActivate = { extras.onTap(key) }, onMenu = { extras.onLongPress(key) })
+        Modifier.launcherItem("band.$key", onActivate = { extras.onTap(key) }, onMenu = { extras.onLongPress(key) })
             .combinedClickable(onClick = { extras.onTap(key) }, onLongClick = { extras.onLongPress(key) }),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

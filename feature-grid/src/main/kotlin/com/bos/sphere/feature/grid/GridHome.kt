@@ -1058,6 +1058,6 @@ private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere
         itemKey, extra, g.pitchX, g.pitchY,
         Modifier.offset { IntOffset(left.roundToInt(), top.roundToInt()) }
             .size(with(density) { wPx.toDp() }, with(density) { hPx.toDp() })
-            .launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) }, focusable = false),
+            .launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) }),
     )
 }

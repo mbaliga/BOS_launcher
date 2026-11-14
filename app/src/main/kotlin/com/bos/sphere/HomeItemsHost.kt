@@ -66,6 +66,7 @@ import com.bos.sphere.feature.grid.WidgetPlaceholder
 import com.bos.sphere.feature.grid.bandKeys
 import com.bos.sphere.feature.grid.rememberWidgetPicker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -175,11 +176,14 @@ class HomeItems internal constructor(
                 }
             }
             ItemKind.Link -> extrasState.items[key]?.let { def ->
-                runCatching {
-                    val uri = Uri.parse(def.target)
-                    val i = Intent(Intent.ACTION_VIEW).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    if (def.isFile) i.setDataAndType(uri, context.contentResolver.getType(uri)) else i.data = uri
-                    context.startActivity(i)
+                // The content resolver lookup is a provider call: off the main thread.
+                kotlin.concurrent.thread(name = "home-link-open") {
+                    runCatching {
+                        val uri = Uri.parse(def.target)
+                        val i = Intent(Intent.ACTION_VIEW).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        if (def.isFile) i.setDataAndType(uri, context.contentResolver.getType(uri)) else i.data = uri
+                        context.startActivity(i)
+                    }
                 }
             }
             else -> Unit
@@ -306,12 +310,16 @@ class HomeItems internal constructor(
     fun Overlays(hiddenStore: HiddenAppsStore, hidden: Set<String>) {
         val ctx = LocalContext.current
         val picker = rememberWidgetPicker(host) { id, label -> addWidget(id, label) }
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
         val openDoc = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) {
-                runCatching { ctx.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                val name = runCatching {
-                    ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-                }.getOrNull() ?: uri.lastPathSegment.orEmpty()
+            if (uri != null) scope.launch {
+                // Provider queries run off the main thread.
+                val name = withContext(Dispatchers.IO) {
+                    runCatching { ctx.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                    runCatching {
+                        ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                    }.getOrNull()
+                } ?: uri.lastPathSegment.orEmpty()
                 addLink(uri.toString(), name, isFile = true)
             }
         }
@@ -368,14 +376,14 @@ class HomeItems internal constructor(
             val ov = remember { OverrideStoreHolder.get(ctx) }
             val pack by ov.pack.collectAsStateWithLifecycle()
             val themed by ov.themed.collectAsStateWithLifecycle()
-            val packs = remember { runCatching { IconPackLoader(ctx).installed() }.getOrDefault(emptyList()) }
+            val packs by produceState(emptyList<Pair<String, String>>()) { value = withContext(Dispatchers.IO) { runCatching { IconPackLoader(ctx).installed() }.getOrDefault(emptyList()) } }
             IconPackDialog(packs, pack, themed, onSelect = { ov.setPack(it) }, onThemed = { ov.setThemed(it) }, onDismiss = { packOpen = false })
         }
         iconFor?.let { app ->
             val ov = remember { OverrideStoreHolder.get(ctx) }
             val overrides by ov.overrides.collectAsStateWithLifecycle()
             val loader = remember { IconPackLoader(ctx) }
-            val packs = remember { runCatching { loader.installed() }.getOrDefault(emptyList()) }
+            val packs by produceState(emptyList<Pair<String, String>>()) { value = withContext(Dispatchers.IO) { runCatching { loader.installed() }.getOrDefault(emptyList()) } }
             IconOverrideDialog(
                 title = app.label, packs = packs,
                 drawablesOf = { p -> loader.load(p)?.drawables().orEmpty() },

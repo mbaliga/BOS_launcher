@@ -174,7 +174,7 @@ fun IconOverrideDialog(
                 if (packs.isEmpty()) item { Text(L10n.tr("No icon packs are installed."), color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(8.dp)) }
             }
         } else {
-            val all = remember(p) { drawablesOf(p) }
+            val all by androidx.compose.runtime.produceState(emptyList<String>(), p) { value = withContext(Dispatchers.Default) { runCatching { drawablesOf(p) }.getOrDefault(emptyList()) } }
             val shown = remember(all, query) { all.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) }.take(240) }
             BasicTextField(
                 value = query, onValueChange = { query = it }, singleLine = true,

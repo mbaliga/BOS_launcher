@@ -464,7 +464,12 @@ private fun CornerSlotView(
                 slot,
                 Modifier.align(align).padding(safeInsetsFor(corner, safe)).longPressFirst(onEdit),
             )
-            is CornerSlot.Complication -> complication(placement, slot, boxModifier.longPressFirst(onEdit))
+            // INP-17: a complication corner is a node in the focus graph like every other corner; Enter runs its action, the Menu key edits it.
+            is CornerSlot.Complication -> complication(
+                placement, slot,
+                boxModifier.longPressFirst(onEdit)
+                    .launcherItem("corner.${corner.name}", FocusKind.Corner, focusable = false, onActivate = { slot.kind.action?.let { onTap(CornerItem.Action(it)) } }, onMenu = onEdit, ringRadiusDp = 24f),
+            )
             is CornerSlot.Palette -> Box(
                 contentAlignment = Alignment.Center,
                 modifier = boxModifier

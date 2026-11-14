@@ -266,7 +266,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val appLauncher = remember { com.bos.sphere.feature.dock.AppLauncher(context, rootView = { rootView }) }
     val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch { IntArray(2).also { rootView.getLocationOnScreen(it) }.let { it[0] to it[1] } } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
-    val shortcutRegistry = remember { com.bos.sphere.core.input.ShortcutRegistry() }
+    val shortcutRegistry = remember { com.bos.sphere.feature.grid.LauncherInput.registry }
     fun launch(app: AppEntry) {
         com.bos.sphere.feature.dock.SessionUse.mark(app.key)
         appLauncher.launch(app, lastTouch.sourceRect())
@@ -392,6 +392,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         })
     }
 
+    // INP-11: an app dragged out of the drawer with a mouse and dropped on the home is added to the current page.
+    com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
+        if (appsByKey[key] != null && pages.none { key in it.keys }) stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)
+    })
     // ---- keyboard, pointer and controller (INP-04, INP-05, INP-16, HOM-21): shortcuts go to the same openers the touch paths use
     com.bos.sphere.feature.grid.LauncherInputWiring(
         overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || leftOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
@@ -403,9 +407,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
                 // Workspaces do not exist yet (WSP): the home pages stand in.
-                com.bos.sphere.core.input.LauncherCommand.NextWorkspace -> { scope.launch { gridState.goToPage((gridState.currentPage + 1).coerceAtMost((pages.size - 1).coerceAtLeast(0))) }; true }
-                com.bos.sphere.core.input.LauncherCommand.PreviousWorkspace -> { scope.launch { gridState.goToPage((gridState.currentPage - 1).coerceAtLeast(0)) }; true }
-                else -> false
+                com.bos.sphere.core.input.LauncherCommand.NextWorkspace -> if (dockController.handle(c)) true else { scope.launch { gridState.goToPage((gridState.currentPage + 1).coerceAtMost((pages.size - 1).coerceAtLeast(0))) }; true }
+                com.bos.sphere.core.input.LauncherCommand.PreviousWorkspace -> if (dockController.handle(c)) true else { scope.launch { gridState.goToPage((gridState.currentPage - 1).coerceAtLeast(0)) }; true }
+                // Dock items 1 to 9 and "focus the dock" (INP-05, DCK-04): the dock stream's controller handles them.
+                else -> dockController.handle(c)
             }
         },
         onEmptyMenu = { quickPage = gridState.currentPage; quickOpen = true },
@@ -649,6 +654,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         radius = 92.dp,
                         onClick = { k -> k.action?.let { runItem(CornerItem.Action(it), placement.screen) } },
                         modifier = mod,
+                        focusIdPrefix = "corner.${placement.screen.name}",
                     )
                 },
                 widget = { placement, slot ->

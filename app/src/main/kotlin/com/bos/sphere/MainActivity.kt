@@ -22,6 +22,7 @@ import com.bos.sphere.feature.grid.WidgetConfigureResults
 import com.bos.sphere.feature.grid.InputModeProvider
 import com.bos.sphere.feature.grid.LauncherInput
 import com.bos.sphere.feature.grid.hotCorners
+import com.bos.sphere.feature.grid.homeDropTarget
 import com.bos.sphere.feature.grid.inputSensing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,7 +75,7 @@ class MainActivity : ComponentActivity() {
             SphereTheme {
                 // The input layer observes pointer and touch from here without consuming anything (INP-06, INP-16).
                 InputModeProvider {
-                    Box(Modifier.fillMaxSize().inputSensing().hotCorners()) {
+                    Box(Modifier.fillMaxSize().inputSensing().hotCorners().homeDropTarget()) {
                         // CFG-09: after a crash loop, a minimal grid with widgets off and a snapshot restore on offer.
                         var safe by remember { mutableStateOf(com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
                         if (safe) com.bos.sphere.ui.SafeModeScreen(onContinue = { safe = false })

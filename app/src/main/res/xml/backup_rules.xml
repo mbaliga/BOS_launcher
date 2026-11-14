@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NFR-18 for Android 11 and below (android:fullBackupContent); the same exclusions as data_extraction_rules.xml. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="launch_history.xml" />
+    <exclude domain="sharedpref" path="search_habits.xml" />
+    <exclude domain="sharedpref" path="steps.xml" />
+    <exclude domain="sharedpref" path="weather.xml" />
+    <exclude domain="sharedpref" path="crash_loop.xml" />
+    <exclude domain="sharedpref" path="icon_colors.xml" />
+    <exclude domain="database" path="." />
+    <exclude domain="file" path="state/snapshots" />
+    <exclude domain="file" path="index" />
+    <exclude domain="file" path="notifications" />
+    <exclude domain="file" path="usage" />
+</full-backup-content>

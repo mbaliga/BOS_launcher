@@ -750,6 +750,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 m.lab.map { e -> SettingItem.Action(e.title, Glyphs.Bolt, e.result, navigates = e.run != null, onClick = { e.run?.invoke() }) },
         )
     }
+    // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
+    out += com.bos.sphere.ui.backupCategory()
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(
         x("About"),
@@ -790,6 +792,7 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     cat("Radar")?.let { out += it }
     cat("Launchpad")?.let { out += it }
     out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
+    cat("Backup")?.let { out += it }
     cat("Capabilities")?.let { out += it }
     cat("Lab")?.let { out += it }
     cat("About")?.let { out += it }

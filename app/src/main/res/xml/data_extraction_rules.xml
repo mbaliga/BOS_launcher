@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NFR-18: usage history, search indexes, notification content and the local snapshots stay on the device. They are
+  excluded from system cloud backup and from device-to-device transfer. Layout and settings may be restored by the
+  system; the user's own export file (Ground Control, Backup) is the portable copy.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="launch_history.xml" />
+        <exclude domain="sharedpref" path="search_habits.xml" />
+        <exclude domain="sharedpref" path="steps.xml" />
+        <exclude domain="sharedpref" path="weather.xml" />
+        <exclude domain="sharedpref" path="crash_loop.xml" />
+        <exclude domain="sharedpref" path="icon_colors.xml" />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="state/snapshots" />
+        <exclude domain="file" path="index" />
+        <exclude domain="file" path="notifications" />
+        <exclude domain="file" path="usage" />
+        <exclude domain="root" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="launch_history.xml" />
+        <exclude domain="sharedpref" path="search_habits.xml" />
+        <exclude domain="sharedpref" path="steps.xml" />
+        <exclude domain="sharedpref" path="weather.xml" />
+        <exclude domain="sharedpref" path="crash_loop.xml" />
+        <exclude domain="sharedpref" path="icon_colors.xml" />
+        <exclude domain="database" path="." />
+        <exclude domain="file" path="state/snapshots" />
+        <exclude domain="file" path="index" />
+        <exclude domain="file" path="notifications" />
+        <exclude domain="file" path="usage" />
+    </device-transfer>
+</data-extraction-rules>

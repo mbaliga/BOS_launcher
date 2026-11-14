@@ -354,6 +354,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 )
             }
             add(SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("A keyboard that's always open: type to find an app, like an old-school phone")) { v -> upd { it.copy(alwaysKeyboard = v) } })
+            add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · portrait"), Glyphs.Message, p.keyboardOnOpenPortrait, x("Raises the on-screen keyboard when Radar or the drawer opens")) { v -> upd { it.copy(keyboardOnOpenPortrait = v) } })
+            add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · landscape"), Glyphs.Message, p.keyboardOnOpenLandscape) { v -> upd { it.copy(keyboardOnOpenLandscape = v) } })
+            add(SettingItem.Action(x("Keyboard shortcuts"), Glyphs.Info, x("Every shortcut and its keys; Meta shortcuts stay with the system"), navigates = true) { com.bos.sphere.feature.grid.LauncherInput.sheetOpen.value = true })
             add(SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("The clock and corner icons sit flush to the top; swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } })
         },
     )
@@ -446,6 +449,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Slider(x("Corner icon size"), Glyphs.Dial, p.cornerIconSize, LauncherPrefs.MIN_CORNER_ICON..LauncherPrefs.MAX_CORNER_ICON, "${p.cornerIconSize.roundToInt()}", step = 1f) { v -> upd { it.copy(cornerIconSize = v) } })
             add(SettingItem.Choice(x("Icon type"), Glyphs.Apps, CornerIconMode.entries, p.cornerIconMode, { x(it.label) }, hint = x("App icon shows the real icon of the app an action opens (Music → your music player).")) { c -> upd { it.copy(cornerIconMode = c) } })
             add(SettingItem.Toggle(x("Follow device rotation"), Glyphs.Flip, p.cornersFollowDevice, x("Each corner stays under the same physical corner when you rotate")) { v -> upd { it.copy(cornersFollowDevice = v) } })
+            add(SettingItem.Toggle(x("Separate corners for landscape"), Glyphs.Flip, p.cornersPerOrientation, x("Landscape keeps its own set; edits below apply to the orientation you are in")) { v -> upd { it.copy(cornersPerOrientation = v) } })
+            add(SettingItem.Toggle(x("Hot corners with a mouse"), Glyphs.Pinch, p.hotCornersOn, x("Rest the pointer in a corner to reveal its action, click to run it")) { v -> upd { it.copy(hotCornersOn = v) } })
+            if (p.hotCornersOn) add(SettingItem.Slider(x("Hot corner delay"), Glyphs.Dial, p.hotCornerDwellMs.toFloat(), 50f..600f, "${p.hotCornerDwellMs} ms", step = 10f) { v -> upd { it.copy(hotCornerDwellMs = v.roundToInt()) } })
             Corner.entries.forEach { c ->
                 add(SettingItem.Action(x(c.label), Glyphs.Palette, slotSummary(m.corners[c] ?: CornerSlot.Empty, m.appsByKey), navigates = true) { m.editCorner(c) })
             }

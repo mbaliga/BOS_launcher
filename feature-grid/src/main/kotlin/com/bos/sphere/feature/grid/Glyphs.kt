@@ -281,7 +281,7 @@ object Glyphs {
 
     fun forGesture(g: HomeGesture): ImageVector = when (g) {
         HomeGesture.PinchIn, HomeGesture.PinchOut -> Pinch
-        HomeGesture.SwipeUp, HomeGesture.SwipeDown, HomeGesture.SwipeLeft, HomeGesture.SwipeRight, HomeGesture.DoubleTap -> Swipe
+        HomeGesture.SwipeUp, HomeGesture.SwipeDown, HomeGesture.SwipeLeft, HomeGesture.SwipeRight, HomeGesture.DoubleTap, HomeGesture.LongPress -> Swipe
         HomeGesture.Shake, HomeGesture.DoubleFlick -> Shake
         HomeGesture.DoubleFlip, HomeGesture.FaceDown -> Flip
     }

@@ -301,6 +301,7 @@ private fun ContinuousCell(
         modifier
             .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
             .semantics { contentDescription = app.label }
+            .launcherItem("cell.${app.key}", focusable = false, onMenu = { onLong(app) }, ringRadiusDp = if (dsi) 10f else 14f)
             .combinedClickable(interaction, null, onClick = { onTap(app) }, onLongClick = { onLong(app) }),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

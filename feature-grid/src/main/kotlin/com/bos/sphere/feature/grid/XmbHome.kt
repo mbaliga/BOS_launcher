@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import com.bos.sphere.core.input.FocusKind
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -292,7 +293,7 @@ private fun XmbHomeImpl(
 
         // Gesture layer + content. Rows/icons carry their own tap handlers; this drags.
         Box(
-            Modifier.fillMaxSize().pointerInput(Unit) {
+            Modifier.fillMaxSize().linearTraversal().pointerInput(Unit) {
                 val tracker = VelocityTracker()
                 var axis = 0 // 0 undecided, 1 horizontal, 2 vertical
                 var acc = Offset.Zero
@@ -341,6 +342,7 @@ private fun XmbHomeImpl(
                             onDrawBehind { drawCircle(glow) }
                         }
                         .semantics { contentDescription = cat.name }
+                        .launcherItem("xmb.cat.$i", FocusKind.Category, order = i, focusable = false, onFocused = { if (i != shownCat) settleCat(i) }, ringRadiusDp = 26f)
                         .clickable(interaction, null) { if (i != shownCat) settleCat(i) },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -374,6 +376,7 @@ private fun XmbHomeImpl(
                             app = app, index = i, geo = geo,
                             listPos = { listPos }, catOffset = { catPos - shownCat },
                             showLabels = showLabels,
+                            itemModifier = Modifier.launcherItem("xmb.row.${app.key}", order = 1000 + i, focusable = false, onFocused = { if (abs(listPos - i) > 0.5f) settleList(i) }, onMenu = { latestLong(app) }),
                             onTap = {
                                 if (abs(listPos - i) > 0.5f) settleList(i)
                                 else { latestSounds?.play(UiSound.Select); latestLaunch(app) }
@@ -401,6 +404,7 @@ private fun XmbRow(
     listPos: () -> Float,
     catOffset: () -> Float,
     showLabels: Boolean,
+    itemModifier: Modifier,
     onTap: () -> Unit,
     onLong: () -> Unit,
 ) {
@@ -430,6 +434,7 @@ private fun XmbRow(
                 alpha = (0.62f + 0.38f * c) * top * bottom * fade
             }
             .semantics { contentDescription = app.label }
+            .then(itemModifier)
             .combinedClickable(interaction, null, onClick = onTap, onLongClick = onLong),
         verticalAlignment = Alignment.CenterVertically,
     ) {

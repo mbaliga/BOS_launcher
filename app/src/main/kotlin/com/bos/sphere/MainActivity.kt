@@ -19,6 +19,18 @@ import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ThemeVariant
 import com.bos.sphere.core.design.SphereTheme
 import com.bos.sphere.feature.grid.WidgetConfigureResults
+import com.bos.sphere.feature.grid.InputModeProvider
+import com.bos.sphere.feature.grid.LauncherInput
+import com.bos.sphere.feature.grid.hotCorners
+import com.bos.sphere.feature.grid.inputSensing
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
+import android.view.Menu
+import com.bos.sphere.core.input.KeyLabels
 
 /** [seq] makes repeated requests for the same action distinct. */
 data class ExternalAction(val id: CornerActionId, val seq: Int)
@@ -59,10 +71,15 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             SphereTheme {
-                // CFG-09: after a crash loop, a minimal grid with widgets off and a snapshot restore on offer.
-                var safe by remember { mutableStateOf(com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
-                if (safe) com.bos.sphere.ui.SafeModeScreen(onContinue = { safe = false })
-                else HomeScreen(homeSignal = homeSignal, externalAction = externalAction)
+                // The input layer observes pointer and touch from here without consuming anything (INP-06, INP-16).
+                InputModeProvider {
+                    Box(Modifier.fillMaxSize().inputSensing().hotCorners()) {
+                        // CFG-09: after a crash loop, a minimal grid with widgets off and a snapshot restore on offer.
+                        var safe by remember { mutableStateOf(com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
+                        if (safe) com.bos.sphere.ui.SafeModeScreen(onContinue = { safe = false })
+                        else HomeScreen(homeSignal = homeSignal, externalAction = externalAction)
+                    }
+                }
             }
         }
     }
@@ -86,6 +103,26 @@ class MainActivity : ComponentActivity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         WidgetConfigureResults.deliver(requestCode, resultCode)
+    }
+
+    /** Controller buttons become arrows, Enter and Esc; registered shortcuts and focus keys are handled before Compose sees them (INP-04, INP-20). */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val e = LauncherInput.translate(event)
+        if (LauncherInput.onKeyEvent(e)) return true
+        return super.dispatchKeyEvent(e)
+    }
+
+    /** Publishes every registered shortcut to the system's keyboard shortcut helper (INP-04). */
+    override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
+        val infos = LauncherInput.registry.all().mapNotNull { (cmd, chord) ->
+            chord?.let {
+                val mods = (if (it.ctrl) KeyEvent.META_CTRL_ON else 0) or (if (it.alt) KeyEvent.META_ALT_ON else 0) or
+                    (if (it.shift) KeyEvent.META_SHIFT_ON else 0) or (if (it.meta) KeyEvent.META_META_ON else 0)
+                KeyboardShortcutInfo(L10n.tr(cmd.label), it.keyCode, mods)
+            }
+        }
+        data.add(KeyboardShortcutGroup(L10n.tr("Liftoff"), infos))
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
     }
 
     /** Pressing Home while already here delivers a new MAIN/HOME intent — reset the surface. */

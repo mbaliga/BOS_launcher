@@ -179,7 +179,7 @@ fun Modifier.homeGestures(spec: HomeGestureSpec?, isEmptyAt: ((Offset) -> Boolea
                             if (!c.pressed) break
                         }
                         val g = HomeGestureMath.swipeFor(total.x, total.y, scroll, swipeMin)
-                        if (g != null && g in s.bound) s.onGesture(g)
+                        if (g != null && g in s.bound && !swipeStartsInSystemZone(down.position, size, g)) s.onGesture(g)
                     }
 
                     Phase.Pinch -> {

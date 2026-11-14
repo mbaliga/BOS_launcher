@@ -351,8 +351,20 @@ data class LauncherPrefs(
     // --- Radar (PAL-18)
     /** The user chose a Radar layout on purpose: it is kept even when a keyboard or pointer is in use (which otherwise means Flat). */
     val searchLayoutPinned: Boolean = false,
+
+    // --- input (INP-12, INP-15, INP-16); added at the end so other streams' fields merge cleanly
+    /** Raise the on-screen keyboard when the palette or drawer opens, per orientation (INP-12). */
+    val keyboardOnOpenPortrait: Boolean = false,
+    val keyboardOnOpenLandscape: Boolean = false,
+    /** A separate set of corner assignments for landscape (INP-15). */
+    val cornersPerOrientation: Boolean = false,
+    /** Hot corners for a pointer (INP-16): on or off, and the dwell before the action shows. */
+    val hotCornersOn: Boolean = true,
+    val hotCornerDwellMs: Int = 150,
 ) {
     fun gridFor(landscape: Boolean): GridSpec = if (landscape) landscapeGrid else portraitGrid
+    /** INP-12: whether the keyboard should rise on open for this orientation. */
+    fun keyboardOnOpen(landscape: Boolean): Boolean = if (landscape) keyboardOnOpenLandscape else keyboardOnOpenPortrait
     fun pagingFor(landscape: Boolean): PagingAxis = if (landscape) landscapePaging else portraitPaging
 
     companion object {
@@ -500,6 +512,8 @@ enum class HomeGesture(val label: String, val kind: GestureKind, val hint: Strin
     SwipeLeft("Swipe left", GestureKind.Touch, "Only when pages turn up / down"),
     SwipeRight("Swipe right", GestureKind.Touch, "Only when pages turn up / down"),
     DoubleTap("Double tap", GestureKind.Touch, "On empty space"),
+    /** INP-08: unbound, the long press on empty space opens the quick sheet as before. */
+    LongPress("Long press", GestureKind.Touch, "On empty space"),
     Shake("Shake", GestureKind.Motion, "A few quick shakes"),
     DoubleFlick("Flick twice", GestureKind.Motion, "Twist the wrist back and forth twice"),
     DoubleFlip("Flip twice", GestureKind.Motion, "Turn face down and back up, twice"),

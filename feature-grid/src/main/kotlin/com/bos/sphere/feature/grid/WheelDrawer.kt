@@ -78,6 +78,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AppEntry
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.traversalIndex
+import com.bos.sphere.core.input.FocusKind
+import com.bos.sphere.core.input.PuckEffect
+import com.bos.sphere.core.input.PuckKey
+import com.bos.sphere.core.input.PuckKeys
+import com.bos.sphere.core.input.PuckLayout
+import com.bos.sphere.core.input.PuckMode
+import com.bos.sphere.core.input.PuckState
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.WheelGrouping
 import com.bos.sphere.core.design.HyleColors
@@ -556,6 +566,50 @@ private fun WheelContent(
         val currentLayout by rememberUpdatedState(layout)
         val currentDismiss by rememberUpdatedState(onDismiss)
 
+        // INP-19: hub and ring spacing come from the window size, so nothing overlaps or clips when it is small.
+        val minSideDp = with(density) { metrics.minSide.toDp().value }
+        val puck = remember(minSideDp, actions.size) { PuckLayout.compute(minSideDp, actions.size) }
+
+        // INP-18: keyboard and scroll wheel. The puck owns its keys while open (ahead of the home's shortcuts).
+        val currentGroups by rememberUpdatedState(groups)
+        val currentGrouping by rememberUpdatedState(grouping)
+        val currentActions by rememberUpdatedState(actions)
+        val currentRotation by rememberUpdatedState(rotation)
+        var kbItem by remember(grouping, anchor) { androidx.compose.runtime.mutableIntStateOf(0) }
+        val currentKbItem by rememberUpdatedState(kbItem)
+        fun focusedGroup() = WheelGeometry.focusedSegment(currentLayout, currentRotation.value).coerceAtLeast(0)
+        fun focusGroup(i: Int) {
+            kbItem = 0
+            scope.launch { rotation.animateTo(WheelGeometry.rotationToCenter(currentLayout, i), spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)) }
+        }
+        val currentFocusGroup by rememberUpdatedState(::focusGroup)
+        androidx.compose.runtime.DisposableEffect(interactive) {
+            if (!interactive) return@DisposableEffect onDispose { }
+            val handler: (android.view.KeyEvent) -> Boolean = h@{ e ->
+                if (e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@h false
+                val ch = e.unicodeChar.takeIf { it > 0 }?.toChar()
+                if (!PuckKeys.owns(e.keyCode, ch)) return@h false
+                val g = currentGroups.getOrNull(focusedGroup())
+                val state = PuckState(PuckMode.entries[currentGrouping.ordinal], currentGroups.map { it.label }, focusedGroup(), currentKbItem, g?.apps?.size ?: 0)
+                when (val eff = PuckKeys.onKey(state, PuckKey(e.keyCode, e.isShiftPressed, ch))) {
+                    is PuckEffect.FocusGroup -> currentFocusGroup(eff.index)
+                    is PuckEffect.SetMode -> onGroupingChange(WheelGrouping.entries[eff.mode.ordinal])
+                    is PuckEffect.SelectItem -> kbItem = eff.index
+                    PuckEffect.Launch -> g?.apps?.getOrNull(currentKbItem)?.let { onLaunch(it) }
+                    PuckEffect.Search -> onSearch()
+                    is PuckEffect.Action -> currentActions.getOrNull(eff.index)?.onClick?.invoke()
+                    PuckEffect.Close -> currentDismiss()
+                    null -> Unit
+                }
+                true
+            }
+            LauncherInput.pushKeyHandler(handler)
+            onDispose { LauncherInput.removeKeyHandler(handler) }
+        }
+        var wheelCarry by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        val inputMode by LocalInputMode.current
+        val selectedKey = if (inputMode == com.bos.sphere.core.input.InputMode.Keyboard && interactive) groups.getOrNull(focusedGroup())?.apps?.getOrNull(kbItem)?.key else null
+
         // Band labels, measured once per layout; ellipsised to their segment's arc length.
         val measurer = rememberTextMeasurer()
         val bandLabels: List<TextLayoutResult> = remember(groups, layout, metrics) {
@@ -586,9 +640,28 @@ private fun WheelContent(
         val corner = Offset(WheelGeometry.cornerX(anchor, w), WheelGeometry.cornerY(anchor, h))
         val origin = TransformOrigin(if (corner.x > 0f) 1f else 0f, if (corner.y > 0f) 1f else 0f)
 
+        FocusLayer(layer = 3, active = interactive) {
         Box(
             Modifier
                 .fillMaxSize()
+                .linearTraversal()
+                .pointerInput(interactive) {
+                    // The scroll wheel (or a trackpad) rotates the puck one group per notch.
+                    if (!interactive) return@pointerInput
+                    awaitPointerEventScope {
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            if (ev.type != androidx.compose.ui.input.pointer.PointerEventType.Scroll) continue
+                            val d = ev.changes.first().scrollDelta
+                            val (steps, carry) = PuckKeys.wheelSteps(d.y + d.x, wheelCarry)
+                            wheelCarry = carry
+                            if (steps != 0 && currentGroups.isNotEmpty()) {
+                                currentFocusGroup((focusedGroup() + steps).coerceIn(0, currentGroups.lastIndex))
+                            }
+                            ev.changes.forEach { it.consume() }
+                        }
+                    }
+                }
                 .pointerInput(anchor, metrics, rotation, interactive) {
                     if (!interactive) {
                         // Closing: swallow touches so nothing underneath fires mid-animation.
@@ -786,7 +859,7 @@ private fun WheelContent(
                 val accent = HyleColors.Violet
                 Canvas(Modifier.fillMaxSize()) {
                     val corner = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
-                    val r = metrics.chipRadius
+                    val r = puck.chipRadiusDp.dp.toPx()
                     val oval = android.graphics.RectF(corner.x - r, corner.y - r, corner.x + r, corner.y + r)
                     WheelGrouping.entries.forEachIndexed { i, g ->
                         val selected = g == grouping
@@ -818,7 +891,7 @@ private fun WheelContent(
                 // Invisible touch targets over each label.
                 WheelGrouping.entries.forEachIndexed { i, g ->
                     val angle = qs + ChipAngles[i.coerceAtMost(ChipAngles.lastIndex)]
-                    val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.chipRadius, angle)
+                    val pt = WheelGeometry.polarToScreen(anchor, w, h, with(density) { puck.chipRadiusDp.dp.toPx() }, angle)
                     Box(
                         Modifier
                             .centeredAt { Offset(pt.x, pt.y) }
@@ -833,21 +906,21 @@ private fun WheelContent(
                 }
                 // The puck: Radar at the very centre, a ring of crater buttons around it, group labels outside.
                 val sp = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
-                Crater(56.dp, accent = true, modifier = Modifier.centeredAt { Offset(sp.x, sp.y) }) {
-                    SearchButton(onClick = onSearch, modifier = Modifier.size(56.dp))
+                Crater(puck.searchSizeDp.dp, accent = true, modifier = Modifier.centeredAt { Offset(sp.x, sp.y) }.semantics { traversalIndex = 0f }) {
+                    SearchButton(onClick = onSearch, modifier = Modifier.size(puck.searchSizeDp.dp))
                 }
-                val slots = listOf(0.40f to 22f, 0.40f to 68f, 0.64f to 14f, 0.64f to 45f, 0.64f to 76f)
-                actions.take(slots.size).forEachIndexed { i, a ->
-                    val (rf, deg) = slots[i]
-                    val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.hubRadius * rf, qs + deg)
-                    Crater(42.dp, modifier = Modifier.centeredAt { Offset(pt.x, pt.y) }) {
+                actions.take(puck.slots.size).forEachIndexed { i, a ->
+                    val slot = puck.slots[i]
+                    val pt = WheelGeometry.polarToScreen(anchor, w, h, with(density) { slot.radiusDp.dp.toPx() }, qs + slot.angleDeg)
+                    Crater(puck.actionSizeDp.dp, modifier = Modifier.centeredAt { Offset(pt.x, pt.y) }.semantics { traversalIndex = (i + 1).toFloat() }) {
                         Box(
                             Modifier
-                                .size(42.dp)
+                                .size(puck.actionSizeDp.dp)
                                 .semantics { contentDescription = a.label }
+                                .launcherItem("puck.action.$i", FocusKind.PuckRing, order = i + 1, layer = 3, focusable = false, ringRadiusDp = 21f)
                                 .clickable(role = Role.Button) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); a.onClick() },
                             contentAlignment = Alignment.Center,
-                        ) { androidx.compose.material3.Icon(a.glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size(22.dp)) }
+                        ) { androidx.compose.material3.Icon(a.glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size((puck.actionSizeDp * 0.52f).dp)) }
                     }
                 }
             }
@@ -872,6 +945,7 @@ private fun WheelContent(
                                 Offset(pt.x, pt.y)
                             },
                             alpha = { ((progress.value - delay) / (1f - delay)).coerceIn(0f, 1f) },
+                            selected = app.key == selectedKey,
                             onClick = { onLaunch(app) },
                             onLongClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -899,6 +973,7 @@ private fun WheelContent(
                 )
             }
         }
+        }
     }
 }
 
@@ -920,6 +995,8 @@ private fun WheelIcon(
     alpha: () -> Float,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    /** The keyboard's current app (INP-18): drawn with a ring. */
+    selected: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -940,6 +1017,11 @@ private fun WheelIcon(
                 scaleY = scale
             }
             .semantics { contentDescription = app.label }
+            .drawWithContent {
+                drawContent()
+                if (selected) drawCircle(Color.White, radius = this.size.minDimension / 2f, style = Stroke(2.dp.toPx()))
+            }
+            .launcherItem("puck.app.${app.key}", FocusKind.PuckSpoke, layer = 3, focusable = false, onMenu = onLongClick, ringRadiusDp = 22f)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,

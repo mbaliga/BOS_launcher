@@ -119,6 +119,7 @@ fun ListHome(
                         is LRow.App -> Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
+                                .launcherItem("list.${r.app.key}", focusable = false, onMenu = { onLongPress(r.app) })
                                 .combinedClickable(onClick = { onLaunch(r.app) }, onLongClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress); onLongPress(r.app)
                                 })

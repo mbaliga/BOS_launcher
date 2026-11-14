@@ -48,6 +48,7 @@ android {
 dependencies {
     implementation(project(":core-design"))
     implementation(project(":core-data"))
+    implementation(project(":core-input"))
     implementation(project(":feature-search"))
     implementation(project(":core-catalog"))
     implementation(project(":core-capabilities"))

@@ -277,9 +277,9 @@ class NetworkStatusMathTest {
     fun `paged home keeps the old paging rule`() {
         val h = LauncherPrefs(portraitPaging = PagingAxis.Horizontal, leftPage = LeftPage.Off).surface(landscape = false)
         assertTrue(h.paged && h.hasDensity)
-        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.SwipeUp, HomeGesture.SwipeDown, HomeGesture.DoubleTap), touch().filter { it.usableOn(h) }.toSet())
+        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.SwipeUp, HomeGesture.SwipeDown, HomeGesture.DoubleTap, HomeGesture.LongPress), touch().filter { it.usableOn(h) }.toSet())
         val v = LauncherPrefs(portraitPaging = PagingAxis.Vertical, leftPage = LeftPage.Off).surface(landscape = false)
-        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.SwipeLeft, HomeGesture.SwipeRight, HomeGesture.DoubleTap), touch().filter { it.usableOn(v) }.toSet())
+        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.SwipeLeft, HomeGesture.SwipeRight, HomeGesture.DoubleTap, HomeGesture.LongPress), touch().filter { it.usableOn(v) }.toSet())
         for (g in touch()) assertEquals(g.usableWith(PagingAxis.Vertical), g.usableOn(v))
     }
 
@@ -310,7 +310,7 @@ class NetworkStatusMathTest {
     @Test
     fun `PSP scrolls both ways so only pinch and double tap remain`() {
         val psp = LauncherPrefs(homeStyle = HomeStyle.Psp).surface(landscape = false)
-        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.DoubleTap), touch().filter { it.usableOn(psp) }.toSet())
+        assertEquals(setOf(HomeGesture.PinchIn, HomeGesture.PinchOut, HomeGesture.DoubleTap, HomeGesture.LongPress), touch().filter { it.usableOn(psp) }.toSet())
         // Motion gestures never depend on the surface.
         HomeGesture.entries.filter { it.kind == GestureKind.Motion }.forEach { assertNull(it.unavailableReason(psp)) }
     }

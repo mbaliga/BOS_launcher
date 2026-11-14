@@ -128,6 +128,8 @@ import com.bos.sphere.feature.grid.UiSounds
 import com.bos.sphere.feature.grid.WheelCategoryCache
 import com.bos.sphere.feature.grid.WheelDrawer
 import com.bos.sphere.feature.grid.cornerPlacements
+import com.bos.sphere.feature.grid.toCorner
+import com.bos.sphere.feature.grid.slotSummary
 import com.bos.sphere.feature.grid.rememberDisplayRotation
 import com.bos.sphere.feature.grid.rememberGridHomeState
 import com.bos.sphere.feature.grid.rememberLauncherWidgetHost
@@ -196,13 +198,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     val prefs by stores.prefs.prefs.collectAsStateWithLifecycle()
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
-    val corners by stores.shortcuts.corners.collectAsStateWithLifecycle()
+    val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()
+    val landscapeCorners by stores.shortcuts.landscapeCorners.collectAsStateWithLifecycle()
     val gestures by stores.shortcuts.gestures.collectAsStateWithLifecycle()
     val history by stores.history.events.collectAsStateWithLifecycle()
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isPortrait = !isLandscape
+    // INP-15: one set of corner assignments, or a separate landscape set; every corner style draws whichever is active.
+    val corners = com.bos.sphere.core.data.CornerSets.select(portraitCorners, landscapeCorners, prefs.cornersPerOrientation, isLandscape)
     val capacityOf: (PageLayout) -> Int = { it.capacity(isLandscape, prefs) }
     val allPages = remember(layout, apps, isLandscape, prefs) {
         HomeLayoutMath.visualPages(layout, apps.map { it.key }, capacityOf, autoPlace = prefs.appsOnHome == AppsOnHome.Everything)
@@ -379,10 +384,39 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // The shared gesture layer of the scrolling homes (the paged grid has its own arbiter).
     val surface = prefs.surface(isLandscape)
     val gestureRefHolder = rememberUpdatedState(::onGesture)
+    val gestureKeysRef = rememberUpdatedState(gestures.keys)
     val openSettingsRef = rememberUpdatedState<(Int) -> Unit> { c -> openSettings(c) }
     val homeGestureSpec = remember(surface, gestures.keys) {
-        HomeGestureSpec(surface, gestures.keys, onGesture = { g -> gestureRefHolder.value(g) }, onEmptyLongPress = { openSettingsRef.value(CATEGORY_HOME) })
+        HomeGestureSpec(surface, gestures.keys, onGesture = { g -> gestureRefHolder.value(g) }, onEmptyLongPress = {
+            if (HomeGesture.LongPress in gestureKeysRef.value) gestureRefHolder.value(HomeGesture.LongPress) else openSettingsRef.value(CATEGORY_HOME)
+        })
     }
+
+    // ---- keyboard, pointer and controller (INP-04, INP-05, INP-16, HOM-21): shortcuts go to the same openers the touch paths use
+    com.bos.sphere.feature.grid.LauncherInputWiring(
+        overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || leftOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
+        onCommand = { c ->
+            when (c) {
+                com.bos.sphere.core.input.LauncherCommand.OpenPalette -> { internal(CornerActionId.Search, null); true }
+                com.bos.sphere.core.input.LauncherCommand.OpenDrawer -> { wheelOpen = false; drawerOpen = true; true }
+                com.bos.sphere.core.input.LauncherCommand.OpenPuck -> { drawerOpen = false; wheelAnchor = Corner.BottomLeft; wheelOpen = true; true }
+                com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
+                com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
+                // Workspaces do not exist yet (WSP): the home pages stand in.
+                com.bos.sphere.core.input.LauncherCommand.NextWorkspace -> { scope.launch { gridState.goToPage((gridState.currentPage + 1).coerceAtMost((pages.size - 1).coerceAtLeast(0))) }; true }
+                com.bos.sphere.core.input.LauncherCommand.PreviousWorkspace -> { scope.launch { gridState.goToPage((gridState.currentPage - 1).coerceAtLeast(0)) }; true }
+                else -> false
+            }
+        },
+        onEmptyMenu = { quickPage = gridState.currentPage; quickOpen = true },
+        surfaceOpen = searchOpen || drawerOpen,
+        raiseKeyboard = prefs.keyboardOnOpen(isLandscape),
+        hotCornerDwellMs = if (prefs.hotCornersOn) prefs.hotCornerDwellMs.toLong() else 0L,
+        cornerLabel = { hot -> placements.firstOrNull { it.screen == hot.toCorner() }?.slot?.takeIf { it is CornerSlot.Single }?.let { slotSummary(it, appsByKey) } },
+        onCornerActivate = { hot ->
+            placements.firstOrNull { it.screen == hot.toCorner() }?.let { p -> (p.slot as? CornerSlot.Single)?.let { runItem(it.item, p.screen) } }
+        },
+    )
 
     // ---- widgets
     val widgetHost = rememberLauncherWidgetHost()
@@ -393,7 +427,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (old is CornerSlot.Widget && (slot !is CornerSlot.Widget || slot.appWidgetId != old.appWidgetId)) {
             widgetHost.deleteWidget(old.appWidgetId)
         }
-        stores.shortcuts.setCorner(c, slot)
+        if (com.bos.sphere.core.data.CornerSets.writesLandscape(prefs.cornersPerOrientation, isLandscape)) stores.shortcuts.setLandscapeCorner(c, slot) else stores.shortcuts.setCorner(c, slot)
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -769,7 +803,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onLaunch = ::launch,
                             onAppLongPress = { menuApp = it },
                             onPagesChange = { savePages(it) },
-                            onEmptyLongPress = { page -> quickPage = page; quickOpen = true },
+                            onEmptyLongPress = { page -> if (HomeGesture.LongPress in gestures) onGesture(HomeGesture.LongPress) else { quickPage = page; quickOpen = true } },
                             onGesture = ::onGesture,
                             onClockTap = { runner.run(CornerActionId.Clock) },
                             onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },

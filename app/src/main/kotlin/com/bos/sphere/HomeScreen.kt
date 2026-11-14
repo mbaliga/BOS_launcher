@@ -991,6 +991,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     }
                 },
                 deletePage = { i ->
+                    com.bos.sphere.core.data.StateService.beforeDestructive(context, "delete page")
                     savePages(HomeLayoutMath.deletePage(pages, i, capacityOf))
                     settingsPage = (i - 1).coerceAtLeast(0)
                 },
@@ -1135,7 +1136,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 page = quickPage?.takeIf { prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged },
                 pageCount = pages.size,
                 onAddPage = { val i = quickPage ?: 0; savePages(HomeLayoutMath.insertPage(pages, i)); quickOpen = false },
-                onDeletePage = { val i = quickPage ?: 0; savePages(HomeLayoutMath.deletePage(pages, i, capacityOf)); quickOpen = false },
+                onDeletePage = { val i = quickPage ?: 0; com.bos.sphere.core.data.StateService.beforeDestructive(context, "delete page"); savePages(HomeLayoutMath.deletePage(pages, i, capacityOf)); quickOpen = false },
                 onWallpaper = { quickOpen = false; openSettings(categories.indexOfFirst { it.title == L10n.tr("Look") }.coerceAtLeast(0)) },
                 onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
                 onDismiss = { quickOpen = false },

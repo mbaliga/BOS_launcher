@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="style">Psp</string>
+    <string name="homeScroll">Continuous</string>
+    <boolean name="drawerRailVisible" value="false" />
+    <int name="contCols" value="5" />
+    <int name="pCols" value="5" />
+    <int name="pRows" value="7" />
+    <int name="lCols" value="8" />
+    <int name="lRows" value="4" />
+    <float name="iconScale" value="0.62" />
+    <boolean name="labels" value="true" />
+    <boolean name="wallpaper" value="true" />
+    <boolean name="motion" value="true" />
+    <float name="motionSens" value="0.35" />
+    <string name="strip">Time:Left,Battery:Right</string>
+    <string name="webEngine">DuckDuckGo</string>
+    <boolean name="searchContacts" value="false" />
+    <string name="bgPicture">/data/user/0/com.bos.sphere/files/background_1.img</string>
+    <string name="leftPage">Widget</string>
+    <int name="leftWidgetId" value="42" />
+    <float name="clockSize" value="1.4" />
+    <string name="indEffects">DotsBreathe,DotsBloomCentre</string>
+    <long name="indLow" value="4278255360" />
+    <string name="themeMode">Amoled</string>
+    <long name="accent" value="4283215696" />
+    <string name="language">German</string>
+    <boolean name="onboardingDone" value="true" />
+    <string name="someFutureKey">kept</string>
+</map>

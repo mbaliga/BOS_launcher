@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="rules">[{&quot;id&quot;:&quot;r1&quot;,&quot;action&quot;:&quot;Silent&quot;,&quot;pkg&quot;:&quot;com.example.chat&quot;,&quot;sender&quot;:&quot;Boss&quot;,&quot;minutes&quot;:0}]</string>
+    <string name="prefs">{&quot;default&quot;:&quot;App&quot;,&quot;perApp&quot;:{&quot;com.example.chat&quot;:&quot;Sender&quot;}}</string>
+    <string name="gestures">PinchIn=ShowAll;DoubleTapHeader=ClearAll</string>
+</map>

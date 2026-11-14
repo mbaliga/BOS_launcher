@@ -274,6 +274,9 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
         if (kept.size != cur.removed.size) write(cur.copy(removed = kept))
     }
 
+    /** Replaces the whole arrangement (import or snapshot restore, CFG-02 / CFG-04). */
+    fun replace(next: HomeLayout) = write(next)
+
     private fun write(next: HomeLayout) {
         _layout.value = next
         sp.edit()

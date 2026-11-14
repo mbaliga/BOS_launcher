@@ -6,11 +6,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.LauncherStores
+import com.bos.sphere.core.data.StateService
 import com.bos.sphere.core.data.ThemeMode
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
@@ -37,8 +39,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleAction(intent)
+        // CFG-09: the start is recorded first, so a crash below counts towards safe mode.
         com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
-        window.decorView.postDelayed({ com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext) }, com.bos.sphere.core.data.CrashLoopMath.WINDOW_MS)
+        // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
+        runCatching { StateService.bridgeBuild31(applicationContext) }
+        window.decorView.postDelayed({
+            com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext)
+            // A stable start is the last known good state: snapshot it so safe mode has something to restore (CFG-04).
+            if (!com.bos.sphere.core.data.CrashLoopGuard.safeMode) StateService.onStable(applicationContext)
+        }, com.bos.sphere.core.data.CrashLoopMath.WINDOW_MS)
         // Apply theme and language before the first frame so there is no flash of defaults.
         LauncherStores.get(this).prefs.prefs.value.let { p ->
             HyleTheme.apply(
@@ -49,7 +58,10 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             SphereTheme {
-                HomeScreen(homeSignal = homeSignal, externalAction = externalAction)
+                // CFG-09: after a crash loop, a minimal grid with widgets off and a snapshot restore on offer.
+                var safe by remember { mutableStateOf(com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
+                if (safe) com.bos.sphere.ui.SafeModeScreen(onContinue = { safe = false })
+                else HomeScreen(homeSignal = homeSignal, externalAction = externalAction)
             }
         }
     }

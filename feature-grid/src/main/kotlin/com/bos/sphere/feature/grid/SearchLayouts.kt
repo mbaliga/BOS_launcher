@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -263,7 +264,7 @@ internal fun Orbit(
         }
     }
 
-    BoxWithConstraints(modifier.clipToBounds().pointerInput(Unit) {
+    BoxWithConstraints(modifier.clipToBounds().systemGestureExclusion().pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
                 val e = awaitPointerEvent(PointerEventPass.Initial)
@@ -290,7 +291,9 @@ internal fun Orbit(
         val tilePx = with(density) { tileSize.toPx() }
         val colW = 80.dp
         val colWPx = with(density) { colW.toPx() }
-        val margin = colWPx / 2f
+        // Keep tiles clear of the system's edge-swipe zones, which swallow touches along both sides.
+        val edgeGuard = with(density) { 28.dp.toPx() }
+        val margin = colWPx / 2f + edgeGuard
         // Ring gaps stay wider than a tile (face + caption) so rings revolving past each other never touch.
         val gap = max(0.22f * wPx, with(density) { 92.dp.toPx() })
         val radii = FloatArray(4) { 0.42f * wPx + it * gap }

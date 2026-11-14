@@ -268,6 +268,9 @@ internal fun Orbit(
     val extra = remember { floatArrayOf(0f) } // px/s added by the user
     val dragging = remember { booleanArrayOf(false) }
     val density0 = LocalDensity.current
+    val appCtx = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    // PAL-23: tuned values persist; load them once so the Orbit uses them without the Lab page being opened first.
+    androidx.compose.runtime.LaunchedEffect(Unit) { OrbitFeel.load(appCtx) }
     androidx.compose.runtime.LaunchedEffect(motion) {
         var last = 0L
         while (true) {

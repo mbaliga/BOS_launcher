@@ -53,7 +53,14 @@ class AndroidSearchHub(context: Context, private val extraProviders: List<Search
             send(SearchMerge.categories(actions, media, deepHits, extraHits.values.flatten()))
         }
 
-        extraProviders.forEachIndexed { i, p -> launch { val r = try { p.search(q, 8) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { emptyList() }; publish { extraHits[i] = r } } }
+        extraProviders.forEachIndexed { i, p ->
+            launch {
+                val r = try { p.search(q, 8) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { emptyList() }
+                // The existing search switches still apply to what the palette providers add.
+                val allowed = r.filter { if (it.category == SearchCategory.Files) prefs.searchFiles else prefs.searchActions }
+                publish { extraHits[i] = allowed }
+            }
+        }
         if (prefs.searchActions) publish { actions = ActionHits.match(q, if (q.isEmpty()) 10 else 6) } else send(emptyMap())
         if (prefs.searchFiles) launch { val r = files.search(q, SearchMerge.MAX_FILES); publish { media = r } }
         if (prefs.searchDeep && q.isNotEmpty()) launch { val r = deep.search(q, SearchMerge.MAX_FILES); publish { deepHits = r } }

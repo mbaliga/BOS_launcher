@@ -107,7 +107,12 @@ class FileIndex {
 }
 
 /** Files provider over a [FileIndex]. Results open with the default handler (ACTION_VIEW on [PaletteResult.payload] uri). */
-class FileProvider(private val index: FileIndex, private val hasAccess: () -> Boolean = { true }, private val strings: PaletteStrings = PaletteStrings()) : PaletteProvider {
+class FileProvider(private val indexOf: () -> FileIndex, private val hasAccess: () -> Boolean = { true }, private val strings: PaletteStrings = PaletteStrings()) : PaletteProvider {
+    constructor(index: FileIndex, hasAccess: () -> Boolean = { true }, strings: PaletteStrings = PaletteStrings()) : this({ index }, hasAccess, strings)
+
+    // Resolved on first query, on the provider's own thread, so building the provider never reads the index from disk.
+    private val index: FileIndex get() = indexOf()
+
     override val id = "files"
     override val scope = PaletteScope.Files
 

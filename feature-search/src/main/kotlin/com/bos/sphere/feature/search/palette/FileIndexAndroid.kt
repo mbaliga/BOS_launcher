@@ -19,6 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -74,9 +76,9 @@ object FileIndexer {
         fun add(d: FileIndex.Diff) { added += d.added; removed += d.removed; changed += d.changed }
         val mediaGranted = listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE)
             .any { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
-        if (mediaGranted && isActive()) runCatching { add(idx.reconcile("media", scanMedia(context))) }
+        if (mediaGranted && isActive()) runCatching { val l = scanMedia(context); if (isActive()) add(idx.reconcile("media", l)) }
         val trees = FileGrants.trees(context)
-        for (t in trees) { if (!isActive()) return FileIndex.Diff(added, removed, changed); runCatching { add(idx.reconcile("tree:$t", scanTree(context, t, isActive))) } }
+        for (t in trees) { if (!isActive()) return FileIndex.Diff(added, removed, changed); runCatching { val l = scanTree(context, t, isActive); if (isActive()) add(idx.reconcile("tree:$t", l)) } }
         // Revoked folders disappear from the index.
         val live = trees.map { "tree:$it" }.toSet()
         idx.sources().filter { it.startsWith("tree:") && it !in live }.forEach { removed += idx.dropSource(it) }
@@ -129,12 +131,14 @@ class FileIndexJobService : JobService() {
 
     override fun onStartJob(params: JobParameters): Boolean {
         job = scope.launch {
-            try { FileIndexer.reconcile(applicationContext) { job?.isActive == true } } finally { jobFinished(params, false) }
+            try { FileIndexer.reconcile(applicationContext) { isActive } } finally { jobFinished(params, false) }
         }
         return true
     }
 
     override fun onStopJob(params: JobParameters): Boolean { job?.cancel(); return true }
+
+    override fun onDestroy() { scope.cancel(); super.onDestroy() }
 }
 
 object FileIndexScheduler {

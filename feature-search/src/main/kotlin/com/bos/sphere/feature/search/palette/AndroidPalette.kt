@@ -127,7 +127,7 @@ class AndroidPalette(context: Context, private val scope: CoroutineScope = Corou
     private val app = context.applicationContext
     val prefs = PalettePrefs(app)
     val shortcuts = ShortcutCache(app, scope)
-    val fileIndex = FileIndexHolder.get(app)
+    val fileIndex: dev.aarso.search.palette.FileIndex get() = FileIndexHolder.get(app)
     private val strings = paletteStrings()
 
     /** Does the system have a handler for this settings screen? Entries without one are hidden (PAL-04). */
@@ -135,7 +135,7 @@ class AndroidPalette(context: Context, private val scope: CoroutineScope = Corou
         app.packageManager.resolveActivity(Intent(action), 0) != null
 
     val settingsProvider: PaletteProvider = SettingsProvider { resolves(it.action) }
-    val fileProvider: PaletteProvider = FileProvider(fileIndex, { FileIndexer.hasAccess(app) }, strings)
+    val fileProvider: PaletteProvider = FileProvider({ FileIndexHolder.get(app) }, { FileIndexer.hasAccess(app) }, strings)
     val shortcutProvider: PaletteProvider = ShortcutProvider { shortcuts.get() }
     val calculatorProvider: PaletteProvider = CalculatorProvider(strings)
     val launcherActions: PaletteProvider = LauncherActionProvider()
@@ -168,7 +168,7 @@ object PaletteHits {
             PaletteScope.Files -> SearchCategory.Files
             PaletteScope.Contacts -> SearchCategory.Contacts
             PaletteScope.Web -> SearchCategory.Web
-            PaletteScope.Apps -> SearchCategory.Apps
+            PaletteScope.Apps -> SearchCategory.Actions // the hub only has Actions and Files; shortcuts surface as actions
             else -> SearchCategory.Actions
         }
         val intentUri = r.payload["intentAction"]?.let { Intent(it).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).toUri(Intent.URI_INTENT_SCHEME) }

@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleAction(intent)
+        com.bos.sphere.feature.desktop.DesktopController.get(this).start()
         com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
         window.decorView.postDelayed({ com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext) }, com.bos.sphere.core.data.CrashLoopMath.WINDOW_MS)
         // Apply theme and language before the first frame so there is no flash of defaults.
@@ -79,5 +80,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (!handleAction(intent)) homeSignal++
+    }
+
+    // EXT-02: tell the desktop feature where this home activity runs, so the offer is skipped where the platform gives home.
+    override fun onStart() {
+        super.onStart()
+        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStarted(this, display?.displayId ?: 0)
+    }
+
+    override fun onStop() {
+        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStopped(this)
+        super.onStop()
     }
 }

@@ -64,6 +64,7 @@ dependencies {
     implementation(project(":core-capabilities"))
     implementation(project(":core-launch"))
     implementation(project(":core-input"))
+    implementation(project(":feature-desktop"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.health.connect.client)

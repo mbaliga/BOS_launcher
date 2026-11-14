@@ -74,10 +74,12 @@ class StateService private constructor(context: Context) {
     }
 
     /** Called before a destructive edit (delete a page, remove a group of items): snapshot first (CFG-04). Rate limited. */
-    fun beforeDestructive(reason: String) {
+    fun beforeDestructive(reason: String) = takeRateLimited(reason, exportText())
+
+    internal fun takeRateLimited(reason: String, text: String) {
         val last = snapshots.latest()
         if (last != null && System.currentTimeMillis() - last.takenAt < DESTRUCTIVE_MIN_GAP_MS) return
-        snapshot(reason)
+        snapshots.take(reason, text)
     }
 
     private fun appTag() = "liftoff"
@@ -92,9 +94,21 @@ class StateService private constructor(context: Context) {
             instance ?: synchronized(this) { instance ?: StateService(context).also { instance = it } }
 
         /** After the launcher has been up for the stability window: the state is known good, so snapshot it (safe mode restores this). */
-        fun onStable(context: Context) { runCatching { get(context).snapshot("stable start") } }
+        fun onStable(context: Context) { io.execute { runCatching { get(context).snapshot("stable start") } } }
 
-        fun beforeDestructive(context: Context, reason: String) { runCatching { get(context).beforeDestructive(reason) } }
+        /**
+         * Called on the UI thread before a destructive edit. The state is read here, before the edit runs, and the file
+         * work (write, hash, prune) happens on a background thread so the main thread does no disk I/O.
+         */
+        fun beforeDestructive(context: Context, reason: String) {
+            runCatching {
+                val svc = get(context)
+                val text = svc.exportText()
+                io.execute { runCatching { svc.takeRateLimited(reason, text) } }
+            }
+        }
+
+        private val io = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "state-io").apply { isDaemon = true } }
 
         /**
          * Build-31 bridge. Runs once, before any store is touched: if the old preference files hold a setup, it is

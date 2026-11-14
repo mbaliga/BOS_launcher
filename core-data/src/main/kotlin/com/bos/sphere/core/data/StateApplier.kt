@@ -89,7 +89,8 @@ class StateApplier(
             writeExtras(
                 cur.copy(
                     opaque = cur.opaque + StateSchema.OPAQUE_SECTIONS.filter { it in present }.associateWith { ex.opaque[it] ?: JSONArray() },
-                    unknownTop = ex.unknownTop.takeIf { present.isNotEmpty() } ?: cur.unknownTop,
+                    // A settings-only file carries no top-level extras, so it must not wipe the ones already kept.
+                    unknownTop = if (StateSchema.K_LAYOUT in present) ex.unknownTop else cur.unknownTop,
                     unknownPrefs = if (StateSchema.K_SETTINGS in present) ex.unknownPrefs else cur.unknownPrefs,
                     keyboardShortcuts = if (StateSchema.K_SHORTCUTS in present) ex.keyboardShortcuts else cur.keyboardShortcuts,
                     widgets = if (StateSchema.K_WIDGETS in present) ex.widgets else cur.widgets,

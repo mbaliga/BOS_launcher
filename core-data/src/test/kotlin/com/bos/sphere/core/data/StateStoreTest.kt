@@ -166,6 +166,15 @@ class StateStoreTest {
         )
     }
 
+    @Test
+    fun CFG_11_settingsOnlyImportKeepsExtrasAlreadyHeld() {
+        val p = StateTestSupport.Process(extrasFile = tmp.newFile("so.json"))
+        p.extras.write(StateExtras(unknownTop = org.json.JSONObject().put("futureThing", 7)))
+        val dec = StateCodec.decode(StateDocument.parse(SettingsCodec.encode(LauncherPrefs()).toString()))
+        p.applier.apply(dec.parts, dec.present)
+        assertEquals(7, p.extras.read().unknownTop.getInt("futureThing"))
+    }
+
     // ---- NFR-18 backup exclusion --------------------------------------------------------------
 
     private fun appFile(rel: String): File {

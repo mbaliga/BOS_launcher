@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   NFR-18: usage history, search indexes, notification content and the local snapshots stay on the device. They are
-  excluded from system cloud backup and from device-to-device transfer. Layout and settings may be restored by the
-  system; the user's own export file (Ground Control, Backup) is the portable copy.
+  excluded from system cloud backup and from device-to-device transfer. Cloud backup is excluded as a whole (the root rule below); the
+  user's own export file (Ground Control, Backup) is the portable copy.
 -->
 <data-extraction-rules>
     <cloud-backup>

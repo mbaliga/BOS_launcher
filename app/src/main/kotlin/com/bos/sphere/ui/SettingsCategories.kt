@@ -677,6 +677,10 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Toggle(x("Files"), Glyphs.Image, p.searchFiles, x("Documents, photos and downloads on this phone")) { v -> upd { it.copy(searchFiles = v) } },
             SettingItem.Toggle(x("Deep results"), Glyphs.Search, p.searchDeep, x("With Fylz or Fotoz installed: text inside documents and images")) { v -> upd { it.copy(searchDeep = v) } },
             SettingItem.Toggle(x("Contacts"), Glyphs.Message, p.searchContacts, x("Call, message or email people straight from results")) { v -> upd { it.copy(searchContacts = v) } },
+            SettingItem.Pane(x("Search folders"), Glyphs.Image, "") { com.bos.sphere.feature.grid.FolderGrantsPane() },
+            SettingItem.Pane(x("Search prefixes"), Glyphs.Search, "") { com.bos.sphere.feature.grid.PrefixEditorPane() },
+            SettingItem.Pane(x("Search providers from other apps"), Glyphs.Search, "") { com.bos.sphere.feature.grid.SearchProvidersPane() },
+            SettingItem.Pane(x("Search history and aliases"), Glyphs.Search, "") { com.bos.sphere.feature.grid.SearchHistoryPane() },
         ),
     )
 

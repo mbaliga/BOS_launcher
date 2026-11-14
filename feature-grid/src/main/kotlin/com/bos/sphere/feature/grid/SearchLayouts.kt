@@ -502,12 +502,12 @@ internal fun FlatResults(
     }
 }
 
-/** The sections of the flat list, in order: Applications, Actions, Contacts, Files, Web (web first for bangs and URLs). */
+/** The sections of the flat list, in order: Applications, Actions, Contacts, Files, Web (always last, PAL-06; an inline answer moves Actions to the top, PAL-05). */
 internal fun flatSections(data: SearchData): List<Pair<SearchCategory, String>> = listOf(
     SearchCategory.Apps to L10n.tr("Applications"), SearchCategory.Actions to L10n.tr("Actions"),
     SearchCategory.Contacts to L10n.tr("Contacts"), SearchCategory.Files to L10n.tr("Files"),
     SearchCategory.Web to L10n.tr("Web"),
-).let { if (data.webFirst) it.sortedBy { p -> if (p.first == SearchCategory.Web) 0 else 1 } else it }
+).let { l -> if (data.answer != null) l.sortedBy { p -> if (p.first == SearchCategory.Actions) 0 else 1 } else l } // PAL-05, PAL-06: an answer on top, the web hand-off always last
 
 /** The results the keyboard walks in the flat list (PAL-07), top to bottom as they are drawn. */
 internal fun flatTiles(data: SearchData, scope: SearchCategory?): List<Tile> =

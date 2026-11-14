@@ -101,6 +101,12 @@ object LauncherInput {
 
     private val swallowedUps = HashSet<Int>()
 
+    /** PAL-01: the home sets this to open Radar when a printable key arrives on a launcher surface that has no use for it. */
+    @Volatile var typeHook: ((KeyEvent) -> Boolean)? = null
+
+    /** Runs [c] as if its shortcut had been pressed (a Radar result asking for a launcher command, PAL-03). */
+    fun dispatch(c: LauncherCommand) { _commands.tryEmit(c) }
+
     /**
      * A controller button becomes the key the surfaces understand (INP-20); every other event is returned as is.
      * The activity should dispatch the returned event.
@@ -124,7 +130,8 @@ object LauncherInput {
             is KeyRoute.Move -> if (editMode.value && moveHook != null) { moveHook?.invoke(route.dir); true } else focus.move(route.dir)
             is KeyRoute.Tab -> focus.tab(route.backwards)
             KeyRoute.Menu -> if (focus.currentId == null && !overlayOpen) { emptyMenu.tryEmit(Unit); true } else false
-            KeyRoute.Activate, KeyRoute.None -> false
+            KeyRoute.Activate -> false
+            KeyRoute.None -> !overlayOpen && !focus.anyLayerActive && typeHook?.invoke(e) == true
         }
         if (consumed) swallowedUps += e.keyCode
         return consumed

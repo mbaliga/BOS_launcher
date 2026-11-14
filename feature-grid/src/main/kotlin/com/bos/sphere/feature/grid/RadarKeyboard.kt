@@ -86,7 +86,15 @@ object RadarKeyboard {
 enum class ResultKind { App, Person, File, Action, Web, Setting, Other }
 
 /** One entry of a result's action list: a core-input [MenuAction], or Radar's own preview. */
-data class ResultMenuEntry(val label: String, val action: MenuAction?, val preview: Boolean = false)
+data class ResultMenuEntry(
+    val label: String,
+    val action: MenuAction?,
+    val preview: Boolean = false,
+    /** Edit the app's search alias (PAL-02). */
+    val alias: Boolean = false,
+    /** Open the launcher's full app sheet (display and split choices, hide, icon colour). */
+    val more: Boolean = false,
+)
 
 object ResultMenus {
     /** Built on the shared context-menu model for apps; everything else offers Open and Preview. */
@@ -96,7 +104,8 @@ object ResultMenus {
                 com.bos.sphere.core.input.MenuContext(isApp = true, canUninstall = canUninstall, otherDisplays = otherDisplays, adjacentSupported = adjacentSupported),
             ).filter { it.enabled }.map { ResultMenuEntry(it.action.label, it.action) }
         } else listOf(ResultMenuEntry(MenuAction.Open.label, MenuAction.Open))
-        return base + ResultMenuEntry("Preview", null, preview = true)
+        val apps = if (kind == ResultKind.App) listOf(ResultMenuEntry("Set search alias", null, alias = true), ResultMenuEntry("More options", null, more = true)) else emptyList()
+        return base + apps + ResultMenuEntry("Preview", null, preview = true)
     }
 }
 

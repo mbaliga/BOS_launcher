@@ -18,6 +18,9 @@
     <!-- Optional step count in the status strip -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- PAL-17: other apps guard a read-only search provider with this normal permission; Radar lists them and the user approves each. -->
+    <permission android:name="com.bos.sphere.permission.READ_SEARCH" android:protectionLevel="normal" />
+    <uses-permission android:name="com.bos.sphere.permission.READ_SEARCH" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
@@ -48,6 +51,10 @@
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- PAL-17: lets Radar see apps that offer a guarded search provider (package visibility, Android 11+). -->
+        <intent>
+            <action android:name="com.bos.sphere.action.SEARCH_PROVIDER" />
         </intent>
     </queries>
 

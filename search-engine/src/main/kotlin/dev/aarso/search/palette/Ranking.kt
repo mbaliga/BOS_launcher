@@ -24,6 +24,22 @@ class UsageStore(private val maxEntries: Int = 2000) {
     @Synchronized fun reset() = map.clear()
     @Synchronized fun size() = map.size
 
+    /** Sets [key] to [rec] as is (used to seed from the launch history). */
+    @Synchronized fun put(key: String, rec: UsageRecord) { map.remove(key); map[key] = rec }
+
+    @Synchronized fun entries(): Map<String, UsageRecord> = LinkedHashMap(map)
+
+    /** A new store holding this one's entries, then [other]'s: for a key in both, the larger count and the later time. */
+    @Synchronized fun mergedWith(other: UsageStore): UsageStore {
+        val out = UsageStore(maxEntries)
+        map.forEach { (k, v) -> out.map[k] = v }
+        other.entries().forEach { (k, v) ->
+            val o = out.map[k]
+            out.map[k] = if (o == null) v else UsageRecord(maxOf(o.count, v.count), maxOf(o.lastMillis, v.lastMillis))
+        }
+        return out
+    }
+
     @Synchronized fun encode(): String = map.entries.joinToString("\n") { (k, v) -> "${k.replace('\t', ' ').replace('\n', ' ')}\t${v.count}\t${v.lastMillis}" }
 
     companion object {

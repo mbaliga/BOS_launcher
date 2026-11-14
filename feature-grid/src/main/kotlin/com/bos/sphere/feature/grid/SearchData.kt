@@ -92,6 +92,9 @@ internal class SearchData(
 ) {
     val blank = query.isBlank()
 
+    /** PAL-05: an inline answer (calculator, unit conversion) sits on top; Enter copies it. */
+    val answer: SearchHit? = hits[SearchCategory.Actions]?.firstOrNull { it.copyText != null }
+
     fun count(cat: SearchCategory): Int = when (cat) {
         SearchCategory.Apps -> apps.size
         SearchCategory.Contacts -> contacts.size
@@ -111,16 +114,18 @@ internal class SearchData(
     /** "Everything": a mix, best matches first — apps, people, actions, files, web (web first for bangs/URLs). */
     fun tiles(cat: SearchCategory?): List<Tile> {
         if (cat != null) return tilesFor(cat)
+        // PAL-06: the web hand-off is always the last result, bang and URL queries included (Enter still reaches it first, see webFirst).
         val order = listOf(SearchCategory.Apps, SearchCategory.Contacts, SearchCategory.Actions, SearchCategory.Files, SearchCategory.Web)
-            .let { if (webFirst) it.sortedBy { c -> if (c == SearchCategory.Web) 0 else 1 } else it }
         // Round-robin so every kind of result shows up near the centre, not just the first kind.
         // Before anything is typed, "Everything" is only what you really used: recent apps and people.
         // Actions, files and web rows are suggestions, not recents, so they wait for their own category.
         val usable = if (blank) order.filter { it == SearchCategory.Apps || it == SearchCategory.Contacts } else order
-        val lists = usable.map { tilesFor(it).filter { t -> t !is Tile.Allow && t !is Tile.Bang } }
+        val mixed = usable.filter { it != SearchCategory.Web }.map { tilesFor(it).filter { t -> t !is Tile.Allow && t !is Tile.Bang } }
         val out = ArrayList<Tile>()
+        answer?.let { out += Tile.Hit(it) }
         var i = 0
-        while (out.size < 40 && lists.any { i < it.size }) { lists.forEach { l -> l.getOrNull(i)?.let(out::add) }; i++ }
+        while (out.size < 40 && mixed.any { i < it.size }) { mixed.forEach { l -> l.getOrNull(i)?.let { t -> if (out.none { o -> o.key == t.key }) out.add(t) } }; i++ }
+        if (SearchCategory.Web in usable) out += tilesFor(SearchCategory.Web).filter { t -> t !is Tile.Allow && t !is Tile.Bang }
         return out
     }
 
@@ -134,13 +139,25 @@ internal class SearchData(
             if (askFiles) add(Tile.Allow(files = true))
             hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
         }
+        // PAL-06 / PAL-15: any hits and the bang chips first, then the app-store lookup, and the hand-off to the browser last.
         SearchCategory.Web -> buildList {
-            web.forEachIndexed { i, w ->
-                if (w is WebRow.BangHints) w.chips.forEach { add(Tile.Bang(it.code, it.name, it.rewritten)) } else add(Tile.Web(w, i))
-            }
             hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
+            web.forEach { w -> if (w is WebRow.BangHints) w.chips.forEach { add(Tile.Bang(it.code, it.name, it.rewritten)) } }
+            web.withIndex().filter { it.value is WebRow.PlayStore }.forEach { add(Tile.Web(it.value, it.index)) }
+            web.withIndex().filter { it.value !is WebRow.PlayStore && it.value !is WebRow.BangHints }.forEach { add(Tile.Web(it.value, it.index)) }
         }
-        SearchCategory.Actions -> hits[cat].orEmpty().map<SearchHit, Tile> { Tile.Hit(it) } + settings.map { Tile.Setting(it) }
+        SearchCategory.Actions -> hits[cat].orEmpty().sortedByDescending { it.copyText != null }.map<SearchHit, Tile> { Tile.Hit(it) } + settings.map { Tile.Setting(it) }
+    }
+
+    /**
+     * What Enter runs (PAL-05, PAL-06): a bang or URL query goes to the web row that opens it, even though the web rows
+     * sit last; otherwise the top result, which is the inline answer when there is one.
+     */
+    fun enterTile(cat: SearchCategory?): Tile? {
+        if (webFirst && (cat == null || cat == SearchCategory.Web)) {
+            tilesFor(SearchCategory.Web).firstOrNull { it is Tile.Web && (it.row is WebRow.Open || it.row is WebRow.BangSearch) }?.let { return it }
+        }
+        return tiles(cat).firstOrNull()
     }
 
     /** A quiet hint under the Files results when no deep-search app is installed. */

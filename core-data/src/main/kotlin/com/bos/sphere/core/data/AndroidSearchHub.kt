@@ -36,9 +36,9 @@ object SearchMerge {
 }
 
 /** [extraProviders] contribute hits to their own [SearchHit.category] (the palette engine's settings, calculator, shortcuts, file index). */
-class AndroidSearchHub(context: Context, private val extraProviders: List<SearchProvider> = emptyList()) : SearchHub {
+class AndroidSearchHub(context: Context, private val extraProviders: List<SearchProvider> = emptyList(), approvedSources: () -> Set<String> = { emptySet() }) : SearchHub {
     private val files = FileSearch(context)
-    private val deep = DeepSearch(context)
+    private val deep = DeepSearch(context, approvedSources)
 
     override fun search(query: String, prefs: LauncherPrefs): Flow<Map<SearchCategory, List<SearchHit>>> = channelFlow {
         val q = query.trim()

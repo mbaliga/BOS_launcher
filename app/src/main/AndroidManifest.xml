@@ -49,6 +49,10 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- PAL-17: lets Radar see apps that offer a guarded search provider (package visibility, Android 11+). -->
+        <intent>
+            <action android:name="com.bos.sphere.action.SEARCH_PROVIDER" />
+        </intent>
     </queries>
 
     <application

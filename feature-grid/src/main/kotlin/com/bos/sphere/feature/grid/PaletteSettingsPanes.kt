@@ -77,6 +77,8 @@ fun FolderGrantsPane() {
         trees.forEach { t ->
             ActionRow(label = Uri.decode(t.lastPathSegment.orEmpty()).substringAfter(':').ifEmpty { t.toString() }, summary = L10n.tr("Tap to stop searching this folder"), onClick = {
                 FileGrants.release(context, t); trees = FileGrants.trees(context)
+                // The released folder's files leave the index at once, not at the next job.
+                scope.launch { withContext(Dispatchers.IO) { FileIndexer.reconcile(context) } }
             })
         }
         ActionRow(label = L10n.tr("Update the file index now"), summary = status.ifEmpty { L10n.tr("%s files indexed", FileIndexHolder.get(context).size()) }, onClick = {

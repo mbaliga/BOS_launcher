@@ -23,6 +23,12 @@ interface LaunchpadSink {
     }
 }
 
+/** Where the hidden-apps set lives (a SharedPreferences string set; the in-memory store re-reads it when the activity is recreated). */
+interface HiddenSink {
+    fun get(): Set<String>
+    fun set(keys: Set<String>)
+}
+
 /** Reads the live stores into [StateParts] and writes parts back (import, snapshot restore). Pure over the store objects, so JVM-testable. */
 class StateApplier(
     private val prefs: LauncherPrefsStore,
@@ -33,6 +39,7 @@ class StateApplier(
     private val writeExtras: (StateExtras) -> Unit,
     private val launchpadPrefs: () -> LaunchpadPrefs = { LaunchpadSettings.prefs.value },
     private val launchpadGestures: () -> Map<LaunchpadGesture, LaunchpadAction> = { LaunchpadSettings.gestures.value },
+    private val hiddenApps: HiddenSink? = null,
 ) {
     fun current(): StateParts {
         val g = shortcuts.gestures.value
@@ -40,6 +47,8 @@ class StateApplier(
             prefs = prefs.prefs.value,
             layout = layout.layout.value,
             corners = shortcuts.corners.value,
+            landscapeCorners = shortcuts.explicitLandscapeCorners(),
+            hidden = hiddenApps?.get().orEmpty(),
             gestures = HomeGesture.entries.associateWith { g[it] },
             launchpadRules = launchpad.rules(),
             launchpadPrefs = launchpadPrefs(),
@@ -63,7 +72,10 @@ class StateApplier(
                 )
             }
         }
-        if (StateSchema.K_LAYOUT in present) layout.replace(parts.layout)
+        if (StateSchema.K_LAYOUT in present) {
+            layout.replace(parts.layout)
+            hiddenApps?.set(parts.hidden)
+        }
         if (StateSchema.K_SHORTCUTS in present) {
             val live = shortcuts.corners.value
             parts.corners.forEach { (c, slot) ->
@@ -71,6 +83,12 @@ class StateApplier(
                 val keepWidget = slot == CornerSlot.Empty && bound is CornerSlot.Widget &&
                     parts.extras.widgets.any { it.slot == "corner.${c.name}" }
                 if (!keepWidget) shortcuts.setCorner(c, slot)
+            }
+            val liveLandscape = shortcuts.landscapeCorners.value
+            parts.landscapeCorners.forEach { (c, slot) ->
+                val keepWidget = slot == CornerSlot.Empty && liveLandscape[c] is CornerSlot.Widget &&
+                    parts.extras.widgets.any { it.slot == "lcorner.${c.name}" }
+                if (!keepWidget) shortcuts.setLandscapeCorner(c, slot)
             }
             parts.gestures.forEach { (g, item) -> shortcuts.setGesture(g, item) }
         }
@@ -84,7 +102,8 @@ class StateApplier(
         }
         val cur = extras()
         val ex = parts.extras
-        val touched = StateSchema.OPAQUE_SECTIONS.any { it in present } || StateSchema.K_SETTINGS in present || StateSchema.K_WIDGETS in present
+        val touched = StateSchema.OPAQUE_SECTIONS.any { it in present } || StateNested.KEYS_BY_SECTION.keys.any { it in present } ||
+            StateSchema.K_WIDGETS in present || StateSchema.OBJECT_SECTIONS.any { it in present }
         if (touched) {
             writeExtras(
                 cur.copy(
@@ -94,6 +113,8 @@ class StateApplier(
                     unknownPrefs = if (StateSchema.K_SETTINGS in present) ex.unknownPrefs else cur.unknownPrefs,
                     keyboardShortcuts = if (StateSchema.K_SHORTCUTS in present) ex.keyboardShortcuts else cur.keyboardShortcuts,
                     widgets = if (StateSchema.K_WIDGETS in present) ex.widgets else cur.widgets,
+                    nested = StateNested.merge(cur.nested, ex.nested, present),
+                    objects = cur.objects + StateSchema.OBJECT_SECTIONS.filter { it in present }.mapNotNull { k -> ex.objects[k]?.let { k to it } },
                 ),
             )
         }

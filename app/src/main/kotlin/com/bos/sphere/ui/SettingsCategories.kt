@@ -772,6 +772,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     }
     // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
     out += com.bos.sphere.ui.backupCategory()
+    out += com.bos.sphere.ui.puckCategory()
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(
         x("About"),

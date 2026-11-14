@@ -255,7 +255,10 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
      */
     fun setPages(visual: List<HomePage>, preserve: Set<String> = emptySet()) {
         val cur = _layout.value
-        write(cur.copy(pages = HomeLayoutMath.toStored(visual, cur.pages, preserve), seeded = true))
+        val next = HomeLayoutMath.toStored(visual, cur.pages, preserve)
+        // CFG-04: an edit that drops an app or a page from the arrangement snapshots first.
+        if (cur.pages.size > next.size || cur.pages.any { p -> p.keys.any { k -> next.none { k in it.keys } } }) DestructiveEdits.before("remove from home")
+        write(cur.copy(pages = next, seeded = true))
     }
 
     /** Replaces the whole arrangement, used when a workspace is switched (WSP-07). */
@@ -265,6 +268,7 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
 
     /** Takes [key] off the home pages (it stays in the drawer). */
     fun removeFromHome(key: String, visual: List<HomePage>, preserve: Set<String> = emptySet()) {
+        DestructiveEdits.before("remove from home")
         val cur = _layout.value
         write(
             cur.copy(
@@ -360,6 +364,7 @@ class ShortcutStore internal constructor(private val sp: SharedPreferences) {
     val gestures: StateFlow<Map<HomeGesture, CornerItem>> = _gestures.asStateFlow()
 
     fun setCorner(corner: Corner, slot: CornerSlot) {
+        if (slot == CornerSlot.Empty && _corners.value[corner].let { it != null && it != CornerSlot.Empty }) DestructiveEdits.before("clear corner")
         val next = _corners.value + (corner to slot)
         _corners.value = next
         sp.edit().putString("corner.${corner.name}", ShortcutCodec.encodeSlot(slot)).apply()
@@ -374,11 +379,16 @@ class ShortcutStore internal constructor(private val sp: SharedPreferences) {
         sp.edit().putString("lcorner.${corner.name}", ShortcutCodec.encodeSlot(slot)).apply()
     }
 
+    /** Only the landscape slots the user set (the [landscapeCorners] flow also holds portrait fallbacks); this is what a state export carries. */
+    fun explicitLandscapeCorners(): Map<Corner, CornerSlot> =
+        Corner.entries.mapNotNull { c -> sp.getString("lcorner.${c.name}", null)?.let(ShortcutCodec::decodeSlot)?.let { c to it } }.toMap()
+
     private fun readLandscapeCorners(): Map<Corner, CornerSlot> = Corner.entries.associateWith { c ->
         sp.getString("lcorner.${c.name}", null)?.let(ShortcutCodec::decodeSlot) ?: readCorners()[c] ?: CornerSlot.Empty
     }
 
     fun setGesture(gesture: HomeGesture, item: CornerItem?) {
+        if (item == null && gesture in _gestures.value) DestructiveEdits.before("clear gesture")
         val next = if (item == null) _gestures.value - gesture else _gestures.value + (gesture to item)
         _gestures.value = next
         // An explicit "none" is stored as an empty string so it survives over the defaults.

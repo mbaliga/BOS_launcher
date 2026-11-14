@@ -39,15 +39,22 @@ object StateSchema {
     const val K_WORKSPACES = "workspaces"
     const val K_SESSIONS = "sessions"
     const val K_WIDGETS = "widgets"
+    /** Dock settings, active workspace and app groups (added within v2; older v2 files lack it and are left untouched on import). */
+    const val K_DOCK = "dock"
+    /** Settings kept in other preference files (home state, tags, icon overrides, badges, action apps, Radar and Orbit options); an allow-list, see [PrefFilesSource]. */
+    const val K_PREF_FILES = "prefFiles"
 
     /** Top-level keys this build understands in the current schema. Anything else is preserved, never dropped. */
     val KNOWN_TOP: Set<String> = setOf(
         K_FORMAT, K_VERSION, K_EXPORTED_AT, K_APP, K_LAYOUT, K_SETTINGS, K_SHORTCUTS, K_LAUNCHPAD,
-        K_ALIASES, K_WORKSPACES, K_SESSIONS, K_WIDGETS,
+        K_ALIASES, K_WORKSPACES, K_SESSIONS, K_WIDGETS, K_DOCK, K_PREF_FILES,
     )
 
     /** Sections other work streams fill in later; this build stores and round-trips them verbatim. */
     val OPAQUE_SECTIONS: List<String> = listOf(K_ALIASES, K_WORKSPACES, K_SESSIONS)
+
+    /** Sections that are one JSON object (not an array), filled from other work streams' storage. */
+    val OBJECT_SECTIONS: List<String> = listOf(K_DOCK, K_PREF_FILES)
 
     /**
      * Preference keys that are bound to this device and so never leave it: a widget id is meaningless on
@@ -60,6 +67,15 @@ object StateSchema {
      * What an export never contains (CFG-01, NFR-18). This is documentation the tests enforce: no SharedPreferences
      * file in this list is read by the exporter, so the data cannot reach a file.
      */
+    /**
+     * Stores and files that must stay out of system backup and device transfer (NFR-18) beyond [NEVER_EXPORTED_STORES]: the
+     * palette file mixes aliases with learned selection habits, the file index lists the user's files, spike results and
+     * the desktop profile table describe this device, and crash reports hold stack traces. The user's own export file is
+     * the portable copy of the part of this that is setup (aliases).
+     */
+    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc")
+    val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports")
+
     val NEVER_EXPORTED_STORES: Set<String> = setOf(
         "launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "liftoff_misc",
     )

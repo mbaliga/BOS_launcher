@@ -7,6 +7,12 @@
     <exclude domain="sharedpref" path="weather.xml" />
     <exclude domain="sharedpref" path="crash_loop.xml" />
     <exclude domain="sharedpref" path="icon_colors.xml" />
+    <exclude domain="sharedpref" path="palette.xml" />
+    <exclude domain="sharedpref" path="liftoff_spikes.xml" />
+    <exclude domain="sharedpref" path="desktop_surface.xml" />
+    <exclude domain="sharedpref" path="liftoff_misc.xml" />
+    <exclude domain="file" path="palette-files.idx" />
+    <exclude domain="file" path="crash-reports" />
     <exclude domain="database" path="." />
     <exclude domain="file" path="state/snapshots" />
     <exclude domain="file" path="index" />

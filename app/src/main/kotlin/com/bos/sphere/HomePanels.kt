@@ -154,7 +154,15 @@ private fun UsagePanel(appsByKey: Map<String, AppEntry>) {
     val source = remember { UsageStatsSource(context) }
     var granted by remember { mutableStateOf(source.granted()) }
     var slices by remember { mutableStateOf(emptyList<com.bos.sphere.core.catalog.UsageSlice>()) }
-    LaunchedEffect(granted) {
+    // Coming back from the system usage-access screen re-checks the grant.
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    var resumes by remember { mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val o = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) resumes++ }
+        lifecycle.addObserver(o)
+        onDispose { lifecycle.removeObserver(o) }
+    }
+    LaunchedEffect(resumes) {
         granted = source.granted()
         if (granted) withContext(Dispatchers.IO) {
             val start = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis

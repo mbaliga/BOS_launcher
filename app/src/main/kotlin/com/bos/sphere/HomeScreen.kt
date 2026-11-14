@@ -206,7 +206,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.core.catalog.AdaptivePrefs.effective(storedPrefs, windowCfg.screenWidthDp, windowCfg.screenHeightDp)
     }
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
-    SizeClassLayoutBinding(stores.layout) // HOM-11: one arrangement per window size class
+    SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }) // HOM-11: one arrangement per window size class
     val homeEdit = rememberHomeEdit(stores.layout) // HOM-12
     var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18
     val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()

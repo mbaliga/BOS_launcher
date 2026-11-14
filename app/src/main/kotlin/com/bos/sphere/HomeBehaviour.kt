@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -24,7 +25,8 @@ import kotlinx.coroutines.flow.drop
  * active class.
  */
 @Composable
-fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore) {
+fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<String> = emptySet()) {
+    val installed by rememberUpdatedState(installedKeys)
     val context = LocalContext.current
     val cfg: Configuration = LocalConfiguration.current
     val sc = SizeClass.of(cfg.screenWidthDp, cfg.screenHeightDp)
@@ -35,6 +37,8 @@ fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore) {
         val next = store.activate(sc, now, active)
         active = sc
         if (next != now) layoutStore.replace(next)
+        // A layout stored under another class may remember removals for apps uninstalled since.
+        if (installed.isNotEmpty()) layoutStore.pruneRemoved(installed)
         layoutStore.layout.collect { store.record(sc, it) }
     }
 }

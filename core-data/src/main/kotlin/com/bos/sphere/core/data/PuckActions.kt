@@ -70,4 +70,16 @@ class PuckActionsStore(private val sp: SharedPreferences) {
         _actions.value = PuckActions.DEFAULT
         sp.edit().remove("actions").apply()
     }
+
+    /** Re-reads the preference file (after a state import or restore wrote it behind the store's back). */
+    fun reload() { _actions.value = PuckActions.decode(sp.getString("actions", null)) }
+
+    companion object {
+        @Volatile private var shared: PuckActionsStore? = null
+
+        /** One instance per process, so the Ground Control pane and the home screen's ring see the same list at once. */
+        fun get(context: android.content.Context): PuckActionsStore = shared ?: synchronized(this) {
+            shared ?: PuckActionsStore(context.applicationContext.getSharedPreferences("puck_actions", android.content.Context.MODE_PRIVATE)).also { shared = it }
+        }
+    }
 }

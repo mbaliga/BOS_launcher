@@ -40,7 +40,7 @@ fun puckCategory(): SettingCategory = SettingCategory(
 @Composable
 fun ColumnScope.PuckActionsPane() {
     val context = LocalContext.current
-    val store = remember { PuckActionsStore(context.applicationContext.getSharedPreferences("puck_actions", android.content.Context.MODE_PRIVATE)) }
+    val store = remember { PuckActionsStore.get(context) }
     val actions by store.actions.collectAsState()
     var selected by remember { mutableIntStateOf(-1) }
     val cfg = LocalConfiguration.current

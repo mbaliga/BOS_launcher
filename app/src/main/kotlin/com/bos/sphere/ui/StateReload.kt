@@ -12,5 +12,6 @@ import com.bos.sphere.feature.grid.LauncherInput
  */
 fun reloadAfterStateChange(context: Context) {
     runCatching { WorkspaceRepository.get(context).reload() }
+    runCatching { com.bos.sphere.core.data.PuckActionsStore.get(context).reload() }
     runCatching { LauncherInput.registry.import(StateService.get(context).keyboardOverrides()) }
 }

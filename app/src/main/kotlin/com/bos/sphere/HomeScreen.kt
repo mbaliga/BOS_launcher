@@ -267,7 +267,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val lastTouch = remember { com.bos.sphere.feature.dock.LastTouch { IntArray(2).also { rootView.getLocationOnScreen(it) }.let { it[0] to it[1] } } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.core.input.ShortcutRegistry() }
-    val puckActionIds by remember { com.bos.sphere.core.data.PuckActionsStore(context.getSharedPreferences("puck_actions", android.content.Context.MODE_PRIVATE)).actions }.collectAsStateWithLifecycle()
+    val puckActionIds by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).actions }.collectAsStateWithLifecycle()
     fun launch(app: AppEntry) {
         com.bos.sphere.feature.dock.SessionUse.mark(app.key)
         appLauncher.launch(app, lastTouch.sourceRect())

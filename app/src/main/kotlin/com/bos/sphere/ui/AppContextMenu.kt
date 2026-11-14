@@ -49,6 +49,8 @@ fun AppContextMenu(
     onIconColor: (() -> Unit)? = null,
     /** Shown on homes that have no empty space to long-press (PSP, DSi, continuous). */
     onHomeSettings: (() -> Unit)? = null,
+    /** Launch-control and dock entries from the dock stream: "Open on <display>", "Open beside", bounds, dock pinning. */
+    extraEntries: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
     Dialog(onDismissRequest = onDismiss) {
         val shape = RoundedCornerShape(24.dp)
@@ -77,6 +79,7 @@ fun AppContextMenu(
             MenuItem(Glyphs.Plus, L10n.tr("Tags"), { tagsOpen.value = true })
             if (isOnHome != null) MenuItem(if (isOnHome) Glyphs.Close else Glyphs.Plus, L10n.tr(if (isOnHome) "Remove from home" else "Add to home"), onToggleHome)
             if (onIconColor != null) MenuItem(Glyphs.Palette, L10n.tr("Icon colour"), onIconColor)
+            extraEntries.forEach { (label, run) -> MenuItem(Glyphs.Plus, label, run) }
             MenuItem(Glyphs.Info, L10n.tr("App info"), onAppInfo)
             MenuItem(Glyphs.Image, L10n.tr(if (isHidden) "Unhide" else "Hide"), onToggleHidden)
             if (onHomeSettings != null) MenuItem(Glyphs.Gear, L10n.tr("Home settings"), onHomeSettings)

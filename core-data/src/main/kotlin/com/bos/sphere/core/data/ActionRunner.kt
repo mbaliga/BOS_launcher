@@ -129,6 +129,9 @@ class ActionRunner(
     private val onPickApp: ((CornerActionId) -> Unit)? = null,
 ) {
     private val ctx = context.applicationContext
+
+    /** Routes app launches through the launch layer (WSP-01); returns whether the app started. Null keeps the direct path. */
+    var launchHook: ((String) -> Boolean)? = null
     private val launcherApps = ctx.getSystemService(LauncherApps::class.java)
     private val userManager = ctx.getSystemService(UserManager::class.java)
     private val audio = ctx.getSystemService(AudioManager::class.java)
@@ -185,6 +188,7 @@ class ActionRunner(
 
     /** Launches the app behind an [AppEntry.key] (`component#userHash`). */
     fun launchKey(key: String): Boolean {
+        launchHook?.let { hook -> return hook(key).also { if (it) onAppLaunched(key) else toast("App not available") } }
         val hashAt = key.lastIndexOf('#')
         if (hashAt <= 0) return false
         val component = ComponentName.unflattenFromString(key.substring(0, hashAt)) ?: return false

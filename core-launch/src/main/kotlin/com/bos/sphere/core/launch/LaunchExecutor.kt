@@ -20,6 +20,8 @@ class LaunchExecutor(
     private val context: Context,
     private val caps: () -> LaunchCaps,
     private val userFor: (Int) -> UserHandle? = { null },
+    /** A view of the launcher window, so a launch with a source rectangle can open out of it (WSP-06). */
+    private val rootView: () -> android.view.View? = { null },
 ) {
     private val notices = DropNotices()
 
@@ -33,19 +35,14 @@ class LaunchExecutor(
     fun freshNotices(result: LaunchResult): List<DropReason> = notices.fresh(result.resolution.dropped)
 
     /** Launches the members one after another, re-checking each result (WSP-05). */
-    suspend fun launchGroup(group: AppGroup, gapMs: Long = 350): List<LaunchResult> {
-        val out = mutableListOf<LaunchResult>()
-        for (m in group.members) {
-            val r = launch(m)
-            out += r
-            if (!r.started) break
-            delay(gapMs)
-        }
-        return out
-    }
+    suspend fun launchGroup(group: AppGroup, gapMs: Long = 350): List<LaunchResult> =
+        launchPlan(GroupPlan(GroupMode.Bounds, group.members, emptyList()), gapMs).results
+
+    /** Runs a planned group or restored session in sequence; a step that fails is retried once (WSP-05, WSP-09). */
+    suspend fun launchPlan(plan: GroupPlan, gapMs: Long = 350): GroupOutcome = GroupRunner.run(plan, gapMs, { delay(it) }) { launch(it) }
 
     private fun start(req: LaunchRequest, res: Resolution) {
-        val opts = ActivityOptions.makeBasic()
+        val opts = animationOptions(req.source)
         res.displayId?.let { opts.launchDisplayId = it }
         res.bounds?.let { opts.setLaunchBounds(Rect(it.left, it.top, it.right, it.bottom)) }
         val t = req.target
@@ -55,9 +52,24 @@ class LaunchExecutor(
             val intent = (component?.let { Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(it) }
                 ?: context.packageManager.getLaunchIntentForPackage(t.packageName) ?: error("no launch intent"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or if (res.adjacent) Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK else 0)
+            req.source?.let { intent.sourceBounds = Rect(it.left, it.top, it.right, it.bottom) }
             context.startActivity(intent, opts.toBundle())
         } else {
-            context.getSystemService(LauncherApps::class.java).startMainActivity(component, user, null, opts.toBundle())
+            val src = req.source?.let { Rect(it.left, it.top, it.right, it.bottom) }
+            context.getSystemService(LauncherApps::class.java).startMainActivity(component, user, src, opts.toBundle())
         }
+    }
+
+    /** The app opens out of the tapped item using the public clip-reveal option; without a window or source it is a plain launch. */
+    private fun animationOptions(source: Bounds?): ActivityOptions {
+        val view = rootView()
+        if (source != null && view != null && view.isAttachedToWindow) {
+            runCatching {
+                val at = IntArray(2).also { view.getLocationOnScreen(it) }
+                val r = SourceRects.relativeTo(source, at[0], at[1])
+                return ActivityOptions.makeClipRevealAnimation(view, r.left, r.top, r.right - r.left, r.bottom - r.top)
+            }
+        }
+        return ActivityOptions.makeBasic()
     }
 }

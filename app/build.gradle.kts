@@ -66,6 +66,8 @@ dependencies {
     implementation(project(":core-input"))
     implementation(project(":core-quality"))
     implementation(project(":core-catalog"))
+    implementation(project(":core-signals"))
+    implementation(project(":feature-dock"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.health.connect.client)

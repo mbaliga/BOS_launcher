@@ -25,3 +25,7 @@ Not in my list: NFR-11 gained a pass/fail row in the checklist table only.
 ## Shared-file edits (small, additive)
 
 `GridHome.kt` (paging helper), `XmbHome.kt`, `ContinuousHome.kt` (press spring), `SearchLayouts.kt` (Orbit parameter renamed `motionRequested`, Filmstrip semantics, Flat headings), `SearchOverlay.kt` (one argument name), `SearchChrome.kt`, `SettingsSpace.kt` (wave field), `IndicatorLayer.kt`, `Backgrounds.kt` (`textureSampleColors`), `HomeLegibility.kt`, `settings.gradle.kts` (opt-in include), `benchmark/build.gradle.kts`. No new strings, so no L10n table was needed.
+
+## Review pass
+
+Fixed: `ContinuousCell` registered three settings content observers per grid cell (via `rememberMotionPrefs()` in each cell); now read once in `ContinuousHome` and passed down (NFR-06/10). `-Pliftoff.benchmark=false` no longer includes the module. `benchmark/README.md` no longer claims the module is inactive or that palette trace sections are missing. All statuses remain partial: none has a device number.

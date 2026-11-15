@@ -196,6 +196,7 @@ private fun ContinuousImpl(
         val fadeStart = with(density) { (if (landscape) padL else padT).toPx() }
         val fadeEnd = with(density) { (if (landscape) padR else padB).toPx() }
 
+        val stillCells = com.bos.sphere.core.design.rememberMotionPrefs().reduced
         // NFR-13: one linear reading order for TalkBack, by item index, whichever way the grid flows.
         Box(
             Modifier
@@ -211,7 +212,7 @@ private fun ContinuousImpl(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(apps, key = { _, a -> a.key }, contentType = { _, _ -> "app" }) { index, app ->
-                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxWidth().height(extentDp).semantics { traversalIndex = index.toFloat() })
+                        ContinuousCell(app, dsi, plate.dp, showLabels, stillCells, onTap, onLong, Modifier.fillMaxWidth().height(extentDp).semantics { traversalIndex = index.toFloat() })
                     }
                 }
             } else {
@@ -222,7 +223,7 @@ private fun ContinuousImpl(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(apps, key = { _, a -> a.key }, contentType = { _, _ -> "app" }) { index, app ->
-                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxHeight().width(extentDp).semantics { traversalIndex = index.toFloat() })
+                        ContinuousCell(app, dsi, plate.dp, showLabels, stillCells, onTap, onLong, Modifier.fillMaxHeight().width(extentDp).semantics { traversalIndex = index.toFloat() })
                     }
                 }
             }
@@ -294,13 +295,14 @@ private fun ContinuousCell(
     dsi: Boolean,
     plate: Dp,
     showLabels: Boolean,
+    still: Boolean,
     onTap: (AppEntry) -> Unit,
     onLong: (AppEntry) -> Unit,
     modifier: Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale: State<Float> = animateFloatAsState(if (pressed && dsi) 0.92f else 1f, if (com.bos.sphere.core.design.rememberMotionPrefs().reduced) tween(0) else spring(dampingRatio = 0.55f, stiffness = 500f), label = "press")
+    val scale: State<Float> = animateFloatAsState(if (pressed && dsi) 0.92f else 1f, if (still) tween(0) else spring(dampingRatio = 0.55f, stiffness = 500f), label = "press")
     Column(
         modifier
             .graphicsLayer { scaleX = scale.value; scaleY = scale.value }

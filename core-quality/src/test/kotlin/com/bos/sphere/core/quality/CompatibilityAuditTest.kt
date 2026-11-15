@@ -25,7 +25,8 @@ class CompatibilityAuditTest {
      * a new bare handler fails here until someone audits it.
      */
     @Test fun NFR_19_backHandlersAreEnabledOnlyWhileTheirSurfaceIsOpen() {
-        val modalOnly = mapOf("Corners.kt" to 1, "SettingsSpace.kt" to 1, "Launchpad.kt" to 1)
+        // Launchpad.kt left this list in wave 4: its handler is now gated on `visible` (off from the first frame of the exit).
+        val modalOnly = mapOf("Corners.kt" to 1, "SettingsSpace.kt" to 1)
         val bare = HashMap<String, Int>()
         Repo.mainSources().forEach { f ->
             f.readLines().filter { it.contains("BackHandler") && !it.contains("import") }.forEach { l ->

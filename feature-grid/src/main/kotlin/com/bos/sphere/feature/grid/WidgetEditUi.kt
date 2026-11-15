@@ -1,5 +1,9 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -75,6 +79,24 @@ private fun androidx.compose.foundation.layout.BoxScope.Handle(
     var dy by remember { mutableFloatStateOf(0f) }
     Box(
         Modifier.align(at).size(28.dp).background(HyleColors.VioletSoft.copy(alpha = 0.9f), CircleShape)
+            .semantics {
+                // NFR-13: dragging is not reachable by TalkBack, so the handle offers the same one-cell steps as actions.
+                contentDescription = com.bos.sphere.core.design.L10n.tr("Resize handle")
+                val (grow, shrink) = when (handle) {
+                    WidgetSizing.Handle.East, WidgetSizing.Handle.West -> "Wider" to "Narrower"
+                    WidgetSizing.Handle.South, WidgetSizing.Handle.North -> "Taller" to "Shorter"
+                    WidgetSizing.Handle.SouthEast -> "Larger" to "Smaller"
+                }
+                fun step(sign: Int): Pair<Int, Int> = when (handle) {
+                    WidgetSizing.Handle.East, WidgetSizing.Handle.West -> sign to 0
+                    WidgetSizing.Handle.South, WidgetSizing.Handle.North -> 0 to sign
+                    WidgetSizing.Handle.SouthEast -> sign to sign
+                }
+                customActions = listOf(
+                    CustomAccessibilityAction(com.bos.sphere.core.design.L10n.tr(grow)) { step(1).let { onResize(it.first, it.second) }; true },
+                    CustomAccessibilityAction(com.bos.sphere.core.design.L10n.tr(shrink)) { step(-1).let { onResize(it.first, it.second) }; true },
+                )
+            }
             .pointerInput(handle, cellWpx, cellHpx) {
                 detectDragGestures(
                     onDragStart = { dx = 0f; dy = 0f },

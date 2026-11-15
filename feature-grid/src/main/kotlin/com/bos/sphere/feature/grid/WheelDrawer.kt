@@ -3,7 +3,7 @@ package com.bos.sphere.feature.grid
 import androidx.compose.ui.draw.drawBehind
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import androidx.activity.compose.BackHandler
+import com.bos.sphere.core.design.predictiveBackLayer
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -471,7 +471,7 @@ fun WheelDrawer(
         else spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
         label = "wheelOpen",
     )
-    BackHandler(enabled = visible) { onDismiss() }
+    val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
     // About a centimetre in from both edges (160dp per inch), set before anything reads the geometry.
     WheelGeometry.insetPx = with(androidx.compose.ui.platform.LocalDensity.current) { 63.dp.toPx() }
     val visibleNow by rememberUpdatedState(visible)
@@ -497,7 +497,7 @@ fun WheelDrawer(
         onDismiss = onDismiss,
         interactive = visible,
         progress = if (motion.reduced) geometry else progress,
-        modifier = if (motion.reduced) modifier.graphicsLayer { alpha = com.bos.sphere.core.quality.MorphPolicy.alpha(motion, progress.value) } else modifier,
+        modifier = (if (motion.reduced) modifier.graphicsLayer { alpha = com.bos.sphere.core.quality.MorphPolicy.alpha(motion, progress.value) } else modifier).predictiveBackLayer(backProgress),
     )
     }
 }

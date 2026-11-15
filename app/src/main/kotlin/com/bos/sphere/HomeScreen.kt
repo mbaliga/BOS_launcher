@@ -349,6 +349,15 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
             return
         }
+        if (storedPrefs.adaptiveGrid) {
+            // HOM-11: the grid follows the window, so a pinch moves the density setting instead of the fixed grids.
+            val next = com.bos.sphere.core.catalog.AdaptivePrefs.stepDensity(storedPrefs.gridDensity, delta, windowCfg.screenWidthDp, windowCfg.screenHeightDp)
+            if (next != storedPrefs.gridDensity) {
+                stores.prefs.update { it.copy(gridDensity = next) }
+                android.widget.Toast.makeText(context, L10n.tr("Grid density %d%%", Math.round(next * 100)), android.widget.Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         fun step(g: GridSpec) = GridSpec(g.columns + delta, g.rows + delta).coerced()
         val idx = gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
         val page = pages.getOrNull(idx)
@@ -896,6 +905,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             weather = weather,
                             health = health,
                             extras = homeItems.homeExtras,
+                            editMode = homeEdit.active,
+                            onRemoveItem = { key ->
+                                val a = appsByKey[key]
+                                if (a != null) stores.layout.removeFromHome(a.key, pages, preserve) else homeItems.removeFromHome(key)
+                            },
                         )
                     }
                     Corners()
@@ -1343,7 +1357,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onHomeItems = { quickOpen = false; homeItems.openSheet() },
             )
         }
-        if (panelsOpen) HomePanelsSheet(history, appsByKey) { panelsOpen = false }
+        if (panelsOpen || homeItems.panelRequest >= 0) {
+            HomePanelsSheet(history, appsByKey, onDismiss = { panelsOpen = false; homeItems.panelRequest = -1 }, initialTab = homeItems.panelRequest.coerceAtLeast(0), onLaunch = { a -> panelsOpen = false; homeItems.panelRequest = -1; launch(a) })
+        }
+        // HOM-06: the work profile pause chip, shown while a work profile exists.
+        val workPaused by com.bos.sphere.core.catalog.WorkProfileState.workPaused.collectAsStateWithLifecycle()
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            val reg = com.bos.sphere.core.catalog.WorkProfileState.start(context)
+            onDispose { reg.close() }
+        }
+        if (workPaused != null && !homeEdit.active) {
+            Box(Modifier.fillMaxSize().safeDrawingPadding().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
+                com.bos.sphere.feature.grid.WorkPauseChip(workPaused, onToggle = { com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, workPaused != true) })
+            }
+        }
         if (homeEdit.active) {
             BackHandler { homeEdit.exit() }
             com.bos.sphere.feature.grid.HomeEditBar(

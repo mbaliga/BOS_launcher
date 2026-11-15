@@ -3,7 +3,12 @@ package com.bos.sphere.feature.grid
 import android.content.Context
 import android.os.Process
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -28,6 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bos.sphere.core.catalog.AppMark
+import com.bos.sphere.core.catalog.AppPresentation
 import com.bos.sphere.core.catalog.Badge
 import com.bos.sphere.core.catalog.BadgeSettings
 import com.bos.sphere.core.catalog.Badges
@@ -75,8 +82,11 @@ fun BadgedAppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val prefs by remember(context) { com.bos.sphere.core.data.LauncherStores.get(context).prefs.prefs }.collectAsState()
     Box(modifier) {
-        // HOM-10: a suspended app stays on home, dimmed.
-        AppIcon(app, size, Modifier.size(size).then(if (app.suspended) Modifier.alpha(0.45f) else Modifier))
+        // HOM-10 / HOM-06: a suspended, archived or paused-profile app stays on home, dimmed and marked.
+        val quiet by com.bos.sphere.core.catalog.WorkProfileState.quietProfileIds.collectAsState()
+        val look = AppPresentation.of(app.suspended, app.archived, app.user.hashCode() in quiet)
+        AppIcon(app, size, Modifier.size(size).then(if (look.mark != AppMark.None) Modifier.alpha(look.alpha) else Modifier))
+        if (look.mark != AppMark.None) AppMarkGlyph(look.mark, Modifier.align(Alignment.BottomStart).offset(x = (-2).dp, y = 2.dp))
         if (prefs.badgesOn) {
             // HOM-09: the notification feed is per profile, so a work app is badged by its own profile's notifications.
             val map by BadgeFeed.badges.collectAsState()
@@ -105,4 +115,35 @@ fun NotificationPreview(app: AppEntry, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(6.dp))
         }
     }
+}
+
+/** HOM-10 / HOM-06: the small mark on a dimmed icon (pause bars for paused or suspended, a down arrow for archived). */
+@Composable
+fun AppMarkGlyph(mark: AppMark, modifier: Modifier = Modifier) {
+    val (glyph, desc) = when (mark) {
+        AppMark.Archived -> "\u2193" to L10n.tr("Archived")
+        AppMark.ProfilePaused -> "\u23F8" to L10n.tr("Paused")
+        AppMark.Suspended -> "\u23F8" to L10n.tr("Suspended")
+        AppMark.None -> return
+    }
+    Box(
+        modifier.size(16.dp).background(Color(0xE6101426), CircleShape)
+            .semantics { contentDescription = desc },
+        contentAlignment = Alignment.Center,
+    ) { Text(glyph, color = Color.White, fontSize = 10.sp) }
+}
+
+/**
+ * HOM-06: the work profile pause chip on the home surface. Shown only while a work profile exists;
+ * "Resume work apps" while paused, "Pause work apps" otherwise.
+ */
+@Composable
+fun WorkPauseChip(paused: Boolean?, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val label = com.bos.sphere.core.catalog.WorkProfileState.chipLabel(paused) ?: return
+    Text(
+        L10n.tr(label), color = Color.White, fontSize = 12.sp,
+        modifier = modifier.background(if (paused == true) Color(0xE6B3541E) else Color(0xCC101426), androidx.compose.foundation.shape.RoundedCornerShape(50))
+            .clickable(onClick = onToggle).padding(horizontal = 14.dp, vertical = 8.dp)
+            .semantics { role = Role.Button },
+    )
 }

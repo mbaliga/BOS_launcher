@@ -97,7 +97,7 @@ fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifi
         val b = bmp
         if (b != null) Image(b, null, contentScale = ContentScale.Fit, modifier = Modifier.size(size))
         else Text(
-            when (def.kind) { ItemKind.Link -> if (def.isFile) "▤" else "↗"; ItemKind.Group -> "▦"; else -> def.label.take(1).uppercase().ifEmpty { "•" } },
+            when (def.kind) { ItemKind.Link -> com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target)?.let { panelGlyph(it) } ?: if (def.isFile) "▤" else "↗"; ItemKind.Group -> "▦"; else -> def.label.take(1).uppercase().ifEmpty { "•" } },
             color = HyleColors.InkBright, fontSize = (size.value * 0.42f).sp,
         )
     }
@@ -139,4 +139,11 @@ fun WidgetPlaceholder(label: String, onRestore: () -> Unit, modifier: Modifier =
         Text(label.ifEmpty { L10n.tr("Widget") }, color = HyleColors.InkBright, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         Text(L10n.tr("Not available. Tap to restore."), color = HyleColors.InkDim, fontSize = 11.sp, textAlign = TextAlign.Center)
     }
+}
+
+/** HOM-15, HOM-17, HOM-18: the glyph of a panel tile on home. */
+fun panelGlyph(tab: com.bos.sphere.core.catalog.PanelTab): String = when (tab) {
+    com.bos.sphere.core.catalog.PanelTab.Files -> "\u25A4"
+    com.bos.sphere.core.catalog.PanelTab.Usage -> "\u25D4"
+    com.bos.sphere.core.catalog.PanelTab.Timeline -> "\u29D6"
 }

@@ -28,6 +28,24 @@ object AdaptivePrefs {
         return AdaptiveGrid.dims(pw, ph, density) to AdaptiveGrid.dims(lw, lh, density)
     }
 
+    /**
+     * HOM-11: the density a pinch or "denser / sparser" lands on while the grid follows the window.
+     * Steps by 0.05 until the derived grid really changes (a small step may not cross a cell
+     * boundary), bounded to the slider's 0.5 to 2 range; at the bound it stays.
+     */
+    fun stepDensity(density: Float, delta: Int, widthDp: Int, heightDp: Int): Float {
+        if (delta == 0 || widthDp <= 0 || heightDp <= 0) return density
+        val start = grids(widthDp.toFloat(), heightDp.toFloat(), density)
+        var d = density
+        repeat(30) {
+            val next = (Math.round((d + 0.05f * delta.coerceIn(-1, 1)) * 100f) / 100f).coerceIn(0.5f, 2f)
+            if (next == d) return d
+            d = next
+            if (grids(widthDp.toFloat(), heightDp.toFloat(), d) != start) return d
+        }
+        return d
+    }
+
     /** [p] with its portrait and landscape grids replaced by the derived ones when adaptive mode is on. */
     fun effective(p: LauncherPrefs, widthDp: Int, heightDp: Int): LauncherPrefs {
         if (!p.adaptiveGrid || widthDp <= 0 || heightDp <= 0) return p

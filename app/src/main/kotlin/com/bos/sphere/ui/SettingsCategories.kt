@@ -291,6 +291,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 ) { v -> upd { it.copy(scrollAxis = v) } },
             )
             add(SettingItem.Toggle(x("Grid follows window size"), Glyphs.Widget, p.adaptiveGrid, x("Columns and rows come from the window (rotation, folding, split screen) and the density below, instead of the fixed grids")) { v -> upd { it.copy(adaptiveGrid = v) } })
+            add(SettingItem.Pane(x("Home panels"), Glyphs.Apps, x("Files, usage, timeline"), { com.bos.sphere.HomePanelSettings() })) // HOM-15, HOM-17, HOM-18
             if (p.adaptiveGrid) add(SettingItem.Slider(x("Grid density"), Glyphs.Widget, p.gridDensity, 0.5f..2f, pct(p.gridDensity)) { v -> upd { it.copy(gridDensity = v) } })
             if (paged) {
                 val preset = DensityPreset.entries.firstOrNull { it.portrait == p.portraitGrid && it.landscape == p.landscapeGrid }

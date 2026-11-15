@@ -82,6 +82,7 @@ class AppCatalog(context: Context) {
                 label = info.label.toString(),
                 profileId = user.hashCode(),
                 suspended = flags and ApplicationInfo.FLAG_SUSPENDED != 0,
+                archived = com.bos.sphere.core.data.AppFlags.archived(flags),
                 versionStamp = info.firstInstallTime,
             )
             CatalogApp(rec, info.componentName, user, kind)

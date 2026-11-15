@@ -23,7 +23,7 @@ class LiveReconcile {
 
     companion object {
         fun recordOf(a: AppEntry) = AppRecord(
-            key = a.key, packageName = a.packageName, label = a.label, profileId = a.user.hashCode(), suspended = a.suspended, versionStamp = a.versionStamp,
+            key = a.key, packageName = a.packageName, label = a.label, profileId = a.user.hashCode(), suspended = a.suspended, archived = a.archived, versionStamp = a.versionStamp,
         )
     }
 }

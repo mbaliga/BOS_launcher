@@ -106,6 +106,9 @@ class HomeItems internal constructor(
     internal var iconFor by mutableStateOf<AppEntry?>(null)
     internal var restoreRev by mutableIntStateOf(0)
 
+    /** HOM-15, HOM-17, HOM-18: a panel tile was tapped (index of its tab), -1 when none is requested. */
+    var panelRequest by mutableIntStateOf(-1)
+
     fun openSheet() { sheetOpen = true }
 
     /** HOM-04: the Radar provider that lists folders by name. */
@@ -156,6 +159,13 @@ class HomeItems internal constructor(
         edit { HomeEdit.add(it, def, page(), capacityOf) }
     }
 
+    /** One tile per panel: a second tap on "add" for the same panel does nothing (the key is the target). */
+    fun addPanel(tab: com.bos.sphere.core.catalog.PanelTab) {
+        val uri = com.bos.sphere.core.catalog.HomePanelLinks.uri(tab)
+        if (extrasState.items.containsKey(ItemKeys.link(uri))) return
+        addLink(uri, L10n.tr(tab.title), isFile = false)
+    }
+
     fun addShortcut(app: AppEntry, s: PinnableShortcut) {
         val def = ItemDef(ItemKeys.shortcut(app.packageName, s.id, app.user.hashCode()), ItemKind.Shortcut, s.label, s.id)
         edit { HomeEdit.add(it, def, page(), capacityOf) }
@@ -199,6 +209,7 @@ class HomeItems internal constructor(
                 com.bos.sphere.feature.dock.WorkspaceRepository.get(context).current.groups.firstOrNull { it.id == id }?.let(runGroup)
             }
             ItemKind.Link -> extrasState.items[key]?.let { def ->
+                com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target)?.let { panelRequest = it.ordinal; return }
                 // The content resolver lookup is a provider call: off the main thread.
                 kotlin.concurrent.thread(name = "home-link-open") {
                     runCatching {
@@ -212,6 +223,9 @@ class HomeItems internal constructor(
             else -> Unit
         }
     }
+
+    /** HOM-12: the edit-mode remove handle of a placed item. */
+    fun removeFromHome(key: String) = removeKey(key)
 
     private fun removeKey(key: String) {
         if (WidgetStacks.isStack(key)) {
@@ -427,6 +441,7 @@ class HomeItems internal constructor(
             onHiddenApps = { sheetOpen = false; hiddenOpen = true },
             onDismiss = { sheetOpen = false },
             onGroup = { sheetOpen = false; groupOpen = true },
+            onPanel = { t -> sheetOpen = false; addPanel(t) },
         )
         if (groupOpen) com.bos.sphere.feature.grid.GroupPickerDialog(
             groups = com.bos.sphere.feature.dock.WorkspaceRepository.get(ctx).current.groups.map { Triple(it.id, it.name, it.members.size) },

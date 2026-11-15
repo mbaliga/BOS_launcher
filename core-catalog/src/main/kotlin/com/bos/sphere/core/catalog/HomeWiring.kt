@@ -155,7 +155,12 @@ object HomeResolve {
 
     fun layoutFor(layout: HomeLayout, extras: HomeState): HomeLayout {
         val held = extras.folders.values.flatMap { it.keys } + extras.dock + WidgetStacks.members(extras)
-        return if (held.isEmpty()) layout else layout.copy(removed = layout.removed + held)
+        if (held.isEmpty()) return layout
+        // HOM-11: another size class may still list an app that was filed into a folder (or put on the
+        // dock) while a different class was active; it must not show twice.
+        val heldSet = held.toSet()
+        val pages = layout.pages.map { p -> if (p.keys.any { it in heldSet }) p.copy(keys = p.keys.filter { it !in heldSet }) else p }
+        return layout.copy(pages = pages, removed = layout.removed + held)
     }
 
     /** Stored keys the save must keep although they are not drawn: apps are decided by the caller, non-app items never. */

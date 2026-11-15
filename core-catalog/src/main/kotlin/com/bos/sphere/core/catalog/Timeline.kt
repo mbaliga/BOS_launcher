@@ -10,6 +10,9 @@ import com.bos.sphere.core.data.LaunchEvent
 data class TimelineEntry(val timeMs: Long, val key: String, val label: String, val scheduled: Boolean, val id: String = "")
 
 object Timeline {
+    /** The launch history keeps at most this many opens. */
+    const val HISTORY_MAX = 400
+
     /**
      * Upcoming scheduled launches (soonest first) followed by past opens (newest first), at most [limit] past ones.
      * [labelOf] resolves an app key to its label; keys that cannot be resolved (uninstalled) are dropped.

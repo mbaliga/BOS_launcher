@@ -10,6 +10,7 @@ import android.content.res.Configuration
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
+import com.bos.sphere.core.design.gate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -589,7 +590,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     LaunchedEffect(prefs.indicatorMetric) { indicator.setMetric(prefs.indicatorMetric) }
     val reading by indicator.reading.collectAsStateWithLifecycle()
     val indicatorTarget = IndicatorColors.argb(reading, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, prefs.indicatorInvert)
-    val indicatorColor by androidx.compose.animation.animateColorAsState(Color(indicatorTarget.toInt()), androidx.compose.animation.core.tween(800), label = "indicator")
+    val indicatorColor by androidx.compose.animation.animateColorAsState(Color(indicatorTarget.toInt()), com.bos.sphere.core.design.rememberMotionPrefs().gate(androidx.compose.animation.core.tween(800)), label = "indicator")
 
     // ---- weather (opt-in; needs approximate location)
     val weatherSource = remember { WeatherSource(context) }

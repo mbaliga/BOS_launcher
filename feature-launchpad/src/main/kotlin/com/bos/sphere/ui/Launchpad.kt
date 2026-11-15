@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateFormat
-import androidx.activity.compose.BackHandler
+import com.bos.sphere.core.design.predictiveBackLayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -260,14 +260,22 @@ fun LaunchpadPanel(
         com.bos.sphere.core.data.LaunchpadTheme.Light -> false
         com.bos.sphere.core.data.LaunchpadTheme.System -> androidx.compose.foundation.isSystemInDarkTheme()
     }
+    // NFR-14: with animations off the slide becomes a short cross-fade (no travel).
+    val motion = com.bos.sphere.core.design.rememberMotionPrefs()
+    // NFR-19: the handler lives outside the animated content, which stays composed during the exit; it is off from the
+    // first frame of the exit and follows the back gesture while open.
+    val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
     androidx.compose.runtime.CompositionLocalProvider(LocalLp provides if (dark) LpDark else LpLight) {
     AnimatedVisibility(
         visible = visible,
-        modifier = modifier,
-        enter = if (underlay) androidx.compose.animation.EnterTransition.None else slideInHorizontally { -it } + fadeIn(),
-        exit = if (underlay) androidx.compose.animation.ExitTransition.None else slideOutHorizontally { -it } + fadeOut(),
+        modifier = modifier.predictiveBackLayer(backProgress),
+        enter = if (underlay) androidx.compose.animation.EnterTransition.None
+        else if (motion.reduced) fadeIn(androidx.compose.animation.core.tween(motion.crossFadeMs()))
+        else slideInHorizontally { -it } + fadeIn(),
+        exit = if (underlay) androidx.compose.animation.ExitTransition.None
+        else if (motion.reduced) fadeOut(androidx.compose.animation.core.tween(motion.crossFadeMs()))
+        else slideOutHorizontally { -it } + fadeOut(),
     ) {
-        BackHandler(onBack = onDismiss)
         RestoreFocusOnExit()
         val ctx = LocalContext.current
         val items by NotificationProvider.notifications.collectAsStateWithLifecycle(emptyList())

@@ -24,8 +24,10 @@ import kotlinx.coroutines.withContext
 /**
  * NFR-15: wallpaper colours the home text can land on, so the scrim can be sized from real data. Solid and gradient
  * backgrounds are exact (every stop counts); a picture is sampled on a 3x3 grid from a downscaled decode; the system
- * wallpaper uses the colours the platform extracts. Textures are sampled from their rendered tile; live scenes and the bundled Horizon picture are animated or procedural and are not
- * sampled: they use the mid-grey fallback of [com.bos.sphere.core.quality.Contrast.scrimAlphaForAny] (known limit).
+ * wallpaper uses the colours the platform extracts. Textures are sampled from their rendered tile; live scenes are drawn
+ * once per sample time into a small bitmap and the bundled Horizon picture is decoded small (see [liveSampleColors],
+ * [horizonSampleColors]); all of it runs off the main thread. A photo that cannot be read still uses the mid-grey
+ * fallback of [com.bos.sphere.core.quality.Contrast.scrimAlphaForAny].
  */
 object WallpaperSamples {
     fun staticColors(kind: BackgroundKind, preset: String, colorA: Long, colorB: Long): List<Int> = when (kind) {
@@ -54,6 +56,12 @@ object WallpaperSamples {
     }
 }
 
+/** NFR-15: the last legibility check, shown as a Lab row. Null until the home has computed one. */
+object LegibilityReport {
+    var line by mutableStateOf<String?>(null)
+        internal set
+}
+
 /** The scrim over the wallpaper for the current background; recomputed off the main thread when the background changes. */
 @Composable
 fun rememberHomeScrim(kind: BackgroundKind, preset: String, colorA: Long, colorB: Long, picturePath: String): HomeLegibility.Plan {
@@ -66,7 +74,9 @@ fun rememberHomeScrim(kind: BackgroundKind, preset: String, colorA: Long, colorB
             when {
                 fixed.isNotEmpty() -> fixed
                 kind == BackgroundKind.Texture -> runCatching { textureSampleColors(preset, colorA) }.getOrDefault(emptyList())
+                kind == BackgroundKind.Live -> runCatching { liveSampleColors(preset, colorA) }.getOrDefault(emptyList())
                 kind == BackgroundKind.Picture && preset == "photo" && picturePath.isNotEmpty() -> runCatching { WallpaperSamples.photoColors(picturePath) }.getOrDefault(emptyList())
+                kind == BackgroundKind.Picture -> runCatching { horizonSampleColors(context) }.getOrDefault(emptyList())
                 kind == BackgroundKind.System -> runCatching {
                     val c = context.getSystemService(WallpaperManager::class.java)?.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
                     listOfNotNull(c?.primaryColor, c?.secondaryColor, c?.tertiaryColor).map { it.toArgb() }
@@ -75,6 +85,7 @@ fun rememberHomeScrim(kind: BackgroundKind, preset: String, colorA: Long, colorB
             }
         }
         plan = withContext(Dispatchers.Default) { HomeLegibility.plan(texts, samples) }
+        LegibilityReport.line = HomeLegibility.describe("${kind.name} ${preset}".trim() + (if (samples.isEmpty()) " (not sampled, mid-grey assumed)" else ""), plan)
     }
     return plan
 }

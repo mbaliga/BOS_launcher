@@ -32,10 +32,11 @@ class NfrWave3Test {
         assertTrue(t.contains("semantics { heading() }"))
     }
 
-    @Test fun NFR_15_texturesAreSampledForTheHomeScrimAndLiveScenesAreTheDocumentedGap() {
+    @Test fun NFR_15_texturesLiveScenesAndHorizonAreSampledForTheHomeScrim() {
         val t = text("$grid/HomeLegibility.kt")
         assertTrue(t.contains("kind == BackgroundKind.Texture"))
-        assertTrue(t.contains("live scenes and the bundled Horizon picture"))
+        assertTrue(t.contains("kind == BackgroundKind.Live"))
+        assertTrue(t.contains("horizonSampleColors"))
     }
 
     @Test fun NFR_01_NFR_05_macrobenchmarkIsOneGradleFlagAndDeviceStepsAreOneScript() {

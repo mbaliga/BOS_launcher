@@ -6,6 +6,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import com.bos.sphere.core.design.gate
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -452,7 +453,8 @@ private fun SettingsSpaceContent(
 /** Horizontally scrolling category tabs: every one shows its icon and its name; the selected one is lit and underlined. */
 @Composable
 private fun CategoryTabs(categories: List<SettingCategory>, selected: Int, anchorX: androidx.compose.ui.unit.Dp, onSelect: (Int) -> Unit) {
-    val pos by androidx.compose.animation.core.animateFloatAsState(selected.toFloat(), androidx.compose.animation.core.tween(260), label = "catpos")
+    val tabMotion = com.bos.sphere.core.design.rememberMotionPrefs()
+    val pos by androidx.compose.animation.core.animateFloatAsState(selected.toFloat(), tabMotion.gate(androidx.compose.animation.core.tween(260)), label = "catpos")
     val pitch = 104.dp
     val itemW = 96.dp
     Box(Modifier.fillMaxWidth().height(88.dp)) {

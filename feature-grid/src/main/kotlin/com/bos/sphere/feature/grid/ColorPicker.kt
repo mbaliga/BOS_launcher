@@ -1,5 +1,15 @@
 package com.bos.sphere.feature.grid
 
+import com.bos.sphere.core.design.L10n
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -111,7 +121,11 @@ fun ColorDot(argb: Long, size: Dp, onClick: (() -> Unit)? = null, selected: Bool
             .size(size)
             .background(argb.toColor(), CircleShape)
             .border(if (selected) 2.dp else 1.dp, if (selected) HyleColors.InkBright else HyleColors.Hairline, CircleShape)
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it },
+            .let {
+                if (onClick != null) it.clickable(onClick = onClick)
+                    .semantics { contentDescription = "#%06X".format(argb.toInt() and 0xFFFFFF); role = Role.Button; this.selected = selected }
+                else it
+            },
     )
 }
 
@@ -153,6 +167,10 @@ fun ColorPicker(argb: Long, onChange: (Long) -> Unit, modifier: Modifier = Modif
                 .fillMaxWidth()
                 .height(150.dp)
                 .border(1.dp, HyleColors.Hairline, RoundedCornerShape(10.dp))
+                .semantics {
+                    contentDescription = L10n.tr("Saturation and brightness")
+                    stateDescription = "${(hsv[1] * 100).toInt()}%, ${(hsv[2] * 100).toInt()}%"
+                }
                 .pointerInput(Unit) {
                     detectTapGestures { p ->
                         val w = size.width.toFloat().coerceAtLeast(1f)
@@ -191,6 +209,11 @@ fun ColorPicker(argb: Long, onChange: (Long) -> Unit, modifier: Modifier = Modif
                 .fillMaxWidth()
                 .height(22.dp)
                 .border(1.dp, HyleColors.Hairline, RoundedCornerShape(11.dp))
+                .semantics {
+                    contentDescription = L10n.tr("Colour hue")
+                    progressBarRangeInfo = ProgressBarRangeInfo(hsv[0], 0f..360f)
+                    setProgress { v -> commit(v.coerceIn(0f, 360f), hsv[1], hsv[2]); true }
+                }
                 .pointerInput(Unit) {
                     detectTapGestures { p ->
                         commit(((p.x / size.width.coerceAtLeast(1)) * 360f).coerceIn(0f, 360f), hsv[1], hsv[2])

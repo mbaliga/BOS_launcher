@@ -1,5 +1,8 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -97,6 +100,10 @@ internal fun TactileSlider(
         modifier
             .fillMaxWidth()
             .height(40.dp)
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(fraction.coerceIn(0f, 1f), 0f..1f)
+                setProgress { v -> onFraction(v.coerceIn(0f, 1f)); true }
+            }
             .pointerInput(Unit) { detectTapGestures { p -> onFraction(((p.x - thumbW / 2) / (size.width - thumbW)).coerceIn(0f, 1f)) } }
             .pointerInput(Unit) {
                 detectDragGestures { change, _ ->

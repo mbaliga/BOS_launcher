@@ -769,31 +769,97 @@ private fun LiveBackground(
     val ribbon = remember { RibbonCache() }
     val bokeh = remember { BokehState() }
     Canvas(modifier.fillMaxSize().clipToBounds()) {
-        if (scene == "ribbon") {
-            drawRibbon(ribbon, (time?.value ?: STATIC_T) * 0.4f, density)
-            return@Canvas
-        }
-        if (scene == "bokeh") {
-            drawBokeh(bokeh, time?.value ?: STATIC_T, animate, touch?.value, density)
-            return@Canvas
-        }
-        cache.ensure(size.width, size.height, density, scene, tint)
-        val t = time?.value ?: STATIC_T
-        drawRect(Color(cache.base))
-        when (scene) {
-            "starfield" -> drawStarfield(cache, t, density)
-            "waves" -> drawWaves(cache, t)
-            "fireflies" -> drawFireflies(cache, t, density)
-            "nebula" -> drawNebula(cache, t)
-            "rain" -> drawRain(cache, t, density)
-            "lava" -> drawLava(cache, t)
-            "snow" -> drawSnow(cache, t, density)
-            "matrix" -> drawMatrix(cache, t, density)
-            "orbits" -> drawOrbits(cache, t, density)
-            "plasma" -> drawPlasma(cache, t)
-            else -> drawAurora(cache, t)
-        }
+        drawLiveScene(scene, cache, ribbon, bokeh, time?.value ?: STATIC_T, animate, touch?.value, density, tint)
     }
+}
+
+/** One frame of a live scene at clock [t]; shared by the screen and by the legibility sampler (NFR-15). */
+private fun DrawScope.drawLiveScene(
+    scene: String, cache: LiveCache, ribbon: RibbonCache, bokeh: BokehState,
+    t: Float, animate: Boolean, touch: TouchPoint?, density: Float, tint: Int,
+) {
+    if (scene == "ribbon") {
+        drawRibbon(ribbon, t * 0.4f, density)
+        return
+    }
+    if (scene == "bokeh") {
+        drawBokeh(bokeh, t, animate, touch, density)
+        return
+    }
+    cache.ensure(size.width, size.height, density, scene, tint)
+    drawRect(Color(cache.base))
+    when (scene) {
+        "starfield" -> drawStarfield(cache, t, density)
+        "waves" -> drawWaves(cache, t)
+        "fireflies" -> drawFireflies(cache, t, density)
+        "nebula" -> drawNebula(cache, t)
+        "rain" -> drawRain(cache, t, density)
+        "lava" -> drawLava(cache, t)
+        "snow" -> drawSnow(cache, t, density)
+        "matrix" -> drawMatrix(cache, t, density)
+        "orbits" -> drawOrbits(cache, t, density)
+        "plasma" -> drawPlasma(cache, t)
+        else -> drawAurora(cache, t)
+    }
+}
+
+/**
+ * NFR-15: colours a live scene really puts behind the text. The scene is drawn once (its static frame) into a small
+ * bitmap and sampled on a grid; call off the main thread. Same preset resolution as [LiveBackground].
+ */
+internal fun liveSampleColors(preset: String, colorA: Long): List<Int> {
+    val scene = if (BackgroundPresets.lives.any { it.id == preset }) preset
+    else if (preset == BackgroundMath.CUSTOM) "aurora" else BackgroundPresets.default(BackgroundKind.Live)
+    val w = SAMPLE_W; val h = SAMPLE_H
+    val out = ArrayList<Int>(25 * LIVE_SAMPLE_TIMES.size)
+    // Scenes move: sample several clock values so a bright moment of the scene counts, not only the still frame.
+    for (t in LIVE_SAMPLE_TIMES) {
+        val image = androidx.compose.ui.graphics.ImageBitmap(w, h)
+        val canvas = androidx.compose.ui.graphics.Canvas(image)
+        androidx.compose.ui.graphics.drawscope.CanvasDrawScope().draw(
+            androidx.compose.ui.unit.Density(1f), androidx.compose.ui.unit.LayoutDirection.Ltr, canvas,
+            androidx.compose.ui.geometry.Size(w.toFloat(), h.toFloat()),
+        ) {
+            drawLiveScene(scene, LiveCache(), RibbonCache(), BokehState(), t, false, null, 1f, colorA.toInt())
+        }
+        val px = IntArray(w * h)
+        image.readPixels(px, 0, 0, w, h)
+        out += gridOf(px, w, h)
+    }
+    return out
+}
+
+internal val LIVE_SAMPLE_TIMES = listOf(STATIC_T, 4f, 9f, 31f)
+
+/**
+ * NFR-15: colours of the bundled Horizon picture, decoded at no more than about 64 px wide and sampled on a grid over the
+ * whole image (the screen crops it, so sampling all of it can only be stricter). Call off the main thread.
+ */
+internal fun horizonSampleColors(context: android.content.Context): List<Int> {
+    val res = context.resources
+    val id = com.bos.sphere.feature.grid.R.drawable.search_backdrop
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeResource(res, id, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return emptyList()
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= 64) sample *= 2
+    val bmp = android.graphics.BitmapFactory.decodeResource(res, id, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        ?: return emptyList()
+    val px = IntArray(bmp.width * bmp.height)
+    bmp.getPixels(px, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+    val out = gridOf(px, bmp.width, bmp.height)
+    bmp.recycle()
+    return out
+}
+
+private const val SAMPLE_W = 48
+private const val SAMPLE_H = 96
+
+/** 5x5 grid of opaque pixel colours across a [w]x[h] pixel block. */
+internal fun gridOf(px: IntArray, w: Int, h: Int): List<Int> {
+    val out = ArrayList<Int>(25)
+    for (iy in 0..4) for (ix in 0..4) out += px[((h - 1) * iy / 4) * w + (w - 1) * ix / 4] or (0xFF shl 24)
+    return out
 }
 
 /** Geometry, palette and brushes for the active scene; rebuilt only when size / scene / tint change. */

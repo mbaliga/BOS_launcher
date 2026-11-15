@@ -37,7 +37,8 @@ fun launchCaps(i: CapabilityInputs, adjacentProven: Boolean?): LaunchCaps = Laun
 fun rememberLabEntries(inputs: CapabilityInputs, results: SnapshotStateMap<String, String>): List<LabEntry> {
     val context = LocalContext.current
     val app = context.applicationContext
-    return remember(inputs, results.toMap()) {
+    val legibility = com.bos.sphere.feature.grid.LegibilityReport.line
+    return remember(inputs, results.toMap(), legibility) {
         fun settingsTarget() = LaunchTarget("com.android.settings")
         val exec = LaunchExecutor(app, caps = { launchCaps(inputs, adjacentProven = true) })
         fun put(id: String, text: String) { results[id] = text }
@@ -46,6 +47,7 @@ fun rememberLabEntries(inputs: CapabilityInputs, results: SnapshotStateMap<Strin
         fun mark(id: String, spike: String, outcome: SpikeOutcome) { spikes.record(spike, outcome); put(id, "Recorded for $spike: ${word(outcome)}") }
         fun recorded(id: String, spike: String) = results[id] ?: "Recorded for $spike: ${word(spikes.outcome(spike))}"
         listOf(
+            LabEntry("legibility", "Home legibility (NFR-15)", legibility ?: "Not computed yet: open the home screen first", null),
             LabEntry("env", "Device", "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) · tier ${CapabilityEvaluator.tier(inputs).name}", null),
             LabEntry("spk01", "SPK-01 Displays", results["spk01"] ?: (inputs.displays.joinToString("\n") { "#${it.id} ${it.name} ${it.widthPx}x${it.heightPx} @${it.densityDpi}dpi" + if (it.isDefault) " (default)" else " hosts-tasks=${it.canHostTasks}" }.ifEmpty { "No displays read" } + "\nConnect an external display, reopen this page, and note whether Liftoff became its home."), null),
             LabEntry("spk02", "SPK-02 Open beside", results["spk02"] ?: "Tap to open Settings beside Liftoff", {

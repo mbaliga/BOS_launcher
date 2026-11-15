@@ -101,9 +101,13 @@ import kotlin.math.roundToInt
  */
 class GridHomeState internal constructor(val pager: PagerState, internal val count: androidx.compose.runtime.MutableIntState) {
     val currentPage: Int get() = pager.currentPage
+
+    /** NFR-14: set from the motion preference by [rememberGridHomeState]; a host-driven animated jump then lands at once. */
+    @Volatile internal var stillPaging: Boolean = false
+
     suspend fun goToPage(page: Int, animate: Boolean = true) {
         val p = page.coerceIn(0, (count.intValue - 1).coerceAtLeast(0))
-        if (animate) pager.animateScrollToPage(p) else pager.scrollToPage(p)
+        if (animate && !stillPaging) pager.animateScrollToPage(p) else pager.scrollToPage(p)
     }
 }
 
@@ -111,7 +115,9 @@ class GridHomeState internal constructor(val pager: PagerState, internal val cou
 fun rememberGridHomeState(): GridHomeState {
     val count = remember { mutableIntStateOf(1) }
     val pager = androidx.compose.foundation.pager.rememberPagerState { count.intValue }
-    return remember(pager) { GridHomeState(pager, count) }
+    val state = remember(pager) { GridHomeState(pager, count) }
+    state.stillPaging = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    return state
 }
 
 /** Slot geometry of one page, grid or circle, in px within the page area. */

@@ -1,7 +1,7 @@
 package com.bos.sphere.feature.grid
 
 import com.bos.sphere.core.input.FocusKind
-import androidx.activity.compose.BackHandler
+import com.bos.sphere.core.design.predictiveBackLayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -220,13 +220,13 @@ fun AppDrawerSpace(
     railVisible: Boolean = true,
     viewSwitch: com.bos.sphere.core.data.SwitchStyle = com.bos.sphere.core.data.SwitchStyle.IconText,
 ) {
-    BackHandler(enabled = visible) { onDismiss() }
+    val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
     val drawerMotion = com.bos.sphere.core.design.rememberMotionPrefs()
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(drawerMotion.crossFadeMs(160))),
         exit = fadeOut(tween(drawerMotion.crossFadeMs(120))),
-        modifier = modifier,
+        modifier = modifier.predictiveBackLayer(backProgress),
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             // INP-01: the drawer sits above the home, so only its rows take arrows and Tab while it is open.

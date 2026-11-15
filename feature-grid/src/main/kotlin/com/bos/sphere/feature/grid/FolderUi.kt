@@ -1,5 +1,9 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,6 +58,7 @@ fun FolderTile(folder: Folder, resolve: (String) -> AppEntry?, size: Dp, onOpen:
                 if (interactive) Modifier
                     .onKeyEvent { if (it.type == KeyEventType.KeyUp && (it.key == Key.Enter || it.key == Key.NumPadEnter)) { onOpen(); true } else false }
                     .focusable().clickable(onClick = onOpen)
+                    .semantics(mergeDescendants = true) { contentDescription = folder.name; role = Role.Button }
                 else Modifier,
             )
             .padding(size * 0.12f),

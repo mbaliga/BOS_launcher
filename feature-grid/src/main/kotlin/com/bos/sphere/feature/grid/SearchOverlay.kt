@@ -1,7 +1,10 @@
 package com.bos.sphere.feature.grid
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import android.content.Intent
-import androidx.activity.compose.BackHandler
+import com.bos.sphere.core.design.predictiveBackLayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -150,8 +153,8 @@ fun SearchOverlay(
     /** PAL-08: the choices of an action that needs a pick ("Open on display" with several displays, "Add to workspace"); null = none to offer. */
     onAppActionChoices: (AppEntry, MenuAction) -> List<RadarChoice>? = { _, _ -> null },
 ) {
-    if (visible) BackHandler(onBack = onDismiss)
-    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+    val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier.predictiveBackLayer(backProgress)) {
         SearchScreen(
             apps = apps, recent = recent, prefs = prefs, contacts = contacts,
             onLaunch = onLaunch, onLongPressApp = onLongPressApp, onOpenIntent = onOpenIntent,
@@ -711,6 +714,7 @@ private fun SuggestionChip(s: Suggestion, onClick: () -> Unit) {
             .background(HyleColors.Surface, RoundedCornerShape(50))
             .border(1.dp, if (accent) HyleColors.Violet.copy(alpha = 0.5f) else HyleColors.Hairline, RoundedCornerShape(50))
             .clickable(onClick = onClick)
+            .semantics { role = androidx.compose.ui.semantics.Role.Button }
             .padding(horizontal = 12.dp, vertical = 7.dp),
     )
 }
@@ -774,7 +778,8 @@ internal fun ChannelButton(ch: Channel, onClick: () -> Unit) {
             .size(32.dp)
             .background(HyleColors.Surface, CircleShape)
             .border(1.dp, HyleColors.Hairline, CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = desc; role = androidx.compose.ui.semantics.Role.Button },
         contentAlignment = Alignment.Center,
     ) {
         Icon(glyph, desc, tint = HyleColors.Violet, modifier = Modifier.size(16.dp))

@@ -3,6 +3,7 @@ package com.bos.sphere.feature.grid
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.animation.core.animateFloatAsState
+import com.bos.sphere.core.design.gate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -397,7 +398,8 @@ private fun DsiScrollBar(
     insetAfterPx: Float,
     crossInsetPx: Float,
 ) {
-    val alpha: State<Float> = animateFloatAsState(if (state.isScrollInProgress) 0.95f else 0.5f, tween(250), label = "bar")
+    val barMotion = com.bos.sphere.core.design.rememberMotionPrefs()
+    val alpha: State<Float> = animateFloatAsState(if (state.isScrollInProgress) 0.95f else 0.5f, barMotion.gate(tween(250)), label = "bar")
     Canvas(Modifier.fillMaxSize()) {
         val viewport = if (landscape) size.width else size.height
         val content = ContinuousMath.rows(count, crossCount) * extentPx + padBeforePx + padAfterPx

@@ -47,6 +47,8 @@ object HomeBottomStack {
     /** Where the media strip sits with no rail (it clears the clock and dots in the band). */
     const val MEDIA_DEFAULT_DP = 66f
     const val SHELF_OFF_DP = 8f
+    /** The group shelf's chip row: padding and one line of text. */
+    const val SHELF_HEIGHT_DP = 40f
 
     data class Plan(
         /** Distance from the window's bottom edge to the rail's bottom (bottom rail only; the side rails use their own margins). */
@@ -58,7 +60,7 @@ object HomeBottomStack {
         val shelfBottomDp: Float,
     )
 
-    fun plan(enabled: Boolean, edge: DockEdge, collapsed: Boolean, bandDp: Float, lowerStackDp: Float): Plan {
+    fun plan(enabled: Boolean, edge: DockEdge, collapsed: Boolean, bandDp: Float, lowerStackDp: Float, shelfShown: Boolean = false): Plan {
         val bottomRail = enabled && edge == DockEdge.Bottom
         val railBottom = if (bottomRail && lowerStackDp > 0f) maxOf(DockFootprint.BOTTOM_MARGIN_DP, lowerStackDp + GAP_DP) else DockFootprint.BOTTOM_MARGIN_DP
         val body = if (collapsed) DockFootprint.COLLAPSED_DP else DockFootprint.SLOT_DP + 2 * DockFootprint.PAD_DP
@@ -68,10 +70,13 @@ object HomeBottomStack {
             edge == DockEdge.Bottom -> DockFootprint.Reserve(bottom = (railTop - bandDp).coerceAtLeast(0f))
             else -> DockFootprint.reserve(true, edge, collapsed, bandDp)
         }
+        val shelfBottom = if (bottomRail) railTop + GAP_DP else maxOf(SHELF_OFF_DP, if (lowerStackDp > 0f) lowerStackDp + GAP_DP else 0f)
+        val mediaBase = if (bottomRail) maxOf(MEDIA_DEFAULT_DP, railTop + GAP_DP) else MEDIA_DEFAULT_DP
         return Plan(
             railBottomDp = railBottom, railTopDp = railTop, reserve = reserve,
-            mediaBottomDp = if (bottomRail) maxOf(MEDIA_DEFAULT_DP, railTop + GAP_DP) else MEDIA_DEFAULT_DP,
-            shelfBottomDp = if (bottomRail) railTop + GAP_DP else maxOf(SHELF_OFF_DP, if (lowerStackDp > 0f) lowerStackDp + GAP_DP else 0f),
+            // The media strip and the group shelf both ride on the rail: with a shelf on screen the strip sits above it.
+            mediaBottomDp = if (shelfShown) maxOf(mediaBase, shelfBottom + SHELF_HEIGHT_DP + GAP_DP) else mediaBase,
+            shelfBottomDp = shelfBottom,
         )
     }
 }

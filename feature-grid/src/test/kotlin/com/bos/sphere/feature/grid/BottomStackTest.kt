@@ -48,6 +48,10 @@ class BottomStackTest {
             assertTrue("media strip below the rail top: $label", plan.mediaBottomDp >= plan.railTopDp)
             assertTrue("shelf below the rail top: $label", plan.shelfBottomDp >= plan.railTopDp)
         }
+        // With the group shelf on, the media strip sits above the shelf instead of on it.
+        val withShelf = HomeBottomStack.plan(true, edge, collapsed, band, lower, shelfShown = true)
+        assertTrue("media strip over the group shelf: $label", withShelf.mediaBottomDp >= withShelf.shelfBottomDp + HomeBottomStack.SHELF_HEIGHT_DP)
+        assertEquals(plan.shelfBottomDp, withShelf.shelfBottomDp, 0f)
         // The rail stays inside the window.
         assertTrue("rail off the window: $label", rail.t >= -0.01f && rail.b <= h + 0.01f && rail.l >= -0.01f && rail.r <= w + 0.01f)
     }

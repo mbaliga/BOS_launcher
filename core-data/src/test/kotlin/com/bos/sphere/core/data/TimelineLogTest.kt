@@ -65,6 +65,21 @@ class TimelineLogTest {
     }
 
     @Test
+    fun HOM_18_launchesQueuedTogetherAreNeverWrittenTwiceAcrossACompaction() {
+        val file = tmp.newFolder("f3").resolve("usage/timeline.log")
+        val io = QueueExecutor()
+        val log = TimelineLogStore(file, io, max = 10, slack = 3)
+        io.drain()
+        for (i in 0 until 12) { log.record(ev(i)); io.drain() }
+        // Three records land before the writer runs; the first write crosses the compaction line.
+        for (i in 12 until 15) log.record(ev(i))
+        io.drain()
+        val keys = file.readLines().mapNotNull(TimelineLogCodec::decode).map { it.key }
+        assertEquals(keys.size, keys.toSet().size)
+        assertEquals("app14", keys.last())
+    }
+
+    @Test
     fun HOM_18_nothingTouchesTheFileOnTheCallingThread() {
         val file = tmp.newFolder("f2").resolve("usage/timeline.log")
         val io = QueueExecutor()

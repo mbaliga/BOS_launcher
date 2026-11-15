@@ -779,6 +779,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         enabled = dockState.dock.isEnabled(dockTier), edge = dockState.dock.edgeFor(isLandscape),
         collapsed = dockState.dock.mode == com.bos.sphere.feature.dock.DockMode.Collapsed, bandDp = frame.value,
         lowerStackDp = com.bos.sphere.feature.grid.bottomStackDp(prefs, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()),
+        shelfShown = com.bos.sphere.feature.dock.GroupShelfModel.visible(dockState.groups, dockState.dock.groupShelf).isNotEmpty(),
     )
     val dockReserve = bottomPlan.reserve
     val scrollBottom = bottomClear + frame + dockReserve.bottom.dp

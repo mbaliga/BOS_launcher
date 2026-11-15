@@ -59,6 +59,8 @@ class TimelineLogStore(
     private var lines = 0
     private var loaded = false
     private val pending = ArrayList<LaunchEvent>()
+    /** Recorded but not yet in the file; one queued write appends them all (or rewrites the file), so none is written twice. */
+    private val unwritten = ArrayList<LaunchEvent>()
     private var seed: List<LaunchEvent> = emptyList()
 
     init { io.execute { load() } }
@@ -70,6 +72,7 @@ class TimelineLogStore(
             lines = read.size
             loaded = true
             pending.clear()
+            unwritten.clear()
             // What was recorded before the read finished is part of the log: write the merged result once.
             val rewrite = merged.size != read.size || TimelineLogCodec.needsCompaction(read.size, max, slack)
             _events.value = merged
@@ -84,7 +87,12 @@ class TimelineLogStore(
             seed = history
             if (loaded) {
                 val merged = TimelineLogCodec.merge(history, _events.value, max)
-                if (merged.size != _events.value.size) { _events.value = merged; io.execute { synchronized(lock) { writeAll(merged) } } }
+                if (merged.size != _events.value.size) {
+                    _events.value = merged
+                    unwritten.clear()
+                    // Written from the list as it is when the task runs, so a launch recorded meanwhile is not lost.
+                    io.execute { synchronized(lock) { writeAll(_events.value) } }
+                }
             }
         }
     }
@@ -94,11 +102,19 @@ class TimelineLogStore(
         synchronized(lock) {
             _events.value = TimelineLogCodec.compact(_events.value + e, max)
             if (!loaded) { pending += e; return }
+            unwritten += e
         }
         io.execute {
             synchronized(lock) {
-                if (TimelineLogCodec.needsCompaction(lines + 1, max, slack)) writeAll(_events.value)
-                else runCatching { file.parentFile?.mkdirs(); file.appendText(TimelineLogCodec.encode(e) + "\n"); lines++ }
+                if (unwritten.isEmpty()) return@synchronized
+                val batch = unwritten.toList()
+                unwritten.clear()
+                if (TimelineLogCodec.needsCompaction(lines + batch.size, max, slack)) writeAll(_events.value)
+                else runCatching {
+                    file.parentFile?.mkdirs()
+                    file.appendText(batch.joinToString("") { TimelineLogCodec.encode(it) + "\n" })
+                    lines += batch.size
+                }
             }
         }
     }

@@ -243,7 +243,7 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
             ) {
                 if (entry != null) AppIcon(entry, layout.iconDp, dp(layout.iconDp), showLabel = true)
                 else if (hosted != null && widgetHost != null) {
-                    if (widgetHost.isBound(hosted)) widgetHost.Content(hosted, Modifier.fillMaxSize())
+                    if (remember(hosted) { widgetHost.isBound(hosted) }) widgetHost.Content(hosted, Modifier.fillMaxSize())
                     else Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
                         Text(L10n.tr("Widget not available"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }

@@ -20,3 +20,7 @@ Nothing here is device-verified. "built" means the code is wired into the live s
 ## Shared files touched (small additive edits)
 
 `HomeScreen.kt` (drop binding moved after `homeItems` and given `onItems`, workspace switch by index, `PaletteWorkspaces`, two Radar parameters), `HomeItemsHost.kt` (`addDropped`, `applyKeyboardAction`, `onAction`), `GridHome.kt` (one argument), `SearchOverlay.kt` (two parameters, menu runner, drag dismissal), `Lab.kt` (one row). No new strings: nothing new goes through `L10n.tr`.
+
+## Adversarial review (final)
+
+Re-read the whole wave-3 diff against the Spec. No crash, state-loss, main-thread I/O or missing-translation defects found (no new `L10n.tr` strings; Lab rows are untranslated like the other Lab rows). Statuses above are the honest final table; INP-02's pointer-icon assertion states a constant and proves nothing about a real mouse. Full `testDebugUnitTest assembleRelease --offline` passes.

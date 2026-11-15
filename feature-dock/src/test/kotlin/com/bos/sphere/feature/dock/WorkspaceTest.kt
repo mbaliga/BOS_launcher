@@ -163,4 +163,14 @@ class WorkspaceTest {
         assertEquals(LaunchTarget("com.x", "org.y.Z", 0), AppKeys.target("com.x/org.y.Z#0"))
         assertNull(AppKeys.target("broken"))
     }
+
+    @Test fun PAL_03_aRadarWorkspaceResultSwitchesToTheWorkspaceItNames() {
+        val m = manager()
+        val b = m.create("Work"); m.create("Play")
+        assertEquals(listOf("Home", "Work", "Play").size, m.names().size)
+        assertTrue(m.switchToIndex(1))
+        assertEquals(b, m.current.activeId)
+        assertFalse("an index past the end does nothing", m.switchToIndex(9))
+        assertEquals(b, m.current.activeId)
+    }
 }

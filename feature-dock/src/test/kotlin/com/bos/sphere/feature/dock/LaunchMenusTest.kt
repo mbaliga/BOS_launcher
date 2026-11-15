@@ -40,4 +40,15 @@ class LaunchMenusTest {
         assertEquals(Placement.Adjacent, LaunchMenus.request(LaunchChoice.Beside, LaunchTarget("p"), 0, { 1 to 1 }).placement)
         assertEquals(src, LaunchMenus.request(LaunchChoice.Plain, LaunchTarget("p"), 0, { 1 to 1 }, src).source)
     }
+
+    @Test fun PAL_08_radarRunsBesideAndTheOnlyOtherDisplayDirectlyAndAsksWhenThereAreSeveral() {
+        val one = LaunchCaps(setOf(0, 2), setOf(0, 2), boundsHonoured = false, adjacentSupported = true)
+        assertEquals(LaunchChoice.Beside, AppActionList.directChoice(com.bos.sphere.core.input.MenuAction.OpenBeside, LaunchMenus.choices(one, 0, names)))
+        assertEquals(2, (AppActionList.directChoice(com.bos.sphere.core.input.MenuAction.OpenOnDisplay, LaunchMenus.choices(one, 0, names)) as LaunchChoice.OnDisplay).displayId)
+        // Two other displays: the person must pick, so Radar hands over to the sheet that lists them by name.
+        assertEquals(null, AppActionList.directChoice(com.bos.sphere.core.input.MenuAction.OpenOnDisplay, LaunchMenus.choices(rich, 0, names)))
+        // Nothing is offered where the spike did not prove it, and unrelated actions are never run here.
+        assertEquals(null, AppActionList.directChoice(com.bos.sphere.core.input.MenuAction.OpenBeside, LaunchMenus.choices(none, 0, names)))
+        assertEquals(null, AppActionList.directChoice(com.bos.sphere.core.input.MenuAction.Uninstall, LaunchMenus.choices(rich, 0, names)))
+    }
 }

@@ -59,6 +59,8 @@ class HomeExtras(
     val onTap: (String) -> Unit = {},
     val onLongPress: (String) -> Unit = {},
     val onDropOnto: (drag: String, target: String) -> Unit = { _, _ -> },
+    /** A keyboard edit (INP-09): the same [ItemAction] a drag produces, applied through the host's one edit path. */
+    val onAction: (ItemAction) -> Unit = {},
 ) {
     private val owned: Set<String> = state.nonAppKeys().toSet()
     fun owns(key: String) = key in owned

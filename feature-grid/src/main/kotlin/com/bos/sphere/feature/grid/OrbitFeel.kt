@@ -16,6 +16,25 @@ data class OrbitFeelValues(
     fun coerced() = OrbitFeelValues(creepDp.coerceIn(0f, 20f), flingDecay.coerceIn(0.5f, 12f), flingGain.coerceIn(0.01f, 0.5f), flingMax.coerceIn(100f, 2500f))
 }
 
+/**
+ * PAL-23 capture and commit tooling: the values tuned on a device become the committed defaults by pasting one
+ * snippet over the [OrbitFeelValues] constructor defaults. [snippet] is that text; [parse] reads it back (and any
+ * snippet a person edited), so the committed numbers can be checked against what the Lab page captured.
+ */
+object OrbitFeelCapture {
+    fun snippet(v: OrbitFeelValues): String {
+        val c = v.coerced()
+        return "val creepDp: Float = ${num(c.creepDp)}f,\nval flingDecay: Float = ${num(c.flingDecay)}f,\nval flingGain: Float = ${num(c.flingGain)}f,\nval flingMax: Float = ${num(c.flingMax)}f,"
+    }
+
+    fun parse(text: String): OrbitFeelValues? {
+        fun field(name: String) = Regex(name + "\\s*:\\s*Float\\s*=\\s*(-?[0-9]*\\.?[0-9]+)f").find(text)?.groupValues?.get(1)?.toFloatOrNull()
+        return OrbitFeelValues(field("creepDp") ?: return null, field("flingDecay") ?: return null, field("flingGain") ?: return null, field("flingMax") ?: return null).coerced()
+    }
+
+    private fun num(f: Float): String = if (f == f.toInt().toFloat()) "${f.toInt()}" else f.toString()
+}
+
 /** One adjustable constant, as the Lab page lists it. */
 class FeelHook(
     val id: String,

@@ -34,18 +34,30 @@ import com.bos.sphere.core.design.L10n
 object LauncherDrops {
     @Volatile var onApp: ((String) -> Unit)? = null
 
+    /** Set by Radar while it is open so a drag that starts on a result closes it, the same way the drawer closes (INP-11). */
+    @Volatile var onDragStart: (() -> Unit)? = null
+
+    /** The live home's handler for dropped link, file and search items; it places them on the current page through the home's own edit path (INP-11). */
+    @Volatile var onItems: ((List<com.bos.sphere.core.catalog.ItemDef>) -> Unit)? = null
+
     /** What the last drop looked like, for the SPK-05 spike row: types offered, clip items, what was made of them. */
     @Volatile var report: String? = null
 }
 
 /** Registers the home's handler for a launcher app key dropped on it (INP-11). Call once from the home. */
 @Composable
-fun HomeDropBinding(onApp: (String) -> Unit) {
+fun HomeDropBinding(onApp: (String) -> Unit, onItems: ((List<com.bos.sphere.core.catalog.ItemDef>) -> Unit)? = null) {
     val latest by rememberUpdatedState(onApp)
+    val latestItems by rememberUpdatedState(onItems)
     DisposableEffect(Unit) {
         val h: (String) -> Unit = { latest(it) }
+        val hi: (List<com.bos.sphere.core.catalog.ItemDef>) -> Unit = { latestItems?.invoke(it) }
         LauncherDrops.onApp = h
-        onDispose { if (LauncherDrops.onApp === h) LauncherDrops.onApp = null }
+        if (onItems != null) LauncherDrops.onItems = hi
+        onDispose {
+            if (LauncherDrops.onApp === h) LauncherDrops.onApp = null
+            if (LauncherDrops.onItems === hi) LauncherDrops.onItems = null
+        }
     }
 }
 
@@ -77,7 +89,8 @@ fun Modifier.homeDropTarget(sizeClass: SizeClass): Modifier {
                 LauncherDrops.report = "types=${event.mimeTypes()} items=${clips.size} made=${result.items.size + result.appKeys.size} ignored=${result.ignored}"
                 result.appKeys.forEach { LauncherDrops.onApp?.invoke(it) }
                 if (result.items.isNotEmpty()) {
-                    HomeDropStore.add(context, sc, result)
+                    // The live home places the items itself (so they render at once); with no home composed they go to the arrangement store.
+                    LauncherDrops.onItems?.invoke(result.items) ?: HomeDropStore.add(context, sc, result)
                     android.widget.Toast.makeText(context, L10n.tr("Added %d to home", result.items.size), android.widget.Toast.LENGTH_SHORT).show()
                 }
                 return result.items.isNotEmpty() || result.appKeys.isNotEmpty()

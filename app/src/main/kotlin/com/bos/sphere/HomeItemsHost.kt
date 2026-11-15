@@ -166,6 +166,23 @@ class HomeItems internal constructor(
         addLink(uri, L10n.tr(tab.title), isFile = false)
     }
 
+    /** INP-11: items dropped on the home (links, files, search text) are placed on the current page like any added item. */
+    fun addDropped(defs: List<ItemDef>) {
+        if (defs.isEmpty()) return
+        edit { s -> defs.fold(s) { acc, def -> HomeEdit.add(acc, def, page(), capacityOf) } }
+    }
+
+    /** INP-09: a keyboard edit ends in the same shared edit a drag does; a widget resize is bounded by the grid. */
+    fun applyKeyboardAction(a: com.bos.sphere.feature.grid.ItemAction) {
+        val (cols, rows) = gridDims()
+        val action = when (a) {
+            is com.bos.sphere.feature.grid.ItemAction.Resize -> a.copy(max = com.bos.sphere.core.catalog.WidgetSpan(cols, rows))
+            is com.bos.sphere.feature.grid.ItemAction.FileInto -> a.copy(newFolderId = newId(), defaultName = L10n.tr("Folder"))
+            else -> a
+        }
+        edit { com.bos.sphere.feature.grid.SharedItemActions.apply(action, it, capacityOf) }
+    }
+
     fun addShortcut(app: AppEntry, s: PinnableShortcut) {
         val def = ItemDef(ItemKeys.shortcut(app.packageName, s.id, app.user.hashCode()), ItemKind.Shortcut, s.label, s.id)
         edit { HomeEdit.add(it, def, page(), capacityOf) }
@@ -358,6 +375,7 @@ class HomeItems internal constructor(
         onResizeDone = { resizing = null },
         onTap = ::tap,
         onLongPress = { itemMenu = it },
+        onAction = ::applyKeyboardAction,
         onDropOnto = { drag, target ->
             edit { s -> HomeEdit.dropOnto(s, drag, target, newId(), L10n.tr("Folder"), capacityOf) }
         },

@@ -63,4 +63,17 @@ class KeyboardEditOpsTest {
         val act = KeyboardEditOps.resolve(s2, p, "a", FocusDir.Right, shift = true, columns = 4)
         assertTrue(act == null || (act as ItemAction.FileInto).targetKey != widget)
     }
+
+    @Test fun INP_09_on_a_page_shift_arrow_resizes_a_widget_and_files_into_the_packed_neighbour() {
+        val s = state("a", widget, "b", "c")
+        // The widget spans 2x2 in a 4-column page: Shift+Right on "a" must find the widget (not file into it) and Shift+Right on the widget grows it.
+        assertNull(KeyboardEditOps.resolveOnPage(s, 0, "a", FocusDir.Right, shift = true, columns = 4, rows = 4))
+        val grow = KeyboardEditOps.resolveOnPage(s, 0, widget, FocusDir.Right, shift = true, columns = 4, rows = 4)
+        assertTrue(grow is ItemAction.Resize && grow.dCols == 1)
+        val s2 = state("a", "b", "c")
+        val file = KeyboardEditOps.resolveOnPage(s2, 0, "b", FocusDir.Left, shift = true, columns = 4, rows = 4)
+        assertEquals("a", (file as ItemAction.FileInto).targetKey)
+        val next = SharedItemActions.apply(file.copy(newFolderId = "fx", defaultName = "Folder"), s2, cap)
+        assertEquals(setOf("a", "b"), next.folders.getValue("fx").keys.toSet())
+    }
 }

@@ -149,7 +149,7 @@ class AndroidPalette(context: Context, private val scope: CoroutineScope = Corou
     val fileProvider: PaletteProvider = FileProvider({ FileIndexHolder.get(app) }, { FileIndexer.hasAccess(app) }, strings)
     val shortcutProvider: PaletteProvider = ShortcutProvider { shortcuts.get() }
     val calculatorProvider: PaletteProvider = CalculatorProvider(strings)
-    val launcherActions: PaletteProvider = LauncherActionProvider()
+    val launcherActions: PaletteProvider = LauncherActionProvider(workspaces = { PaletteWorkspaces.names() })
 
     /** The non-app providers, as SearchProvider for the existing hub (apps and contacts keep their existing UI path). */
     fun hubProviders(): List<SearchProvider> =
@@ -195,6 +195,11 @@ object PaletteHits {
             intentUri = intentUri, actionId = action, score = r.score.coerceIn(0.0, 1.0).toFloat(), copyText = r.copyText, extras = r.payload,
         )
     }
+}
+
+/** The workspace names Radar's launcher actions offer ("Switch to workspace Work"); the host sets it from its workspace manager (PAL-03). */
+object PaletteWorkspaces {
+    @Volatile var names: () -> List<String> = { emptyList() }
 }
 
 /** Runs the parts of a hit the existing UI does not know: copy, app shortcut, launcher command. */

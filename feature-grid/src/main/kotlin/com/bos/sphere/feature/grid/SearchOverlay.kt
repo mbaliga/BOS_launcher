@@ -143,6 +143,10 @@ fun SearchOverlay(
     initialQuery: String = "",
     /** PAL-03: a launcher command a result asked for (a core-input LauncherCommand name, and a workspace index if any). */
     onRunCommand: (String, Int?) -> Unit = { _, _ -> },
+    /** PAL-08: run a shared menu action (display, beside, dock) straight from the Radar list; false = the host cannot, so the app sheet opens. */
+    onRunAppAction: (AppEntry, MenuAction) -> Boolean = { _, _ -> false },
+    /** PAL-08: whether "Open beside" is proven on this device (SPK-02); Radar offers it only then. */
+    adjacentSupported: Boolean = false,
 ) {
     if (visible) BackHandler(onBack = onDismiss)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
@@ -153,6 +157,7 @@ fun SearchOverlay(
             hub = hub, onOpenHit = onOpenHit, onRunAction = onRunAction,
             onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
             initialQuery = initialQuery, onRunCommand = onRunCommand,
+            onRunAppAction = onRunAppAction, adjacentSupported = adjacentSupported,
         )
     }
 }
@@ -204,6 +209,8 @@ internal fun SearchScreen(
     initialCategory: SearchCategory? = null,
     settingsSource: SettingsResultSource? = null,
     onRunCommand: (String, Int?) -> Unit = { _, _ -> },
+    onRunAppAction: (AppEntry, MenuAction) -> Boolean = { _, _ -> false },
+    adjacentSupported: Boolean = false,
 ) {
     val context = LocalContext.current
     // PAL-02, PAL-09: plain app queries also match aliases, initials and a typo, and learn from selections.
@@ -352,6 +359,12 @@ internal fun SearchScreen(
             is Tile.Setting -> settingsSource?.open(tile.entry)
         }
     }
+    val dismissForDrag by androidx.compose.runtime.rememberUpdatedState(onDismiss)
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val h: () -> Unit = { dismissForDrag() }
+        LauncherDrops.onDragStart = h
+        onDispose { if (LauncherDrops.onDragStart === h) LauncherDrops.onDragStart = null }
+    }
     // PAL-20: long-press and right-click open the same preview on every result, in all three layouts.
     val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }, onTouch = { touched = true })
     val onPreview: (Tile) -> Unit = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }
@@ -366,7 +379,7 @@ internal fun SearchScreen(
     LaunchedEffect(trimmed, selected) { nav = RadarNav(navTiles.size) }
     val selectedKey = if (inputMode == InputMode.Keyboard && navNow.active) navTiles.getOrNull(navNow.selected)?.key else null
     selectedHitHolder[0] = selectedKey?.takeIf { it.startsWith("h:") }?.removePrefix("h:")
-    fun menuFor(t: Tile) = ResultMenus.forKind(tileKind(t), otherDisplays = otherDisplays)
+    fun menuFor(t: Tile) = ResultMenus.forKind(tileKind(t), otherDisplays = otherDisplays, adjacentSupported = adjacentSupported)
     fun runMenu(tile: Tile, entry: ResultMenuEntry) {
         when {
             entry.preview -> previewTile = tile
@@ -374,7 +387,8 @@ internal fun SearchScreen(
             entry.action == MenuAction.Open -> tap(tile)
             entry.action == MenuAction.AppInfo && tile is Tile.App -> onOpenIntent(appInfoIntent(tile.app.packageName))
             entry.action == MenuAction.Uninstall && tile is Tile.App -> onOpenIntent(appUninstallIntent(tile.app))
-            tile is Tile.App -> onLongPressApp(tile.app) // display, split, dock, workspace, more: the host's own sheet
+            // PAL-08: display, beside and dock run from here when the host can; workspace and "more" open the host's own sheet.
+            tile is Tile.App -> if (entry.action == null || !onRunAppAction(tile.app, entry.action)) onLongPressApp(tile.app)
         }
     }
     val onRadarKey: (KeyEvent) -> Boolean = handler@{ ev ->
@@ -383,7 +397,7 @@ internal fun SearchScreen(
         val key = RadarKeyMap.radarKey(ev) ?: return@handler false
         val sel = field.selection
         val caret = CaretContext(queryBlank = query.isBlank(), atStart = sel.collapsed && sel.start == 0, atEnd = sel.collapsed && sel.end == query.length)
-        val r = RadarKeyboard.reduce(navNow, key, caret) { i -> ResultMenus.forKind(navTiles.getOrNull(i)?.let(::tileKind) ?: ResultKind.Other, otherDisplays = otherDisplays).size }
+        val r = RadarKeyboard.reduce(navNow, key, caret) { i -> ResultMenus.forKind(navTiles.getOrNull(i)?.let(::tileKind) ?: ResultKind.Other, otherDisplays = otherDisplays, adjacentSupported = adjacentSupported).size }
         nav = r.nav
         when (val e = r.effect) {
             is RadarEffect.Run -> navTiles.getOrNull(e.index)?.let { tap(it) }

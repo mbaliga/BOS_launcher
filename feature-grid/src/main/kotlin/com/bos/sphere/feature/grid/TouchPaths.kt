@@ -28,6 +28,25 @@ object TouchPaths {
         LauncherCommand.Dismiss -> "Tap outside the surface, or the system Back gesture"
     }
 
+    /**
+     * The corner action whose tap runs the same opener as [c] (the home's key handler and the corner both go through
+     * the one opener), or null when the touch way in is not a corner action. A test renders the real corner editor and
+     * checks the action is offered there, so these paths are proven against the UI rather than only worded.
+     */
+    fun cornerActionFor(c: LauncherCommand): CornerActionId? = when (c) {
+        LauncherCommand.OpenPalette -> CornerActionId.Search
+        LauncherCommand.OpenDrawer -> CornerActionId.AllApps
+        LauncherCommand.OpenSettings -> CornerActionId.LauncherSettings
+        else -> null
+    }
+
+    /**
+     * Commands whose touch path is a described gesture, dock tap, page swipe or settings row that no JVM test renders
+     * (they live in the dock, pager and Ground Control code of other streams, or are device gestures). Listed so the
+     * audit states what it does not prove; a new command lands here or in [cornerActionFor], never silently.
+     */
+    val describedOnly: Set<LauncherCommand> = LauncherCommand.entries.filter { cornerActionFor(it) == null }.toSet()
+
     /** Every menu entry is a row in the long-press menu, which is the touch way in. */
     fun forMenu(a: MenuAction): String = when (a) {
         MenuAction.Open, MenuAction.OpenOnDisplay, MenuAction.OpenBeside, MenuAction.AppInfo, MenuAction.AddToDock,

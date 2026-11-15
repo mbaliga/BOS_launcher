@@ -91,4 +91,10 @@ class InputAuditTest {
     @Test fun INP_08_gestures_that_are_not_swipes_are_never_blocked() {
         for (g in listOf(HomeGesture.PinchIn, HomeGesture.DoubleTap, HomeGesture.LongPress)) assertFalse(d1.swipeStartsInSystemZone(Offset(1f, 1f), screen, g))
     }
+
+    @Test fun PAL_08_radar_offers_open_beside_only_when_the_host_says_it_is_proven() {
+        fun has(adjacent: Boolean) = ResultMenus.forKind(ResultKind.App, otherDisplays = 0, adjacentSupported = adjacent).any { it.action == MenuAction.OpenBeside }
+        assertFalse(has(false))
+        assertTrue(has(true))
+    }
 }

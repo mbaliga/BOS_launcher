@@ -24,6 +24,9 @@ private class ControllerWindowCallback(private val base: Window.Callback) : Wind
     }
 }
 
+/** The wrapped callback a dialog window gets (INP-20); visible so a test can drive the hook itself. */
+internal fun controllerWindowCallback(base: Window.Callback): Window.Callback = ControllerWindowCallback(base)
+
 /**
  * Call once inside the content of a Compose Dialog. Dialogs are their own window and never see the activity key
  * hook, so without this a controller's B button would not close them (INP-20, INP-01).

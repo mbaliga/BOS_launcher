@@ -76,6 +76,8 @@ object LauncherInput {
     val editMode = mutableStateOf(false)
     /** Set by the paged home while it is composed; returns true when it consumed the move. */
     @Volatile var moveHook: ((FocusDir) -> Boolean)? = null
+    /** Shift + arrow in edit mode (INP-09): resize a widget by one cell or file an item into its neighbour. */
+    @Volatile var shiftMoveHook: ((FocusDir) -> Boolean)? = null
 
     /** INP-12: Radar or the drawer is open and the prefs ask for the keyboard in this orientation; text fields on those surfaces take focus. */
     val keyboardWanted = mutableStateOf(false)
@@ -127,7 +129,8 @@ object LauncherInput {
         val route = router.route(e.keyCode, e.isCtrlPressed, e.isAltPressed, e.isShiftPressed, e.isMetaPressed)
         val consumed = when (route) {
             is KeyRoute.Command -> { if (e.repeatCount == 0) _commands.tryEmit(route.command); true }
-            is KeyRoute.Move -> if (editMode.value && moveHook != null) { moveHook?.invoke(route.dir); true } else focus.move(route.dir)
+            is KeyRoute.Move -> if (editMode.value && e.isShiftPressed && shiftMoveHook != null) { shiftMoveHook?.invoke(route.dir); true }
+                else if (editMode.value && moveHook != null) { moveHook?.invoke(route.dir); true } else focus.move(route.dir)
             is KeyRoute.Tab -> focus.tab(route.backwards)
             KeyRoute.Menu -> if (focus.currentId == null && !overlayOpen) { emptyMenu.tryEmit(Unit); true } else false
             KeyRoute.Activate -> false

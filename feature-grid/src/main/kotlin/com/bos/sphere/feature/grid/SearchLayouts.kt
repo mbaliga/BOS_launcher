@@ -237,6 +237,7 @@ private fun StripTileView(tile: Tile, actions: TileActions) {
             .size(StripTile)
             .radarSelectedRing(LocalRadarSelection.current == tile.key, RoundedCornerShape(14.dp))
             .secondaryClick { actions.onSecondary(tile) }
+            .radarDragOut(tile)
             .combinedClickable(onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
     ) { TileFace(tile, StripTile) }
 }
@@ -552,6 +553,7 @@ private fun FlatTileRow(
                 .fillMaxWidth()
                 .then(selBg)
                 .secondaryClick { onPreview(tile) }
+                .radarDragOut(tile)
                 .combinedClickable(
                     onClick = { onTap(tile) },
                     onLongClick = { onPreview(tile) },
@@ -629,3 +631,7 @@ internal fun ResultPreview(
         }
     }
 }
+
+/** INP-11: a mouse drag out of a Radar app result carries the app to the home (a finger keeps tap, long-press and the preview). */
+internal fun Modifier.radarDragOut(tile: Tile): Modifier =
+    if (tile is Tile.App) appDragSource(tile.app.key, onStart = { LauncherDrops.onDragStart?.invoke() }) else this

@@ -17,3 +17,7 @@ Nothing here is device-verified. Status vocabulary: built (compiles and unit-tes
 ## Shared-file edits (small, additive)
 
 `HomeScreen.kt` (two grant hooks, picture path), `HomePanels.kt` (usage access hook), `MainActivity.kt` (one guard call), `BackupPane.kt` (dismiss and blank-provider message), `L10n.kt` (two table merges), new `L10nW3state.kt` with all eight languages, `docs/device-checklist.md` (new section).
+
+## Adversarial review (final)
+
+Reviewed `8ba41dc..daf33e8` against the Spec. Claims checked against code and tests; the grant interceptor is installed by `HomeScreen`, pending-widget slot names match the codec, translations exist for all new strings, and `testDebugUnitTest assembleRelease` passes. No overstated status found; statuses above stand (built: CFG-01, CFG-04, NFR-18; partial: the rest). Known limit: the NFR-18 guard does a few small file reads in `MainActivity.onCreate` (the same stores are read there anyway).

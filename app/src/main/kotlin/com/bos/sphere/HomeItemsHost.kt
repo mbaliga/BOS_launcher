@@ -13,6 +13,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +40,7 @@ import com.bos.sphere.core.catalog.IconSpec
 import com.bos.sphere.core.catalog.ItemDef
 import com.bos.sphere.core.catalog.ItemKeys
 import com.bos.sphere.core.catalog.ItemKind
+import com.bos.sphere.core.catalog.WidgetStacks
 import com.bos.sphere.core.catalog.RestoreAction
 import com.bos.sphere.core.catalog.WidgetSizing
 import com.bos.sphere.core.catalog.WidgetStartup
@@ -106,6 +108,16 @@ class HomeItems internal constructor(
 
     fun openSheet() { sheetOpen = true }
 
+    /** HOM-04: the Radar provider that lists folders by name. */
+    fun folderSearchProvider(): com.bos.sphere.core.data.SearchProvider = com.bos.sphere.core.catalog.FolderSearchProvider(
+        folders = { extrasState.folders.values },
+        intentFor = { f ->
+            Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_FOLDER, f.id)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP).toUri(Intent.URI_INTENT_SCHEME)
+        },
+        subtitle = { L10n.tr("Folder, %d items", it.keys.size) },
+    )
+
     /** Runs [f] on the shared arrangement (pages from the live list, extras from the store) and writes both back. */
     fun edit(f: (HomeState) -> HomeState) {
         val cur = store.state.value.copy(pages = pagesNow())
@@ -129,6 +141,14 @@ class HomeItems internal constructor(
         if (keys.isEmpty()) return
         val id = newId()
         edit { HomeEdit.createFolder(it, keys, id, name, capacityOf) }
+    }
+
+    /** WSP-05: set by the home screen; runs a saved group the way the dock does. */
+    internal var runGroup: (com.bos.sphere.core.launch.AppGroup) -> Unit = {}
+    internal var groupOpen by mutableStateOf(false)
+
+    fun addGroup(id: String, name: String) {
+        edit { HomeEdit.add(it, ItemDef(ItemKeys.group(id), ItemKind.Group, name, id), page(), capacityOf) }
     }
 
     fun addLink(uri: String, label: String, isFile: Boolean) {
@@ -175,6 +195,9 @@ class HomeItems internal constructor(
                     launcherApps.startShortcut(body.substringBefore('/'), def.target, null, null, userOf(body.substringAfterLast('#').toIntOrNull() ?: 0))
                 }
             }
+            ItemKind.Group -> ItemKeys.groupId(key)?.let { id ->
+                com.bos.sphere.feature.dock.WorkspaceRepository.get(context).current.groups.firstOrNull { it.id == id }?.let(runGroup)
+            }
             ItemKind.Link -> extrasState.items[key]?.let { def ->
                 // The content resolver lookup is a provider call: off the main thread.
                 kotlin.concurrent.thread(name = "home-link-open") {
@@ -191,8 +214,27 @@ class HomeItems internal constructor(
     }
 
     private fun removeKey(key: String) {
+        if (WidgetStacks.isStack(key)) {
+            // HOM-14: removing a stack removes every widget in it.
+            var members = emptyList<String>()
+            edit { s -> WidgetStacks.removeAll(s, key, capacityOf).let { (n, m) -> members = m; n } }
+            members.forEach { m -> ItemKeys.widgetId(m)?.let { host.deleteWidget(it) } }
+            return
+        }
         ItemKeys.widgetId(key)?.let { host.deleteWidget(it) }
         edit { HomeEdit.remove(it, key, capacityOf) }
+    }
+
+    internal var stackPick by mutableStateOf<String?>(null)
+
+    /** HOM-14: the widgets on pages that [key] could be stacked with. */
+    private fun stackCandidates(key: String): List<Pair<String, () -> Unit>> {
+        val onPages = pagesNow().flatMap { it.keys }.filter { ItemKeys.kind(it) == ItemKind.Widget && it != key && !WidgetStacks.isStack(it) }
+        return onPages.map { w ->
+            entry(L10n.tr("Stack with %s", extrasState.items[w]?.label ?: w)) {
+                edit { s -> if (WidgetStacks.isStack(key)) WidgetStacks.add(s, key, w) else WidgetStacks.create(s, key, w, newId()) }
+            }
+        }
     }
 
     private fun entry(label: String, run: () -> Unit): Pair<String, () -> Unit> = label to run
@@ -204,15 +246,30 @@ class HomeItems internal constructor(
                 entry(L10n.tr("Dissolve folder")) { ItemKeys.folderId(key)?.let { id -> edit { HomeEdit.dissolve(it, id) } } },
             )
             ItemKind.Widget -> buildList {
+                val stack = WidgetStacks.stackAt(extrasState, key)
+                if (stack != null) {
+                    add(entry(L10n.tr("Next widget in stack")) { edit { WidgetStacks.setActive(it, key, stack.next()) } })
+                    stack.keys.forEach { m ->
+                        add(entry(L10n.tr("Take out %s", extrasState.items[m]?.label ?: m)) { edit { WidgetStacks.takeOut(it, key, m, page(), capacityOf) } })
+                    }
+                }
+                if (stackCandidates(key).isNotEmpty() && (stack == null || stack.keys.size < 6)) add(entry(L10n.tr("Stack with another widget")) { stackPick = key })
                 add(entry(L10n.tr("Resize")) { resizing = key })
                 add(entry(L10n.tr("Move earlier")) { edit { s -> HomeEdit.reorderOnPage(s, key, (HomeLayoutIndex.indexOf(s, key) - 1).coerceAtLeast(0), capacityOf) } })
                 add(entry(L10n.tr("Move later")) { edit { s -> HomeEdit.reorderOnPage(s, key, HomeLayoutIndex.indexOf(s, key) + 1, capacityOf) } })
                 val info = ItemKeys.widgetId(key)?.let { host.providerInfo(it) }
-                if (info?.configure != null) add(entry(L10n.tr("Reconfigure")) { reconfigure(key) })
+                if (stack == null && info?.configure != null) add(entry(L10n.tr("Reconfigure")) { reconfigure(key) })
             }
             else -> listOf(entry(L10n.tr("Open")) { tap(key) })
         }
-        return own + entry(L10n.tr("Remove from home")) { removeKey(key) }
+        // HOM-02: folders, shortcuts and links can also sit in the dock rail.
+        val dockRef = com.bos.sphere.feature.dock.HomeItemPins.refOf(key)
+        val dockEntry = if (dockRef == null) emptyList() else {
+            val wm = com.bos.sphere.feature.dock.WorkspaceRepository.get(context)
+            val pinned = com.bos.sphere.feature.dock.HomeItemPins.isPinned(wm.current.active.dockPins, key)
+            listOf(entry(L10n.tr(if (pinned) "Remove from dock" else "Add to dock")) { wm.setPins(com.bos.sphere.feature.dock.HomeItemPins.toggle(wm.current.active.dockPins, key)) })
+        }
+        return own + dockEntry + entry(L10n.tr("Remove from home")) { removeKey(key) }
     }
 
     private fun reconfigure(key: String) {
@@ -247,11 +304,25 @@ class HomeItems internal constructor(
 
     /** Extra padding the scrolling homes take so the band never overlaps their tiles. */
     fun padFor(base: PaddingValues, widthDp: Float, heightDp: Float, topLevel: List<String>, style: com.bos.sphere.core.data.HomeStyle): PaddingValues {
-        val (items, widgets) = bandKeys(homeExtras, topLevel, style, widthDp.toInt(), heightDp.toInt())
-        return ScrollExtrasLayout.padFor(base, widthDp, heightDp, widgets.size, items.size)
+        // HOM-01: folders, shortcuts and links are rows of the home itself now; only widgets take a band.
+        val (_, widgets) = bandKeys(homeExtras, topLevel, style, widthDp.toInt(), heightDp.toInt())
+        return ScrollExtrasLayout.padFor(base, widthDp, heightDp, widgets.size, 0)
     }
 
     val iconSources: IconSources get() = sources
+
+    /** HOM-01: the folders, shortcuts, links and files the scrolling homes interleave with their app rows, in page order. */
+    fun interleavedKeys(stored: List<HomePage>): List<String> = com.bos.sphere.feature.grid.HomeInterleave.extraKeys(stored.flatMap { it.keys }, homeExtras::owns)
+
+    /** One hosted widget, or its placeholder when the provider is gone. */
+    @Composable
+    private fun HostedBody(key: String, modifier: Modifier) {
+        val id = ItemKeys.widgetId(key)
+        val rev = restoreRev
+        val available = remember(id, rev) { id != null && host.providerInfo(id) != null }
+        if (available && id != null) HostedWidget(host, id, modifier)
+        else WidgetPlaceholder(extrasState.items[key]?.label.orEmpty(), onRestore = { restoreRev++ }, modifier = modifier)
+    }
 
     /** What the surfaces render. */
     val homeExtras: HomeExtras get() = HomeExtras(
@@ -259,11 +330,11 @@ class HomeItems internal constructor(
         resolveApp = { appsByKey()[it] },
         shortcutIcon = ::shortcutIcon,
         widget = { key, modifier ->
-            val id = ItemKeys.widgetId(key)
-            val rev = restoreRev
-            val available = remember(id, rev) { id != null && host.providerInfo(id) != null }
-            if (available && id != null) HostedWidget(host, id, modifier)
-            else WidgetPlaceholder(extrasState.items[key]?.label.orEmpty(), onRestore = { restoreRev++ }, modifier = modifier)
+            val stack = com.bos.sphere.core.catalog.WidgetStacks.stackAt(extrasState, key)
+            if (stack != null) com.bos.sphere.feature.grid.WidgetStackView(
+                stack, onChange = { next -> edit { com.bos.sphere.core.catalog.WidgetStacks.setActive(it, key, next) } }, modifier = modifier,
+            ) { member -> HostedBody(member, Modifier.fillMaxSize()) }
+            else HostedBody(key, modifier)
         },
         resizing = resizing,
         onResize = { key, dc, dr ->
@@ -355,10 +426,16 @@ class HomeItems internal constructor(
             onIconPack = { sheetOpen = false; packOpen = true },
             onHiddenApps = { sheetOpen = false; hiddenOpen = true },
             onDismiss = { sheetOpen = false },
+            onGroup = { sheetOpen = false; groupOpen = true },
+        )
+        if (groupOpen) com.bos.sphere.feature.grid.GroupPickerDialog(
+            groups = com.bos.sphere.feature.dock.WorkspaceRepository.get(ctx).current.groups.map { Triple(it.id, it.name, it.members.size) },
+            onPick = ::addGroup, onDismiss = { groupOpen = false },
         )
         if (folderOpen) com.bos.sphere.feature.grid.NewFolderDialog(allApps().sortedBy { it.label.lowercase() }, onCreate = { keys, n -> addFolderWith(keys, n) }, onDismiss = { folderOpen = false })
         if (linkOpen) LinkDialog(onAdd = { u -> addLink(u, Uri.parse(u).host ?: u, false) }, onDismiss = { linkOpen = false })
         if (shortcutOpen) ShortcutPickerDialog(allApps().sortedBy { it.label.lowercase() }, ::shortcutsOf, onPick = ::addShortcut, onDismiss = { shortcutOpen = false })
+        stackPick?.let { k -> HomeItemMenu(L10n.tr("Stack with another widget"), stackCandidates(k), onDismiss = { stackPick = null }) }
         itemMenu?.let { k -> HomeItemMenu(extrasState.items[k]?.label ?: extrasState.folders[ItemKeys.folderId(k)]?.name.orEmpty(), menuEntries(k), onDismiss = { itemMenu = null }) }
         openFolder?.let { id ->
             val f = extrasState.folders[id]
@@ -405,9 +482,14 @@ class HomeItems internal constructor(
     /** The band over the scrolling homes (List, XMB, DSi, continuous): widgets and the item strip. */
     @Composable
     fun Band(stored: List<HomePage>, widthDp: Float, heightDp: Float, style: com.bos.sphere.core.data.HomeStyle) {
-        val (items, widgets) = bandKeys(homeExtras, topLevelKeys(stored), style, widthDp.toInt(), heightDp.toInt())
-        ScrollExtrasBand(homeExtras, items, widgets, widthDp, heightDp)
+        val (_, widgets) = bandKeys(homeExtras, topLevelKeys(stored), style, widthDp.toInt(), heightDp.toInt())
+        ScrollExtrasBand(homeExtras, emptyList(), widgets, widthDp, heightDp)
     }
+}
+
+/** HOM-04: a request from outside the home screen (a Radar result) to open a folder. */
+internal object HomeOpenRequests {
+    val folder = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 }
 
 /** Index of [key] on its page, for the widget "move" menu entries. */
@@ -446,6 +528,14 @@ fun rememberHomeItems(
     val dims by rememberUpdatedState(gridDims)
     val items = remember { HomeItems(context, store, { dims() }, { pagesNow }, { save(it) }, { cap(it) }, { cur() }, host, { all }, { byKey }, { launch(it) }) }
     items.extrasState = state
+    // HOM-04: a folder chosen in Radar opens here (the request is consumed once).
+    val openRequest by HomeOpenRequests.folder.collectAsStateWithLifecycle()
+    LaunchedEffect(openRequest, state.folders) {
+        openRequest?.let { id ->
+            // Kept until the folder exists: on a cold start the stored state may not have loaded yet.
+            if (id in state.folders) { items.openFolder = id; HomeOpenRequests.folder.value = null }
+        }
+    }
     // Icon sources: overrides, the chosen pack (parsed off the main thread), themed icons.
     val ov = remember { OverrideStoreHolder.get(context) }
     val overrides by ov.overrides.collectAsStateWithLifecycle()

@@ -58,6 +58,21 @@ object SpanGrid {
         val before = packed.placed.count { cellOf(it, cols) < cell }
         return before.coerceIn(0, rest.size)
     }
+
+    /**
+     * HOM-07 / HOM-08: the insertion index for dragging [dragged], which may span several cells, to
+     * [cell]. The footprint's top-left is the target cell pulled back so the whole footprint stays on the
+     * grid (a 2x2 widget dropped on the last column or row anchors one cell in); the index is then the
+     * number of the other items that start before that anchor, exactly as for a one-cell item. The live
+     * preview packs the page with the dragged item at this index, so it lands where the preview showed it.
+     */
+    fun insertIndexForDrag(keys: List<String>, dragged: String, spanOf: (String) -> WidgetSpan, cols: Int, rows: Int, cell: Int): Int {
+        if (cols < 1) return keys.count { it != dragged }
+        val sp = spanOf(dragged)
+        val c = (cell % cols).coerceIn(0, (cols - sp.cols).coerceAtLeast(0))
+        val r = (cell / cols).coerceIn(0, (rows - sp.rows).coerceAtLeast(0))
+        return insertIndex(keys, dragged, spanOf, cols, rows, r * cols + c)
+    }
 }
 
 /**
@@ -114,7 +129,15 @@ object HomeRekey {
             pages = state.pages.map { p -> p.copy(keys = p.keys.map(::sw)) },
             dock = state.dock.map(::sw),
             folders = state.folders.mapValues { (_, f) -> f.copy(keys = f.keys.map(::sw)) },
-            items = state.items.mapKeys { (k, _) -> sw(k) }.mapValues { (_, d) -> if (d.key == oldKey) d.copy(key = newKey) else d },
+            items = state.items.mapKeys { (k, _) -> sw(k) }.mapValues { (_, d) ->
+                when {
+                    d.key == oldKey -> d.copy(key = newKey)
+                    // HOM-14: a stack remembers its members by key.
+                    WidgetStacks.isStack(d.key) && oldKey in WidgetStacks.stackOf(d).keys ->
+                        d.copy(target = WidgetStacks.encode(WidgetStacks.stackOf(d).let { st -> st.copy(keys = st.keys.map(::sw)) }))
+                    else -> d
+                }
+            },
             widgets = state.widgets.mapKeys { (k, _) -> sw(k) },
         )
     }
@@ -125,10 +148,13 @@ object HomeRekey {
  * in folders or the dock must not be auto-placed back onto a page.
  */
 object HomeResolve {
-    fun available(appKeys: List<String>, extras: HomeState): List<String> = appKeys + extras.nonAppKeys()
+    fun available(appKeys: List<String>, extras: HomeState): List<String> {
+        val stacked = WidgetStacks.members(extras)
+        return appKeys + extras.nonAppKeys().filter { it !in stacked }
+    }
 
     fun layoutFor(layout: HomeLayout, extras: HomeState): HomeLayout {
-        val held = extras.folders.values.flatMap { it.keys } + extras.dock
+        val held = extras.folders.values.flatMap { it.keys } + extras.dock + WidgetStacks.members(extras)
         return if (held.isEmpty()) layout else layout.copy(removed = layout.removed + held)
     }
 

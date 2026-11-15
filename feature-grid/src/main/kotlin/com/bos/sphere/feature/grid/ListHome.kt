@@ -49,6 +49,8 @@ import kotlin.math.roundToInt
 private sealed interface LRow {
     data class Head(val letter: Char) : LRow
     data class App(val app: AppEntry) : LRow
+    /** HOM-01: a folder, shortcut, link or file shown among the app rows. */
+    data class Extra(val key: String, val label: String) : LRow
 }
 
 /** Letter an app files under: its first letter, or '#'. */
@@ -70,15 +72,20 @@ fun ListHome(
     showLabels: Boolean = true,
     /** Pinch / horizontal swipes / double tap / long press on empty space (see [homeGestures]). */
     gestures: HomeGestureSpec? = null,
+    /** HOM-01: the non-app items and which of them to interleave with the app rows (sorted by name). */
+    extras: HomeExtras? = null,
+    extraKeys: List<String> = emptyList(),
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        val rows = remember(apps) {
+        val rows = remember(apps, extras, extraKeys) {
             buildList<LRow> {
                 var last: Char? = null
-                apps.sortedBy { it.label.lowercase() }.forEach { a ->
-                    val l = listLetter(a.label)
+                val merged = HomeInterleave.alphabetical(apps, { it.key }, { it.label }, if (extras == null) emptyList() else extraKeys, { k -> extras?.let { extraLabel(k, it) }.orEmpty() })
+                merged.forEach { r ->
+                    val label = when (r) { is HomeRow.App -> r.app.label; is HomeRow.Extra -> extraLabel(r.key, extras!!) }
+                    val l = listLetter(label)
                     if (l != last) { add(LRow.Head(l)); last = l }
-                    add(LRow.App(a))
+                    add(when (r) { is HomeRow.App -> LRow.App(r.app); is HomeRow.Extra -> LRow.Extra(r.key, label) })
                 }
             }
         }
@@ -110,12 +117,27 @@ fun ListHome(
                 ),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(rows, key = { if (it is LRow.Head) "h${it.letter}" else (it as LRow.App).app.key }, contentType = { it::class }) { r ->
+                items(rows, key = { when (it) { is LRow.Head -> "h${it.letter}"; is LRow.App -> it.app.key; is LRow.Extra -> it.key } }, contentType = { it::class }) { r ->
                     when (r) {
                         is LRow.Head -> Text(
                             r.letter.toString(), color = HyleColors.Violet, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(start = 6.dp, top = 14.dp, bottom = 4.dp),
                         )
+                        is LRow.Extra -> Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                                .launcherItem("list.${r.key}", focusable = false, onMenu = { extras?.onLongPress?.invoke(r.key) })
+                                .combinedClickable(onClick = { extras?.onTap?.invoke(r.key) }, onLongClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress); extras?.onLongPress?.invoke(r.key)
+                                })
+                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                        ) {
+                            if (extras != null) ExtraItemFace(r.key, extras, icon)
+                            if (showLabels) {
+                                Spacer(Modifier.width(16.dp))
+                                Text(r.label, color = HyleColors.InkBright, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
                         is LRow.App -> Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()

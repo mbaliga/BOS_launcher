@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -63,21 +64,30 @@ fun HomeQuickSheet(
     onHomeItems: (() -> Unit)? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = HyleColors.Surface) {
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
+        // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
+        Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
             Text(L10n.tr("Home"), color = HyleColors.InkBright, fontSize = 20.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(bottom = 12.dp))
 
             // Up front: the four things people toggle most.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val timeOn = prefs.clockPosition != ClockPosition.Hidden
-                Tile(Modifier.weight(1f), Glyphs.Clock, "Time", timeOn) {
-                    update { it.copy(clockPosition = if (timeOn) ClockPosition.Hidden else ClockPosition.Top) }
+            val timeOn = prefs.clockPosition != ClockPosition.Hidden
+            val batteryOn = StripItem.Battery in prefs.strip
+            val tiles: List<@Composable (Modifier) -> Unit> = listOf(
+                { m -> Tile(m, Glyphs.Clock, "Time", timeOn) { update { it.copy(clockPosition = if (timeOn) ClockPosition.Hidden else ClockPosition.Top) } } },
+                { m -> Tile(m, Glyphs.Sun, "Weather", prefs.clockShowWeather) { update { it.copy(clockShowWeather = !it.clockShowWeather) } } },
+                { m ->
+                    Tile(m, Glyphs.Battery, "Battery %", batteryOn) {
+                        update { it.copy(strip = if (batteryOn) it.strip - StripItem.Battery else it.strip + (StripItem.Battery to StripZone.Right)) }
+                    }
+                },
+                { m -> Tile(m, Glyphs.Music, "Media", prefs.mediaControls) { update { it.copy(mediaControls = !it.mediaControls) } } },
+            )
+            val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+            val columns = com.bos.sphere.feature.grid.QuickSheetLayout.tileColumns(cfg.screenWidthDp.toFloat(), cfg.fontScale, tiles.size)
+            com.bos.sphere.feature.grid.QuickSheetLayout.rows(tiles, columns).forEachIndexed { r, rowTiles ->
+                if (r > 0) Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rowTiles.forEach { t -> t(Modifier.weight(1f)) }
                 }
-                Tile(Modifier.weight(1f), Glyphs.Sun, "Weather", prefs.clockShowWeather) { update { it.copy(clockShowWeather = !it.clockShowWeather) } }
-                val batteryOn = StripItem.Battery in prefs.strip
-                Tile(Modifier.weight(1f), Glyphs.Battery, "Battery %", batteryOn) {
-                    update { it.copy(strip = if (batteryOn) it.strip - StripItem.Battery else it.strip + (StripItem.Battery to StripZone.Right)) }
-                }
-                Tile(Modifier.weight(1f), Glyphs.Music, "Media", prefs.mediaControls) { update { it.copy(mediaControls = !it.mediaControls) } }
             }
 
             if (page != null) {
@@ -137,7 +147,7 @@ private fun Tile(modifier: Modifier, glyph: ImageVector, label: String, on: Bool
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(glyph, null, tint = if (on) HyleColors.InkBright else HyleColors.InkDim, modifier = Modifier.size(24.dp))
-        Text(L10n.tr(label), color = if (on) HyleColors.InkBright else HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp), maxLines = 1)
+        Text(L10n.tr(label), color = if (on) HyleColors.InkBright else HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp), maxLines = 2)
         Text(L10n.tr(if (on) "On" else "Off"), color = HyleColors.InkDim, fontSize = 10.sp)
     }
 }

@@ -5,7 +5,39 @@ import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.input.LauncherCommand
 
 /** A pinned thing, by kind and id. The folder and shortcut kinds are defined by the home stream; the dock only carries the reference. */
-enum class ItemKind { App, Shortcut, Folder, Group }
+enum class ItemKind { App, Shortcut, Folder, Group, Link }
+
+/**
+ * HOM-02: home items that are not apps (a folder, a launcher shortcut, a web link or file) pinned to the rail.
+ * The rail's pin stores a [DockItemRef]; this maps the home item key to one and back, with no catalog dependency.
+ */
+object HomeItemPins {
+    private const val FOLDER = "folder:"
+    private const val SHORTCUT = "shortcut:"
+    private const val LINK = "link:"
+
+    fun refOf(homeKey: String): DockItemRef? = when {
+        homeKey.startsWith(FOLDER) -> DockItemRef(ItemKind.Folder, homeKey.removePrefix(FOLDER))
+        homeKey.startsWith(SHORTCUT) -> DockItemRef(ItemKind.Shortcut, homeKey)
+        homeKey.startsWith(LINK) -> DockItemRef(ItemKind.Link, homeKey)
+        else -> null
+    }
+
+    /** The home item key a pin stands for, or null for apps, groups and other launcher pins (the Desktop item). */
+    fun homeKeyOf(ref: DockItemRef): String? = when (ref.kind) {
+        ItemKind.Folder -> FOLDER + ref.id
+        ItemKind.Shortcut -> ref.id.takeIf { it.startsWith(SHORTCUT) }
+        ItemKind.Link -> ref.id.takeIf { it.startsWith(LINK) }
+        else -> null
+    }
+
+    fun isPinned(pins: List<DockItemRef>, homeKey: String): Boolean = refOf(homeKey)?.let { it in pins } ?: false
+
+    fun toggle(pins: List<DockItemRef>, homeKey: String): List<DockItemRef> {
+        val r = refOf(homeKey) ?: return pins
+        return if (r in pins) pins - r else pins + r
+    }
+}
 
 data class DockItemRef(val kind: ItemKind, val id: String) {
     fun encode(): String = kind.name.lowercase() + ":" + id

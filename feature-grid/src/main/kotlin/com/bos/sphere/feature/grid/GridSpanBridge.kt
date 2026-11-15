@@ -26,8 +26,9 @@ internal fun keyAtSlot(page: HomePage, geom: PageGeometry, slot: Int, extras: Ho
 /** The index a dragged item takes in [restKeys] (the page without it) when dropped at ([x], [y]). */
 internal fun dropIndex(geom: PageGeometry, restKeys: List<String>, dragged: String, extras: HomeExtras?, x: Float, y: Float): Int {
     val cell = geom.nearest(x, y)
-    if (extras != null && geom is PageGeometry.Grid && SpanGrid.active(restKeys, extras::spanOf)) {
-        return SpanGrid.insertIndex(restKeys, dragged, extras::spanOf, geom.g.columns, geom.g.rows, cell)
+    // The dragged item counts too: a spanning widget dragged alone still packs by its span (HOM-07).
+    if (extras != null && geom is PageGeometry.Grid && SpanGrid.active(restKeys + dragged, extras::spanOf)) {
+        return SpanGrid.insertIndexForDrag(restKeys, dragged, extras::spanOf, geom.g.columns, geom.g.rows, cell)
     }
     return cell.coerceAtMost(restKeys.size)
 }

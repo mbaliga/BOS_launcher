@@ -76,16 +76,29 @@ fun HomeItemsSheet(
     onIconPack: () -> Unit,
     onHiddenApps: () -> Unit,
     onDismiss: () -> Unit,
+    /** WSP-05: place a saved app group on the page grid. */
+    onGroup: (() -> Unit)? = null,
 ) {
     Panel(onDismiss) {
         Text(L10n.tr("Home items"), color = HyleColors.InkBright, fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
         Row1(L10n.tr("Widget"), hint = L10n.tr("Pick from a searchable list")) { onWidget() }
         Row1(L10n.tr("New folder")) { onFolder() }
         Row1(L10n.tr("App shortcut"), hint = L10n.tr("A shortcut an app offers")) { onShortcut() }
+        if (onGroup != null) Row1(L10n.tr("App group"), hint = L10n.tr("Opens 2 to 4 apps with one tap")) { onGroup() }
         Row1(L10n.tr("Web link")) { onLink() }
         Row1(L10n.tr("File"), hint = L10n.tr("Opens with the app you choose")) { onFile() }
         Row1(L10n.tr("Icon pack and themed icons")) { onIconPack() }
         Row1(L10n.tr("Hidden apps")) { onHiddenApps() }
+    }
+}
+
+/** WSP-05: the saved app groups, to place one on home. [groups] are (id, name, member count). */
+@Composable
+fun GroupPickerDialog(groups: List<Triple<String, String, Int>>, onPick: (id: String, name: String) -> Unit, onDismiss: () -> Unit) {
+    Panel(onDismiss) {
+        Text(L10n.tr("App group"), color = HyleColors.InkBright, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
+        if (groups.isEmpty()) Text(L10n.tr("No app groups yet. Save one from the dock panel."), color = HyleColors.InkDim, fontSize = 14.sp)
+        groups.forEach { (id, name, n) -> Row1(name, hint = L10n.tr("App group, %d apps", n)) { onPick(id, name); onDismiss() } }
     }
 }
 

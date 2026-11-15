@@ -108,6 +108,8 @@ fun BoxScope.DockLayer(
     visible: Boolean,
     keyboardMode: Boolean,
     onLaunch: (AppEntry) -> Unit,
+    /** HOM-02: the home's folders, shortcuts and links, so they can be pinned to and drawn in the rail. */
+    homeExtras: com.bos.sphere.feature.grid.HomeExtras? = null,
 ) {
     val context = LocalContext.current
     val stores = remember { LauncherStores.get(context) }
@@ -132,8 +134,17 @@ fun BoxScope.DockLayer(
         apps = apps, launcher = launcher, controller = controller, refreshKey = homeSignal,
         onLaunchApp = onLaunch, onOpenPanel = { panelOpen = true }, inputIsKeyboard = keyboardMode,
         onRunGroup = { g -> scope.launch { launcher.runGroup(g) } },
-        labelOfOther = { ref -> if (ref.kind == ItemKind.Shortcut && ref.id == DESKTOP_PIN_ID) L10n.tr("Desktop") else null },
-        onLaunchOther = { ref -> if (ref.id == DESKTOP_PIN_ID) openDesktop(context, desktop) },
+        labelOfOther = { ref ->
+            if (ref.kind == ItemKind.Shortcut && ref.id == DESKTOP_PIN_ID) L10n.tr("Desktop")
+            else com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(ref)?.takeIf { homeExtras?.owns(it) == true }?.let { com.bos.sphere.feature.grid.extraLabel(it, homeExtras!!) }
+        },
+        onLaunchOther = { ref ->
+            if (ref.id == DESKTOP_PIN_ID) openDesktop(context, desktop)
+            else com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(ref)?.let { homeExtras?.onTap?.invoke(it) }
+        },
+        iconOther = if (homeExtras == null) null else { item, size ->
+            com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(item.ref)?.let { com.bos.sphere.feature.grid.ExtraItemFace(it, homeExtras, size) }
+        },
         modifier = { edge ->
             when (edge) {
                 DockEdge.Bottom -> Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = 8.dp)

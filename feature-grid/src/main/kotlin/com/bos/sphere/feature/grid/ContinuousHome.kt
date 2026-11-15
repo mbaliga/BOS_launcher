@@ -136,9 +136,13 @@ fun ContinuousHome(
     sounds: UiSounds? = null,
     /** Pinch / cross-axis swipes / double tap / long press on empty space (see [homeGestures]). */
     gestures: HomeGestureSpec? = null,
+    /** HOM-01: non-app items drawn as cells among the apps, placed by their position in [topLevel]. */
+    extras: HomeExtras? = null,
+    extraKeys: List<String> = emptyList(),
+    topLevel: List<String> = emptyList(),
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds, gestures)
+        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds, gestures, extras, extraKeys, topLevel)
     }
 }
 
@@ -164,7 +168,11 @@ private fun ContinuousImpl(
     showLabels: Boolean,
     sounds: UiSounds?,
     gestures: HomeGestureSpec?,
+    extras: HomeExtras?,
+    extraKeys: List<String>,
+    topLevel: List<String>,
 ) {
+    val rows = remember(apps, extras, extraKeys, topLevel) { HomeInterleave.merge(apps, { it.key }, if (extras == null) emptyList() else extraKeys, topLevel) }
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val latestLaunch by rememberUpdatedState(onLaunch)
@@ -210,8 +218,12 @@ private fun ContinuousImpl(
                     contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    itemsIndexed(apps, key = { _, a -> a.key }, contentType = { _, _ -> "app" }) { index, app ->
-                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxWidth().height(extentDp).semantics { traversalIndex = index.toFloat() })
+                    itemsIndexed(rows, key = { _, r -> r.key }, contentType = { _, r -> if (r is HomeRow.Extra) "extra" else "app" }) { index, row ->
+                        val m = Modifier.fillMaxWidth().height(extentDp).semantics { traversalIndex = index.toFloat() }
+                        when (row) {
+                            is HomeRow.App -> ContinuousCell(row.app, dsi, plate.dp, showLabels, onTap, onLong, m)
+                            is HomeRow.Extra -> if (extras != null) ContinuousExtraCell(row.key, extras, dsi, plate.dp, showLabels, m)
+                        }
                     }
                 }
             } else {
@@ -221,15 +233,19 @@ private fun ContinuousImpl(
                     contentPadding = contentPadding,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    itemsIndexed(apps, key = { _, a -> a.key }, contentType = { _, _ -> "app" }) { index, app ->
-                        ContinuousCell(app, dsi, plate.dp, showLabels, onTap, onLong, Modifier.fillMaxHeight().width(extentDp).semantics { traversalIndex = index.toFloat() })
+                    itemsIndexed(rows, key = { _, r -> r.key }, contentType = { _, r -> if (r is HomeRow.Extra) "extra" else "app" }) { index, row ->
+                        val m = Modifier.fillMaxHeight().width(extentDp).semantics { traversalIndex = index.toFloat() }
+                        when (row) {
+                            is HomeRow.App -> ContinuousCell(row.app, dsi, plate.dp, showLabels, onTap, onLong, m)
+                            is HomeRow.Extra -> if (extras != null) ContinuousExtraCell(row.key, extras, dsi, plate.dp, showLabels, m)
+                        }
                     }
                 }
             }
         }
         run {
             DsiScrollBar(
-                state = gridState, landscape = landscape, count = apps.size, crossCount = crossCount,
+                state = gridState, landscape = landscape, count = rows.size, crossCount = crossCount,
                 extentPx = with(density) { extent.dp.toPx() },
                 padBeforePx = with(density) { (if (landscape) padL else padT).toPx() },
                 padAfterPx = with(density) { (if (landscape) padR else padB).toPx() },
@@ -239,12 +255,12 @@ private fun ContinuousImpl(
             )
             // Grab the bar and drag: speed-scrubs the whole list (a fat, invisible touch strip along the bar).
             val scrubScope = rememberCoroutineScope()
-            val rowsTotal = ContinuousMath.rows(apps.size, crossCount)
+            val rowsTotal = ContinuousMath.rows(rows.size, crossCount)
             val strip = Modifier.pointerInput(rowsTotal, crossCount, landscape) {
                 fun jump(pos: Float, length: Float) {
                     val f = (pos / length.coerceAtLeast(1f)).coerceIn(0f, 1f)
                     val idx = (f * (rowsTotal - 1).coerceAtLeast(0)).roundToInt() * crossCount
-                    scrubScope.launch { gridState.scrollToItem(idx.coerceIn(0, (apps.size - 1).coerceAtLeast(0))) }
+                    scrubScope.launch { gridState.scrollToItem(idx.coerceIn(0, (rows.size - 1).coerceAtLeast(0))) }
                 }
                 detectDragGestures(
                     onDragStart = { o -> jump(if (landscape) o.x else o.y, if (landscape) size.width.toFloat() else size.height.toFloat()) },
@@ -330,6 +346,31 @@ private fun ContinuousCell(
                     modifier = Modifier.padding(top = 4.dp).widthIn(max = plate + 8.dp),
                 )
             }
+        }
+    }
+}
+
+/** HOM-01: a folder, shortcut, link or file as a cell among the apps. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ContinuousExtraCell(key: String, extras: HomeExtras, dsi: Boolean, plate: Dp, showLabels: Boolean, modifier: Modifier) {
+    val label = extraLabel(key, extras)
+    Column(
+        modifier
+            .semantics { contentDescription = label }
+            .launcherItem("cell.$key", focusable = false, onMenu = { extras.onLongPress(key) }, ringRadiusDp = if (dsi) 10f else 14f)
+            .combinedClickable(onClick = { extras.onTap(key) }, onLongClick = { extras.onLongPress(key) }),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        ExtraItemFace(key, extras, if (dsi) plate * 0.92f else plate)
+        if (showLabels) {
+            Text(
+                label, color = HyleColors.Ink, fontSize = if (dsi) 12.sp else 11.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, 1f), 4f)),
+                modifier = Modifier.padding(top = 4.dp).widthIn(max = plate + 8.dp),
+            )
         }
     }
 }

@@ -522,7 +522,7 @@ fun GridHome(
                                     is Hit.Focus -> st.pages.getOrNull(hit.page)?.keys?.getOrNull(hit.index)
                                         ?.let { if (HomeTiles.isTile(it)) Hit.Tile(it) else Hit.App(it) } ?: Hit.Empty
                                     else -> hit
-                                }.let { h -> if (h is Hit.Tile && ex?.owns(h.key) == true && ex?.isWidget(h.key) == false) Hit.App(h.key) else h }
+                                }.let { h -> if (h is Hit.Tile && ex?.owns(h.key) == true) Hit.App(h.key) else h }
                                 when (pressed) {
                                     is Hit.Focus -> Unit
                                     Hit.Empty -> {
@@ -671,6 +671,24 @@ fun GridHome(
                     ghost != null -> AppIcon(ghost, iconDp, ghostModifier)
                     key == HomeTiles.CLOCK -> ClockTile(iconDp, ghostModifier)
                     key == HomeTiles.SETTINGS -> SettingsTile(iconDp, ghostModifier)
+                    extras?.owns(key) == true && extras.isWidget(key) -> {
+                        // HOM-07: a widget is dragged as its whole span, not as one icon.
+                        val geo = geomFor(tp, dragBase.getOrNull(tp)) as? PageGeometry.Grid
+                        val sp = extras.spanOf(key)
+                        val wPx = (geo?.g?.pitchX ?: iconPx) * sp.cols
+                        val hPx = (geo?.g?.pitchY ?: iconPx) * sp.rows
+                        val wDp = with(density) { wPx.toDp() }
+                        val hDp = with(density) { hPx.toDp() }
+                        Box(
+                            Modifier
+                                .offset { IntOffset((dragPos.x - wPx / 2).roundToInt(), (dragPos.y - hPx / 2).roundToInt()) }
+                                .size(wDp, hDp)
+                                .graphicsLayer { alpha = 0.85f }
+                                .shadow(12.dp, RoundedCornerShape(16.dp))
+                                .background(HyleColors.Violet.copy(alpha = 0.35f), RoundedCornerShape(16.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(extraLabel(key, extras), color = HyleColors.InkBright, fontSize = 12.sp, maxLines = 1) }
+                    }
                     extras?.owns(key) == true -> ExtraItemFace(key, extras, iconDp, ghostModifier)
                 }
             }

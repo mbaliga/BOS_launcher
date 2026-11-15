@@ -84,7 +84,9 @@ import kotlin.math.roundToInt
 
 /** Black, or the bundled picture (cropped, gently scrimmed, drifting slowly when [motion]). */
 @Composable
-internal fun SearchBackdrop(style: com.bos.sphere.core.data.SearchBackdropStyle, motion: Boolean, modifier: Modifier = Modifier) {
+internal fun SearchBackdrop(style: com.bos.sphere.core.data.SearchBackdropStyle, motionRequested: Boolean, modifier: Modifier = Modifier) {
+    // NFR-14: with system animations off the backdrop holds still, whatever the setting says.
+    val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
     val picture = style == com.bos.sphere.core.data.SearchBackdropStyle.Picture
     Box(modifier.background(Color.Black)) {
         if (style == com.bos.sphere.core.data.SearchBackdropStyle.Radar) RadarSweep(motion, Modifier.fillMaxSize())
@@ -236,8 +238,10 @@ internal fun CategoryWheel(
 
 @Composable
 internal fun BlinkingCaret(height: Dp, color: Color = Color.White, modifier: Modifier = Modifier) {
-    val t = rememberInfiniteTransition(label = "caret").animateFloat(0f, 1f, infiniteRepeatable(tween(1060, easing = LinearEasing)), label = "c")
-    Box(modifier.padding(start = 2.dp).width(2.dp).height(height).graphicsLayer { alpha = if (t.value < 0.5f) 1f else 0f }.background(color))
+    // NFR-14: with system animations off the caret stays solid instead of blinking.
+    val still = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    val t = if (still) null else rememberInfiniteTransition(label = "caret").animateFloat(0f, 1f, infiniteRepeatable(tween(1060, easing = LinearEasing)), label = "c")
+    Box(modifier.padding(start = 2.dp).width(2.dp).height(height).graphicsLayer { alpha = if (t == null || t.value < 0.5f) 1f else 0f }.background(color))
 }
 
 /**

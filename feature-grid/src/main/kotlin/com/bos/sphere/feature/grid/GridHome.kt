@@ -228,6 +228,8 @@ fun GridHome(
     val editNow by rememberUpdatedState(editMode)
     val paging = prefs.pagingFor(isLandscape)
     val pagerState = state.pager
+    // NFR-14: with system animations off, page changes jump instead of sliding.
+    val stillPaging = com.bos.sphere.core.design.rememberMotionPrefs().reduced
     // The whole surface is laid out in physical (LTR) coordinates — geometry, hit-testing and
     // gestures are physical, and corners are pinned to physical corners — so RTL locales draw
     // exactly where touches land. Text inside still shapes right-to-left.
@@ -328,7 +330,7 @@ fun GridHome(
             val next = (pagerState.currentPage + edgeDir).coerceIn(0, pageCount - 1)
             if (next != pagerState.currentPage) {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                pagerState.animateScrollToPage(next)
+                pagerState.pageTo(next, stillPaging)
             }
         }
     }
@@ -509,7 +511,7 @@ fun GridHome(
                                     }
                                     if (pressed.isEmpty()) break
                                 }
-                                scope.launch { pagerState.animateScrollToPage(pagerState.currentPage) }
+                                scope.launch { pagerState.pageTo(pagerState.currentPage, stillPaging) }
                                 if (startSpan > 0f && span > 0f) {
                                     val ratio = span / startSpan
                                     val g = when {
@@ -639,13 +641,13 @@ fun GridHome(
                     suggestion = if (index == 0 && prefs.showSuggestion && dragKey == null) suggestion else null,
                     onLaunch = onLaunch,
                     onLongPress = onAppLongPress,
-                    onItemFocused = { if (pagerState.currentPage != index) scope.launch { pagerState.animateScrollToPage(index) } },
+                    onItemFocused = { if (pagerState.currentPage != index) scope.launch { pagerState.pageTo(index, stillPaging) } },
                     extras = extras,
                     editing = editMode,
                     onRemove = onRemoveItem,
                 )
             }
-            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.animateScrollToPage(it) } }, extras = extras)
+            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.pageTo(it, stillPaging) } }, extras = extras)
             if (areaSize != IntSize.Zero) {
                 if (paging == PagingAxis.Horizontal) {
                     HorizontalPager(
@@ -708,7 +710,7 @@ fun GridHome(
             count = pageCount,
             current = pagerState.currentPage,
             vertical = indicatorAtStart,
-            onSelect = { scope.launch { pagerState.animateScrollToPage(it) } },
+            onSelect = { scope.launch { pagerState.pageTo(it, stillPaging) } },
             onMenu = { onEmptyLongPress(pagerState.currentPage) },
             homeIndex = prefs.homePage.coerceIn(0, (pageCount - 1).coerceAtLeast(0)),
             modifier = if (indicatorAtStart) {
@@ -1097,4 +1099,9 @@ private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere
         // HOM-12: the remove handle of a widget in edit mode.
         if (editing) EditHandleBox(with(density) { wPx.toDp() }, extraLabel(itemKey, extra), onRemove) {}
     }
+}
+
+/** NFR-14: slide to [page], or jump straight there when [still] (system animations off). */
+internal suspend fun PagerState.pageTo(page: Int, still: Boolean) {
+    if (still) scrollToPage(page) else animateScrollToPage(page)
 }

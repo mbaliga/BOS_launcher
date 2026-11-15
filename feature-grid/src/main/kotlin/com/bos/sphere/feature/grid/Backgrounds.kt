@@ -387,6 +387,21 @@ private fun TextureBackground(preset: String, colorA: Long, modifier: Modifier) 
     }
 }
 
+/**
+ * NFR-15: colours a texture really puts behind the text (3x3 pixels of its rendered tile, plus the corner shade that
+ * [TextureBackground] draws is ignored, which only darkens). Same preset resolution as [TextureBackground].
+ */
+internal fun textureSampleColors(preset: String, colorA: Long): List<Int> {
+    val custom = preset == BackgroundMath.CUSTOM
+    val id = if (BackgroundPresets.textures.any { it.id == preset }) preset
+    else if (custom) "grain" else BackgroundPresets.default(BackgroundKind.Texture)
+    val tile = TextureTiles.render(id, colorA.toInt(), custom, 1f)
+    val out = ArrayList<Int>(9)
+    for (iy in 0..2) for (ix in 0..2) out += tile.getPixel((tile.width - 1) * ix / 2, (tile.height - 1) * iy / 2) or (0xFF shl 24)
+    tile.recycle()
+    return out
+}
+
 /** A *mutable* bitmap from pixels (`createBitmap(int[], …)` returns an immutable one, which a Canvas then refuses). */
 private fun mutableBitmap(px: IntArray, size: Int): Bitmap =
     Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { it.setPixels(px, 0, size, 0, 0, size, size) }

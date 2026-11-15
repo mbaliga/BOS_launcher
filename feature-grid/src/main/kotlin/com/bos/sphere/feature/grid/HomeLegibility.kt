@@ -24,7 +24,7 @@ import kotlinx.coroutines.withContext
 /**
  * NFR-15: wallpaper colours the home text can land on, so the scrim can be sized from real data. Solid and gradient
  * backgrounds are exact (every stop counts); a picture is sampled on a 3x3 grid from a downscaled decode; the system
- * wallpaper uses the colours the platform extracts. Textures and live scenes are animated or procedural and are not
+ * wallpaper uses the colours the platform extracts. Textures are sampled from their rendered tile; live scenes and the bundled Horizon picture are animated or procedural and are not
  * sampled: they use the mid-grey fallback of [com.bos.sphere.core.quality.Contrast.scrimAlphaForAny] (known limit).
  */
 object WallpaperSamples {
@@ -65,6 +65,7 @@ fun rememberHomeScrim(kind: BackgroundKind, preset: String, colorA: Long, colorB
             val fixed = WallpaperSamples.staticColors(kind, preset, colorA, colorB)
             when {
                 fixed.isNotEmpty() -> fixed
+                kind == BackgroundKind.Texture -> runCatching { textureSampleColors(preset, colorA) }.getOrDefault(emptyList())
                 kind == BackgroundKind.Picture && preset == "photo" && picturePath.isNotEmpty() -> runCatching { WallpaperSamples.photoColors(picturePath) }.getOrDefault(emptyList())
                 kind == BackgroundKind.System -> runCatching {
                     val c = context.getSystemService(WallpaperManager::class.java)?.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)

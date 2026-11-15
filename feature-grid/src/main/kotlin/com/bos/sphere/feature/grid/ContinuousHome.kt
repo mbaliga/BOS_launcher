@@ -204,6 +204,7 @@ private fun ContinuousImpl(
         val fadeStart = with(density) { (if (landscape) padL else padT).toPx() }
         val fadeEnd = with(density) { (if (landscape) padR else padB).toPx() }
 
+        val stillCells = com.bos.sphere.core.design.rememberMotionPrefs().reduced
         // NFR-13: one linear reading order for TalkBack, by item index, whichever way the grid flows.
         Box(
             Modifier
@@ -221,7 +222,7 @@ private fun ContinuousImpl(
                     itemsIndexed(rows, key = { _, r -> r.key }, contentType = { _, r -> if (r is HomeRow.Extra) "extra" else "app" }) { index, row ->
                         val m = Modifier.fillMaxWidth().height(extentDp).semantics { traversalIndex = index.toFloat() }
                         when (row) {
-                            is HomeRow.App -> ContinuousCell(row.app, dsi, plate.dp, showLabels, onTap, onLong, m)
+                            is HomeRow.App -> ContinuousCell(row.app, dsi, plate.dp, showLabels, stillCells, onTap, onLong, m)
                             is HomeRow.Extra -> if (extras != null) ContinuousExtraCell(row.key, extras, dsi, plate.dp, showLabels, m)
                         }
                     }
@@ -236,7 +237,7 @@ private fun ContinuousImpl(
                     itemsIndexed(rows, key = { _, r -> r.key }, contentType = { _, r -> if (r is HomeRow.Extra) "extra" else "app" }) { index, row ->
                         val m = Modifier.fillMaxHeight().width(extentDp).semantics { traversalIndex = index.toFloat() }
                         when (row) {
-                            is HomeRow.App -> ContinuousCell(row.app, dsi, plate.dp, showLabels, onTap, onLong, m)
+                            is HomeRow.App -> ContinuousCell(row.app, dsi, plate.dp, showLabels, stillCells, onTap, onLong, m)
                             is HomeRow.Extra -> if (extras != null) ContinuousExtraCell(row.key, extras, dsi, plate.dp, showLabels, m)
                         }
                     }
@@ -310,13 +311,14 @@ private fun ContinuousCell(
     dsi: Boolean,
     plate: Dp,
     showLabels: Boolean,
+    still: Boolean,
     onTap: (AppEntry) -> Unit,
     onLong: (AppEntry) -> Unit,
     modifier: Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale: State<Float> = animateFloatAsState(if (pressed && dsi) 0.92f else 1f, spring(dampingRatio = 0.55f, stiffness = 500f), label = "press")
+    val scale: State<Float> = animateFloatAsState(if (pressed && dsi) 0.92f else 1f, if (still) tween(0) else spring(dampingRatio = 0.55f, stiffness = 500f), label = "press")
     Column(
         modifier
             .graphicsLayer { scaleX = scale.value; scaleY = scale.value }

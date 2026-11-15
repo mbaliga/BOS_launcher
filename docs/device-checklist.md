@@ -88,3 +88,24 @@ Record with: `adb logcat -b all -d > run.txt` after each section, and look for `
 - [ ] CFG-04: remove a Launchpad rule, then Backup > restore the newest snapshot: the rule is back.
 - [ ] CFG-07: from a clean install, press the microphone button in Radar, open the Launchpad access prompt, the Recents panel's access row and the dock's notification access: each shows the one-screen explanation before the system route.
 - [ ] CFG-01: Ground Control > Home > Keyboard shortcuts: change a shortcut, export the setup, import it on a second install: the same key works there.
+## 13. NFR pass/fail record (one row per requirement)
+Run `tools/device_nfr.sh` on the mid-range reference device for the rows marked script, then write the number in the last column and the date and build. A blank cell means not measured. Nothing in this table has been run.
+
+| ID | Exact step | Pass when | Recorded number (device, build, date) |
+| --- | --- | --- | --- |
+| NFR-01 | script: `tools/device_nfr.sh` (perf.sh warm loop; macrobenchmark `HomeBenchmarks` warm) | warm home p95 at most 150 ms | |
+| NFR-02 | script: same run; `HomeBenchmarks` cold start with the `Liftoff.homeInteractive` metric | cold start p95 at most 700 ms | |
+| NFR-03 | script: `PaletteBenchmarks` open (`Liftoff.paletteOpen`, `Liftoff.paletteFirstResults`) | p95 at most 100 ms | |
+| NFR-04 | script: `PaletteBenchmarks` keystroke (`Liftoff.paletteKeystroke`); the span covers app results only, so also eyeball provider rows | p95 at most 50 ms | |
+| NFR-05 | script: perf.sh gfxinfo and `FrameTimingMetric`; scroll home pages, drawer, open the palette, open Ground Control | janky frames at most 1% | |
+| NFR-06 | script: `tools/measure_pss.sh` with 10 widgets on home | median PSS at most 180 MB | |
+| NFR-07 | `tools/measure_battery.sh 8` overnight, idle, unplugged; then `adb shell dumpsys batterystats` for wake locks | at most 0.5% per day and no held wake lock from Liftoff | |
+| NFR-09 | beta cohort: Ground Control > Backup > Crash reports shows the local figure per device; sum across the cohort | crash-free at least 99.8% over the cohort | |
+| NFR-10 | `tools/soak.sh` 7200 s (`tools/device_nfr.sh --soak`) | no ANR and no crash in logcat | |
+| NFR-11 | section 4 of this file (kill, reboot, package update, profile toggle, display hot-plug) | every step in section 4 leaves state intact | |
+| NFR-12 | debug build, `adb logcat -s StrictMode` while doing section 8 and one cold start | no StrictMode disk or network violation from Liftoff frames on the main thread other than the first prefs read in `MainActivity.onCreate` (known, recorded) | |
+| NFR-13 | TalkBack on, every home style (Grid, List, Psp, Dsi), Continuous and Paged, Orbit, Filmstrip and Flat search; swipe through the whole screen | each item announces a name, order follows the intended order (Orbit: best match first), every action reachable | |
+| NFR-14 | Settings > Accessibility > Remove animations (or the three animation scales to 0), then open: palette, drawer (all styles), Ground Control, Launchpad, notifications hub, page home, XMB, Orbit | no spring, slide or loop; only fades and snaps; the Launchpad still slides briefly and linearly (known gap) | |
+| NFR-15 | each background kind (black, wallpaper bright and dark, solid, gradient, texture, live scenes, Horizon, a bright photo): look at clock and labels; run an accessibility contrast check (Accessibility Scanner) on home, palette, settings | primary text 4.5:1; live scenes and Horizon are the unsampled cases to look at first | |
+| NFR-17 | Ground Control > Backup > Crash reports: force a crash on a debug build, share it, delete all | the share sheet is the only exit; no network traffic from Liftoff (check with a packet capture or `dumpsys netstats`) | |
+| NFR-19 | section 9, three-button and gesture navigation, on a notch device | every step in section 9 passes | |

@@ -189,7 +189,9 @@ fun IndicatorLayer(
     modifier: Modifier = Modifier,
 ) {
     val live = reading.kind == ReadingKind.Live
-    val animated = reading.kind != ReadingKind.Off && effects.any {
+    // NFR-14: with system animations off the indicators draw one still frame.
+    val stillIndicators = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    val animated = !stillIndicators && reading.kind != ReadingKind.Off && effects.any {
         when (it) {
             IndicatorEffect.DotsBreathe -> live
             IndicatorEffect.DotsBloomCentre, IndicatorEffect.DotsBloomEdges,

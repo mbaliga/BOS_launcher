@@ -216,6 +216,19 @@ fun BoxScope.StripHost(
 private fun Modifier.androidx_windowInsetsPadding(insets: androidx.compose.foundation.layout.WindowInsets): Modifier =
     this.then(Modifier.windowInsetsPadding(insets))
 
+/**
+ * HOM-19: how far up from the bottom edge the bottom clock and the page dots reach at this window size, so the dock rail can
+ * sit above them. Zero when neither is at the bottom. Same numbers [bottomClockFit] uses, without needing composition.
+ */
+fun bottomStackDp(prefs: LauncherPrefs, widthDp: Float, heightDp: Float): Float {
+    val dotsAtBottom = prefs.pagingFor(widthDp > heightDp) != com.bos.sphere.core.data.PagingAxis.Vertical
+    if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Bottom) {
+        val band = HomeFrame.band(widthDp, heightDp)
+        return ClockBandFit.compute(band, clockBlockHeight(prefs).value, clockBlockHeight(prefs.copy(clockShowWeather = false)).value, dotsAtBottom).usedDp
+    }
+    return if (dotsAtBottom) ClockBandFit.clockBottomDp(true) else 0f
+}
+
 /** HOM-20: how the bottom clock fits the bottom margin band at the current window size. */
 @Composable
 internal fun bottomClockFit(prefs: LauncherPrefs): ClockBandFit {

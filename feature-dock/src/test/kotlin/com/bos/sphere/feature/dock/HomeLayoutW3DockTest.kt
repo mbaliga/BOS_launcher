@@ -19,7 +19,8 @@ class HomeLayoutW3DockTest {
         }
         assertEquals(ItemKind.Folder, HomeItemPins.refOf("folder:f1")!!.kind)
         assertNull(HomeItemPins.refOf("com.a/.Main#0"))
-        assertNull(HomeItemPins.refOf("widget:4"))
+        // HOM-02 (wave 4): a widget can be pinned to the rail too, in a slot that takes its span.
+        assertEquals(ItemKind.Widget, HomeItemPins.refOf("widget:4")!!.kind)
         // The Desktop item and groups are not home items.
         assertNull(HomeItemPins.homeKeyOf(DockItemRef(ItemKind.Shortcut, "liftoff.desktop")))
         assertNull(HomeItemPins.homeKeyOf(DockItemRef.group("g")))

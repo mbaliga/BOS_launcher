@@ -34,3 +34,44 @@ object DockFootprint {
         }
     }
 }
+
+/**
+ * HOM-19: the bottom of the home when the dock rail, the bottom clock and the page dots all want it. The clock and dots
+ * stack up from the bottom edge (their height, [lowerStackDp], is what the clock fit reports); a rail on the bottom edge
+ * sits above that stack instead of on top of it, and everything else that lives above the rail (the media strip, the group
+ * shelf) rides on the rail's top. The app area gives up whatever the rail's top reaches beyond the frame band.
+ */
+object HomeBottomStack {
+    /** Air between the lower stack and the rail, and between the rail and what sits above it. */
+    const val GAP_DP = 4f
+    /** Where the media strip sits with no rail (it clears the clock and dots in the band). */
+    const val MEDIA_DEFAULT_DP = 66f
+    const val SHELF_OFF_DP = 8f
+
+    data class Plan(
+        /** Distance from the window's bottom edge to the rail's bottom (bottom rail only; the side rails use their own margins). */
+        val railBottomDp: Float,
+        /** Distance from the bottom edge to the top of the rail (bottom rail), or 0 when no bottom rail is drawn. */
+        val railTopDp: Float,
+        val reserve: DockFootprint.Reserve,
+        val mediaBottomDp: Float,
+        val shelfBottomDp: Float,
+    )
+
+    fun plan(enabled: Boolean, edge: DockEdge, collapsed: Boolean, bandDp: Float, lowerStackDp: Float): Plan {
+        val bottomRail = enabled && edge == DockEdge.Bottom
+        val railBottom = if (bottomRail && lowerStackDp > 0f) maxOf(DockFootprint.BOTTOM_MARGIN_DP, lowerStackDp + GAP_DP) else DockFootprint.BOTTOM_MARGIN_DP
+        val body = if (collapsed) DockFootprint.COLLAPSED_DP else DockFootprint.SLOT_DP + 2 * DockFootprint.PAD_DP
+        val railTop = if (bottomRail) railBottom + body else 0f
+        val reserve = when {
+            !enabled -> DockFootprint.Reserve()
+            edge == DockEdge.Bottom -> DockFootprint.Reserve(bottom = (railTop - bandDp).coerceAtLeast(0f))
+            else -> DockFootprint.reserve(true, edge, collapsed, bandDp)
+        }
+        return Plan(
+            railBottomDp = railBottom, railTopDp = railTop, reserve = reserve,
+            mediaBottomDp = if (bottomRail) maxOf(MEDIA_DEFAULT_DP, railTop + GAP_DP) else MEDIA_DEFAULT_DP,
+            shelfBottomDp = if (bottomRail) railTop + GAP_DP else maxOf(SHELF_OFF_DP, if (lowerStackDp > 0f) lowerStackDp + GAP_DP else 0f),
+        )
+    }
+}

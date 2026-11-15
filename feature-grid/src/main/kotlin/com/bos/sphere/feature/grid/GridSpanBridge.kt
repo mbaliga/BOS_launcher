@@ -43,3 +43,16 @@ internal fun dropOntoTarget(extras: HomeExtras?, base: HomePage?, geom: PageGeom
     val c = geom.center(slot)
     return DropOntoIntent.target(dragKey, hit, local.x - c.x, local.y - c.y, geom.iconPx, extras.state)
 }
+
+/** HOM-04: where the finger is relative to the item under it: that item, the offset from its centre and its cell size. */
+internal data class DropProbe(val hitKey: String, val dx: Float, val dy: Float, val cell: Float)
+
+internal fun dropOntoProbe(extras: HomeExtras?, base: HomePage?, geom: PageGeometry, local: Offset): DropProbe? {
+    if (extras == null || base == null || geom !is PageGeometry.Grid) return null
+    val slot = geom.slotAt(local.x, local.y)
+    if (slot < 0) return null
+    val hit = keyAtSlot(base, geom, slot, extras) ?: return null
+    if (extras.isWidget(hit)) return null
+    val c = geom.center(slot)
+    return DropProbe(hit, local.x - c.x, local.y - c.y, geom.iconPx)
+}

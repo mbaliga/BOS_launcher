@@ -50,6 +50,7 @@ object DesktopDockProvider : DesktopDock {
         val repo = remember { LauncherAppsAppRepository(context) }
         val apps by repo.apps.collectAsState(initial = emptyList())
         val launcher = remember { AppLauncher(context, rootView = { view }) }
+        DockPinBinding.ensure(context) // HOM-02: the desktop's dock reads and writes the same HomeState.dock
         val controller = remember(state.displayId) { DockController() }
         val desktop = remember { DesktopController.get(context) }
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }

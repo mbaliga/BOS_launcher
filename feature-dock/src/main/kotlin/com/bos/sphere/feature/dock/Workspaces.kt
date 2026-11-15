@@ -77,6 +77,9 @@ class WorkspaceManager(
 ) {
     /** False when the stored document is from a newer version or unreadable: it is left untouched on disk (WSP-07). */
     private var persist = true
+
+    /** False while the stored document could not be read: groups then look empty and must not be taken as deleted (WSP-05). */
+    val groupsReliable: Boolean get() = persist
     private val _state = MutableStateFlow(load())
     val state: StateFlow<DockWorkspaceState> = _state.asStateFlow()
     val current: DockWorkspaceState get() = _state.value
@@ -107,7 +110,19 @@ class WorkspaceManager(
 
     fun setDock(f: (DockSettings) -> DockSettings) = update { it.copy(dock = f(it.dock)) }
 
-    fun setPins(pins: List<DockItemRef>) = updateActive { it.copy(dockPins = pins) }
+    /**
+     * HOM-02: where the pins really live. When set (the app points it at `HomeState.dock`), [setPins] writes there and the
+     * workspace's own list only mirrors it through [mirrorPins]; unset, the workspace list is the store (tests, other hosts).
+     */
+    @Volatile var pinSink: ((List<DockItemRef>) -> Unit)? = null
+
+    fun setPins(pins: List<DockItemRef>) {
+        val sink = pinSink
+        if (sink != null) sink(pins) else updateActive { it.copy(dockPins = pins) }
+    }
+
+    /** Follows the shared dock list without writing it back. */
+    fun mirrorPins(pins: List<DockItemRef>) = updateActive { if (it.dockPins == pins) it else it.copy(dockPins = pins) }
 
     private fun updateActive(f: (Workspace) -> Workspace) = update { s -> s.copy(workspaces = s.workspaces.map { if (it.id == s.activeId) f(it) else it }) }
 
@@ -182,7 +197,11 @@ class WorkspaceManager(
     // ---- groups and sessions
 
     fun saveGroup(group: AppGroup) = update { s -> s.copy(groups = s.groups.filter { it.id != group.id } + group) }
-    fun deleteGroup(id: String) = update { s -> s.copy(groups = s.groups.filter { it.id != id }, workspaces = s.workspaces.map { w -> w.copy(dockPins = w.dockPins - DockItemRef.group(id)) }) }
+    fun deleteGroup(id: String) {
+        update { s -> s.copy(groups = s.groups.filter { it.id != id }, workspaces = s.workspaces.map { w -> w.copy(dockPins = w.dockPins - DockItemRef.group(id)) }) }
+        // HOM-02: with the shared dock list in use, the group's pin leaves it too.
+        pinSink?.invoke(current.active.dockPins)
+    }
     fun saveSession(session: Session) = update { s -> s.copy(sessions = s.sessions.filter { it.id != session.id } + session) }
     fun deleteSession(id: String) = update { s -> s.copy(sessions = s.sessions.filter { it.id != id }) }
     fun addSchedule(sl: ScheduledLaunch) = update { s -> s.copy(schedules = s.schedules.filter { it.id != sl.id } + sl) }

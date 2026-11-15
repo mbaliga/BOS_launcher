@@ -153,6 +153,17 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
         if (placed != null) commit(profile.copy(items = profile.items + PlacedItem(PlacedItem.KIND_WIDGET, "clock", placed.rect.left, placed.rect.top, w, h)))
     }
 
+    // HOM-13: real app widgets, through the host the app plugs in. Without one only the built-in clock is offered.
+    val widgetHost = DesktopWidgetSlot.provider
+    val addWidget: () -> Unit = widgetHost?.rememberAdder { appWidgetId, minW, minH ->
+        val (w, h) = DesktopWidgets.sizeFor(minW, minH, layout.cellDp, container)
+        val next = DesktopWidgets.add(profile, appWidgetId, w, h, container)
+        if (next != null) commit(next) else {
+            widgetHost.release(appWidgetId)
+            android.widget.Toast.makeText(context, L10n.tr("No room for that widget on this desktop"), android.widget.Toast.LENGTH_SHORT).show()
+        }
+    } ?: {}
+
     // Commands from the phone's trackpad and keyboard panel (EXT-10).
     LaunchedEffect(sizePx) { cursor.resize(sizePx.width.toFloat().coerceAtLeast(1f), sizePx.height.toFloat().coerceAtLeast(1f)) }
     LaunchedEffect(Unit) {
@@ -189,6 +200,33 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
             if (!item.isWidget && entry == null) continue
             // A removed or recomposed-away item must not stay clickable through the phone trackpad.
             DisposableEffect(item.id) { onDispose { targets.remove(item.id) } }
+            val hosted = DesktopWidgets.appWidgetId(item.id)?.takeIf { item.isWidget }
+            // Dragging moves the item with snap guides; a hosted widget takes its touches itself, so it is dragged by its handle.
+            val dragModifier = Modifier.pointerInput(item.id, layout.scale, profile.items) {
+                detectDragGestures(
+                    onDragStart = { drag = item.id to item.rect() },
+                    onDragEnd = {
+                        drag?.let { (id, r) ->
+                            commit(profile.copy(items = profile.items.map { if (it.id == id) it.copy(x = r.left, y = r.top) else it }))
+                        }
+                        drag = null; guides = emptyList()
+                    },
+                    onDragCancel = { drag = null; guides = emptyList() },
+                ) { change, delta ->
+                    change.consume()
+                    val cur = drag?.second ?: item.rect()
+                    val moved = cur.moved(delta.x / layout.scale, delta.y / layout.scale)
+                    val others = profile.items.filter { it.id != item.id }
+                    if (item.isWidget) {
+                        val res = FreeformPlacement.placeWidget(moved, others.filter { it.isWidget }.map { it.rect() }, container, 6f)
+                        if (res != null) { drag = item.id to res.rect; guides = res.guides }
+                    } else {
+                        val res = FreeformPlacement.snap(moved, others.map { it.rect() }, container, 6f)
+                        drag = item.id to res.rect; guides = res.guides
+                    }
+                }
+            }
+            val gestures = Modifier.then(dragModifier).combinedClickable(onClick = { entry?.let { launchHere(it) } }, onLongClick = { menuKey = item.id })
             Box(
                 Modifier
                     .offset { IntOffset((live.left * layout.scale).roundToInt(), (live.top * layout.scale).roundToInt()) }
@@ -200,41 +238,29 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
                             { entry?.let { launchHere(it) } }, { menuKey = item.id },
                         )
                     }
-                    .pointerInput(item.id, layout.scale, profile.items) {
-                        detectDragGestures(
-                            onDragStart = { drag = item.id to item.rect() },
-                            onDragEnd = {
-                                drag?.let { (id, r) ->
-                                    commit(profile.copy(items = profile.items.map { if (it.id == id) it.copy(x = r.left, y = r.top) else it }))
-                                }
-                                drag = null; guides = emptyList()
-                            },
-                            onDragCancel = { drag = null; guides = emptyList() },
-                        ) { change, delta ->
-                            change.consume()
-                            val cur = drag?.second ?: item.rect()
-                            val moved = cur.moved(delta.x / layout.scale, delta.y / layout.scale)
-                            val others = profile.items.filter { it.id != item.id }
-                            if (item.isWidget) {
-                                val res = FreeformPlacement.placeWidget(moved, others.filter { it.isWidget }.map { it.rect() }, container, 6f)
-                                if (res != null) { drag = item.id to res.rect; guides = res.guides }
-                            } else {
-                                val res = FreeformPlacement.snap(moved, others.map { it.rect() }, container, 6f)
-                                drag = item.id to res.rect; guides = res.guides
-                            }
-                        }
-                    }
-                    .combinedClickable(onClick = { entry?.let { launchHere(it) } }, onLongClick = { menuKey = item.id }),
+                    .then(if (hosted == null) gestures else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
                 if (entry != null) AppIcon(entry, layout.iconDp, dp(layout.iconDp), showLabel = true)
-                else ClockWidget()
+                else if (hosted != null && widgetHost != null) {
+                    if (widgetHost.isBound(hosted)) widgetHost.Content(hosted, Modifier.fillMaxSize())
+                    else Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                        Text(L10n.tr("Widget not available"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    // The handle: drag to move, long-press for the menu (a secondary click from the phone's trackpad opens it too).
+                    Box(
+                        Modifier.align(Alignment.TopCenter).padding(top = 2.dp).size(48.dp, 16.dp).clip(RoundedCornerShape(8.dp))
+                            .background(Color.Black.copy(alpha = 0.35f)).then(gestures),
+                    ) { Box(Modifier.align(Alignment.Center).size(24.dp, 3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.8f))) }
+                } else ClockWidget()
                 DropdownMenu(expanded = menuKey == item.id, onDismissRequest = { menuKey = null }) {
                     if (entry != null) {
                         DropdownMenuItem(text = { Text(L10n.tr("Open on phone")) }, onClick = { menuKey = null; launchOnOther(entry) })
                     }
                     DropdownMenuItem(text = { Text(L10n.tr("Remove from desktop")) }, onClick = {
-                        menuKey = null; commit(profile.copy(items = profile.items.filter { it.id != item.id }))
+                        menuKey = null
+                        hosted?.let { widgetHost?.release(it) }
+                        commit(DesktopWidgets.remove(profile, item.id))
                     })
                 }
             }
@@ -305,8 +331,15 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
                     .background(Color.White).border(2.dp, Color.Black, CircleShape),
             )
         }
+        if (widgetHost != null) {
+            Box(Modifier.align(Alignment.TopStart).padding(top = 12.dp, start = if (profile.items.none { it.isWidget }) 112.dp else 12.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+                .combinedClickable(onClick = { addWidget() }).onGloballyPositioned { c -> targets["addwidget"] = Target(c.boundsInRoot().let { FRect(it.left, it.top, it.right, it.bottom) }, 0, { addWidget() }, null) }
+                .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Text(L10n.tr("Add widget"), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+            }
+        }
         if (profile.items.none { it.isWidget }) {
-            // Offered once so the free-form widget placement can be tried; real widget hosting is a separate stream.
+            // The built-in clock, offered once so the free-form widget placement can be tried without a widget host.
             Box(Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
                 .combinedClickable(onClick = { placeClock() }).padding(horizontal = 10.dp, vertical = 6.dp)) {
                 Text(L10n.tr("Add clock"), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)

@@ -98,6 +98,8 @@ class MainActivity : ComponentActivity() {
         intent?.getStringExtra(EXTRA_OPEN_FOLDER)?.let { id ->
             intent.removeExtra(EXTRA_OPEN_FOLDER)
             HomeOpenRequests.folder.value = id
+            // The folder opens on the home itself: close the drawer, search and other overlays first, as the home button does.
+            if (com.bos.sphere.core.catalog.HomeIntentRouting.closesOverlays(com.bos.sphere.core.catalog.HomeIntentRoute.OpenFolder(id))) homeSignal++
             return true
         }
         val name = intent?.getStringExtra(EXTRA_ACTION) ?: return false

@@ -130,12 +130,52 @@ enum class HomeMenuAction(val label: String) {
     Tags("Tags"), AddToHome("Add to home"), IconColour("Icon colour"), Hide("Hide"), Unhide("Unhide"), HomeSettings("Home settings"),
 }
 
-/** One row of the home's app menu: a shared [MenuAction] or a [HomeMenuAction]. */
+/**
+ * HOM-21: the on/off rows of the home's long-press sheet. Each is a row with a state, which is the new entry kind
+ * [AppMenuEntry.Toggle]; the page rows (align, make home) are states of the page and use the same kind.
+ */
+enum class SheetToggle(val label: String) {
+    Time("Time"), Weather("Weather"), Battery("Battery %"), Media("Media"),
+    AlignTop("Align with top"), AlignBottom("Align with bottom"), MakeHome("Make this home"),
+}
+
+/** HOM-21: the plain action rows of the home's long-press sheet. */
+enum class HomeSheetAction(val label: String) {
+    EditHome("Edit home"), Panels("Files, usage and timeline"), Wallpaper("Wallpaper"), GroundControl("Ground Control"),
+    HomeItems("Widgets, folders and icons"), AddPage("Add page"), DeletePage("Delete page"),
+}
+
+/** One row of the home's app menu: a shared [MenuAction] or a [HomeMenuAction]; the home sheet adds toggles, choices and its own actions. */
 sealed interface AppMenuEntry {
     val label: String
     data class Shared(val entry: MenuEntry) : AppMenuEntry { override val label get() = entry.action.label }
     data class Home(val action: HomeMenuAction) : AppMenuEntry { override val label get() = action.label }
+    /** HOM-21: a row that is switched on or off. */
+    data class Toggle(val kind: SheetToggle, val on: Boolean) : AppMenuEntry { override val label get() = kind.label }
+    /** HOM-21: one option of a group of which one is selected (the page transition). */
+    data class Choice(val group: String, val option: String, val selected: Boolean) : AppMenuEntry { override val label get() = option }
+    /** HOM-21: a plain action row of the home sheet. */
+    data class Sheet(val action: HomeSheetAction, val danger: Boolean = false) : AppMenuEntry { override val label get() = action.label }
 }
+
+/** What the home sheet can offer right now; the sheet is derived from this alone ([ContextMenus.forHomeSheet]). */
+data class HomeSheetContext(
+    val timeOn: Boolean = true,
+    val weatherOn: Boolean = false,
+    val batteryOn: Boolean = false,
+    val mediaOn: Boolean = false,
+    /** null on homes without pages: the page rows are not offered. */
+    val page: Int? = null,
+    val pageCount: Int = 1,
+    val alignTop: Boolean = false,
+    val alignBottom: Boolean = false,
+    val isHomePage: Boolean = false,
+    /** The page transitions with the selected one marked; empty hides the group. */
+    val transitions: List<Pair<String, Boolean>> = emptyList(),
+    val canEdit: Boolean = true,
+    val hasPanels: Boolean = true,
+    val hasHomeItems: Boolean = true,
+)
 
 data class MenuEntry(val action: MenuAction, val enabled: Boolean = true)
 
@@ -196,6 +236,37 @@ object ContextMenus {
             tail.forEach { add(AppMenuEntry.Shared(it)) }
         }
     }
+
+    const val TRANSITION_GROUP = "Transition"
+
+    /**
+     * HOM-21: the rows of the home's long-press sheet: the four switches people use most, this page's rows (align, make
+     * home, transition, add and delete page) when the home has pages, then the actions. The sheet draws exactly this list,
+     * and a touch long-press, a secondary click and the Menu key on empty home space all ask for it.
+     */
+    fun forHomeSheet(c: HomeSheetContext): List<AppMenuEntry> = buildList {
+        add(AppMenuEntry.Toggle(SheetToggle.Time, c.timeOn))
+        add(AppMenuEntry.Toggle(SheetToggle.Weather, c.weatherOn))
+        add(AppMenuEntry.Toggle(SheetToggle.Battery, c.batteryOn))
+        add(AppMenuEntry.Toggle(SheetToggle.Media, c.mediaOn))
+        if (c.page != null) {
+            add(AppMenuEntry.Toggle(SheetToggle.AlignTop, c.alignTop))
+            add(AppMenuEntry.Toggle(SheetToggle.AlignBottom, c.alignBottom))
+            add(AppMenuEntry.Toggle(SheetToggle.MakeHome, c.isHomePage))
+            c.transitions.forEach { (name, selected) -> add(AppMenuEntry.Choice(TRANSITION_GROUP, name, selected)) }
+            add(AppMenuEntry.Sheet(HomeSheetAction.AddPage))
+            if (c.pageCount > 1) add(AppMenuEntry.Sheet(HomeSheetAction.DeletePage, danger = true))
+        }
+        if (c.canEdit) add(AppMenuEntry.Sheet(HomeSheetAction.EditHome))
+        if (c.hasPanels) add(AppMenuEntry.Sheet(HomeSheetAction.Panels))
+        add(AppMenuEntry.Sheet(HomeSheetAction.Wallpaper))
+        add(AppMenuEntry.Sheet(HomeSheetAction.GroundControl))
+        if (c.hasHomeItems) add(AppMenuEntry.Sheet(HomeSheetAction.HomeItems))
+    }
+
+    fun onLongPressHome(c: HomeSheetContext) = forHomeSheet(c)
+    fun onSecondaryClickHome(c: HomeSheetContext) = forHomeSheet(c)
+    fun onMenuKeyHome(c: HomeSheetContext) = forHomeSheet(c)
 
     fun onLongPress(c: MenuContext) = forItem(c)
     fun onSecondaryClick(c: MenuContext) = forItem(c)

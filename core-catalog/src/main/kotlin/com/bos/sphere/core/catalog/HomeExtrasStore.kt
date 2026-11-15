@@ -22,4 +22,12 @@ class HomeExtrasStore(context: Context) {
         _state.value = v
         sp.edit().putString("extras", HomeStateCodec.encode(v)).apply()
     }
+
+    companion object {
+        @Volatile private var instance: HomeExtrasStore? = null
+
+        /** HOM-02: one store per process, so the home, the dock and a desktop surface see the same dock list. */
+        fun get(context: Context): HomeExtrasStore =
+            instance ?: synchronized(this) { instance ?: HomeExtrasStore(context).also { instance = it } }
+    }
 }

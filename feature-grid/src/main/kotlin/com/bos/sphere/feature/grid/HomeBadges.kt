@@ -87,6 +87,11 @@ fun BadgedAppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier) {
         val look = AppPresentation.of(app.suspended, app.archived, app.user.hashCode() in quiet)
         AppIcon(app, size, Modifier.size(size).then(if (look.mark != AppMark.None) Modifier.alpha(look.alpha) else Modifier))
         if (look.mark != AppMark.None) AppMarkGlyph(look.mark, Modifier.align(Alignment.BottomStart).offset(x = (-2).dp, y = 2.dp))
+        // HOM-06: where the icon lost the system's profile badge (override, pack, themed), draw it here.
+        val kinds by com.bos.sphere.core.catalog.WorkProfileState.profileKinds.collectAsState()
+        val lost = IconCache.systemBadgeLost(LocalIconSources.current.cacheKey(app))
+        val own = com.bos.sphere.core.catalog.ProfileBadgeRule.decide(kinds[app.user.hashCode()] ?: com.bos.sphere.core.catalog.ProfileKind.Personal, lost)
+        if (own != com.bos.sphere.core.catalog.ProfileBadgeKind.None) ProfileBadgeGlyph(own, Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp))
         if (prefs.badgesOn) {
             // HOM-09: the notification feed is per profile, so a work app is badged by its own profile's notifications.
             val map by BadgeFeed.badges.collectAsState()
@@ -113,6 +118,25 @@ fun NotificationPreview(app: AppEntry, modifier: Modifier = Modifier) {
             Text(n.title.ifEmpty { n.appLabel }, color = HyleColors.InkBright, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (n.summary.isNotEmpty()) Text(n.summary, color = HyleColors.Ink, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(6.dp))
+        }
+    }
+}
+
+/** HOM-06: the profile badge drawn by the launcher: a briefcase for work, a padlock for private space, drawn as shapes. */
+@Composable
+fun ProfileBadgeGlyph(kind: com.bos.sphere.core.catalog.ProfileBadgeKind, modifier: Modifier = Modifier) {
+    val desc = if (kind == com.bos.sphere.core.catalog.ProfileBadgeKind.Private) L10n.tr("Private space") else L10n.tr("Work profile")
+    androidx.compose.foundation.Canvas(
+        modifier.size(16.dp).background(Color(0xFF1F6FEB), CircleShape).semantics { contentDescription = desc },
+    ) {
+        val w = size.width; val h = size.height
+        val c = Color.White
+        if (kind == com.bos.sphere.core.catalog.ProfileBadgeKind.Private) {
+            drawRoundRect(c, androidx.compose.ui.geometry.Offset(w * 0.28f, h * 0.48f), androidx.compose.ui.geometry.Size(w * 0.44f, h * 0.32f), androidx.compose.ui.geometry.CornerRadius(w * 0.05f))
+            drawArc(c, 180f, 180f, false, androidx.compose.ui.geometry.Offset(w * 0.34f, h * 0.22f), androidx.compose.ui.geometry.Size(w * 0.32f, h * 0.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.07f))
+        } else {
+            drawRoundRect(c, androidx.compose.ui.geometry.Offset(w * 0.24f, h * 0.38f), androidx.compose.ui.geometry.Size(w * 0.52f, h * 0.36f), androidx.compose.ui.geometry.CornerRadius(w * 0.06f))
+            drawRoundRect(c, androidx.compose.ui.geometry.Offset(w * 0.38f, h * 0.24f), androidx.compose.ui.geometry.Size(w * 0.24f, h * 0.2f), androidx.compose.ui.geometry.CornerRadius(w * 0.04f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.07f))
         }
     }
 }

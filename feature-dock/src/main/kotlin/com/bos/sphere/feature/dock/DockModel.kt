@@ -5,7 +5,7 @@ import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.input.LauncherCommand
 
 /** A pinned thing, by kind and id. The folder and shortcut kinds are defined by the home stream; the dock only carries the reference. */
-enum class ItemKind { App, Shortcut, Folder, Group, Link }
+enum class ItemKind { App, Shortcut, Folder, Group, Link, Widget }
 
 /**
  * HOM-02: home items that are not apps (a folder, a launcher shortcut, a web link or file) pinned to the rail.
@@ -15,11 +15,13 @@ object HomeItemPins {
     private const val FOLDER = "folder:"
     private const val SHORTCUT = "shortcut:"
     private const val LINK = "link:"
+    private const val WIDGET = "widget:"
 
     fun refOf(homeKey: String): DockItemRef? = when {
         homeKey.startsWith(FOLDER) -> DockItemRef(ItemKind.Folder, homeKey.removePrefix(FOLDER))
         homeKey.startsWith(SHORTCUT) -> DockItemRef(ItemKind.Shortcut, homeKey)
         homeKey.startsWith(LINK) -> DockItemRef(ItemKind.Link, homeKey)
+        homeKey.startsWith(WIDGET) -> DockItemRef(ItemKind.Widget, homeKey)
         else -> null
     }
 
@@ -28,6 +30,7 @@ object HomeItemPins {
         ItemKind.Folder -> FOLDER + ref.id
         ItemKind.Shortcut -> ref.id.takeIf { it.startsWith(SHORTCUT) }
         ItemKind.Link -> ref.id.takeIf { it.startsWith(LINK) }
+        ItemKind.Widget -> ref.id.takeIf { it.startsWith(WIDGET) }
         else -> null
     }
 
@@ -98,7 +101,67 @@ object DockReorder {
     }
 }
 
-data class DockItem(val ref: DockItemRef, val label: String, val recentlyUsed: Boolean = false)
+/** [span] is how many rail slots the item takes along the rail: 1 for everything but a pinned widget (HOM-02). */
+data class DockItem(val ref: DockItemRef, val label: String, val recentlyUsed: Boolean = false, val span: Int = 1)
+
+/**
+ * HOM-02: the rail's widget slot. A pinned widget takes its column span along the rail ([MAX_SPAN] slots at most, so one
+ * widget cannot push the rest off a phone's rail); across the rail it is one slot thick, the rail's thickness, so the
+ * widget's rows beyond the first are not shown there. The home keeps the full-size copy.
+ */
+object DockWidgetSlot {
+    const val MAX_SPAN = 4
+    const val SLOT_DP = DockFootprint.SLOT_DP
+    const val GAP_DP = 8f
+
+    fun slots(cols: Int): Int = cols.coerceIn(1, MAX_SPAN)
+
+    /** Length along the rail of an item spanning [cols] slots, in dp. */
+    fun lengthDp(cols: Int): Float = slots(cols) * SLOT_DP + (slots(cols) - 1) * GAP_DP
+}
+
+/**
+ * HOM-02: `HomeState.dock` is the one list the rail reads. Each entry is a pin written as `pin:` plus a [DockItemRef]
+ * encoding, so a pinned copy never collides with the key of the item it points at (that item stays on its home page).
+ */
+object HomeDockKeys {
+    private const val PIN = "pin:"
+
+    fun encode(ref: DockItemRef): String = PIN + ref.encode()
+
+    /** An entry as a pin: `pin:` entries decode directly; an older plain home key (from "move to dock") becomes a pin of that item. */
+    fun decode(entry: String): DockItemRef? =
+        if (entry.startsWith(PIN)) DockItemRef.decode(entry.removePrefix(PIN))
+        else HomeItemPins.refOf(entry) ?: entry.takeIf { it.isNotEmpty() }?.let(DockItemRef::app)
+
+    fun decodeAll(dock: List<String>): List<DockItemRef> = dock.mapNotNull(::decode).distinct()
+
+    fun encodeAll(pins: List<DockItemRef>): List<String> = pins.distinct().map(::encode)
+
+    fun hasPins(dock: List<String>): Boolean = dock.any { it.startsWith(PIN) }
+
+    /**
+     * Migration of the old per-workspace pin store into `HomeState.dock`: the dock list is kept when it already holds pins;
+     * otherwise the active workspace's pins seed it. Returns null when nothing changes.
+     */
+    fun migrate(dock: List<String>, activeWorkspacePins: List<DockItemRef>): List<String>? =
+        if (hasPins(dock) || activeWorkspacePins.isEmpty()) null else encodeAll(activeWorkspacePins)
+
+    /**
+     * The dock list for a workspace being entered: its saved arrangement's dock when the arrangement has one, else its
+     * own legacy pins (a workspace saved before the dock moved into the arrangement keeps its pins).
+     */
+    fun forWorkspace(arrangementDock: List<String>?, legacyPins: List<DockItemRef>): List<String> =
+        arrangementDock ?: encodeAll(legacyPins)
+
+    /** The `dock` array of a saved home arrangement (the JSON the workspace hooks write), or null when it has none. */
+    fun dockOf(arrangement: String?): List<String>? {
+        if (arrangement == null) return null
+        return runCatching {
+            org.json.JSONObject(arrangement).optJSONArray("dock")?.let { a -> List(a.length()) { a.getString(it) } }
+        }.getOrNull()
+    }
+}
 
 /** What the rail shows, already decided (DCK-02, DCK-03, DCK-06, DCK-08). */
 data class DockContent(
@@ -137,9 +200,10 @@ object DockContentBuilder {
         sessionUsed: Set<String>,
         media: MediaInfo?,
         recentLimit: Int = 6,
+        spanOf: (DockItemRef) -> Int = { 1 },
     ): DockContent {
         val pinned = pins.mapNotNull { ref ->
-            labelOf(ref)?.let { DockItem(ref, it, recentlyUsed = ref.kind == ItemKind.App && ref.id in sessionUsed) }
+            labelOf(ref)?.let { DockItem(ref, it, recentlyUsed = ref.kind == ItemKind.App && ref.id in sessionUsed, span = if (ref.kind == ItemKind.Widget) DockWidgetSlot.slots(spanOf(ref)) else 1) }
         }
         val pinnedIds = pins.filter { it.kind == ItemKind.App }.mapTo(HashSet()) { it.id }
         val showRecent = mode == DockMode.PinnedPlusRecent

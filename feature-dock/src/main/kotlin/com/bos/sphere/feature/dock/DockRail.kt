@@ -94,6 +94,8 @@ fun DockRail(
     showNumbers: Boolean,
     actions: DockActions,
     modifier: Modifier = Modifier,
+    /** HOM-02: draws a pinned widget into a slot of the given width and height; null draws it as an icon like any other item. */
+    widget: (@Composable (DockItem, Dp, Dp) -> Unit)? = null,
     icon: @Composable (DockItem, Dp) -> Unit,
 ) {
     val horizontal = edge == DockEdge.Bottom
@@ -135,7 +137,7 @@ fun DockRail(
         Strip {
             WorkspaceChip(workspaceName, horizontal, actions)
             content.pinned.forEachIndexed { i, item ->
-                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it })
+                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, widget = widget)
             }
             if (content.showRecentSection && content.recent.isNotEmpty()) {
                 SectionLabel(L10n.tr(DockText.RECENT_LABEL), horizontal)
@@ -223,8 +225,14 @@ private fun DockSlot(
     onFocusMove: (Int) -> Unit,
     onMoved: (Int) -> Unit,
     reorderable: Boolean = true,
+    widget: (@Composable (DockItem, Dp, Dp) -> Unit)? = null,
 ) {
     val slot = 52.dp
+    // HOM-02: a pinned widget takes its span of slots along the rail and one slot across it.
+    val wide = item.ref.kind == ItemKind.Widget && widget != null
+    val along = if (wide) DockWidgetSlot.lengthDp(item.span).dp else slot
+    val boxW = if (horizontal) along else slot
+    val boxH = if (horizontal) slot else along
     val slotPx = with(LocalDensity.current) { (slot + 8.dp).toPx() }
     var drag by remember { mutableFloatStateOf(0f) }
     var focused by remember { mutableStateOf(false) }
@@ -232,7 +240,7 @@ private fun DockSlot(
     val shape = RoundedCornerShape(16.dp)
 
     Box(
-        Modifier.size(slot)
+        Modifier.size(boxW, boxH)
             .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; alpha = if (drag != 0f) 0.8f else 1f }
             .clip(shape)
             .then(if (focused) Modifier.border(2.dp, HyleColors.Violet, shape) else Modifier)
@@ -274,7 +282,7 @@ private fun DockSlot(
             },
         contentAlignment = Alignment.Center,
     ) {
-        icon(item, 40.dp)
+        if (wide) widget!!(item, boxW, boxH) else icon(item, 40.dp)
         if (item.recentlyUsed) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).size(8.dp).clip(CircleShape).background(HyleColors.Violet))
         if (showNumbers && index < 9) Text("${index + 1}", color = HyleColors.OnAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.TopStart).padding(2.dp).clip(CircleShape).background(HyleColors.Violet).padding(horizontal = 5.dp))

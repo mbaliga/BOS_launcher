@@ -216,6 +216,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val landscapeCorners by stores.shortcuts.landscapeCorners.collectAsStateWithLifecycle()
     val gestures by stores.shortcuts.gestures.collectAsStateWithLifecycle()
     val history by stores.history.events.collectAsStateWithLifecycle()
+    /** HOM-18: the timeline reads the larger log (up to 5000 opens), not the 400-entry history. */
+    val timelineLog by stores.timelineLog.events.collectAsStateWithLifecycle()
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -224,7 +226,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val corners = com.bos.sphere.core.data.CornerSets.select(portraitCorners, landscapeCorners, prefs.cornersPerOrientation, isLandscape)
     val capacityOf: (PageLayout) -> Int = { it.capacity(isLandscape, prefs) }
     // HOM-01 / HOM-02: folders, shortcuts, links and widget tiles share the pages with apps on every home style.
-    val extrasStore = remember { com.bos.sphere.core.catalog.HomeExtrasStore(context) }
+    val extrasStore = remember { com.bos.sphere.core.catalog.HomeExtrasStore.get(context) }
     val extrasState by extrasStore.state.collectAsStateWithLifecycle()
     val allPages = remember(layout, apps, isLandscape, prefs, extrasState) {
         com.bos.sphere.core.catalog.SpanReflow.reflow(
@@ -772,10 +774,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // HOM-19: where the dock rail is thicker than the frame band, the app area gives up the difference.
     val dockState by com.bos.sphere.feature.dock.WorkspaceRepository.get(context).state.collectAsState()
     val dockTier = remember(cfg.screenWidthDp) { com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs()) }
-    val dockReserve = com.bos.sphere.feature.dock.DockFootprint.reserve(
+    // HOM-19: the rail sits above the bottom clock and page dots, and the app area gives up what the rail reaches past the band.
+    val bottomPlan = com.bos.sphere.feature.dock.HomeBottomStack.plan(
         enabled = dockState.dock.isEnabled(dockTier), edge = dockState.dock.edgeFor(isLandscape),
         collapsed = dockState.dock.mode == com.bos.sphere.feature.dock.DockMode.Collapsed, bandDp = frame.value,
+        lowerStackDp = com.bos.sphere.feature.grid.bottomStackDp(prefs, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()),
     )
+    val dockReserve = bottomPlan.reserve
     val scrollBottom = bottomClear + frame + dockReserve.bottom.dp
     val scrollPadding = homeItems.padFor(
         androidx.compose.foundation.layout.PaddingValues(start = sideGap + dockReserve.start.dp, end = sideGap + dockReserve.end.dp, top = scrollTop, bottom = scrollBottom),
@@ -984,7 +989,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             visible = mediaInfo != null && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen,
             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
             exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
-            modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = 66.dp + bottomClear),
+            modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         ) {
             mediaInfo?.let { mi ->
                 com.bos.sphere.feature.grid.MediaStrip(
@@ -1003,12 +1008,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen,
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
+            bottomPlan = bottomPlan,
         )
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
             visible = prefs.mediaControls && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen,
-            modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = 66.dp + bottomClear),
+            modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         )
 
         grantPrompter.Host()
@@ -1370,7 +1376,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
         if (panelsOpen || homeItems.panelRequest >= 0) {
-            HomePanelsSheet(history, appsByKey, onDismiss = { panelsOpen = false; homeItems.panelRequest = -1 }, initialTab = homeItems.panelRequest.coerceAtLeast(0), onLaunch = { a -> panelsOpen = false; homeItems.panelRequest = -1; launch(a) })
+            HomePanelsSheet(timelineLog, appsByKey, onDismiss = { panelsOpen = false; homeItems.panelRequest = -1 }, initialTab = homeItems.panelRequest.coerceAtLeast(0), onLaunch = { a -> panelsOpen = false; homeItems.panelRequest = -1; launch(a) })
         }
         // HOM-06: the work profile pause chip, shown while a work profile exists.
         val workPaused by com.bos.sphere.core.catalog.WorkProfileState.workPaused.collectAsStateWithLifecycle()

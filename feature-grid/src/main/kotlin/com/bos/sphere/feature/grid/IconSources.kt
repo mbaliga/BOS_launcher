@@ -45,6 +45,7 @@ class IconSources(
         val own = app.loadIcon()
         val mono = monochromeOf(own)
         val source = IconPolicy.resolve(app.key, component(app), overrides, pack, themed, mono != null, own is AdaptiveIconDrawable)
+        IconCache.noteSource(cacheKey, source)
         return when (source) {
             is IconSource.Override -> IconSpec.decode(source.spec)?.let { (p, n) -> drawable(p, n) }?.let { rasterizeFull(it, px) }
                 ?: own?.let { IconCache.rasterize(it, px, cacheKey) }

@@ -283,6 +283,9 @@ fun GridHome(
     var dragKey by remember { mutableStateOf<String?>(null) }
     var dragBase by remember { mutableStateOf<List<HomePage>>(emptyList()) }
     var dragPos by remember { mutableStateOf(Offset.Zero) }
+    // HOM-04: the drop-onto rule (dwell and hysteresis); while it is armed the reorder preview holds still.
+    val dropTracker = remember { com.bos.sphere.core.catalog.DropOntoTracker() }
+    var ontoArmed by remember { mutableStateOf<String?>(null) }
     var edgeDir by remember { mutableIntStateOf(0) }
 
     // Fractional focused index per coverflow page.
@@ -316,7 +319,7 @@ fun GridHome(
         return tp to idx
     }
 
-    val shown: List<HomePage> = dragKey?.let { key ->
+    val shown: List<HomePage> = dragKey?.takeIf { ontoArmed == null }?.let { key ->
         val (tp, idx) = dropTarget()
         HomeLayoutMath.move(dragBase, key, tp, idx, capacityOf, dropEmpty = false)
     } ?: pages
@@ -324,6 +327,14 @@ fun GridHome(
     androidx.compose.runtime.SideEffect { state.count.intValue = pageCount }
 
     // Edge dwell flips pages while dragging.
+    // HOM-04: a finger resting on a centre sends no new events, so the dwell is checked on a short tick while dragging.
+    LaunchedEffect(dragKey) {
+        while (dragKey != null) {
+            kotlinx.coroutines.delay(60)
+            dropTracker.tick(android.os.SystemClock.uptimeMillis())
+            if (dropTracker.armedKey != ontoArmed) ontoArmed = dropTracker.armedKey
+        }
+    }
     LaunchedEffect(edgeDir, dragKey) {
         while (dragKey != null && edgeDir != 0) {
             delay(650)
@@ -566,6 +577,14 @@ fun GridHome(
                                             }
                                             if (dragging) {
                                                 dragPos = c.position
+                                                run {
+                                                    val tpNow = pagerState.currentPage
+                                                    val b = dragBase.getOrNull(tpNow)
+                                                    val probe = dropOntoProbe(ex, b, PageGeometry.of(b?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, b?.keys?.size ?: 0, clampedCover(st.coverPos, tpNow, b)), dragPos - st.contentOffset)
+                                                    val now = android.os.SystemClock.uptimeMillis()
+                                                    if (probe != null && probe.hitKey != dragKey) dropTracker.update(probe.hitKey, probe.dx, probe.dy, probe.cell, now) else dropTracker.reset()
+                                                    ontoArmed = dropTracker.armedKey
+                                                }
                                                 val edge = 28.dp.toPx()
                                                 val (along, extent) = if (st.paging == PagingAxis.Horizontal) {
                                                     c.position.x to size.width.toFloat()
@@ -587,11 +606,10 @@ fun GridHome(
                                             if (key != null) {
                                                 val (tp, idx) = dropTargetNow()
                                                 // HOM-04: ending on another item's centre files into a folder instead of reordering.
-                                                val onto = dropOntoTarget(
-                                                    ex, dragBase.getOrNull(tp),
-                                                    PageGeometry.of(dragBase.getOrNull(tp)?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, dragBase.getOrNull(tp)?.keys?.size ?: 0, clampedCover(st.coverPos, tp, dragBase.getOrNull(tp))),
-                                                    dragPos - st.contentOffset, key,
-                                                )
+                                                val iconPx = PageGeometry.of(dragBase.getOrNull(tp)?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, dragBase.getOrNull(tp)?.keys?.size ?: 0, clampedCover(st.coverPos, tp, dragBase.getOrNull(tp))).iconPx
+                                                val decision = ex?.let { com.bos.sphere.core.catalog.DropRule.decide(dropTracker, key, iconPx, it.state, android.os.SystemClock.uptimeMillis()) } ?: com.bos.sphere.core.catalog.DropDecision.Reorder
+                                                val onto = (decision as? com.bos.sphere.core.catalog.DropDecision.Onto)?.key
+                                                dropTracker.reset(); ontoArmed = null
                                                 if (onto != null) ex?.onDropOnto?.invoke(key, onto)
                                                 else cb.onPagesChange(HomeLayoutMath.move(dragBase, key, tp, idx, cb.capacityOf, dropEmpty = true))
                                             }

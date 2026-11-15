@@ -63,7 +63,7 @@ import java.io.File
 class InputTouchPathsUiTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    @org.junit.Before fun english() { com.bos.sphere.core.design.L10n.setLanguage("en") } // other tests switch the language; the labels looked up here are English
+    @org.junit.Before fun english() { LauncherInput.tracker.onTouch(); com.bos.sphere.core.design.L10n.setLanguage("en") } // other tests switch the language; the labels looked up here are English
 
     @After fun reset() { LauncherInput.sheetOpen.value = false; LauncherDrops.onTouchDragStart = null }
 

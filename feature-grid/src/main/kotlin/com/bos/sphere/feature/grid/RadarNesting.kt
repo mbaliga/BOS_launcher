@@ -73,11 +73,11 @@ internal object NestedShortcuts {
 
 /** One nested shortcut: a small pill that runs it. */
 @Composable
-internal fun ShortcutPill(title: String, tag: String, scale: Float, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun ShortcutPill(title: String, tag: String, scale: Float, modifier: Modifier = Modifier, describe: String = L10n.tr("App shortcut: %s", title), onClick: () -> Unit) {
     Text(
         title, color = Color.White, fontSize = (11 * scale).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
         modifier = modifier.testTag(tag).clip(RoundedCornerShape(9.dp)).background(Color(0x33FFFFFF)).clickable(onClick = onClick)
-            .semantics { contentDescription = L10n.tr("App shortcut: %s", title) }
+            .semantics { contentDescription = describe }
             .padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }
@@ -100,7 +100,7 @@ internal fun NestedShortcutPills(
     Column(modifier.widthIn(max = width).padding(top = 3.dp), verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         tile.shortcuts.take(shown).forEach { h -> ShortcutPill(h.title, "nested.${tile.app.key}.${h.id}", z) { onRun(h) } }
         val more = tile.shortcuts.size - shown
-        if (more > 0) ShortcutPill("+$more", "nested.${tile.app.key}.more", z, onClick = onMore)
+        if (more > 0) ShortcutPill("+$more", "nested.${tile.app.key}.more", z, describe = "+$more", onClick = onMore)
     }
 }
 

@@ -149,5 +149,18 @@ class RadarNestingTest {
         assertEquals(listOf<Tile>(Tile.Hit(compose), Tile.Hit(inbox)), tapped)
     }
 
+    @Test @Config(sdk = [35]) fun PAL_08_theChooserDialogRendersAndARowRunsItsChoiceAndCancelDismisses() {
+        val ran = mutableListOf<String>(); var dismissed = 0; val picked = mutableListOf<String>()
+        val choices = listOf(RadarChoice("Open on Desk") { ran += "desk" }, RadarChoice("Open on TV") { ran += "tv" })
+        rule.setContent { RadarChoicePicker("Open on which display?", choices, onDismiss = { dismissed++ }, onPick = { picked += it.label; it.run() }) }
+        rule.waitForIdle()
+        rule.onNodeWithTag("radar.picker").assertExists()
+        rule.onNodeWithTag("radar.picker.1").performClick()
+        assertEquals(listOf("TV".let { "Open on $it" }), picked)
+        assertEquals(listOf("tv"), ran)
+        rule.onNodeWithTag("radar.picker.cancel").performClick()
+        assertEquals(1, dismissed)
+    }
+
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertExistsAndTap() { assertExists(); performClick() }
 }

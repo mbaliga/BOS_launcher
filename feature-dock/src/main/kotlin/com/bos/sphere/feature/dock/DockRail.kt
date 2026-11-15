@@ -34,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -94,6 +96,8 @@ fun DockRail(
     showNumbers: Boolean,
     actions: DockActions,
     modifier: Modifier = Modifier,
+    /** INP-01: where this rail's items register on the shared focus graph; null for a rail that must stay out of it (the desktop surface's). */
+    graphBridge: DockInput.FocusBridge? = DockInput.bridge,
     icon: @Composable (DockItem, Dp) -> Unit,
 ) {
     val horizontal = edge == DockEdge.Bottom
@@ -133,29 +137,41 @@ fun DockRail(
 
     Box(modifier.then(surface).semantics { contentDescription = L10n.tr("Dock") }) {
         Strip {
-            WorkspaceChip(workspaceName, horizontal, actions)
+            WorkspaceChip(workspaceName, horizontal, actions, graphBridge)
             content.pinned.forEachIndexed { i, item ->
-                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it })
+                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, bridge = graphBridge)
             }
             if (content.showRecentSection && content.recent.isNotEmpty()) {
                 SectionLabel(L10n.tr(DockText.RECENT_LABEL), horizontal)
                 content.recent.forEachIndexed { j, item ->
                     val i = content.pinned.size + j
-                    DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = {}, reorderable = false)
+                    DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = {}, reorderable = false, bridge = graphBridge)
                 }
             }
-            if (content.showEnableRow) EnableRow(horizontal, actions.onEnableUsage)
+            if (content.showEnableRow) EnableRow(horizontal, actions.onEnableUsage, graphBridge)
             content.media?.let { MediaItem(it, horizontal, actions) }
-            RoundButton("i", L10n.tr("About the dock")) { helpOpen = true }
-            RoundButton("...", L10n.tr("Workspaces, groups and dock settings"), actions.onOpenPanel)
+            RoundButton("i", L10n.tr("About the dock"), graphBridge) { helpOpen = true }
+            RoundButton("...", L10n.tr("Workspaces, groups and dock settings"), graphBridge, actions.onOpenPanel)
         }
     }
     if (helpOpen) HelpDialog { helpOpen = false }
 }
 
+/** INP-01: a rail control (not a pinned item) as a node of the shared focus graph; place it before the control's own clickable. */
+@Composable
+private fun Modifier.graphNode(id: String, bridge: DockInput.FocusBridge?): Modifier {
+    if (bridge == null) return this
+    val requester = remember { FocusRequester() }
+    androidx.compose.runtime.DisposableEffect(id) { onDispose { bridge.unregister(id) } }
+    return this
+        .onGloballyPositioned { c -> val b = c.boundsInRoot(); bridge.register(id, b.left, b.top, b.right, b.bottom, requester) }
+        .focusRequester(requester).onFocusChanged { bridge.onFocus(id, it.isFocused) }
+}
+
 @Composable
 private fun HelpDialog(onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
+        DockDialogInput() // INP-20: controller window hook and the shared focus layer
         val shape = RoundedCornerShape(20.dp)
         Column(Modifier.clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(20.dp)) {
             Text(L10n.tr("About the dock"), color = HyleColors.InkBright, fontSize = 17.sp, fontWeight = FontWeight.Medium)
@@ -174,7 +190,7 @@ private fun SectionLabel(text: String, horizontal: Boolean) {
 }
 
 @Composable
-private fun WorkspaceChip(name: String, horizontal: Boolean, actions: DockActions) {
+private fun WorkspaceChip(name: String, horizontal: Boolean, actions: DockActions, bridge: DockInput.FocusBridge?) {
     // Tap opens the workspace panel; a horizontal swipe switches workspace (WSP-07 gesture route).
     Box(
         Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.22f))
@@ -182,6 +198,7 @@ private fun WorkspaceChip(name: String, horizontal: Boolean, actions: DockAction
                 var total = 0f
                 detectHorizontalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total > 40f) actions.onSwitchWorkspace(-1) else if (total < -40f) actions.onSwitchWorkspace(1) }) { _, d -> total += d }
             }
+            .graphNode("dock.workspaces", bridge)
             .clickable(onClickLabel = L10n.tr("Workspaces"), onClick = actions.onOpenPanel)
             .padding(horizontal = 10.dp, vertical = 8.dp)
             .semantics { contentDescription = L10n.tr("Workspace %s", name) },
@@ -191,18 +208,18 @@ private fun WorkspaceChip(name: String, horizontal: Boolean, actions: DockAction
 }
 
 @Composable
-private fun RoundButton(glyph: String, description: String, onClick: () -> Unit) {
+private fun RoundButton(glyph: String, description: String, bridge: DockInput.FocusBridge?, onClick: () -> Unit) {
     Box(
-        Modifier.size(36.dp).clip(CircleShape).background(HyleColors.Hairline).clickable(onClickLabel = description, onClick = onClick)
+        Modifier.size(36.dp).clip(CircleShape).background(HyleColors.Hairline).graphNode("dock.button.$glyph", bridge).clickable(onClickLabel = description, onClick = onClick)
             .semantics { role = Role.Button; contentDescription = description },
         contentAlignment = Alignment.Center,
     ) { Text(glyph, color = HyleColors.Ink, fontSize = 14.sp) }
 }
 
 @Composable
-private fun EnableRow(horizontal: Boolean, onClick: () -> Unit) {
+private fun EnableRow(horizontal: Boolean, onClick: () -> Unit, bridge: DockInput.FocusBridge?) {
     Box(
-        Modifier.clip(RoundedCornerShape(14.dp)).border(1.dp, HyleColors.Hairline, RoundedCornerShape(14.dp)).clickable(onClick = onClick)
+        Modifier.clip(RoundedCornerShape(14.dp)).border(1.dp, HyleColors.Hairline, RoundedCornerShape(14.dp)).graphNode("dock.enable", bridge).clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp).semantics { role = Role.Button },
     ) {
         Text(L10n.tr(DockText.ENABLE_ROW), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.then(if (horizontal) Modifier.width(150.dp) else Modifier.width(60.dp)))
@@ -223,11 +240,14 @@ private fun DockSlot(
     onFocusMove: (Int) -> Unit,
     onMoved: (Int) -> Unit,
     reorderable: Boolean = true,
+    bridge: DockInput.FocusBridge? = null,
 ) {
     val slot = 52.dp
     val slotPx = with(LocalDensity.current) { (slot + 8.dp).toPx() }
     var drag by remember { mutableFloatStateOf(0f) }
     var focused by remember { mutableStateOf(false) }
+    val nodeId = "dock.${item.ref.encode()}"
+    androidx.compose.runtime.DisposableEffect(nodeId) { onDispose { bridge?.unregister(nodeId) } }
     val desc = item.label + if (item.recentlyUsed) ", " + L10n.tr("used this session") else ""
     val shape = RoundedCornerShape(16.dp)
 
@@ -236,7 +256,9 @@ private fun DockSlot(
             .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; alpha = if (drag != 0f) 0.8f else 1f }
             .clip(shape)
             .then(if (focused) Modifier.border(2.dp, HyleColors.Violet, shape) else Modifier)
-            .focusRequester(requester).onFocusChanged { focused = it.isFocused }.focusable()
+            // INP-01: the slot is a node of the shared focus graph (arrows leave the rail into the home and back, the graph knows what has focus).
+            .onGloballyPositioned { c -> val b = c.boundsInRoot(); bridge?.register(nodeId, b.left, b.top, b.right, b.bottom, requester) }
+            .focusRequester(requester).onFocusChanged { focused = it.isFocused; bridge?.onFocus(nodeId, it.isFocused) }.focusable()
             .onPreviewKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (DockKeys.interpret(ev.key.nativeKeyCode, ev.isAltPressed, horizontal)) {

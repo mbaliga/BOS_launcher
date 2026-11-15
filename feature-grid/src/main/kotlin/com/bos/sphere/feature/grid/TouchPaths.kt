@@ -20,12 +20,12 @@ object TouchPaths {
         LauncherCommand.OpenLaunchpad -> "Swipe right from the left edge, or the unread rail"
         LauncherCommand.OpenPuck -> "The All apps corner when the drawer style is Wheel"
         LauncherCommand.ShortcutSheet -> "Ground Control, Home, Keyboard shortcuts"
-        LauncherCommand.NextWorkspace, LauncherCommand.PreviousWorkspace -> "Swipe between home pages"
-        LauncherCommand.FocusDock -> "Tap a dock item"
+        LauncherCommand.NextWorkspace, LauncherCommand.PreviousWorkspace -> "Swipe the workspace chip on the dock, or tap it and pick a workspace"
+        LauncherCommand.FocusDock -> "Tap a dock item, or the collapsed dock band to open it"
         LauncherCommand.Dock1, LauncherCommand.Dock2, LauncherCommand.Dock3, LauncherCommand.Dock4, LauncherCommand.Dock5,
         LauncherCommand.Dock6, LauncherCommand.Dock7, LauncherCommand.Dock8, LauncherCommand.Dock9 -> "Tap the dock item"
         LauncherCommand.CornerTopLeft, LauncherCommand.CornerTopRight, LauncherCommand.CornerBottomLeft, LauncherCommand.CornerBottomRight -> "Tap the corner"
-        LauncherCommand.Dismiss -> "Tap outside the surface, or the system Back gesture"
+        LauncherCommand.Dismiss -> "Tap the close button of Radar, the drawer or Ground Control, or the system Back gesture"
     }
 
     /**
@@ -40,12 +40,42 @@ object TouchPaths {
         else -> null
     }
 
+    /** A headless test that renders the real surface for a touch path and taps or swipes it: module, test class, test function. */
+    data class RenderedBy(val module: String, val testClass: String, val testName: String)
+
+    private fun grid(name: String) = RenderedBy("feature-grid", "InputTouchPathsUiTest", name)
+    private fun dock(name: String) = RenderedBy("feature-dock", "W4RadarInputDockTest", name)
+
     /**
-     * Commands whose touch path is a described gesture, dock tap, page swipe or settings row that no JVM test renders
-     * (they live in the dock, pager and Ground Control code of other streams, or are device gestures). Listed so the
-     * audit states what it does not prove; a new command lands here or in [cornerActionFor], never silently.
+     * INP-07: the commands whose touch path is proven by a test that renders the real surface and touches it (not a corner
+     * action, which [cornerActionFor] ties to the corner editor). [InputAuditTest] checks that every test named here exists.
      */
-    val describedOnly: Set<LauncherCommand> = LauncherCommand.entries.filter { cornerActionFor(it) == null }.toSet()
+    val renderedBy: Map<LauncherCommand, List<RenderedBy>> = buildMap {
+        put(LauncherCommand.EditMode, listOf(grid("INP_07_a_long_press_on_a_paged_home_icon_then_a_drag_rearranges_the_home")))
+        put(LauncherCommand.OpenLaunchpad, listOf(
+            RenderedBy("feature-launchpad", "LaunchpadTouchPathTest", "INP_07_tapping_the_unread_rail_opens_launchpad"),
+            RenderedBy("feature-launchpad", "LaunchpadInteractionTest", "STR_01_longDragFromTheEdgeOpens"),
+        ))
+        put(LauncherCommand.OpenPuck, listOf(grid("INP_07_the_all_apps_corner_opens_the_puck_for_the_wheel_style_and_the_puck_is_operable_by_touch")))
+        put(LauncherCommand.ShortcutSheet, listOf(grid("INP_07_the_keyboard_shortcuts_row_in_home_settings_opens_the_shortcut_sheet")))
+        for (c in listOf(LauncherCommand.NextWorkspace, LauncherCommand.PreviousWorkspace)) put(c, listOf(dock("INP_07_theWorkspaceChipSwitchesWorkspaceBySwipeAndOpensThePanelOnTap")))
+        put(LauncherCommand.FocusDock, listOf(dock("INP_07_theCollapsedBandExpandsOnTapSoFocusDockHasATouchPath"), dock("INP_07_tappingADockItemLaunchesItAndItsNumberIsItsPosition")))
+        for (c in LauncherCommand.entries.filter { it.name.startsWith("Dock") && it.name.length == 5 }) put(c, listOf(dock("INP_07_tappingADockItemLaunchesItAndItsNumberIsItsPosition")))
+        for (c in listOf(LauncherCommand.CornerTopLeft, LauncherCommand.CornerTopRight, LauncherCommand.CornerBottomLeft, LauncherCommand.CornerBottomRight)) put(c, listOf(grid("INP_07_tapping_each_corner_runs_what_it_holds")))
+        put(LauncherCommand.Dismiss, listOf(
+            grid("INP_07_the_close_button_and_back_dismiss_radar"),
+            grid("INP_07_the_close_button_and_back_dismiss_the_drawer"),
+            grid("INP_07_back_dismisses_ground_control"),
+        ))
+    }
+
+    /**
+     * Commands whose touch path no headless test renders. Listed so the audit states what it does not prove; a new command lands
+     * here, in [renderedBy] or in [cornerActionFor], never silently. Empty: every touch path of a [LauncherCommand] is now rendered
+     * and touched by a test. What still needs a device is the system's own Back gesture and edge gestures (the platform delivers
+     * them), which no test can send; the surfaces behind them are tested through their back handler.
+     */
+    val describedOnly: Set<LauncherCommand> = LauncherCommand.entries.filter { cornerActionFor(it) == null && it !in renderedBy }.toSet()
 
     /** Every menu entry is a row in the long-press menu, which is the touch way in. */
     fun forMenu(a: MenuAction): String = when (a) {

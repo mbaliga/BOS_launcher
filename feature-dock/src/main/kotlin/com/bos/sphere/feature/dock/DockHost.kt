@@ -47,16 +47,48 @@ import com.bos.sphere.core.signals.UsageRecents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val PENDING_FOCUS_NS = 3_000_000_000L
+
 /** The dock's command surface: the input layer resolves a shortcut to a [LauncherCommand] and calls [handle] (DCK-05). */
 class DockController {
     var focusRequest by mutableIntStateOf(0)
         internal set
-    internal var launchNth: (Int) -> Boolean = { false }
+    private var pinLaunch: (Int) -> Boolean = { false }
+
+    /** What number keys 1 to 9 launch: the rail's numbered items while a rail is composed, otherwise the pin list ([bindPinLaunch], INP-05). */
+    internal var launchNth: (Int) -> Boolean = { pinLaunch(it) }
     internal var step: (Int) -> Boolean = { false }
+
+    /**
+     * INP-05: number keys launch the Nth pinned item even while no rail is on screen (Radar, the drawer, Ground Control or
+     * the puck is open, or the dock setting is off). [f] gets the zero-based index. A composed rail takes over while it shows.
+     */
+    fun bindPinLaunch(f: (Int) -> Boolean) { pinLaunch = f }
+
+    /** A rail left the composition: number keys go back to the pin list. */
+    internal fun releaseRail() { launchNth = { pinLaunch(it) } }
+
+    /** True when a rail is composed and numbering what it shows (so "focus dock" has something to focus). */
+    var railShown: Boolean by mutableStateOf(false)
+        internal set
 
     /** Lets a host that has no dock on screen still step workspaces from the shortcut keys (WSP-07). */
     fun bindWorkspaceStep(f: (Int) -> Boolean) { step = f }
-    private val dock = DockCommandHandler(focusDock = { focusRequest++ }, launchNth = { launchNth(it) })
+    private var pendingFocusAt = 0L
+
+    /**
+     * "Focus dock" with a rail on screen focuses it; with none on screen (an overlay hides it) the request also waits for the
+     * rail that appears next, for a couple of seconds, so closing the overlay and showing the rail takes focus to it.
+     */
+    private fun focusDock() { focusRequest++; if (!railShown) pendingFocusAt = System.nanoTime() }
+
+    internal fun consumePendingFocus(): Boolean {
+        val at = pendingFocusAt
+        pendingFocusAt = 0L
+        return at != 0L && System.nanoTime() - at < PENDING_FOCUS_NS
+    }
+
+    private val dock = DockCommandHandler(focusDock = ::focusDock, launchNth = { launchNth(it) })
 
     /** True when the command was the dock's (or a workspace switch) and has been handled. */
     fun handle(command: LauncherCommand): Boolean = when (command) {
@@ -106,6 +138,8 @@ fun DockHost(
     forceEnabled: Boolean = false,
     /** The edge the host surface reserved for this rail; the desktop surface decides its own (EXT-09). */
     edgeOverride: DockEdge? = null,
+    /** INP-11: extra modifiers for the rail itself, applied in composition (the app adds the drop target that pins a dropped app or link). */
+    railModifier: @Composable Modifier.() -> Modifier = { this },
 ) {
     val context = LocalContext.current
     val manager = remember { WorkspaceRepository.get(context) }
@@ -162,6 +196,10 @@ fun DockHost(
         }
     }
     controller.launchNth = { n -> content.numbered.getOrNull(n)?.let { launchItem(it); true } ?: false }
+    DisposableEffect(controller) { controller.railShown = true; onDispose { controller.railShown = false; controller.releaseRail() } }
+    // A "focus dock" that arrived while an overlay hid the rail is honoured once the rail is back (INP-05); the counter is relative to this entry.
+    val focusBase = remember(controller) { controller.focusRequest }
+    LaunchedEffect(controller) { if (controller.consumePendingFocus()) { androidx.compose.runtime.withFrameNanos { }; controller.focusRequest++ } }
     controller.step = { d -> if (d > 0) manager.next() else manager.previous() }
 
     val actions = remember(content, state.active.dockPins) {
@@ -182,7 +220,8 @@ fun DockHost(
     val edge = edgeOverride ?: state.dock.edgeFor(landscape)
     DockRail(
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
-        focusRequest = controller.focusRequest, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge),
+        focusRequest = controller.focusRequest - focusBase, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge).railModifier(),
+        graphBridge = if (forceEnabled) null else DockInput.bridge, // the desktop surface's rail stays out of the phone home's graph
         icon = { item, size -> if (iconOther != null && item.ref.kind != ItemKind.App && item.ref.kind != ItemKind.Group && HomeItemPins.homeKeyOf(item.ref) != null) iconOther(item, size) else DockIcon(item, byKey, size) },
     )
 }

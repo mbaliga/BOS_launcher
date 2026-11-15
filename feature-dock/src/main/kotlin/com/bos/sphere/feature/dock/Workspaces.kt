@@ -109,6 +109,9 @@ class WorkspaceManager(
 
     fun setPins(pins: List<DockItemRef>) = updateActive { it.copy(dockPins = pins) }
 
+    /** PAL-08: adds [ref] to the dock pins of workspace [id] (not necessarily the active one); no change when it is already there. */
+    fun addPinTo(id: String, ref: DockItemRef) = update { s -> s.copy(workspaces = s.workspaces.map { if (it.id == id) it.copy(dockPins = DockPins.add(it.dockPins, ref)) else it }) }
+
     private fun updateActive(f: (Workspace) -> Workspace) = update { s -> s.copy(workspaces = s.workspaces.map { if (it.id == s.activeId) f(it) else it }) }
 
     // ---- workspaces (WSP-07)

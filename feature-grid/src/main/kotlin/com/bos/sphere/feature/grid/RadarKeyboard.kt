@@ -94,6 +94,8 @@ data class ResultMenuEntry(
     val alias: Boolean = false,
     /** Open the launcher's full app sheet (display and split choices, hide, icon colour). */
     val more: Boolean = false,
+    /** PAL-03: a nested app shortcut this entry runs. */
+    val shortcut: com.bos.sphere.core.data.SearchHit? = null,
 )
 
 object ResultMenus {

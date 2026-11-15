@@ -361,7 +361,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("A keyboard that's always open: type to find an app, like an old-school phone")) { v -> upd { it.copy(alwaysKeyboard = v) } })
             add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · portrait"), Glyphs.Message, p.keyboardOnOpenPortrait, x("Raises the on-screen keyboard when Radar or the drawer opens")) { v -> upd { it.copy(keyboardOnOpenPortrait = v) } })
             add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · landscape"), Glyphs.Message, p.keyboardOnOpenLandscape) { v -> upd { it.copy(keyboardOnOpenLandscape = v) } })
-            add(SettingItem.Action(x("Keyboard shortcuts"), Glyphs.Info, x("Every shortcut and its keys; Meta shortcuts stay with the system"), navigates = true) { com.bos.sphere.feature.grid.LauncherInput.sheetOpen.value = true })
+            add(com.bos.sphere.feature.grid.keyboardShortcutsRow())
             add(SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("The clock and corner icons sit flush to the top; swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } })
         },
     )

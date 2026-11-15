@@ -115,6 +115,15 @@ object HomeEdit {
         return s.copy(folders = s.folders + (folderId to f.copy(keys = f.keys + key)))
     }
 
+    /**
+     * INP-11: a link or file dropped on a folder tile. The item is defined on the home (so it can be drawn and opened) and filed
+     * into [folderId] without keeping a cell of its own on [page]; an item that is already on the home is moved into the folder.
+     */
+    fun addIntoFolder(state: HomeState, def: ItemDef, folderId: String, page: Int, cap: (PageLayout) -> Int): HomeState {
+        if (folderId !in state.folders) return state
+        return fileInto(add(state, def, page, cap), folderId, def.key, cap)
+    }
+
     fun renameFolder(state: HomeState, id: String, name: String): HomeState {
         val f = state.folders[id] ?: return state
         val n = name.trim().ifEmpty { f.name }

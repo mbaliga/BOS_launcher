@@ -58,4 +58,43 @@ object AppActionList {
         launcher.launch(LaunchMenus.request(choice, launcher.targetOf(app), current, launcher::displaySize, source?.let { Bounds(it.left, it.top, it.right, it.bottom) }))
         return true
     }
+
+    /** One row of Radar's chooser (PAL-08): a display to open on, or a workspace to add the app to ([already] when it holds the app). */
+    sealed interface PickerEntry {
+        val label: String
+        data class Display(val choice: LaunchChoice.OnDisplay) : PickerEntry { override val label get() = L10n.tr("Open on %s", choice.displayName) }
+        data class Workspace(val id: String, val name: String, val already: Boolean) : PickerEntry {
+            override val label get() = if (already) L10n.tr("%s (added)", name) else name
+        }
+    }
+
+    /**
+     * PAL-08: what an action that needs a pick offers, so Radar can show its own small chooser instead of sending the person
+     * to the home's app sheet. "Open on display" lists every other display that can host the app, "Add to workspace" lists
+     * the workspaces (one that already holds [ref] says so and picking it changes nothing); any other action has none (null).
+     */
+    fun pickerEntries(action: MenuAction, choices: List<LaunchChoice>, workspaces: List<com.bos.sphere.feature.dock.Workspace>, ref: DockItemRef): List<PickerEntry>? = when (action) {
+        MenuAction.OpenOnDisplay -> choices.filterIsInstance<LaunchChoice.OnDisplay>().map(PickerEntry::Display).takeIf { it.isNotEmpty() }
+        MenuAction.AddToWorkspace -> workspaces.map { PickerEntry.Workspace(it.id, it.name, ref in it.dockPins) }.takeIf { it.isNotEmpty() }
+        else -> null
+    }
+
+    /** [pickerEntries] bound to the launcher and the workspace manager: each entry's action does the work. */
+    fun pickerChoices(action: MenuAction, launcher: AppLauncher, manager: WorkspaceManager, app: AppEntry, source: Rect? = null): List<AppAction>? {
+        val current = launcher.defaultDisplayId()
+        val src = source?.let { Bounds(it.left, it.top, it.right, it.bottom) }
+        val ref = DockItemRef.app(app.key)
+        val choices = if (action == MenuAction.OpenOnDisplay) LaunchMenus.choices(launcher.caps(), current, launcher.displayNames()) else emptyList()
+        return pickerEntries(action, choices, manager.current.workspaces, ref)?.map { e ->
+            AppAction(e.label) {
+                when (e) {
+                    is PickerEntry.Display -> {
+                        SessionUse.mark(app.key)
+                        launcher.launch(LaunchMenus.request(e.choice, launcher.targetOf(app), current, launcher::displaySize, src))
+                    }
+                    is PickerEntry.Workspace -> if (!e.already) manager.addPinTo(e.id, ref)
+                }
+            }
+        }
+    }
 }

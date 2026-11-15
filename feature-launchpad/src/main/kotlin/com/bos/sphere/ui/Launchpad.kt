@@ -714,10 +714,18 @@ internal fun Chevron(color: Color, down: Boolean, size: Int = 18) {
  * Renders nothing when there is nothing unread or notification access is missing.
  */
 @Composable
-fun LaunchpadRail(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun LaunchpadRail(
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Where the unread notifications come from; the live stream by default. A test passes its own (INP-07). */
+    source: kotlinx.coroutines.flow.Flow<List<HubNotification>> = NotificationProvider.notifications,
+    /** Overrides the notification-access check; null reads the real grant. */
+    accessOverride: Boolean? = null,
+) {
     rememberLaunchpadInit()
-    val access = rememberNotificationAccess()
-    val items by NotificationProvider.notifications.collectAsStateWithLifecycle(emptyList())
+    val grant = rememberNotificationAccess()
+    val access = accessOverride ?: grant
+    val items by source.collectAsStateWithLifecycle(emptyList())
     val rules by LaunchpadSettings.rules.collectAsStateWithLifecycle()
     val read by LaunchpadSettings.readKeys.collectAsStateWithLifecycle()
     val now = rememberNow()

@@ -179,7 +179,8 @@ class InputW3UiTest {
     @Test @Config(sdk = [35]) fun INP_07_commands_with_a_corner_touch_path_name_an_action_the_defaults_bind_or_the_editor_offers() {
         for (c in com.bos.sphere.core.input.LauncherCommand.entries) {
             val a = TouchPaths.cornerActionFor(c)
-            if (a == null) assertTrue(c in TouchPaths.describedOnly) else assertTrue("$c names $a", a in CornerActionId.entries && c !in TouchPaths.describedOnly)
+            // Wave 4 shrank describedOnly: a command without a corner action is either rendered by a named test or still described only.
+            if (a == null) assertTrue(c in TouchPaths.describedOnly || c in TouchPaths.renderedBy) else assertTrue("$c names $a", a in CornerActionId.entries && c !in TouchPaths.describedOnly)
         }
         // Radar and all apps are also on default gestures, so a bare install reaches them by finger.
         assertTrue(com.bos.sphere.core.data.DefaultGestures.values.contains(CornerItem.Action(CornerActionId.Search)))

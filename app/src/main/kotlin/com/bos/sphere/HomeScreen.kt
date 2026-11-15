@@ -159,6 +159,9 @@ import androidx.compose.runtime.snapshotFlow
 import com.bos.sphere.core.data.Torch
 import java.util.Calendar
 
+/** The focus layer Launchpad sits on while open: above the home (0), the drawer (2) and the puck (3). */
+private const val LAUNCHPAD_FOCUS_LAYER = 4
+
 /**
  * The home root. Four home styles share one set of overlays (corners, status strip, Launchpad,
  * drawer, Radar, Settings) and one gesture vocabulary:
@@ -320,7 +323,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     fun openAllApps(anchor: Corner?) {
-        if (prefs.drawerStyle == DrawerStyle.Wheel) {
+        if (com.bos.sphere.feature.grid.AllAppsOpening.surfaceFor(prefs.drawerStyle) == com.bos.sphere.feature.grid.AllAppsSurface.Puck) {
             wheelAnchor = anchor
                 ?: placements.firstOrNull { p ->
                     val s = p.slot
@@ -455,6 +458,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
                 // Workspace switching and the dock's focus and number shortcuts belong to the dock controller (DCK-05, WSP-07).
+                // INP-05: Dock 1 to 9 and the workspace step act with Radar, the drawer, Ground Control or the puck open (the controller
+                // falls back to the pin list when no rail is shown); "focus dock" closes whatever hides the rail so the rail can take focus.
+                com.bos.sphere.core.input.LauncherCommand.FocusDock -> {
+                    if (searchOpen || drawerOpen || wheelOpen || leftOpen || settingsOpen) { searchOpen = false; drawerOpen = false; wheelOpen = false; leftOpen = false; settingsOpen = false }
+                    dockController.handle(c)
+                }
                 else -> dockController.handle(c)
             }
         },
@@ -502,7 +511,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     )
     com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
         if (appsByKey[key] != null && pages.none { key in it.keys }) stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)
-    }, onItems = { defs -> homeItems.addDropped(defs) })
+    }, onItems = { defs -> homeItems.addDropped(defs) }, onTouchDrag = { menuApp = null })
     var leftWidgetLabel by remember { mutableStateOf<String?>(null) }
     val widgetPicker = rememberWidgetPicker(widgetHost) { id, label ->
         if (pickingLeft) {
@@ -797,7 +806,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.toFloat(),
     )
     val revealSlideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * revealLayout.slideFraction
-    val launchpadShortcuts = remember { com.bos.sphere.core.input.ShortcutRegistry() }
+    // INP-01: Launchpad's open chord comes from the one shared registry (a rebinding in Ground Control reaches it), and while it is open it is a
+    // layer of the shared focus graph (STR-08 keeps its own arrow, collapse and Esc handling inside the panel, so its rows are not graph nodes).
+    val launchpadShortcuts = shortcutRegistry
+    com.bos.sphere.feature.grid.FocusLayer(layer = LAUNCHPAD_FOCUS_LAYER, active = leftOpen) {}
     val grantPrompter = com.bos.sphere.ui.rememberGrantPrompter()
     val homeCapture = com.bos.sphere.feature.grid.rememberHomeCapture()
     // CFG-07: features in other modules ask for grants through GrantHooks; the home shows the explanation first.
@@ -1124,6 +1136,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             // PAL-08: Open on display, Open beside and Add to dock run straight from Radar's action list.
             onRunAppAction = { app, action -> com.bos.sphere.feature.dock.AppActionList.runDirect(action, appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect()).also { if (it) searchOpen = false } },
             adjacentSupported = remember(searchOpen) { com.bos.sphere.core.launch.LaunchResolver.offersAdjacent(appLauncher.caps()) },
+            // PAL-08: "Open on display" with several displays and "Add to workspace" ask in Radar's own chooser.
+            onAppActionChoices = { app, action ->
+                com.bos.sphere.feature.dock.AppActionList.pickerChoices(action, appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect())
+                    ?.map { c -> com.bos.sphere.feature.grid.RadarChoice(c.label) { c.run(); searchOpen = false } }
+            },
         )
 
         WheelDrawer(

@@ -233,6 +233,7 @@ private fun tileCaption(t: Tile, query: String): AnnotatedString {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StripTileView(tile: Tile, actions: TileActions) {
+  Column(horizontalAlignment = Alignment.CenterHorizontally) {
     Box(
         Modifier
             .size(StripTile)
@@ -243,6 +244,9 @@ private fun StripTileView(tile: Tile, actions: TileActions) {
             .semantics(mergeDescendants = true) { contentDescription = tile.caption() }
             .combinedClickable(onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
     ) { TileFace(tile, StripTile) }
+    // PAL-03: the app's own shortcuts sit inside its tile.
+    if (tile is Tile.App) NestedShortcutPills(tile, NestedShortcuts.SMALL_SHOWN, StripTile, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) })
+  }
 }
 
 // ---------------------------------------------------------------- orbit
@@ -386,12 +390,13 @@ internal fun Orbit(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 androidx.compose.foundation.layout.Box(
-                    Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape).secondaryClick { actions.onSecondary(tile) }.orbitClick(tile, actions),
+                    Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape).secondaryClick { actions.onSecondary(tile) }.radarDragOut(tile, pointer = false).orbitClick(tile, actions),
                 ) { TileFace(tile, tileSize) }
                 Text(
                     tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
                 )
+                if (tile is Tile.App) NestedShortcutPills(tile, NestedShortcuts.SMALL_SHOWN, colW, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) })
             }
         }
         if (footnote != null) {
@@ -571,6 +576,7 @@ private fun FlatTileRow(
                     if (tile is Tile.Hit) highlight(tile.hit.title, query, Color(0xFFB9A8FF)) else AnnotatedString(tile.caption()),
                     color = if (tile is Tile.Allow) Color(0x99FFFFFF) else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
+                if (tile is Tile.App) NestedShortcutRow(tile, onRun = { onTap(Tile.Hit(it)) })
                 if (tile is Tile.Hit) {
                     tile.hit.subtitle?.let { Text(it, color = Color(0x99FFFFFF), fontSize = (12 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     tile.hit.snippet?.let {
@@ -604,6 +610,8 @@ internal fun ResultPreview(
     onOpen: () -> Unit,
     onLongPressApp: (com.bos.sphere.core.data.AppEntry) -> Unit,
     onOpenIntent: ((android.content.Intent) -> Unit)? = null,
+    /** PAL-03: runs one of an app result's nested shortcuts. */
+    onShortcut: (com.bos.sphere.core.data.SearchHit) -> Unit = {},
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         DialogControllerKeys()
@@ -617,6 +625,7 @@ internal fun ResultPreview(
                 tile.hit.subtitle?.let { Text(it, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp)) }
                 tile.hit.snippet?.let { Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xE6FFFFFF), fontSize = 16.sp, maxLines = 12, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp)) }
             }
+            if (tile is Tile.App) NestedShortcutRow(tile, onRun = onShortcut, modifier = Modifier.padding(top = 10.dp))
             if (tile is Tile.Setting) {
                 Text(tile.entry.category, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                 if (tile.entry.description.isNotEmpty()) Text(tile.entry.description, color = Color(0xE6FFFFFF), fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
@@ -637,6 +646,6 @@ internal fun ResultPreview(
     }
 }
 
-/** INP-11: a mouse drag out of a Radar app result carries the app to the home (a finger keeps tap, long-press and the preview). */
-internal fun Modifier.radarDragOut(tile: Tile): Modifier =
-    if (tile is Tile.App) appDragSource(tile.app.key, onStart = { LauncherDrops.onDragStart?.invoke() }) else this
+/** INP-11: a drag out of a Radar app result (a mouse drag, or a finger after a long press) carries the app to the home, a folder or the dock. */
+internal fun Modifier.radarDragOut(tile: Tile, pointer: Boolean = true): Modifier =
+    if (tile is Tile.App) appDragSource(tile.app.key, onStart = { LauncherDrops.onDragStart?.invoke() }, pointer = pointer) else this

@@ -36,6 +36,7 @@ fun ScheduleDialog(label: String, now: Long, onDismiss: () -> Unit, onPick: (Lon
     var hour by remember { mutableIntStateOf(start.get(java.util.Calendar.HOUR_OF_DAY)) }
     var minute by remember { mutableIntStateOf((start.get(java.util.Calendar.MINUTE) / 5) * 5) }
     Dialog(onDismissRequest = onDismiss) {
+        DockDialogInput() // INP-20: controller window hook and the shared focus layer
         val shape = RoundedCornerShape(24.dp)
         Column(
             Modifier.fillMaxWidth().clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(18.dp),

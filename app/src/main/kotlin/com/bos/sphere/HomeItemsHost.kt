@@ -172,6 +172,13 @@ class HomeItems internal constructor(
         edit { s -> defs.fold(s) { acc, def -> HomeEdit.add(acc, def, page(), capacityOf) } }
     }
 
+    /** INP-11: links and files dropped on a folder tile are defined on the home (without taking a page cell of their own) and filed into that folder. */
+    fun addDroppedInto(folderKey: String, defs: List<ItemDef>) {
+        val folderId = ItemKeys.folderId(folderKey) ?: return
+        if (defs.isEmpty()) return
+        edit { s -> defs.fold(s) { acc, def -> HomeEdit.addIntoFolder(acc, def, folderId, page(), capacityOf) } }
+    }
+
     /** INP-09: a keyboard edit ends in the same shared edit a drag does; a widget resize is bounded by the grid. */
     fun applyKeyboardAction(a: com.bos.sphere.feature.grid.ItemAction) {
         val (cols, rows) = gridDims()
@@ -376,6 +383,7 @@ class HomeItems internal constructor(
         onTap = ::tap,
         onLongPress = { itemMenu = it },
         onAction = ::applyKeyboardAction,
+        onDropItems = ::addDroppedInto,
         onDropOnto = { drag, target ->
             edit { s -> HomeEdit.dropOnto(s, drag, target, newId(), L10n.tr("Folder"), capacityOf) }
         },

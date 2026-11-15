@@ -50,7 +50,8 @@ fun openHitIntent(context: Context, hit: SearchHit): Intent? {
 internal sealed interface Tile {
     val key: String
 
-    data class App(val app: AppEntry) : Tile { override val key get() = "a:${app.key}" }
+    /** PAL-03: [shortcuts] are the app's own launcher shortcuts that matched the query; they are drawn inside this tile or row. */
+    data class App(val app: AppEntry, val shortcuts: List<SearchHit> = emptyList()) : Tile { override val key get() = "a:${app.key}" }
     data class Person(val c: ContactRow) : Tile { override val key get() = "c:${c.hit.id}" }
     data class Hit(val hit: SearchHit) : Tile { override val key get() = "h:${hit.id}" }
     data class Web(val row: WebRow, val index: Int) : Tile { override val key get() = "w:$index" }
@@ -92,6 +93,10 @@ internal class SearchData(
 ) {
     val blank = query.isBlank()
 
+    /** PAL-03: app shortcuts nested in their app's tile (app key to shortcuts); the rest of the Actions hits stay Actions rows. */
+    private val nesting: NestedShortcuts.Split = NestedShortcuts.split(apps, hits[SearchCategory.Actions].orEmpty())
+    private val actionHits: List<SearchHit> get() = nesting.rest
+
     /** PAL-05: an inline answer (calculator, unit conversion) sits on top; Enter copies it. */
     val answer: SearchHit? = hits[SearchCategory.Actions]?.firstOrNull { it.copyText != null }
 
@@ -99,7 +104,7 @@ internal class SearchData(
         SearchCategory.Apps -> apps.size
         SearchCategory.Contacts -> contacts.size
         SearchCategory.Web -> web.count { it !is WebRow.BangHints } + (hits[cat]?.size ?: 0)
-        SearchCategory.Actions -> (hits[cat]?.size ?: 0) + settings.size
+        SearchCategory.Actions -> actionHits.size + settings.size
         else -> hits[cat]?.size ?: 0
     }
 
@@ -130,7 +135,7 @@ internal class SearchData(
     }
 
     private fun tilesFor(cat: SearchCategory): List<Tile> = when (cat) {
-        SearchCategory.Apps -> apps.map { Tile.App(it) }
+        SearchCategory.Apps -> apps.map { Tile.App(it, nesting.byApp[it.key].orEmpty()) }
         SearchCategory.Contacts -> buildList {
             contacts.forEach { add(Tile.Person(it)) }
             if (askContacts) add(Tile.Allow(files = false))
@@ -146,7 +151,7 @@ internal class SearchData(
             web.withIndex().filter { it.value is WebRow.PlayStore }.forEach { add(Tile.Web(it.value, it.index)) }
             web.withIndex().filter { it.value !is WebRow.PlayStore && it.value !is WebRow.BangHints }.forEach { add(Tile.Web(it.value, it.index)) }
         }
-        SearchCategory.Actions -> hits[cat].orEmpty().sortedByDescending { it.copyText != null }.map<SearchHit, Tile> { Tile.Hit(it) } + settings.map { Tile.Setting(it) }
+        SearchCategory.Actions -> actionHits.sortedByDescending { it.copyText != null }.map<SearchHit, Tile> { Tile.Hit(it) } + settings.map { Tile.Setting(it) }
     }
 
     /**

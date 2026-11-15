@@ -59,6 +59,8 @@ class HomeExtras(
     val onTap: (String) -> Unit = {},
     val onLongPress: (String) -> Unit = {},
     val onDropOnto: (drag: String, target: String) -> Unit = { _, _ -> },
+    /** INP-11: links and files dropped on the folder tile [folderKey] are filed into it. */
+    val onDropItems: (folderKey: String, defs: List<ItemDef>) -> Unit = { _, _ -> },
     /** A keyboard edit (INP-09): the same [ItemAction] a drag produces, applied through the host's one edit path. */
     val onAction: (ItemAction) -> Unit = {},
 ) {
@@ -74,7 +76,9 @@ fun ExtraItemFace(key: String, extras: HomeExtras, size: Dp, modifier: Modifier 
     when (ItemKeys.kind(key)) {
         ItemKind.Folder -> {
             val folder = ItemKeys.folderId(key)?.let { extras.state.folders[it] }
-            if (folder != null) FolderTile(folder, extras.resolveApp, size, onOpen = {}, modifier = modifier, interactive = false)
+            val context = androidx.compose.ui.platform.LocalContext.current
+            // INP-11: an app, link or file dropped on the tile is filed into the folder.
+            if (folder != null) FolderTile(folder, extras.resolveApp, size, onOpen = {}, modifier = modifier.launcherDropTarget { r -> FolderDrop.file(extras, key, r).also { n -> if (n > 0) android.widget.Toast.makeText(context, L10n.tr("Added %d to folder", n), android.widget.Toast.LENGTH_SHORT).show() } > 0 }, interactive = false)
         }
         else -> extras.state.items[key]?.let { ItemGlyphTile(it, extras.shortcutIcon, size, modifier) }
     }
@@ -148,4 +152,14 @@ fun panelGlyph(tab: com.bos.sphere.core.catalog.PanelTab): String = when (tab) {
     com.bos.sphere.core.catalog.PanelTab.Files -> "\u25A4"
     com.bos.sphere.core.catalog.PanelTab.Usage -> "\u25D4"
     com.bos.sphere.core.catalog.PanelTab.Timeline -> "\u29D6"
+}
+
+/** INP-11: what a drop on a folder tile does, apart from the UI: apps and items are filed into the folder through the host's edit path. */
+internal object FolderDrop {
+    /** Files [r] into folder [folderKey]; returns how many items went in. */
+    fun file(extras: HomeExtras, folderKey: String, r: DropResult): Int {
+        r.appKeys.forEach { extras.onDropOnto(it, folderKey) }
+        if (r.items.isNotEmpty()) extras.onDropItems(folderKey, r.items)
+        return r.appKeys.size + r.items.size
+    }
 }

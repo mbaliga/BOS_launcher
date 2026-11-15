@@ -147,6 +147,8 @@ fun SearchOverlay(
     onRunAppAction: (AppEntry, MenuAction) -> Boolean = { _, _ -> false },
     /** PAL-08: whether "Open beside" is proven on this device (SPK-02); Radar offers it only then. */
     adjacentSupported: Boolean = false,
+    /** PAL-08: the choices of an action that needs a pick ("Open on display" with several displays, "Add to workspace"); null = none to offer. */
+    onAppActionChoices: (AppEntry, MenuAction) -> List<RadarChoice>? = { _, _ -> null },
 ) {
     if (visible) BackHandler(onBack = onDismiss)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
@@ -157,7 +159,7 @@ fun SearchOverlay(
             hub = hub, onOpenHit = onOpenHit, onRunAction = onRunAction,
             onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
             initialQuery = initialQuery, onRunCommand = onRunCommand,
-            onRunAppAction = onRunAppAction, adjacentSupported = adjacentSupported,
+            onRunAppAction = onRunAppAction, adjacentSupported = adjacentSupported, onAppActionChoices = onAppActionChoices,
         )
     }
 }
@@ -211,8 +213,11 @@ internal fun SearchScreen(
     onRunCommand: (String, Int?) -> Unit = { _, _ -> },
     onRunAppAction: (AppEntry, MenuAction) -> Boolean = { _, _ -> false },
     adjacentSupported: Boolean = false,
+    onAppActionChoices: (AppEntry, MenuAction) -> List<RadarChoice>? = { _, _ -> null },
 ) {
     val context = LocalContext.current
+    // PAL-08: the chooser of an action that needs a pick (which display, which workspace), shown over Radar.
+    var picker by remember { mutableStateOf<RadarPickerState?>(null) }
     // PAL-02, PAL-09: plain app queries also match aliases, initials and a typo, and learn from selections.
     androidx.compose.runtime.SideEffect { AppSearch.appContext = context.applicationContext }
     val palette = remember { PaletteHost.get(context) }
@@ -379,16 +384,20 @@ internal fun SearchScreen(
     LaunchedEffect(trimmed, selected) { nav = RadarNav(navTiles.size) }
     val selectedKey = if (inputMode == InputMode.Keyboard && navNow.active) navTiles.getOrNull(navNow.selected)?.key else null
     selectedHitHolder[0] = selectedKey?.takeIf { it.startsWith("h:") }?.removePrefix("h:")
-    fun menuFor(t: Tile) = ResultMenus.forKind(tileKind(t), otherDisplays = otherDisplays, adjacentSupported = adjacentSupported)
+    fun menuFor(t: Tile) = NestedShortcuts.menuFor(t, ResultMenus.forKind(tileKind(t), otherDisplays = otherDisplays, adjacentSupported = adjacentSupported))
     fun runMenu(tile: Tile, entry: ResultMenuEntry) {
         when {
+            entry.shortcut != null -> tap(Tile.Hit(entry.shortcut)) // PAL-03: a nested app shortcut
             entry.preview -> previewTile = tile
             entry.alias && tile is Tile.App -> aliasFor = tile.app
             entry.action == MenuAction.Open -> tap(tile)
             entry.action == MenuAction.AppInfo && tile is Tile.App -> onOpenIntent(appInfoIntent(tile.app.packageName))
             entry.action == MenuAction.Uninstall && tile is Tile.App -> onOpenIntent(appUninstallIntent(tile.app))
-            // PAL-08: display, beside and dock run from here when the host can; workspace and "more" open the host's own sheet.
-            tile is Tile.App -> if (entry.action == null || !onRunAppAction(tile.app, entry.action)) onLongPressApp(tile.app)
+            // PAL-08: display, beside and dock run from here when the host can; a display or workspace pick opens Radar's own chooser; "more" opens the host's sheet.
+            tile is Tile.App -> if (entry.action == null || !onRunAppAction(tile.app, entry.action)) {
+                val choices = entry.action?.let { onAppActionChoices(tile.app, it) }?.takeIf { it.isNotEmpty() }
+                if (choices != null) picker = RadarPickerState(RadarPicker.titleFor(entry.action), choices) else onLongPressApp(tile.app)
+            }
         }
     }
     val onRadarKey: (KeyEvent) -> Boolean = handler@{ ev ->
@@ -397,7 +406,7 @@ internal fun SearchScreen(
         val key = RadarKeyMap.radarKey(ev) ?: return@handler false
         val sel = field.selection
         val caret = CaretContext(queryBlank = query.isBlank(), atStart = sel.collapsed && sel.start == 0, atEnd = sel.collapsed && sel.end == query.length)
-        val r = RadarKeyboard.reduce(navNow, key, caret) { i -> ResultMenus.forKind(navTiles.getOrNull(i)?.let(::tileKind) ?: ResultKind.Other, otherDisplays = otherDisplays, adjacentSupported = adjacentSupported).size }
+        val r = RadarKeyboard.reduce(navNow, key, caret) { i -> navTiles.getOrNull(i)?.let { menuFor(it).size } ?: ResultMenus.forKind(ResultKind.Other).size }
         nav = r.nav
         when (val e = r.effect) {
             is RadarEffect.Run -> navTiles.getOrNull(e.index)?.let { tap(it) }
@@ -521,8 +530,9 @@ internal fun SearchScreen(
             )
         }
         previewTile?.let { t ->
-            ResultPreview(t, trimmed, onDismiss = { previewTile = null }, onOpen = { previewTile = null; tap(t) }, onLongPressApp = { previewTile = null; onLongPressApp(it) }, onOpenIntent = onOpenIntent)
+            ResultPreview(t, trimmed, onDismiss = { previewTile = null }, onOpen = { previewTile = null; tap(t) }, onLongPressApp = { previewTile = null; onLongPressApp(it) }, onOpenIntent = onOpenIntent, onShortcut = { previewTile = null; tap(Tile.Hit(it)) })
         }
+        picker?.let { p -> RadarChoicePicker(p.title, p.choices, onDismiss = { picker = null }, onPick = { c -> picker = null; c.run() }) }
     }
     }
 }

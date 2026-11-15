@@ -83,6 +83,7 @@ fun DockPanel(
     var pickingScheduleApp by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
+        DockDialogInput() // INP-20: controller window hook and the shared focus layer
         val shape = RoundedCornerShape(24.dp)
         Column(
             Modifier.fillMaxWidth().heightIn(max = 640.dp).clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape)
@@ -198,6 +199,7 @@ fun GroupEditor(apps: List<PanelApp>, onSave: (AppGroup) -> Unit, onDismiss: () 
     var chosen by remember { mutableStateOf(emptySet<String>()) }
     var picking by remember { mutableStateOf(false) }
     Dialog(onDismissRequest = onDismiss) {
+        DockDialogInput() // INP-20: controller window hook and the shared focus layer
         val shape = RoundedCornerShape(24.dp)
         Column(Modifier.fillMaxWidth().clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Heading("New app group")
@@ -219,6 +221,7 @@ fun GroupEditor(apps: List<PanelApp>, onSave: (AppGroup) -> Unit, onDismiss: () 
 fun AppPicker(title: String, apps: List<PanelApp>, selected: Set<String>, max: Int, min: Int, onDone: (Set<String>) -> Unit, onDismiss: () -> Unit) {
     val picked = remember { mutableStateListOf<String>().also { it.addAll(selected) } }
     Dialog(onDismissRequest = onDismiss) {
+        DockDialogInput() // INP-20: controller window hook and the shared focus layer
         val shape = RoundedCornerShape(24.dp)
         Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(18.dp)) {
             Heading(title)
@@ -241,6 +244,7 @@ private fun SessionDialog(group: AppGroup, displays: List<DisplayRef>, onSave: (
     var name by remember { mutableStateOf(group.name) }
     val assign = remember { mutableStateListOf<Int>().also { l -> repeat(group.members.size) { l.add(-1) } } }
     Dialog(onDismissRequest = onDismiss) {
+        DockDialogInput() // INP-20: controller window hook and the shared focus layer
         val shape = RoundedCornerShape(24.dp)
         Column(Modifier.fillMaxWidth().clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Heading("Save session")

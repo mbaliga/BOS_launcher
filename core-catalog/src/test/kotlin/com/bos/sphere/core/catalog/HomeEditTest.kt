@@ -158,4 +158,36 @@ class HomeEditTest {
         assertEquals(listOf("a", "c"), m.folders["f1"]!!.keys)
         assertNull(m.folders["zz"])
     }
+
+    @Test
+    fun INP_11_aLinkDroppedOnAFolderTileIsDefinedAndFiledInsideItWithoutAPageCell() {
+        val link = ItemDef(ItemKeys.link("https://example.com"), ItemKind.Link, "example.com", "https://example.com")
+        val s0 = HomeEdit.createFolder(state("a", "b", "c"), listOf("a", "b"), "f", "F", cap)
+        val s1 = HomeEdit.addIntoFolder(s0, link, "f", 0, cap)
+        assertEquals(listOf("a", "b", link.key), s1.folders.getValue("f").keys)
+        assertEquals(link, s1.items[link.key])
+        assertTrue("the link keeps no cell on the page", s1.pages.flatMap { it.keys }.none { it == link.key })
+        assertEquals("the other items did not move", s0.pages, s1.pages)
+    }
+
+    @Test
+    fun INP_11_aLinkAlreadyOnThePageMovesIntoTheFolderAndAnUnknownFolderChangesNothing() {
+        val link = ItemDef(ItemKeys.link("https://example.com"), ItemKind.Link, "example.com", "https://example.com")
+        val onPage = HomeEdit.add(state("a", "b"), link, 0, cap)
+        val withFolder = HomeEdit.createFolder(onPage, listOf("a", "b"), "f", "F", cap)
+        val moved = HomeEdit.addIntoFolder(withFolder, link, "f", 0, cap)
+        assertTrue(link.key in moved.folders.getValue("f").keys)
+        assertTrue(moved.pages.flatMap { it.keys }.none { it == link.key })
+        assertEquals(withFolder, HomeEdit.addIntoFolder(withFolder, link, "nope", 0, cap))
+    }
+
+    @Test
+    fun INP_11_anAppDroppedOnAFolderTileIsFiledByTheSameEditADragUses() {
+        val s0 = HomeEdit.createFolder(state("a", "b", "c"), listOf("a", "b"), "f", "F", cap)
+        val s1 = HomeEdit.dropOnto(s0, "c", ItemKeys.folder("f"), "new", "Folder", cap)
+        assertEquals(listOf("a", "b", "c"), s1.folders.getValue("f").keys)
+        // an app that is not on the home yet (dropped from the drawer or Radar) files in as well
+        val s2 = HomeEdit.dropOnto(s0, "z", ItemKeys.folder("f"), "new", "Folder", cap)
+        assertEquals(listOf("a", "b", "z"), s2.folders.getValue("f").keys)
+    }
 }

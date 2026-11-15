@@ -54,6 +54,7 @@ object DesktopDockProvider : DesktopDock {
         val desktop = remember { DesktopController.get(context) }
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
         var panelOpen by remember { mutableStateOf(false) }
+        DockInputWiring.Install(withBridge = false) // INP-20: the panel's dialogs get the controller window hook here too
         DisposableEffect(state.displayId, controller) {
             controllers[state.displayId] = controller
             val manager = com.bos.sphere.feature.dock.WorkspaceRepository.get(context)

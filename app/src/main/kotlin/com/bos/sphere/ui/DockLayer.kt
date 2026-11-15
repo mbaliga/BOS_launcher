@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.capabilities.CapabilityEvaluator
 import com.bos.sphere.core.design.L10n
+import com.bos.sphere.feature.grid.launcherDropTarget
 import androidx.compose.runtime.collectAsState
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.Corner
@@ -120,6 +121,7 @@ fun BoxScope.DockLayer(
         manager.applyActive()
         onDispose { if (WorkspaceRepository.hooks === hooks) WorkspaceRepository.hooks = object : WorkspaceHooks {} }
     }
+    DockInputWiring.Install()
     var panelOpen by remember { mutableStateOf(false) }
     // Workspace shortcuts work with the dock off (DCK-05): the controller steps the workspace itself.
     DisposableEffect(controller) { controller.bindWorkspaceStep { d -> if (d > 0) manager.next() else manager.previous() }; onDispose { } }
@@ -128,6 +130,41 @@ fun BoxScope.DockLayer(
     DisposableEffect(Unit) { onDispose { scope.cancel() } }
 
     val desktop = remember { DesktopController.get(context) }
+    // INP-05: Dock 1 to 9 launch the Nth pin even when no rail is composed (an overlay hides it, or the dock setting is off).
+    val latestApps = androidx.compose.runtime.rememberUpdatedState(apps)
+    val latestHome = androidx.compose.runtime.rememberUpdatedState(homeExtras)
+    val latestLaunch = androidx.compose.runtime.rememberUpdatedState(onLaunch)
+    fun pinDropped(r: com.bos.sphere.feature.grid.DropResult): Int {
+        val known = latestApps.value.mapTo(HashSet()) { it.key }
+        val appRefs = r.appKeys.filter { it in known }.map { DockItemRef.app(it) }
+        if (r.items.isNotEmpty()) com.bos.sphere.feature.grid.LauncherDrops.onItems?.invoke(r.items) // a link or file lives on the home first; the pin refers to it
+        val itemRefs = if (com.bos.sphere.feature.grid.LauncherDrops.onItems != null) r.items.mapNotNull { com.bos.sphere.feature.dock.HomeItemPins.refOf(it.key) } else emptyList()
+        val refs = appRefs + itemRefs
+        manager.setPins(refs.fold(manager.current.active.dockPins) { acc, ref -> com.bos.sphere.feature.dock.DockPins.add(acc, ref) })
+        return refs.size
+    }
+    DisposableEffect(controller) {
+        fun otherKey(ref: DockItemRef) = com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(ref)?.takeIf { latestHome.value?.owns(it) == true }
+        controller.bindPinLaunch { n ->
+            val st = manager.current
+            val byKey = latestApps.value.associateBy { it.key }
+            val available = { ref: DockItemRef ->
+                when (ref.kind) {
+                    ItemKind.App -> byKey.containsKey(ref.id)
+                    ItemKind.Group -> st.groups.any { it.id == ref.id }
+                    else -> ref.id == DESKTOP_PIN_ID || otherKey(ref) != null
+                }
+            }
+            com.bos.sphere.feature.dock.DockPinLaunch.launchNth(n, st.active.dockPins, available) { ref ->
+                when (ref.kind) {
+                    ItemKind.App -> byKey[ref.id]?.let { com.bos.sphere.feature.dock.SessionUse.mark(it.key); latestLaunch.value(it) }
+                    ItemKind.Group -> st.groups.firstOrNull { it.id == ref.id }?.let { g -> scope.launch { launcher.runGroup(g) } }
+                    else -> if (ref.id == DESKTOP_PIN_ID) openDesktop(context, desktop) else otherKey(ref)?.let { latestHome.value?.onTap?.invoke(it) }
+                }
+            }
+        }
+        onDispose { controller.bindPinLaunch { false } }
+    }
     val tierNow = remember { CapabilityEvaluator.tier(launcher.inputs()) }
     if (visible) GroupShelfSlot(wsState.groups, wsState.dock.groupShelf, wsState.dock.isEnabled(tierNow), onRun = { g -> scope.launch { launcher.runGroup(g) } })
     if (visible) DockHost(
@@ -144,6 +181,11 @@ fun BoxScope.DockLayer(
         },
         iconOther = if (homeExtras == null) null else { item, size ->
             com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(item.ref)?.let { com.bos.sphere.feature.grid.ExtraItemFace(it, homeExtras, size) }
+        },
+        // INP-11: an app dragged out of the drawer or Radar, or a link or file dragged in, is pinned by dropping it on the rail.
+        railModifier = {
+            val ctx = LocalContext.current
+            launcherDropTarget { r -> pinDropped(r).also { n -> if (n > 0) android.widget.Toast.makeText(ctx, L10n.tr("Pinned %d to dock", n), android.widget.Toast.LENGTH_SHORT).show() } > 0 }
         },
         modifier = { edge ->
             when (edge) {
@@ -267,3 +309,51 @@ fun homeLastTouch(rootView: () -> android.view.View): com.bos.sphere.feature.doc
         origin = { IntArray(2).also { rootView().getLocationOnScreen(it) }.let { it[0] to it[1] } },
         itemRects = { com.bos.sphere.feature.grid.LauncherInput.focus.let { f -> f.nodes().filter { it.layer >= f.topLayer }.map { it.rect } } },
     )
+
+/**
+ * INP-01, INP-20: connects the dock module to the launcher's shared input hub. The rail's items and controls register as
+ * nodes of the focus graph (layer 0, the home's), and every dock dialog installs the controller window hook and counts as
+ * a focus layer above the home while it is open. Installed while the home is composed; the desktop surface's rail passes
+ * no bridge (see `DockHost.forceEnabled`).
+ */
+internal object DockInputWiring {
+    val bridge = object : com.bos.sphere.feature.dock.DockInput.FocusBridge {
+        override fun register(id: String, left: Float, top: Float, right: Float, bottom: Float, requester: androidx.compose.ui.focus.FocusRequester) {
+            com.bos.sphere.feature.grid.LauncherInput.focus.register(
+                com.bos.sphere.core.input.FocusNode(id, com.bos.sphere.core.input.FRect(left, top, right, bottom), 0, com.bos.sphere.core.input.FocusKind.Item), requester,
+            )
+        }
+        override fun unregister(id: String) = com.bos.sphere.feature.grid.LauncherInput.focus.unregister(id)
+        override fun onFocus(id: String, focused: Boolean) = com.bos.sphere.feature.grid.LauncherInput.focus.onFocus(id, focused)
+    }
+
+    val dialogHook: @Composable () -> Unit = {
+        com.bos.sphere.feature.grid.DialogControllerKeys()
+        DisposableEffect(Unit) {
+            com.bos.sphere.feature.grid.LauncherInput.focus.layerActive(com.bos.sphere.feature.dock.DockInput.DIALOG_LAYER, true)
+            onDispose { com.bos.sphere.feature.grid.LauncherInput.focus.layerActive(com.bos.sphere.feature.dock.DockInput.DIALOG_LAYER, false) }
+        }
+    }
+
+    private var users = 0
+    private var bridgeUsers = 0
+
+    /** [withBridge] false for the desktop surface, which needs the dialog hook but keeps its rail off the phone home's graph. */
+    @Composable
+    fun Install(withBridge: Boolean = true) {
+        DisposableEffect(withBridge) {
+            synchronized(this@DockInputWiring) {
+                users++
+                com.bos.sphere.feature.dock.DockInput.dialogHook = dialogHook
+                if (withBridge) { bridgeUsers++; com.bos.sphere.feature.dock.DockInput.bridge = bridge }
+            }
+            onDispose {
+                synchronized(this@DockInputWiring) {
+                    users--
+                    if (withBridge && --bridgeUsers <= 0) com.bos.sphere.feature.dock.DockInput.bridge = null
+                    if (users <= 0) com.bos.sphere.feature.dock.DockInput.dialogHook = {}
+                }
+            }
+        }
+    }
+}

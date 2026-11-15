@@ -21,7 +21,12 @@ import kotlin.coroutines.cancellation.CancellationException
 fun rememberPredictiveBackProgress(enabled: Boolean, onBack: () -> Unit): State<Float> {
     val progress = remember { mutableFloatStateOf(0f) }
     val current = rememberUpdatedState(onBack)
-    LaunchedEffect(enabled) { if (enabled) progress.floatValue = 0f }
+    // After a committed back the surface keeps its shrunk look while it exits; the reset comes once the exit is over
+    // (or at once on open), so the next open never starts shrunk.
+    LaunchedEffect(enabled) {
+        if (!enabled) kotlinx.coroutines.delay(700)
+        progress.floatValue = 0f
+    }
     PredictiveBackHandler(enabled = enabled) { events ->
         try {
             events.collect { progress.floatValue = PredictiveBackMath.clamp(it.progress) }

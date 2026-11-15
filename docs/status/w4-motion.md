@@ -16,3 +16,7 @@ Nothing here is device-verified. A status is `partial` while a device figure or 
 ## Shared-file edits (small, additive)
 
 `GridHome.kt` (`stillPaging` and `goToPage`), `SearchOverlay.kt`, `WheelDrawer.kt` (predictive back, semantics, imports), `SettingsSpace.kt` (tab gating), `HomeScreen.kt` (indicator gating, import), `ContinuousHome.kt`, `core-design/L10n.kt` (the two merge expressions get `L10nW4motion`), `core-design/build.gradle.kts` (activity-compose, implementation), `app/ui/Lab.kt` (one row). New: `MotionGate.kt`, `PredictiveBack.kt`, `L10nW4motion.kt`, `PredictiveBackMath.kt`.
+
+## Review pass
+
+Defect fixed: `rememberPredictiveBackProgress` left the back-gesture progress at its last value after a committed back, so the next open of the surface could start shrunk and dimmed for a frame. It now resets on open and 700 ms after the surface closes (the exit animation keeps the shrunk look). All statuses stay `partial`: each still has a device or owner residue named above, and the predictive-back visual progress and the 6x-budget CI bound for NFR-03/04 are the only weaker-than-device claims (stated in the notes).

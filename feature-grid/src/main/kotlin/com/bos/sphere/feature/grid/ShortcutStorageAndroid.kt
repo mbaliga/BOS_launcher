@@ -10,10 +10,10 @@ import java.util.concurrent.Executors
  * The keyboard slot of the state file (`extras.json`, key "keyboard") as a [ShortcutStorage]. Import and restore
  * write the same slot, so [reload] after one of them picks the imported bindings up (INP-10, CFG-02).
  */
-class StateShortcutStorage(context: Context) : ShortcutStorage {
+class StateShortcutStorage(context: Context) : ShortcutStorage, com.bos.sphere.core.data.ShortcutOverrideStore {
     private val extras = StateService.get(context.applicationContext).extras
     override fun read(): String? = extras.read().keyboardShortcuts
-    override fun write(text: String?) { extras.write(extras.read().copy(keyboardShortcuts = text)) }
+    override fun write(text: String?) { extras.write(extras.read().copy(keyboardShortcuts = text?.takeIf { it.isNotBlank() })) }
 }
 
 /** Loads the saved bindings into [LauncherInput.registry] off the main thread, and saves changes the same way. */

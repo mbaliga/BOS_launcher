@@ -206,7 +206,13 @@ fun ColumnScope.BackupPane() {
             Text(L10n.tr("Widgets to add again"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
             note(L10n.tr("These widgets were in the file. Each needs one confirmation from Android."))
             widgetsLeft.forEach { w ->
-                ActionRow(w.label.ifBlank { widgetPlace(w) }, widgetPlace(w), Glyphs.Widget) { rebinder.start(w) }
+                // A platform restore (NFR-18) removes the device-bound id and cannot say which provider it was: nothing to bind, so say so.
+                ActionRow(w.label.ifBlank { widgetPlace(w) }, widgetPlace(w), Glyphs.Widget) {
+                    if (w.provider.isBlank()) message = L10n.tr("Add it again from the widget picker. This setup was restored without the widget's app.") else rebinder.start(w)
+                }
+                ActionRow(L10n.tr("Dismiss"), w.label.ifBlank { widgetPlace(w) }, Glyphs.Plus) {
+                    service.clearPendingWidget(w.slot); widgetsLeft = service.pendingWidgets()
+                }
             }
         }
 

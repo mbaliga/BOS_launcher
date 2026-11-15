@@ -74,4 +74,16 @@ class LauncherImportTest {
             try { LI.databaseBytes(bad); fail("accepted") } catch (_: StateFormatException) { }
         }
     }
+
+    @Test fun CFG_12_aZipWithOnlyAGridNamedDatabaseIsReadAndLauncherDbWinsWhenBothExist() {
+        val head = "SQLite format 3\u0000".toByteArray(Charsets.ISO_8859_1)
+        val grid = head + ByteArray(10)
+        val plain = head + ByteArray(20)
+        fun zip(vararg e: Pair<String, ByteArray>) = ByteArrayOutputStream().also { o ->
+            ZipOutputStream(o).use { z -> e.forEach { (n, b) -> z.putNextEntry(ZipEntry(n)); z.write(b); z.closeEntry() } }
+        }.toByteArray()
+        assertEquals(grid.size, LI.databaseBytes(zip("x/launcher_4_by_4.db" to grid)).size)
+        assertEquals(plain.size, LI.databaseBytes(zip("launcher_4_by_4.db" to grid, "launcher.db" to plain)).size)
+        try { LI.databaseBytes(zip("other.db" to plain)); fail("accepted") } catch (_: StateFormatException) { }
+    }
 }

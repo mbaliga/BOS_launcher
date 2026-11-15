@@ -241,7 +241,9 @@ private fun UsagePanel(appsByKey: Map<String, AppEntry>, prefs: HomePanelPrefs, 
         Column {
             Text(L10n.tr("Usage access is off. It lets the launcher read how long each app was open today. The numbers stay on this device."), color = HyleColors.Ink, fontSize = 13.sp)
             Text(L10n.tr("Open usage access settings"), color = HyleColors.Violet, fontSize = 13.sp, modifier = Modifier.clickable {
-                runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { // CFG-07
+                    runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }
             }.padding(vertical = 10.dp))
         }
         return

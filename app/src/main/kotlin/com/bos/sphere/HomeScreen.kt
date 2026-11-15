@@ -481,7 +481,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            val dest = java.io.File(context.filesDir, "background_${System.currentTimeMillis()}.img")
+            val dest = java.io.File(context.noBackupFilesDir, "background_${System.currentTimeMillis()}.img") // NFR-18: never in a platform backup
             // NFR-12: the copy runs on the IO dispatcher; only the preference update comes back to the main thread.
             scope.launch {
                 val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { context.contentResolver.openInputStream(uri)?.use { i -> dest.outputStream().use { o -> i.copyTo(o) } } }.isSuccess }
@@ -1066,7 +1066,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             ) {
                 HubPanel(fraction = hubFraction, onRequestAccess = {
                     hubOpen = false
-                    runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.Notifications) { // CFG-07
+                        runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }
                 })
             }
             if (hubOpen) BackHandler { hubOpen = false }
@@ -1237,7 +1239,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         runCatching { context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     },
                     notificationAccess = {
-                        runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.Notifications) { // CFG-07
+                            runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        }
                     },
                     dndAccess = {
                         runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }

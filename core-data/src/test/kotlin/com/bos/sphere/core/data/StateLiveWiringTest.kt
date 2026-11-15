@@ -133,6 +133,23 @@ class StateLiveWiringTest {
     }
 
     @Test
+    fun CFG_01_theOverrideStoreInterfaceIsTheSameSlotTheStateFileCarries() {
+        val a = Proc("a"); val b = Proc("b")
+        val store = StateShortcutOverrides(a.extrasStore)
+        assertFalse(store.hasOverrides())
+        store.write("OpenPalette=C:76")
+        val doc = a.export()
+        assertEquals("OpenPalette=C:76", doc.json.getJSONObject(StateSchema.K_SHORTCUTS).getString("keyboard"))
+        b.import(doc)
+        assertEquals("OpenPalette=C:76", StateShortcutOverrides(b.extrasStore).read())
+        StateShortcutOverrides(b.extrasStore).clear()
+        assertFalse(StateShortcutOverrides(b.extrasStore).hasOverrides())
+        store.write("  ")
+        assertNull(store.read())
+        val mem = MemoryShortcutOverrides(); mem.write("X=-"); assertTrue(mem.hasOverrides()); mem.clear(); assertNull(mem.read())
+    }
+
+    @Test
     fun CFG_01_keyboardShortcutOverridesRideInTheShortcutsSection() {
         val a = Proc("a"); val b = Proc("b")
         a.extrasStore.write(StateExtras(keyboardShortcuts = "Search=CA:76"))

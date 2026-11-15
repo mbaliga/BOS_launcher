@@ -44,11 +44,12 @@ fun rememberWidgetRebinder(
     var slot by rememberSaveable { mutableStateOf("") }
     var label by rememberSaveable { mutableStateOf("") }
     var provider by rememberSaveable { mutableStateOf("") }
+    var work by rememberSaveable { mutableStateOf(false) }
     var info by remember { mutableStateOf<AppWidgetProviderInfo?>(null) }
 
     fun finish(outcome: RebindOutcome) {
         val id = pendingId
-        val w = PendingWidget(slot, label, provider)
+        val w = PendingWidget(slot, label, provider, work)
         pendingId = AppWidgetManager.INVALID_APPWIDGET_ID
         info = null
         if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return
@@ -83,11 +84,9 @@ fun rememberWidgetRebinder(
     return remember {
         WidgetRebinder { w ->
             if (pendingId != AppWidgetManager.INVALID_APPWIDGET_ID) finish(RebindOutcome.Declined)
-            slot = w.slot; label = w.label; provider = w.provider
+            slot = w.slot; label = w.label; provider = w.provider; work = w.work
             val component = ComponentName.unflattenFromString(w.provider)
-            val found = component?.let { c ->
-                runCatching { host.appWidgetManager.installedProviders }.getOrDefault(emptyList()).firstOrNull { it.provider == c }
-            }
+            val found = component?.let { c -> chooseProvider(c, w.work, providersOfAllProfiles(context, host.appWidgetManager)) { it.provider to (it.profile != Process.myUserHandle()) } }
             if (found == null) {
                 current(w, RebindOutcome.ProviderMissing, AppWidgetManager.INVALID_APPWIDGET_ID, w.label)
                 return@WidgetRebinder
@@ -114,6 +113,30 @@ fun rememberWidgetRebinder(
             }
         }
     }
+}
+
+/**
+ * CFG-02: every provider the user can bind, from the launcher's own profile and from the other profiles of this user (a work
+ * profile), through the public APIs `UserManager.getUserProfiles` and `AppWidgetManager.getInstalledProvidersForProfile`.
+ * A profile the system will not list is skipped; the own profile is always listed.
+ */
+internal fun providersOfAllProfiles(context: android.content.Context, manager: AppWidgetManager): List<AppWidgetProviderInfo> {
+    val own = runCatching { manager.installedProviders }.getOrDefault(emptyList())
+    val others = runCatching {
+        context.getSystemService(android.os.UserManager::class.java).userProfiles.filter { it != Process.myUserHandle() }
+            .flatMap { u -> runCatching { manager.getInstalledProvidersForProfile(u) }.getOrDefault(emptyList()) }
+    }.getOrDefault(emptyList())
+    return own + others
+}
+
+/**
+ * Picks the entry for [component]: the one in the profile kind the export recorded ([wantWork]) when there is one, else any
+ * entry with that component (an app installed in only one profile on this device). [view] gives an entry's component and
+ * whether it is in a work profile. Pure, so it is tested without a device.
+ */
+internal fun <T, C> chooseProvider(component: C, wantWork: Boolean, entries: List<T>, view: (T) -> Pair<C, Boolean>): T? {
+    val same = entries.filter { view(it).first == component }
+    return same.firstOrNull { view(it).second == wantWork } ?: same.firstOrNull()
 }
 
 private fun isConfigurationOptional(info: AppWidgetProviderInfo): Boolean {

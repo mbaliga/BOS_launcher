@@ -274,8 +274,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var settingsCategory by remember { mutableIntStateOf(CATEGORY_HOME) }
     var settingsPage by remember { mutableIntStateOf(0) }
     var settingsSession by remember { mutableIntStateOf(0) }
-    var drawerOpen by remember { mutableStateOf(false) }
-    var searchOpen by remember { mutableStateOf(false) }
+    // NFR-11: opt-in restore of the surface that was open before a restart (off by default; never in safe mode).
+    val openSurfaces = remember { com.bos.sphere.core.data.OpenSurfaceStore.get(context) }
+    val restoredSurface = remember { openSurfaces.takeRestore(prefs.restoreOpenSurfaces, com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
+    var drawerOpen by remember { mutableStateOf(restoredSurface == com.bos.sphere.core.data.OpenSurface.Drawer) }
+    var searchOpen by remember { mutableStateOf(restoredSurface == com.bos.sphere.core.data.OpenSurface.Search) }
+    LaunchedEffect(drawerOpen, searchOpen) {
+        openSurfaces.record(if (drawerOpen) com.bos.sphere.core.data.OpenSurface.Drawer else if (searchOpen) com.bos.sphere.core.data.OpenSurface.Search else null)
+    }
     var colorApp by remember { mutableStateOf<AppEntry?>(null) }
     var fillPrompt by remember { mutableStateOf(false) }
     var wheelOpen by remember { mutableStateOf(false) }

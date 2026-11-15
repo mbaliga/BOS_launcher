@@ -9,6 +9,12 @@ data class PendingWidget(
     val label: String,
     /** Flattened provider component (`pkg/cls`) so the widget can be re-added on this or another install; empty when unknown. */
     val provider: String = "",
+    /**
+     * CFG-02: the provider ran in a work (managed) profile. The public API names the profile (`AppWidgetProviderInfo.getProfile`)
+     * but gives no id that is portable across installs, so only this fact is recorded; the re-add looks the component up in the
+     * profiles this user has and asks the system's bind screen for that profile.
+     */
+    val work: Boolean = false,
 )
 
 /**
@@ -97,7 +103,7 @@ object SettingsCodec {
 
 /** [StateParts] <-> [StateDocument]. Pure apart from org.json. */
 object StateCodec {
-    fun export(parts: StateParts, now: Long, app: String = "", widgetProvider: (Int) -> String? = { null }): StateDocument {
+    fun export(parts: StateParts, now: Long, app: String = "", widgetProvider: (Int) -> String? = { null }, widgetIsWork: (Int) -> Boolean = { false }): StateDocument {
         val o = JSONObject()
         parts.extras.unknownTop.keys().forEach { k -> if (k !in StateSchema.KNOWN_TOP) o.put(k, parts.extras.unknownTop.get(k)) }
         o.put(StateSchema.K_FORMAT, StateSchema.FORMAT)
@@ -119,7 +125,7 @@ object StateCodec {
         val corners = JSONObject()
         parts.corners.forEach { (c, slot) ->
             val kept = if (slot is CornerSlot.Widget) {
-                widgets += PendingWidget("corner.${c.name}", slot.label, widgetProvider(slot.appWidgetId).orEmpty())
+                widgets += PendingWidget("corner.${c.name}", slot.label, widgetProvider(slot.appWidgetId).orEmpty(), widgetIsWork(slot.appWidgetId))
                 CornerSlot.Empty
             } else slot
             corners.put(c.name, JSONObject(ShortcutCodec.encodeSlot(kept)))
@@ -127,7 +133,7 @@ object StateCodec {
         val landscape = JSONObject()
         parts.landscapeCorners.forEach { (c, slot) ->
             val kept = if (slot is CornerSlot.Widget) {
-                widgets += PendingWidget("lcorner.${c.name}", slot.label, widgetProvider(slot.appWidgetId).orEmpty())
+                widgets += PendingWidget("lcorner.${c.name}", slot.label, widgetProvider(slot.appWidgetId).orEmpty(), widgetIsWork(slot.appWidgetId))
                 CornerSlot.Empty
             } else slot
             landscape.put(c.name, JSONObject(ShortcutCodec.encodeSlot(kept)))
@@ -143,7 +149,7 @@ object StateCodec {
             },
         )
         if (parts.prefs.leftPage == LeftPage.Widget && parts.prefs.leftWidgetId >= 0) {
-            widgets += PendingWidget("leftPage", "Left page widget", widgetProvider(parts.prefs.leftWidgetId).orEmpty())
+            widgets += PendingWidget("leftPage", "Left page widget", widgetProvider(parts.prefs.leftWidgetId).orEmpty(), widgetIsWork(parts.prefs.leftWidgetId))
         }
         o.put(
             StateSchema.K_LAUNCHPAD,
@@ -156,7 +162,7 @@ object StateCodec {
         for (s in StateSchema.OPAQUE_SECTIONS) o.put(s, parts.extras.opaque[s] ?: JSONArray())
         o.put(
             StateSchema.K_WIDGETS,
-            JSONArray().also { a -> widgets.distinct().forEach { a.put(JSONObject().put("slot", it.slot).put("label", it.label).apply { if (it.provider.isNotEmpty()) put("provider", it.provider) }) } },
+            JSONArray().also { a -> widgets.distinct().forEach { a.put(JSONObject().put("slot", it.slot).put("label", it.label).apply { if (it.provider.isNotEmpty()) put("provider", it.provider); if (it.work) put("work", true) }) } },
         )
         parts.extras.objects.forEach { (k, v) -> if (k in StateSchema.OBJECT_SECTIONS) o.put(k, JSONObject(v.toString())) }
         StateNested.inject(o, parts.extras.nested, parts.corners)
@@ -208,7 +214,7 @@ object StateCodec {
         val lp = j.optJSONObject(StateSchema.K_LAUNCHPAD)
         val widgets = j.optJSONArray(StateSchema.K_WIDGETS)?.let { a ->
             (0 until a.length()).mapNotNull { i ->
-                a.optJSONObject(i)?.let { PendingWidget(it.optString("slot"), it.optString("label"), it.optString("provider")) }?.takeIf { it.slot.isNotEmpty() }
+                a.optJSONObject(i)?.let { PendingWidget(it.optString("slot"), it.optString("label"), it.optString("provider"), it.optBoolean("work", false)) }?.takeIf { it.slot.isNotEmpty() }
             }
         } ?: emptyList()
         val opaque = StateSchema.OPAQUE_SECTIONS.mapNotNull { s -> j.optJSONArray(s)?.let { s to it } }.toMap()

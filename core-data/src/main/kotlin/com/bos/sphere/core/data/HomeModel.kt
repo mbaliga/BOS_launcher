@@ -324,6 +324,8 @@ data class LauncherPrefs(
     // --- screen
     /** Hide the system status bar on home so corner icons and the clock sit flush to the top. */
     val hideStatusBar: Boolean = true,
+    /** NFR-11: after a restart, reopen the drawer or search screen that was open. Off by default (see [OpenSurfaceStore]). */
+    val restoreOpenSurfaces: Boolean = false,
 
     // --- apps and pages
     val appsOnHome: AppsOnHome = AppsOnHome.Everything,

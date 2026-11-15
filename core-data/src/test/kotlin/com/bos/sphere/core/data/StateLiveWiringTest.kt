@@ -160,6 +160,23 @@ class StateLiveWiringTest {
     }
 
     @Test
+    fun CFG_01_theExportReadsTheLiveShortcutRegistryNotOnlyTheSavedSlot() {
+        val store = StateExtrasStore(File(tmp.root, "live-extras.json"))
+        store.write(StateExtras(keyboardShortcuts = "Search=CA:76")) // stale slot
+        var live: String? = "OpenPalette=C:76" // what the registry holds now
+        val ext = LiveExtras(store, emptyList(), keyboardLive = { LiveText(live) })
+        assertEquals("OpenPalette=C:76", ext.read().keyboardShortcuts)
+        live = "" // every shortcut reset in the registry, slot not yet saved
+        assertNull(ext.read().keyboardShortcuts)
+        val noLive = LiveExtras(store, emptyList())
+        assertEquals("without a live registry the slot is read", "Search=CA:76", noLive.read().keyboardShortcuts)
+        val throwing = LiveExtras(store, emptyList(), keyboardLive = { error("registry gone") })
+        assertEquals("a failing source falls back to the slot", "Search=CA:76", throwing.read().keyboardShortcuts)
+        val absent = LiveExtras(store, emptyList(), keyboardLive = { null })
+        assertEquals("a null source means not installed", "Search=CA:76", absent.read().keyboardShortcuts)
+    }
+
+    @Test
     fun CFG_01_exportCarriesNoPersonalContent() {
         val a = Proc("a")
         a.prefFiles["launch_history"] = MapSharedPreferences(mapOf("events" to "SENTINEL"))

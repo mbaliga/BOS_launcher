@@ -16,6 +16,7 @@
         <exclude domain="sharedpref" path="liftoff_spikes.xml" />
         <exclude domain="sharedpref" path="desktop_surface.xml" />
         <exclude domain="sharedpref" path="liftoff_misc.xml" />
+        <exclude domain="sharedpref" path="device_bound.xml" />
         <exclude domain="file" path="palette-files.idx" />
         <exclude domain="file" path="crash-reports" />
         <exclude domain="database" path="." />
@@ -36,6 +37,7 @@
         <exclude domain="sharedpref" path="liftoff_spikes.xml" />
         <exclude domain="sharedpref" path="desktop_surface.xml" />
         <exclude domain="sharedpref" path="liftoff_misc.xml" />
+        <exclude domain="sharedpref" path="device_bound.xml" />
         <exclude domain="file" path="palette-files.idx" />
         <exclude domain="file" path="crash-reports" />
         <exclude domain="database" path="." />

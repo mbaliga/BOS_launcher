@@ -38,6 +38,7 @@ class StateService private constructor(context: Context) {
             WorkspaceFileSource(File(app.filesDir, "liftoff_workspaces.json")),
             PrefFilesSource({ app.getSharedPreferences(it, Context.MODE_PRIVATE) }),
         ),
+        keyboardLive = { keyboardLiveSource?.let { LiveText(it()) } },
     )
 
     private val applier by lazy {
@@ -57,9 +58,12 @@ class StateService private constructor(context: Context) {
         return PlatformRestoreGuard.check(File(root, "device-binding"), File(app.noBackupFilesDir, "device-binding"), s.shortcuts, s.prefs, extras)
     }
 
+    /** NFR-18: moves a picture an older build left in the backed-up files directory. Copies a file, so call it off the main thread. */
+    fun migrateBackgroundPictures(): Int = runCatching { BackgroundPictures.migrate(app.filesDir, app.noBackupFilesDir, LauncherStores.get(app).prefs) }.getOrDefault(0)
+
     fun currentParts(): StateParts = applier.current()
 
-    fun exportDocument(): StateDocument = StateCodec.export(currentParts(), System.currentTimeMillis(), appTag(), ::widgetProvider)
+    fun exportDocument(): StateDocument = StateCodec.export(currentParts(), System.currentTimeMillis(), appTag(), ::widgetProvider, ::widgetIsWork)
 
     fun exportText(): String = exportDocument().encode()
 
@@ -111,15 +115,20 @@ class StateService private constructor(context: Context) {
     /** Called before a destructive edit (delete a page, remove a group of items): snapshot first (CFG-04). Rate limited. */
     fun beforeDestructive(reason: String) = takeRateLimited(reason, exportText())
 
+    private val limiter = DestructiveLimiter(DESTRUCTIVE_MIN_GAP_MS)
+
     internal fun takeRateLimited(reason: String, text: String) {
-        val last = snapshots.latest()
-        if (last != null && System.currentTimeMillis() - last.takenAt < DESTRUCTIVE_MIN_GAP_MS) return
+        if (!limiter.allow(reason, System.currentTimeMillis())) return
         snapshots.take(reason, text)
     }
 
     /** The component of the widget provider bound to [appWidgetId], so an export can say what to re-add (CFG-02). Public API only. */
     private fun widgetProvider(appWidgetId: Int): String? =
         runCatching { AppWidgetManager.getInstance(app).getAppWidgetInfo(appWidgetId)?.provider?.flattenToString() }.getOrNull()
+
+    /** True when the widget's provider runs in a profile other than the launcher's own (a work profile). Public API only (CFG-02). */
+    private fun widgetIsWork(appWidgetId: Int): Boolean =
+        runCatching { AppWidgetManager.getInstance(app).getAppWidgetInfo(appWidgetId)?.let { it.profile != android.os.Process.myUserHandle() } ?: false }.getOrDefault(false)
 
     /** Widgets an import could not carry and that are still waiting to be re-added (CFG-02). */
     fun pendingWidgets(): List<PendingWidget> = extras.read().widgets
@@ -146,6 +155,12 @@ class StateService private constructor(context: Context) {
         private val META_KEYS = setOf(StateSchema.K_FORMAT, StateSchema.K_VERSION, StateSchema.K_EXPORTED_AT, StateSchema.K_APP)
 
         @Volatile private var instance: StateService? = null
+
+        /**
+         * CFG-01: the live keyboard shortcut registry's overrides (`ShortcutRegistry.export()`), installed by the app at start.
+         * An export reads this, so a rebind that has not been written to the slot yet is still in the file. Null: read the slot.
+         */
+        @Volatile var keyboardLiveSource: (() -> String?)? = null
         fun get(context: Context): StateService =
             instance ?: synchronized(this) { instance ?: StateService(context).also { instance = it } }
 

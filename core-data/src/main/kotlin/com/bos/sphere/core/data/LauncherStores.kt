@@ -17,9 +17,12 @@ import java.util.Calendar
 class LauncherStores private constructor(context: Context) {
     private val app = context.applicationContext
 
-    val prefs = LauncherPrefsStore(app.getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE))
+    /** NFR-18: widget ids and the background picture path belong to one device; they live in a file the platform backup excludes. */
+    private val deviceBound = app.getSharedPreferences(DeviceBound.FILE, Context.MODE_PRIVATE)
+
+    val prefs = LauncherPrefsStore(app.getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE), deviceBound)
     val layout = HomeLayoutStore(app.getSharedPreferences("home_layout", Context.MODE_PRIVATE))
-    val shortcuts = ShortcutStore(app.getSharedPreferences("shortcuts", Context.MODE_PRIVATE))
+    val shortcuts = ShortcutStore(app.getSharedPreferences("shortcuts", Context.MODE_PRIVATE), deviceBound)
     val history = LaunchHistoryStore(app.getSharedPreferences("launch_history", Context.MODE_PRIVATE))
     val iconColors = IconColorStore(app.getSharedPreferences("icon_colors", Context.MODE_PRIVATE))
 
@@ -31,8 +34,8 @@ class LauncherStores private constructor(context: Context) {
     }
 }
 
-class LauncherPrefsStore internal constructor(private val sp: SharedPreferences) {
-    private val _prefs = MutableStateFlow(read())
+class LauncherPrefsStore internal constructor(private val sp: SharedPreferences, private val device: SharedPreferences? = null) {
+    private val _prefs = MutableStateFlow(run { DeviceBound.migratePrefs(sp, device); read() })
     val prefs: StateFlow<LauncherPrefs> = _prefs.asStateFlow()
 
     fun update(transform: (LauncherPrefs) -> LauncherPrefs) {
@@ -79,7 +82,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putLong("bgA", next.backgroundColorA).putLong("bgB", next.backgroundColorB)
             .putString("webEngine", next.webEngine.name)
             .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
-            .putString("bgPicture", next.backgroundPicturePath).putString("leftPage", next.leftPage.name).putInt("leftWidgetId", next.leftWidgetId).putBoolean("launchpadRail", next.launchpadRail).putString("lpTheme", next.launchpadTheme.name)
+            .putString("leftPage", next.leftPage.name).putBoolean("launchpadRail", next.launchpadRail).putString("lpTheme", next.launchpadTheme.name)
             .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
             .putFloat("spacingV", next.spacingV).putFloat("gridBias", next.gridBias).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
             .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
@@ -99,6 +102,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putFloat("cornerIconSize", next.cornerIconSize)
             .putString("cornerIconMode", next.cornerIconMode.name)
             .putBoolean("hideStatusBar", next.hideStatusBar)
+            .putBoolean("restoreSurfaces", next.restoreOpenSurfaces)
             .putString("appsOnHome", next.appsOnHome.name)
             .putString("pageMode", next.pageMode.name)
             .putString("drawerView", next.drawerView.name)
@@ -122,6 +126,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name)
             .apply()
+        DeviceBound.writePrefs(sp, device, next.backgroundPicturePath, next.leftWidgetId)
     }
 
     private fun read(): LauncherPrefs {
@@ -171,9 +176,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
             searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
             searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
-            backgroundPicturePath = sp.getString("bgPicture", "") ?: "",
+            backgroundPicturePath = DeviceBound.pictureOf(sp, device),
             leftPage = runCatching { LeftPage.valueOf(sp.getString("leftPage", null) ?: "") }.getOrDefault(d.leftPage),
-            leftWidgetId = sp.getInt("leftWidgetId", d.leftWidgetId),
+            leftWidgetId = DeviceBound.leftWidgetOf(sp, device, d.leftWidgetId),
             launchpadRail = sp.getBoolean("launchpadRail", d.launchpadRail),
             launchpadTheme = enumOr(sp.getString("lpTheme", null), d.launchpadTheme),
             settingsBackdrop = runCatching { SettingsBackdrop.valueOf(sp.getString("settingsBackdrop", null) ?: "") }.getOrDefault(d.settingsBackdrop),
@@ -211,6 +216,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences)
             cornerIconSize = sp.getFloat("cornerIconSize", d.cornerIconSize).coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
             cornerIconMode = enumOr(sp.getString("cornerIconMode", null), d.cornerIconMode),
             hideStatusBar = sp.getBoolean("hideStatusBar", d.hideStatusBar),
+            restoreOpenSurfaces = sp.getBoolean("restoreSurfaces", d.restoreOpenSurfaces),
             // New installs keep the home nearly empty (the drawer has everything); existing ones keep All apps.
             appsOnHome = enumOr(sp.getString("appsOnHome", null), if (sp.contains("style") || sp.contains("pCols")) AppsOnHome.Everything else AppsOnHome.PinnedOnly),
             pageMode = enumOr(sp.getString("pageMode", null), d.pageMode),
@@ -356,8 +362,8 @@ object HomeLayoutCodec {
 }
 
 /** Corner slots (by physical corner) and gesture bindings. */
-class ShortcutStore internal constructor(private val sp: SharedPreferences) {
-    private val _corners = MutableStateFlow(readCorners())
+class ShortcutStore internal constructor(private val sp: SharedPreferences, private val device: SharedPreferences? = null) {
+    private val _corners = MutableStateFlow(run { DeviceBound.migrateSlots(sp, device); readCorners() })
     val corners: StateFlow<Map<Corner, CornerSlot>> = _corners.asStateFlow()
 
     private val _gestures = MutableStateFlow(readGestures())
@@ -367,7 +373,7 @@ class ShortcutStore internal constructor(private val sp: SharedPreferences) {
         if (slot == CornerSlot.Empty && _corners.value[corner].let { it != null && it != CornerSlot.Empty }) DestructiveEdits.before("clear corner")
         val next = _corners.value + (corner to slot)
         _corners.value = next
-        sp.edit().putString("corner.${corner.name}", ShortcutCodec.encodeSlot(slot)).apply()
+        DeviceBound.putSlot(sp, device, "corner.${corner.name}", slot)
     }
 
     /** Landscape-only assignments (INP-15), used when the prefs ask for a separate set per orientation. Unset corners follow portrait. */
@@ -376,15 +382,15 @@ class ShortcutStore internal constructor(private val sp: SharedPreferences) {
 
     fun setLandscapeCorner(corner: Corner, slot: CornerSlot) {
         _landscapeCorners.value = _landscapeCorners.value + (corner to slot)
-        sp.edit().putString("lcorner.${corner.name}", ShortcutCodec.encodeSlot(slot)).apply()
+        DeviceBound.putSlot(sp, device, "lcorner.${corner.name}", slot)
     }
 
     /** Only the landscape slots the user set (the [landscapeCorners] flow also holds portrait fallbacks); this is what a state export carries. */
     fun explicitLandscapeCorners(): Map<Corner, CornerSlot> =
-        Corner.entries.mapNotNull { c -> sp.getString("lcorner.${c.name}", null)?.let(ShortcutCodec::decodeSlot)?.let { c to it } }.toMap()
+        Corner.entries.mapNotNull { c -> DeviceBound.getSlot(sp, device, "lcorner.${c.name}")?.let { c to it } }.toMap()
 
     private fun readLandscapeCorners(): Map<Corner, CornerSlot> = Corner.entries.associateWith { c ->
-        sp.getString("lcorner.${c.name}", null)?.let(ShortcutCodec::decodeSlot) ?: readCorners()[c] ?: CornerSlot.Empty
+        DeviceBound.getSlot(sp, device, "lcorner.${c.name}") ?: readCorners()[c] ?: CornerSlot.Empty
     }
 
     fun setGesture(gesture: HomeGesture, item: CornerItem?) {
@@ -396,7 +402,7 @@ class ShortcutStore internal constructor(private val sp: SharedPreferences) {
     }
 
     private fun readCorners(): Map<Corner, CornerSlot> = Corner.entries.associateWith { c ->
-        sp.getString("corner.${c.name}", null)?.let(ShortcutCodec::decodeSlot)
+        DeviceBound.getSlot(sp, device, "corner.${c.name}")
             ?: DefaultCorners[c] ?: CornerSlot.Empty
     }
 

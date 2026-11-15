@@ -363,6 +363,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · landscape"), Glyphs.Message, p.keyboardOnOpenLandscape) { v -> upd { it.copy(keyboardOnOpenLandscape = v) } })
             add(SettingItem.Action(x("Keyboard shortcuts"), Glyphs.Info, x("Every shortcut and its keys; Meta shortcuts stay with the system"), navigates = true) { com.bos.sphere.feature.grid.LauncherInput.sheetOpen.value = true })
             add(SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("The clock and corner icons sit flush to the top; swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } })
+            add(SettingItem.Toggle(x("Restore open screens"), Glyphs.Up, p.restoreOpenSurfaces, if (p.restoreOpenSurfaces) x("On: after a restart, Liftoff reopens the drawer or search screen that was open") else x("Off: Liftoff always starts on the home screen")) { v -> upd { it.copy(restoreOpenSurfaces = v) } })
         },
     )
 

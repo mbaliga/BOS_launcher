@@ -18,16 +18,26 @@ interface LiveSections {
     fun write(opaque: Map<String, JSONArray>, objects: Map<String, JSONObject>, present: Set<String>)
 }
 
+/** A live value that may be absent: [text] null means the live owner holds nothing (cleared). */
+class LiveText(val text: String?)
+
 /**
  * Wraps [StateExtrasStore] so reads see the live sections and writes push them back. Everything else stays in the
  * extras file. Pass [read] and [write] to [StateApplier].
  */
-class LiveExtras(private val store: StateExtrasStore, private val live: List<LiveSections>) {
+class LiveExtras(
+    private val store: StateExtrasStore,
+    private val sections: List<LiveSections>,
+    /** CFG-01: the keyboard shortcut overrides as the live registry holds them right now (null: no live registry, read the saved slot). */
+    private val keyboardLive: (() -> LiveText?)? = null,
+) {
     fun read(): StateExtras {
-        val base = store.read()
+        val stored = store.read()
+        val live = runCatching { keyboardLive?.invoke() }.getOrNull()
+        val base = if (live == null) stored else stored.copy(keyboardShortcuts = live.text?.takeIf { it.isNotBlank() })
         var opaque = base.opaque
         var objects = base.objects
-        for (l in live) {
+        for (l in sections) {
             opaque = opaque + l.read()
             objects = objects + l.readObjects()
         }
@@ -40,7 +50,7 @@ class LiveExtras(private val store: StateExtrasStore, private val live: List<Liv
             addAll(e.opaque.keys)
             addAll(e.objects.keys)
         }
-        for (l in live) l.write(e.opaque, e.objects, present)
+        for (l in sections) l.write(e.opaque, e.objects, present)
     }
 }
 

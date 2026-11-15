@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
         runCatching {
             com.bos.sphere.core.data.DestructiveEdits.install { StateService.beforeDestructive(applicationContext, it) }
             LauncherInput.registry.import(StateService.get(this).keyboardOverrides())
+            StateService.keyboardLiveSource = { LauncherInput.registry.export() } // CFG-01: an export reads the live registry
         }
         window.decorView.postDelayed({
             com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext)

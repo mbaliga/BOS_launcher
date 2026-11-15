@@ -153,7 +153,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier) {
         PushToTalk(
             AndroidOnDeviceRecogniser(context),
             hasPermission = { context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED },
-            askPermission = { permission.launch(Manifest.permission.RECORD_AUDIO) },
+            askPermission = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.Microphone) { permission.launch(Manifest.permission.RECORD_AUDIO) } }, // CFG-07: explanation first
             onText = { latestText(it) },
             onListening = { listening = it },
         )

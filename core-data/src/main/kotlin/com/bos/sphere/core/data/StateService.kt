@@ -51,6 +51,12 @@ class StateService private constructor(context: Context) {
             })
     }
 
+    /** NFR-18: after a platform restore or device transfer, removes the device-bound widget ids and background picture (see [PlatformRestoreGuard]). */
+    fun guardPlatformRestore(): PlatformRestoreGuard.Result {
+        val s = LauncherStores.get(app)
+        return PlatformRestoreGuard.check(File(root, "device-binding"), File(app.noBackupFilesDir, "device-binding"), s.shortcuts, s.prefs, extras)
+    }
+
     fun currentParts(): StateParts = applier.current()
 
     fun exportDocument(): StateDocument = StateCodec.export(currentParts(), System.currentTimeMillis(), appTag(), ::widgetProvider)

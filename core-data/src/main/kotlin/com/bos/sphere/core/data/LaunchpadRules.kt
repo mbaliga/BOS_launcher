@@ -483,6 +483,7 @@ object LaunchpadSettings {
     }
 
     fun setPolicy(policy: AppPolicy) {
+        if (policy == AppPolicy(policy.packageName) && _policies.value.any { it.packageName.equals(policy.packageName, ignoreCase = true) }) DestructiveEdits.before("clear Launchpad policy") // CFG-04
         val kept = _policies.value.filterNot { it.packageName.equals(policy.packageName, ignoreCase = true) }
         savePolicies(if (policy == AppPolicy(policy.packageName)) kept else kept + policy)
     }
@@ -534,7 +535,10 @@ object LaunchpadSettings {
         saveRules(kept + rule)
     }
 
-    fun removeRule(id: String) = saveRules(_rules.value.filterNot { it.id == id })
+    fun removeRule(id: String) {
+        if (_rules.value.any { it.id == id }) DestructiveEdits.before("remove Launchpad rule") // CFG-04: snapshot first
+        saveRules(_rules.value.filterNot { it.id == id })
+    }
 
     fun setDefaultMode(mode: GroupMode) = savePrefs(_prefs.value.copy(defaultMode = mode))
 

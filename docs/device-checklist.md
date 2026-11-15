@@ -79,3 +79,12 @@ Record with: `adb logcat -b all -d > run.txt` after each section, and look for `
 | Install size | `./gradlew :app:checkReleaseApkSize --offline` | NFR-08 |
 | Soak | `tools/soak.sh` (nightly, 7200 s) | NFR-09, NFR-10 |
 | Coverage by ID | `python3 tools/spec_coverage.py` | spec section 15 |
+
+## State, backup and grants (wave 3 state stream)
+
+- [ ] NFR-18: `adb shell bmgr backupnow com.bos.sphere`, uninstall, reinstall, `adb shell bmgr restore` (or a device transfer): after the first start no corner or left-page widget is bound, the picked background picture is gone, and Ground Control > Backup lists the widgets under "Widgets to add again" with a Dismiss action. Layout, settings and Launchpad rules are intact.
+- [ ] NFR-18: an ordinary app update (install over the top) keeps every widget and the background picture.
+- [ ] CFG-02: from a setup file exported on another install, Add on each listed widget shows the system bind screen (when needed) and the provider's configure screen, then the widget lands in its corner. Repeat with a widget whose provider lives in the work profile (recorded limit: main profile only).
+- [ ] CFG-04: remove a Launchpad rule, then Backup > restore the newest snapshot: the rule is back.
+- [ ] CFG-07: from a clean install, press the microphone button in Radar, open the Launchpad access prompt, the Recents panel's access row and the dock's notification access: each shows the one-screen explanation before the system route.
+- [ ] CFG-01: Ground Control > Home > Keyboard shortcuts: change a shortcut, export the setup, import it on a second install: the same key works there.

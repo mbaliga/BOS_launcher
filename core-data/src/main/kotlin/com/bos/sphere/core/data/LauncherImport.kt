@@ -41,13 +41,17 @@ object LauncherImport {
     fun databaseBytes(bytes: ByteArray): ByteArray = when (detect(bytes)) {
         Kind.SqliteDatabase -> bytes
         Kind.Zip -> {
-            var found: ByteArray? = null
+            // AOSP names the file `launcher.db`; its grid-specific variants are `launcher_<c>_by_<r>.db` (InvariantDeviceProfile.dbFile).
+            // `launcher.db` wins; otherwise the first variant that really is a SQLite file.
+            val variants = ArrayList<Pair<String, ByteArray>>()
             ZipInputStream(ByteArrayInputStream(bytes)).use { z ->
-                while (found == null) {
+                while (true) {
                     val e = z.nextEntry ?: break
-                    if (!e.isDirectory && e.name.substringAfterLast('/').equals("launcher.db", ignoreCase = true)) found = z.readBytes()
+                    val n = e.name.substringAfterLast('/').lowercase()
+                    if (!e.isDirectory && n.endsWith(".db") && (n == "launcher.db" || Regex("launcher_\\d+_by_\\d+\\.db").matches(n))) variants += n to z.readBytes()
                 }
             }
+            val found = (variants.firstOrNull { it.first == "launcher.db" } ?: variants.sortedBy { it.first }.firstOrNull { detect(it.second) == Kind.SqliteDatabase })?.second
             found?.takeIf { detect(it) == Kind.SqliteDatabase } ?: throw StateFormatException("This backup has no launcher.db, so its layout cannot be read")
         }
         Kind.Unknown -> throw StateFormatException("This is not a launcher database or a backup that holds one")

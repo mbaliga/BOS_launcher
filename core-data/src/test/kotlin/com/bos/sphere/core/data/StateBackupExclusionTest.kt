@@ -1,6 +1,7 @@
 package com.bos.sphere.core.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -45,5 +46,66 @@ class StateBackupExclusionTest {
     @Test
     fun CFG_01_noExportedPrefFileIsAlsoAHistoryOrIndexStore() {
         assertTrue((PrefFilesSource.ALLOWED.toSet() intersect (StateSchema.NEVER_EXPORTED_STORES + StateSchema.BACKUP_EXCLUDED_PREF_FILES)).isEmpty())
+    }
+}
+
+/** NFR-18: device-bound widget ids and the background picture are removed after a platform restore. */
+class PlatformRestoreGuardTest {
+    @org.junit.Rule @JvmField val tmp = org.junit.rules.TemporaryFolder()
+
+    private class Env(root: File) {
+        val shortcuts = ShortcutStore(MapSharedPreferences())
+        val prefs = LauncherPrefsStore(MapSharedPreferences())
+        val extras = StateExtrasStore(File(root, "extras.json"))
+        val bound = File(root, "files/state/device-binding")
+        val local = File(root, "nobackup/device-binding")
+        val picture = File(root, "files/background_1.img").also { it.parentFile!!.mkdirs(); it.writeText("x") }
+        init {
+            shortcuts.setCorner(Corner.TopLeft, CornerSlot.Widget(41, "Clock"))
+            shortcuts.setLandscapeCorner(Corner.TopRight, CornerSlot.Widget(42, "Weather"))
+            prefs.update { it.copy(leftPage = LeftPage.Widget, leftWidgetId = 43, backgroundKind = BackgroundKind.Picture, backgroundPreset = "photo", backgroundPicturePath = picture.absolutePath) }
+        }
+        fun check() = PlatformRestoreGuard.check(bound, local, shortcuts, prefs, extras)
+    }
+
+    @Test
+    fun NFR_18_aFirstRunOrAnUpdateFromABuildWithoutTheGuardKeepsEveryWidgetAndThePicture() {
+        val e = Env(tmp.root)
+        val r = e.check()
+        assertFalse(r.restored)
+        assertTrue(e.shortcuts.corners.value[Corner.TopLeft] is CornerSlot.Widget)
+        assertEquals(43, e.prefs.prefs.value.leftWidgetId)
+        assertTrue(e.picture.exists())
+        assertEquals(e.bound.readText(), e.local.readText())
+        assertFalse(e.check().restored) // second start: ids agree
+    }
+
+    @Test
+    fun NFR_18_aPlatformRestoreBringsBackTheBoundIdButNotTheLocalOneAndTheWidgetsAndPictureAreRemoved() {
+        val e = Env(tmp.root)
+        e.check()
+        e.local.delete() // the no-backup copy is not restored
+        val r = e.check()
+        assertTrue(r.restored)
+        assertTrue(r.backgroundCleared)
+        assertEquals(setOf("corner.TopLeft", "lcorner.TopRight", "leftPage"), r.widgetsCleared.map { it.slot }.toSet())
+        assertEquals(CornerSlot.Empty, e.shortcuts.corners.value[Corner.TopLeft])
+        assertEquals(CornerSlot.Empty, e.shortcuts.explicitLandscapeCorners()[Corner.TopRight] ?: CornerSlot.Empty)
+        assertEquals(LauncherPrefs().leftWidgetId, e.prefs.prefs.value.leftWidgetId)
+        assertEquals("", e.prefs.prefs.value.backgroundPicturePath)
+        assertFalse(e.prefs.prefs.value.backgroundKind == BackgroundKind.Picture)
+        assertFalse(e.picture.exists())
+        assertEquals(3, e.extras.read().widgets.size) // listed so the user can add them again
+        assertFalse(e.check().restored) // the guard settles after one run
+    }
+
+    @Test
+    fun NFR_18_aDifferentLocalIdAlsoCountsAsARestoreAndSetupThatIsNotDeviceBoundIsUntouched() {
+        val e = Env(tmp.root)
+        e.prefs.update { it.copy(accentColor = 0xFF123456) }
+        e.check()
+        e.local.writeText("some-other-device")
+        assertTrue(e.check().restored)
+        assertEquals(0xFF123456, e.prefs.prefs.value.accentColor)
     }
 }

@@ -780,7 +780,7 @@ private fun PageView(
             if (geometry is PageGeometry.Coverflow && !geometry.c.visible(index)) return@forEachIndexed
             key(itemKey) {
                 if (extra != null && extra.isWidget(itemKey) && place != null && geometry is PageGeometry.Grid) {
-                    WidgetSlot(itemKey, extra, place, geometry, onItemFocused)
+                    WidgetSlot(itemKey, extra, place, geometry, onItemFocused, editing, { onRemove(itemKey) })
                 } else {
                 val itemPx = if (geometry is PageGeometry.Coverflow) geometry.c.sizeAt(index) else geometry.iconPx
                 val itemDp = with(density) { itemPx.toDp() }
@@ -1059,7 +1059,7 @@ fun HomeClock(onTap: () -> Unit, modifier: Modifier = Modifier) {
 
 /** HOM-08: a widget tile in its span box on a grid page. */
 @Composable
-private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit) {
+private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit, editing: Boolean = false, onRemove: () -> Unit = {}) {
     val density = LocalDensity.current
     val g = geometry.g
     val slot = com.bos.sphere.core.catalog.SpanGrid.cellOf(place, g.columns)
@@ -1068,10 +1068,15 @@ private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere
     val hPx = place.span.rows * g.pitchY - 2 * pad
     val left = g.cellLeft(slot) + pad
     val top = g.cellTop(slot) + pad
-    HomeWidgetCell(
-        itemKey, extra, g.pitchX, g.pitchY,
+    Box(
         Modifier.offset { IntOffset(left.roundToInt(), top.roundToInt()) }
-            .size(with(density) { wPx.toDp() }, with(density) { hPx.toDp() })
-            .launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) }),
-    )
+            .size(with(density) { wPx.toDp() }, with(density) { hPx.toDp() }),
+    ) {
+        HomeWidgetCell(
+            itemKey, extra, g.pitchX, g.pitchY,
+            Modifier.fillMaxSize().launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) }),
+        )
+        // HOM-12: the remove handle of a widget in edit mode.
+        if (editing) EditHandleBox(with(density) { wPx.toDp() }, extraLabel(itemKey, extra), onRemove) {}
+    }
 }

@@ -52,8 +52,13 @@ object WorkProfileState {
         val user = workUser ?: return
         scope.launch {
             val ok = AppCatalog(app).setPaused(user, paused)
-            if (ok) _workPaused.value = paused
-            refresh(app)
+            if (ok) {
+                // Quiet mode changes asynchronously; an immediate re-read could still see the old value and
+                // flip the chip back. Trust the accepted request, the availability broadcast confirms it.
+                _workPaused.value = paused
+                val id = user.hashCode()
+                _quiet.value = if (paused) _quiet.value + id else _quiet.value - id
+            } else refresh(app)
         }
     }
 

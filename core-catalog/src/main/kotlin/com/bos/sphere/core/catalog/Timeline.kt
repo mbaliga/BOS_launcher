@@ -13,6 +13,9 @@ object Timeline {
     /** The launch history keeps at most this many opens. */
     const val HISTORY_MAX = 400
 
+    /** HOM-18: the timeline log keeps this many opens ([com.bos.sphere.core.data.TimelineLogCodec.MAX]). */
+    const val LOG_MAX = com.bos.sphere.core.data.TimelineLogCodec.MAX
+
     /**
      * Upcoming scheduled launches (soonest first) followed by past opens (newest first), at most [limit] past ones.
      * [labelOf] resolves an app key to its label; keys that cannot be resolved (uninstalled) are dropped.

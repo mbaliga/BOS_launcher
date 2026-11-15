@@ -36,6 +36,14 @@ class DesktopActivity : ComponentActivity() {
     private var identity = ""
     private var displayName = ""
 
+    /** The system-launched widget configure screen reports back here (HOM-13). */
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        com.bos.sphere.feature.grid.WidgetConfigureResults.deliver(requestCode, resultCode)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -50,6 +58,8 @@ class DesktopActivity : ComponentActivity() {
         DesktopSurfaces.register(token, SurfaceInfo(ownerDisplayId, ownerDisplayId, identity))
         // The dock stream's rail replaces the basic recents dock on this display (DCK-07).
         com.bos.sphere.feature.desktop.DesktopDockSlot.provider = com.bos.sphere.ui.DesktopDockProvider
+        // HOM-13: real app widgets on the desktop, through the home's widget host.
+        com.bos.sphere.feature.desktop.DesktopWidgetSlot.provider = com.bos.sphere.ui.DesktopWidgetProvider(this)
 
         LauncherStores.get(this).prefs.prefs.value.let { p ->
             HyleTheme.apply(

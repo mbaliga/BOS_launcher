@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
+    testImplementation(project(":feature-dock"))
     testImplementation(libs.junit)
     // JVM screenshot smoke tests (Robolectric native graphics) — see ScreenshotTest.
     testImplementation(libs.robolectric)

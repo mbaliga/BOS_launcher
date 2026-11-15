@@ -2,6 +2,8 @@ package com.bos.sphere.ui
 
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,10 +55,18 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Connects workspace switching to the home arrangement and to the Launchpad's display filter (WSP-07, WSP-08). */
-private class AppWorkspaceHooks(private val stores: LauncherStores) : WorkspaceHooks {
+private class AppWorkspaceHooks(private val stores: LauncherStores, private val extras: com.bos.sphere.core.catalog.HomeExtrasStore) : WorkspaceHooks {
     override fun captureHome(): String {
         val l = stores.layout.layout.value
-        return JSONObject().put("pages", HomeLayoutCodec.encode(l.pages)).put("removed", JSONArray(l.removed.toList())).toString()
+        // HOM-02: the workspace's dock is part of its arrangement now (HomeState.dock is the one dock list).
+        return JSONObject().put("pages", HomeLayoutCodec.encode(l.pages)).put("removed", JSONArray(l.removed.toList()))
+            .put("dock", JSONArray(extras.state.value.dock)).toString()
+    }
+
+    override fun onSwitched(workspace: com.bos.sphere.feature.dock.Workspace) {
+        // A workspace saved before the dock moved into the arrangement keeps its own pins.
+        val dock = com.bos.sphere.feature.dock.HomeDockKeys.forWorkspace(com.bos.sphere.feature.dock.HomeDockKeys.dockOf(workspace.homeArrangement), workspace.dockPins)
+        if (dock != extras.state.value.dock) extras.set(extras.state.value.copy(dock = dock))
     }
 
     override fun applyHome(arrangement: String?) {
@@ -111,12 +121,15 @@ fun BoxScope.DockLayer(
     onLaunch: (AppEntry) -> Unit,
     /** HOM-02: the home's folders, shortcuts and links, so they can be pinned to and drawn in the rail. */
     homeExtras: com.bos.sphere.feature.grid.HomeExtras? = null,
+    /** HOM-19: where the bottom rail and what rides on it sit above the bottom clock and page dots; null keeps the fixed margins. */
+    bottomPlan: com.bos.sphere.feature.dock.HomeBottomStack.Plan? = null,
 ) {
     val context = LocalContext.current
     val stores = remember { LauncherStores.get(context) }
     val manager = remember { WorkspaceRepository.get(context) }
     DisposableEffect(Unit) {
-        val hooks = AppWorkspaceHooks(stores)
+        DockPinBinding.ensure(context)
+        val hooks = AppWorkspaceHooks(stores, com.bos.sphere.core.catalog.HomeExtrasStore.get(context))
         WorkspaceRepository.hooks = hooks
         manager.applyActive()
         onDispose { if (WorkspaceRepository.hooks === hooks) WorkspaceRepository.hooks = object : WorkspaceHooks {} }
@@ -166,7 +179,7 @@ fun BoxScope.DockLayer(
         onDispose { controller.bindPinLaunch { false } }
     }
     val tierNow = remember { CapabilityEvaluator.tier(launcher.inputs()) }
-    if (visible) GroupShelfSlot(wsState.groups, wsState.dock.groupShelf, wsState.dock.isEnabled(tierNow), onRun = { g -> scope.launch { launcher.runGroup(g) } })
+    if (visible) GroupShelfSlot(wsState.groups, wsState.dock.groupShelf, wsState.dock.isEnabled(tierNow), bottomPlan?.shelfBottomDp, onRun = { g -> scope.launch { launcher.runGroup(g) } })
     if (visible) DockHost(
         apps = apps, launcher = launcher, controller = controller, refreshKey = homeSignal,
         onLaunchApp = onLaunch, onOpenPanel = { panelOpen = true }, inputIsKeyboard = keyboardMode,
@@ -179,6 +192,11 @@ fun BoxScope.DockLayer(
             if (ref.id == DESKTOP_PIN_ID) openDesktop(context, desktop)
             else com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(ref)?.let { homeExtras?.onTap?.invoke(it) }
         },
+        spanOfOther = { ref -> com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(ref)?.let { homeExtras?.spanOf(it)?.cols } ?: 1 },
+        widgetOther = if (homeExtras == null) null else { item, w, h ->
+            // HOM-02: a pinned widget is the same hosted widget the home shows, in its rail slot.
+            com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(item.ref)?.let { k -> androidx.compose.foundation.layout.Box(Modifier.size(w, h)) { homeExtras.widget(k, Modifier.fillMaxSize()) } }
+        },
         iconOther = if (homeExtras == null) null else { item, size ->
             com.bos.sphere.feature.dock.HomeItemPins.homeKeyOf(item.ref)?.let { com.bos.sphere.feature.grid.ExtraItemFace(it, homeExtras, size) }
         },
@@ -189,7 +207,7 @@ fun BoxScope.DockLayer(
         },
         modifier = { edge ->
             when (edge) {
-                DockEdge.Bottom -> Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = 8.dp)
+                DockEdge.Bottom -> Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = (bottomPlan?.railBottomDp ?: 8f).dp)
                 DockEdge.Left -> Modifier.align(Alignment.CenterStart).safeDrawingPadding().padding(start = 12.dp, top = 76.dp, bottom = 76.dp)
                 DockEdge.Right -> Modifier.align(Alignment.CenterEnd).safeDrawingPadding().padding(end = 12.dp, top = 76.dp, bottom = 76.dp)
             }
@@ -241,6 +259,34 @@ fun DockPanelHost(
     )
 }
 
+/**
+ * HOM-02: makes `HomeState.dock` (the home extras store) the one place the dock's pins live. Pins written anywhere
+ * (`WorkspaceManager.setPins`) go to that list; the active workspace's own list only mirrors it. Runs once per process, from
+ * whichever surface composes a dock first, and migrates the old per-workspace pins into the list the first time.
+ */
+object DockPinBinding {
+    private var bound = false
+
+    @Synchronized fun ensure(context: android.content.Context) {
+        if (bound) return
+        bound = true
+        val store = com.bos.sphere.core.catalog.HomeExtrasStore.get(context)
+        val manager = WorkspaceRepository.get(context)
+        com.bos.sphere.feature.dock.HomeDockKeys.migrate(store.state.value.dock, manager.current.active.dockPins)?.let { store.set(store.state.value.copy(dock = it)) }
+        manager.pinSink = { pins ->
+            val enc = com.bos.sphere.feature.dock.HomeDockKeys.encodeAll(pins)
+            if (store.state.value.dock != enc) store.set(store.state.value.copy(dock = enc))
+            manager.mirrorPins(pins)
+        }
+        manager.mirrorPins(com.bos.sphere.feature.dock.HomeDockKeys.decodeAll(store.state.value.dock))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        scope.launch {
+            var last = store.state.value.dock
+            store.state.collect { st -> if (st.dock != last) { last = st.dock; manager.mirrorPins(com.bos.sphere.feature.dock.HomeDockKeys.decodeAll(st.dock)) } }
+        }
+    }
+}
+
 /** Dock pin id of the "reopen the desktop surface" item (EXT-02). */
 const val DESKTOP_PIN_ID = "liftoff.desktop"
 
@@ -251,12 +297,12 @@ private fun openDesktop(context: android.content.Context, desktop: DesktopContro
 
 /** Saved groups as chips above the dock (WSP-05). The dock's own edge padding is reused so the two never overlap. */
 @Composable
-private fun BoxScope.GroupShelfSlot(groups: List<com.bos.sphere.core.launch.AppGroup>, on: Boolean, dockOn: Boolean, onRun: (com.bos.sphere.core.launch.AppGroup) -> Unit) {
+private fun BoxScope.GroupShelfSlot(groups: List<com.bos.sphere.core.launch.AppGroup>, on: Boolean, dockOn: Boolean, shelfBottomDp: Float?, onRun: (com.bos.sphere.core.launch.AppGroup) -> Unit) {
     val shown = GroupShelfModel.visible(groups, on)
     if (shown.isEmpty()) return
     GroupShelf(
         shown, onRun,
-        Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = if (dockOn) 84.dp else 8.dp),
+        Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = (shelfBottomDp ?: if (dockOn) 84f else 8f).dp),
     )
 }
 

@@ -53,7 +53,7 @@ object PackageReconcile {
      */
     fun applyToState(state: HomeState, diff: CatalogDiff, cap: (PageLayout) -> Int): HomeState {
         if (diff.removed.isEmpty()) return state
-        val live = state.allKeys().filter { ItemKeys.kind(it) == ItemKind.App }.toMutableSet()
+        val live = state.allKeys().mapNotNull { DockEntries.appKey(it) }.toMutableSet()
         live.removeAll(diff.removed.map { it.key }.toSet())
         return HomeEdit.pruneMissing(state, live, cap)
     }

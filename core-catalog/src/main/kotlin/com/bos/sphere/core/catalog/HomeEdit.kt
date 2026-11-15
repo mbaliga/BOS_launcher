@@ -16,7 +16,7 @@ object HomeEdit {
     private fun withoutTopLevel(state: HomeState, key: String, cap: (PageLayout) -> Int): HomeState =
         state.copy(
             pages = if (find(state, key) >= 0) HomeLayoutMath.remove(state.pages, key) else state.pages,
-            dock = state.dock - key,
+            dock = DockEntries.without(state.dock, key),
         )
 
     // ---- placement ----------------------------------------------------------------------
@@ -33,7 +33,7 @@ object HomeEdit {
     fun move(state: HomeState, key: String, page: Int, index: Int, cap: (PageLayout) -> Int): HomeState {
         if (find(state, key) >= 0) return state.copy(pages = HomeLayoutMath.move(state.pages, key, page, index, cap))
         val inFolder = state.folders.values.firstOrNull { key in it.keys }
-        val base = if (inFolder != null) removeFromFolderKeys(state, inFolder.id, key) else state.copy(dock = state.dock - key)
+        val base = if (inFolder != null) removeFromFolderKeys(state, inFolder.id, key) else state.copy(dock = DockEntries.without(state.dock, key))
         val placed = HomeLayoutMath.add(base.pages, key, page, cap)
         return base.copy(pages = HomeLayoutMath.move(placed, key, page.coerceIn(0, placed.lastIndex), index, cap))
     }
@@ -152,7 +152,7 @@ object HomeEdit {
         val f = state.folders[folderId] ?: return state
         return state.copy(
             pages = state.pages.map { p -> p.copy(keys = p.keys.flatMap { if (it == f.key) f.keys else listOf(it) }) },
-            dock = state.dock.flatMap { if (it == f.key) f.keys else listOf(it) },
+            dock = DockEntries.without(state.dock, f.key, replaceLegacyWith = f.keys),
             folders = state.folders - folderId,
         )
     }
@@ -170,7 +170,7 @@ object HomeEdit {
                 // Replace the folder slot with its last child.
                 val only = left.first()
                 val pages = state.pages.map { p -> p.copy(keys = p.keys.map { if (it == f.key) only else it }) }
-                state.copy(pages = pages, dock = state.dock.map { if (it == f.key) only else it }, folders = state.folders - folderId)
+                state.copy(pages = pages, dock = DockEntries.without(state.dock, f.key, replaceLegacyWith = listOf(only)), folders = state.folders - folderId)
             }
             else -> state.copy(folders = state.folders + (folderId to f.copy(keys = left)))
         }
@@ -179,7 +179,7 @@ object HomeEdit {
     private fun deleteFolderSlot(state: HomeState, f: Folder): HomeState =
         state.copy(
             pages = if (find(state, f.key) >= 0) HomeLayoutMath.remove(state.pages, f.key) else state.pages,
-            dock = state.dock - f.key,
+            dock = DockEntries.without(state.dock, f.key),
             folders = state.folders - f.id,
         )
 
@@ -205,7 +205,8 @@ object HomeEdit {
      * tiles) are never touched here. Folders left with a single item dissolve; empty ones go.
      */
     fun pruneMissing(state: HomeState, liveApps: Set<String>, cap: (PageLayout) -> Int): HomeState {
-        fun gone(k: String) = ItemKeys.kind(k) == ItemKind.App && k !in liveApps
+        // A dock entry is a plain home key or a `pin:` entry (HOM-02); only an app pin whose app is gone is dropped.
+        fun gone(k: String): Boolean = DockEntries.appKey(k)?.let { it !in liveApps } ?: false
         var s = state
         for (f in state.folders.values) for (k in f.keys.filter(::gone)) {
             val cur = s.folders[f.id] ?: break
@@ -216,4 +217,43 @@ object HomeEdit {
     }
 
     private val NOT_FILEABLE = setOf(ItemKind.Folder, ItemKind.Widget, ItemKind.Tile)
+}
+
+/**
+ * HOM-02: `HomeState.dock` holds the rail's pins as `pin:` + `kind:id` entries (the dock stream writes them), next to older
+ * plain home keys. These helpers let the home edits keep both forms in step with the items they point at.
+ */
+object DockEntries {
+    private const val PIN = "pin:"
+
+    fun isPin(entry: String) = entry.startsWith(PIN)
+
+    /** The home key a `pin:` entry points at, or the entry itself for a plain key. Null for pins of groups and other non-home things. */
+    fun homeKey(entry: String): String? {
+        if (!entry.startsWith(PIN)) return entry
+        val r = entry.removePrefix(PIN)
+        return when {
+            r.startsWith("folder:") -> r
+            r.startsWith("shortcut:shortcut:") || r.startsWith("link:link:") || r.startsWith("widget:widget:") -> r.substringAfter(':')
+            else -> null
+        }
+    }
+
+    /** The app key an entry stands for (`pin:app:<key>` or a plain app key), else null. */
+    fun appKey(entry: String): String? = when {
+        entry.startsWith("pin:app:") -> entry.removePrefix("pin:app:")
+        entry.startsWith(PIN) -> null
+        ItemKeys.kind(entry) == ItemKind.App -> entry
+        else -> null
+    }
+
+    /** [dock] without the entries that point at [key]; a plain entry is replaced by [replaceLegacyWith] instead when given. */
+    fun without(dock: List<String>, key: String, replaceLegacyWith: List<String>? = null): List<String> =
+        dock.flatMap { e ->
+            when {
+                homeKey(e) != key -> listOf(e)
+                !isPin(e) && replaceLegacyWith != null -> replaceLegacyWith
+                else -> emptyList()
+            }
+        }
 }

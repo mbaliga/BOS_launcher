@@ -21,6 +21,11 @@ class LauncherStores private constructor(context: Context) {
     val layout = HomeLayoutStore(app.getSharedPreferences("home_layout", Context.MODE_PRIVATE))
     val shortcuts = ShortcutStore(app.getSharedPreferences("shortcuts", Context.MODE_PRIVATE))
     val history = LaunchHistoryStore(app.getSharedPreferences("launch_history", Context.MODE_PRIVATE))
+    /** HOM-18: the larger, file-backed log the timeline reads; fed by every [history] record. */
+    val timelineLog = TimelineLogStore(java.io.File(app.filesDir, TimelineLogStore.RELATIVE_PATH)).also { log ->
+        history.mirror = log::record
+        log.seedFrom(history.events.value)
+    }
     val iconColors = IconColorStore(app.getSharedPreferences("icon_colors", Context.MODE_PRIVATE))
 
     companion object {
@@ -469,13 +474,17 @@ object ShortcutCodec {
 
 /** Bounded log of launches feeding [AppSuggester]. */
 class LaunchHistoryStore internal constructor(private val sp: SharedPreferences) {
+    /** HOM-18: called with every recorded launch so a larger log can keep more than [MAX_EVENTS]. */
+    var mirror: ((LaunchEvent) -> Unit)? = null
     private val _events = MutableStateFlow(read())
     val events: StateFlow<List<LaunchEvent>> = _events.asStateFlow()
 
     fun record(key: String, nowMillis: Long = System.currentTimeMillis()) {
         val hour = Calendar.getInstance().apply { timeInMillis = nowMillis }.get(Calendar.HOUR_OF_DAY)
-        val next = (_events.value + LaunchEvent(key, nowMillis, hour)).takeLast(MAX_EVENTS)
+        val event = LaunchEvent(key, nowMillis, hour)
+        val next = (_events.value + event).takeLast(MAX_EVENTS)
         _events.value = next
+        mirror?.invoke(event)
         val arr = JSONArray()
         next.forEach { arr.put(JSONArray().put(it.key).put(it.timeMillis).put(it.hourOfDay)) }
         sp.edit().putString("events", arr.toString()).apply()

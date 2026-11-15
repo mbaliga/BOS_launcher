@@ -78,6 +78,14 @@ import kotlin.math.roundToInt
  */
 class LauncherWidgetHost(context: Context) {
     private val appContext = context.applicationContext
+    private var users = 0
+
+    /**
+     * HOM-13: the home and the desktop surface share this one host (two hosts with the same id steal each other's update
+     * callbacks), so listening is counted: it starts with the first surface to start and stops with the last to stop.
+     */
+    @Synchronized fun acquire() { users++; if (users == 1) startListening() }
+    @Synchronized fun release() { if (users > 0) { users--; if (users == 0) stopListening() } }
 
     val appWidgetManager: AppWidgetManager = AppWidgetManager.getInstance(appContext)
     val host: AppWidgetHost = AppWidgetHost(appContext, HOST_ID)
@@ -111,6 +119,16 @@ class LauncherWidgetHost(context: Context) {
         else runCatching { appWidgetManager.getAppWidgetInfo(appWidgetId) }.getOrNull()
 
     companion object {
+        @Volatile private var shared: LauncherWidgetHost? = null
+
+        /** The process-wide host for [context]'s application (rebuilt when the application object changes, as in tests). */
+        fun shared(context: Context): LauncherWidgetHost {
+            val app = context.applicationContext
+            return shared?.takeIf { it.appContext === app } ?: synchronized(this) {
+                shared?.takeIf { it.appContext === app } ?: LauncherWidgetHost(app).also { shared = it }
+            }
+        }
+
         /** Stable host id ("SH"). Changing it orphans every previously bound widget. */
         const val HOST_ID = 0x5348
     }
@@ -123,20 +141,21 @@ class LauncherWidgetHost(context: Context) {
 @Composable
 fun rememberLauncherWidgetHost(): LauncherWidgetHost {
     val context = LocalContext.current
-    val host = remember { LauncherWidgetHost(context.applicationContext) }
+    val host = remember { LauncherWidgetHost.shared(context) }
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner, host) {
+        var held = false
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> host.startListening()
-                Lifecycle.Event.ON_STOP -> host.stopListening()
+                Lifecycle.Event.ON_START -> if (!held) { held = true; host.acquire() }
+                Lifecycle.Event.ON_STOP -> if (held) { held = false; host.release() }
                 else -> Unit
             }
         }
         owner.lifecycle.addObserver(observer) // replays ON_START if already started
         onDispose {
             owner.lifecycle.removeObserver(observer)
-            host.stopListening()
+            if (held) { held = false; host.release() }
         }
     }
     return host

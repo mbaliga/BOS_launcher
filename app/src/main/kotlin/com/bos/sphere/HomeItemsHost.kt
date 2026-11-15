@@ -106,6 +106,21 @@ class HomeItems internal constructor(
     internal var iconFor by mutableStateOf<AppEntry?>(null)
     internal var restoreRev by mutableIntStateOf(0)
 
+    /** HOM-17: the usage split the Usage tile draws; loaded off the main thread while such a tile is on home. */
+    var usageSlices by mutableStateOf<List<com.bos.sphere.core.catalog.UsageSlice>>(emptyList())
+
+    internal suspend fun refreshUsage() {
+        val slices = withContext(Dispatchers.IO) {
+            val source = com.bos.sphere.core.catalog.UsageStatsSource(context)
+            if (!source.granted()) emptyList() else {
+                val range = com.bos.sphere.core.catalog.HomePanelPrefs(context).usageRange
+                val midnight = java.util.Calendar.getInstance().apply { set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
+                com.bos.sphere.core.catalog.UsageSplit.build(source.samples(range.startMs(midnight), System.currentTimeMillis()))
+            }
+        }
+        usageSlices = slices
+    }
+
     /** HOM-15, HOM-17, HOM-18: a panel tile was tapped (index of its tab), -1 when none is requested. */
     var panelRequest by mutableIntStateOf(-1)
 
@@ -152,6 +167,12 @@ class HomeItems internal constructor(
 
     fun addGroup(id: String, name: String) {
         edit { HomeEdit.add(it, ItemDef(ItemKeys.group(id), ItemKind.Group, name, id), page(), capacityOf) }
+    }
+
+    /** WSP-05: group tiles follow the saved groups (a deleted group loses its tile, a renamed one renames it). */
+    internal fun syncGroups(groups: List<Pair<String, String>>) {
+        val cur = store.state.value.copy(pages = pagesNow())
+        if (com.bos.sphere.core.catalog.GroupTiles.reconcile(cur, groups, capacityOf) !== cur) edit { com.bos.sphere.core.catalog.GroupTiles.reconcile(it, groups, capacityOf) }
     }
 
     fun addLink(uri: String, label: String, isFile: Boolean) {
@@ -384,6 +405,7 @@ class HomeItems internal constructor(
         onLongPress = { itemMenu = it },
         onAction = ::applyKeyboardAction,
         onDropItems = ::addDroppedInto,
+        usageSlices = usageSlices,
         onDropOnto = { drag, target ->
             edit { s -> HomeEdit.dropOnto(s, drag, target, newId(), L10n.tr("Folder"), capacityOf) }
         },
@@ -569,6 +591,21 @@ fun rememberHomeItems(
     val dims by rememberUpdatedState(gridDims)
     val items = remember { HomeItems(context, store, { dims() }, { pagesNow }, { save(it) }, { cap(it) }, { cur() }, host, { all }, { byKey }, { launch(it) }) }
     items.extrasState = state
+    // WSP-05: keep the group tiles in step with the dock panel's groups.
+    val groupManager = remember { com.bos.sphere.feature.dock.WorkspaceRepository.get(context) }
+    val groupState by groupManager.state.collectAsStateWithLifecycle()
+    LaunchedEffect(groupState.groups, state.items) {
+        if (groupManager.groupsReliable) items.syncGroups(groupState.groups.map { it.id to it.name })
+    }
+    // HOM-17: the Usage tile's bar; refreshed when the tile appears and each time the launcher is resumed.
+    val usageTileOn = com.bos.sphere.core.catalog.HomePanelLinks.placed(state).contains(com.bos.sphere.core.catalog.PanelTab.Usage)
+    val usageOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var usageResumes by remember { mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(usageOwner) {
+        val o = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) usageResumes++ }
+        usageOwner.lifecycle.addObserver(o); onDispose { usageOwner.lifecycle.removeObserver(o) }
+    }
+    LaunchedEffect(usageTileOn, usageResumes) { if (usageTileOn) items.refreshUsage() }
     // HOM-04: a folder chosen in Radar opens here (the request is consumed once).
     val openRequest by HomeOpenRequests.folder.collectAsStateWithLifecycle()
     LaunchedEffect(openRequest, state.folders) {

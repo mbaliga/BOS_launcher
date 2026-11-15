@@ -45,6 +45,15 @@ object IconCache {
     private val plates = java.util.concurrent.ConcurrentHashMap<String, Int>()
     fun plateFor(key: String): Int? = plates[key]
 
+    /** HOM-06: cache keys whose bitmap does not carry the system's profile badge (override, pack or themed icon). */
+    private val unbadged = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val unbadgedRev = androidx.compose.runtime.mutableIntStateOf(0)
+    fun noteSource(key: String, source: com.bos.sphere.core.catalog.IconSource) {
+        if (com.bos.sphere.core.catalog.ProfileBadgeRule.systemBadgeLost(source) && unbadged.add(key)) unbadgedRev.intValue++
+    }
+    /** Reads snapshot state, so a caller recomposes when the icon turns out to have lost the system badge. */
+    fun systemBadgeLost(key: String): Boolean { unbadgedRev.intValue; return key in unbadged }
+
     fun get(key: String): ImageBitmap? = cache.get(key)
     fun put(key: String, bmp: ImageBitmap) { cache.put(key, bmp) }
 

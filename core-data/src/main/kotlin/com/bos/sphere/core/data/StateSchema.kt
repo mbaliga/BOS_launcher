@@ -74,7 +74,13 @@ object StateSchema {
      * the portable copy of the part of this that is setup (aliases).
      */
     val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc")
-    val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports")
+    val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage")
+
+    /**
+     * Files (relative to the app's files directory) that hold usage history and are never exported (HOM-18): the timeline
+     * log of up to 5000 opens. Each lives under a directory in [BACKUP_EXCLUDED_FILES], so system backup skips it too.
+     */
+    val NEVER_EXPORTED_FILES: Set<String> = setOf(TimelineLogStore.RELATIVE_PATH)
 
     val NEVER_EXPORTED_STORES: Set<String> = setOf(
         "launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "liftoff_misc",

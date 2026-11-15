@@ -107,7 +107,13 @@ fun DrawerFilterBar(state: DrawerFilterState, modifier: Modifier = Modifier) {
                 .focusRequester(filterFocus),
             decorationBox = { inner -> Box { if (state.filter.isEmpty()) Text(L10n.tr("Type to filter apps"), color = HyleColors.InkDim, fontSize = 14.sp); inner() } },
         )
-        if (tabs.size > 1 || allTags.isNotEmpty()) {
+        // HOM-06: private-space gate. Locked: a chip asks the system to unlock (it shows its own authentication).
+        val privateQuiet by com.bos.sphere.core.catalog.WorkProfileState.privateQuiet.collectAsState()
+        val gate = remember(privateQuiet) {
+            val capable = runCatching { CapabilityEvaluator.evaluate(CapabilityRegistry(context).snapshot()).firstOrNull { it.id == "private_space" }?.state == CapState.On }.getOrDefault(false)
+            com.bos.sphere.core.catalog.PrivateSpaceGate.of(privateQuiet, Build.VERSION.SDK_INT, capable)
+        }
+        if (tabs.size > 1 || allTags.isNotEmpty() || gate == com.bos.sphere.core.catalog.PrivateSpaceGate.Locked) {
             Row(Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                 if (tabs.size > 1) for (t in tabs) Chip(L10n.tr(t.label), state.tab == t) { state.tab = t }
                 if (state.tab == DrawerTab.Work) {
@@ -117,6 +123,9 @@ fun DrawerFilterBar(state: DrawerFilterState, modifier: Modifier = Modifier) {
                     if (p != null) Chip(L10n.tr(com.bos.sphere.core.catalog.WorkProfileState.chipLabel(p).orEmpty()), false) {
                         com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, !p)
                     }
+                }
+                com.bos.sphere.core.catalog.PrivateSpaceGate.chipLabel(gate, state.tab == DrawerTab.Private)?.let { label ->
+                    Chip(L10n.tr(label), false) { com.bos.sphere.core.catalog.WorkProfileState.setPrivateLocked(context, gate == com.bos.sphere.core.catalog.PrivateSpaceGate.Unlocked) }
                 }
                 for (tg in allTags) Chip("#$tg", state.tag == tg) { state.tag = if (state.tag == tg) null else tg }
             }

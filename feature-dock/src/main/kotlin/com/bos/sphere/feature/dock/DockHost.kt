@@ -134,6 +134,9 @@ fun DockHost(
     onRunGroup: (com.bos.sphere.core.launch.AppGroup) -> Unit = {},
     /** HOM-02: draws the icon of a pinned folder, shortcut or link; null falls back to the initials tile. */
     iconOther: (@Composable (DockItem, Dp) -> Unit)? = null,
+    /** HOM-02: how many columns a pinned widget spans (its home span), and how a pinned widget is drawn into its rail slot. */
+    spanOfOther: (DockItemRef) -> Int = { 1 },
+    widgetOther: (@Composable (DockItem, Dp, Dp) -> Unit)? = null,
     /** A desktop surface always shows its dock; the tier default only decides for the phone's home (DCK-04, DCK-07). */
     forceEnabled: Boolean = false,
     /** The edge the host surface reserved for this rail; the desktop surface decides its own (EXT-09). */
@@ -179,6 +182,7 @@ fun DockHost(
     val sessionUsed = remember(sinceStart, apps, resumes, refreshKey) { SessionUse.all() + sinceStart.mapNotNull { keyByPackage[it] } }
     val content = remember(state.active.dockPins, state.groups, apps, recents, granted, state.dock.mode, sessionUsed, media) {
         DockContentBuilder.build(
+            spanOf = spanOfOther,
             pins = state.active.dockPins,
             labelOf = { ref -> when (ref.kind) { ItemKind.App -> byKey[ref.id]?.label; ItemKind.Group -> state.groups.firstOrNull { it.id == ref.id }?.name; else -> labelOfOther(ref) } },
             recentApps = recents.mapNotNull { keyByPackage[it] },
@@ -220,7 +224,7 @@ fun DockHost(
     val edge = edgeOverride ?: state.dock.edgeFor(landscape)
     DockRail(
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
-        focusRequest = controller.focusRequest - focusBase, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge).railModifier(),
+        focusRequest = controller.focusRequest - focusBase, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge).railModifier(), widget = widgetOther,
         graphBridge = if (forceEnabled) null else DockInput.bridge, // the desktop surface's rail stays out of the phone home's graph
         icon = { item, size -> if (iconOther != null && item.ref.kind != ItemKind.App && item.ref.kind != ItemKind.Group && HomeItemPins.homeKeyOf(item.ref) != null) iconOther(item, size) else DockIcon(item, byKey, size) },
     )

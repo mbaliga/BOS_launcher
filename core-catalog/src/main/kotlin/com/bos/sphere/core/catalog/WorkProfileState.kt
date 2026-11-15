@@ -30,7 +30,15 @@ object WorkProfileState {
     val quietProfileIds: StateFlow<Set<Int>> = _quiet.asStateFlow()
     val workPaused: StateFlow<Boolean?> = _workPaused.asStateFlow()
 
+    private val _kinds = MutableStateFlow<Map<Int, ProfileKind>>(emptyMap())
+    private val _privateQuiet = MutableStateFlow<Boolean?>(null)
+    /** HOM-06: the kind of every profile by `UserHandle.hashCode()`, for the explicit profile badge on home icons. */
+    val profileKinds: StateFlow<Map<Int, ProfileKind>> = _kinds.asStateFlow()
+    /** HOM-06: null without a private profile, true while it is locked. Feeds [PrivateSpaceGate]. */
+    val privateQuiet: StateFlow<Boolean?> = _privateQuiet.asStateFlow()
+
     @Volatile private var workUser: UserHandle? = null
+    @Volatile private var privateUser: UserHandle? = null
 
     /** Re-reads the profiles (off the main thread). */
     fun refresh(context: Context) {
@@ -42,6 +50,10 @@ object WorkProfileState {
             _quiet.value = secondary.filter { it.second.quiet }.mapTo(HashSet()) { it.first.hashCode() }
             val work = secondary.firstOrNull { it.second.kind == ProfileKind.Work }
             workUser = work?.first
+            _kinds.value = profiles.associate { it.first.hashCode() to it.second.kind }
+            val priv = secondary.firstOrNull { it.second.kind == ProfileKind.Private }
+            privateUser = priv?.first
+            _privateQuiet.value = priv?.second?.quiet
             _workPaused.value = work?.second?.quiet
         }
     }
@@ -59,6 +71,19 @@ object WorkProfileState {
                 val id = user.hashCode()
                 _quiet.value = if (paused) _quiet.value + id else _quiet.value - id
             } else refresh(app)
+        }
+    }
+
+    /**
+     * Locks or unlocks the private space. Unlocking shows the system's own authentication; the state follows the
+     * availability broadcast, not the request, because the user may cancel the prompt.
+     */
+    fun setPrivateLocked(context: Context, locked: Boolean) {
+        val app = context.applicationContext
+        val user = privateUser ?: return
+        scope.launch {
+            AppCatalog(app).setPaused(user, locked)
+            refresh(app)
         }
     }
 

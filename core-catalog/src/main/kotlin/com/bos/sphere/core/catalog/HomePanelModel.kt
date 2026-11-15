@@ -36,9 +36,9 @@ enum class UsageRange(val label: String, val days: Int) {
     fun startMs(startOfTodayMs: Long): Long = startOfTodayMs - (days - 1) * 86_400_000L
 }
 
-/** HOM-18: how far back the timeline reads. The launch history keeps at most [HISTORY_MAX] opens. */
+/** HOM-18: how far back the timeline reads. The timeline log keeps at most [Timeline.LOG_MAX] opens. */
 enum class TimelineDepth(val label: String, val opens: Int) {
-    Short("Last 30 opens", 30), Medium("Last 100 opens", 100), Full("Everything recorded (400)", Timeline.HISTORY_MAX);
+    Short("Last 30 opens", 30), Medium("Last 100 opens", 100), Full("Everything recorded (up to 5000)", Timeline.LOG_MAX);
 }
 
 /** Panel settings. Kept in the existing home state preference file under its own keys. */

@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,6 +64,8 @@ class HomeExtras(
     val onDropItems: (folderKey: String, defs: List<ItemDef>) -> Unit = { _, _ -> },
     /** A keyboard edit (INP-09): the same [ItemAction] a drag produces, applied through the host's one edit path. */
     val onAction: (ItemAction) -> Unit = {},
+    /** HOM-17: the usage split the Usage tile draws as a bar inside itself (empty: no bar). */
+    val usageSlices: List<com.bos.sphere.core.catalog.UsageSlice> = emptyList(),
 ) {
     private val owned: Set<String> = state.nonAppKeys().toSet()
     fun owns(key: String) = key in owned
@@ -80,7 +83,7 @@ fun ExtraItemFace(key: String, extras: HomeExtras, size: Dp, modifier: Modifier 
             // INP-11: an app, link or file dropped on the tile is filed into the folder.
             if (folder != null) FolderTile(folder, extras.resolveApp, size, onOpen = {}, modifier = modifier.launcherDropTarget { r -> FolderDrop.file(extras, key, r).also { n -> if (n > 0) android.widget.Toast.makeText(context, L10n.tr("Added %d to folder", n), android.widget.Toast.LENGTH_SHORT).show() } > 0 }, interactive = false)
         }
-        else -> extras.state.items[key]?.let { ItemGlyphTile(it, extras.shortcutIcon, size, modifier) }
+        else -> extras.state.items[key]?.let { ItemGlyphTile(it, extras.shortcutIcon, size, modifier, extras.usageSlices) }
     }
 }
 
@@ -91,7 +94,7 @@ fun extraLabel(key: String, extras: HomeExtras): String = when (ItemKeys.kind(ke
 }
 
 @Composable
-fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifier: Modifier = Modifier) {
+fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifier: Modifier = Modifier, usageSlices: List<com.bos.sphere.core.catalog.UsageSlice> = emptyList()) {
     val shape = RoundedCornerShape(22)
     var bmp by remember(def.key) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(def.key) {
@@ -106,6 +109,20 @@ fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifi
             when (def.kind) { ItemKind.Link -> com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target)?.let { panelGlyph(it) } ?: if (def.isFile) "▤" else "↗"; ItemKind.Group -> "▦"; else -> def.label.take(1).uppercase().ifEmpty { "•" } },
             color = HyleColors.InkBright, fontSize = (size.value * 0.42f).sp,
         )
+        // HOM-17: the Usage tile carries the split bar itself, along its lower edge.
+        if (def.kind == ItemKind.Link && com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target) == com.bos.sphere.core.catalog.PanelTab.Usage) {
+            val seg = remember(usageSlices) { com.bos.sphere.core.catalog.UsageTileBar.segments(usageSlices) }
+            if (seg.isNotEmpty()) UsageTileBarView(seg, Modifier.align(Alignment.BottomCenter).padding(bottom = size / 10).size(size * 0.7f, (size / 12).coerceAtLeast(3.dp)))
+        }
+    }
+}
+
+/** HOM-17: the colours follow the Usage panel's slice order so the bar and the panel agree. */
+@Composable
+fun UsageTileBarView(segments: List<com.bos.sphere.core.catalog.UsageTileBar.Segment>, modifier: Modifier = Modifier) {
+    val colors = listOf(Color(0xFF7C5CFF), Color(0xFF3FB6A8), Color(0xFFE5A04D), Color(0xFFE5484D), Color(0xFF5B9BF0), Color(0xFF8A90A8))
+    androidx.compose.foundation.layout.Row(modifier.clip(RoundedCornerShape(50)).background(Color(0x22FFFFFF))) {
+        segments.forEach { s -> Box(Modifier.weight(s.share).fillMaxHeight().background(colors[s.sliceIndex % colors.size])) }
     }
 }
 

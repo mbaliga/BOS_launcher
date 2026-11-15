@@ -168,8 +168,9 @@ class HomeInfoW3Test {
         assertEquals(1 + 30, short.size)
         assertTrue(short.first().scheduled)
         assertEquals(100, TimelineView.build(opens, sched, now, TimelineDepth.Medium, false) { "A" }.size)
-        assertEquals(200, TimelineView.build(opens, emptyList(), now, TimelineDepth.Full, true) { "A" }.size) // all recorded (history keeps 400)
-        assertEquals(400, TimelineDepth.Full.opens)
+        assertEquals(200, TimelineView.build(opens, emptyList(), now, TimelineDepth.Full, true) { "A" }.size) // all recorded
+        // Wave 4: the timeline reads the larger log (TimelineLogStore), not the 400-entry history.
+        assertEquals(5000, TimelineDepth.Full.opens)
     }
 
     @Test

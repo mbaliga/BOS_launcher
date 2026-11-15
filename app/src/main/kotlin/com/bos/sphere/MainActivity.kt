@@ -59,6 +59,7 @@ class MainActivity : ComponentActivity() {
         // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
         runCatching { StateService.bridgeBuild31(applicationContext) }
         runCatching { StateService.get(this).guardPlatformRestore() } // NFR-18: drop device-bound widget ids and picture after a platform restore
+        Thread { StateService.get(applicationContext).migrateBackgroundPictures() }.start() // NFR-18: older pictures leave the backed-up directory, off the main thread
         // CFG-04 / CFG-01: destructive edits snapshot first; the user's keyboard shortcut overrides come back from the state store.
         runCatching {
             com.bos.sphere.core.data.DestructiveEdits.install { StateService.beforeDestructive(applicationContext, it) }

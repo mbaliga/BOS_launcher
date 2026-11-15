@@ -188,7 +188,7 @@ private fun startOfToday(): Long = Calendar.getInstance().apply {
     set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
 }.timeInMillis
 
-private sealed interface DrawerRow {
+internal sealed interface DrawerRow {
     data class Header(val title: String) : DrawerRow
     data class App(val app: AppEntry) : DrawerRow
 }
@@ -513,14 +513,14 @@ private fun SectionTitle(title: String) {
     }
 }
 
-private fun rowKey(r: DrawerRow): String = when (r) {
+internal fun rowKey(r: DrawerRow): String = when (r) {
     is DrawerRow.Header -> "h:${r.title}"
     is DrawerRow.App -> "a:${r.app.key}"
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DrawerGrid(
+internal fun DrawerGrid(
     state: LazyGridState,
     rows: List<DrawerRow>,
     padding: PaddingValues,

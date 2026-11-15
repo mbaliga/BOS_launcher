@@ -157,6 +157,11 @@ class WorkspaceManager(
         return true
     }
 
+    /** PAL-03: the Radar result "Switch to workspace <name>" carries the workspace's position in [DockWorkspaceState.workspaces]. */
+    fun switchToIndex(index: Int): Boolean = current.workspaces.getOrNull(index)?.let { switchTo(it.id) } ?: false
+
+    fun names(): List<String> = current.workspaces.map { it.name }
+
     fun next(): Boolean = step(+1)
     fun previous(): Boolean = step(-1)
     private fun step(delta: Int): Boolean {

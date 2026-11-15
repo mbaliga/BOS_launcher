@@ -29,7 +29,10 @@ fun GridKeyboardMove(
     onPagesChange: (List<HomePage>) -> Unit,
     /** Brings a page into view; after a move across pages the item is on another page and must be composed to take focus back. */
     showPage: (Int) -> Unit = {},
+    /** The live non-app items (folders, widgets); with them Shift + arrow resizes a widget or files an item into its neighbour. */
+    extras: HomeExtras? = null,
 ) {
+    val ex by rememberUpdatedState(extras)
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val show by rememberUpdatedState(showPage)
     val p by rememberUpdatedState(pages)
@@ -58,7 +61,27 @@ fun GridKeyboardMove(
             }
             true
         }
+        val shiftHook: (FocusDir) -> Boolean = h@{ dir ->
+            val id = LauncherInput.focus.currentId ?: return@h false
+            if (!id.startsWith("grid.")) return@h false
+            val extras = ex ?: return@h false
+            val key = id.removePrefix("grid.")
+            val all = p
+            val pageIdx = all.indexOfFirst { key in it.keys }
+            if (pageIdx < 0) return@h false
+            val page = all[pageIdx]
+            val columns = if (page.layout.shape == PageShape.Grid) page.layout.gridFor(isLandscape, pr).columns else 1
+            val rows = (cap(page.layout) / columns.coerceAtLeast(1)).coerceAtLeast(1)
+            val state = extras.state.copy(pages = all)
+            val action = KeyboardEditOps.resolveOnPage(state, pageIdx, key, dir, shift = true, columns = columns, rows = rows)
+            if (action != null) extras.onAction(action)
+            true
+        }
         LauncherInput.moveHook = hook
-        onDispose { if (LauncherInput.moveHook === hook) LauncherInput.moveHook = null }
+        LauncherInput.shiftMoveHook = shiftHook
+        onDispose {
+            if (LauncherInput.moveHook === hook) LauncherInput.moveHook = null
+            if (LauncherInput.shiftMoveHook === shiftHook) LauncherInput.shiftMoveHook = null
+        }
     }
 }

@@ -434,9 +434,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     // INP-11: an app dragged out of the drawer with a mouse and dropped on the home is added to the current page.
-    com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
-        if (appsByKey[key] != null && pages.none { key in it.keys }) stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)
-    })
     // ---- keyboard, pointer and controller (INP-04, INP-05, INP-16, HOM-21): shortcuts go to the same openers the touch paths use
     com.bos.sphere.feature.grid.LauncherInputWiring(
         overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || leftOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
@@ -486,12 +483,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
         }
     }
+    androidx.compose.runtime.SideEffect { com.bos.sphere.feature.search.palette.PaletteWorkspaces.names = { com.bos.sphere.feature.dock.WorkspaceRepository.get(context).names() } }
     var pickingLeft by remember { mutableStateOf(false) }
     val homeItems = rememberHomeItems(
         store = extrasStore, pages = pages, savePages = ::savePages, capacityOf = capacityOf, currentPage = { gridState.currentPage },
         host = widgetHost, allApps = allApps, appsByKey = appsByKey, launchApp = ::launch, accentArgb = prefs.accentColor.toInt(),
         gridDims = { pages.getOrNull(gridState.currentPage)?.layout?.gridFor(isLandscape, prefs)?.let { it.columns to it.rows } ?: (prefs.gridFor(isLandscape).let { it.columns to it.rows }) },
     )
+    com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
+        if (appsByKey[key] != null && pages.none { key in it.keys }) stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)
+    }, onItems = { defs -> homeItems.addDropped(defs) })
     var leftWidgetLabel by remember { mutableStateOf<String?>(null) }
     val widgetPicker = rememberWidgetPicker(widgetHost) { id, label ->
         if (pickingLeft) {
@@ -1084,7 +1085,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             settingsSource = settingsSource,
             initialQuery = typedQuery,
-            onRunCommand = { name, _ -> runCatching { com.bos.sphere.core.input.LauncherCommand.valueOf(name) }.getOrNull()?.let { com.bos.sphere.feature.grid.LauncherInput.dispatch(it) } },
+            onRunCommand = { name, index ->
+                // PAL-03: "Switch to workspace Work" names a workspace by position; every other command is a launcher command.
+                if (name == "GoToWorkspace" && index != null) com.bos.sphere.feature.dock.WorkspaceRepository.get(context).switchToIndex(index)
+                else runCatching { com.bos.sphere.core.input.LauncherCommand.valueOf(name) }.getOrNull()?.let { com.bos.sphere.feature.grid.LauncherInput.dispatch(it) }
+            },
+            // PAL-08: Open on display, Open beside and Add to dock run straight from Radar's action list.
+            onRunAppAction = { app, action -> com.bos.sphere.feature.dock.AppActionList.runDirect(action, appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect()).also { if (it) searchOpen = false } },
+            adjacentSupported = remember(searchOpen) { com.bos.sphere.core.launch.LaunchResolver.offersAdjacent(appLauncher.caps()) },
         )
 
         WheelDrawer(

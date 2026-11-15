@@ -29,4 +29,15 @@ class OrbitFeelTest {
         assertEquals(20f, OrbitFeelValues(creepDp = 99f).coerced().creepDp, 0f)
         assertEquals(0f, OrbitFeelValues(creepDp = -1f).coerced().creepDp, 0f)
     }
+
+    @Test
+    fun PAL_23_the_captured_values_round_trip_through_the_commit_snippet() {
+        val tuned = OrbitFeelValues(creepDp = 4f, flingDecay = 5f, flingGain = 0.1f, flingMax = 1200f)
+        val text = OrbitFeelCapture.snippet(tuned)
+        assertTrue(text.contains("val creepDp: Float = 4f"))
+        assertEquals(tuned, OrbitFeelCapture.parse(text))
+        // The shipped defaults are what a fresh capture of an untouched device gives.
+        assertEquals(OrbitFeelValues(), OrbitFeelCapture.parse(OrbitFeelCapture.snippet(OrbitFeelValues())))
+        assertEquals(null, OrbitFeelCapture.parse("nothing here"))
+    }
 }

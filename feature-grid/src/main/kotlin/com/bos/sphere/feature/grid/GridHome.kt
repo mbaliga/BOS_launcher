@@ -636,7 +636,7 @@ fun GridHome(
                     extras = extras,
                 )
             }
-            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.animateScrollToPage(it) } })
+            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.animateScrollToPage(it) } }, extras = extras)
             if (areaSize != IntSize.Zero) {
                 if (paging == PagingAxis.Horizontal) {
                     HorizontalPager(

@@ -42,4 +42,17 @@ object KeyboardEditOps {
         val toIndex = if (t.index == KeyboardMove.END) state.pages[toPage].keys.size else t.index
         return ItemAction.Move(key, toPage, toIndex)
     }
+
+    /**
+     * [resolve] for one page of the paged home: the neighbour a shift+arrow files into is found from the page's own packed
+     * layout (widgets span cells), not from a surface plan the live home does not build.
+     */
+    fun resolveOnPage(state: HomeState, pageIdx: Int, key: String, dir: FocusDir, shift: Boolean, columns: Int, rows: Int): ItemAction? {
+        val page = state.pages.getOrNull(pageIdx) ?: return null
+        val cols = columns.coerceAtLeast(1)
+        val packed = com.bos.sphere.core.catalog.TilePacker.pack(page.keys, { state.spanOf(it) }, cols, rows.coerceAtLeast(1))
+        val cells = packed.placed.map { SurfaceCell(it.key, it.col, it.row, it.span.cols, it.span.rows) }
+        val plan = SurfacePlan(com.bos.sphere.core.data.HomeStyle.Grid, cells, emptyList(), gridFocus(cells), true, packed.overflow)
+        return resolve(state, plan, key, dir, shift, cols)
+    }
 }

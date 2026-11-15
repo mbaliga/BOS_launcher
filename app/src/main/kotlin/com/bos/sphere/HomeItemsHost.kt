@@ -532,8 +532,8 @@ fun rememberHomeItems(
     val openRequest by HomeOpenRequests.folder.collectAsStateWithLifecycle()
     LaunchedEffect(openRequest, state.folders) {
         openRequest?.let { id ->
-            if (id in state.folders) items.openFolder = id
-            HomeOpenRequests.folder.value = null
+            // Kept until the folder exists: on a cold start the stored state may not have loaded yet.
+            if (id in state.folders) { items.openFolder = id; HomeOpenRequests.folder.value = null }
         }
     }
     // Icon sources: overrides, the chosen pack (parsed off the main thread), themed icons.

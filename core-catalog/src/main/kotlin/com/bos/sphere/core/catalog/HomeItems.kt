@@ -9,19 +9,22 @@ import com.bos.sphere.core.data.HomeTiles
  * "tile:..."), and add one prefix per new kind so a stored page is still just a list of strings.
  */
 
-enum class ItemKind { App, Shortcut, Folder, Widget, Link, Tile }
+enum class ItemKind { App, Shortcut, Folder, Widget, Link, Tile, Group }
 
 object ItemKeys {
     const val SHORTCUT = "shortcut:"
     const val FOLDER = "folder:"
     const val WIDGET = "widget:"
     const val LINK = "link:"
+    /** WSP-05: a saved app group placed on the page grid like any other item. */
+    const val GROUP = "group:"
 
     fun kind(key: String): ItemKind = when {
         key.startsWith(SHORTCUT) -> ItemKind.Shortcut
         key.startsWith(FOLDER) -> ItemKind.Folder
         key.startsWith(WIDGET) -> ItemKind.Widget
         key.startsWith(LINK) -> ItemKind.Link
+        key.startsWith(GROUP) -> ItemKind.Group
         HomeTiles.isTile(key) -> ItemKind.Tile
         else -> ItemKind.App
     }
@@ -30,6 +33,8 @@ object ItemKeys {
     fun folder(id: String) = FOLDER + id
     fun widget(appWidgetId: Int) = WIDGET + appWidgetId
     fun link(uri: String) = LINK + uri
+    fun group(id: String) = GROUP + id
+    fun groupId(key: String): String? = key.takeIf { it.startsWith(GROUP) }?.removePrefix(GROUP)
 
     fun folderId(key: String): String? = key.takeIf { it.startsWith(FOLDER) }?.removePrefix(FOLDER)
     fun widgetId(key: String): Int? = key.takeIf { it.startsWith(WIDGET) }?.removePrefix(WIDGET)?.toIntOrNull()

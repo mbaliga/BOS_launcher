@@ -62,6 +62,7 @@ import com.bos.sphere.feature.grid.SearchOverlay
 import com.bos.sphere.feature.grid.StripHost
 import com.bos.sphere.feature.grid.TextButtonPill
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -624,11 +625,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
     }
 
+    // WSP-05: a group placed on the page grid runs like the dock's group item.
+    homeItems.runGroup = { g -> scope.launch { appLauncher.runGroup(g) } }
     val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
     val searchHub = remember {
         val palette = com.bos.sphere.feature.search.palette.PaletteHost.get(context)
         com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)
-        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders() + com.bos.sphere.ui.dockSearchProvider(context)) { palette.prefs.approvedSources() }
+        com.bos.sphere.core.data.AndroidSearchHub(context, palette.hubProviders() + com.bos.sphere.ui.dockSearchProvider(context) + homeItems.folderSearchProvider()) { palette.prefs.approvedSources() }
     }
     val appCtx = androidx.compose.ui.platform.LocalContext.current
     val filePermission = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -756,9 +759,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val sideGap = frame + (cfg.screenWidthDp * prefs.gridInsetX).dp
     val stripH = com.bos.sphere.feature.grid.stripHeight(prefs)
     val scrollTop = if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Top) maxOf(frame, stripH + 14.dp) else frame
-    val scrollBottom = bottomClear + frame
+    // HOM-19: where the dock rail is thicker than the frame band, the app area gives up the difference.
+    val dockState by com.bos.sphere.feature.dock.WorkspaceRepository.get(context).state.collectAsState()
+    val dockTier = remember(cfg.screenWidthDp) { com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs()) }
+    val dockReserve = com.bos.sphere.feature.dock.DockFootprint.reserve(
+        enabled = dockState.dock.isEnabled(dockTier), edge = dockState.dock.edgeFor(isLandscape),
+        collapsed = dockState.dock.mode == com.bos.sphere.feature.dock.DockMode.Collapsed, bandDp = frame.value,
+    )
+    val scrollBottom = bottomClear + frame + dockReserve.bottom.dp
     val scrollPadding = homeItems.padFor(
-        androidx.compose.foundation.layout.PaddingValues(start = sideGap, end = sideGap, top = scrollTop, bottom = scrollBottom),
+        androidx.compose.foundation.layout.PaddingValues(start = sideGap + dockReserve.start.dp, end = sideGap + dockReserve.end.dp, top = scrollTop, bottom = scrollBottom),
         cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), homeItems.topLevelKeys(layout.pages), prefs.homeStyle,
     )
     // The PSP bar has no reliable empty space to long-press: holding the top band (clock area) opens Settings.
@@ -853,13 +863,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         contentPadding = scrollPadding,
                         iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
+                        extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
                     )
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
                 } else {
                     Background()
                     Box(
-                        Modifier.fillMaxSize().padding(bottom = bottomClear).leftSwipe(
+                        Modifier.fillMaxSize().padding(start = dockReserve.start.dp, end = dockReserve.end.dp, bottom = bottomClear + dockReserve.bottom.dp).leftSwipe(
                             enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen,
                             atFirstPage = { gridState.pager.currentPage == 0 && !gridState.pager.isScrollInProgress },
                             onOpen = { leftOpen = true },
@@ -901,6 +912,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         contentPadding = scrollPadding,
                         showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
+                        extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
                     )
                     SettingsHoldBand()
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
@@ -915,6 +927,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         contentPadding = scrollPadding,
                         iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
+                        extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
                     )
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
@@ -927,6 +940,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         contentPadding = scrollPadding,
                         iconScale = prefs.iconScale, showLabels = prefs.showLabels,
                         gestures = homeGestureSpec,
+                        extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages),
                     )
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
@@ -973,6 +987,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
             visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen,
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
+            homeExtras = homeItems.homeExtras,
         )
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).

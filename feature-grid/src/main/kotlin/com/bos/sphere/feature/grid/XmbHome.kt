@@ -67,7 +67,24 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** One column of the cross media bar: a named set of apps. */
-internal data class XmbCategory(val name: String, val isRecent: Boolean, val apps: List<AppEntry>)
+internal data class XmbCategory(
+    val name: String,
+    val isRecent: Boolean,
+    val apps: List<AppEntry>,
+    /** HOM-01: non-app items shown in front of the app with this key, and after the last app. */
+    val extraBefore: Map<String, List<String>> = emptyMap(),
+    val extraTail: List<String> = emptyList(),
+) {
+    /** The rows of the column: apps with the extras interleaved at their place. */
+    val rows: List<HomeRow<AppEntry>>
+        get() = buildList {
+            apps.forEach { a ->
+                extraBefore[a.key]?.forEach { add(HomeRow.Extra(it)) }
+                add(HomeRow.App(a, a.key))
+            }
+            extraTail.forEach { add(HomeRow.Extra(it)) }
+        }
+}
 
 /** Pure helpers behind [XmbHome] (unit tested). */
 internal object XmbMath {
@@ -103,6 +120,34 @@ internal object XmbMath {
             out += keep
         }
         return out
+    }
+
+    /**
+     * HOM-01: put each non-app item in the column of the app that follows it in [topLevel] (before
+     * that app), else of the app before it (at the end), else in the first column that is not Recent.
+     */
+    fun withExtras(cats: List<XmbCategory>, extras: List<String>, topLevel: List<String>): List<XmbCategory> {
+        if (extras.isEmpty() || cats.isEmpty()) return cats
+        val home = cats.indices.filter { !cats[it].isRecent }.ifEmpty { cats.indices.toList() }
+        val catOf = HashMap<String, Int>()
+        for (i in home) cats[i].apps.forEach { catOf.putIfAbsent(it.key, i) }
+        val before = cats.map { LinkedHashMap<String, MutableList<String>>() }
+        val tail = cats.map { ArrayList<String>() }
+        val extraSet = extras.toHashSet()
+        val order = topLevel.filter { it in extraSet || it in catOf }
+        val placed = HashSet<String>()
+        extras.forEach { e ->
+            val at = order.indexOf(e)
+            val next = if (at >= 0) order.drop(at + 1).firstOrNull { it in catOf } else null
+            val prev = if (at >= 0) order.take(at).lastOrNull { it in catOf } else null
+            when {
+                next != null -> before[catOf.getValue(next)].getOrPut(next) { ArrayList() } += e
+                prev != null -> tail[catOf.getValue(prev)] += e
+                else -> tail[home.first()] += e
+            }
+            placed += e
+        }
+        return cats.mapIndexed { i, c -> if (before[i].isEmpty() && tail[i].isEmpty()) c else c.copy(extraBefore = before[i], extraTail = tail[i]) }
     }
 
     /** A sensible glyph for a category name; [Glyphs.Apps] when nothing matches. */
@@ -184,10 +229,14 @@ fun XmbHome(
      * category glyphs consume their taps, so "empty" is wherever nothing claimed the release.
      */
     gestures: HomeGestureSpec? = null,
+    /** HOM-01: non-app items drawn as rows of the category columns, placed by their position in [topLevel]. */
+    extras: HomeExtras? = null,
+    extraKeys: List<String> = emptyList(),
+    topLevel: List<String> = emptyList(),
 ) {
     // Physical coordinates: layout and swipes must not mirror under RTL.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        XmbHomeImpl(apps, recent, categoryOf, onLaunch, onLongPress, modifier.homeGestures(gestures), contentPadding, showLabels, sounds)
+        XmbHomeImpl(apps, recent, categoryOf, onLaunch, onLongPress, modifier.homeGestures(gestures), contentPadding, showLabels, sounds, extras, extraKeys, topLevel)
     }
 }
 
@@ -202,12 +251,17 @@ private fun XmbHomeImpl(
     contentPadding: PaddingValues,
     showLabels: Boolean,
     sounds: UiSounds?,
+    extras: HomeExtras?,
+    extraKeys: List<String>,
+    topLevel: List<String>,
 ) {
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val latestCategoryOf by rememberUpdatedState(categoryOf)
-    val cats = remember(apps, recent) { XmbMath.categories(apps, recent, categoryOf = { latestCategoryOf(it) }) }
+    val cats = remember(apps, recent, extras, extraKeys, topLevel) {
+        XmbMath.withExtras(XmbMath.categories(apps, recent, categoryOf = { latestCategoryOf(it) }), if (extras == null) emptyList() else extraKeys, topLevel)
+    }
     val lastCat = cats.lastIndex
 
     var catPos by remember { mutableFloatStateOf(0f) }
@@ -217,8 +271,8 @@ private fun XmbHomeImpl(
     if (catPos > lastCat.coerceAtLeast(0)) catPos = lastCat.coerceAtLeast(0).toFloat()
 
     val shownCat by remember { derivedStateOf { catPos.roundToInt().coerceIn(0, lastCat.coerceAtLeast(0)) } }
-    val shownApps = cats.getOrNull(shownCat)?.apps.orEmpty()
-    val lastApp = shownApps.lastIndex
+    val shownRows = cats.getOrNull(shownCat)?.rows.orEmpty()
+    val lastApp = shownRows.lastIndex
     val focusIdx by remember { derivedStateOf { listPos.roundToInt().coerceIn(0, lastApp.coerceAtLeast(0)) } }
 
     val lastCatNow by rememberUpdatedState(lastCat)
@@ -370,10 +424,30 @@ private fun XmbHomeImpl(
                 val visible = ((geo.bottomY - geo.listY0) / geo.rowH).toInt() + 3
                 val last = (focusIdx + visible).coerceAtMost(lastApp)
                 for (i in first..last) {
-                    val app = shownApps.getOrNull(i) ?: break
+                    val row = shownRows.getOrNull(i) ?: break
+                    if (row is HomeRow.Extra) {
+                        if (extras != null) key(row.key) {
+                            XmbRow(
+                                label = extraLabel(row.key, extras), icon = { ExtraItemFace(row.key, extras, 56.dp) }, index = i, geo = geo,
+                                listPos = { listPos }, catOffset = { catPos - shownCat },
+                                showLabels = showLabels,
+                                itemModifier = Modifier.launcherItem("xmb.row.${row.key}", order = 1000 + i, focusable = false, onFocused = { if (abs(listPos - i) > 0.5f) settleList(i) }, onMenu = { extras.onLongPress(row.key) }),
+                                onTap = {
+                                    if (abs(listPos - i) > 0.5f) settleList(i)
+                                    else { latestSounds?.play(UiSound.Select); extras.onTap(row.key) }
+                                },
+                                onLong = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    extras.onLongPress(row.key)
+                                },
+                            )
+                        }
+                        continue
+                    }
+                    val app = (row as HomeRow.App).app
                     key(app.key) {
                         XmbRow(
-                            app = app, index = i, geo = geo,
+                            label = app.label, icon = { AppIcon(app, 56.dp) }, index = i, geo = geo,
                             listPos = { listPos }, catOffset = { catPos - shownCat },
                             showLabels = showLabels,
                             itemModifier = Modifier.launcherItem("xmb.row.${app.key}", order = 1000 + i, focusable = false, onFocused = { if (abs(listPos - i) > 0.5f) settleList(i) }, onMenu = { latestLong(app) }),
@@ -398,7 +472,8 @@ private class JobPair { var cat: Job? = null; var list: Job? = null }
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun XmbRow(
-    app: AppEntry,
+    label: String,
+    icon: @Composable () -> Unit,
     index: Int,
     geo: XmbGeo,
     listPos: () -> Float,
@@ -433,12 +508,12 @@ private fun XmbRow(
                 val fade = 1f - (abs(catOffset()) * 2f).coerceAtMost(1f)
                 alpha = (0.62f + 0.38f * c) * top * bottom * fade
             }
-            .semantics { contentDescription = app.label }
+            .semantics { contentDescription = label }
             .then(itemModifier)
             .combinedClickable(interaction, null, onClick = onTap, onLongClick = onLong),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppIcon(app, 56.dp)
+        icon()
         Spacer(Modifier.width(14.dp))
         // Labels: all rows, or only the focused one when labels are off.
         Box(
@@ -448,7 +523,7 @@ private fun XmbRow(
             },
         ) {
             Text(
-                app.label, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+                label, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.65f), Offset(0f, 1f), 8f)),
             )

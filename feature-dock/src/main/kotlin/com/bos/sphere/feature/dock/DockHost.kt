@@ -100,6 +100,8 @@ fun DockHost(
     labelOfOther: (DockItemRef) -> String? = { null },
     onLaunchOther: (DockItemRef) -> Unit = {},
     onRunGroup: (com.bos.sphere.core.launch.AppGroup) -> Unit = {},
+    /** HOM-02: draws the icon of a pinned folder, shortcut or link; null falls back to the initials tile. */
+    iconOther: (@Composable (DockItem, Dp) -> Unit)? = null,
     /** A desktop surface always shows its dock; the tier default only decides for the phone's home (DCK-04, DCK-07). */
     forceEnabled: Boolean = false,
     /** The edge the host surface reserved for this rail; the desktop surface decides its own (EXT-09). */
@@ -181,7 +183,7 @@ fun DockHost(
     DockRail(
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
         focusRequest = controller.focusRequest, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge),
-        icon = { item, size -> DockIcon(item, byKey, size) },
+        icon = { item, size -> if (iconOther != null && item.ref.kind != ItemKind.App && item.ref.kind != ItemKind.Group && HomeItemPins.homeKeyOf(item.ref) != null) iconOther(item, size) else DockIcon(item, byKey, size) },
     )
 }
 

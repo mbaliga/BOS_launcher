@@ -93,6 +93,12 @@ class MainActivity : ComponentActivity() {
 
     /** A launcher-internal action forwarded by the motion service or its notification. */
     private fun handleAction(intent: Intent?): Boolean {
+        // HOM-04: a Radar result for a home folder opens that folder.
+        intent?.getStringExtra(EXTRA_OPEN_FOLDER)?.let { id ->
+            intent.removeExtra(EXTRA_OPEN_FOLDER)
+            HomeOpenRequests.folder.value = id
+            return true
+        }
         val name = intent?.getStringExtra(EXTRA_ACTION) ?: return false
         val id = CornerActionId.entries.firstOrNull { it.name == name } ?: return false
         intent.removeExtra(EXTRA_ACTION)
@@ -102,6 +108,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_ACTION = "com.bos.sphere.extra.ACTION"
+        const val EXTRA_OPEN_FOLDER = "com.bos.sphere.extra.OPEN_FOLDER"
     }
 
     /** The system-launched widget configure screen reports back here (not through Compose). */

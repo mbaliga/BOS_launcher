@@ -97,7 +97,7 @@ fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifi
         val b = bmp
         if (b != null) Image(b, null, contentScale = ContentScale.Fit, modifier = Modifier.size(size))
         else Text(
-            when (def.kind) { ItemKind.Link -> if (def.isFile) "▤" else "↗"; else -> def.label.take(1).uppercase().ifEmpty { "•" } },
+            when (def.kind) { ItemKind.Link -> if (def.isFile) "▤" else "↗"; ItemKind.Group -> "▦"; else -> def.label.take(1).uppercase().ifEmpty { "•" } },
             color = HyleColors.InkBright, fontSize = (size.value * 0.42f).sp,
         )
     }

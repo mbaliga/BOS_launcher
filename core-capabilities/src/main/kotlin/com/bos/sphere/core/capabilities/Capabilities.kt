@@ -56,8 +56,20 @@ object CapabilityEvaluator {
     fun tier(i: CapabilityInputs): Tier {
         val external = i.displays.any { !it.isDefault && it.canHostTasks == true }
         if (i.apiLevel >= 36 && (i.desktopWindowing == true || external)) return Tier.T3
-        if (i.windowWidthDp >= COMPACT_MAX_DP || i.hasKeyboard || i.hasPointer) return Tier.T2
+        if (i.windowWidthDp >= COMPACT_MAX_DP || i.hasKeyboard || i.hasPointer || mirrored(i)) return Tier.T2
         return Tier.T1
+    }
+
+    /**
+     * EXT-11: a second display that shows the phone's own screen. The platform has no public mirroring
+     * signal, so this is the same inference the desktop module uses: not the default display, cannot host
+     * tasks, same pixel size as the default one. While one is connected the phone's surface runs the T2
+     * rules (persistent dock, hover and right-click, shortcut hints) because that is what people see and
+     * point at on the larger screen.
+     */
+    fun mirrored(i: CapabilityInputs): Boolean {
+        val primary = i.displays.firstOrNull { it.isDefault } ?: return false
+        return i.displays.any { d -> !d.isDefault && d.canHostTasks != true && d.widthPx == primary.widthPx && d.heightPx == primary.heightPx }
     }
 
     fun externalDisplays(i: CapabilityInputs): List<DisplayInfo> = i.displays.filter { !it.isDefault }

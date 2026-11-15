@@ -111,12 +111,11 @@ fun DrawerFilterBar(state: DrawerFilterState, modifier: Modifier = Modifier) {
             Row(Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                 if (tabs.size > 1) for (t in tabs) Chip(L10n.tr(t.label), state.tab == t) { state.tab = t }
                 if (state.tab == DrawerTab.Work) {
-                    val work = catalog.profiles().firstOrNull { it.second.kind == ProfileKind.Work }
-                    if (work != null) {
-                        var paused by remember { mutableStateOf(work.second.quiet) }
-                        Chip(L10n.tr(if (paused) "Resume work apps" else "Pause work apps"), false) {
-                            if (catalog.setPaused(work.first, !paused)) paused = !paused
-                        }
+                    // HOM-06: the state is shared with the home chip and read off the main thread.
+                    val paused by com.bos.sphere.core.catalog.WorkProfileState.workPaused.collectAsState()
+                    val p = paused
+                    if (p != null) Chip(L10n.tr(com.bos.sphere.core.catalog.WorkProfileState.chipLabel(p).orEmpty()), false) {
+                        com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, !p)
                     }
                 }
                 for (tg in allTags) Chip("#$tg", state.tag == tg) { state.tag = if (state.tag == tg) null else tg }

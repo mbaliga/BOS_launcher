@@ -76,6 +76,8 @@ fun HomeItemsSheet(
     onIconPack: () -> Unit,
     onHiddenApps: () -> Unit,
     onDismiss: () -> Unit,
+    /** HOM-15, HOM-17, HOM-18: put a panel on home as a tile. */
+    onPanel: ((com.bos.sphere.core.catalog.PanelTab) -> Unit)? = null,
 ) {
     Panel(onDismiss) {
         Text(L10n.tr("Home items"), color = HyleColors.InkBright, fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
@@ -84,6 +86,9 @@ fun HomeItemsSheet(
         Row1(L10n.tr("App shortcut"), hint = L10n.tr("A shortcut an app offers")) { onShortcut() }
         Row1(L10n.tr("Web link")) { onLink() }
         Row1(L10n.tr("File"), hint = L10n.tr("Opens with the app you choose")) { onFile() }
+        if (onPanel != null) com.bos.sphere.core.catalog.PanelTab.entries.forEach { t ->
+            Row1(L10n.tr("%s panel", L10n.tr(t.title)), hint = L10n.tr("A tile that opens it")) { onPanel(t) }
+        }
         Row1(L10n.tr("Icon pack and themed icons")) { onIconPack() }
         Row1(L10n.tr("Hidden apps")) { onHiddenApps() }
     }

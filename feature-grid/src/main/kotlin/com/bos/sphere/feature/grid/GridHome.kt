@@ -219,9 +219,13 @@ fun GridHome(
     health: com.bos.sphere.core.data.HealthToday? = null,
     /** HOM-01 / HOM-02 / HOM-08: folders, shortcuts, links and widget tiles that share the pages with apps. */
     extras: HomeExtras? = null,
+    /** HOM-12: edit mode. Items are grabbed at once (no long press), and apps and shortcuts carry a remove handle. */
+    editMode: Boolean = false,
+    onRemoveItem: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val ex by rememberUpdatedState(extras)
+    val editNow by rememberUpdatedState(editMode)
     val paging = prefs.pagingFor(isLandscape)
     val pagerState = state.pager
     // The whole surface is laid out in physical (LTR) coordinates — geometry, hit-testing and
@@ -401,7 +405,10 @@ fun GridHome(
                         val hit = if (settled) hitTest(startPage, down.position) else Hit.Empty
                         var swipeDelta = Offset.Zero
 
-                        val early: Early? = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        // HOM-12: in edit mode a press on an app or shortcut grabs it at once (the drag loop below).
+                        val grabNow = editNow && settled && !down.isConsumed &&
+                            (hit is Hit.App || (hit is Hit.Tile && ex?.owns(hit.key) == true && ex?.isWidget(hit.key) == false))
+                        val early: Early? = if (grabNow) null else withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                             while (true) {
                                 val ev = awaitPointerEvent()
                                 if (ev.changes.count { it.pressed } >= 2) return@withTimeoutOrNull Early.Pinch
@@ -634,6 +641,8 @@ fun GridHome(
                     onLongPress = onAppLongPress,
                     onItemFocused = { if (pagerState.currentPage != index) scope.launch { pagerState.animateScrollToPage(index) } },
                     extras = extras,
+                    editing = editMode,
+                    onRemove = onRemoveItem,
                 )
             }
             GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.animateScrollToPage(it) } })
@@ -745,6 +754,8 @@ private fun PageView(
     /** Keyboard focus reached an item: bring its page into view. */
     onItemFocused: () -> Unit = {},
     extras: HomeExtras? = null,
+    editing: Boolean = false,
+    onRemove: (String) -> Unit = {},
 ) {
     val density = LocalDensity.current
     val packed = spanPacked(page, geometry, extras)
@@ -816,14 +827,16 @@ private fun PageView(
                         },
                 ) {
                     if (app != null) {
-                        BadgedAppIcon(app, itemDp, Modifier.size(itemDp))
+                        if (editing) EditHandleBox(itemDp, app.label, { onRemove(itemKey) }) { BadgedAppIcon(app, itemDp, Modifier.size(itemDp)) }
+                        else BadgedAppIcon(app, itemDp, Modifier.size(itemDp))
                         // Coverflow names only the focused card; the rest would just pile up their labels.
                         if (showLabels && (!cf || kotlin.math.abs(dCover) < 0.5f)) AppLabel(app.label, itemDp)
                     } else if (itemKey == HomeTiles.SETTINGS) {
                         SettingsTile(itemDp, Modifier.size(itemDp))
                         if (showLabels) AppLabel(L10n.tr("Settings"), itemDp)
                     } else if (extra != null) {
-                        ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp))
+                        if (editing) EditHandleBox(itemDp, extraLabel(itemKey, extra), { onRemove(itemKey) }) { ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp)) }
+                        else ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp))
                         if (showLabels && !cf) AppLabel(extraLabel(itemKey, extra), itemDp)
                     } else {
                         ClockTile(itemDp, Modifier.size(itemDp))

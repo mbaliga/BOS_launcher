@@ -14,6 +14,11 @@ class RecentFilesSource(context: Context) {
     fun grantedTrees(): List<Uri> = resolver.persistedUriPermissions.filter { it.isReadPermission }.map { it.uri }
         .filter { DocumentsContract.isTreeUri(it) }
 
+    /** Gives the grant back to the system: the folder stops being listed and its files leave the panel. */
+    fun release(tree: Uri) {
+        runCatching { resolver.releasePersistableUriPermission(tree, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    }
+
     /** Direct children (files only) of one granted tree, newest first. */
     fun recent(tree: Uri, limit: Int = 20): List<RecentFile> = runCatching {
         val docId = DocumentsContract.getTreeDocumentId(tree)

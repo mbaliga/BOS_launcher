@@ -104,6 +104,9 @@ class HomeItems internal constructor(
     internal var iconFor by mutableStateOf<AppEntry?>(null)
     internal var restoreRev by mutableIntStateOf(0)
 
+    /** HOM-15, HOM-17, HOM-18: a panel tile was tapped (index of its tab), -1 when none is requested. */
+    var panelRequest by mutableIntStateOf(-1)
+
     fun openSheet() { sheetOpen = true }
 
     /** Runs [f] on the shared arrangement (pages from the live list, extras from the store) and writes both back. */
@@ -134,6 +137,13 @@ class HomeItems internal constructor(
     fun addLink(uri: String, label: String, isFile: Boolean) {
         val def = ItemDef(ItemKeys.link(uri), ItemKind.Link, label, uri, isFile)
         edit { HomeEdit.add(it, def, page(), capacityOf) }
+    }
+
+    /** One tile per panel: a second tap on "add" for the same panel does nothing (the key is the target). */
+    fun addPanel(tab: com.bos.sphere.core.catalog.PanelTab) {
+        val uri = com.bos.sphere.core.catalog.HomePanelLinks.uri(tab)
+        if (extrasState.items.containsKey(ItemKeys.link(uri))) return
+        addLink(uri, L10n.tr(tab.title), isFile = false)
     }
 
     fun addShortcut(app: AppEntry, s: PinnableShortcut) {
@@ -176,6 +186,7 @@ class HomeItems internal constructor(
                 }
             }
             ItemKind.Link -> extrasState.items[key]?.let { def ->
+                com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target)?.let { panelRequest = it.ordinal; return }
                 // The content resolver lookup is a provider call: off the main thread.
                 kotlin.concurrent.thread(name = "home-link-open") {
                     runCatching {
@@ -189,6 +200,9 @@ class HomeItems internal constructor(
             else -> Unit
         }
     }
+
+    /** HOM-12: the edit-mode remove handle of a placed item. */
+    fun removeFromHome(key: String) = removeKey(key)
 
     private fun removeKey(key: String) {
         ItemKeys.widgetId(key)?.let { host.deleteWidget(it) }
@@ -355,6 +369,7 @@ class HomeItems internal constructor(
             onIconPack = { sheetOpen = false; packOpen = true },
             onHiddenApps = { sheetOpen = false; hiddenOpen = true },
             onDismiss = { sheetOpen = false },
+            onPanel = { t -> sheetOpen = false; addPanel(t) },
         )
         if (folderOpen) com.bos.sphere.feature.grid.NewFolderDialog(allApps().sortedBy { it.label.lowercase() }, onCreate = { keys, n -> addFolderWith(keys, n) }, onDismiss = { folderOpen = false })
         if (linkOpen) LinkDialog(onAdd = { u -> addLink(u, Uri.parse(u).host ?: u, false) }, onDismiss = { linkOpen = false })

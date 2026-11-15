@@ -39,3 +39,7 @@ include(":core-signals")
 include(":feature-dock")
 include(":feature-desktop")
 include(":feature-launchpad")
+
+// NFR-01 to NFR-05: the macrobenchmark module needs androidx.benchmark from the network, so it is opt-in:
+// ./gradlew -Pliftoff.benchmark=true :benchmark:connectedBenchmarkAndroidTest (see tools/device_nfr.sh, benchmark/README.md).
+if (providers.gradleProperty("liftoff.benchmark").isPresent) include(":benchmark")

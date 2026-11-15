@@ -300,7 +300,7 @@ private fun ContinuousCell(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale: State<Float> = animateFloatAsState(if (pressed && dsi) 0.92f else 1f, spring(dampingRatio = 0.55f, stiffness = 500f), label = "press")
+    val scale: State<Float> = animateFloatAsState(if (pressed && dsi) 0.92f else 1f, if (com.bos.sphere.core.design.rememberMotionPrefs().reduced) tween(0) else spring(dampingRatio = 0.55f, stiffness = 500f), label = "press")
     Column(
         modifier
             .graphicsLayer { scaleX = scale.value; scaleY = scale.value }

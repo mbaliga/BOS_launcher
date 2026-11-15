@@ -1,6 +1,7 @@
 package com.bos.sphere.feature.grid
 
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.gestures.calculateZoom
@@ -237,6 +238,8 @@ private fun StripTileView(tile: Tile, actions: TileActions) {
             .size(StripTile)
             .radarSelectedRing(LocalRadarSelection.current == tile.key, RoundedCornerShape(14.dp))
             .secondaryClick { actions.onSecondary(tile) }
+            // NFR-13: the strip shows the caption of the centred tile only, so every tile carries its own name.
+            .semantics(mergeDescendants = true) { contentDescription = tile.caption() }
             .combinedClickable(onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
     ) { TileFace(tile, StripTile) }
 }
@@ -253,7 +256,7 @@ private fun StripTileView(tile: Tile, actions: TileActions) {
 @Composable
 internal fun Orbit(
     tiles: List<Tile>,
-    motion: Boolean,
+    motionRequested: Boolean,
     footnote: String?,
     actions: TileActions,
     /** Distance from the bottom edge to the common centre of the rings (the middle of the category wheel). */
@@ -262,6 +265,8 @@ internal fun Orbit(
     /** Reports how many of [tiles] have a slot on screen, so the keyboard never selects one that is not drawn. */
     onVisibleCount: (Int) -> Unit = {},
 ) {
+    // NFR-14: with system animations off the rings do not creep by themselves (a drag still turns them).
+    val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
     val z = LocalResultScale.current
     val selectedKey = LocalRadarSelection.current
     // Arc length travelled (px). It creeps along very slowly by itself; a sideways drag turns the
@@ -482,7 +487,7 @@ internal fun FlatResults(
             when (row) {
                 is FRow.Header -> Text(
                     row.title.removeSuffix("​"), color = Color(0x99FFFFFF), fontSize = (15 * z).sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 3.dp),
+                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 3.dp).semantics { heading() },
                 )
                 is FRow.Note -> Text(row.text, color = Color(0x80FFFFFF), fontSize = (15 * z).sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 is FRow.Sugg -> {

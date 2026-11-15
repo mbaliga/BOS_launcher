@@ -1,8 +1,7 @@
-// INACTIVE: not included in settings.gradle.kts. See README.md.
+// Opt-in: included by settings.gradle.kts only with -Pliftoff.benchmark=true (needs network for androidx.benchmark). See README.md.
 plugins {
     id("com.android.test")
     id("org.jetbrains.kotlin.android")
-    id("androidx.baselineprofile")
 }
 
 android {
@@ -23,8 +22,6 @@ android {
         }
     }
 }
-
-baselineProfile { useConnectedDevices = true }
 
 dependencies {
     implementation("androidx.benchmark:benchmark-macro-junit4:1.3.3")

@@ -496,8 +496,10 @@ internal val LocalSettingsBackdrop = androidx.compose.runtime.compositionLocalOf
 /** Slowly drifting translucent ribbons — the "waves" behind a console menu, in Hyle colours. */
 @Composable
 internal fun WaveField(modifier: Modifier) {
-    val t = rememberInfiniteTransition(label = "waves")
-    val phase by t.animateFloat(0f, 1f, infiniteRepeatable(tween(18_000, easing = LinearEasing)), label = "phase")
+    // NFR-14: with system animations off the ribbons hold one frame.
+    val still = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    val phase by if (still) androidx.compose.runtime.rememberUpdatedState(0.25f)
+    else rememberInfiniteTransition(label = "waves").animateFloat(0f, 1f, infiniteRepeatable(tween(18_000, easing = LinearEasing)), label = "phase")
     Canvas(modifier) {
         val ribbons = listOf(
             Triple(HyleColors.Violet, 0.58f, 0.0f),

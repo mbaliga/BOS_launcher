@@ -448,7 +448,7 @@ internal fun SearchScreen(
                     }
                     if (layout == SearchLayout.Orbit) {
                         Orbit(
-                            tiles = data.tiles(selected), motion = prefs.searchMotion, footnote = data.footnote(selected),
+                            tiles = data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
                             actions = tileActions, centreFromBottom = centre, modifier = Modifier.fillMaxSize(),
                             onVisibleCount = { orbitVisible = it },
                         )

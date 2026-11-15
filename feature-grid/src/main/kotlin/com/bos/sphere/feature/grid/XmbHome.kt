@@ -278,16 +278,20 @@ private fun XmbHomeImpl(
 
         WaveField(Modifier.fillMaxSize().alpha(0.55f))
 
+        // NFR-14: with system animations off the bar and list snap to the chosen item instead of springing.
+        val stillXmb = com.bos.sphere.core.design.rememberMotionPrefs().reduced
         fun settleCat(target: Int, velocity: Float = 0f) {
             jobs.cat?.cancel()
             jobs.cat = scope.launch {
-                animate(catPos, target.toFloat(), velocity, spring(0.85f, 320f)) { v, _ -> catPos = v }
+                if (stillXmb) catPos = target.toFloat()
+                else animate(catPos, target.toFloat(), velocity, spring(0.85f, 320f)) { v, _ -> catPos = v }
             }
         }
         fun settleList(target: Int, velocity: Float = 0f) {
             jobs.list?.cancel()
             jobs.list = scope.launch {
-                animate(listPos, target.toFloat(), velocity, spring(0.85f, 380f)) { v, _ -> listPos = v }
+                if (stillXmb) listPos = target.toFloat()
+                else animate(listPos, target.toFloat(), velocity, spring(0.85f, 380f)) { v, _ -> listPos = v }
             }
         }
 

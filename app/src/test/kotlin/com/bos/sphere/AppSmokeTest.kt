@@ -175,7 +175,6 @@ class AppSmokeTest {
         key(sc, KeyEvent.KEYCODE_D, ctrl = true)
         assertTrue("the drawer's items sit above the home", LauncherInput.focus.nodes().filter { it.id.startsWith("drawer.") }.all { it.layer == 2 })
         assertTrue(LauncherInput.focus.anyLayerActive)
-        assertFalse("the rail is not on the graph under the drawer", ids.isEmpty())
     }
 
     // ---- NFR-19

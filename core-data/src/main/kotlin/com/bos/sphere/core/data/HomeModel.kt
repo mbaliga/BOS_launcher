@@ -237,6 +237,16 @@ data class LauncherPrefs(
     val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
 
+    // --- home landing (HOM-22)
+    /** What the home shows: the user's pages, the recent apps, every app, or only the wallpaper and the four hotspots. */
+    val homeLanding: HomeLanding = HomeLanding.Selected,
+    /** How many recent apps the Recent landing keeps, [HomeRecents.MIN_LIMIT]..[HomeRecents.MAX_LIMIT]. */
+    val recentsLimit: Int = HomeRecents.DEFAULT_LIMIT,
+    /** Add apps opened elsewhere (usage access, when granted) to the Recent landing. */
+    val recentsUseUsageAccess: Boolean = true,
+    /** The faint dot that marks each hotspot on the Minimal landing. */
+    val minimalHints: Boolean = true,
+
     val healthSource: HealthSourcePref = HealthSourcePref.Phone,
     /** An always-open keyboard that searches apps as you type — the old-school-phone mode. */
     val alwaysKeyboard: Boolean = false,
@@ -445,6 +455,10 @@ enum class CornerActionId(val label: String, val internal: Boolean = false) {
     RingerSilent("Silent mode"),
     DoNotDisturb("Do not disturb"),
     SystemSettings("Settings"),
+    /** HOM-22: opens Launchpad (the left card); the default top-right hotspot of the Minimal landing. */
+    OpenLaunchpad("Launchpad", internal = true),
+    /** HOM-22: steps the home landing; assignable to a corner or a gesture. */
+    CycleLanding("Cycle home landing", internal = true),
 }
 
 /** One thing a corner (or a palette entry) can do. */

@@ -39,6 +39,27 @@ class UsageRecents(private val context: Context) {
     /** Opens the system usage-access screen (the "enable" row in the dock). */
     fun settingsIntent(): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /**
+     * HOM-22: the foreground sightings of the last [windowMs] as plain data, for the Recent landing. Empty without the grant.
+     * Public UsageStatsManager events only; the platform has no public list of live tasks. Call it off the main thread.
+     */
+    fun sightings(windowMs: Long = 7L * 24 * 60 * 60 * 1000, now: Long = System.currentTimeMillis()): List<com.bos.sphere.core.data.UsageSighting> {
+        if (!hasAccess()) return emptyList()
+        return runCatching {
+            val usm = appContext.getSystemService(UsageStatsManager::class.java)
+            val q = usm.queryEvents(now - windowMs, now)
+            val out = ArrayList<com.bos.sphere.core.data.UsageSighting>()
+            val e = UsageEvents.Event()
+            while (q.hasNextEvent()) {
+                q.getNextEvent(e)
+                @Suppress("DEPRECATION")
+                val fg = e.eventType == UsageEvents.Event.ACTIVITY_RESUMED || e.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
+                if (fg) out += com.bos.sphere.core.data.UsageSighting(e.packageName, e.timeStamp)
+            }
+            out
+        }.getOrDefault(emptyList())
+    }
+
     fun recents(limit: Int = 12, windowMs: Long = 3L * 24 * 60 * 60 * 1000, now: Long = System.currentTimeMillis()): List<String> {
         if (!hasAccess()) return emptyList()
         return runCatching {

@@ -34,6 +34,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -179,15 +181,28 @@ private fun AppCard(app: AppEntry, onAdd: (AppEntry) -> Unit, cardRect: () -> Ed
     }
 }
 
-/** HOM-01: the quiet hint an empty home shows in its middle. Tapping it opens edit mode with the add carousel focused. */
+/**
+ * HOM-01: the quiet hint an empty home shows in its middle. Tapping it opens edit mode with the add carousel focused.
+ * HOM-22: with [onShowRecents] a second line, "Or show recent apps", switches the home landing to Recent apps (one tap away).
+ */
 @Composable
-fun EmptyHomeHint(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun EmptyHomeHint(onOpen: () -> Unit, modifier: Modifier = Modifier, onShowRecents: (() -> Unit)? = null) {
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Text(
-            L10n.tr("Long press to add apps"), color = HyleColors.InkDim, fontSize = 15.sp,
-            modifier = Modifier.background(HyleColors.InkDim.copy(alpha = 0.10f), RoundedCornerShape(50)).clickable(onClickLabel = L10n.tr("Add to home"), onClick = onOpen)
-                .padding(horizontal = 18.dp, vertical = 10.dp)
-                .semantics { role = Role.Button; contentDescription = L10n.tr("Long press to add apps") },
-        )
+        androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            Text(
+                L10n.tr("Long press to add apps"), color = HyleColors.InkDim, fontSize = 15.sp,
+                modifier = Modifier.background(HyleColors.InkDim.copy(alpha = 0.10f), RoundedCornerShape(50)).clickable(onClickLabel = L10n.tr("Add to home"), onClick = onOpen)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                    .semantics { role = Role.Button; contentDescription = L10n.tr("Long press to add apps") },
+            )
+            if (onShowRecents != null) {
+                Text(
+                    L10n.tr("Or show recent apps"), color = HyleColors.InkDim, fontSize = 14.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClickLabel = L10n.tr("Show recent apps"), role = Role.Button, onClick = onShowRecents)
+                        .defaultMinSize(minHeight = 48.dp).padding(horizontal = 18.dp, vertical = 12.dp)
+                        .semantics { role = Role.Button; contentDescription = L10n.tr("Or show recent apps") },
+                )
+            }
+        }
     }
 }

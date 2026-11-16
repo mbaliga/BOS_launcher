@@ -25,6 +25,7 @@ object TouchPaths {
         LauncherCommand.Dock1, LauncherCommand.Dock2, LauncherCommand.Dock3, LauncherCommand.Dock4, LauncherCommand.Dock5,
         LauncherCommand.Dock6, LauncherCommand.Dock7, LauncherCommand.Dock8, LauncherCommand.Dock9 -> "Tap the dock item"
         LauncherCommand.CornerTopLeft, LauncherCommand.CornerTopRight, LauncherCommand.CornerBottomLeft, LauncherCommand.CornerBottomRight -> "Tap the corner"
+        LauncherCommand.CycleLanding -> "Long-press empty home for the quick sheet, or Ground Control, Home, Landing"
         LauncherCommand.Dismiss -> "Tap the close button of Radar, the drawer or Ground Control, or the system Back gesture"
     }
 
@@ -37,6 +38,7 @@ object TouchPaths {
         LauncherCommand.OpenPalette -> CornerActionId.Search
         LauncherCommand.OpenDrawer -> CornerActionId.AllApps
         LauncherCommand.OpenSettings -> CornerActionId.LauncherSettings
+        LauncherCommand.CycleLanding -> CornerActionId.CycleLanding
         else -> null
     }
 
@@ -95,6 +97,6 @@ object TouchPaths {
         CornerActionId.RingerCycle, CornerActionId.RingerNormal, CornerActionId.RingerVibrate, CornerActionId.RingerSilent,
         CornerActionId.DoNotDisturb, CornerActionId.SystemSettings -> "Assign it to a corner or gesture (long-press a corner), then tap it"
         CornerActionId.Search, CornerActionId.AllApps, CornerActionId.Notifications, CornerActionId.LauncherSettings,
-        CornerActionId.GridDenser, CornerActionId.GridSparser -> "Tap the corner it is assigned to, or its bound gesture"
+        CornerActionId.GridDenser, CornerActionId.GridSparser, CornerActionId.OpenLaunchpad, CornerActionId.CycleLanding -> "Tap the corner it is assigned to, or its bound gesture"
     }
 }

@@ -256,6 +256,21 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Home"),
         Glyphs.Apps,
         buildList {
+            // HOM-22: what the home shows. Switching changes nothing that is saved (pages, folders, widgets, hidden apps).
+            add(
+                SettingItem.Choice(
+                    x("Home landing"), Glyphs.Home, com.bos.sphere.core.data.HomeLanding.entries, p.homeLanding, { x(it.label) },
+                    hint = com.bos.sphere.feature.grid.HomeLandingCopy.description(p.homeLanding),
+                    preview = { com.bos.sphere.feature.grid.LandingChoiceList(p.homeLanding, { l -> upd { it.copy(homeLanding = l) } }) },
+                ) { l -> upd { it.copy(homeLanding = l) } },
+            )
+            if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Recents) {
+                add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })
+                add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Uses usage access when it is allowed; otherwise only apps opened from Liftoff are listed")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })
+            }
+            if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Minimal) {
+                add(SettingItem.Toggle(x("Show corner dots"), Glyphs.Dial, p.minimalHints, x("A faint dot marks each of the four hotspots")) { v -> upd { it.copy(minimalHints = v) } })
+            }
             add(
                 SettingItem.Choice(
                     x("Style"), Glyphs.Apps, HomeStyle.entries, p.homeStyle, { x(homeStyleName(it)) },

@@ -144,11 +144,16 @@ fun ContinuousHome(
     topLevel: List<String> = emptyList(),
     /** HOM-16: forward the scroll position to the system wallpaper (home is drawn over it). */
     wallpaperScroll: Boolean = false,
+    /** HOM-22: an index rail (All apps landing) asks the grid to scroll to an item; a new instance is a new request. */
+    jump: ScrollJump? = null,
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds, gestures, extras, extraKeys, topLevel, wallpaperScroll)
+        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds, gestures, extras, extraKeys, topLevel, wallpaperScroll, jump)
     }
 }
+
+/** HOM-22: one request to scroll a scrolling home to [index]; each request is a new instance, so asking twice for the same row scrolls twice. */
+class ScrollJump(val index: Int)
 
 /** True when no visible grid item covers [pos] (positions relative to the grid's own bounds). */
 internal fun LazyGridState.isEmptyAt(pos: Offset): Boolean = layoutInfo.visibleItemsInfo.none { item ->
@@ -176,6 +181,7 @@ private fun ContinuousImpl(
     extraKeys: List<String>,
     topLevel: List<String>,
     wallpaperScroll: Boolean = false,
+    jump: ScrollJump? = null,
 ) {
     val rows = remember(apps, extras, extraKeys, topLevel) { HomeInterleave.merge(apps, { it.key }, if (extras == null) emptyList() else extraKeys, topLevel) }
     val density = LocalDensity.current
@@ -184,6 +190,7 @@ private fun ContinuousImpl(
     val latestLong by rememberUpdatedState(onLongPress)
     val latestSounds by rememberUpdatedState(sounds)
     val gridState = rememberLazyGridState()
+    androidx.compose.runtime.LaunchedEffect(jump) { jump?.let { gridState.requestScrollToItem(it.index.coerceAtLeast(0)) } }
 
     // The grid fills this box, so pointer positions here are grid positions.
     BoxWithConstraints(modifier.fillMaxSize().homeGestures(gestures) { pos -> gridState.isEmptyAt(pos) }) {

@@ -3,6 +3,7 @@ package com.bos.sphere
 import android.content.Intent
 import com.bos.sphere.feature.grid.SettingsPreviewDock
 import com.bos.sphere.feature.grid.captureHome
+import com.bos.sphere.feature.grid.homeGestures
 import com.bos.sphere.ui.launchpadCloseDrag
 import com.bos.sphere.ui.launchpadEdgeDrag
 import com.bos.sphere.ui.launchpadShortcut
@@ -44,6 +45,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.bos.sphere.core.data.AppsOnHome
+import com.bos.sphere.core.data.HomeLanding
+import com.bos.sphere.core.data.HomeLandingRules
+import com.bos.sphere.core.data.MinimalHotspots
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -224,6 +228,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.core.catalog.AdaptivePrefs.effective(storedPrefs, windowCfg.screenWidthDp, windowCfg.screenHeightDp)
     }
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
+    // HOM-22: the live Recent apps (only collected while that landing is on) and whether usage access is granted.
+    val landingRecents by rememberRecentApps(context, stores, apps, hidden, storedPrefs)
+    val usageAccessOn by rememberUsageAccess(context, storedPrefs.homeLanding == HomeLanding.Recents)
+    var menuRecents by remember { mutableStateOf(false) } // the open app menu was opened from the Recent apps landing
     SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }) // HOM-11: one arrangement per window size class
     val homeEdit = rememberHomeEdit(stores.layout, remember(context) { WorkspaceHomeDockPins(com.bos.sphere.feature.dock.WorkspaceRepository.get(context)) }) // HOM-12 (layout and dock pins share one undo)
     var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18
@@ -239,6 +247,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val isPortrait = !isLandscape
     // INP-15: one set of corner assignments, or a separate landscape set; every corner style draws whichever is active.
     val corners = com.bos.sphere.core.data.CornerSets.select(portraitCorners, landscapeCorners, prefs.cornersPerOrientation, isLandscape)
+    // HOM-22: on the Minimal landing the four corners are the hotspots: a corner still on the factory assignment gets the Minimal default, an assigned one keeps its own.
+    val landing = prefs.homeLanding
+    val activeCorners = if (landing == HomeLanding.Minimal) MinimalHotspots.effective(corners) else corners
     val capacityOf: (PageLayout) -> Int = { it.capacity(isLandscape, prefs) }
     // HOM-01 / HOM-02: folders, shortcuts, links and widget tiles share the pages with apps on every home style.
     val extrasStore = remember { com.bos.sphere.core.catalog.HomeExtrasStore.get(context) }
@@ -357,8 +368,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
 
     val rotation = rememberDisplayRotation()
-    val placements = remember(corners, rotation, prefs.cornersFollowDevice) {
-        cornerPlacements(corners, rotation, prefs.cornersFollowDevice)
+    val placements = remember(activeCorners, rotation, prefs.cornersFollowDevice) {
+        cornerPlacements(activeCorners, rotation, prefs.cornersFollowDevice)
     }
 
     fun openAllApps(anchor: Corner?) {
@@ -428,6 +439,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
     }
 
+    // HOM-22: "Cycle home landing" (command, corner or gesture): next landing, said in a toast so a gesture is never silent.
+    fun cycleLanding() {
+        val next = stores.prefs.prefs.value.homeLanding.next()
+        stores.prefs.update { it.copy(homeLanding = next) }
+        android.widget.Toast.makeText(context, L10n.tr("Home landing: %s", L10n.tr(next.label)), android.widget.Toast.LENGTH_SHORT).show()
+    }
+
     fun internal(id: CornerActionId, anchor: Corner?) {
         when (id) {
             CornerActionId.GridDenser -> changeDensity(+1)
@@ -436,6 +454,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             CornerActionId.AllApps -> openAllApps(anchor)
             CornerActionId.Notifications -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true
             CornerActionId.LauncherSettings -> openSettings(CATEGORY_HOME)
+            CornerActionId.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true
+            CornerActionId.CycleLanding -> cycleLanding()
             else -> Unit
         }
     }
@@ -479,11 +499,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val gestureRefHolder = rememberUpdatedState(::onGesture)
     val gestureKeysRef = rememberUpdatedState(gestures.keys)
     val openSettingsRef = rememberUpdatedState<(Int) -> Unit> { c -> openSettings(c) }
+    // HOM-22: outside Selected apps a long press on empty space opens the quick sheet (where the landing is changed), never edit mode.
+    val landingRef = rememberUpdatedState(landing)
     val homeGestureSpec = remember(surface, gestures.keys) {
         HomeGestureSpec(surface, gestures.keys, onGesture = { g -> gestureRefHolder.value(g) }, onEmptyLongPress = {
-            if (HomeGesture.LongPress in gestureKeysRef.value) gestureRefHolder.value(HomeGesture.LongPress) else openSettingsRef.value(CATEGORY_HOME)
+            if (HomeGesture.LongPress in gestureKeysRef.value) gestureRefHolder.value(HomeGesture.LongPress)
+            else if (HomeLandingRules.longPress(landingRef.value) == HomeLandingRules.LongPress.QuickSheet) { quickPage = null; quickOpen = true }
+            else openSettingsRef.value(CATEGORY_HOME)
         })
     }
+    // HOM-22: edit mode is only for Selected apps; leaving that landing ends it.
+    LaunchedEffect(landing) { if (!HomeLandingRules.allowsEditMode(landing) && homeEdit.active) homeEdit.exit() }
 
     // INP-11: an app dragged out of the drawer with a mouse and dropped on the home is added to the current page.
     // ---- keyboard, pointer and controller (INP-04, INP-05, INP-16, HOM-21): shortcuts go to the same openers the touch paths use
@@ -496,6 +522,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.input.LauncherCommand.OpenPuck -> { drawerOpen = false; wheelAnchor = Corner.BottomLeft; wheelOpen = true; true }
                 com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
+                com.bos.sphere.core.input.LauncherCommand.CycleLanding -> { cycleLanding(); true }
                 // Workspace switching and the dock's focus and number shortcuts belong to the dock controller (DCK-05, WSP-07).
                 // INP-05: Dock 1 to 9 and the workspace step act with Radar, the drawer, Ground Control or the puck open (the controller
                 // falls back to the pin list when no rail is shown); "focus dock" closes whatever hides the rail so the rail can take focus.
@@ -511,9 +538,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         surfaceOpen = searchOpen || drawerOpen,
         raiseKeyboard = prefs.keyboardOnOpen(isLandscape),
         hotCornerDwellMs = if (prefs.hotCornersOn) prefs.hotCornerDwellMs.toLong() else 0L,
-        cornerLabel = { hot -> placements.firstOrNull { it.screen == hot.toCorner() }?.slot?.takeIf { it is CornerSlot.Single }?.let { slotSummary(it, appsByKey) } },
+        cornerLabel = { hot ->
+            val slot = placements.firstOrNull { it.screen == hot.toCorner() }?.slot
+            if (landing == HomeLanding.Minimal) slot?.let(MinimalHotspots::itemOf)?.let { com.bos.sphere.feature.grid.itemLabel(it, appsByKey) }
+            else slot?.takeIf { it is CornerSlot.Single }?.let { slotSummary(it, appsByKey) }
+        },
         onCornerActivate = { hot ->
-            placements.firstOrNull { it.screen == hot.toCorner() }?.let { p -> (p.slot as? CornerSlot.Single)?.let { runItem(it.item, p.screen) } }
+            placements.firstOrNull { it.screen == hot.toCorner() }?.let { p ->
+                if (landing == HomeLanding.Minimal) MinimalHotspots.itemOf(p.slot)?.let { runItem(it, p.screen) }
+                else (p.slot as? CornerSlot.Single)?.let { runItem(it.item, p.screen) }
+            }
         },
     )
 
@@ -925,7 +959,43 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 .then(if (leftActive) Modifier.background(Color.Black) else Modifier)
                 .captureHome(homeCapture),
         ) {
-            when (prefs.homeStyle) {
+            // HOM-22: one landing at a time; switching cross-fades (a short fade with reduced motion).
+            val landingMotion = com.bos.sphere.core.design.rememberMotionPrefs()
+            androidx.compose.animation.Crossfade(landing, Modifier.fillMaxSize(), animationSpec = tween(landingMotion.crossFadeMs(220)), label = "landing") { shown ->
+            if (shown != HomeLanding.Selected) {
+                Background()
+                val look = com.bos.sphere.feature.grid.LandingLook(
+                    style = prefs.homeStyle, columns = prefs.continuousColumns, scrollHorizontal = scrollHorizontal, padding = scrollPadding, iconScale = prefs.iconScale,
+                    spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds, gestures = homeGestureSpec,
+                    categoryOf = { com.bos.sphere.feature.search.AppSearch.categoryNameOf(it.packageName) },
+                    wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System,
+                )
+                when (shown) {
+                    HomeLanding.Recents -> {
+                        com.bos.sphere.feature.grid.RecentsLanding(
+                            recents = landingRecents, look = look, usageAccessOn = usageAccessOn,
+                            onGrantUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
+                            onLaunch = ::launch, onLongPress = { menuRecents = true; menuApp = it },
+                        )
+                        StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                        Corners()
+                    }
+                    HomeLanding.AllApps -> {
+                        com.bos.sphere.feature.grid.AllAppsLanding(apps = apps, look = look, topInset = scrollTop, onLaunch = ::launch, onLongPress = { menuApp = it })
+                        StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
+                        Corners()
+                    }
+                    else -> {
+                        // Minimal: the wallpaper and the four hotspots, nothing else. The gesture layer keeps swipes, pinch, double tap and long press working.
+                        Box(Modifier.fillMaxSize().homeGestures(homeGestureSpec) { true })
+                        com.bos.sphere.feature.grid.MinimalHotspotLayer(
+                            hotspots = placements.mapNotNull { p -> MinimalHotspots.itemOf(p.slot)?.let { com.bos.sphere.feature.grid.Hotspot(p.screen, it) } },
+                            appsByKey = appsByKey, showHints = MinimalHotspots.hintsVisible(shown, prefs.minimalHints),
+                            onRun = { item, screen -> runItem(item, screen) },
+                        )
+                    }
+                }
+            } else when (prefs.homeStyle) {
                 HomeStyle.Grid -> if (prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
                     Background()
                     com.bos.sphere.feature.grid.ContinuousHome(
@@ -1028,14 +1098,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     Corners()
                 }
             }
+            }
             // HOM-01: an empty home says how to fill it; the hint opens edit mode with the add carousel focused.
-            if (prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged && !homeEdit.active && !leftActive &&
+            if (landing == HomeLanding.Selected && prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged && !homeEdit.active && !leftActive &&
                 com.bos.sphere.core.data.FreshHome.isEmpty(pages)
             ) {
-                com.bos.sphere.feature.grid.EmptyHomeHint(onOpen = { editFocusAdd = true; homeEdit.enter() }, modifier = Modifier.align(Alignment.Center))
+                com.bos.sphere.feature.grid.EmptyHomeHint(
+                    onOpen = { editFocusAdd = true; homeEdit.enter() }, modifier = Modifier.align(Alignment.Center),
+                    onShowRecents = { stores.prefs.update { it.copy(homeLanding = HomeLanding.Recents) } }, // HOM-22
+                )
             }
             // HOM-08: widgets and the item strip live in a band on the scrolling homes, never over their tiles.
-            if (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
+            if (landing == HomeLanding.Selected && (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous)) {
                 homeItems.Band(layout.pages, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), prefs.homeStyle)
             }
 
@@ -1048,7 +1122,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // Media controls: a track + prev / play / next strip while something is playing.
         val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(prefs.mediaControls)
         androidx.compose.animation.AnimatedVisibility(
-            visible = mediaInfo != null && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen,
+            visible = mediaInfo != null && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
             exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
@@ -1067,7 +1141,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
-            visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active, // HOM-12: the dock steps aside while the home is a card
+            visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && landing != HomeLanding.Minimal, // HOM-12, HOM-22: no dock on Minimal: the dock steps aside while the home is a card
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,
@@ -1076,7 +1150,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
-            visible = prefs.mediaControls && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen,
+            visible = prefs.mediaControls && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         )
 
@@ -1086,7 +1160,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val leftEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) 1f else -1f, 0f)
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
         // (tap it, or swipe in from the left edge) so it is always discoverable.
-        if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen) {
+        // HOM-22: Minimal draws no rail, handle or waiting dot; the edge swipe still opens Launchpad.
+        if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && HomeLandingRules.showsChrome(landing)) {
             if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && prefs.launchpadRail) {
                 com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge))
             }
@@ -1351,6 +1426,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         )
 
         // ---- dialogs
+        LaunchedEffect(menuApp) { if (menuApp == null) menuRecents = false }
         menuApp?.let { app ->
             AppContextMenu(
                 app = app,
@@ -1362,7 +1438,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onToggleHidden = { hiddenStore.setHidden(app.key, app.key !in hidden); menuApp = null },
                 onIconColor = { colorApp = app; menuApp = null },
                 extraEntries = com.bos.sphere.feature.dock.AppActionList.build(appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect()) { menuApp = null }
-                    .map { it.label to it.run } + homeItems.appMenuEntries(app) { menuApp = null },
+                    .map { it.label to it.run } + homeItems.appMenuEntries(app) { menuApp = null } +
+                    // HOM-22: on the Recent apps landing the app menu also offers to take the app off the list, or to clear the list.
+                    (if (menuRecents) listOf(
+                        L10n.tr("Remove from recents") to { stores.recentsState.remove(app.key); menuApp = null },
+                        L10n.tr("Clear recents") to { stores.recentsState.clear(); menuApp = null },
+                    ) else emptyList()),
                 onHomeSettings = if (!prefs.isPaged) {
                     { menuApp = null; openSettings(CATEGORY_HOME) }
                 } else null,
@@ -1433,11 +1514,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (quickOpen) {
             com.bos.sphere.ui.HomeQuickSheet(
                 prefs = prefs, update = { f -> stores.prefs.update(f) },
-                page = quickPage?.takeIf { prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged },
+                page = quickPage?.takeIf { landing == HomeLanding.Selected && prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged },
+                landing = landing, onLanding = { l -> stores.prefs.update { it.copy(homeLanding = l) } }, // HOM-22
                 pageCount = pages.size,
                 onAddPage = { val i = quickPage ?: 0; savePages(HomeLayoutMath.insertPage(pages, i)); quickOpen = false },
                 onDeletePage = { val i = quickPage ?: 0; com.bos.sphere.core.data.StateService.beforeDestructive(context, "delete page"); savePages(HomeLayoutMath.deletePage(pages, i, capacityOf)); quickOpen = false },
-                onEdit = { quickOpen = false; editFocusAdd = false; homeEdit.enter() },
+                // HOM-22: "Edit home pages" on another landing switches to Selected apps first, then enters edit mode.
+                onEdit = { quickOpen = false; editFocusAdd = false; if (landing != HomeLandingRules.editHomePagesLanding) stores.prefs.update { it.copy(homeLanding = HomeLandingRules.editHomePagesLanding) }; homeEdit.enter() },
                 onPanels = { quickOpen = false; panelsOpen = true },
                 onWallpaper = { quickOpen = false; openSettings(categories.indexOfFirst { it.title == L10n.tr("Look") }.coerceAtLeast(0)) },
                 onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
@@ -1454,7 +1537,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             val reg = com.bos.sphere.core.catalog.WorkProfileState.start(context)
             onDispose { reg.close() }
         }
-        if (workPaused != null && !homeEdit.active) {
+        if (workPaused != null && !homeEdit.active && HomeLandingRules.showsChrome(landing)) {
             Box(Modifier.fillMaxSize().safeDrawingPadding().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
                 com.bos.sphere.feature.grid.WorkPauseChip(workPaused, onToggle = { com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, workPaused != true) })
             }

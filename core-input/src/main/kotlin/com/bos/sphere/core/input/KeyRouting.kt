@@ -87,10 +87,10 @@ object KeyLabels {
         add(keyName(c.keyCode))
     }.joinToString(" + ")
 
-    /** The sentence the shortcut sheet shows about the system's own Meta shortcuts. */
     /** The sentence the shortcut sheet shows about where launcher shortcuts work (section 6 constraint). */
     const val SCOPE_NOTE = "These shortcuts work only while a Liftoff screen has focus. Other apps and the system keep their own."
 
+    /** The sentence the shortcut sheet shows about the system's own Meta shortcuts. */
     const val META_NOTE = "Shortcuts that use the Meta (Windows or Command) key belong to the system. Liftoff never claims them."
 }
 

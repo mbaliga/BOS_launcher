@@ -20,3 +20,9 @@ STR-01 (card layout, both orientations, RTL, reduced motion), STR-02 (where rows
 | STR-01 | Device steps (wave 8 section of `docs/device-checklist-launchpad.md`): 60 fps of the shrink, RTL drag, TalkBack, reduced motion. |
 | STR-09 | Device check of the indicator and handle on the right edge in an RTL language. |
 | HOM-09 | None from this stream. |
+
+## Review notes (adversarial pass)
+
+Verified: the card is wired in `HomeScreen.kt` (one `homeCardLayer` graphicsLayer reading the reveal fraction inside the layer block, so a drag does not recompose the home); touches reach the home through the layer transform; the overlay covers only the visible card slice; edge drag and close drag are mirrored for RTL; spec rows STR-01, 02, 07, 08, 09 updated; strings registered for all eight languages; `./gradlew testDebugUnitTest assembleRelease --offline -q` passes. No code defects found that needed a fix.
+
+Known gaps, honest: (1) STR-09 has no new test for the mirrored edge, only the existing WaitingHeadlineTest. (2) While the card is up, the home beneath is hidden from accessibility services but keyboard Tab could still reach its focusables (not changed; needs a device check). (3) The old "LAUNCHPAD" title text is gone from the header, so there is no heading for TalkBack beyond the section tabs. (4) Frame rate and RTL drag are device-only checks. (5) Parts (2) edit-home carousel and (3) empty default home of the owner brief belong to other streams and are not in this one.

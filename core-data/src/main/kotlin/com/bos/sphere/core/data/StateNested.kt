@@ -26,7 +26,7 @@ object StateNested {
     private val PAGE_KNOWN = setOf("k", "s", "r", "id", "p", "l")
     private val SHORTCUT_KNOWN = setOf("corners", "landscapeCorners", "gestures", "keyboard")
     private val SLOT_KNOWN = setOf("t", "i", "n", "k", "id")
-    private val LAUNCHPAD_KNOWN = setOf("rules", "prefs", "gestures")
+    private val LAUNCHPAD_KNOWN = setOf("rules", "prefs", "gestures", "groups")
     private val SETTINGS_KNOWN = setOf(StateSchema.K_FORMAT, "settingsVersion", "prefs")
 
     /** Which keys of the nested object belong to which top-level section, so an import of one section replaces only its own. */

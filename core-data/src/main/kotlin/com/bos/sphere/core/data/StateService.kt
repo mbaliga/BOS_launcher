@@ -43,6 +43,7 @@ class StateService private constructor(context: Context) {
 
     private val applier by lazy {
         LaunchpadSettings.init(app)
+        GroupsSettings.init(app)
         val s = LauncherStores.get(app)
         StateApplier(s.prefs, s.layout, s.shortcuts, LaunchpadSink.Live, live::read, live::write,
             hiddenApps = object : HiddenSink {

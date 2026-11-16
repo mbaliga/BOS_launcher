@@ -88,6 +88,13 @@ Record with: `adb logcat -b all -d > run.txt` after each section, and look for `
 - [ ] CFG-04: remove a Launchpad rule, then Backup > restore the newest snapshot: the rule is back.
 - [ ] CFG-07: from a clean install, press the microphone button in Radar, open the Launchpad access prompt, the Recents panel's access row and the dock's notification access: each shows the one-screen explanation before the system route.
 - [ ] CFG-01: Ground Control > Home > Keyboard shortcuts: change a shortcut, export the setup, import it on a second install: the same key works there.
+## Edit card and empty home (wave 8 editCard)
+
+- [ ] HOM-12: long press empty home, or quick sheet, Edit. The home shrinks to a rounded card on the left (right in RTL) with the page carousel on the right and the add carousel below; drag, drop onto an app, resize a widget and Undo all work on the card; no dropped frames during the transition.
+- [ ] HOM-12: Delete page shows an Undo notice and one tap restores it; deleting the last page leaves an empty page; Move up, Move down and long-press drag reorder; rotate keeps the arrangement; Esc, Back and Done leave.
+- [ ] HOM-12: animations off: no shrink, the carousel fades in; TalkBack reads Page N of M and the buttons; keyboard arrows and Tab reach the card, the thumbnails, the buttons and the add carousel.
+- [ ] HOM-01: fresh data: one empty page, hint "Long press to add apps", empty dock; adding from the carousel works; updating over an existing install leaves the layout as it was.
+
 ## 13. NFR pass/fail record (one row per requirement)
 Run `tools/device_nfr.sh` on the mid-range reference device for the rows marked script, then write the number in the last column and the date and build. A blank cell means not measured. Nothing in this table has been run.
 

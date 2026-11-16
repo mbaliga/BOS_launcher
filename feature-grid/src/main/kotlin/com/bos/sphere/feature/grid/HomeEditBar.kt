@@ -1,8 +1,6 @@
 package com.bos.sphere.feature.grid
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +32,7 @@ import com.bos.sphere.core.design.L10n
 /**
  * HOM-12: the explicit edit-mode chrome. A banner at the top says what edit mode is for; the bar
  * at the bottom carries Undo, Redo (with the depth of the 20-change history), Add page and Done.
- * An outline around the screen shows that edit mode is on. Nothing here changes the arrangement
+ * The home itself is a card beside the page carousel while this is shown. Nothing here changes the arrangement
  * itself: the drag, remove and page actions of the home already do that and the session records
  * them.
  */
@@ -49,7 +47,8 @@ fun HomeEditBar(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize().border(BorderStroke(2.dp, HyleColors.Violet.copy(alpha = 0.7f)))) {
+    // The card itself shows that edit mode is on (the home shrinks, see EditCardGeometry); no outline around the whole screen any more.
+    Box(modifier.fillMaxSize()) {
         Text(
             L10n.tr("Editing home: drag items to rearrange, long-press for more"),
             color = HyleColors.InkBright, fontSize = 12.sp,

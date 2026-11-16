@@ -44,6 +44,13 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.bos.sphere.core.data.AppsOnHome
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import com.bos.sphere.feature.grid.editCardLayer
+import kotlinx.coroutines.withContext
 import com.bos.sphere.core.data.GridSpec
 import com.bos.sphere.core.data.PageShape
 import com.bos.sphere.core.data.StripItem
@@ -246,8 +253,23 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             extrasState::spanOf,
         ) { l -> l.gridFor(isLandscape, prefs).let { it.columns to it.rows } }
     }
+    // HOM-01: a fresh install starts with ONE EMPTY page and no apps placed (they live behind the add carousel, the drawer, Radar and
+    // search). The decision is the absence of a saved arrangement; an existing user's layout is never touched. The old three-app seed
+    // below is then marked done so it cannot fill the page.
+    var freshDecided by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val misc = context.getSharedPreferences("liftoff_misc", android.content.Context.MODE_PRIVATE)
+        val legacy = withContext(kotlinx.coroutines.Dispatchers.IO) { misc.getBoolean("defaultHomeSeeded", false) }
+        if (com.bos.sphere.core.data.FreshHome.isFresh(stores.layout.layout.value, stores.prefs.prefs.value.onboardingDone, legacy)) {
+            stores.layout.replace(com.bos.sphere.core.data.FreshHome.emptyLayout())
+            stores.prefs.update { com.bos.sphere.core.data.FreshHome.prefs(it) }
+            misc.edit().putBoolean("defaultHomeSeeded", true).apply()
+        }
+        freshDecided = true
+    }
     // A fresh "only the ones I add" home isn't blank: Settings, Phone and Messages are put there once.
-    LaunchedEffect(prefs.appsOnHome, apps.isNotEmpty()) {
+    LaunchedEffect(prefs.appsOnHome, apps.isNotEmpty(), freshDecided) {
+        if (!freshDecided) return@LaunchedEffect
         val misc = context.getSharedPreferences("liftoff_misc", android.content.Context.MODE_PRIVATE)
         if (prefs.appsOnHome == AppsOnHome.PinnedOnly && apps.isNotEmpty() && !misc.getBoolean("defaultHomeSeeded", false) &&
             layout.pages.all { it.keys.isEmpty() }
@@ -300,6 +322,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var expandedWidget by remember { mutableStateOf<Corner?>(null) }
 
     val gridState = rememberGridHomeState()
+    // HOM-12: while editing, the home is a card pushed to the start side; the page carousel and the add carousel fill the background.
+    val editCard = rememberEditCardState(homeEdit.active)
+    var editFocusAdd by remember { mutableStateOf(false) }
+    LaunchedEffect(homeEdit.active) { if (!homeEdit.active) editFocusAdd = false }
     val sounds = remember { UiSounds() }
     DisposableEffect(Unit) { onDispose { sounds.release(); VoiceInputManager.release() } }
     sounds.enabled = prefs.uiSounds
@@ -853,7 +879,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     CompositionLocalProvider(LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail) {
     Box(
-        modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
+        modifier = Modifier.fillMaxSize().onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { homeEdit.exit(); true } else false }.observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
             .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off, revealSlideDp, mirrored = launchpadRtl).leftSwipe(
             enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && !launchpadRtl &&
@@ -863,6 +889,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             edgeDp = 28f,
         ),
     ) {
+        EditCardOverlay(
+            card = editCard, homeEdit = homeEdit, stores = stores, homeItems = homeItems, pages = pages, layout = layout, preserve = preserve,
+            capacityOf = capacityOf, gridState = gridState, appsByKey = appsByKey, apps = apps,
+            folderKeys = remember(extrasState) { extrasState.folders.values.flatMapTo(HashSet()) { it.keys } },
+            prefs = prefs, isLandscape = isLandscape, focusAdd = editFocusAdd, savePages = { savePages(it) },
+        )
         // The left page lies UNDER the home: the home slides right, casting a shadow onto it.
         val leftProgress = reveal.progress
         val leftActive = leftOpen || leftProgress > 0.001f
@@ -885,7 +917,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         val slideDp = revealSlideDp
         Box(
-            Modifier.fillMaxSize().homeCardLayer(launchpadGeometry) { reveal.progress }
+            Modifier.fillMaxSize().editCardLayer { editCard.frame() }.homeCardLayer(launchpadGeometry) { reveal.progress }
                 // Behind the card the home is inert for accessibility services; the card overlay below is the one control.
                 .then(if (leftOpen) Modifier.clearAndSetSemantics { } else Modifier)
                 .then(if (leftActive) Modifier.background(Color.Black) else Modifier)
@@ -927,7 +959,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onLaunch = ::launch,
                             onAppLongPress = { menuApp = it },
                             onPagesChange = { savePages(it) },
-                            onEmptyLongPress = { page -> if (HomeGesture.LongPress in gestures) onGesture(HomeGesture.LongPress) else { quickPage = page; quickOpen = true } },
+                            onEmptyLongPress = { page -> if (!homeEdit.active && com.bos.sphere.core.data.FreshHome.isEmpty(pages)) { editFocusAdd = true; homeEdit.enter() } else if (HomeGesture.LongPress in gestures) onGesture(HomeGesture.LongPress) else { quickPage = page; quickOpen = true } },
                             onGesture = ::onGesture,
                             onClockTap = { runner.run(CornerActionId.Clock) },
                             onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },
@@ -994,6 +1026,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     Corners()
                 }
             }
+            // HOM-01: an empty home says how to fill it; the hint opens edit mode with the add carousel focused.
+            if (prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged && !homeEdit.active && !leftActive &&
+                com.bos.sphere.core.data.FreshHome.isEmpty(pages)
+            ) {
+                com.bos.sphere.feature.grid.EmptyHomeHint(onOpen = { editFocusAdd = true; homeEdit.enter() }, modifier = Modifier.align(Alignment.Center))
+            }
             // HOM-08: widgets and the item strip live in a band on the scrolling homes, never over their tiles.
             if (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous) {
                 homeItems.Band(layout.pages, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), prefs.homeStyle)
@@ -1027,7 +1065,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
-            visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen,
+            visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active, // HOM-12: the dock steps aside while the home is a card
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,
@@ -1397,7 +1435,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 pageCount = pages.size,
                 onAddPage = { val i = quickPage ?: 0; savePages(HomeLayoutMath.insertPage(pages, i)); quickOpen = false },
                 onDeletePage = { val i = quickPage ?: 0; com.bos.sphere.core.data.StateService.beforeDestructive(context, "delete page"); savePages(HomeLayoutMath.deletePage(pages, i, capacityOf)); quickOpen = false },
-                onEdit = { quickOpen = false; homeEdit.enter() },
+                onEdit = { quickOpen = false; editFocusAdd = false; homeEdit.enter() },
                 onPanels = { quickOpen = false; panelsOpen = true },
                 onWallpaper = { quickOpen = false; openSettings(categories.indexOfFirst { it.title == L10n.tr("Look") }.coerceAtLeast(0)) },
                 onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
@@ -1424,7 +1462,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             com.bos.sphere.feature.grid.HomeEditBar(
                 undoDepth = homeEdit.undoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
                 onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
-                onAddPage = { savePages(HomeLayoutMath.insertPage(pages, gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))) },
+                onAddPage = { val r = com.bos.sphere.core.data.HomePageOps.add(pages, gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))); savePages(r.pages); scope.launch { gridState.goToPage(r.focus) } },
                 onDone = { homeEdit.exit() },
             )
         }

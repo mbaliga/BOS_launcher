@@ -2,6 +2,7 @@ package com.bos.sphere.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,6 +52,9 @@ abstract class LaunchpadScreenshotCases(private val orientation: String) : Launc
 
     @Test fun STR_10_systemRowShowsStateWithoutClaimingToToggle() {
         render("system", true) { Body(grouped) }
-        shown("82%"); shown("Wi-Fi"); shown("Vibrate")
+        // Wave 9: icon-only tiles; the state lives in the content descriptions.
+        for (d in listOf("Battery: 82%, charging", "Connectivity: Wi-Fi", "Sound: Vibrate", "Time: 12:00 PM"))
+            rule.onNodeWithContentDescription(d).assertIsDisplayed()
+        assertTrue(rule.onAllNodesWithText("82%").fetchSemanticsNodes().isEmpty())
     }
 }

@@ -85,7 +85,7 @@ import com.bos.sphere.core.design.L10n
 import java.time.ZoneId
 import kotlin.math.roundToInt
 
-private val FocusRing = Color(0xFF7CC8FF)
+internal val FocusRing = Color(0xFF7CC8FF)
 
 /** Everything a row does, as callbacks, so the same handler serves swipe, buttons, menu, keys and tests. */
 internal class RowHandlers(

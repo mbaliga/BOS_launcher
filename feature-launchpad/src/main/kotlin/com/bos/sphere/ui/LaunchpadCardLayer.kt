@@ -10,6 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -24,8 +26,9 @@ import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.design.L10n
 
 /**
- * STR-01: puts the live home composition into its card pose with ONE graphicsLayer (scale, translate, rounded clip, soft shadow).
- * [fraction] is read inside the layer block, so a drag never recomposes the home and the home keeps its state (NFR-05).
+ * STR-01: puts the live home composition into its card pose with ONE graphicsLayer (scale, translate, rounded clip, soft shadow),
+ * then dims it with a black scrim and draws a hairline lighter edge on its leading side (the side facing the panel), both inside the
+ * clip. [fraction] is read inside the layer and draw blocks, so a drag never recomposes the home and the home keeps its state (NFR-05).
  */
 fun Modifier.homeCardLayer(geometry: LaunchpadCardGeometry, fraction: () -> Float): Modifier = this.graphicsLayer {
     val f = fraction()
@@ -39,24 +42,28 @@ fun Modifier.homeCardLayer(geometry: LaunchpadCardGeometry, fraction: () -> Floa
         ambientShadowColor = Color.Black.copy(alpha = 0.5f)
         spotShadowColor = Color.Black.copy(alpha = 0.5f)
     }
+}.drawWithContent {
+    drawContent()
+    val f = fraction()
+    if (f <= 0.001f) return@drawWithContent
+    val p = geometry.pose(f)
+    if (p.scrimAlpha > 0f) drawRect(Color.Black.copy(alpha = p.scrimAlpha))
+    // Hairline on the leading side only: a rounded outline that fades out away from that side.
+    val r = p.layerCornerDp * density
+    val leftLeading = geometry.edge == CardEdge.Right
+    val stroke = (1.5f * density / p.scale).coerceAtLeast(1f)
+    val fadeTo = (r * 2f).coerceAtMost(size.width)
+    val brush = if (leftLeading) Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.40f), Color.Transparent), 0f, fadeTo)
+    else Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.40f), Color.Transparent), size.width, size.width - fadeTo)
+    drawRoundRect(
+        brush = brush, topLeft = Offset(stroke / 2f, stroke / 2f), size = Size(size.width - stroke, size.height - stroke),
+        cornerRadius = CornerRadius(r, r), style = Stroke(stroke),
+    )
 }
 
-/**
- * The background the home card floats in front of: a quiet vertical gradient, and the neighbouring page peeking in under the card
- * (the second card of the mock-up) as a soft tinted gradient with no hard border.
- */
-fun Modifier.launchpadNeighbourCard(rtl: Boolean, reduced: Boolean, bg: Color, surface: Color, fraction: () -> Float): Modifier = this.drawBehind {
+/** The panel's own backdrop: a quiet vertical gradient, static (the panel does not move). */
+fun Modifier.launchpadBackdrop(bg: Color, surface: Color): Modifier = this.drawBehind {
     drawRect(Brush.verticalGradient(listOf(bg, androidx.compose.ui.graphics.lerp(bg, surface, 0.55f))))
-    val f = fraction()
-    if (f <= 0.001f) return@drawBehind
-    val g = LaunchpadCardGeometry(size.width, size.height, CardEdge.forLaunchpad(rtl), density, reduced)
-    val r = g.neighbourBounds(f)
-    val radius = g.pose(f).visibleCornerDp * density
-    val tint = BlueLight
-    drawRoundRect(
-        brush = Brush.verticalGradient(listOf(tint.copy(alpha = 0.55f), tint.copy(alpha = 0.18f)), startY = r.top, endY = r.top + r.height * 0.4f),
-        topLeft = Offset(r.left, r.top), size = Size(r.width, r.height), cornerRadius = CornerRadius(radius, radius),
-    )
 }
 
 /**
@@ -72,7 +79,8 @@ fun BoxScope.LaunchpadCardOverlay(
     modifier: Modifier = Modifier,
 ) {
     val rtl = geometry.edge == CardEdge.Left
-    val widthDp = (geometry.cardCoverFraction * geometry.widthPx) / geometry.density
+    // The visible sliver, widened to a 48 dp touch target when it is thinner than that.
+    val widthDp = geometry.returnZonePx / geometry.density
     Box(
         // Absolute sides: the card is on the physical right (left in right-to-left), whatever the layout direction does to Start and End.
         modifier.align(androidx.compose.ui.BiasAbsoluteAlignment(if (rtl) -1f else 1f, 0f)).fillMaxHeight().width(widthDp.dp)

@@ -1,8 +1,6 @@
 package com.bos.sphere.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
@@ -97,7 +95,8 @@ class LaunchpadRevealState internal constructor(private val scope: CoroutineScop
 
     internal suspend fun animateTo(open: Boolean) {
         if (reducedMotion) { anim.animateTo(if (open) 1f else 0f, androidx.compose.animation.core.tween(90)); return }
-        anim.animateTo(if (open) 1f else 0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+        // Wave 9: a 0.45 s ease-out (decelerate) settle, no bounce, like the video reference; was a low-bounce spring.
+        anim.animateTo(if (open) 1f else 0f, androidx.compose.animation.core.tween(LaunchpadCardGeometry.SETTLE_MS, easing = androidx.compose.animation.core.CubicBezierEasing(0.15f, 0.85f, 0.25f, 1f)))
     }
 }
 

@@ -12,15 +12,16 @@ and layout only. The items below need real fingers, a real window and real notif
 | # | Step | Expected |
 | --- | --- | --- |
 | 1 | Landscape. Put a finger on the very left edge of home and drag right slowly across about a fifth of the width, then let go | The home shrinks with the finger into a rounded card on the right, then springs back. Launchpad is not left open |
-| 2 | Same, but drag across more than a third of the width and let go | The home stays shrunk to a card (about two thirds size, 28 dp corners) pushed to the right, its right side off screen. The notifications show on the left, a neighbouring card peeks in below |
+| 2 | Same, but drag across more than a third of the width and let go | The home leaves as a card (about 0.93 scale, 28 dp corners, dimmed to about half) and only a thin sliver of its inner edge, about 7 percent of the width, stays at the right edge. The notifications fill the rest of the screen and do not move; their content fades in near the end. No second card is visible. Wave 9: judge the motion against the owner's screen recording (0.45 s ease-out, dimming while it recedes, no bounce) |
 | 3 | Same, with a quick short flick right from the edge | Opens, whatever the distance |
-| 4 | With Launchpad open, drag the card to the left | The card grows back to full size following the finger, and closes |
+| 4 | With Launchpad open, drag the sliver to the left | The card grows back to full size following the finger 1:1 (its edge under the finger), and closes |
 | 5 | With Launchpad open, drag the card a short way and let go | Stays open (it needs to be pulled back past about two thirds to close) |
 | 6 | Tap the visible handle on the left edge | Opens |
 | 7 | Tap the left-edge waiting indicator (turn off the unread strip first) | Opens |
 | 8 | Press Ctrl+N with a keyboard attached and a home element focused | Opens. Rebind it in the shortcut settings, the new chord opens it and the old one does not |
 | 9 | Portrait. Repeat 1 to 7 | The same card layout (wave 8: Launchpad no longer takes the whole screen). Back, the Home button, tapping the card, Esc and a drag back all return |
 | 10 | Start a drag in the middle of the screen on page 2 of the grid | Launchpad does not open and the pager still scrolls |
+| 12 | With Launchpad open, tap the sliver; then reopen and tap the clock, battery, connectivity and sound icons; TalkBack on | The sliver returns home (its touch zone is at least 48 dp wide). Each icon opens its system panel, is read as for example "Battery: 82%, charging", and shows a focus ring when reached with Tab or arrows. Icons are the only content of that row, no text. Right-to-left: the sliver is at the left edge and the card moves left |
 | 11 | Rotate while Launchpad is open | The card re-poses for the new orientation without losing the selected section or scroll position |
 
 ## Row gestures and their equivalents (STR-03)

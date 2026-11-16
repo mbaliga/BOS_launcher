@@ -48,8 +48,10 @@ class RevealMathTest {
         for ((w, h) in listOf(900f to 400f, 400f to 900f)) {
             val l = RevealLayout.forWindow(w, h)
             assertEquals(w > h, l.landscape)
-            assertTrue("card still covers part of the window", l.homeStripFraction > 0.3f && l.homeStripFraction < 0.7f)
-            assertTrue("a drag never has to cross the whole window", l.slideFraction in 0.3f..0.7f)
+            // Wave 9 (docs/decisions/cardTune.md): was a card covering 30 to 70 percent with a drag of 30 to 70 percent of the width;
+            // now a thin sliver stays and the drag is the card's edge travel, about 0.94 of the width.
+            assertTrue("only a thin sliver stays", l.homeStripFraction in 0.06f..0.08f)
+            assertTrue("a drag crosses nearly the whole window", l.slideFraction in 0.9f..0.96f)
         }
     }
 

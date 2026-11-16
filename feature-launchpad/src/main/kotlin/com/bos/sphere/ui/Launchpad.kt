@@ -254,7 +254,7 @@ fun LaunchpadPanel(
     underlay: Boolean = false,
     /**
      * STR-01: the live reveal fraction (0..1) of the home card that sits in front of this panel. Read only while drawing, so a drag
-     * never recomposes the panel. Used with [underlay] to place the peeking neighbour card and the reduced-motion cross-fade.
+     * never recomposes the panel. Used with [underlay] for the content fade-in and the reduced-motion cross-fade.
      */
     cardFraction: () -> Float = { 1f },
 ) {
@@ -272,14 +272,17 @@ fun LaunchpadPanel(
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     androidx.compose.runtime.CompositionLocalProvider(LocalLp provides if (dark) LpDark else LpLight) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.predictiveBackLayer(backProgress)) {
-    // The home card covers the far part of the window (STR-01); the notifications live in the background column beside it.
+    // The home card leaves only a thin sliver at the far edge (STR-01); the panel is full width and its content is inset from the sliver.
     val geo = LaunchpadCardGeometry(maxWidth.value, maxHeight.value, CardEdge.forLaunchpad(rtl), 1f, motion.reduced)
-    val cardInset = if (underlay) (geo.cardCoverFraction * maxWidth.value).dp else 0.dp
+    // The panel is full width and static; only its content is inset from the sliver side (at least a 48 dp return zone).
+    val cardInset = if (underlay) geo.returnZonePx.dp else 0.dp
     AnimatedVisibility(
         visible = visible,
         modifier = Modifier.fillMaxSize()
             .then(if (underlay) Modifier.graphicsLayer { alpha = geo.pose(cardFraction()).backdropAlpha } else Modifier)
-            .then(if (underlay) Modifier.launchpadNeighbourCard(rtl, motion.reduced, LocalLp.current.bg, LocalLp.current.surface, cardFraction) else Modifier),
+            .then(if (underlay) Modifier.launchpadBackdrop(LocalLp.current.bg, LocalLp.current.surface) else Modifier)
+            // The content fades in over the last part of the card's motion; the backdrop is already there.
+            .then(if (underlay) Modifier.graphicsLayer { alpha = geo.pose(cardFraction()).contentAlpha } else Modifier),
         enter = if (underlay) androidx.compose.animation.EnterTransition.None
         else if (motion.reduced) fadeIn(androidx.compose.animation.core.tween(motion.crossFadeMs()))
         else slideInHorizontally { -it } + fadeIn(),
@@ -518,7 +521,7 @@ fun LaunchpadContent(
     Column(
         modifier
             .fillMaxSize()
-            // Beside the home card the host draws the backdrop (it needs it behind the peeking neighbour); alone, the content draws its own.
+            // Beside the home card the host draws the backdrop (it must not fade with the content); alone, the content draws its own.
             .then(if (endInset > 0.dp) Modifier else Modifier.background(Brush.verticalGradient(listOf(LocalLp.current.bg, androidx.compose.ui.graphics.lerp(LocalLp.current.bg, LocalLp.current.surface, 0.55f)))))
             .testTag("lp.root")
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }

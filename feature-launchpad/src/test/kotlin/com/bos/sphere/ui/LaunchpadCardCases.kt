@@ -14,11 +14,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.LayoutDirection
@@ -35,12 +37,13 @@ import org.junit.Test
 
 /**
  * STR-01, STR-07, STR-08 for the card layout: Launchpad as the background of the shrunken home card.
- * The stage is the same composition the app builds (neighbour card, notifications column, card layer, card overlay) with a
+ * The stage is the same composition the app builds (backdrop, notifications column, card layer, card overlay) with a
  * stand-in home; screenshots go to build/screenshots/launchpad-card-*.png. Subclasses fix the orientation.
  */
 @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadShots() {
     protected var returned = 0
+    protected val opened = mutableListOf<com.bos.sphere.core.data.SystemTileKind>()
 
     @Composable
     private fun Stage(
@@ -55,12 +58,12 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
                 val density = androidx.compose.ui.platform.LocalDensity.current.density
                 val maxW = maxWidth
                 val geo = LaunchpadCardGeometry(maxWidth.value * density, maxHeight.value * density, CardEdge.forLaunchpad(rtl), density)
-                Box(Modifier.fillMaxSize().launchpadNeighbourCard(rtl, false, LocalLp.current.bg, LocalLp.current.surface) { fraction }) {
+                Box(Modifier.fillMaxSize().launchpadBackdrop(LocalLp.current.bg, LocalLp.current.surface)) {
                     LaunchpadContent(
                         items = items, rules = emptyList(), prefs = LaunchpadPrefs(mode), readKeys = setOf("c1"), hasAccess = hasAccess, now = now,
                         onClose = { returned++ }, onOpenItem = {}, onOpenApp = {}, onDismissItem = {}, onClearAll = {}, onAddRule = {},
-                        onSetDefaultMode = {}, onRequestAccess = {}, policies = policies, systemState = system, zone = zone,
-                        endInset = (geo.cardCoverFraction * maxW.value).dp,
+                        onSetDefaultMode = {}, onRequestAccess = {}, policies = policies, systemState = system, zone = zone, onOpenSystemPanel = { opened += it },
+                        endInset = (geo.returnZonePx / density).dp,
                     )
                 }
                 // A stand-in for the live home: it is composed at full size and only the layer shrinks it.
@@ -107,7 +110,7 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
         render("overlay", dark = false)
         val b = rule.onNodeWithTag("lp.card").getUnclippedBoundsInRoot()
         val root = rule.onNodeWithTag("lp.root").getUnclippedBoundsInRoot()
-        assertTrue("card overlay sits in the right part of the window", b.left.value > (root.right.value - root.left.value) * 0.4f)
+        assertTrue("card overlay sits at the right edge of the window (left=${b.left.value})", b.left.value > (root.right.value - root.left.value) * 0.8f)
         rule.onNodeWithTag("lp.card").performClick(); rule.waitForIdle()
         assertEquals(1, returned)
     }
@@ -116,7 +119,7 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
         render("overlay-rtl", dark = false, rtl = true)
         val b = rule.onNodeWithTag("lp.card").getUnclippedBoundsInRoot()
         val rootW = rule.onNodeWithTag("lp.root").getUnclippedBoundsInRoot().right.value
-        assertTrue("overlay at the left edge (left=${b.left.value})", b.left.value <= 1f && b.right.value < rootW * 0.7f)
+        assertTrue("overlay at the left edge (left=${b.left.value})", b.left.value <= 1f && b.right.value < rootW * 0.2f)
     }
 
     @Test fun STR_01_card_titleSelectsASectionAndItsRowsSitBeneathIt() {
@@ -144,5 +147,40 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
         val desc = rule.onNodeWithTag("lp.card").fetchSemanticsNode().config
             .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)
         assertEquals(listOf("Home card. Return to home"), desc)
+    }
+
+    // Wave 9: the four system tiles are icon-only buttons in one row (was: text tiles wrapping into rows of two).
+    @Test fun STR_10_card_systemRowIsFourIconButtonsWithoutText() {
+        render("system", dark = false)
+        val tags = listOf("lp.sys.time", "lp.sys.battery", "lp.sys.connectivity", "lp.sys.sound")
+        val tops = tags.map { rule.onNodeWithTag(it).assertIsDisplayed().getUnclippedBoundsInRoot().top.value }
+        assertTrue("one row: $tops", tops.distinct().size == 1)
+        for (text in listOf("82%", "Wi-Fi", "Vibrate", "12:00 PM", "Charging")) assertTrue("'$text' must not be drawn", rule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty())
+        fun desc(tag: String) = rule.onNodeWithTag(tag).fetchSemanticsNode().config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)
+        assertEquals(listOf("Battery: 82%, charging"), desc("lp.sys.battery"))
+        assertEquals(listOf("Connectivity: Wi-Fi"), desc("lp.sys.connectivity"))
+        assertEquals(listOf("Sound: Vibrate"), desc("lp.sys.sound"))
+        assertEquals(listOf("Time: 12:00 PM"), desc("lp.sys.time"))
+    }
+
+    @Test fun STR_10_card_iconTileOpensItsSystemPanelAndIsFocusable() {
+        rule.setContent { Stage(1f, false, false, grouped) }
+        rule.mainClock.advanceTimeBy(500); rule.waitForIdle()
+        // Buttons take focus in keyboard input mode only: a key press (as a real keyboard user does) switches to it.
+        rule.onNodeWithTag("lp.root").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Tab) }
+        rule.waitForIdle()
+        rule.onNodeWithTag("lp.sys.battery").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        rule.waitForIdle()
+        rule.onNodeWithTag("lp.sys.battery").assertIsFocused()
+        rule.onNodeWithTag("lp.sys.battery").performClick(); rule.waitForIdle()
+        assertEquals(listOf(com.bos.sphere.core.data.SystemTileKind.Battery), opened)
+    }
+
+    @Test fun STR_01_card_noNeighbourCardAndTheSliverIsAllThatStaysOfHome() {
+        render("sliver", dark = false)
+        val b = rule.onNodeWithTag("lp.card").getUnclippedBoundsInRoot()
+        val rootW = rule.onNodeWithTag("lp.root").getUnclippedBoundsInRoot().right.value
+        val w = b.right.value - b.left.value
+        assertTrue("return zone is the sliver widened to at most 48 dp: $w", w <= maxOf(48f, rootW * 0.07f) + 0.5f && b.right.value >= rootW - 0.5f)
     }
 }

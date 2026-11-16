@@ -191,3 +191,91 @@ class HomeEditTest {
         assertEquals(listOf("a", "b", "z"), s2.folders.getValue("f").keys)
     }
 }
+
+class EditGraveyardTest {
+    private val cap: (com.bos.sphere.core.data.PageLayout) -> Int = { 12 }
+    private fun base(): HomeState {
+        var s = HomeState(pages = listOf(HomePage(listOf("a", "b"), id = 1L)))
+        s = HomeEdit.add(s, ItemDef(ItemKeys.link("https://x"), ItemKind.Link, "X", "https://x"), 0, cap)
+        s = HomeEdit.add(s, ItemDef(ItemKeys.widget(3), ItemKind.Widget, "Clock"), 0, cap, WidgetSpan(2, 1))
+        return s
+    }
+
+    @Test
+    fun HOM_12_undoOfARemovedLinkOrWidgetBringsItsDefinitionAndSizeBack() {
+        val before = base()
+        val g = EditGraveyard()
+        var s = before
+        for (k in listOf(ItemKeys.link("https://x"), ItemKeys.widget(3))) { g.stash(s, listOf(k)); s = HomeEdit.remove(s, k, cap) }
+        assertTrue(ItemKeys.widget(3) !in s.items && ItemKeys.widget(3) !in s.widgets)
+        // The undo stack brings the pages back, nothing else.
+        val undone = s.copy(pages = before.pages)
+        val revived = g.revive(undone)
+        assertEquals(before.items, revived.items)
+        assertEquals(before.widgets, revived.widgets)
+    }
+
+    @Test
+    fun HOM_12_whatStaysRemovedIsSettledAtTheEndAndTheWidgetIsDestroyedOnlyThen() {
+        val before = base()
+        val g = EditGraveyard()
+        g.stash(before, listOf(ItemKeys.widget(3)))
+        val removed = HomeEdit.remove(before, ItemKeys.widget(3), cap)
+        val done = g.settle(removed)
+        assertEquals(listOf(ItemKeys.widget(3)), done.widgetKeys)
+        assertTrue(g.isEmpty)
+        // A widget that came back by undo is kept and not destroyed.
+        val g2 = EditGraveyard()
+        g2.stash(before, listOf(ItemKeys.widget(3)))
+        val kept = g2.settle(before)
+        assertTrue(kept.widgetKeys.isEmpty())
+        assertEquals(before.items, kept.state.items)
+    }
+
+    @Test
+    fun HOM_12_redoAfterUndoLeavesNoOrphanDefinitionAfterSettling() {
+        val before = base()
+        val g = EditGraveyard()
+        g.stash(before, listOf(ItemKeys.link("https://x")))
+        val removed = HomeEdit.remove(before, ItemKeys.link("https://x"), cap)
+        val redone = g.revive(removed.copy(pages = removed.pages)) // redo: the key is off the pages, nothing to revive
+        assertTrue(ItemKeys.link("https://x") !in redone.items)
+        assertTrue(g.settle(redone).state.items.keys.none { it == ItemKeys.link("https://x") })
+    }
+
+    @Test
+    fun HOM_12_undoOfFolderCreationAndOfDissolveBringsTheFolderStateBackWithThePages() {
+        val start = HomeState(pages = listOf(HomePage(listOf("a", "b", "c"), id = 1L)))
+        val g = EditGraveyard()
+        g.record(start.pages, start)
+        val made = HomeEdit.createFolder(start, listOf("a", "b"), "f", "F", cap)
+        g.record(made.pages, made)
+        assertTrue("f" in made.folders)
+        // Undo of the creation: the pages come back, the folder must go with them.
+        val undone = g.restore(made.pages, start.pages, made.copy(pages = start.pages))
+        assertTrue(undone.folders.isEmpty())
+        // Redo: the folder returns.
+        val redone = g.restore(start.pages, made.pages, undone.copy(pages = made.pages))
+        assertEquals(made.folders, redone.folders)
+        // Dissolve, then undo it: the folder returns with its members.
+        val dissolved = HomeEdit.dissolve(made, "f")
+        g.record(dissolved.pages, dissolved)
+        assertTrue(dissolved.folders.isEmpty())
+        val back = g.restore(dissolved.pages, made.pages, dissolved.copy(pages = made.pages))
+        assertEquals(made.folders, back.folders)
+    }
+
+    @Test
+    fun HOM_12_undoLeavesAFolderRenameMadeMeanwhileAlone() {
+        val start = HomeState(pages = listOf(HomePage(listOf("a", "b", "c", "d"), id = 1L)))
+        val g = EditGraveyard()
+        val made = HomeEdit.createFolder(start, listOf("a", "b"), "f", "F", cap)
+        g.record(start.pages, start); g.record(made.pages, made)
+        val next = HomeEdit.createFolder(made, listOf("c", "d"), "g", "G", cap)
+        g.record(next.pages, next)
+        val renamed = next.copy(folders = next.folders + ("f" to next.folders.getValue("f").copy(name = "Renamed")))
+        val undone = g.restore(next.pages, made.pages, renamed.copy(pages = made.pages))
+        assertEquals("Renamed", undone.folders.getValue("f").name)
+        assertTrue("g" !in undone.folders)
+    }
+}

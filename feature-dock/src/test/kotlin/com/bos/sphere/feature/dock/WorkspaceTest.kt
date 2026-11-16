@@ -63,6 +63,61 @@ class WorkspaceTest {
         assertEquals("B", m.current.active.name)
     }
 
+    @Test fun WSP_12_aSwitchMadeWhileNoHomeIsComposedKeepsTheLiveHomeForTheWorkspaceThatWasLeft() {
+        var attached = false
+        val h = Hooks(); h.home = "LIVE-A"
+        val hooks = object : WorkspaceHooks {
+            override val ready get() = attached
+            override fun captureHome() = h.captureHome()
+            override fun applyHome(arrangement: String?) = h.applyHome(arrangement)
+        }
+        val store = InMemoryWorkspaceStore()
+        val m = WorkspaceManager(store, { hooks }, newId = { "id${n++}" })
+        val b = m.create("B"); val c = m.create("C")
+        // A broadcast arrives with the launcher screen gone: the state follows at once, nothing is captured or applied yet.
+        assertTrue(m.switchTo(b))
+        assertEquals(b, m.current.activeId)
+        assertEquals(DockWorkspaceState.DEFAULT_ID, m.current.captureDue)
+        assertTrue(h.applied.isEmpty())
+        m.next() // a second hop keeps the first owner of the live home
+        assertEquals(c, m.current.activeId)
+        assertEquals(DockWorkspaceState.DEFAULT_ID, m.current.captureDue)
+        // The process dies and starts again: the debt is in the stored document.
+        val again = WorkspaceManager(store, { hooks }, newId = { "id${n++}" })
+        assertEquals(DockWorkspaceState.DEFAULT_ID, again.current.captureDue)
+        attached = true
+        again.applyActive()
+        assertEquals("LIVE-A", again.current.workspaces.first { it.id == DockWorkspaceState.DEFAULT_ID }.homeArrangement)
+        assertNull(again.current.captureDue)
+        assertEquals(listOf<String?>(null), h.applied) // C had no arrangement of its own yet
+    }
+
+    @Test fun WSP_12_switchingAwayAndBackWhileDetachedKeepsTheLiveHome() {
+        var attached = false
+        val h = Hooks(); h.home = "LIVE-A"
+        val hooks = object : WorkspaceHooks {
+            override val ready get() = attached
+            override fun captureHome() = h.captureHome()
+            override fun applyHome(arrangement: String?) = h.applyHome(arrangement)
+        }
+        val m = WorkspaceManager(InMemoryWorkspaceStore(), { hooks }, newId = { "id${n++}" })
+        val b = m.create("B")
+        m.switchTo(b); m.switchTo(DockWorkspaceState.DEFAULT_ID)
+        attached = true
+        m.applyActive()
+        assertEquals(listOf<String?>("LIVE-A"), h.applied)
+    }
+
+    @Test fun WSP_12_deletingTheWorkspaceThatOwnsTheLiveHomeClearsTheDebt() {
+        val hooks = object : WorkspaceHooks { override val ready get() = false }
+        val m = WorkspaceManager(InMemoryWorkspaceStore(), { hooks }, newId = { "id${n++}" })
+        val b = m.create("B")
+        m.switchTo(b)
+        assertEquals(DockWorkspaceState.DEFAULT_ID, m.current.captureDue)
+        m.delete(DockWorkspaceState.DEFAULT_ID)
+        assertNull(m.current.captureDue)
+    }
+
     @Test fun WSP_07_theLastWorkspaceCannotBeDeleted() {
         val m = manager(); m.delete(DockWorkspaceState.DEFAULT_ID)
         assertEquals(1, m.current.workspaces.size)

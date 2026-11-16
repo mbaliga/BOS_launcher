@@ -134,7 +134,7 @@ fun BoxScope.DockLayer(
         val hooks = AppWorkspaceHooks(stores, com.bos.sphere.core.catalog.HomeExtrasStore.get(context))
         WorkspaceRepository.hooks = hooks
         manager.applyActive()
-        onDispose { if (WorkspaceRepository.hooks === hooks) WorkspaceRepository.hooks = object : WorkspaceHooks {} }
+        onDispose { if (WorkspaceRepository.hooks === hooks) WorkspaceRepository.hooks = WorkspaceRepository.DETACHED }
     }
     DockInputWiring.Install()
     var panelOpen by remember { mutableStateOf(false) }
@@ -243,7 +243,8 @@ fun DockPanelHost(
         onSchedule = { target, label, at ->
             val sl = ScheduledLaunch(manager.idFor("sc"), label, at, target)
             manager.addSchedule(sl); Scheduler.schedule(context, sl)
-            android.widget.Toast.makeText(context, L10n.tr("A notification with an Open action will appear at the chosen time"), android.widget.Toast.LENGTH_SHORT).show()
+            val on = context.getSystemService(android.app.NotificationManager::class.java)?.areNotificationsEnabled() != false
+            android.widget.Toast.makeText(context, L10n.tr(if (on) "A notification with an Open action will appear at the chosen time" else "Notifications are off for Liftoff, so the scheduled launch cannot appear"), android.widget.Toast.LENGTH_SHORT).show()
         },
         onDismiss = onDismiss,
         paletteActionChoices = PinnableActions.choices(),

@@ -28,6 +28,7 @@ object WorkspaceJson {
         put("schemaVersion", SCHEMA_VERSION)
         put("dock", JSONObject().put("enabled", s.dock.enabled ?: JSONObject.NULL).put("mode", s.dock.mode.name).put("edge", s.dock.edge.name).put("groupShelf", s.dock.groupShelf))
         put("activeId", s.activeId)
+        s.captureDue?.let { put("captureDue", it) }
         put("workspaces", JSONArray(s.workspaces.map { w ->
             JSONObject().put("id", w.id).put("name", w.name).put("home", w.homeArrangement ?: JSONObject.NULL)
                 .put("pins", JSONArray(w.dockPins.map { it.encode() }))
@@ -93,7 +94,8 @@ object WorkspaceJson {
                 ScheduledLaunch(c.getString("id"), c.optString("label"), c.getLong("at"), RunTarget(kind, c.getString("target")))
             }
             val active = o.optString("activeId", DockWorkspaceState.DEFAULT_ID).takeIf { id -> workspaces.any { it.id == id } } ?: workspaces.first().id
-            Decoded.Ok(DockWorkspaceState(SCHEMA_VERSION, dock, active, workspaces, groups, sessions, schedules))
+            val due = o.optString("captureDue").takeIf { id -> id.isNotEmpty() && workspaces.any { it.id == id } }
+            Decoded.Ok(DockWorkspaceState(SCHEMA_VERSION, dock, active, workspaces, groups, sessions, schedules, due))
         }.getOrDefault(Decoded.Corrupt)
     }
 

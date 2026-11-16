@@ -69,13 +69,18 @@ object FilesView {
 }
 
 /** One row of the timeline list: the entry and whether it starts a new day group. */
-data class TimelineRow(val entry: TimelineEntry, val day: String, val header: Boolean)
+data class TimelineRow(
+    val entry: TimelineEntry, val day: String, val header: Boolean,
+    /** The heading as a translatable key and the number it formats, so a count of days is translated too. */
+    val dayKey: String = day, val dayArg: Int? = null,
+)
 
 object TimelineView {
-    fun rows(entries: List<TimelineEntry>, startOfTodayMs: Long): List<TimelineRow> =
+    fun rows(entries: List<TimelineEntry>, startOfTodayMs: Long, zone: java.util.TimeZone? = null): List<TimelineRow> =
         entries.mapIndexed { i, e ->
-            val day = Timeline.dayLabel(startOfTodayMs, e.timeMs)
-            TimelineRow(e, day, i == 0 || day != Timeline.dayLabel(startOfTodayMs, entries[i - 1].timeMs))
+            val (key, n) = Timeline.dayParts(startOfTodayMs, e.timeMs, zone)
+            val day = Timeline.dayLabel(startOfTodayMs, e.timeMs, zone)
+            TimelineRow(e, day, i == 0 || day != Timeline.dayLabel(startOfTodayMs, entries[i - 1].timeMs, zone), key, n)
         }
 
     /** The timeline for the settings: [scheduled] only when asked for, opens cut to the chosen depth. */

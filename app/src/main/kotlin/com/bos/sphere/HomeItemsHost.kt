@@ -90,7 +90,7 @@ class HomeItems internal constructor(
     private val allApps: () -> List<AppEntry>,
     private val appsByKey: () -> Map<String, AppEntry>,
     private val launchApp: (AppEntry) -> Unit,
-) {
+) : HomeEditHooks {
     /** The latest extras (set on every composition by [rememberHomeItems]). */
     var extrasState: HomeState = HomeState()
     internal var folderOpen by mutableStateOf(false)
@@ -306,12 +306,44 @@ class HomeItems internal constructor(
     /** HOM-12: the edit-mode remove handle of a placed item. */
     fun removeFromHome(key: String) = removeKey(key)
 
+    /** HOM-12: while edit mode is on, what a removal takes is kept here (and widget ids stay bound) so undo can bring it back whole. */
+    private var graveyard: com.bos.sphere.core.catalog.EditGraveyard? = null
+
+    override fun begin(pages: List<HomePage>) {
+        graveyard = com.bos.sphere.core.catalog.EditGraveyard().also { it.record(pages, store.state.value) }
+    }
+
+    override fun observed(pages: List<HomePage>) { graveyard?.record(pages, store.state.value) }
+
+    override fun revived(before: List<HomePage>, after: List<HomePage>) {
+        val g = graveyard ?: return
+        val cur = store.state.value.copy(pages = after)
+        val next = g.revive(g.restore(before, after, cur))
+        if (next != cur) store.set(next)
+    }
+
+    override fun end(pages: List<HomePage>) {
+        val g = graveyard ?: return
+        graveyard = null
+        val cur = store.state.value.copy(pages = pages)
+        val done = g.settle(cur)
+        if (done.state != cur) store.set(done.state)
+        done.widgetKeys.forEach { k -> ItemKeys.widgetId(k)?.let { host.deleteWidget(it) } }
+    }
+
     private fun removeKey(key: String) {
+        val keep = graveyard
         if (WidgetStacks.isStack(key)) {
             // HOM-14: removing a stack removes every widget in it.
             var members = emptyList<String>()
-            edit { s -> WidgetStacks.removeAll(s, key, capacityOf).let { (n, m) -> members = m; n } }
-            members.forEach { m -> ItemKeys.widgetId(m)?.let { host.deleteWidget(it) } }
+            var before: HomeState? = null
+            edit { s -> before = s; WidgetStacks.removeAll(s, key, capacityOf).let { (n, m) -> members = m; n } }
+            if (keep != null) before?.let { keep.stash(it, listOf(key) + members) }
+            else members.forEach { m -> ItemKeys.widgetId(m)?.let { host.deleteWidget(it) } }
+            return
+        }
+        if (keep != null) {
+            edit { s -> keep.stash(s, listOf(key)); HomeEdit.remove(s, key, capacityOf) }
             return
         }
         ItemKeys.widgetId(key)?.let { host.deleteWidget(it) }

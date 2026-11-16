@@ -192,7 +192,8 @@ fun DockHost(
             usageGranted = granted, mode = state.dock.mode, sessionUsed = sessionUsed, media = media,
         ).let { c -> c.copy(pinned = c.pinned.map { if (it.ref.kind == ItemKind.App && byKey[it.ref.id] == null) it.copy(unavailable = true) else it }) }
     }
-    var expanded by remember { mutableStateOf(false) }
+    // The band's expanded state is recorded on this display's own instance, so two displays never share it (DCK-07).
+    var expanded by remember(instance) { mutableStateOf(instance.expanded) }
 
     fun launchItem(item: DockItem) {
         when (item.ref.kind) {
@@ -217,8 +218,8 @@ fun DockHost(
             onEnableUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(usage.settingsIntent()) } } },
             onOpenPanel = onOpenPanel,
             onSwitchWorkspace = { d -> if (d > 0) manager.next() else manager.previous() },
-            onToggleExpanded = { expanded = !expanded },
-            onLeave = { expanded = false },
+            onToggleExpanded = { expanded = !expanded; instance.expanded = expanded },
+            onLeave = { expanded = false; instance.expanded = false },
             onMediaPrev = MediaSignals::previous, onMediaPlayPause = MediaSignals::playPause, onMediaNext = MediaSignals::next,
             onMediaOpen = { MediaSignals.open(context) },
         )

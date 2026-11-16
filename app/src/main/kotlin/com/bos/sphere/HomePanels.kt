@@ -288,12 +288,12 @@ private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, App
         SettingChips(listOf(true, false), withScheduled, { if (it) L10n.tr("With scheduled launches") else L10n.tr("Opens only") }) { withScheduled = it; prefs.timelineScheduled = it }
     }
     if (entries.isEmpty()) { Column { chips(); Text(L10n.tr("Nothing yet. Opened apps and scheduled launches appear here."), color = HyleColors.Ink, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) }; return }
-    val rows = remember(entries, startOfToday) { TimelineView.rows(entries, startOfToday) }
+    val rows = remember(entries, startOfToday) { TimelineView.rows(entries, startOfToday, java.util.TimeZone.getDefault()) }
     LazyColumn {
         item { chips() }
         items(rows) { r ->
             val e = r.entry
-            if (r.header) Text(L10n.tr(r.day), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
+            if (r.header) Text(if (r.dayArg == null) L10n.tr(r.dayKey) else L10n.tr(r.dayKey, r.dayArg), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
             val app = if (e.key.isNotEmpty()) appsByKey[e.key] else null
             Line((if (e.scheduled) L10n.tr("Scheduled") + ": " else "") + e.label, fmt.format(Date(e.timeMs)), onClick = app?.let { a -> { onLaunch(a) } })
         }

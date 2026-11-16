@@ -519,6 +519,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         host = widgetHost, allApps = allApps, appsByKey = appsByKey, launchApp = ::launch, accentArgb = prefs.accentColor.toInt(),
         gridDims = { pages.getOrNull(gridState.currentPage)?.layout?.gridFor(isLandscape, prefs)?.let { it.columns to it.rows } ?: (prefs.gridFor(isLandscape).let { it.columns to it.rows }) },
     )
+    androidx.compose.runtime.SideEffect { homeEdit.hooks = homeItems }
     com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
         if (appsByKey[key] != null && pages.none { key in it.keys }) stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)
     }, onItems = { defs -> homeItems.addDropped(defs) }, onTouchDrag = { menuApp = null })
@@ -862,7 +863,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onOpenApp = { pkg ->
                     leftOpen = false
                     apps.firstOrNull { it.packageName == pkg }?.let(::launch)
-                        ?: context.packageManager.getLaunchIntentForPackage(pkg)?.let { runCatching { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+                        ?: appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg)))
                 },
                 modifier = Modifier.fillMaxSize(),
                 theme = prefs.launchpadTheme,

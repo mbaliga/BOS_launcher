@@ -96,7 +96,7 @@ class AppLauncher(
         val out = executor.launchPlan(plan)
         out.results.forEach { r -> executor.freshNotices(r).forEach { notify(L10n.tr(it.message)) } }
         if (out.failed.isNotEmpty()) notify(L10n.tr("%d app(s) in %s did not open", out.failed.size, name))
-        if (out.switcher.isNotEmpty()) QuickSwitcher.post(app, name, out.switcher)
+        if (out.switcher.isNotEmpty() && !QuickSwitcher.post(app, name, out.switcher)) notify(L10n.tr("Notifications are off for Liftoff, so the rest of the group cannot be offered"))
         return out
     }
 }
@@ -108,11 +108,13 @@ class AppLauncher(
 object QuickSwitcher {
     private const val CHANNEL = "liftoff_switcher"
 
-    fun post(context: Context, groupName: String, rest: List<LaunchRequest>) {
-        val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Group switcher", NotificationManager.IMPORTANCE_LOW))
+    /** False when the switcher could not be shown (notifications are off for the app), so the caller can say so. */
+    fun post(context: Context, groupName: String, rest: List<LaunchRequest>): Boolean {
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return false
+        if (!nm.areNotificationsEnabled()) return false
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, L10n.tr("Group switcher"), NotificationManager.IMPORTANCE_LOW))
         val b = Notification.Builder(context, CHANNEL)
-            .setSmallIcon(context.applicationInfo.icon).setContentTitle(groupName).setContentText("Open the rest of the group")
+            .setSmallIcon(context.applicationInfo.icon).setContentTitle(groupName).setContentText(L10n.tr("Open the rest of the group"))
             .setAutoCancel(true)
         rest.take(3).forEachIndexed { i, r ->
             val intent = launchIntent(context, r.target) ?: return@forEachIndexed
@@ -120,7 +122,7 @@ object QuickSwitcher {
             val pi = PendingIntent.getActivity(context, (groupName + r.target.packageName).hashCode() + i, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             b.addAction(Notification.Action.Builder(null, label, pi).build())
         }
-        runCatching { nm.notify(("switcher:" + groupName).hashCode(), b.build()) }
+        return runCatching { nm.notify(("switcher:" + groupName).hashCode(), b.build()) }.isSuccess
     }
 
     fun launchIntent(context: Context, t: LaunchTarget): Intent? =

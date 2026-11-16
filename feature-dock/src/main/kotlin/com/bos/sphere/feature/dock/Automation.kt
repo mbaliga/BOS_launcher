@@ -54,12 +54,12 @@ internal object ScheduleNotifications {
     /** A notification with an Open action. The tap that follows is what lets the launch happen: nothing opens on its own (WSP-11). */
     fun post(context: Context, label: String, target: RunTarget) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Scheduled launches", NotificationManager.IMPORTANCE_DEFAULT))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, com.bos.sphere.core.design.L10n.tr("Scheduled launches"), NotificationManager.IMPORTANCE_DEFAULT))
         val pi = PendingIntent.getActivity(context, (target.kind.name + target.id).hashCode(), runIntent(context, target), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = Notification.Builder(context, CHANNEL)
-            .setSmallIcon(context.applicationInfo.icon).setContentTitle(label).setContentText("Tap Open to start it")
+            .setSmallIcon(context.applicationInfo.icon).setContentTitle(label).setContentText(com.bos.sphere.core.design.L10n.tr("Tap Open to start it"))
             .setContentIntent(pi).setAutoCancel(true)
-            .addAction(Notification.Action.Builder(null, "Open", pi).build())
+            .addAction(Notification.Action.Builder(null, com.bos.sphere.core.design.L10n.tr("Open"), pi).build())
             .build()
         runCatching { nm.notify((target.kind.name + target.id).hashCode(), n) }
     }
@@ -134,7 +134,7 @@ class RunActivity : Activity() {
         )
         val target = raw?.let { AutomationIntents.resolve(it, WorkspaceRepository.get(this).current) }
         // Stay in the foreground until the sequence has run: later steps of a group are blocked once this activity is gone.
-        if (target == null) { Toast.makeText(this, "Nothing to open", Toast.LENGTH_SHORT).show(); finish() }
+        if (target == null) { Toast.makeText(this, com.bos.sphere.core.design.L10n.tr("Nothing to open"), Toast.LENGTH_SHORT).show(); finish() }
         else RunTargets.run(this, target, onDone = { if (!isFinishing) finish() })
     }
 }

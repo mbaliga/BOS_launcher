@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -87,6 +88,9 @@ fun FolderSheet(
     onReorder: (key: String, toIndex: Int) -> Unit,
     onTakeOut: (key: String) -> Unit,
     onDismiss: () -> Unit,
+    /** HOM-10: members whose app is not installed right now (kept until the grace period ends); drawn dimmed with a remove action. */
+    unavailable: Set<String> = emptySet(),
+    onRemoveUnavailable: (key: String) -> Unit = {},
 ) {
     var name by remember(folder.id) { mutableStateOf(folder.name) }
     Dialog(onDismissRequest = { onRename(name); onDismiss() }) {
@@ -99,7 +103,11 @@ fun FolderSheet(
             )
             LazyVerticalGrid(GridCells.Adaptive(76.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(folder.keys, key = { it }) { k ->
-                    val app = resolve(k) ?: return@items
+                    val app = resolve(k)
+                    if (app == null) {
+                        if (k in unavailable) UnavailableMember(k, onRemoveUnavailable)
+                        return@items
+                    }
                     val i = folder.keys.indexOf(k)
                     Column(
                         Modifier.onKeyEvent { e ->
@@ -125,5 +133,21 @@ fun FolderSheet(
             }
             if (editing) Text(L10n.tr("Alt+arrows reorder. ↥ moves an item out of the folder."), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
         }
+    }
+}
+
+/** HOM-10: a folder cell for an app that is gone for now. It cannot launch; "Remove" takes it out before the grace period ends. */
+@Composable
+internal fun UnavailableMember(key: String, onRemove: (String) -> Unit) {
+    val label = L10n.tr("App unavailable")
+    Column(
+        Modifier.semantics(mergeDescendants = true) { contentDescription = label }.alpha(0.55f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(52.dp).clip(RoundedCornerShape(22)).background(Color(0x26FFFFFF)), contentAlignment = Alignment.Center) {
+            Text("?", color = HyleColors.InkBright, fontSize = 22.sp)
+        }
+        Text(label, color = HyleColors.Ink, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(L10n.tr("Remove"), color = HyleColors.InkBright, fontSize = 11.sp, modifier = Modifier.clickable { onRemove(key) }.padding(horizontal = 8.dp, vertical = 4.dp))
     }
 }

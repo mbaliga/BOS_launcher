@@ -119,6 +119,8 @@ fun BoxScope.DockLayer(
     visible: Boolean,
     keyboardMode: Boolean,
     onLaunch: (AppEntry) -> Unit,
+    /** HOM-10: pinned app keys that are gone for now (kept dimmed until the grace period ends). */
+    unavailableApps: Set<String> = emptySet(),
     /** HOM-02: the home's folders, shortcuts and links, so they can be pinned to and drawn in the rail. */
     homeExtras: com.bos.sphere.feature.grid.HomeExtras? = null,
     /** HOM-19: where the bottom rail and what rides on it sit above the bottom clock and page dots; null keeps the fixed margins. */
@@ -181,6 +183,7 @@ fun BoxScope.DockLayer(
     val tierNow = remember { CapabilityEvaluator.tier(launcher.inputs()) }
     if (visible) GroupShelfSlot(wsState.groups, wsState.dock.groupShelf, wsState.dock.isEnabled(tierNow), bottomPlan?.shelfBottomDp, onRun = { g -> scope.launch { launcher.runGroup(g) } })
     if (visible) DockHost(
+        unavailableApps = unavailableApps,
         apps = apps, launcher = launcher, controller = controller, refreshKey = homeSignal,
         onLaunchApp = onLaunch, onOpenPanel = { panelOpen = true }, inputIsKeyboard = keyboardMode,
         onRunGroup = { g -> scope.launch { launcher.runGroup(g) } },

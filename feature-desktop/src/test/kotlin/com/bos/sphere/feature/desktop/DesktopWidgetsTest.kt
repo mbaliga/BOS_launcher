@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -91,5 +92,81 @@ class DesktopWidgetsTest {
     @Test
     fun HOM_13_theWidgetSlotIsEmptyUntilTheAppPlugsItsHostIn() {
         assertNull(DesktopWidgetSlot.provider)
+    }
+}
+
+/** HOM-13: resizing a hosted widget after it is placed: whole cells, provider limits, container, non-overlap, persisted. */
+class DesktopWidgetResizeTest {
+    private val container = FRect(0f, 0f, 800f, 450f)
+    private val cell = 80f
+
+    private fun two(): DesktopProfile {
+        var p = DesktopWidgets.add(DesktopProfile(), 1, 160f, 80f, container)!!   // top-left
+        p = p.copy(items = p.items + PlacedItem(PlacedItem.KIND_WIDGET, "aw:2", 400f, 8f, 160f, 160f))
+        return p
+    }
+
+    private fun item(p: DesktopProfile, id: String) = DesktopWidgets.widgetItem(p, id)!!
+
+    @Test fun HOM_13_resizeSnapsToWholeCellsAndKeepsTheTopLeftCorner() {
+        val p = two()
+        val before = item(p, "aw:1")
+        val r = DesktopWidgets.resize(p, "aw:1", 237f, 110f, cell, container)
+        val a = item(r, "aw:1")
+        assertEquals(before.x, a.x, 0.001f); assertEquals(before.y, a.y, 0.001f)
+        assertEquals(240f, a.w, 0.001f)   // 237 rounds to 3 cells
+        assertEquals(80f, a.h, 0.001f)    // 110 rounds to 1 cell
+    }
+
+    @Test fun HOM_13_resizeNeverGoesBelowOneCellOrOutsideTheWorkArea() {
+        val p = two()
+        val tiny = item(DesktopWidgets.resize(p, "aw:2", 1f, 1f, cell, container), "aw:2")
+        assertEquals(80f, tiny.w, 0.001f); assertEquals(80f, tiny.h, 0.001f)
+        val big = item(DesktopWidgets.resize(p, "aw:2", 5000f, 5000f, cell, container), "aw:2")
+        assertTrue(big.rect().inside(container))
+    }
+
+    @Test fun HOM_13_aWidgetCannotBeGrownOverAnotherWidgetItStopsAtTheLargestFreeSize() {
+        val p = two() // aw:1 is at x=8..168; aw:2 starts at x=400, so at most 4 cells (320dp) fit to its left
+        val grown = item(DesktopWidgets.resize(p, "aw:1", 800f, 80f, cell, container), "aw:1")
+        assertEquals(320f, grown.w, 0.001f)
+        assertFalse(grown.rect().overlaps(item(p, "aw:2").rect()))
+        val tall = item(DesktopWidgets.resize(p, "aw:1", 560f, 400f, cell, container), "aw:1")
+        assertFalse(tall.rect().overlaps(item(p, "aw:2").rect()))
+        assertTrue(tall.w * tall.h >= grown.w * grown.h)
+    }
+
+    @Test fun HOM_13_theProvidersMinimumSizeAndAxesAreHonoured() {
+        val p = two()
+        val limits = ResizeLimits(minWidthDp = 150f, minHeightDp = 150f, horizontal = true, vertical = false)
+        val r = item(DesktopWidgets.resize(p, "aw:1", 80f, 400f, cell, container, limits), "aw:1")
+        assertEquals(160f, r.w, 0.001f)           // 80 would be below the 150 minimum: two cells
+        assertEquals(80f, r.h, 0.001f)            // vertical resizing is not allowed, height is unchanged
+        val none = ResizeLimits(0f, 0f, horizontal = false, vertical = false)
+        assertSame(p, DesktopWidgets.resize(p, "aw:1", 400f, 400f, cell, container, none))
+    }
+
+    @Test fun HOM_13_theSizeMenuStepsOneCellAndStopsAtTheLimits() {
+        var p = two()
+        p = DesktopWidgets.resizeByCells(p, "aw:2", 1, 0, cell, container)
+        assertEquals(240f, item(p, "aw:2").w, 0.001f)
+        p = DesktopWidgets.resizeByCells(p, "aw:2", 0, -1, cell, container)
+        assertEquals(80f, item(p, "aw:2").h, 0.001f)
+        repeat(5) { p = DesktopWidgets.resizeByCells(p, "aw:2", -1, 0, cell, container) }
+        assertEquals(80f, item(p, "aw:2").w, 0.001f)
+    }
+
+    @Test fun HOM_13_aResizedWidgetSurvivesTheProfileCodecAndNothingElseMoves() {
+        val p = two()
+        val r = DesktopWidgets.resize(p, "aw:2", 320f, 240f, cell, container)
+        val back = ProfileCodec.decode(ProfileCodec.encode(r))!!
+        assertEquals(r.items, back.items)
+        assertEquals(item(p, "aw:1"), item(back, "aw:1"))
+    }
+
+    @Test fun HOM_13_resizingAnUnknownOrNonWidgetItemChangesNothing() {
+        val p = two().copy(items = two().items + PlacedItem(PlacedItem.KIND_APP, "com.x/.A#0", 600f, 300f, 80f, 80f))
+        assertSame(p, DesktopWidgets.resize(p, "com.x/.A#0", 400f, 400f, cell, container))
+        assertSame(p, DesktopWidgets.resize(p, "aw:99", 400f, 400f, cell, container))
     }
 }

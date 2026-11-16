@@ -522,6 +522,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
         if (appsByKey[key] != null && pages.none { key in it.keys }) stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)
     }, onItems = { defs -> homeItems.addDropped(defs) }, onTouchDrag = { menuApp = null })
+    // HOM-10: folder members and dock pins of packages that are gone are unavailable first, then removed after the grace period.
+    LaunchedEffect(allApps) { if (allApps.isNotEmpty()) homeItems.reconcileMembers(allApps.mapTo(HashSet()) { it.key }) }
     var leftWidgetLabel by remember { mutableStateOf<String?>(null) }
     val widgetPicker = rememberWidgetPicker(widgetHost) { id, label ->
         if (pickingLeft) {
@@ -1029,6 +1031,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen,
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
+            unavailableApps = homeItems.unavailableKeys,
             bottomPlan = bottomPlan,
         )
 

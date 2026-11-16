@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.graphics.asImageBitmap
 import com.bos.sphere.core.catalog.HomeEdit
 import com.bos.sphere.core.catalog.HomeExtrasStore
 import com.bos.sphere.core.catalog.HomeRekey
@@ -121,10 +122,43 @@ class HomeItems internal constructor(
         usageSlices = slices
     }
 
+    /** HOM-15: the Files tile's first few files (thumbnail or name), loaded off the main thread while such a tile is on home. */
+    var fileCells by mutableStateOf<List<com.bos.sphere.feature.grid.FileTileCell>>(emptyList())
+
+    internal suspend fun refreshFiles() {
+        val cells = withContext(Dispatchers.IO) { runCatching {
+            val source = com.bos.sphere.core.catalog.RecentFilesSource(context)
+            val granted = source.grantedTrees().map { it.toString() }.toSet()
+            if (granted.isEmpty()) emptyList() else {
+                val files = com.bos.sphere.core.catalog.RecentFilesModel.withinGrants(source.all(com.bos.sphere.core.catalog.HomePanelPrefs(context).filesPerFolder), granted)
+                com.bos.sphere.core.catalog.FileThumbs.shared(context).load(files).map { com.bos.sphere.feature.grid.FileTileCell(it.name, it.image?.asImageBitmap()) }
+            }
+        }.getOrDefault(emptyList()) }
+        fileCells = cells
+    }
+
     /** HOM-15, HOM-17, HOM-18: a panel tile was tapped (index of its tab), -1 when none is requested. */
     var panelRequest by mutableIntStateOf(-1)
 
     fun openSheet() { sheetOpen = true }
+
+    /** HOM-10: folder members and dock pins whose app is missing right now (kept for the grace period, drawn as unavailable). */
+    var unavailableKeys by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    /**
+     * HOM-10: the reconcile step for folders and the dock. [inventory] is every key the launcher lists now (hidden apps too); apps
+     * missing from it stay as unavailable for [MemberReconcile.GRACE_MS], then leave their folder or the dock without a gap.
+     */
+    fun reconcileMembers(inventory: Set<String>, now: Long = System.currentTimeMillis()) {
+        val misc = context.getSharedPreferences("liftoff_misc", Context.MODE_PRIVATE)
+        val since = com.bos.sphere.core.catalog.MemberReconcile.decode(misc.getString("memberMissingSince", null))
+        val cur = store.state.value.copy(pages = pagesNow())
+        val r = com.bos.sphere.core.catalog.MemberReconcile.reconcile(cur, inventory, since, now, capacityOf)
+        if (r.state != cur) { store.set(r.state); if (r.state.pages != cur.pages) savePages(r.state.pages) }
+        if (r.missingSince != since) misc.edit().putString("memberMissingSince", com.bos.sphere.core.catalog.MemberReconcile.encode(r.missingSince)).apply()
+        if (r.unavailable != unavailableKeys) unavailableKeys = r.unavailable
+    }
 
     /** HOM-04: the Radar provider that lists folders by name. */
     fun folderSearchProvider(): com.bos.sphere.core.data.SearchProvider = com.bos.sphere.core.catalog.FolderSearchProvider(
@@ -406,6 +440,7 @@ class HomeItems internal constructor(
         onAction = ::applyKeyboardAction,
         onDropItems = ::addDroppedInto,
         usageSlices = usageSlices,
+        fileCells = fileCells,
         onDropOnto = { drag, target ->
             edit { s -> HomeEdit.dropOnto(s, drag, target, newId(), L10n.tr("Folder"), capacityOf) }
         },
@@ -510,6 +545,8 @@ class HomeItems internal constructor(
                 onReorder = { k, to -> edit { HomeEdit.reorderInFolder(it, id, k, to) } },
                 onTakeOut = { k -> edit { HomeEdit.takeOut(it, id, k, page(), pagesNow().getOrNull(page())?.keys?.size ?: 0, capacityOf) } },
                 onDismiss = { openFolder = null },
+                unavailable = unavailableKeys,
+                onRemoveUnavailable = { k -> edit { HomeEdit.pruneMissing(it, it.allKeys().mapNotNull { e -> com.bos.sphere.core.catalog.DockEntries.appKey(e) }.toSet() - k, capacityOf) } },
             )
         }
         if (packOpen) {
@@ -606,6 +643,9 @@ fun rememberHomeItems(
         usageOwner.lifecycle.addObserver(o); onDispose { usageOwner.lifecycle.removeObserver(o) }
     }
     LaunchedEffect(usageTileOn, usageResumes) { if (usageTileOn) items.refreshUsage() }
+    // HOM-15: the Files tile's thumbnails follow the same rhythm (when the tile appears and on each resume).
+    val filesTileOn = com.bos.sphere.core.catalog.HomePanelLinks.placed(state).contains(com.bos.sphere.core.catalog.PanelTab.Files)
+    LaunchedEffect(filesTileOn, usageResumes) { if (filesTileOn) items.refreshFiles() else items.fileCells = emptyList() }
     // HOM-04: a folder chosen in Radar opens here (the request is consumed once).
     val openRequest by HomeOpenRequests.folder.collectAsStateWithLifecycle()
     LaunchedEffect(openRequest, state.folders) {

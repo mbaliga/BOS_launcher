@@ -78,7 +78,9 @@ fun PageCarousel(
     compact: Boolean = false,
 ) {
     val list = rememberLazyListState()
-    LaunchedEffect(current) { if (current in pages.indices) list.animateScrollToItem(current) }
+    // NFR-14: with animations off the carousel jumps to the page instead of gliding.
+    val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    LaunchedEffect(current) { if (current in pages.indices) { if (reduced) list.scrollToItem(current) else list.animateScrollToItem(current) } }
     Column(modifier.semantics { contentDescription = L10n.tr("Page carousel") }) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Text(L10n.tr("Pages"), color = HyleColors.InkBright, fontSize = 22.sp, fontWeight = FontWeight.Medium)
@@ -101,12 +103,13 @@ private fun PageThumb(
     onSelect: () -> Unit, onDelete: () -> Unit, onMove: (Int) -> Unit, onMoveTo: (Int) -> Unit,
 ) {
     var pitch by remember { mutableIntStateOf(1) }
+    val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { 14.dp.roundToPx() } // the column's spacedBy(14.dp), not a pixel constant
     var drag by remember { mutableFloatStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(20.dp)
     val label = L10n.tr("Page %d of %d", index + 1, count) + if (page.keys.isEmpty()) ", " + L10n.tr("empty") else ""
     Column(
-        Modifier.fillMaxWidth().onSizeChanged { pitch = it.height + 40 } // the column's own spacing and the buttons sit inside the item
+        Modifier.fillMaxWidth().onSizeChanged { pitch = it.height + gapPx } // the column's own spacing and the buttons sit inside the item
             .graphicsLayer { translationY = if (dragging) drag else 0f; alpha = if (dragging) 0.85f else 1f }
             .pointerInput(index, count) {
                 detectDragGesturesAfterLongPress(

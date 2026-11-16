@@ -5,6 +5,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
@@ -98,5 +100,54 @@ class EditCardAppTest {
         assertTrue("the placed app leaves the carousel", rule.onAllNodesWithContentDescription("Add to home: Camera").fetchSemanticsNodes().isEmpty())
         scenario!!.onActivity { it.onBackPressedDispatcher.onBackPressed() }; settle()
         assertTrue("the carousel is gone after Back", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
+    }
+
+    private fun pageKeys(stores: LauncherStores) = stores.layout.layout.value.pages.map { it.keys }
+
+    @Test fun HOM_12_deletePageThenUndoRestoresItAndALaterEditIsNotUndoneByTheNotice() {
+        val stores = startFresh()
+        rule.onNodeWithText("Long press to add apps").performClick(); settle()
+        val camera = AppSmokeHarness.appKey("Camera"); val alpha = AppSmokeHarness.appKey("Alpha")
+        stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
+        assertEquals(listOf(listOf(camera), listOf(alpha)), pageKeys(stores))
+        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle()
+        assertEquals("the deleted page's items joined the previous page", listOf(listOf(camera, alpha)), pageKeys(stores))
+        rule.onNodeWithText("Page deleted").assertIsDisplayed()
+        rule.onNodeWithText("Undo", useUnmergedTree = true).performClick(); settle()
+        assertEquals("one tap on the notice brought the whole page back", listOf(listOf(camera), listOf(alpha)), pageKeys(stores))
+    }
+
+    @Test fun HOM_12_theDeleteNoticeNeverUndoesAnEditMadeAfterTheDelete() {
+        val stores = startFresh()
+        rule.onNodeWithText("Long press to add apps").performClick(); settle()
+        val camera = AppSmokeHarness.appKey("Camera"); val alpha = AppSmokeHarness.appKey("Alpha"); val bravo = AppSmokeHarness.appKey("Bravo")
+        stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
+        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle(300)
+        rule.onNodeWithContentDescription("Add to home: Bravo").performClick(); settle(300) // the notice lasts six seconds
+        val afterAdd = pageKeys(stores)
+        assertTrue(bravo in afterAdd.flatten())
+        rule.onNodeWithText("Page deleted").assertIsDisplayed()
+        rule.onNodeWithText("Undo", useUnmergedTree = true).performClick(); settle(300)
+        assertEquals("the notice only undoes the delete while nothing else changed", afterAdd, pageKeys(stores))
+    }
+
+    @Test fun HOM_12_deletingTheLastPageEmptiesItAndTheAppsStayInstalledAndInTheAddCarousel() {
+        val stores = startFresh()
+        rule.onNodeWithText("Long press to add apps").performClick(); settle()
+        rule.onNodeWithContentDescription("Add to home: Camera").performClick(); settle()
+        rule.onNodeWithContentDescription("Delete page 1").performClick(); settle()
+        assertEquals(1, stores.layout.layout.value.pages.size)
+        assertTrue(stores.layout.layout.value.pages[0].keys.isEmpty())
+        rule.onNodeWithContentDescription("Add to home: Camera").assertIsDisplayed() // back in the carousel
+    }
+
+    @Test fun HOM_22_leavingSelectedAppsEndsAnOpenEditSession() {
+        val stores = startFresh()
+        rule.onNodeWithText("Long press to add apps").performClick(); settle()
+        rule.onNodeWithContentDescription("Page carousel").assertIsDisplayed()
+        stores.prefs.update { it.copy(homeLanding = com.bos.sphere.core.data.HomeLanding.Minimal) }; settle()
+        assertTrue("edit mode ended with the landing switch", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
+        stores.prefs.update { it.copy(homeLanding = com.bos.sphere.core.data.HomeLanding.Selected) }; settle()
+        assertTrue("and does not come back by itself", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
     }
 }

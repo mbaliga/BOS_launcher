@@ -2,6 +2,12 @@ package com.bos.sphere.feature.grid
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import com.bos.sphere.core.data.RecentsProfile
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -80,14 +86,50 @@ fun RecentsLanding(
     onLaunch: (AppEntry) -> Unit,
     onLongPress: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
+    /** A work profile exists: the list can be narrowed to Personal or Work apps (work apps are badged either way). */
+    hasWork: Boolean = false,
+    profile: RecentsProfile = RecentsProfile.Both,
+    onProfile: (RecentsProfile) -> Unit = {},
+    topInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     Box(modifier.fillMaxSize()) {
-        if (recents.isEmpty()) {
-            // The gesture layer still covers the empty home (long press opens the quick sheet).
-            Box(Modifier.fillMaxSize().homeGestures(look.gestures) { true })
-            RecentsEmptyState(usageAccessOn, onGrantUsage, Modifier.align(Alignment.Center).safeDrawingPadding())
-        } else {
-            LandingList(recents, look, ordered = true, onLaunch = onLaunch, onLongPress = onLongPress)
+        val body: @Composable (LandingLook) -> Unit = { l ->
+            if (recents.isEmpty()) {
+                // The gesture layer still covers the empty home (long press opens the quick sheet).
+                Box(Modifier.fillMaxSize().homeGestures(l.gestures) { true })
+                RecentsEmptyState(usageAccessOn, onGrantUsage, Modifier.align(Alignment.Center).safeDrawingPadding())
+            } else {
+                LandingList(recents, l, ordered = true, onLaunch = onLaunch, onLongPress = onLongPress)
+            }
+        }
+        if (!hasWork) body(look) else {
+            val padL = look.padding.calculateLeftPadding(LayoutDirection.Ltr)
+            val padR = look.padding.calculateRightPadding(LayoutDirection.Ltr)
+            val listLook = remember(look, padL, padR) {
+                LandingLook(look.style, look.columns, look.scrollHorizontal, PaddingValues(start = padL, end = padR, top = 4.dp, bottom = look.padding.calculateBottomPadding()),
+                    look.iconScale, look.spacing, look.showLabels, look.sounds, look.gestures, look.categoryOf, look.wallpaperScroll)
+            }
+            Column(Modifier.fillMaxSize().safeDrawingPadding().padding(top = topInset)) {
+                RecentsProfileChips(profile, onProfile, Modifier.padding(horizontal = padL.coerceAtMost(24.dp), vertical = 4.dp))
+                Box(Modifier.fillMaxWidth().weight(1f)) { body(listLook) }
+            }
+        }
+    }
+}
+
+/** HOM-22: the Recent apps landing's Personal / Work filter (only drawn when a work profile exists). */
+@Composable
+internal fun RecentsProfileChips(selected: RecentsProfile, onSelect: (RecentsProfile) -> Unit, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Row(modifier.selectableGroup(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+        listOf(RecentsProfile.Both to "All", RecentsProfile.PersonalOnly to "Personal", RecentsProfile.WorkOnly to "Work").forEach { (v, label) ->
+            val on = selected == v
+            Text(
+                L10n.tr(label), fontSize = 13.sp, color = if (on) HyleColors.OnAccent else HyleColors.InkDim,
+                modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+                    .background(if (on) HyleColors.Violet else HyleColors.InkDim.copy(alpha = 0.14f))
+                    .selectable(selected = on, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { onSelect(v) })
+                    .defaultMinSize(minHeight = 48.dp).padding(horizontal = 14.dp, vertical = 14.dp),
+            )
         }
     }
 }

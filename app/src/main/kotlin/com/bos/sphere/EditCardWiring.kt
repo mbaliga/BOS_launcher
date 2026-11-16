@@ -84,6 +84,7 @@ fun EditCardOverlay(
         onDelete = { i ->
             val r = HomePageOps.delete(pages, i, capacityOf)
             val base = homeEdit.undoDepth
+            val before = layout
             if (r.taken.isEmpty()) {
                 com.bos.sphere.core.data.StateService.beforeDestructive(homeItems.context(), "delete page")
                 apply(r)
@@ -94,9 +95,14 @@ fun EditCardOverlay(
                 stores.layout.replace(layout.copy(pages = HomeLayoutMath.toStored(r.pages, layout.pages, preserve - r.taken), removed = layout.removed + apps0, seeded = true))
                 goto = 0
             }
+            // The layout as this page edit left it: the Undo button only acts while it is still that, so a later edit is never undone by it.
+            val after = stores.layout.layout.value
             notice = UndoNotice(L10n.tr(if (r.taken.isEmpty()) "Page deleted" else "Page emptied"), onUndo = {
-                // One tap undoes the whole page edit, however many layout writes it took.
-                repeat((homeEdit.undoDepth - base).coerceAtLeast(1)) { homeEdit.undo() }
+                if (stores.layout.layout.value == after) {
+                    // One tap undoes the whole page edit, however many layout writes it took; it stops as soon as the page is back.
+                    var left = (homeEdit.undoDepth - base).coerceAtLeast(2)
+                    while (left-- > 0 && homeEdit.canUndo && stores.layout.layout.value != before) homeEdit.undo()
+                }
             })
         },
         onMove = { i, d -> HomePageOps.move(pages, i, d)?.let(::apply) },

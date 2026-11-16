@@ -16,9 +16,33 @@ object GroupsJson {
     const val VERSION = 1
     private val KNOWN = setOf("v", "groups", "people", "assignments", "rules", "myLastName")
 
+    /**
+     * CFG-03: a reserved key inside [GroupsConfig.extra]. It is never written to the file under this name: [ENTRIES] holds the
+     * fields of single groups, people, assignments and rules that this build does not know (keyed by kind and id). A rule with a
+     * condition this build cannot read (a kind from a newer build) is loaded switched off, because evaluating it without that
+     * condition would match more notifications than its author meant; its unreadable conditions and its stored on/off state
+     * are kept under [UNREADABLE] in the rule's entry and written back with it.
+     */
+    private const val ENTRIES = "~entries"
+    private const val UNREADABLE = "~unreadable"
+    private val GROUP_KEYS = setOf("id", "name", "icon", "color", "order", "priority", "delivery")
+    private val PERSON_KEYS = setOf("id", "name", "aliases", "contact")
+    private val ASSIGN_KEYS = setOf("kind", "target", "group")
+    private val RULE_KEYS = setOf("id", "group", "enabled", "name", "conditions")
+
+    private fun assignKey(kind: String, target: String) = "a:$kind|$target"
+
+    private fun JSONObject.withExtras(extras: JSONObject?, key: String, known: Set<String>): JSONObject {
+        val x = extras?.optJSONObject(key) ?: return this
+        x.keys().forEach { k -> if (k !in known && !has(k)) put(k, x.get(k)) }
+        return this
+    }
+
     fun encode(c: GroupsConfig): JSONObject {
         val o = JSONObject()
-        runCatching { JSONObject(c.extra) }.getOrNull()?.let { x -> x.keys().forEach { k -> if (k !in KNOWN) o.put(k, x.get(k)) } }
+        val extra = runCatching { JSONObject(c.extra) }.getOrNull()
+        extra?.let { x -> x.keys().forEach { k -> if (k !in KNOWN && k != ENTRIES) o.put(k, x.get(k)) } }
+        val entries = extra?.optJSONObject(ENTRIES)
         o.put("v", VERSION)
         o.put("groups", JSONArray().also { a ->
             c.groups.forEach { g ->
@@ -26,22 +50,26 @@ object GroupsJson {
                     if (g.icon.isNotEmpty()) put("icon", g.icon)
                     g.colorArgb?.let { put("color", it) }
                     g.delivery?.let { put("delivery", it.name) }
-                })
+                }.withExtras(entries, "g:${g.id}", GROUP_KEYS))
             }
         })
         o.put("people", JSONArray().also { a ->
             c.people.forEach { p ->
-                a.put(JSONObject().put("id", p.id).put("name", p.name).put("aliases", JSONArray(p.aliases)).apply { p.contactKey?.let { put("contact", it) } })
+                a.put(JSONObject().put("id", p.id).put("name", p.name).put("aliases", JSONArray(p.aliases)).apply { p.contactKey?.let { put("contact", it) } }
+                    .withExtras(entries, "p:${p.id}", PERSON_KEYS))
             }
         })
         o.put("assignments", JSONArray().also { a ->
             c.assignments.forEach { x ->
-                a.put(JSONObject().put("kind", x.kind.name).put("target", x.target).apply { if (x.groupId != null) put("group", x.groupId) })
+                a.put(JSONObject().put("kind", x.kind.name).put("target", x.target).apply { if (x.groupId != null) put("group", x.groupId) }
+                    .withExtras(entries, assignKey(x.kind.name, x.target), ASSIGN_KEYS))
             }
         })
         o.put("rules", JSONArray().also { a ->
             c.rules.forEach { r ->
-                a.put(JSONObject().put("id", r.id).put("group", r.groupId).put("enabled", r.enabled).apply {
+                val lost = entries?.optJSONObject("r:${r.id}")?.optJSONObject(UNREADABLE)
+                a.put(JSONObject().put("id", r.id).put("group", r.groupId).put("enabled", r.enabled || lost?.optBoolean("enabled", false) == true)
+                    .withExtras(entries, "r:${r.id}", RULE_KEYS + UNREADABLE).apply {
                     if (r.name.isNotEmpty()) put("name", r.name)
                     put("conditions", JSONArray().also { ca ->
                         r.conditions.forEach { x ->
@@ -51,6 +79,7 @@ object GroupsJson {
                                 if (x.negate) put("negate", true)
                             })
                         }
+                        lost?.optJSONArray("conditions")?.let { l -> for (i in 0 until l.length()) l.optJSONObject(i)?.let { ca.put(it) } }
                     })
                 })
             }
@@ -64,11 +93,18 @@ object GroupsJson {
     fun decode(o: JSONObject?): GroupsConfig {
         if (o == null) return GroupsConfig()
         return runCatching {
-            val extra = JSONObject().also { x -> o.keys().forEach { k -> if (k !in KNOWN) x.put(k, o.get(k)) } }
+            val extra = JSONObject().also { x -> o.keys().forEach { k -> if (k !in KNOWN && k != ENTRIES) x.put(k, o.get(k)) } }
+            val entries = JSONObject()
+            fun keep(key: String, e: JSONObject, known: Set<String>) {
+                var unk: JSONObject? = null
+                e.keys().forEach { k -> if (k !in known) { if (unk == null) unk = JSONObject(); unk!!.put(k, e.get(k)) } }
+                unk?.let { entries.put(key, it) }
+            }
             val ids = HashSet<String>()
             val groups = o.optJSONArray("groups").objects().mapNotNull { g ->
                 val id = g.optString("id").ifBlank { return@mapNotNull null }
                 if (!ids.add(id)) return@mapNotNull null
+                keep("g:$id", g, GROUP_KEYS)
                 LaunchpadGroup(
                     id = id,
                     name = g.optString("name").trim().ifEmpty { "Group" }.take(GroupsConfig.MAX_NAME),
@@ -82,21 +118,33 @@ object GroupsJson {
             val people = o.optJSONArray("people").objects().mapNotNull { p ->
                 val id = p.optString("id").ifBlank { return@mapNotNull null }
                 val aliases = p.optJSONArray("aliases")?.let { a -> List(a.length()) { a.optString(it) }.filter { it.isNotBlank() } } ?: emptyList()
+                keep("p:$id", p, PERSON_KEYS)
                 Person(id, p.optString("name").ifBlank { aliases.firstOrNull() ?: return@mapNotNull null }, aliases, p.optString("contact").ifEmpty { null })
             }.distinctBy { it.id }.take(GroupsConfig.MAX_PEOPLE)
             val assignments = o.optJSONArray("assignments").objects().mapNotNull { a ->
                 val kind = enumOf<AssignKind>(a.optString("kind")) ?: return@mapNotNull null
                 val target = a.optString("target").ifBlank { return@mapNotNull null }
+                keep(assignKey(kind.name, target), a, ASSIGN_KEYS)
                 GroupAssignment(kind, target, a.optString("group").ifEmpty { null })
             }.distinctBy { it.kind to it.target }.take(GroupsConfig.MAX_ASSIGNMENTS)
             val rules = o.optJSONArray("rules").objects().mapNotNull { r ->
-                val conds = r.optJSONArray("conditions").objects().mapNotNull { x ->
+                val condObjs = r.optJSONArray("conditions").objects()
+                val conds = condObjs.mapNotNull { x ->
                     val kind = enumOf<ConditionKind>(x.optString("kind")) ?: return@mapNotNull null
                     Condition(kind, x.optString("value"), x.optInt("from", 0), x.optInt("to", 0), x.optBoolean("negate", false))
                 }
-                GroupRule(r.optString("id").ifBlank { return@mapNotNull null }, conds, r.optString("group").ifBlank { return@mapNotNull null },
-                    r.optBoolean("enabled", true), r.optString("name"))
+                val rid = r.optString("id").ifBlank { return@mapNotNull null }
+                val gid = r.optString("group").ifBlank { return@mapNotNull null }
+                keep("r:$rid", r, RULE_KEYS)
+                // A condition this build cannot read: the rule loads switched off and the unreadable parts are kept (see UNREADABLE).
+                val unreadable = condObjs.filter { x -> enumOf<ConditionKind>(x.optString("kind")) == null }
+                if (unreadable.isNotEmpty()) {
+                    val e = entries.optJSONObject("r:$rid") ?: JSONObject().also { entries.put("r:$rid", it) }
+                    e.put(UNREADABLE, JSONObject().put("enabled", r.optBoolean("enabled", true)).put("conditions", JSONArray(unreadable)))
+                }
+                GroupRule(rid, conds, gid, r.optBoolean("enabled", true) && unreadable.isEmpty(), r.optString("name"))
             }.distinctBy { it.id }.take(GroupsConfig.MAX_RULES)
+            if (entries.length() > 0) extra.put(ENTRIES, entries)
             GroupsConfig(groups, people, assignments, rules, o.optString("myLastName").trim(), extra.toString())
         }.getOrDefault(GroupsConfig())
     }

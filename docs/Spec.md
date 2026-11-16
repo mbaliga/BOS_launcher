@@ -99,7 +99,7 @@ Status key: **Yes** = public API, works as a normal app. **Grant** = works after
 | App shortcuts and pinning | Yes (home role) | `LauncherApps.getShortcuts`, pin requests | Only while default home |
 | Host widgets | Yes | `AppWidgetHost`; per-widget bind consent | Bind prompt on first add |
 | Notification content, badges, media sessions | Grant | `NotificationListenerService` | Calm centre and dots are off until granted |
-| Recent and foreground app history | Grant | `UsageStatsManager` (usage access) | Dock shows recent apps; cannot enumerate live tasks or windows |
+| Recent and foreground app history | Grant | `UsageStatsManager` (usage access) | Dock and the Recent apps home landing (HOM-22) show recent apps, the landing also from Liftoff's own launches without the grant; cannot enumerate live tasks or windows |
 | Launch on a chosen display | Yes | `ActivityOptions.setLaunchDisplayId` (API 26+) | Basis of external display support |
 | Launch with window bounds | Partial | `ActivityOptions.setLaunchBounds`; ignored where freeform is unsupported | Works in desktop windowing; no-op on most phones' internal display |
 | Force a windowing mode at launch | No (core) | `setLaunchWindowingMode` is a hidden API | Excluded from core; elevated tier only |

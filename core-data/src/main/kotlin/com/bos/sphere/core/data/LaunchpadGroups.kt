@@ -212,7 +212,7 @@ object GroupsEdit {
             rules = c.rules.map { r -> r.copy(conditions = r.conditions.map { x -> if (x.kind == ConditionKind.PersonIs && x.value in oldIds) x.copy(value = merged.id) else x }) })
     }
 
-    /** Takes [alias] (a sender name) out of person [personId]; a person left with no alias is removed with its assignments. */
+    /** Takes [alias] (a sender name) out of person [personId]; a person left with no alias is removed with its assignments and the rules that required it. */
     fun unlinkAlias(c: GroupsConfig, personId: String, alias: String): GroupsConfig {
         val k = PersonNames.key(alias)
         val p = c.person(personId) ?: return c
@@ -224,7 +224,11 @@ object GroupsEdit {
     fun removePerson(c: GroupsConfig, personId: String) = c.copy(
         people = c.people.filterNot { it.id == personId },
         assignments = c.assignments.filterNot { it.kind == AssignKind.Person && it.target == personId },
-        rules = c.rules.map { r -> r.copy(conditions = r.conditions.filterNot { it.kind == ConditionKind.PersonIs && it.value == personId }) }
+        // A rule that required this person can never match again, so it goes; keeping it without that condition would let it
+        // match everyone who fits its other conditions ("Priya, on weekdays" would become "anyone, on weekdays"). A negated
+        // condition ("not this person") has nothing left to exclude and is simply dropped.
+        rules = c.rules.filterNot { r -> r.conditions.any { it.kind == ConditionKind.PersonIs && it.value == personId && !it.negate } }
+            .map { r -> r.copy(conditions = r.conditions.filterNot { it.kind == ConditionKind.PersonIs && it.value == personId }) }
             .filter { it.conditions.isNotEmpty() },
     )
 }

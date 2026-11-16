@@ -126,7 +126,7 @@ fun LandingChoiceList(selected: HomeLanding, onSelect: (HomeLanding) -> Unit, mo
             val desc = HomeLandingCopy.description(l)
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                    .background(if (on) HyleColors.Violet.copy(alpha = 0.22f) else Color(0x12FFFFFF))
+                    .background(if (on) HyleColors.Violet.copy(alpha = 0.22f) else HyleColors.InkDim.copy(alpha = 0.14f))
                     .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(l) })
                     .launcherItem("landing.choice.${l.name}", focusable = false, onActivate = { onSelect(l) })
                     .defaultMinSize(minHeight = 56.dp).padding(horizontal = 12.dp, vertical = 10.dp)
@@ -137,7 +137,7 @@ fun LandingChoiceList(selected: HomeLanding, onSelect: (HomeLanding) -> Unit, mo
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(name, color = HyleColors.InkBright, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text(desc, color = HyleColors.InkDim, fontSize = 12.sp)
+                    Text(desc, color = HyleColors.Ink, fontSize = 12.sp)
                 }
             }
         }
@@ -148,7 +148,7 @@ fun LandingChoiceList(selected: HomeLanding, onSelect: (HomeLanding) -> Unit, mo
 @Composable
 fun LandingSegmented(selected: HomeLanding, onSelect: (HomeLanding) -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0x12FFFFFF)).padding(3.dp).selectableGroup(),
+        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(HyleColors.InkDim.copy(alpha = 0.14f)).padding(3.dp).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         for (l in HomeLanding.entries) {
@@ -164,7 +164,7 @@ fun LandingSegmented(selected: HomeLanding, onSelect: (HomeLanding) -> Unit, mod
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
             ) {
                 HomeLandingGlyph(l, Modifier.size(26.dp), if (on) HyleColors.InkBright else HyleColors.InkDim)
-                Text(name, color = if (on) HyleColors.InkBright else HyleColors.InkDim, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 4.dp))
+                Text(name, color = if (on) HyleColors.InkBright else HyleColors.Ink, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }

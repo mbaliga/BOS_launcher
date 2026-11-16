@@ -27,3 +27,7 @@ Sources read against the briefs: `docs/decisions/editCard.md`, `homeLanding.md`,
 | HOM-12 | Device: drag and drop, drop-onto, resize handles and Undo under the card scale; delete, reorder and undo pages; rotate during edit (the history now restarts at the swap); right to left; TalkBack and keyboard; frame rate during the transition. Optional code follow-up: rebase the undo history on a workspace switch. |
 | HOM-22 | Device: usage-access grant round trip and real history, mouse dwell on the hotspots, TalkBack traversal, cross-fade feel. Owner: whether Recent apps becomes the default landing. |
 | HOM-01, HOM-04, HOM-05, WSP-05, INP-05, INP-16, INP-17, NFR-05, NFR-11, NFR-14, NFR-19 | Device checks as listed in the rows above and `docs/device-checklist.md`. |
+
+## Second review (adversarial)
+
+Found and fixed: the Recent apps Personal / Work filter was remembered while the chips were only drawn when a work profile exists, so after the work profile was removed a saved Work filter left the list empty with no control to change it (`HomeScreen` now applies the filter only while a work profile exists). Re-derived and found sound: the delete-notice undo guard (stops on the pre-delete layout, bounded by the undo depth), rebase echo handling, clamp on load. Open and listed: a clock moved backwards inside one session can still over-hide with a fresh removal stamp (needs a monotonic stamp).

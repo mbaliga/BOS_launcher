@@ -230,7 +230,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
     // HOM-22: the live Recent apps (only collected while that landing is on) and whether usage access is granted.
     var recentsProfile by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(com.bos.sphere.core.data.RecentsProfile.Both) } // HOM-22: the Recent apps landing's Personal / Work filter
-    val landingRecents by rememberRecentApps(context, stores, apps, hidden, storedPrefs, recentsProfile)
+    val recentsHasWork = remember(apps) { val me = android.os.Process.myUserHandle(); apps.any { it.user != me } }
+    // A saved Work / Personal filter must not outlive the work profile: with no chips to change it the list would stay empty for good.
+    val recentsFilter = if (recentsHasWork) recentsProfile else com.bos.sphere.core.data.RecentsProfile.Both
+    val landingRecents by rememberRecentApps(context, stores, apps, hidden, storedPrefs, recentsFilter)
     val usageAccessOn by rememberUsageAccess(context, storedPrefs.homeLanding == HomeLanding.Recents)
     var menuRecents by remember { mutableStateOf(false) } // the open app menu was opened from the Recent apps landing
     val homeEdit = rememberHomeEdit(stores.layout, remember(context) { WorkspaceHomeDockPins(com.bos.sphere.feature.dock.WorkspaceRepository.get(context)) }) // HOM-12 (layout and dock pins share one undo)
@@ -975,7 +978,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     HomeLanding.Recents -> {
                         com.bos.sphere.feature.grid.RecentsLanding(
                             recents = landingRecents, look = look, usageAccessOn = usageAccessOn,
-                            hasWork = remember(apps) { val me = android.os.Process.myUserHandle(); apps.any { it.user != me } }, profile = recentsProfile, onProfile = { recentsProfile = it }, topInset = scrollTop,
+                            hasWork = recentsHasWork, profile = recentsFilter, onProfile = { recentsProfile = it }, topInset = scrollTop,
                             onGrantUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
                             onLaunch = ::launch, onLongPress = { menuRecents = true; menuApp = it },
                         )

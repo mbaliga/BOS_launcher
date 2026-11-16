@@ -30,7 +30,7 @@ class WidgetRebinder internal constructor(private val onStart: (PendingWidget) -
 /**
  * CFG-02: re-adds a widget an import listed as pending, one consent step each. Finds the provider by the component the export
  * recorded, binds it (`bindAppWidgetIdIfAllowed`, else the system's ACTION_APPWIDGET_BIND screen), runs the configure screen if
- * the provider has one, then calls [onResult]. [onResult] gets the new id and label on [RebindOutcome.Done]; on any other outcome
+ * the provider has one (a work-profile provider's through the host's system-launched configure, [WidgetConfigureResults]), then calls [onResult]. [onResult] gets the new id and label on [RebindOutcome.Done]; on any other outcome
  * the allocated id is deleted and nothing changes. Public AppWidget APIs only; the host must not be listening (the home owns that).
  */
 @Composable
@@ -74,7 +74,21 @@ fun rememberWidgetRebinder(
                 Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).setComponent(p.configure).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id),
             )
         }.isSuccess
-        if (!launched) finish(RebindOutcome.Failed)
+        if (launched) return
+        // A provider of another profile (work): the compose launcher cannot start its configure activity, so the host asks the
+        // system to (public `AppWidgetHost.startAppWidgetConfigureActivityForResult`). The result reaches the activity's
+        // `onActivityResult` and arrives through [WidgetConfigureResults], collected below.
+        val activity = context.findActivity()
+        val ok = activity != null && runCatching {
+            host.host.startAppWidgetConfigureActivityForResult(activity, id, 0, REQUEST_CONFIGURE, null)
+        }.isSuccess
+        if (!ok) finish(RebindOutcome.Failed)
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        WidgetConfigureResults.results.collect { (requestCode, resultCode) ->
+            if (requestCode == REQUEST_CONFIGURE) finish(if (resultCode == Activity.RESULT_OK) RebindOutcome.Done else RebindOutcome.Declined)
+        }
     }
 
     val bindLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->

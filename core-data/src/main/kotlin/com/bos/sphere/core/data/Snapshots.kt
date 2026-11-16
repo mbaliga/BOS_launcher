@@ -14,16 +14,21 @@ class SnapshotStore(private val dir: File, val max: Int = MAX_SNAPSHOTS, private
 
     /** Takes a snapshot of [content]. Returns null when it is identical to the newest one and [force] is false. */
     @Synchronized
-    fun take(reason: String, content: String, force: Boolean = false): Info? {
+    fun take(reason: String, content: String, force: Boolean = false, pin: Boolean = false): Info? {
         dir.mkdirs()
         val newest = list().firstOrNull()
-        if (!force && newest != null && digest(read(newest.id) ?: "") == digest(content)) return null
+        if (!force && newest != null && digest(read(newest.id) ?: "") == digest(content)) {
+            // Identical to the newest one: that file already holds this state, so a pin goes onto it.
+            if (pin) pinned = newest.id
+            return null
+        }
         val now = clock()
         val seq = (list().maxOfOrNull { seqOf(it.id) } ?: 0) + 1
         val id = "snap-${now.toString().padStart(15, '0')}-${seq.toString().padStart(4, '0')}-${slug(reason)}.json"
         val tmp = File(dir, "$id.tmp")
         tmp.writeText(content)
         check(tmp.renameTo(File(dir, id))) { "Could not write snapshot" }
+        if (pin) pinned = id
         prune()
         return list().firstOrNull { it.id == id }
     }
@@ -45,7 +50,21 @@ class SnapshotStore(private val dir: File, val max: Int = MAX_SNAPSHOTS, private
     @Synchronized
     fun delete(id: String) { File(dir, id).takeIf { it.parentFile == dir }?.delete() }
 
-    private fun prune() = list().drop(max).forEach { File(dir, it.id).delete() }
+    /**
+     * CFG-04: the snapshot that holds the state before the first destructive edit of the latest burst. It is kept even
+     * when newer snapshots would push it out: the store then holds it and the newest `max - 1`.
+     */
+    private var pinned: String?
+        get() = runCatching { File(dir, PIN_FILE).takeIf { it.isFile }?.readText()?.trim()?.takeIf { it.isNotEmpty() } }.getOrNull()
+        set(v) { runCatching { if (v == null) File(dir, PIN_FILE).delete() else File(dir, PIN_FILE).writeText(v) } }
+
+    private fun prune() {
+        val all = list()
+        val pin = pinned?.takeIf { p -> all.any { it.id == p } }
+        val keep = if (pin == null) all.take(max) else (all.filter { it.id != pin }.take(max - 1) + all.first { it.id == pin })
+        val keepIds = keep.map { it.id }.toSet()
+        all.filter { it.id !in keepIds }.forEach { File(dir, it.id).delete() }
+    }
 
     private fun seqOf(id: String): Int = id.split('-').getOrNull(2)?.toIntOrNull() ?: 0
 
@@ -57,7 +76,7 @@ class SnapshotStore(private val dir: File, val max: Int = MAX_SNAPSHOTS, private
             s.replace(Regex("\"exportedAt\"\\s*:\\s*\\d+"), "").toByteArray(),
         ).joinToString("") { "%02x".format(it) }
 
-    companion object { const val MAX_SNAPSHOTS = 5 }
+    companion object { const val MAX_SNAPSHOTS = 5; private const val PIN_FILE = "pinned" }
 }
 
 /** What safe mode offers (CFG-09). */

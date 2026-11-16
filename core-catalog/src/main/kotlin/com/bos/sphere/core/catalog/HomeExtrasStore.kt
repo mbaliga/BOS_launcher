@@ -13,14 +13,16 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class HomeExtrasStore(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("home_extras", Context.MODE_PRIVATE)
-    private val _state = MutableStateFlow(HomeStateCodec.decode(sp.getString("extras", null)).copy(pages = emptyList()))
+    /** NFR-18: real widget ids live in the device file; the backed-up file holds re-add markers ([WidgetIdSplit]). */
+    private val device = context.applicationContext.getSharedPreferences(com.bos.sphere.core.data.DeviceBound.FILE, Context.MODE_PRIVATE)
+    private val _state = MutableStateFlow(HomeStateCodec.decode(com.bos.sphere.core.data.WidgetIdSplit.getString(sp, device, "home_extras", "extras")).copy(pages = emptyList()))
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
     fun set(next: HomeState) {
         val v = next.copy(pages = emptyList())
         if (v == _state.value) return
         _state.value = v
-        sp.edit().putString("extras", HomeStateCodec.encode(v)).apply()
+        com.bos.sphere.core.data.WidgetIdSplit.putString(sp, device, "home_extras", "extras", HomeStateCodec.encode(v))
     }
 
     companion object {

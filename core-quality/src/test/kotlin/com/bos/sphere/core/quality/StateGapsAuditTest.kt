@@ -58,9 +58,49 @@ class StateGapsAuditTest {
     }
 
     @Test fun CFG_04_everyDestructiveEditAnnouncesItselfByKindAndTheLimiterIsPerKind() {
-        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateService.kt").contains("limiter.allow(reason, System.currentTimeMillis())"))
+        val svc = text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateService.kt")
+        assertTrue(svc.contains("limiter.decide(reason, System.currentTimeMillis())"))
+        assertTrue("the first snapshot of each burst is pinned in the store", svc.contains("pin = d.burstStart"))
         val kinds = Repo.mainSources().flatMap { f -> Regex("""DestructiveEdits\.before\("([^"]+)"\)""").findAll(f.readText()).map { it.groupValues[1] }.toList() }.toSet()
         assertTrue("Launchpad rule removal is hooked: $kinds", "remove Launchpad rule" in kinds)
         assertTrue(kinds.size >= 6)
+    }
+
+    @Test fun NFR_18_everyStoreThatPersistsHomeItemKeysWritesThemThroughTheWidgetIdSplit() {
+        val stores = listOf(
+            "core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt",
+            "core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/CatalogStores.kt",
+            "core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/HomeExtrasStore.kt",
+            "core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/SizeClassLayouts.kt",
+        )
+        for (f in stores) assertTrue("$f must use WidgetIdSplit", text(f).contains("WidgetIdSplit.putString"))
+        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt").contains("HomeLayoutStore(app.getSharedPreferences(\"home_layout\", Context.MODE_PRIVATE), deviceBound)"))
+        // No store writes the raw encoded arrangement to its file any more.
+        assertFalse(text("core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/HomeExtrasStore.kt").contains("putString(\"extras\""))
+        assertFalse(text("core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/SizeClassLayouts.kt").contains("putString(\"pages:"))
+        // The export and import of the arrangement files go through the same rewrite.
+        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateLiveSources.kt").contains("WidgetIdSplit.ARRANGEMENT_FILES"))
+        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateCodec.kt").contains("WidgetIdSplit.sanitize(HomeLayoutCodec.encode"))
+    }
+
+    @Test fun NFR_18_theDockStreamFileKeepsItsWidgetListsInTheNoBackupDirectory() {
+        val dock = text("feature-dock/src/main/kotlin/com/bos/sphere/feature/dock/FileStore.kt")
+        assertTrue(dock.contains("noBackupFilesDir, \"liftoff_workspace_widgets.json\""))
+        assertTrue("the export source must not read widget lists back", text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateLiveSources.kt").contains("put(\"widgets\", JSONArray())"))
+    }
+
+    @Test fun NFR_11_theHomeRestoresEveryOpenSurfaceTheStoreCanRecordAndNothingElse() {
+        val home = text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt")
+        val entries = Regex("""enum class OpenSurface \{([^}]*)}""").find(text("core-data/src/main/kotlin/com/bos/sphere/core/data/OpenSurfaceStore.kt"))!!.groupValues[1].split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        assertTrue(entries.isNotEmpty())
+        for (e in entries) assertTrue("HomeScreen must open $e on restore and record it", home.contains("restoredSurface == com.bos.sphere.core.data.OpenSurface.$e") && home.contains("com.bos.sphere.core.data.OpenSurface.$e else"))
+        assertTrue("safe mode is passed to the restore", home.contains("takeRestore(prefs.restoreOpenSurfaces, com.bos.sphere.core.data.CrashLoopGuard.safeMode)"))
+    }
+
+    @Test fun CFG_02_theWorkProfileWidgetReAddUsesTheHostsSystemLaunchedConfigureForOtherProfiles() {
+        val r = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/WidgetRebind.kt")
+        assertTrue(r.contains("startAppWidgetConfigureActivityForResult"))
+        assertTrue(r.contains("WidgetConfigureResults.results.collect"))
+        assertTrue(text("app/src/main/kotlin/com/bos/sphere/MainActivity.kt").contains("WidgetConfigureResults.deliver"))
     }
 }

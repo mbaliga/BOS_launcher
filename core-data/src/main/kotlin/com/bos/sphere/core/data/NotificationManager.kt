@@ -30,6 +30,8 @@ data class HubNotification(
     val appLabel: String = "",
     val unread: Boolean = true,
     val contentIntent: PendingIntent? = null,
+    /** The notification asked to be cancelled when its content intent is used (Notification.FLAG_AUTO_CANCEL). */
+    val autoCancel: Boolean = false,
     /** HOM-09: the profile (user id) the notification belongs to, 0 for the owner. */
     val profileId: Int = 0,
     val isOngoing: Boolean = false,
@@ -89,12 +91,12 @@ object ReplyLogic {
             val fill = Intent()
             val results = android.os.Bundle().apply { putCharSequence(target.resultKey, text) }
             android.app.RemoteInput.addResultsToIntent(target.inputs, fill, results)
-            pi.send(context, 0, fill)
+            check(PendingIntentLauncher.fire(pi, context, fill))
         }.isSuccess
     }
 
     /** Runs a non-reply action through its own PendingIntent. */
-    fun run(action: HubAction): Boolean = action.intent?.let { runCatching { it.send() }.isSuccess } ?: false
+    fun run(action: HubAction): Boolean = PendingIntentLauncher.fire(action.intent)
 }
 
 /**
@@ -254,6 +256,7 @@ class SphereNotificationListener : NotificationListenerService() {
             unread = true,
             profileId = sbn.user.hashCode(),
             contentIntent = n.contentIntent,
+            autoCancel = (n.flags and android.app.Notification.FLAG_AUTO_CANCEL) != 0,
             isOngoing = ongoing,
             category = cat,
             channelId = n.channelId,

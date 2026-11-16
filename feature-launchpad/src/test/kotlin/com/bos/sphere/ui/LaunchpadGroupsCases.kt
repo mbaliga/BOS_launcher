@@ -1,5 +1,8 @@
 package com.bos.sphere.ui
 
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.onNodeWithTag
+import org.junit.Assert.assertEquals
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.verticalScroll
@@ -105,35 +108,52 @@ abstract class LaunchpadGroupsCases(private val orientation: String) : Launchpad
         return shoot("launchpad-groups-$orientation-$name-${if (dark) "dark" else "light"}")
     }
 
+    /** STR-02: the column is one long list, so a title further down is reached by scrolling to it first. */
+    private fun scrollTo(text: String, substring: Boolean = false) {
+        runCatching { rule.onNodeWithTag("lp.list").performScrollToNode(androidx.compose.ui.test.hasText(text, substring = substring)); rule.waitForIdle() }
+    }
+
     private fun shown(text: String, substring: Boolean = false) {
+        scrollTo(text, substring)
         assertTrue("'$text' is not on screen", rule.onAllNodesWithText(text, substring = substring).fetchSemanticsNodes().isNotEmpty())
         rule.onAllNodesWithText(text, substring = substring)[0].assertIsDisplayed()
     }
 
     @Test fun STR_13_column_sectionsAreTheGroups_light() {
         render("sections", dark = false)
-        // Priority group first and selected (large title, its rows beneath); the others are small titles.
+        // STR-02 (wave 11): every group is open in the one list; the long list is scrolled to reach the lower titles.
         shown("Family"); shown("Work")
-        // In landscape the list is short: the lower titles are reached by scrolling, in portrait they are all on screen.
-        if (orientation == "portrait") { shown("Promos"); shown("Everything else"); shown("Quiet", substring = true) }
+        shown("Promos"); shown("Everything else"); shown("Quiet", substring = true)
         shown("Priority", substring = true)
         shown("Priya Sharma")
         assertTrue("the priority rows of both apps sit under Family", rule.onAllNodesWithText("Priya Sharma (SMS)", substring = true).fetchSemanticsNodes().isNotEmpty())
-        assertTrue("work rows are not shown until Work is selected", rule.onAllNodesWithText("Deck is ready").fetchSemanticsNodes().isEmpty())
+        // Updated from the old accordion ("work rows are not shown until Work is selected"): nothing is hidden behind a selection any more.
+        shown("Deck is ready")
+        assertTrue("work rows are in the list too", rule.onAllNodesWithText("Deck is ready").fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test fun STR_13_column_sectionsAreTheGroups_dark() { render("sections", dark = true); shown("Family"); shown("Work") }
 
+    private fun headTags(): List<String> = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("group head") {
+        it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("lp.group.") == true
+    }).fetchSemanticsNodes().map { it.config.getOrNull(SemanticsProperties.TestTag)!!.removePrefix("lp.group.") }
+
     @Test fun STR_13_column_orderIsPriorityNormalBuiltInThenQuiet() {
         render("order", dark = false)
-        val ids = if (orientation == "portrait") listOf("fam", "work", "_", "promo") else listOf("fam", "work")
-        val top = ids.map { rule.onNodeWithTag("lp.group.group:$it").getUnclippedBoundsInRoot().top.value }
-        assertEquals(top.sorted(), top)
+        val expected = listOf("group:fam", "group:work", "group:_", "group:promo")
+        val top = headTags()
+        scrollTo("Quiet", substring = true)
+        val bottom = headTags()
+        assertTrue("Priority first: $top", top.first() == "group:fam")
+        for (seen in listOf(top, bottom)) assertEquals(seen, expected.filter { it in seen })
+        assertTrue("Quiet last: $bottom", bottom.last() == "group:promo")
     }
 
-    @Test fun STR_13_column_selectingAWorkTitleShowsOnePersonFromEveryApp() {
+    @Test fun STR_13_column_aWorkSectionShowsOnePersonFromEveryApp() {
         render("work", dark = false)
-        rule.onNodeWithText("Work").performClick(); rule.waitForIdle()
+        // Updated from "selecting the Work title shows its rows": the rows are always there; the strip jumps to the section.
+        rule.onNodeWithTag("lp.strip.group:work").performClick(); rule.waitForIdle(); rule.mainClock.advanceTimeBy(1000)
+        rule.onNodeWithTag("lp.group.group:work").assertIsDisplayed()
         shown("Deck is ready"); shown("Review at 3?")
     }
 
@@ -147,12 +167,17 @@ abstract class LaunchpadGroupsCases(private val orientation: String) : Launchpad
 
     @Test fun STR_13_keyboard_arrowsReachAGroupTitleAndEnterSelectsIt() {
         render("keys", dark = false)
-        // Family head, its two rows, then the Work head.
+        // Family head, its two rows, then the Work head (every section is open, so the walk is one straight line).
         val log = ArrayList<String>()
         repeat(4) { rule.onNodeWithTag("lp.root").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.DirectionDown) }; rule.waitForIdle()
             log += rule.onAllNodes(androidx.compose.ui.test.isFocused()).fetchSemanticsNodes().map { n -> (n.config.getOrNull(SemanticsProperties.TestTag) ?: "?") }.joinToString("+") }
         assertEquals(listOf("lp.group.group:fam", "lp.focus.f1", "lp.focus.f2", "lp.group.group:work"), log)
-        rule.onNodeWithTag("lp.root").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) }
+        // Arrow left on a title folds it (the user's choice); arrow right opens it again. Nothing is folded by default.
+        shown("Deck is ready")
+        rule.onNodeWithTag("lp.root").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.DirectionLeft) }
+        rule.waitForIdle()
+        assertTrue(rule.onAllNodesWithText("Deck is ready").fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithTag("lp.root").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.DirectionRight) }
         rule.waitForIdle()
         shown("Deck is ready")
     }

@@ -119,3 +119,17 @@ and layout only. The items below need real fingers, a real window and real notif
 | 5 | TalkBack on: swipe through Launchpad | Titles read as selected or not selected tabs; the card reads "Home card. Return to home"; home icons behind the card are not reachable |
 | 6 | Remove animations (Accessibility) and open Launchpad | The card does not shrink gradually: it appears in place and the background cross-fades (NFR-14) |
 | 7 | Right-to-left language, drag in from the right edge | Card on the left, notifications on the right |
+
+## Added by wave 11 (notification tap-to-open and the roomy list, STR-02)
+
+| # | Step | Expected |
+| --- | --- | --- |
+| 1 | On Android 14 or later, open Launchpad, tap a WhatsApp message row | WhatsApp opens on that chat; Launchpad closes only after it did (the build 43 bug: Launchpad closed and nothing opened) |
+| 2 | Tap rows from a few other apps (a browser, a mail app, an app with a lock screen) and one whose notification is already gone | Each opens through its own intent; the gone one starts the app instead; if even that fails Launchpad stays open with "Couldn't open <app>" |
+| 3 | Tap a notification that auto-cancels | It disappears from the shade and from Launchpad; mark-read is kept for ones that do not |
+| 4 | Tap an action chip and send an inline reply | The action runs in the other app; a failed send shows a message instead of "Reply sent" |
+| 5 | Open Launchpad with 15 or more notifications in portrait and landscape, light and dark | Every section and every notification is in one scrolling list; rows are roomy (72 dp or more, 40 dp icon, bold title, two-line text, time at the end); nothing is a grey one-line title |
+| 6 | Look at a chat with several messages; tap "+N more", then "Show fewer" | Latest message first; the rest open and close in place |
+| 7 | Tap a title in the strip at the top | The list scrolls to that section; the strip highlights the section in view |
+| 8 | Keyboard: arrows walk the rows, left on a title folds it, right opens it, Esc returns home | As before (STR-08); nothing is folded until you fold it |
+| 9 | Android 13 or older device, if available | Tapping a row still opens the app |

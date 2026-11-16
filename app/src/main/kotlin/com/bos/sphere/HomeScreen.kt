@@ -911,6 +911,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 theme = prefs.launchpadTheme,
                 underlay = true,
                 cardFraction = { reveal.progress },
+                // STR-02: reports whether the app started, so a failed open keeps Launchpad up with a message.
+                launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit

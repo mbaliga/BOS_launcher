@@ -12,6 +12,6 @@ object NotificationActions {
                 ReplyTarget(action.remoteInputs.orEmpty(), first.resultKey, first.label?.toString())
             }
             val pi = action.actionIntent
-            HubAction(label = label, action = { runCatching { pi?.send() } }, intent = pi, reply = reply)
+            HubAction(label = label, action = { PendingIntentLauncher.fire(pi) }, intent = pi, reply = reply)
         } ?: emptyList()
 }

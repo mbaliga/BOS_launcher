@@ -1,5 +1,6 @@
 package com.bos.sphere.ui
 
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -122,13 +123,16 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
         assertTrue("overlay at the left edge (left=${b.left.value})", b.left.value <= 1f && b.right.value < rootW * 0.2f)
     }
 
-    @Test fun STR_01_card_titleSelectsASectionAndItsRowsSitBeneathIt() {
+    // Updated for wave 11 (STR-02): this used to select a title and expand only its rows (an accordion); now every title and every
+    // conversation's latest message sit in the one list, and older messages open in place behind "+N more".
+    @Test fun STR_02_card_everyTitleAndItsLatestRowAreInTheOneList() {
         render("select", dark = false, items = digestItems, policies = digestPolicies)
-        // No horizontally scrolling panes: every section title is a node of the one vertical list.
-        shown("Digest"); shown("Mum")
-        assertTrue(rule.onAllNodesWithText("Bring the dessert").fetchSemanticsNodes().isEmpty())
-        rule.onNodeWithText("Mum").performClick(); rule.waitForIdle()
-        shown("Bring the dessert")
+        fun scrollTo(t: String) { rule.onNodeWithTag("lp.list").performScrollToNode(androidx.compose.ui.test.hasText(t)); rule.waitForIdle() }
+        shown("Digest"); scrollTo("Mum"); shown("Mum")
+        scrollTo("Bring the dessert"); shown("Bring the dessert")
+        assertTrue("an older message is folded behind +N more", rule.onAllNodesWithText("Are you coming on Sunday?").fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithText("+1 more").performClick(); rule.waitForIdle()
+        scrollTo("Are you coming on Sunday?"); shown("Are you coming on Sunday?")
     }
 
     @Test fun STR_08_card_arrowsReachTitlesAndEscReturns() {

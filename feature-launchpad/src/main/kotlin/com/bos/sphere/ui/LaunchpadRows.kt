@@ -110,7 +110,7 @@ internal fun menuContextFor(n: HubNotification, replyAvailable: Boolean, unread:
 internal fun SectionHeader(
     sec: Section,
     collapsed: Boolean,
-    selected: Boolean,
+    first: Boolean,
     onToggle: () -> Unit,
     showRing: Boolean,
     requester: FocusRequester,
@@ -123,19 +123,23 @@ internal fun SectionHeader(
     badge: String = "",
 ) {
     var focused by remember { mutableStateOf(false) }
-    // The selected title is large and dark, the others small and grey (the owner's mock-up); there are no panes to scroll between.
+    // STR-02: a quiet title above its notifications; every section is open, and a hairline and extra air set it apart from the one above.
     Column(
         modifier.fillMaxWidth()
             .testTag("lp.group.${sec.key}")
-            .semantics { this.selected = selected; role = androidx.compose.ui.semantics.Role.Tab }
+            .semantics { role = androidx.compose.ui.semantics.Role.Tab }
             .onKeyEvent(onKey)
             .focusRequester(requester)
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
             .then(if (showRing && focused) Modifier.border(2.dp, FocusRing, RoundedCornerShape(10.dp)) else Modifier)
             .clickable(onClick = onToggle),
     ) {
+        if (!first) {
+            Spacer(Modifier.height(RoomyList.GROUP_GAP_DP.dp))
+            Box(Modifier.padding(horizontal = RoomyList.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
+        }
         Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = if (selected) 14.dp else 8.dp, bottom = if (selected) 6.dp else 4.dp),
+            Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = RoomyList.H_PAD_DP.dp, end = 8.dp, top = 8.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (accent != null) Box(Modifier.padding(end = 8.dp).size(10.dp).background(accent, CircleShape))
@@ -144,14 +148,11 @@ internal fun SectionHeader(
                 AppIcon(lead.packageName, sec.subtitle.ifBlank { sec.title }, 20, Modifier.padding(end = 8.dp))
             }
             Text(
-                sec.title,
-                color = if (selected) LocalLp.current.ink else LocalLp.current.dim,
-                fontSize = if (selected) 26.sp else 16.sp,
-                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                sec.title, color = LocalLp.current.dim, fontSize = 14.sp, fontWeight = FontWeight.Medium,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
             )
             val sub = listOf(sec.subtitle, extra).filter { it.isNotEmpty() }.joinToString(" · ")
-            if (sub.isNotEmpty() && selected) {
+            if (sub.isNotEmpty()) {
                 Text(
                     "  $sub", color = LocalLp.current.dim, fontSize = 12.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
@@ -162,7 +163,7 @@ internal fun SectionHeader(
                 "  ${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp,
                 modifier = Modifier.padding(end = 4.dp),
             )
-            if (selected && collapsed) Chevron(LocalLp.current.dim, down = false, size = 14)
+            if (collapsed) Chevron(LocalLp.current.dim, down = false, size = 14)
         }
     }
 }
@@ -173,7 +174,7 @@ internal fun HeldDigestLine(count: Int, timeText: String) {
     Text(
         L10n.tr("%d held for the digest at %s", count, timeText),
         color = LocalLp.current.dim, fontSize = 12.sp,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = RoomyList.H_PAD_DP.dp, vertical = 8.dp),
     )
 }
 
@@ -292,7 +293,8 @@ internal fun NotificationRow(
                 .then(if (showRing && focused) Modifier.border(2.dp, FocusRing, RoundedCornerShape(6.dp)) else Modifier)
                 .combinedClickable(onClick = { if (base > 0f) base = 0f else handlers.onOpen() }, onLongClick = handlers.onMenu)
                 .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
-                .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
+                .heightIn(min = RoomyList.ROW_MIN_DP.dp)
+                .padding(start = RoomyList.H_PAD_DP.dp, end = RoomyList.H_PAD_DP.dp, top = RoomyList.V_PAD_DP.dp, bottom = RoomyList.V_PAD_DP.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.width(3.dp).height(36.dp).background(
@@ -300,7 +302,7 @@ internal fun NotificationRow(
             ))
             Spacer(Modifier.width(10.dp))
             Box {
-                AppIcon(n.packageName, n.appLabel.ifBlank { n.title }, 40)
+                AppIcon(n.packageName, n.appLabel.ifBlank { n.title }, RoomyList.ICON_DP)
                 if (unread && !silent) {
                     Box(
                         Modifier.size(10.dp).align(Alignment.TopStart).offset((-3).dp, (-3).dp)
@@ -311,13 +313,14 @@ internal fun NotificationRow(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    n.title, color = LocalLp.current.ink, fontSize = 16.sp, fontWeight = weight,
+                    n.title, color = LocalLp.current.ink, fontSize = 17.sp, fontWeight = if (unread) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (n.summary.isNotEmpty()) {
                     Text(
-                        n.summary, color = if (unread && !silent) LocalLp.current.ink2 else LocalLp.current.dim, fontSize = 13.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        n.summary, color = if (unread && !silent) LocalLp.current.ink2 else LocalLp.current.dim, fontSize = 14.sp,
+                        fontWeight = FontWeight.Normal, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }

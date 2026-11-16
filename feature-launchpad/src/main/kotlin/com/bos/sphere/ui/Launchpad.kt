@@ -264,6 +264,11 @@ fun LaunchpadPanel(
      * never recomposes the panel. Used with [underlay] for the content fade-in and the reduced-motion cross-fade.
      */
     cardFraction: () -> Float = { 1f },
+    /**
+     * STR-02: starts an app's launcher activity and says whether it started. Used when a notification's own PendingIntent cannot be
+     * sent; unlike [onOpenApp] it must not close anything, so a failure leaves Launchpad open with a message. Null: [onOpenApp] is trusted.
+     */
+    launchApp: ((packageName: String) -> Boolean)? = null,
 ) {
     rememberLaunchpadInit()
     val dark = when (theme) {
@@ -328,12 +333,15 @@ fun LaunchpadPanel(
             onSnooze = { n, until -> LaunchpadSettings.snooze(n.key, until) },
             onRunAction = { a -> ReplyLogic.run(a) },
             onSendReply = { a, text -> ReplyLogic.send(ctx, a, text) },
+            runAction = { a -> ReplyLogic.run(a) },
+            sendReply = { a, text -> ReplyLogic.send(ctx, a, text) },
             onClose = onDismiss,
-            onOpenItem = { n ->
-                LaunchpadSettings.markRead(n.key)
-                val sent = n.contentIntent?.let { pi -> runCatching { pi.send() }.isSuccess } ?: false
-                if (!sent && n.packageName.isNotBlank()) onOpenApp(n.packageName)
-                onDismiss()
+            onOpenItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss) },
+            openItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss).ok },
+            openApp = { pkg ->
+                val ok = launchApp?.invoke(pkg) ?: run { onOpenApp(pkg); true }
+                if (ok) onDismiss()
+                ok
             },
             onOpenApp = { pkg -> onOpenApp(pkg); onDismiss() },
             onDismissItem = { NotificationProvider.dismiss(it.key) },
@@ -347,12 +355,22 @@ fun LaunchpadPanel(
     }
 }
 
+/** STR-02: the shared hand-off for a tapped notification: mark read, send its intent (or start the app), cancel if asked, then close. */
+private fun openThrough(
+    ctx: Context, n: HubNotification, launchApp: ((String) -> Boolean)?, onOpenApp: (String) -> Unit, onDismiss: () -> Unit,
+) = LaunchpadOpen.open(
+    n, ctx, launchApp ?: { pkg -> onOpenApp(pkg); true },
+    markRead = { LaunchpadSettings.markRead(it) }, cancel = { NotificationProvider.dismiss(it) }, close = onDismiss,
+)
+
 private sealed interface Entry {
     val key: String
-    data class Head(val sec: Section, val collapsed: Boolean) : Entry { override val key get() = "h:${sec.key}" }
+    data class Head(val sec: Section, val collapsed: Boolean, val first: Boolean = false) : Entry { override val key get() = "h:${sec.key}" }
     data class Item(val n: HubNotification, val sec: Section, val pinned: Boolean = sec.pinned) : Entry { override val key get() = "n:${n.key}" }
     /** STR-13: the by-app / by-conversation sub-heading inside a group section. */
     data class Sub(val title: String, val id: String) : Entry { override val key get() = "s:$id" }
+    /** STR-02: "+N more" (or "Show fewer") under a conversation's latest message; expanding is the user's choice. */
+    data class More(val id: String, val hidden: Int, val expanded: Boolean) : Entry { override val key get() = "m:$id" }
     data class Held(val count: Int, val at: Long?) : Entry { override val key get() = "held" }
 }
 
@@ -391,14 +409,21 @@ fun LaunchpadContent(
     onSnooze: (HubNotification, Long) -> Unit = { _, _ -> },
     onRunAction: (HubAction) -> Unit = {},
     onSendReply: (HubAction, String) -> Unit = { _, _ -> },
+    /** STR-02: a hand-off that reports success; when set it replaces [onOpenItem], and a false result keeps the column and says so. */
+    openItem: ((HubNotification) -> Boolean)? = null,
+    /** STR-02: like [onRunAction] and [onSendReply] but reporting whether the intent was sent; a failure is shown, never swallowed. */
+    runAction: ((HubAction) -> Boolean)? = null,
+    sendReply: ((HubAction, String) -> Boolean)? = null,
+    openApp: ((String) -> Boolean)? = null,
     zone: ZoneId = remember { ZoneId.systemDefault() },
 ) {
     val ctx = LocalContext.current
     val is24 = remember(ctx) { DateFormat.is24HourFormat(ctx) }
     var filter by remember { mutableStateOf<String?>(null) }
+    // STR-02: nothing is folded by default. A section folds only when the user asks (arrow left, pinch in); a conversation shows
+    // its latest message and "+N more", which the user expands in place.
     var collapsed by remember { mutableStateOf(setOf<String>()) }
-    // STR-01 (card layout): section titles are not panes; the selected title is large and its rows sit beneath it.
-    var selected by remember { mutableStateOf<String?>(null) }
+    var expandedConvs by remember { mutableStateOf(setOf<String>()) }
     var menuFor by remember { mutableStateOf<HubNotification?>(null) }
     var menuExpand by remember { mutableStateOf<RowCommand?>(null) }
     var replyFor by remember { mutableStateOf<String?>(null) }
@@ -428,7 +453,9 @@ fun LaunchpadContent(
             com.bos.sphere.core.data.LaunchpadAction.ClearAll -> onClearAll()
             com.bos.sphere.core.data.LaunchpadAction.Dismiss -> n?.takeIf { !it.isOngoing }?.let(onDismissItem)
             com.bos.sphere.core.data.LaunchpadAction.MarkRead -> n?.let { LaunchpadSettings.markRead(it.key); toast.value = L10n.tr("Marked as read") }
-            com.bos.sphere.core.data.LaunchpadAction.OpenApp -> if (pkg.isNotBlank()) onOpenApp(pkg)
+            com.bos.sphere.core.data.LaunchpadAction.OpenApp -> if (pkg.isNotBlank()) {
+                if (openApp == null) onOpenApp(pkg) else if (!openApp(pkg)) toast.value = L10n.tr("Couldn't open %s", n?.appLabel?.ifBlank { pkg } ?: pkg)
+            }
             com.bos.sphere.core.data.LaunchpadAction.MoreOptions -> { menuFor = n; menuExpand = null }
             com.bos.sphere.core.data.LaunchpadAction.MuteApp -> if (pkg.isNotBlank()) { onAddRule(Rule.create(RuleAction.Silent, packageName = pkg)); toast.value = L10n.tr("Muted") }
             com.bos.sphere.core.data.LaunchpadAction.HideApp -> if (pkg.isNotBlank()) { onAddRule(Rule.create(RuleAction.Hide, packageName = pkg)); toast.value = L10n.tr("Hidden") }
@@ -457,28 +484,43 @@ fun LaunchpadContent(
     val loadingGroups = resolver != null && groupedView == null
     val view = plainView ?: groupedView ?: LaunchpadView(emptyList(), emptyList(), null, emptySet())
     val sections = remember(view, fallbackTitle) { if (view.grouped.isEmpty()) view.sections else GroupColumn.sections(view.grouped, fallbackTitle) }
-    val selKey = sections.firstOrNull { it.key == selected }?.key ?: sections.firstOrNull()?.key
-    val shownCollapsed = remember(sections, selKey, collapsed) { sections.map { it.key }.filter { it != selKey || it in collapsed }.toSet() }
-    val entries = remember(view, shownCollapsed) {
+    val entries = remember(view, sections, collapsed, expandedConvs) {
         buildList<Entry> {
             if (view.held.isNotEmpty()) add(Entry.Held(view.held.size, view.nextRelease))
-            sections.forEach { sec ->
-                val isCollapsed = sec.key in shownCollapsed
-                add(Entry.Head(sec, isCollapsed))
+            // One list, every section and every notification in it (STR-02); a conversation folds only behind its own "+N more".
+            fun addRows(sec: Section, id: String, items: List<HubNotification>, pinned: Boolean) {
+                val open = id in expandedConvs
+                val shownRows = RoomyList.rows(id, items, open, pinned)
+                shownRows.forEach { add(Entry.Item(it, sec, pinned)) }
+                val hidden = RoomyList.hidden(id, items, pinned)
+                if (hidden > 0) add(Entry.More(id, hidden, open))
+            }
+            sections.forEachIndexed { i, sec ->
+                val isCollapsed = sec.key in collapsed
+                add(Entry.Head(sec, isCollapsed, first = i == 0 && view.held.isEmpty()))
                 if (!isCollapsed) {
                     val gs = view.grouped.firstOrNull { it.key == sec.key }
-                    if (gs == null) sec.items.forEach { add(Entry.Item(it, sec)) }
+                    if (gs == null) addRows(sec, sec.key, sec.items, sec.pinned)
                     else gs.sections.forEach { inner ->
                         if (GroupColumn.showSubHeads(gs)) add(Entry.Sub(inner.title, inner.key))
-                        inner.items.forEach { add(Entry.Item(it, sec, inner.pinned)) }
+                        addRows(sec, inner.key, inner.items, inner.pinned)
                     }
                 }
             }
         }
     }
 
+    val headIndex = remember(entries) { entries.withIndex().filter { it.value is Entry.Head }.associate { (it.value as Entry.Head).sec.key to it.index } }
     // ---- keyboard focus over groups and rows (STR-08) ----
-    val order = remember(sections, shownCollapsed) { LaunchpadFocus.order(sections, shownCollapsed) }
+    val order = remember(entries) {
+        entries.mapNotNull { e ->
+            when (e) {
+                is Entry.Head -> FocusTarget.Group(e.sec.key)
+                is Entry.Item -> FocusTarget.Row(e.n.key, e.sec.key)
+                else -> null
+            }
+        }
+    }
     var focus by remember { mutableStateOf<FocusTarget?>(null) }
     var pending by remember { mutableStateOf<FocusTarget?>(null) }
     val requesters = remember { HashMap<String, FocusRequester>() }
@@ -507,15 +549,15 @@ fun LaunchpadContent(
         pending = null
     }
     fun move(delta: Int) { LaunchpadFocus.move(order, focus, delta)?.let { focus = it; pending = it } }
-    /** Activating a title selects it (its rows appear beneath); activating the selected one again folds or unfolds its rows. */
+    /** Folds or unfolds a section: only ever the user's choice (arrow keys, pinch in, tapping a folded title). */
     fun toggleGroup(key: String, open: Boolean?) {
-        if (key != selKey) {
-            if (open == false) return
-            selected = key; collapsed = collapsed - key
-            return
-        }
         val isCollapsed = key in collapsed
         collapsed = if (open == null) (if (isCollapsed) collapsed - key else collapsed + key) else if (open) collapsed - key else collapsed + key
+    }
+    /** STR-02: the shared way to open a notification; a failed hand-off keeps Launchpad open and says so. */
+    fun open(n: HubNotification) {
+        if (openItem == null) onOpenItem(n)
+        else if (!openItem(n)) toast.value = L10n.tr("Couldn't open %s", n.appLabel.ifBlank { n.title })
     }
     fun listKey(e: androidx.compose.ui.input.key.KeyEvent): Boolean {
         if (e.type != KeyEventType.KeyDown) return false
@@ -543,7 +585,7 @@ fun LaunchpadContent(
 
     fun command(cmd: RowCommand, n: HubNotification) {
         when (cmd) {
-            RowCommand.Open -> onOpenItem(n)
+            RowCommand.Open -> open(n)
             RowCommand.Dismiss -> perform(com.bos.sphere.core.data.LaunchpadAction.Dismiss, n, sections)
             RowCommand.MarkRead -> perform(com.bos.sphere.core.data.LaunchpadAction.MarkRead, n, sections)
             RowCommand.Snooze -> { menuFor = n; menuExpand = RowCommand.Snooze }
@@ -604,7 +646,12 @@ fun LaunchpadContent(
                 if (!loadingGroups) Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text(L10n.tr(if (unreadOnly) "No unread notifications" else "All caught up"), color = LocalLp.current.dim, fontSize = 18.sp, fontWeight = FontWeight.Light)
                 }
-            } else LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), state = listState) {
+            } else Column(Modifier.fillMaxSize()) {
+              SectionStrip(sections, listState, headIndex, motion = com.bos.sphere.core.design.rememberMotionPrefs())
+              LazyColumn(
+                Modifier.fillMaxSize().navigationBarsPadding().testTag("lp.list"), state = listState,
+                verticalArrangement = Arrangement.spacedBy(RoomyList.ROW_GAP_DP.dp),
+              ) {
                 items(entries, key = { it.key }) { e ->
                     when (e) {
                         is Entry.Held -> HeldDigestLine(e.count, e.at?.let { formatStamp(it, now, is24, zone) } ?: "")
@@ -614,20 +661,26 @@ fun LaunchpadContent(
                             val target = FocusTarget.Group(sec.key)
                             val grp = view.grouped.firstOrNull { it.key == sec.key }?.group
                             SectionHeader(
-                                sec, e.collapsed, selected = sec.key == selKey, onToggle = { toggleGroup(sec.key, null) },
+                                sec, e.collapsed, first = e.first, onToggle = { if (e.collapsed) toggleGroup(sec.key, true) },
                                 accent = grp?.let { g -> g.colorArgb?.let { Color(it) } ?: if (g.priority == GroupPriority.Priority) BlueLight else null },
                                 badge = grp?.takeIf { it.priority != GroupPriority.Normal }?.let { GroupTexts.priorityLabel(it.priority) }.orEmpty(),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
                                 onKey = { ev ->
-                                    if (ev.type == KeyEventType.KeyDown && RowKeys.map(ev.key.nativeKeyCode) == RowKeys.Result.Activate) { toggleGroup(sec.key, null); true } else false
+                                    if (ev.type == KeyEventType.KeyDown && RowKeys.map(ev.key.nativeKeyCode) == RowKeys.Result.Activate && e.collapsed) { toggleGroup(sec.key, true); true } else false
                                 },
                                 extra = extra, modifier = Modifier.animateItem(),
                             )
                         }
-                        is Entry.Sub -> Text(
-                            e.title, color = LocalLp.current.dim, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 2.dp).testTag("lp.sub.${e.id}"),
-                        )
+                        is Entry.Sub -> Column(Modifier.fillMaxWidth().padding(top = RoomyList.GROUP_GAP_DP.dp)) {
+                            Box(Modifier.padding(horizontal = RoomyList.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
+                            Text(
+                                e.title, color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth().padding(start = RoomyList.H_PAD_DP.dp, end = RoomyList.H_PAD_DP.dp, top = 10.dp).testTag("lp.sub.${e.id}"),
+                            )
+                        }
+                        is Entry.More -> MoreLine(e.hidden, e.expanded, e.id) {
+                            expandedConvs = if (e.expanded) expandedConvs - e.id else expandedConvs + e.id
+                        }
                         is Entry.Item -> {
                             val n = e.n
                             val target = FocusTarget.Row(n.key, e.sec.key)
@@ -640,12 +693,18 @@ fun LaunchpadContent(
                                 silent = n.key in view.silentKeys,
                                 leftAction = leftAction,
                                 handlers = RowHandlers(
-                                    onOpen = { onOpenItem(n) },
+                                    onOpen = { open(n) },
                                     onPrimary = { perform(leftAction, n, sections) },
                                     onCommand = { command(it, n) },
                                     onMenu = { menuFor = n; menuExpand = null },
-                                    onRunAction = onRunAction,
-                                    onSendReply = { a, t -> onSendReply(a, t); replyFor = null; toast.value = L10n.tr("Reply sent") },
+                                    onRunAction = { a ->
+                                        if (runAction == null) onRunAction(a) else if (!runAction(a)) toast.value = L10n.tr("Couldn't open %s", a.label.ifBlank { n.appLabel })
+                                    },
+                                    onSendReply = { a, t ->
+                                        if (sendReply == null) { onSendReply(a, t); replyFor = null; toast.value = L10n.tr("Reply sent") }
+                                        else if (sendReply(a, t)) { replyFor = null; toast.value = L10n.tr("Reply sent") }
+                                        else toast.value = L10n.tr("Couldn't open %s", n.appLabel.ifBlank { n.title })
+                                    },
                                 ),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
                                 onPointer = tracker::onPointer, onKeyOther = keyHandler,
@@ -655,6 +714,7 @@ fun LaunchpadContent(
                         }
                     }
                 }
+              }
             }
         }
     }

@@ -150,7 +150,7 @@ object MediaNow {
     fun openPlayer(context: Context) {
         val c = current ?: return
         val pi = c.sessionActivity
-        if (pi != null && runCatching { pi.send() }.isSuccess) return
+        if (PendingIntentLauncher.fire(pi, context)) return
         context.packageManager.getLaunchIntentForPackage(c.packageName)?.let {
             runCatching { context.startActivity(it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }

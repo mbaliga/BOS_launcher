@@ -73,6 +73,6 @@ fun ColumnScope.DesktopPane() {
     if (identities.isEmpty()) Text(L10n.tr("None yet. A display appears here after you open the desktop on it."), color = HyleColors.InkDim, fontSize = 12.sp)
     identities.forEach { id ->
         var profile by remember(id, bump) { mutableStateOf(controller.profiles.load(id)) }
-        DisplayProfileEditor(id.substringAfterLast(':'), profile, { p -> profile = p; controller.profiles.save(id, p) }, Modifier.padding(vertical = 8.dp))
+        DisplayProfileEditor(com.bos.sphere.feature.desktop.DisplayIdentity.label(id), profile, { p -> profile = p; controller.profiles.save(id, p) }, Modifier.padding(vertical = 8.dp))
     }
 }

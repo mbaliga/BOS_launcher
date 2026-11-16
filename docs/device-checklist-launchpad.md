@@ -96,3 +96,13 @@ and layout only. The items below need real fingers, a real window and real notif
 | 6 | Revoke usage access, tap the enable row in the dock | The explanation screen first, then the system usage access page |
 | 7 | Ground Control, Launchpad, Access Liftoff asks for | Five rows, each showing On or Off. Each row opens the explanation, then the system route (contacts and microphone prompt, folders picker, the two settings pages) |
 | 8 | Reply inline to a messaging notification from Launchpad | The text arrives in the other app and the notification updates |
+
+## Added by the wave 6 audit (streams and external display)
+
+| # | Step | Expected |
+| --- | --- | --- |
+| 1 | Notification access off. Show the media strip, tap the grant chip, turn access on, come back | The strip fills in with the playing session at once, without leaving and re-entering home (STR-05, STR-06) |
+| 2 | Switch the UI language to Arabic. Look at the left-edge handle, the waiting indicator and the rail, then drag in from the left edge | All three sit on the physical left edge, where the drag starts; the indicator reads count then title left to right (STR-01, STR-09) |
+| 3 | A new notification arrives (indicator widens), then dismiss it from the shade within three seconds | The indicator returns to its slim width after about three and a half seconds (STR-09) |
+| 4 | Place the digest widget. Set an app to Digest with a release time a few minutes ahead | At that time the widget lists the released items within about a minute, not half an hour later (STR-11) |
+| 5 | Desktop surface on an external display, phone panel open. Type a letter, press the arrow keys and Tab, then the return key | The drawer opens, a ring moves over the apps, return opens the highlighted one (EXT-10) |

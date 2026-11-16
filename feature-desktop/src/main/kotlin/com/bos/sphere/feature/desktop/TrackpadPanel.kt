@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -82,11 +87,12 @@ fun TrackpadPanel(modifier: Modifier = Modifier) {
         ) { Text(L10n.tr("Trackpad"), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             listOf("Esc" to PanelKey.Escape, "Tab" to PanelKey.Tab, "⌫" to PanelKey.Backspace, "↵" to PanelKey.Enter).forEach { (label, key) ->
-                Box(
-                    Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { DesktopInputBus.send(InputCommand.Key(key)) }.padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) { Text(label, color = MaterialTheme.colorScheme.onSurface) }
+                PanelKeyButton(label, key)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            listOf("←" to PanelKey.Left, "↑" to PanelKey.Up, "↓" to PanelKey.Down, "→" to PanelKey.Right).forEach { (label, key) ->
+                PanelKeyButton(label, key)
             }
         }
         Text(L10n.tr("Type here"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
@@ -102,4 +108,27 @@ fun TrackpadPanel(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(14.dp),
         )
     }
+}
+
+@Composable
+private fun RowScope.PanelKeyButton(label: String, key: PanelKey) {
+    val spoken = L10n.tr(panelKeyName(key))
+    Box(
+        Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            .semantics { role = Role.Button; contentDescription = spoken }
+            .clickable { DesktopInputBus.send(InputCommand.Key(key)) }.padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, color = MaterialTheme.colorScheme.onSurface) }
+}
+
+/** English name of a panel key for screen readers; the glyphs on the buttons (a backspace sign, arrows) read badly aloud. */
+internal fun panelKeyName(key: PanelKey): String = when (key) {
+    PanelKey.Escape -> "Escape key"
+    PanelKey.Tab -> "Tab key"
+    PanelKey.Backspace -> "Backspace key"
+    PanelKey.Enter -> "Enter key"
+    PanelKey.Left -> "Left arrow key"
+    PanelKey.Up -> "Up arrow key"
+    PanelKey.Down -> "Down arrow key"
+    PanelKey.Right -> "Right arrow key"
 }

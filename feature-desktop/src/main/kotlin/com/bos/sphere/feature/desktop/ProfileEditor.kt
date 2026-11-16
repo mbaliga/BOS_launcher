@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,6 +60,6 @@ internal fun Pill(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         label, color = if (selected) c.onPrimary else c.onSurface, fontSize = 13.sp,
         modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(if (selected) c.primary else c.surfaceVariant)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp).semantics { role = Role.RadioButton },
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp).semantics { role = Role.RadioButton; this.selected = selected },
     )
 }

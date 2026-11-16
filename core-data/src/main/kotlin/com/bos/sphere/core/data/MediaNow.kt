@@ -63,6 +63,12 @@ object MediaLogic {
         return maxOf(1, (w * f).toInt()) to maxOf(1, (h * f).toInt())
     }
 
+    /**
+     * STR-05: a watcher that started before notification access was granted stays blind until it re-attaches.
+     * True when someone is watching and the last attach was refused, so the grant coming through must re-attach.
+     */
+    fun needsReattach(watchers: Int, needsAccess: Boolean): Boolean = watchers > 0 && needsAccess
+
     /** Title shown when the player gives none. */
     fun displayTitle(title: String?, fallback: String): String = title?.takeIf { it.isNotBlank() } ?: fallback
 }
@@ -94,8 +100,20 @@ object MediaNow {
 
     /** Starts watching (reference counted: pair every call with [stop]). Call on the main thread. */
     fun start(context: Context) {
-        if (refCount++ > 0) return
-        val ctx = context.applicationContext
+        if (refCount++ > 0) { if (MediaLogic.needsReattach(refCount, _needsAccess.value)) attach(context.applicationContext); return }
+        attach(context.applicationContext)
+    }
+
+    /**
+     * Called by the notification listener when it connects, which is what the system does right after the user turns
+     * notification access on (STR-05, STR-06): a strip that was watching without access starts seeing sessions at once.
+     */
+    fun onAccessMayHaveChanged() {
+        val ctx = appContext ?: return
+        if (MediaLogic.needsReattach(refCount, _needsAccess.value)) attach(ctx)
+    }
+
+    private fun attach(ctx: Context) {
         appContext = ctx
         val mgr = ctx.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager ?: return
         manager = mgr

@@ -109,6 +109,12 @@ object NotificationProvider {
     val notifications: Flow<List<HubNotification>> get() =
         kotlinx.coroutines.flow.combine(_state, displayFilter) { list, allowed -> if (allowed == null) list else list.filter { it.packageName in allowed } }
 
+    /**
+     * The same list as [notifications] right now, readable without collecting. A collector that starts with this as its
+     * initial value never sees an empty first frame, so nothing already waiting looks new (STR-09).
+     */
+    val snapshot: List<HubNotification> get() = _state.value.let { list -> displayFilter.value?.let { allowed -> list.filter { it.packageName in allowed } } ?: list }
+
     /** Display-only filter set by the active workspace (WSP-08): the apps allowed to show; null shows everything. */
     val displayFilter = MutableStateFlow<Set<String>?>(null)
 
@@ -152,6 +158,7 @@ class SphereNotificationListener : NotificationListenerService() {
     }
 
     override fun onListenerConnected() {
+        MediaNow.onAccessMayHaveChanged()
         updateNotifications()
     }
 

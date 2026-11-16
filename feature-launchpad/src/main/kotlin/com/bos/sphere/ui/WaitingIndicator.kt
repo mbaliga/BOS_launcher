@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bos.sphere.core.data.HubNotification
 import com.bos.sphere.core.data.LaunchpadSettings
 import com.bos.sphere.core.data.NotificationProvider
 import com.bos.sphere.core.data.WaitingLogic
@@ -45,7 +46,7 @@ import java.time.ZoneId
 fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     remember(ctx) { LaunchpadSettings.init(ctx); true }
-    val items by NotificationProvider.notifications.collectAsStateWithLifecycle(emptyList())
+    val items by NotificationProvider.notifications.collectAsStateWithLifecycle(remember { NotificationProvider.snapshot })
     val rules by LaunchpadSettings.rules.collectAsStateWithLifecycle()
     val policies by LaunchpadSettings.policies.collectAsStateWithLifecycle()
     val snoozed by LaunchpadSettings.snoozed.collectAsStateWithLifecycle()
@@ -56,20 +57,27 @@ fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier)
     val waiting = remember(items, rules, policies, snoozed, read, now) {
         WaitingLogic.waiting(items, rules, policies, read, snoozed, now, ZoneId.systemDefault())
     }
+    val headline = rememberWaitingHeadline(waiting)
+    WaitingIndicatorView(if (access) waiting.size else 0, headline, onOpen, modifier)
+}
+
+/**
+ * The title of the newest item that just started to wait, for [expandMs]. The timer is keyed on the headline itself, so a
+ * later change of the list that brings no new item (a row dismissed while the indicator is wide) cannot cancel it and
+ * leave the indicator widened for good.
+ */
+@Composable
+internal fun rememberWaitingHeadline(waiting: List<HubNotification>, expandMs: Long = WaitingLogic.EXPAND_MS): String? {
     var seen by remember { mutableStateOf<Set<String>?>(null) }
-    var headline by remember { mutableStateOf<String?>(null) }
+    var shown by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    var counter by remember { mutableStateOf(0) }
     LaunchedEffect(waiting) {
         val before = seen
         seen = waiting.map { it.key }.toSet()
-        if (before != null) {
-            WaitingLogic.fresh(before, waiting).maxByOrNull { it.timestamp }?.let { n ->
-                headline = n.title
-                delay(WaitingLogic.EXPAND_MS)
-                headline = null
-            }
-        }
+        if (before != null) WaitingLogic.fresh(before, waiting).maxByOrNull { it.timestamp }?.let { n -> counter += 1; shown = counter to n.title }
     }
-    WaitingIndicatorView(if (access) waiting.size else 0, headline, onOpen, modifier)
+    LaunchedEffect(shown) { if (shown != null) { delay(expandMs); shown = null } }
+    return shown?.second
 }
 
 /** The drawn indicator, separate from the data so it can be shown in tests. */
@@ -77,6 +85,8 @@ fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier)
 fun WaitingIndicatorView(count: Int, headline: String?, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     if (count <= 0) return
     val desc = L10n.tr("%d waiting. Launchpad", count)
+    // The indicator hugs the physical left edge, where Launchpad opens from, so it is laid out left to right in every language.
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr) {
     Row(
         modifier
             .focusProperties { canFocus = false }
@@ -92,5 +102,6 @@ fun WaitingIndicatorView(count: Int, headline: String?, onOpen: () -> Unit, modi
         if (headline != null) {
             Text(headline, color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp).width(140.dp))
         }
+    }
     }
 }

@@ -278,7 +278,7 @@ fun LaunchpadPanel(
     ) {
         RestoreFocusOnExit()
         val ctx = LocalContext.current
-        val items by NotificationProvider.notifications.collectAsStateWithLifecycle(emptyList())
+        val items by NotificationProvider.notifications.collectAsStateWithLifecycle(remember { NotificationProvider.snapshot })
         val rules by LaunchpadSettings.rules.collectAsStateWithLifecycle()
         val prefs by LaunchpadSettings.prefs.collectAsStateWithLifecycle()
         val read by LaunchpadSettings.readKeys.collectAsStateWithLifecycle()
@@ -290,9 +290,8 @@ fun LaunchpadPanel(
         val gestures by LaunchpadSettings.gestures.collectAsStateWithLifecycle()
         val sys = rememberSystemSnapshot()
         LaunchedEffect(items) {
-            LaunchpadSettings.pruneRead(items.map { it.key }.toSet())
-            // An empty feed can be the listener reconnecting; do not forget snoozes because of it.
-            if (items.isNotEmpty()) LaunchpadSettings.pruneSnoozed(items.map { it.key }.toSet(), System.currentTimeMillis())
+            // An empty feed can be the listener reconnecting; neither read marks nor snoozes are forgotten because of it.
+            LaunchpadSettings.pruneToFeed(items.map { it.key }.toSet(), System.currentTimeMillis())
         }
 
         LaunchpadContent(
@@ -744,7 +743,7 @@ fun LaunchpadRail(
     Column(
         modifier
             .width(44.dp)
-            .clip(RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp))
+            .clip(androidx.compose.foundation.shape.AbsoluteRoundedCornerShape(topRight = 22.dp, bottomRight = 22.dp))
             .background(Color(0xB30B0D14))
             .semantics(mergeDescendants = true) { contentDescription = L10n.tr("%d unread. Launchpad", total) }
             .clickable(onClick = onOpen, onClickLabel = L10n.tr("Open"))

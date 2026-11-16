@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
@@ -1044,17 +1045,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         grantPrompter.Host()
 
+        // STR-01/STR-09: the Launchpad opens from the physical left edge in every language, so these sit there too (not at the layout start, which is the right in RTL).
+        val leftEdge = androidx.compose.ui.BiasAbsoluteAlignment(-1f, 0f)
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
         // (tap it, or swipe in from the left edge) so it is always discoverable.
         if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen) {
             if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && prefs.launchpadRail) {
-                com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(Alignment.CenterStart))
+                com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge))
             }
             if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && !prefs.launchpadRail) {
-                com.bos.sphere.ui.LaunchpadWaitingIndicator(onOpen = { leftOpen = true }, modifier = Modifier.align(Alignment.CenterStart).padding(bottom = 260.dp))
+                com.bos.sphere.ui.LaunchpadWaitingIndicator(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge).padding(bottom = 260.dp))
             }
             Box(
-                Modifier.align(Alignment.CenterStart).padding(start = 2.dp).width(5.dp).height(64.dp)
+                Modifier.align(leftEdge).absolutePadding(left = 2.dp).width(5.dp).height(64.dp)
                     .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
             )
             // Kept narrow so it never sits over the first column of icons; tall so it is still easy to hit.

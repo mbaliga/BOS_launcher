@@ -83,10 +83,14 @@ object DigestWidget {
 
     fun currentModel(context: Context, items: List<HubNotification>, now: Long = System.currentTimeMillis()): DigestWidgetModel {
         LaunchpadSettings.init(context)
+        com.bos.sphere.core.data.GroupsSettings.init(context)
         val zone = ZoneId.systemDefault()
+        // STR-13: a Priority group's notifications bypass the digest here too, so the widget agrees with Launchpad.
+        val groups = com.bos.sphere.core.data.GroupsSettings.snapshot()
+        val resolver = if (groups.groups.isEmpty()) null else com.bos.sphere.core.data.GroupResolver(groups, ContactsRuntime.peek(), zone)
         val view = LaunchpadViewBuilder.build(
             items, LaunchpadSettings.rules.value, LaunchpadSettings.prefs.value, LaunchpadSettings.policies.value,
-            LaunchpadSettings.snoozed.value, now, zone, digestLabel = L10n.tr("Digest"),
+            LaunchpadSettings.snoozed.value, now, zone, digestLabel = L10n.tr("Digest"), grouping = resolver,
         )
         return DigestWidgetLogic.model(view, now, zone, L10n.tr("Digest")) { k, a -> L10n.tr(k, *a) }
     }

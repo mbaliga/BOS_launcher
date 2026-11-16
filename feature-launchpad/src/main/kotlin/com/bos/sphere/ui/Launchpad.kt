@@ -111,6 +111,13 @@ import androidx.compose.ui.input.InputMode as ComposeInputMode
 import com.bos.sphere.core.input.InputMode
 import com.bos.sphere.core.input.InputModeTracker
 import com.bos.sphere.core.data.GroupMode
+import com.bos.sphere.core.data.ContactDirectory
+import com.bos.sphere.core.data.GroupPriority
+import com.bos.sphere.core.data.GroupResolver
+import com.bos.sphere.core.data.GroupsConfig
+import com.bos.sphere.core.data.GroupsSettings
+import com.bos.sphere.core.data.NoContacts
+import com.bos.sphere.core.data.RuleDrafts
 import com.bos.sphere.core.data.HubNotification
 import com.bos.sphere.core.data.LaunchpadLogic
 import com.bos.sphere.core.data.LaunchpadPrefs
@@ -164,7 +171,7 @@ internal fun lpAccentFill(accent: Color): Color {
 @Composable
 private fun rememberLaunchpadInit() {
     val ctx = LocalContext.current
-    remember(ctx) { LaunchpadSettings.init(ctx); DigestWidget.start(ctx); true }
+    remember(ctx) { LaunchpadSettings.init(ctx); GroupsSettings.init(ctx); DigestWidget.start(ctx); true }
 }
 
 /** True while the user has granted notification access; re-checked every time the app resumes. */
@@ -302,6 +309,8 @@ fun LaunchpadPanel(
         val asked = rememberGrantAsked(GrantKind.Notifications)
         val now = rememberNow()
         val gestures by LaunchpadSettings.gestures.collectAsStateWithLifecycle()
+        val groups by GroupsSettings.config.collectAsStateWithLifecycle()
+        val contacts = rememberContactDirectory()
         val sys = rememberSystemSnapshot()
         LaunchedEffect(items) {
             // An empty feed can be the listener reconnecting; neither read marks nor snoozes are forgotten because of it.
@@ -313,6 +322,7 @@ fun LaunchpadPanel(
             gestures = gestures,
             endInset = cardInset,
             policies = policies, snoozed = snoozed, askedBefore = asked,
+            groups = groups, contacts = contacts,
             systemState = sys,
             onOpenSystemPanel = { openSystemPanel(ctx, it) },
             onSnooze = { n, until -> LaunchpadSettings.snooze(n.key, until) },
@@ -340,7 +350,9 @@ fun LaunchpadPanel(
 private sealed interface Entry {
     val key: String
     data class Head(val sec: Section, val collapsed: Boolean) : Entry { override val key get() = "h:${sec.key}" }
-    data class Item(val n: HubNotification, val sec: Section) : Entry { override val key get() = "n:${n.key}" }
+    data class Item(val n: HubNotification, val sec: Section, val pinned: Boolean = sec.pinned) : Entry { override val key get() = "n:${n.key}" }
+    /** STR-13: the by-app / by-conversation sub-heading inside a group section. */
+    data class Sub(val title: String, val id: String) : Entry { override val key get() = "s:$id" }
     data class Held(val count: Int, val at: Long?) : Entry { override val key get() = "held" }
 }
 
@@ -371,6 +383,9 @@ fun LaunchpadContent(
     policies: List<AppPolicy> = emptyList(),
     snoozed: Map<String, Long> = emptyMap(),
     askedBefore: Boolean = false,
+    /** STR-13: the user's groups; with none, the column is exactly as before. */
+    groups: GroupsConfig = GroupsConfig(),
+    contacts: ContactDirectory = NoContacts,
     systemState: SystemSnapshot? = null,
     onOpenSystemPanel: (SystemTileKind) -> Unit = {},
     onSnooze: (HubNotification, Long) -> Unit = { _, _ -> },
@@ -388,6 +403,8 @@ fun LaunchpadContent(
     var menuExpand by remember { mutableStateOf<RowCommand?>(null) }
     var replyFor by remember { mutableStateOf<String?>(null) }
     var unreadOnly by remember { mutableStateOf(false) }
+    var groupFor by remember { mutableStateOf<HubNotification?>(null) }
+    var ruleFrom by remember { mutableStateOf<HubNotification?>(null) }
     val shown = remember(items, readKeys, unreadOnly) { if (unreadOnly) items.filter { it.key !in readKeys } else items }
     val toast = remember { mutableStateOf<String?>(null) }
     LaunchedEffect(toast.value) { if (toast.value != null) { delay(1400); toast.value = null } }
@@ -424,15 +441,22 @@ fun LaunchpadContent(
     val counts = remember(visible) { LaunchpadLogic.countsBySource(visible) }
     val activeFilter = filter?.takeIf { f -> counts.any { it.packageName == f } }
     val digestLabel = L10n.tr("Digest")
-    val view = remember(shown, rules, prefs, policies, snoozed, now, activeFilter, zone) {
-        LaunchpadViewBuilder.build(
-            LaunchpadLogic.filter(shown, activeFilter), rules, prefs, policies, snoozed, now, zone,
-            digestLabel = digestLabel,
-            todayLabel = L10n.tr("Today"), yesterdayLabel = L10n.tr("Yesterday"),
-            pinnedLabel = L10n.tr("Pinned"), flatLabel = L10n.tr("All"),
-        )
+    val todayLabel = L10n.tr("Today"); val yesterdayLabel = L10n.tr("Yesterday"); val pinnedLabel = L10n.tr("Pinned"); val flatLabel = L10n.tr("All")
+    val fallbackTitle = L10n.tr("Everything else")
+    val resolver = remember(groups, contacts, zone) { if (groups.groups.isEmpty()) null else GroupResolver(groups, contacts, zone) }
+    fun buildView(r: GroupResolver?) = LaunchpadViewBuilder.build(
+        LaunchpadLogic.filter(shown, activeFilter), rules, prefs, policies, snoozed, now, zone,
+        digestLabel = digestLabel, todayLabel = todayLabel, yesterdayLabel = yesterdayLabel, pinnedLabel = pinnedLabel, flatLabel = flatLabel,
+        grouping = r,
+    )
+    val plainView = remember(shown, rules, prefs, policies, snoozed, now, activeFilter, zone, resolver) { if (resolver == null) buildView(null) else null }
+    // STR-13: with groups the matching runs off the main thread; until the first result the column shows nothing rather than the wrong sections.
+    val groupedView by produceState<LaunchpadView?>(null, shown, rules, prefs, policies, snoozed, now, activeFilter, zone, resolver) {
+        value = if (resolver == null) null else withContext(Dispatchers.Default) { buildView(resolver) }
     }
-    val sections = view.sections
+    val loadingGroups = resolver != null && groupedView == null
+    val view = plainView ?: groupedView ?: LaunchpadView(emptyList(), emptyList(), null, emptySet())
+    val sections = remember(view, fallbackTitle) { if (view.grouped.isEmpty()) view.sections else GroupColumn.sections(view.grouped, fallbackTitle) }
     val selKey = sections.firstOrNull { it.key == selected }?.key ?: sections.firstOrNull()?.key
     val shownCollapsed = remember(sections, selKey, collapsed) { sections.map { it.key }.filter { it != selKey || it in collapsed }.toSet() }
     val entries = remember(view, shownCollapsed) {
@@ -441,7 +465,14 @@ fun LaunchpadContent(
             sections.forEach { sec ->
                 val isCollapsed = sec.key in shownCollapsed
                 add(Entry.Head(sec, isCollapsed))
-                if (!isCollapsed) sec.items.forEach { add(Entry.Item(it, sec)) }
+                if (!isCollapsed) {
+                    val gs = view.grouped.firstOrNull { it.key == sec.key }
+                    if (gs == null) sec.items.forEach { add(Entry.Item(it, sec)) }
+                    else gs.sections.forEach { inner ->
+                        if (GroupColumn.showSubHeads(gs)) add(Entry.Sub(inner.title, inner.key))
+                        inner.items.forEach { add(Entry.Item(it, sec, inner.pinned)) }
+                    }
+                }
             }
         }
     }
@@ -503,6 +534,12 @@ fun LaunchpadContent(
         }
     }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { rootReq.requestFocus() } }
+    // The handler is read through updated state: with groups the first composition has no sections yet (they are matched off the
+    // main thread), and a handler captured then would see an empty focus order for good.
+    // (A holder, not state: two references to a local function compare equal whatever they captured, so state would never update.)
+    val listKeyNow = remember { arrayOf<(androidx.compose.ui.input.key.KeyEvent) -> Boolean>({ false }) }
+    androidx.compose.runtime.SideEffect { listKeyNow[0] = ::listKey }
+    val keyHandler = remember { { ev: androidx.compose.ui.input.key.KeyEvent -> listKeyNow[0](ev) } }
 
     fun command(cmd: RowCommand, n: HubNotification) {
         when (cmd) {
@@ -514,6 +551,8 @@ fun LaunchpadContent(
             RowCommand.HideApp -> perform(com.bos.sphere.core.data.LaunchpadAction.HideApp, n, sections)
             RowCommand.PinSender -> perform(com.bos.sphere.core.data.LaunchpadAction.PinSender, n, sections)
             RowCommand.MakeRule -> { menuFor = n; menuExpand = RowCommand.MakeRule }
+            RowCommand.MoveToGroup -> groupFor = n
+            RowCommand.GroupRule -> ruleFrom = n
             RowCommand.Reply -> replyFor = if (replyFor == n.key) null else n.key
         }
     }
@@ -525,7 +564,7 @@ fun LaunchpadContent(
             .then(if (endInset > 0.dp) Modifier else Modifier.background(Brush.verticalGradient(listOf(LocalLp.current.bg, androidx.compose.ui.graphics.lerp(LocalLp.current.bg, LocalLp.current.surface, 0.55f)))))
             .testTag("lp.root")
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
-            .onKeyEvent(::listKey)
+            .onKeyEvent(keyHandler)
             .focusRequester(rootReq)
             .focusable()
             .pointerInput(Unit) { detectTapGestures { } }
@@ -562,7 +601,7 @@ fun LaunchpadContent(
             colors = GrantColors(LocalLp.current.bg, LocalLp.current.surface, LocalLp.current.ink, LocalLp.current.dim, BlueLight, Color.White),
         ) {
             if (entries.isEmpty()) {
-                Box(Modifier.fillMaxSize(), Alignment.Center) {
+                if (!loadingGroups) Box(Modifier.fillMaxSize(), Alignment.Center) {
                     Text(L10n.tr(if (unreadOnly) "No unread notifications" else "All caught up"), color = LocalLp.current.dim, fontSize = 18.sp, fontWeight = FontWeight.Light)
                 }
             } else LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), state = listState) {
@@ -573,8 +612,11 @@ fun LaunchpadContent(
                             val sec = e.sec
                             val extra = if (sec.key == LaunchpadView.DIGEST_KEY && view.nextRelease != null) L10n.tr("next at %s", formatStamp(view.nextRelease!!, now, is24, zone)) else ""
                             val target = FocusTarget.Group(sec.key)
+                            val grp = view.grouped.firstOrNull { it.key == sec.key }?.group
                             SectionHeader(
                                 sec, e.collapsed, selected = sec.key == selKey, onToggle = { toggleGroup(sec.key, null) },
+                                accent = grp?.let { g -> g.colorArgb?.let { Color(it) } ?: if (g.priority == GroupPriority.Priority) BlueLight else null },
+                                badge = grp?.takeIf { it.priority != GroupPriority.Normal }?.let { GroupTexts.priorityLabel(it.priority) }.orEmpty(),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
                                 onKey = { ev ->
                                     if (ev.type == KeyEventType.KeyDown && RowKeys.map(ev.key.nativeKeyCode) == RowKeys.Result.Activate) { toggleGroup(sec.key, null); true } else false
@@ -582,6 +624,10 @@ fun LaunchpadContent(
                                 extra = extra, modifier = Modifier.animateItem(),
                             )
                         }
+                        is Entry.Sub -> Text(
+                            e.title, color = LocalLp.current.dim, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 2.dp).testTag("lp.sub.${e.id}"),
+                        )
                         is Entry.Item -> {
                             val n = e.n
                             val target = FocusTarget.Row(n.key, e.sec.key)
@@ -590,7 +636,7 @@ fun LaunchpadContent(
                             NotificationRow(
                                 n = n, unread = n.key !in readKeys, now = now, is24 = is24, zone = zone,
                                 important = LaunchpadLogic.isImportant(n, rules),
-                                pinned = e.sec.pinned,
+                                pinned = e.pinned,
                                 silent = n.key in view.silentKeys,
                                 leftAction = leftAction,
                                 handlers = RowHandlers(
@@ -602,7 +648,7 @@ fun LaunchpadContent(
                                     onSendReply = { a, t -> onSendReply(a, t); replyFor = null; toast.value = L10n.tr("Reply sent") },
                                 ),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
-                                onPointer = tracker::onPointer, onKeyOther = ::listKey,
+                                onPointer = tracker::onPointer, onKeyOther = keyHandler,
                                 replyOpen = replyFor == n.key,
                                 modifier = Modifier.animateItem(),
                             )
@@ -620,6 +666,16 @@ fun LaunchpadContent(
                 modifier = Modifier.background(Color(0xE6202228), RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 9.dp),
             )
         }
+    }
+    groupFor?.let { n ->
+        GroupAssignSheet(
+            n, groups, contacts, items,
+            onMakeRule = { groupFor = null; ruleFrom = n },
+            onDone = { m -> groupFor = null; m?.let { toast.value = it } },
+        )
+    }
+    ruleFrom?.let { n ->
+        GroupRuleSheet(n, groups, contacts, items, onDone = { m -> ruleFrom = null; m?.let { toast.value = it } })
     }
     menuFor?.let { n ->
         RowMenuSheet(

@@ -49,6 +49,8 @@ data class StateParts(
     val launchpadGestures: Map<LaunchpadGesture, LaunchpadAction> = LaunchpadGestures.defaults,
     /** STR-04: per-app delivery policies. */
     val launchpadPolicies: List<AppPolicy> = emptyList(),
+    /** STR-13: groups, people links, assignments, rules and the user's last name. Null: not present in the file (older files), so import leaves the live groups untouched. */
+    val launchpadGroups: GroupsConfig? = null,
     val extras: StateExtras = StateExtras(),
 )
 
@@ -157,7 +159,8 @@ object StateCodec {
                 .put("rules", JSONArray(LaunchpadJson.encodeRules(parts.launchpadRules)))
                 .put("prefs", JSONObject(LaunchpadJson.encodePrefs(parts.launchpadPrefs)))
                 .put("gestures", LaunchpadGestures.encode(parts.launchpadGestures))
-                .put("policies", PolicyJson.encode(parts.launchpadPolicies)),
+                .put("policies", PolicyJson.encode(parts.launchpadPolicies))
+                .apply { parts.launchpadGroups?.let { put("groups", GroupsJson.encode(it)) } },
         )
         for (s in StateSchema.OPAQUE_SECTIONS) o.put(s, parts.extras.opaque[s] ?: JSONArray())
         o.put(
@@ -231,6 +234,7 @@ object StateCodec {
                 launchpadPrefs = LaunchpadJson.decodePrefs(lp?.optJSONObject("prefs")?.toString()),
                 launchpadGestures = LaunchpadGestures.decode(lp?.optString("gestures")),
                 launchpadPolicies = PolicyJson.decode(lp?.optJSONArray("policies")),
+                launchpadGroups = lp?.optJSONObject("groups")?.let { GroupsJson.decode(it) },
                 extras = StateExtras(
                     opaque = opaque,
                     unknownTop = mig.doc.unknownTop(),

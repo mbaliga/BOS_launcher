@@ -14,6 +14,9 @@ interface LaunchpadSink {
     /** STR-04 delivery policies; defaults keep older sinks compiling. */
     fun policies(): List<AppPolicy> = emptyList()
     fun setPolicies(list: List<AppPolicy>) {}
+    /** STR-13 groups; null from a sink that has none, so such a sink writes no groups section. */
+    fun groups(): GroupsConfig? = null
+    fun setGroups(c: GroupsConfig) {}
 
     object Live : LaunchpadSink {
         override fun rules() = LaunchpadSettings.rules.value
@@ -25,6 +28,8 @@ interface LaunchpadSink {
         override fun setGesture(g: LaunchpadGesture, a: LaunchpadAction) = LaunchpadSettings.setGesture(g, a)
         override fun policies() = LaunchpadSettings.policies.value
         override fun setPolicies(list: List<AppPolicy>) = LaunchpadSettings.replacePolicies(list)
+        override fun groups(): GroupsConfig = GroupsSettings.config.value
+        override fun setGroups(c: GroupsConfig) = GroupsSettings.restore(c)
     }
 }
 
@@ -59,6 +64,7 @@ class StateApplier(
             launchpadPrefs = launchpadPrefs(),
             launchpadGestures = launchpadGestures(),
             launchpadPolicies = launchpad.policies(),
+            launchpadGroups = launchpad.groups(),
             extras = extras(),
         )
     }
@@ -106,6 +112,7 @@ class StateApplier(
             parts.launchpadPrefs.perApp.forEach { (k, v) -> launchpad.setAppMode(k, v) }
             parts.launchpadGestures.forEach { (g, a) -> launchpad.setGesture(g, a) }
             launchpad.setPolicies(parts.launchpadPolicies)
+            parts.launchpadGroups?.let { launchpad.setGroups(it) } // absent in older files: the live groups stay
         }
         val cur = extras()
         val ex = parts.extras

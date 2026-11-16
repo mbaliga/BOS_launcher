@@ -73,7 +73,7 @@ object StateSchema {
      * the desktop profile table describe this device, and crash reports hold stack traces. The user's own export file is
      * the portable copy of the part of this that is setup (aliases).
      */
-    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", DeviceBound.FILE)
+    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", DeviceBound.FILE, GroupsSettings.FILE)
     val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage")
 
     /**

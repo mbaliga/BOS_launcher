@@ -86,6 +86,12 @@ data class LaunchpadView(
     val nextRelease: Long?,
     /** Keys of notifications shown but flagged silent. */
     val silentKeys: Set<String>,
+    /** STR-13: the sections by group, in display order. Empty when no group is defined (then [sections] is the whole view). */
+    val grouped: List<GroupedSection> = emptyList(),
+    /** STR-13: keys of the shown notifications that sit in a Priority group (they may raise the handle indicator). */
+    val priorityKeys: Set<String> = emptySet(),
+    /** STR-13: notification key to the id of the group it landed in (absent: built-in section). */
+    val groupOfKey: Map<String, String> = emptyMap(),
 ) {
     companion object { const val DIGEST_KEY = "digest" }
 }
@@ -104,7 +110,12 @@ object LaunchpadViewBuilder {
         yesterdayLabel: String = "Yesterday",
         pinnedLabel: String = "Pinned",
         flatLabel: String = "All",
+        /** STR-13: when set (and the user has groups), the view is split into group sections. */
+        grouping: GroupResolver? = null,
     ): LaunchpadView {
+        if (grouping != null && grouping.config.groups.isNotEmpty()) {
+            return GroupedViewBuilder.build(items, rules, prefs, policies, snoozedUntil, now, zone, digestLabel, todayLabel, yesterdayLabel, pinnedLabel, flatLabel, grouping)
+        }
         val awake = items.filter { !SnoozeLogic.isSnoozed(it.key, snoozedUntil, now) }
         val held = awake.filter { DeliveryLogic.isHeld(it, policies, now, zone) }
         val heldKeys = held.map { it.key }.toSet()
@@ -160,6 +171,10 @@ enum class RowCommand(val label: String) {
     Open("Open"), Dismiss("Dismiss"), MarkRead("Mark as read"), Snooze("Snooze"),
     MuteApp("Mute this app"), MakeRule("Make a rule"), HideApp("Hide this app"),
     PinSender("Pin this sender"), Reply("Reply"),
+    /** STR-13: opens the group picker for the row (move it, or always put its person or app in a group). */
+    MoveToGroup("Move to group..."),
+    /** STR-13: opens the group-rule editor with a starting rule made from the row. */
+    GroupRule("Make a rule from this"),
 }
 
 data class RowMenuContext(
@@ -185,6 +200,8 @@ object LaunchpadRowMenus {
         if (c.hasPackage) { add(RowCommand.MuteApp); add(RowCommand.HideApp) }
         if (c.hasSender) add(RowCommand.PinSender)
         add(RowCommand.MakeRule)
+        add(RowCommand.MoveToGroup)
+        add(RowCommand.GroupRule)
     }
 
     fun palette(c: RowMenuContext) = entries(c)

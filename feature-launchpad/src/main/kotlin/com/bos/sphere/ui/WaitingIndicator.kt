@@ -35,6 +35,7 @@ import com.bos.sphere.core.data.NotificationProvider
 import com.bos.sphere.core.data.WaitingLogic
 import com.bos.sphere.core.design.L10n
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.time.ZoneId
 
 /**
@@ -54,11 +55,28 @@ fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier)
     val access = rememberNotificationAccess()
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = System.currentTimeMillis() } }
-    val waiting = remember(items, rules, policies, snoozed, read, now) {
-        WaitingLogic.waiting(items, rules, policies, read, snoozed, now, ZoneId.systemDefault())
+    // STR-13: Priority groups count even when their app is on a digest, and may tint the indicator; matching runs off the main thread.
+    remember(ctx) { com.bos.sphere.core.data.GroupsSettings.init(ctx); true }
+    val groups by com.bos.sphere.core.data.GroupsSettings.config.collectAsStateWithLifecycle()
+    val contacts = rememberContactDirectory()
+    val plain = remember(items, rules, policies, snoozed, read, now, groups) {
+        if (groups.groups.isEmpty()) WaitingLogic.waiting(items, rules, policies, read, snoozed, now, ZoneId.systemDefault()) else null
     }
+    val grouped by androidx.compose.runtime.produceState<Pair<List<HubNotification>, com.bos.sphere.core.data.PriorityWaiting>?>(null, items, rules, policies, snoozed, read, now, groups, contacts) {
+        value = if (groups.groups.isEmpty()) null else withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val r = com.bos.sphere.core.data.GroupResolver(groups, contacts)
+            val w = com.bos.sphere.core.data.GroupWaiting.waiting(items, rules, policies, read, snoozed, now, ZoneId.systemDefault(), r)
+            w to com.bos.sphere.core.data.GroupWaiting.priority(w, r)
+        }
+    }
+    val waiting = plain ?: grouped?.first ?: emptyList()
+    val priority = if (plain != null) null else grouped?.second
     val headline = rememberWaitingHeadline(waiting)
-    WaitingIndicatorView(if (access) waiting.size else 0, headline, onOpen, modifier)
+    WaitingIndicatorView(
+        if (access) waiting.size else 0, headline, onOpen, modifier,
+        priorityCount = if (access) priority?.count ?: 0 else 0,
+        accent = priority?.takeIf { it.count > 0 }?.let { p -> p.accentArgb?.let { Color(it) } ?: BlueDark },
+    )
 }
 
 /**
@@ -82,9 +100,13 @@ internal fun rememberWaitingHeadline(waiting: List<HubNotification>, expandMs: L
 
 /** The drawn indicator, separate from the data so it can be shown in tests. */
 @Composable
-fun WaitingIndicatorView(count: Int, headline: String?, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun WaitingIndicatorView(
+    count: Int, headline: String?, onOpen: () -> Unit, modifier: Modifier = Modifier,
+    /** STR-13: how many of the waiting items sit in Priority groups, and the colour to tint the indicator with (null: the usual blue). */
+    priorityCount: Int = 0, accent: Color? = null,
+) {
     if (count <= 0) return
-    val desc = L10n.tr("%d waiting. Launchpad", count)
+    val desc = if (priorityCount > 0) L10n.tr("%d waiting, %d priority. Launchpad", count, priorityCount) else L10n.tr("%d waiting. Launchpad", count)
     // The indicator hugs the physical left edge, where Launchpad opens from, so it is laid out left to right in every language.
     androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr) {
     Row(
@@ -94,11 +116,11 @@ fun WaitingIndicatorView(count: Int, headline: String?, onOpen: () -> Unit, modi
             .pointerInput(Unit) { detectTapGestures { onOpen() } }
             .animateContentSize()
             .heightIn(min = 36.dp)
-            .background(Color(0xE60A5C95), RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
+            .background(if (priorityCount > 0 && accent != null) lpAccentFill(accent).copy(alpha = 0.95f) else Color(0xE60A5C95), RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
             .padding(start = 4.dp, end = if (headline != null) 10.dp else 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(if (count > 99) "99+" else "$count", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text((if (priorityCount > 0) "★ " else "") + (if (count > 99) "99+" else "$count"), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         if (headline != null) {
             Text(headline, color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp).width(140.dp))
         }

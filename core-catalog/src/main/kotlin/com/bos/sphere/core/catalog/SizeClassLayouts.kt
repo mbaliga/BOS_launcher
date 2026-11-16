@@ -31,6 +31,8 @@ data class LayoutsBySizeClass(val byClass: Map<String, HomeLayout> = emptyMap(),
 /** Persistence of [LayoutsBySizeClass] (SharedPreferences, one entry per class). */
 class SizeClassLayoutStore(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("home_layout_by_class", Context.MODE_PRIVATE)
+    /** NFR-18: real widget ids live in the device file; the backed-up file holds re-add markers ([com.bos.sphere.core.data.WidgetIdSplit]). */
+    private val device = context.applicationContext.getSharedPreferences(com.bos.sphere.core.data.DeviceBound.FILE, Context.MODE_PRIVATE)
     private var data: LayoutsBySizeClass = read()
 
     /** Makes [sc] active: saves [current] under [previous], returns the layout to show. */
@@ -49,19 +51,21 @@ class SizeClassLayoutStore(context: Context) {
 
     private fun persist(key: String) {
         val l = data.byClass[key] ?: return
-        sp.edit().putString("pages:$key", HomeLayoutCodec.encode(l.pages)).putStringSet("removed:$key", l.removed).apply()
+        com.bos.sphere.core.data.WidgetIdSplit.putString(sp, device, "home_layout_by_class", "pages:$key", HomeLayoutCodec.encode(l.pages))
+        com.bos.sphere.core.data.WidgetIdSplit.putStringSet(sp, device, "home_layout_by_class", "removed:$key", l.removed)
     }
 
     private fun read(): LayoutsBySizeClass {
         var a = LayoutsBySizeClass()
-        for ((k, v) in sp.all) {
+        for ((k, v) in sp.all.toMap()) {
             if (!k.startsWith("pages:") || v !is String) continue
             val key = k.removePrefix("pages:")
             val parts = key.split('-')
             val w = SizeBucket.entries.firstOrNull { it.name.lowercase() == parts.getOrNull(0) } ?: continue
             val h = SizeBucket.entries.firstOrNull { it.name.lowercase() == parts.getOrNull(1) } ?: continue
-            val removed = sp.getStringSet("removed:$key", emptySet())!!.toSet()
-            a = a.with(SizeClass(w, h), HomeLayout(HomeLayoutCodec.decode(v), removed, seeded = true))
+            val removed = com.bos.sphere.core.data.WidgetIdSplit.getStringSet(sp, device, "home_layout_by_class", "removed:$key")
+            val pages = com.bos.sphere.core.data.WidgetIdSplit.getString(sp, device, "home_layout_by_class", k)
+            a = a.with(SizeClass(w, h), HomeLayout(HomeLayoutCodec.decode(pages), removed, seeded = true))
         }
         return a
     }

@@ -63,22 +63,24 @@ class BadgeSettings(context: Context) {
  */
 class HomeStateStore(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("home_state", Context.MODE_PRIVATE)
+    /** NFR-18: real widget ids live in the device file; the backed-up file holds re-add markers ([WidgetIdSplit]). */
+    private val device = context.applicationContext.getSharedPreferences(com.bos.sphere.core.data.DeviceBound.FILE, Context.MODE_PRIVATE)
     private val _state = MutableStateFlow(read())
     val arrangements: StateFlow<SizeClassArrangements> = _state.asStateFlow()
 
     fun save(sc: SizeClass, state: HomeState) {
         _state.value = _state.value.with(sc, state)
-        sp.edit().putString(PREFIX + sc.key, HomeStateCodec.encode(state)).apply()
+        com.bos.sphere.core.data.WidgetIdSplit.putString(sp, device, "home_state", PREFIX + sc.key, HomeStateCodec.encode(state))
     }
 
     private fun read(): SizeClassArrangements {
         var a = SizeClassArrangements()
-        for ((k, v) in sp.all) {
+        for ((k, v) in sp.all.toMap()) {
             if (!k.startsWith(PREFIX) || v !is String) continue
             val parts = k.removePrefix(PREFIX).split('-')
             val w = SizeBucket.entries.firstOrNull { it.name.lowercase() == parts.getOrNull(0) } ?: continue
             val h = SizeBucket.entries.firstOrNull { it.name.lowercase() == parts.getOrNull(1) } ?: continue
-            a = a.with(SizeClass(w, h), HomeStateCodec.decode(v))
+            a = a.with(SizeClass(w, h), HomeStateCodec.decode(com.bos.sphere.core.data.WidgetIdSplit.getString(sp, device, "home_state", k)))
         }
         return a
     }

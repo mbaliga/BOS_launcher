@@ -199,7 +199,7 @@ fun rememberWidgetPicker(
     return remember { WidgetPickerLauncher { showPicker = true } }
 }
 
-private const val REQUEST_CONFIGURE = 0x5349
+internal const val REQUEST_CONFIGURE = 0x5349
 
 private fun isConfigurationOptional(info: AppWidgetProviderInfo): Boolean {
     val f = info.widgetFeatures

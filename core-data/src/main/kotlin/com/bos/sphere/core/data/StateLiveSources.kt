@@ -173,7 +173,8 @@ class PrefFilesSource(
             val all = open(f).all
             if (all.isEmpty()) continue
             val o = JSONObject()
-            all.toSortedMap().forEach { (k, v) -> encode(v)?.let { o.put(k, it) } }
+            val arrangement = f in WidgetIdSplit.ARRANGEMENT_FILES // NFR-18: no widget ids in the export
+            all.toSortedMap().forEach { (k, v) -> encode(if (arrangement) cleanValue(v) else v)?.let { o.put(k, it) } }
             out.put(f, o)
         }
         return mapOf(StateSchema.K_PREF_FILES to out)
@@ -185,9 +186,17 @@ class PrefFilesSource(
         for (f in files) {
             val o = src.optJSONObject(f) ?: continue
             val ed = open(f).edit().clear()
-            o.keys().forEach { k -> decode(o.optJSONObject(k))?.let { v -> put(ed, k, v) } }
+            val arrangement = f in WidgetIdSplit.ARRANGEMENT_FILES
+            o.keys().forEach { k -> decode(o.optJSONObject(k))?.let { v -> put(ed, k, (if (arrangement) cleanValue(v) else v) ?: return@let) } }
             ed.apply()
         }
+    }
+
+    /** NFR-18: a stored home arrangement value without app widget ids (they become re-add markers, see [WidgetIdSplit]). */
+    private fun cleanValue(v: Any?): Any? = when (v) {
+        is String -> WidgetIdSplit.sanitize(v)
+        is Set<*> -> WidgetIdSplit.sanitize(v.map { it.toString() }.toSet())
+        else -> v
     }
 
     private fun encode(v: Any?): JSONObject? = when (v) {

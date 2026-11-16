@@ -21,7 +21,7 @@ class LauncherStores private constructor(context: Context) {
     private val deviceBound = app.getSharedPreferences(DeviceBound.FILE, Context.MODE_PRIVATE)
 
     val prefs = LauncherPrefsStore(app.getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE), deviceBound)
-    val layout = HomeLayoutStore(app.getSharedPreferences("home_layout", Context.MODE_PRIVATE))
+    val layout = HomeLayoutStore(app.getSharedPreferences("home_layout", Context.MODE_PRIVATE), deviceBound)
     val shortcuts = ShortcutStore(app.getSharedPreferences("shortcuts", Context.MODE_PRIVATE), deviceBound)
     val history = LaunchHistoryStore(app.getSharedPreferences("launch_history", Context.MODE_PRIVATE))
     /** HOM-18: the larger, file-backed log the timeline reads; fed by every [history] record. */
@@ -255,7 +255,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
     }
 }
 
-class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
+class HomeLayoutStore internal constructor(private val sp: SharedPreferences, private val device: SharedPreferences? = null) {
     private val _layout = MutableStateFlow(read())
     val layout: StateFlow<HomeLayout> = _layout.asStateFlow()
 
@@ -314,16 +314,15 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences) {
 
     private fun write(next: HomeLayout) {
         _layout.value = next
-        sp.edit()
-            .putString("pages", HomeLayoutCodec.encode(next.pages))
-            .putStringSet("removed", next.removed)
-            .putBoolean("seeded", next.seeded)
-            .apply()
+        // NFR-18: widget ids in the keys go to the excluded device file, the backed-up file holds re-add markers.
+        WidgetIdSplit.putString(sp, device, "home_layout", "pages", HomeLayoutCodec.encode(next.pages))
+        WidgetIdSplit.putStringSet(sp, device, "home_layout", "removed", next.removed)
+        sp.edit().putBoolean("seeded", next.seeded).apply()
     }
 
     private fun read(): HomeLayout = HomeLayout(
-        pages = HomeLayoutMath.normalizeIds(HomeLayoutCodec.decode(sp.getString("pages", null))),
-        removed = sp.getStringSet("removed", emptySet())!!.toSet(),
+        pages = HomeLayoutMath.normalizeIds(HomeLayoutCodec.decode(WidgetIdSplit.getString(sp, device, "home_layout", "pages"))),
+        removed = WidgetIdSplit.getStringSet(sp, device, "home_layout", "removed"),
         seeded = sp.getBoolean("seeded", false),
     )
 }

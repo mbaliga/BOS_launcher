@@ -115,11 +115,13 @@ class StateService private constructor(context: Context) {
     /** Called before a destructive edit (delete a page, remove a group of items): snapshot first (CFG-04). Rate limited. */
     fun beforeDestructive(reason: String) = takeRateLimited(reason, exportText())
 
-    private val limiter = DestructiveLimiter(DESTRUCTIVE_MIN_GAP_MS)
+    // No per-burst cap: the first snapshot of each burst is pinned in the store instead (CFG-04).
+    private val limiter = DestructiveLimiter(DESTRUCTIVE_MIN_GAP_MS, Int.MAX_VALUE)
 
     internal fun takeRateLimited(reason: String, text: String) {
-        if (!limiter.allow(reason, System.currentTimeMillis())) return
-        snapshots.take(reason, text)
+        val d = limiter.decide(reason, System.currentTimeMillis())
+        if (!d.take) return
+        snapshots.take(reason, text, pin = d.burstStart)
     }
 
     /** The component of the widget provider bound to [appWidgetId], so an export can say what to re-add (CFG-02). Public API only. */

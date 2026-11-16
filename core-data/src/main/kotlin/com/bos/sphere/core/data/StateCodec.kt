@@ -114,8 +114,8 @@ object StateCodec {
         o.put(
             StateSchema.K_LAYOUT,
             JSONObject()
-                .put("pages", JSONArray(HomeLayoutCodec.encode(parts.layout.pages)))
-                .put("removed", JSONArray(parts.layout.removed.sorted()))
+                .put("pages", JSONArray(WidgetIdSplit.sanitize(HomeLayoutCodec.encode(parts.layout.pages)))) // NFR-18: no widget ids
+                .put("removed", JSONArray(WidgetIdSplit.sanitize(parts.layout.removed).sorted()))
                 .put("seeded", parts.layout.seeded)
                 .put("hidden", JSONArray(parts.hidden.sorted())),
         )
@@ -181,8 +181,8 @@ object StateCodec {
 
         val lay = j.optJSONObject(StateSchema.K_LAYOUT)
         val layout = HomeLayout(
-            pages = HomeLayoutMath.normalizeIds(HomeLayoutCodec.decode(lay?.optJSONArray("pages")?.toString())),
-            removed = lay?.optJSONArray("removed")?.let { a -> List(a.length()) { a.getString(it) }.toSet() } ?: emptySet(),
+            pages = HomeLayoutMath.normalizeIds(HomeLayoutCodec.decode(lay?.optJSONArray("pages")?.toString()?.let(WidgetIdSplit::sanitize))), // NFR-18: older files may hold ids
+            removed = lay?.optJSONArray("removed")?.let { a -> WidgetIdSplit.sanitize(List(a.length()) { a.getString(it) }.toSet()) } ?: emptySet(),
             seeded = lay?.optBoolean("seeded", false) ?: false,
         )
 

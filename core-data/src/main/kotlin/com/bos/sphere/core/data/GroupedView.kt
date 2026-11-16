@@ -12,7 +12,6 @@ data class GroupedSection(
     val folded: Boolean,
 ) {
     val count: Int get() = sections.sumOf { it.items.size }
-    val isFallback: Boolean get() = group == null
     companion object { const val FALLBACK_KEY = "group:_" }
 }
 

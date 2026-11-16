@@ -35,8 +35,11 @@ object PersonNames {
         }
     }
 
+    /** A person's name is never longer than this; anything longer is cut before the regexes run (bracket matching is quadratic on unbalanced text). */
+    const val MAX_NAME_CHARS = 512
+
     fun clean(raw: String): String {
-        var s = raw.replace("™", "").replace("®", "").replace("©", "")
+        var s = (if (raw.length > MAX_NAME_CHARS) raw.substring(0, MAX_NAME_CHARS) else raw).replace("™", "").replace("®", "").replace("©", "")
         s = Normalizer.normalize(s, Normalizer.Form.NFKC)
         s = BRACKETS.replace(s, " ")
         val sb = StringBuilder(s.length)
@@ -79,6 +82,7 @@ object PersonNames {
                     if (base == null || base !in KEEP_MARKS) sb.appendCodePoint(cp)
                 type == Character.COMBINING_SPACING_MARK -> sb.appendCodePoint(cp) // vowel signs of Indic scripts are part of the letters
                 cp == '\''.code || cp == 0x2019 || cp == '`'.code || cp == 0x02BC -> Unit
+                cp == 0x131 -> { sb.append('i'); base = Character.UnicodeScript.LATIN } // Turkish dotless i: "ISIK" and "ısık" are one name
                 Character.isLetterOrDigit(cp) -> {
                     sb.append(String(Character.toChars(cp)).lowercase(Locale.ROOT))
                     base = runCatching { Character.UnicodeScript.of(cp) }.getOrNull()

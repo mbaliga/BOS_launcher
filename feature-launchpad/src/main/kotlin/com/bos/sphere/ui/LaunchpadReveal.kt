@@ -83,12 +83,18 @@ class LaunchpadRevealState internal constructor(private val scope: CoroutineScop
     /** 0 = home in place, 1 = fully slid aside. */
     val progress: Float get() = anim.value
 
+    /** The last fraction a finger asked for. Read by [endDrag] instead of [anim] because the snap is queued and may not have run yet. */
+    private var lastDragFraction = 0f
+
     internal fun beginDrag() { dragging = true }
-    internal fun dragTo(fraction: Float) { scope.launch { anim.snapTo(fraction) } }
+    internal fun dragTo(fraction: Float) { lastDragFraction = fraction; scope.launch { anim.snapTo(fraction) } }
+
+    /** STR-01: a gesture that ends without a release (the pointer input restarted by a rotation or a size change, or left composition) must not leave the card half open. */
+    internal fun abandonDrag() { if (dragging) endDrag(0f) }
 
     internal fun endDrag(velocity: Float) {
         dragging = false
-        val target = RevealMath.settle(anim.value, velocity, open)
+        val target = RevealMath.settle(lastDragFraction, velocity, open)
         onOpenChange(target)
         scope.launch { animateTo(target) }
     }
@@ -126,6 +132,7 @@ fun Modifier.launchpadCloseDrag(state: LaunchpadRevealState, slideDp: Float, mir
 private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGestures(state: LaunchpadRevealState, slideDp: Float, closing: Boolean, mirrored: Boolean) {
     val slidePx = slideDp * density
     val edgePx = RevealMath.EDGE_DP * density
+    try {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         if (closing != state.open) return@awaitEachGesture
@@ -154,6 +161,10 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGe
             }
         }
         if (dragging) state.endDrag(tracker.calculateVelocity().x * sign)
+    }
+    } finally {
+        // Cancelled mid-drag (rotation changes slideDp and restarts this block): settle from where the finger left it.
+        state.abandonDrag()
     }
 }
 

@@ -229,8 +229,9 @@ internal fun NotificationRow(
     )
     val cellPx = minOf(with(density) { 72.dp.toPx() }, widthPx * 0.9f / cells.size)
     val paletteW = cellPx * cells.size
-    val offsetPx = (base + dx).coerceIn(-widthPx, paletteW * 1.1f)
     val canSwipeLeft = leftAction != LaunchpadAction.None
+    // With no primary action there is nothing behind a left slide, so the row does not move that way.
+    val offsetPx = (base + dx).coerceIn(if (canSwipeLeft) -widthPx else 0f, paletteW * 1.1f)
     val showButtons = hovered || focused
     val primaryLabel = L10n.tr(leftAction.label)
     val a11yActions = buildList {
@@ -242,6 +243,8 @@ internal fun NotificationRow(
       Box(Modifier.fillMaxWidth()) {
         if (offsetPx > 0f) {
             // Slide right: the action palette, held open until one is chosen or the row is tapped.
+            // The row slides physically to the right, so the palette is laid out from the physical left in every language.
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr) {
             Row(Modifier.matchParentSize()) {
                 cells.forEach { cmd ->
                     Box(
@@ -251,11 +254,12 @@ internal fun NotificationRow(
                     ) { Text(L10n.tr(paletteLabel(cmd)), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
                 }
             }
+            }
         } else if (offsetPx < 0f && canSwipeLeft) {
             // Slide left: the one primary action, uncovered behind the row.
             Box(
                 Modifier.matchParentSize().background(Color(0xFFB3261E)).padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterEnd,
+                contentAlignment = androidx.compose.ui.BiasAbsoluteAlignment(1f, 0f), // the physical right: where a left slide uncovers
             ) { Text(primaryLabel, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium) }
         }
         Row(

@@ -71,7 +71,8 @@ fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier)
     }
     val waiting = plain ?: grouped?.first ?: emptyList()
     val priority = if (plain != null) null else grouped?.second
-    val headline = rememberWaitingHeadline(waiting)
+    // Until the grouped list is computed there is nothing to compare against: its arrival must not look like a new item.
+    val headline = rememberWaitingHeadline(waiting, ready = plain != null || grouped != null)
     WaitingIndicatorView(
         if (access) waiting.size else 0, headline, onOpen, modifier,
         priorityCount = if (access) priority?.count ?: 0 else 0,
@@ -85,11 +86,12 @@ fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier)
  * leave the indicator widened for good.
  */
 @Composable
-internal fun rememberWaitingHeadline(waiting: List<HubNotification>, expandMs: Long = WaitingLogic.EXPAND_MS): String? {
+internal fun rememberWaitingHeadline(waiting: List<HubNotification>, expandMs: Long = WaitingLogic.EXPAND_MS, ready: Boolean = true): String? {
     var seen by remember { mutableStateOf<Set<String>?>(null) }
     var shown by remember { mutableStateOf<Pair<Int, String>?>(null) }
     var counter by remember { mutableStateOf(0) }
-    LaunchedEffect(waiting) {
+    LaunchedEffect(waiting, ready) {
+        if (!ready) return@LaunchedEffect
         val before = seen
         seen = waiting.map { it.key }.toSet()
         if (before != null) WaitingLogic.fresh(before, waiting).maxByOrNull { it.timestamp }?.let { n -> counter += 1; shown = counter to n.title }

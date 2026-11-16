@@ -703,7 +703,7 @@ fun LaunchpadContent(
                                     onSendReply = { a, t ->
                                         if (sendReply == null) { onSendReply(a, t); replyFor = null; toast.value = L10n.tr("Reply sent") }
                                         else if (sendReply(a, t)) { replyFor = null; toast.value = L10n.tr("Reply sent") }
-                                        else toast.value = L10n.tr("Couldn't open %s", n.appLabel.ifBlank { n.title })
+                                        else toast.value = L10n.tr("Couldn't send your reply")
                                     },
                                 ),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },

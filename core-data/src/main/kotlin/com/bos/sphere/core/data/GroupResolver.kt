@@ -147,7 +147,14 @@ class GroupResolver(
             ConditionKind.StarredContact -> { f -> if (!contacts.available) null else f.contact?.starred == true }
             ConditionKind.TimeWindow -> { f -> inWindow(f.n.timestamp, c.from, c.to) }
         }
-        // An unevaluable condition (no grant, no last name) never matches, negated or not.
+        // An unevaluable condition (no grant, no last name, nothing typed yet) never matches, negated or not:
+        // "app is not <blank>" must not swallow every notification.
+        val empty = when (c.kind) {
+            ConditionKind.AppIs, ConditionKind.PersonIs, ConditionKind.TextContains, ConditionKind.CategoryIs -> c.value.isBlank()
+            ConditionKind.SenderContains, ConditionKind.SenderStartsWith, ConditionKind.SenderEquals, ConditionKind.ConversationContains -> folded.isEmpty()
+            else -> false
+        }
+        if (empty) return { false }
         return { f -> test(f)?.let { it != c.negate } ?: false }
     }
 

@@ -22,3 +22,9 @@ Method: read the spec row, the decision docs (cardTune, launchpadCard, notifFix,
 - Removed: `GroupView.isFallback` (no caller, no test).
 - Left because only tests call them (removing would mean editing tests): `LaunchpadCardGeometry.contentWidthPx`, `visibleCardBounds`, `settleMs`, `CardEdge.forEdit`, `RevealLayout.forWindow`, `LaunchpadShortcuts.opensLaunchpad`, `GroupResolver.conditionMatches`, `previewWinning`, `GroupSummaries`, `GroupWaiting`-style helpers `priorityWaiting` and `priorityAccent`. `GroupSummaries` is the English summary; the UI builds its own localized text in `GroupTexts`.
 - Redundant: the `leftSwipe` modifier in `HomeScreen` (see STR-01).
+
+## Second review (wave 13)
+
+- Re-read the reveal gesture, row swipe, waiting indicator, group resolver, last-name and PendingIntent paths; the fixes hold. No new defects fixed.
+- Noted: the dotless-i fold changes the stored key of a person name that contains a dotless i (rare; such an alias should be re-linked once). Assignments to a deleted group fall through to rules and app assignments by design.
+- Noted: `AppSmokeTest.HOM_22_*` failed once under full-suite load and passed alone and on the rerun (timing, unrelated to this stream).

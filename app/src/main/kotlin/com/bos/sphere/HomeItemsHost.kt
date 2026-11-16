@@ -126,14 +126,14 @@ class HomeItems internal constructor(
     var fileCells by mutableStateOf<List<com.bos.sphere.feature.grid.FileTileCell>>(emptyList())
 
     internal suspend fun refreshFiles() {
-        val cells = withContext(Dispatchers.IO) {
+        val cells = withContext(Dispatchers.IO) { runCatching {
             val source = com.bos.sphere.core.catalog.RecentFilesSource(context)
             val granted = source.grantedTrees().map { it.toString() }.toSet()
             if (granted.isEmpty()) emptyList() else {
                 val files = com.bos.sphere.core.catalog.RecentFilesModel.withinGrants(source.all(com.bos.sphere.core.catalog.HomePanelPrefs(context).filesPerFolder), granted)
                 com.bos.sphere.core.catalog.FileThumbs.shared(context).load(files).map { com.bos.sphere.feature.grid.FileTileCell(it.name, it.image?.asImageBitmap()) }
             }
-        }
+        }.getOrDefault(emptyList()) }
         fileCells = cells
     }
 

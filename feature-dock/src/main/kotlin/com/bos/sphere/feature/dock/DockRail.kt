@@ -275,7 +275,7 @@ private fun DockSlot(
 
     Box(
         Modifier.size(boxW, boxH)
-            .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; alpha = if (drag != 0f) 0.8f else 1f }
+            .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; alpha = if (item.unavailable) 0.4f else if (drag != 0f) 0.8f else 1f }
             .clip(shape)
             .then(if (focused) Modifier.border(2.dp, HyleColors.Violet, shape) else Modifier)
             // INP-01: the slot is a node of the shared focus graph (arrows leave the rail into the home and back, the graph knows what has focus).

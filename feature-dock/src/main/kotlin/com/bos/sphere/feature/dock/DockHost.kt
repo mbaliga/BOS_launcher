@@ -130,6 +130,8 @@ fun DockHost(
     displayId: Int = 0,
     inputIsKeyboard: Boolean = false,
     labelOfOther: (DockItemRef) -> String? = { null },
+    /** HOM-10: app keys pinned here whose package is gone for now; the pin stays (dimmed) until the grace period ends. */
+    unavailableApps: Set<String> = emptySet(),
     onLaunchOther: (DockItemRef) -> Unit = {},
     onRunGroup: (com.bos.sphere.core.launch.AppGroup) -> Unit = {},
     /** HOM-02: draws the icon of a pinned folder, shortcut or link; null falls back to the initials tile. */
@@ -180,15 +182,15 @@ fun DockHost(
     val byKey = remember(apps) { apps.associateBy { it.key } }
     val keyByPackage = remember(apps) { apps.groupBy { it.packageName }.mapValues { it.value.first().key } }
     val sessionUsed = remember(sinceStart, apps, resumes, refreshKey) { SessionUse.all() + sinceStart.mapNotNull { keyByPackage[it] } }
-    val content = remember(state.active.dockPins, state.groups, apps, recents, granted, state.dock.mode, sessionUsed, media) {
+    val content = remember(state.active.dockPins, state.groups, apps, recents, granted, state.dock.mode, sessionUsed, media, unavailableApps) {
         DockContentBuilder.build(
             spanOf = spanOfOther,
             pins = state.active.dockPins,
-            labelOf = { ref -> when (ref.kind) { ItemKind.App -> byKey[ref.id]?.label; ItemKind.Group -> state.groups.firstOrNull { it.id == ref.id }?.name; else -> labelOfOther(ref) } },
+            labelOf = { ref -> when (ref.kind) { ItemKind.App -> byKey[ref.id]?.label ?: if (ref.id in unavailableApps) com.bos.sphere.core.design.L10n.tr("App unavailable") else null; ItemKind.Group -> state.groups.firstOrNull { it.id == ref.id }?.name; else -> labelOfOther(ref) } },
             recentApps = recents.mapNotNull { keyByPackage[it] },
             recentLabelOf = { byKey[it]?.label },
             usageGranted = granted, mode = state.dock.mode, sessionUsed = sessionUsed, media = media,
-        )
+        ).let { c -> c.copy(pinned = c.pinned.map { if (it.ref.kind == ItemKind.App && byKey[it.ref.id] == null) it.copy(unavailable = true) else it }) }
     }
     var expanded by remember { mutableStateOf(false) }
 

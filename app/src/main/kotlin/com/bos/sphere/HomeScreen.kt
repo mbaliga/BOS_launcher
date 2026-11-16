@@ -1030,6 +1030,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen,
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
+            unavailableApps = homeItems.unavailableKeys,
             bottomPlan = bottomPlan,
         )
 

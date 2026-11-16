@@ -102,7 +102,7 @@ object DockReorder {
 }
 
 /** [span] is how many rail slots the item takes along the rail: 1 for everything but a pinned widget (HOM-02). */
-data class DockItem(val ref: DockItemRef, val label: String, val recentlyUsed: Boolean = false, val span: Int = 1)
+data class DockItem(val ref: DockItemRef, val label: String, val recentlyUsed: Boolean = false, val span: Int = 1, /** HOM-10: the app is gone for now (kept through the grace period); drawn dimmed, not launchable. */ val unavailable: Boolean = false)
 
 /**
  * HOM-02: the rail's widget slot. A pinned widget takes its column span along the rail ([MAX_SPAN] slots at most, so one

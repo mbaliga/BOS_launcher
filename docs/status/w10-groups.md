@@ -12,3 +12,9 @@ and `docs/decisions/launchpadGroups.md`.
 | STR-04 | built | A Priority group sits above the per-app rules (digest, silent in Launchpad, Silent rule); Normal and Quiet group overrides are only defaults; manager shows the override per group. The rules pane still says rules affect Liftoff surfaces only, and the Groups text repeats that system notifications and Do Not Disturb are untouched |
 | STR-09 | built | `GroupWaiting` counts Priority items regardless of digest or silent rules and never Quiet ones; the indicator tints with the group colour, shows a star and announces "N waiting, M priority" (`STR_09_indicator_*`, `StrGroupsWaitingTest`). Off the main thread when groups exist |
 | CFG-04 | built | Deleting a group, a rule, an assignment or a person link takes a snapshot first (`GroupsSettings`); the manager's delete asks first and says so. Restore from the snapshot is device-checked (checklist) |
+
+## Review (adversarial pass)
+
+Re-read the diff against the owner request and `docs/decisions/launchpadGroups.md`. Checked by tests and reading: person link puts one person's chats from two apps into Work; "same last name as mine" to a Priority Family group bypasses digest and silent; manual beats rule; first match wins; last-name edge cases (particles, "Last, First", single name, empty setting); the UI is reached from the real Launchpad column, the rules pane, the row menu and the indicator; matching runs in `Dispatchers.Default`; no network code in the diff; snapshots precede every group, rule, assignment and link delete; export, import and old-file migration; the eight-language coverage test. No defects found, no code changed. `./gradlew testDebugUnitTest assembleRelease --offline -q` passes.
+
+Residue (device only): the ContactsContract reader, the contacts grant flow, TalkBack wording, snapshot restore from Backup, indicator tint on a real home, and the 100+ notification feel. All are rows in the device checklist and none is confirmed.

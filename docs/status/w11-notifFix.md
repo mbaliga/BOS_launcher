@@ -1,6 +1,6 @@
 # Wave 11: notification tap-to-open and the roomy list
 
-Nothing here is device-confirmed. Device steps: `docs/device-checklist-launchpad.md` ("Added by wave 11"). Notes: `docs/decisions/notifFix.md`.
+Nothing here is device-confirmed. The real tap (a notification opening from Launchpad on Android 14+) needs a device: unit tests only prove the opt-in bundle is passed and that failure falls back and is shown, not that the system launches the activity. Reviewed in wave 11: every PendingIntent send site (grep) goes through `PendingIntentLauncher`; no defects found. Device steps: `docs/device-checklist-launchpad.md` ("Added by wave 11"). Notes: `docs/decisions/notifFix.md`.
 
 | ID | Status | Note |
 | --- | --- | --- |

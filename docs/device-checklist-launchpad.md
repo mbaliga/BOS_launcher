@@ -11,17 +11,17 @@ and layout only. The items below need real fingers, a real window and real notif
 
 | # | Step | Expected |
 | --- | --- | --- |
-| 1 | Landscape. Put a finger on the very left edge of home and drag right slowly across about a fifth of the width, then let go | The home card follows the finger, then springs back. Launchpad is not left open |
-| 2 | Same, but drag across more than a third of the width and let go | The card slides on to about 86 percent of the width and stays. A strip of home remains visible on the right |
+| 1 | Landscape. Put a finger on the very left edge of home and drag right slowly across about a fifth of the width, then let go | The home shrinks with the finger into a rounded card on the right, then springs back. Launchpad is not left open |
+| 2 | Same, but drag across more than a third of the width and let go | The home stays shrunk to a card (about two thirds size, 28 dp corners) pushed to the right, its right side off screen. The notifications show on the left, a neighbouring card peeks in below |
 | 3 | Same, with a quick short flick right from the edge | Opens, whatever the distance |
-| 4 | With Launchpad open, drag the strip of home on the right to the left | Closes, following the finger |
-| 5 | With Launchpad open, drag the strip a short way and let go | Stays open (it needs to be pulled back past about two thirds to close) |
+| 4 | With Launchpad open, drag the card to the left | The card grows back to full size following the finger, and closes |
+| 5 | With Launchpad open, drag the card a short way and let go | Stays open (it needs to be pulled back past about two thirds to close) |
 | 6 | Tap the visible handle on the left edge | Opens |
 | 7 | Tap the left-edge waiting indicator (turn off the unread strip first) | Opens |
 | 8 | Press Ctrl+N with a keyboard attached and a home element focused | Opens. Rebind it in the shortcut settings, the new chord opens it and the old one does not |
-| 9 | Portrait. Repeat 1 to 7 | Launchpad takes the whole screen. No strip of home remains. Back, the Home button in the header, Esc and a swipe left all return |
+| 9 | Portrait. Repeat 1 to 7 | The same card layout (wave 8: Launchpad no longer takes the whole screen). Back, the Home button, tapping the card, Esc and a drag back all return |
 | 10 | Start a drag in the middle of the screen on page 2 of the grid | Launchpad does not open and the pager still scrolls |
-| 11 | Rotate while Launchpad is open | Layout switches between strip and full screen without losing scroll position |
+| 11 | Rotate while Launchpad is open | The card re-poses for the new orientation without losing the selected section or scroll position |
 
 ## Row gestures and their equivalents (STR-03)
 
@@ -102,7 +102,19 @@ and layout only. The items below need real fingers, a real window and real notif
 | # | Step | Expected |
 | --- | --- | --- |
 | 1 | Notification access off. Show the media strip, tap the grant chip, turn access on, come back | The strip fills in with the playing session at once, without leaving and re-entering home (STR-05, STR-06) |
-| 2 | Switch the UI language to Arabic. Look at the left-edge handle, the waiting indicator and the rail, then drag in from the left edge | All three sit on the physical left edge, where the drag starts; the indicator reads count then title left to right (STR-01, STR-09) |
+| 2 | Switch the UI language to Arabic. Look at the edge handle, the waiting indicator and the rail, then drag in from the right edge | All three sit on the physical right edge (wave 8: the card goes to the left in right-to-left), where the drag starts; the home card is pushed to the left and the notifications read right to left on the right (STR-01, STR-09) |
 | 3 | A new notification arrives (indicator widens), then dismiss it from the shade within three seconds | The indicator returns to its slim width after about three and a half seconds (STR-09) |
 | 4 | Place the digest widget. Set an app to Digest with a release time a few minutes ahead | At that time the widget lists the released items within about a minute, not half an hour later (STR-11) |
 | 5 | Desktop surface on an external display, phone panel open. Type a letter, press the arrow keys and Tab, then the return key | The drawer opens, a ring moves over the apps, return opens the highlighted one (EXT-10) |
+
+## Added by wave 8 (Launchpad as the background of the shrunken home card)
+
+| # | Step | Expected |
+| --- | --- | --- |
+| 1 | Open Launchpad in portrait and landscape, light and dark | Home is a rounded card on the right, partly off screen; the left holds the menu icon, section titles (selected one large and dark, others small and grey) and the selected section's rows; a second card peeks in below |
+| 2 | Drag in from the left edge and watch the frame rate (Developer options, GPU rendering profile) | The shrink follows the finger at 60 fps; the home content under the card is not redrawn or reloaded (NFR-05) |
+| 3 | Tap a section title, then the same title again | The first tap selects it and its rows appear beneath it; the second folds the rows |
+| 4 | Tap the card, then repeat and press Back, then Esc on a keyboard, then Tab to the card and press Enter | Each returns home; the card grows back; focus returns to the home element that held it |
+| 5 | TalkBack on: swipe through Launchpad | Titles read as selected or not selected tabs; the card reads "Home card. Return to home"; home icons behind the card are not reachable |
+| 6 | Remove animations (Accessibility) and open Launchpad | The card does not shrink gradually: it appears in place and the background cross-fades (NFR-14) |
+| 7 | Right-to-left language, drag in from the right edge | Card on the left, notifications on the right |

@@ -18,6 +18,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.bos.sphere.ui.homeCardLayer
+import com.bos.sphere.ui.LaunchpadCardOverlay
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
@@ -819,11 +822,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     // STR-01: the home card follows a drag from the left edge, peeks and springs back, or opens Launchpad.
     val reveal = com.bos.sphere.ui.rememberLaunchpadReveal(leftOpen) { leftOpen = it }
-    val revealLayout = com.bos.sphere.ui.RevealLayout.forWindow(
-        androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat(),
-        androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.toFloat(),
+    // STR-01: opening Launchpad shrinks the home into a rounded card pushed to one side (the right; the left in right-to-left layouts),
+    // in both orientations. The card is one graphicsLayer on the live home (NFR-05); reduced motion snaps it and cross-fades the backdrop.
+    val launchpadRtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    val launchpadMotion = com.bos.sphere.core.design.rememberMotionPrefs()
+    val launchpadDensity = androidx.compose.ui.platform.LocalDensity.current.density
+    val launchpadGeometry = com.bos.sphere.ui.LaunchpadCardGeometry(
+        androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * launchpadDensity,
+        androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * launchpadDensity,
+        com.bos.sphere.ui.CardEdge.forLaunchpad(launchpadRtl), launchpadDensity, launchpadMotion.reduced,
     )
-    val revealSlideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * revealLayout.slideFraction
+    val revealSlideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * launchpadGeometry.dragTravelFraction
     // INP-01: Launchpad's open chord comes from the one shared registry (a rebinding in Ground Control reaches it), and while it is open it is a
     // layer of the shared focus graph (STR-08 keeps its own arrow, collapse and Esc handling inside the panel, so its rows are not graph nodes).
     val launchpadShortcuts = shortcutRegistry
@@ -846,8 +855,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     Box(
         modifier = Modifier.fillMaxSize().observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
-            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off, revealSlideDp).leftSwipe(
-            enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen &&
+            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off, revealSlideDp, mirrored = launchpadRtl).leftSwipe(
+            enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && !launchpadRtl &&
                 (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous),
             atFirstPage = { true },
             onOpen = { leftOpen = true },
@@ -869,27 +878,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 modifier = Modifier.fillMaxSize(),
                 theme = prefs.launchpadTheme,
                 underlay = true,
-                endInset = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * revealLayout.homeStripFraction).dp,
+                cardFraction = { reveal.progress },
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
         }
         val slideDp = revealSlideDp
         Box(
-            Modifier.fillMaxSize().graphicsLayer {
-                // Home is the floating surface: it slides right, shrinks a touch and rounds its corners,
-                // casting a shadow on the notifications layer beneath.
-                translationX = leftProgress * slideDp * density
-                val sc = 1f - 0.05f * leftProgress
-                scaleX = sc; scaleY = sc
-                if (leftProgress > 0.001f) {
-                    shadowElevation = 36.dp.toPx()
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape((30f * leftProgress).dp)
-                    clip = true
-                    ambientShadowColor = Color.Black
-                    spotShadowColor = Color.Black
-                }
-            }
+            Modifier.fillMaxSize().homeCardLayer(launchpadGeometry) { reveal.progress }
+                // Behind the card the home is inert for accessibility services; the card overlay below is the one control.
+                .then(if (leftOpen) Modifier.clearAndSetSemantics { } else Modifier)
                 .then(if (leftActive) Modifier.background(Color.Black) else Modifier)
                 .captureHome(homeCapture),
         ) {
@@ -1002,15 +1000,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
 
         }
-        // The strip of home still showing: tap it, or drag it left, to bring the home back.
+        // The card of home still showing: tap it, press Enter on it, or drag it back, to bring the home back.
         if (leftOpen) {
-            Box(
-                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width((androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * revealLayout.homeStripFraction).dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures(onTap = { leftOpen = false })
-                    }
-                    .launchpadCloseDrag(reveal, revealSlideDp),
-            )
+            LaunchpadCardOverlay(launchpadGeometry, reveal, onReturn = { leftOpen = false }, slideDp = revealSlideDp)
         }
 
         // Media controls: a track + prev / play / next strip while something is playing.
@@ -1051,7 +1043,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         grantPrompter.Host()
 
         // STR-01/STR-09: the Launchpad opens from the physical left edge in every language, so these sit there too (not at the layout start, which is the right in RTL).
-        val leftEdge = androidx.compose.ui.BiasAbsoluteAlignment(-1f, 0f)
+        val leftEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) 1f else -1f, 0f)
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
         // (tap it, or swipe in from the left edge) so it is always discoverable.
         if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen) {

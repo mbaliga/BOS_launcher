@@ -1,6 +1,7 @@
 package com.bos.sphere.ui
 
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.graphics.graphicsLayer
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateFormat
@@ -251,8 +252,11 @@ fun LaunchpadPanel(
      * home and casts the shadow): the panel then just sits there instead of sliding in itself.
      */
     underlay: Boolean = false,
-    /** Room on the right that the floating home still covers; the list lays out in what is left. */
-    endInset: androidx.compose.ui.unit.Dp = 0.dp,
+    /**
+     * STR-01: the live reveal fraction (0..1) of the home card that sits in front of this panel. Read only while drawing, so a drag
+     * never recomposes the panel. Used with [underlay] to place the peeking neighbour card and the reduced-motion cross-fade.
+     */
+    cardFraction: () -> Float = { 1f },
 ) {
     rememberLaunchpadInit()
     val dark = when (theme) {
@@ -265,10 +269,17 @@ fun LaunchpadPanel(
     // NFR-19: the handler lives outside the animated content, which stays composed during the exit; it is off from the
     // first frame of the exit and follows the back gesture while open.
     val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     androidx.compose.runtime.CompositionLocalProvider(LocalLp provides if (dark) LpDark else LpLight) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.predictiveBackLayer(backProgress)) {
+    // The home card covers the far part of the window (STR-01); the notifications live in the background column beside it.
+    val geo = LaunchpadCardGeometry(maxWidth.value, maxHeight.value, CardEdge.forLaunchpad(rtl), 1f, motion.reduced)
+    val cardInset = if (underlay) (geo.cardCoverFraction * maxWidth.value).dp else 0.dp
     AnimatedVisibility(
         visible = visible,
-        modifier = modifier.predictiveBackLayer(backProgress),
+        modifier = Modifier.fillMaxSize()
+            .then(if (underlay) Modifier.graphicsLayer { alpha = geo.pose(cardFraction()).backdropAlpha } else Modifier)
+            .then(if (underlay) Modifier.launchpadNeighbourCard(rtl, motion.reduced, LocalLp.current.bg, LocalLp.current.surface, cardFraction) else Modifier),
         enter = if (underlay) androidx.compose.animation.EnterTransition.None
         else if (motion.reduced) fadeIn(androidx.compose.animation.core.tween(motion.crossFadeMs()))
         else slideInHorizontally { -it } + fadeIn(),
@@ -297,7 +308,7 @@ fun LaunchpadPanel(
         LaunchpadContent(
             items = items, rules = rules, prefs = prefs, readKeys = read, hasAccess = access, now = now,
             gestures = gestures,
-            endInset = endInset,
+            endInset = cardInset,
             policies = policies, snoozed = snoozed, askedBefore = asked,
             systemState = sys,
             onOpenSystemPanel = { openSystemPanel(ctx, it) },
@@ -318,6 +329,7 @@ fun LaunchpadPanel(
             onSetDefaultMode = { LaunchpadSettings.setDefaultMode(it) },
             onRequestAccess = { GrantSupport.request(ctx, GrantKind.Notifications) },
         )
+    }
     }
     }
 }
@@ -367,6 +379,8 @@ fun LaunchpadContent(
     val is24 = remember(ctx) { DateFormat.is24HourFormat(ctx) }
     var filter by remember { mutableStateOf<String?>(null) }
     var collapsed by remember { mutableStateOf(setOf<String>()) }
+    // STR-01 (card layout): section titles are not panes; the selected title is large and its rows sit beneath it.
+    var selected by remember { mutableStateOf<String?>(null) }
     var menuFor by remember { mutableStateOf<HubNotification?>(null) }
     var menuExpand by remember { mutableStateOf<RowCommand?>(null) }
     var replyFor by remember { mutableStateOf<String?>(null) }
@@ -416,11 +430,13 @@ fun LaunchpadContent(
         )
     }
     val sections = view.sections
-    val entries = remember(view, collapsed) {
+    val selKey = sections.firstOrNull { it.key == selected }?.key ?: sections.firstOrNull()?.key
+    val shownCollapsed = remember(sections, selKey, collapsed) { sections.map { it.key }.filter { it != selKey || it in collapsed }.toSet() }
+    val entries = remember(view, shownCollapsed) {
         buildList<Entry> {
             if (view.held.isNotEmpty()) add(Entry.Held(view.held.size, view.nextRelease))
             sections.forEach { sec ->
-                val isCollapsed = sec.key in collapsed
+                val isCollapsed = sec.key in shownCollapsed
                 add(Entry.Head(sec, isCollapsed))
                 if (!isCollapsed) sec.items.forEach { add(Entry.Item(it, sec)) }
             }
@@ -428,7 +444,7 @@ fun LaunchpadContent(
     }
 
     // ---- keyboard focus over groups and rows (STR-08) ----
-    val order = remember(sections, collapsed) { LaunchpadFocus.order(sections, collapsed) }
+    val order = remember(sections, shownCollapsed) { LaunchpadFocus.order(sections, shownCollapsed) }
     var focus by remember { mutableStateOf<FocusTarget?>(null) }
     var pending by remember { mutableStateOf<FocusTarget?>(null) }
     val requesters = remember { HashMap<String, FocusRequester>() }
@@ -457,7 +473,13 @@ fun LaunchpadContent(
         pending = null
     }
     fun move(delta: Int) { LaunchpadFocus.move(order, focus, delta)?.let { focus = it; pending = it } }
+    /** Activating a title selects it (its rows appear beneath); activating the selected one again folds or unfolds its rows. */
     fun toggleGroup(key: String, open: Boolean?) {
+        if (key != selKey) {
+            if (open == false) return
+            selected = key; collapsed = collapsed - key
+            return
+        }
         val isCollapsed = key in collapsed
         collapsed = if (open == null) (if (isCollapsed) collapsed - key else collapsed + key) else if (open) collapsed - key else collapsed + key
     }
@@ -496,7 +518,8 @@ fun LaunchpadContent(
     Column(
         modifier
             .fillMaxSize()
-            .background(LocalLp.current.bg)
+            // Beside the home card the host draws the backdrop (it needs it behind the peeking neighbour); alone, the content draws its own.
+            .then(if (endInset > 0.dp) Modifier else Modifier.background(Brush.verticalGradient(listOf(LocalLp.current.bg, androidx.compose.ui.graphics.lerp(LocalLp.current.bg, LocalLp.current.surface, 0.55f)))))
             .testTag("lp.root")
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
             .onKeyEvent(::listKey)
@@ -522,7 +545,7 @@ fun LaunchpadContent(
                     null, sections,
                 )
             }
-            .padding(end = endInset),
+            .padding(end = if (endInset > 0.dp) endInset + 8.dp else 0.dp),
     ) {
         LaunchpadHeader(
             counts = counts, filter = activeFilter, mode = prefs.defaultMode,
@@ -548,7 +571,7 @@ fun LaunchpadContent(
                             val extra = if (sec.key == LaunchpadView.DIGEST_KEY && view.nextRelease != null) L10n.tr("next at %s", formatStamp(view.nextRelease!!, now, is24, zone)) else ""
                             val target = FocusTarget.Group(sec.key)
                             SectionHeader(
-                                sec, e.collapsed, onToggle = { toggleGroup(sec.key, null) },
+                                sec, e.collapsed, selected = sec.key == selKey, onToggle = { toggleGroup(sec.key, null) },
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
                                 onKey = { ev ->
                                     if (ev.type == KeyEventType.KeyDown && RowKeys.map(ev.key.nativeKeyCode) == RowKeys.Result.Activate) { toggleGroup(sec.key, null); true } else false
@@ -620,35 +643,35 @@ private fun LaunchpadHeader(
     onDoubleTap: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
+    val ink = LocalLp.current.ink
     Box(
-        Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(BlueDark, BlueLight)))
+        Modifier.fillMaxWidth()
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleTap() }) },
     ) {
         Row(
-            Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(start = 20.dp, end = 8.dp),
+            Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(start = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Box(
+                Modifier.size(48.dp).clip(CircleShape)
+                    .semantics { contentDescription = L10n.tr("Notification menu") }
+                    .clickable(onClickLabel = L10n.tr("Notification menu")) { open = true }.testTag("lp.menu"),
+                Alignment.Center,
+            ) { HamburgerIcon(ink) }
+            Spacer(Modifier.weight(1f))
             Text(
-                L10n.tr("LAUNCHPAD"), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Light,
-                letterSpacing = 1.sp, modifier = Modifier.weight(1f),
-            )
-            Text(
-                L10n.tr("Home"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                L10n.tr("Home"), color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(end = 4.dp).heightIn(min = 40.dp).clip(RoundedCornerShape(20.dp))
                     .clickable(onClickLabel = L10n.tr("Close Launchpad"), onClick = onClose).padding(horizontal = 14.dp, vertical = 10.dp),
             )
             if (filter != null) {
                 Text(
                     counts.firstOrNull { it.packageName == filter }?.appLabel.orEmpty(),
-                    color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, maxLines = 1,
+                    color = LocalLp.current.dim, fontSize = 13.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 4.dp),
                 )
             }
             Box {
-                Box(
-                    Modifier.size(48.dp).clip(CircleShape).clickable { open = true },
-                    Alignment.Center,
-                ) { Chevron(Color.White, down = true) }
                 DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                     MenuLabel(L10n.tr("Group by"))
                     GroupMode.entries.forEach { m ->
@@ -684,6 +707,18 @@ private fun LaunchpadHeader(
                     }
                 }
             }
+        }
+    }
+}
+
+/** The three-line menu icon of the owner's mock-up. */
+@Composable
+internal fun HamburgerIcon(color: Color) {
+    Canvas(Modifier.size(22.dp)) {
+        val stroke = 2.dp.toPx()
+        for (i in 0..2) {
+            val y = size.height * (0.22f + 0.28f * i)
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
         }
     }
 }

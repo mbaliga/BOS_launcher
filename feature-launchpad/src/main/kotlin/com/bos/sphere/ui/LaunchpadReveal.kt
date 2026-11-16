@@ -57,13 +57,16 @@ object RevealMath {
 }
 
 /**
- * How far the home card slides and how much of it stays visible. Landscape keeps part of home showing; portrait
- * hands the whole screen to Launchpad (STR-01).
+ * STR-01 (owner redesign): opening Launchpad shrinks the home into a rounded card pushed to one side, in both orientations.
+ * [slideFraction] is the drag distance (as a fraction of the window width) that completes the reveal; [homeStripFraction] is
+ * the share of the window width the card still covers at rest. The pose itself comes from [LaunchpadCardGeometry].
  */
 data class RevealLayout(val slideFraction: Float, val homeStripFraction: Float, val landscape: Boolean) {
     companion object {
-        fun forWindow(widthDp: Float, heightDp: Float): RevealLayout =
-            if (widthDp > heightDp) RevealLayout(0.86f, 0.14f, true) else RevealLayout(1f, 0f, false)
+        fun forWindow(widthDp: Float, heightDp: Float): RevealLayout {
+            val g = LaunchpadCardGeometry(widthDp, heightDp, CardEdge.Right, 1f)
+            return RevealLayout(g.dragTravelFraction, g.cardCoverFraction, g.landscape)
+        }
     }
 }
 
@@ -110,21 +113,26 @@ fun rememberLaunchpadReveal(open: Boolean, onOpenChange: (Boolean) -> Unit): Lau
     return state
 }
 
-/** Drag from the left edge: the card follows the finger; a partial drag peeks and springs back. */
-fun Modifier.launchpadEdgeDrag(state: LaunchpadRevealState, enabled: Boolean, slideDp: Float): Modifier =
-    if (!enabled) this else this.pointerInput(state, slideDp) { revealGestures(state, slideDp, closing = false) }
+/**
+ * Drag from the screen edge the notifications sit beside (the left edge; the right edge when [mirrored], i.e. right-to-left):
+ * the card follows the finger; a partial drag peeks and springs back.
+ */
+fun Modifier.launchpadEdgeDrag(state: LaunchpadRevealState, enabled: Boolean, slideDp: Float, mirrored: Boolean = false): Modifier =
+    if (!enabled) this else this.pointerInput(state, slideDp, mirrored) { revealGestures(state, slideDp, closing = false, mirrored = mirrored) }
 
-/** Drag the visible strip of home to the left: Launchpad closes live. */
-fun Modifier.launchpadCloseDrag(state: LaunchpadRevealState, slideDp: Float): Modifier =
-    this.pointerInput(state, slideDp) { revealGestures(state, slideDp, closing = true) }
+/** Drag the card back towards its home edge: Launchpad closes live. */
+fun Modifier.launchpadCloseDrag(state: LaunchpadRevealState, slideDp: Float, mirrored: Boolean = false): Modifier =
+    this.pointerInput(state, slideDp, mirrored) { revealGestures(state, slideDp, closing = true, mirrored = mirrored) }
 
-private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGestures(state: LaunchpadRevealState, slideDp: Float, closing: Boolean) {
+private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGestures(state: LaunchpadRevealState, slideDp: Float, closing: Boolean, mirrored: Boolean) {
     val slidePx = slideDp * density
     val edgePx = RevealMath.EDGE_DP * density
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         if (closing != state.open) return@awaitEachGesture
-        if (!closing && !RevealMath.startsInEdge(down.position.x, edgePx)) return@awaitEachGesture
+        val sign = if (mirrored) -1f else 1f
+        val startX = if (mirrored) size.width - down.position.x else down.position.x
+        if (!closing && !RevealMath.startsInEdge(startX, edgePx)) return@awaitEachGesture
         val slop = viewConfiguration.touchSlop
         val tracker = VelocityTracker()
         tracker.addPosition(down.uptimeMillis, down.position)
@@ -134,7 +142,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGe
             val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
             if (!ch.pressed) break
             val d = ch.positionChange()
-            dx += d.x; dy += d.y
+            dx += d.x * sign; dy += d.y
             tracker.addPosition(ch.uptimeMillis, ch.position)
             if (!dragging) {
                 if (abs(dy) > slop * 3 && abs(dy) > abs(dx)) return@awaitEachGesture
@@ -146,7 +154,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGe
                 state.dragTo(RevealMath.fraction(if (closing) 1f else 0f, dx, slidePx))
             }
         }
-        if (dragging) state.endDrag(tracker.calculateVelocity().x)
+        if (dragging) state.endDrag(tracker.calculateVelocity().x * sign)
     }
 }
 

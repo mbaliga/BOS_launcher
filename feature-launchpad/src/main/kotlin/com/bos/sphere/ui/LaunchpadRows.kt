@@ -61,6 +61,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,6 +110,7 @@ internal fun menuContextFor(n: HubNotification, replyAvailable: Boolean, unread:
 internal fun SectionHeader(
     sec: Section,
     collapsed: Boolean,
+    selected: Boolean,
     onToggle: () -> Unit,
     showRing: Boolean,
     requester: FocusRequester,
@@ -117,17 +120,19 @@ internal fun SectionHeader(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
+    // The selected title is large and dark, the others small and grey (the owner's mock-up); there are no panes to scroll between.
     Column(
         modifier.fillMaxWidth()
             .testTag("lp.group.${sec.key}")
+            .semantics { this.selected = selected; role = androidx.compose.ui.semantics.Role.Tab }
             .onKeyEvent(onKey)
             .focusRequester(requester)
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
-            .then(if (showRing && focused) Modifier.border(2.dp, FocusRing, RoundedCornerShape(6.dp)) else Modifier)
+            .then(if (showRing && focused) Modifier.border(2.dp, FocusRing, RoundedCornerShape(10.dp)) else Modifier)
             .clickable(onClick = onToggle),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = if (selected) 14.dp else 8.dp, bottom = if (selected) 6.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val lead = sec.items.firstOrNull()
@@ -135,21 +140,25 @@ internal fun SectionHeader(
                 AppIcon(lead.packageName, sec.subtitle.ifBlank { sec.title }, 20, Modifier.padding(end = 8.dp))
             }
             Text(
-                sec.title, color = LocalLp.current.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                sec.title,
+                color = if (selected) LocalLp.current.ink else LocalLp.current.dim,
+                fontSize = if (selected) 26.sp else 16.sp,
+                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
             )
             val sub = listOf(sec.subtitle, extra).filter { it.isNotEmpty() }.joinToString(" · ")
-            if (sub.isNotEmpty()) {
+            if (sub.isNotEmpty() && selected) {
                 Text(
                     "  $sub", color = LocalLp.current.dim, fontSize = 12.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                 )
             }
-            Spacer(Modifier.weight(1f))
-            Text("${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
-            Chevron(LocalLp.current.dim, down = !collapsed, size = 14)
+            Text(
+                "  ${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp,
+                modifier = Modifier.padding(end = 4.dp),
+            )
+            if (selected && collapsed) Chevron(LocalLp.current.dim, down = false, size = 14)
         }
-        Box(Modifier.fillMaxWidth().height(2.dp).background(BlueLight))
     }
 }
 

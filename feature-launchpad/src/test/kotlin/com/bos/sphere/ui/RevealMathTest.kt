@@ -42,12 +42,15 @@ class RevealMathTest {
         assertFalse(RevealMath.startsInEdge(200f, 28f))
     }
 
-    @Test fun STR_01_landscapeKeepsHomePartlyVisiblePortraitTakesTheScreen() {
-        val land = RevealLayout.forWindow(900f, 400f)
-        assertTrue(land.landscape); assertTrue(land.homeStripFraction > 0f); assertTrue(land.slideFraction < 1f)
-        assertEquals(1f, land.slideFraction + land.homeStripFraction, 1e-4f)
-        val port = RevealLayout.forWindow(400f, 900f)
-        assertFalse(port.landscape); assertEquals(1f, port.slideFraction, 0f); assertEquals(0f, port.homeStripFraction, 0f)
+    // Wave 8 (owner redesign, docs/decisions/launchpadCard.md): the old assertion was "portrait Launchpad takes the screen
+    // (slide 1, strip 0)". Both orientations now keep the home as a card on one side, so both keep a visible strip.
+    @Test fun STR_01_bothOrientationsKeepTheHomeAsACard() {
+        for ((w, h) in listOf(900f to 400f, 400f to 900f)) {
+            val l = RevealLayout.forWindow(w, h)
+            assertEquals(w > h, l.landscape)
+            assertTrue("card still covers part of the window", l.homeStripFraction > 0.3f && l.homeStripFraction < 0.7f)
+            assertTrue("a drag never has to cross the whole window", l.slideFraction in 0.3f..0.7f)
+        }
     }
 
     @Test fun STR_01_shortcutOpensLaunchpadAndFollowsRebinding() {

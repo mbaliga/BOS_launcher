@@ -43,17 +43,22 @@ import java.util.Locale
 fun SystemStateRow(snapshot: SystemSnapshot, is24: Boolean, onOpenPanel: (SystemTileKind) -> Unit, modifier: Modifier = Modifier) {
     val tiles = SystemStateLogic.tiles(snapshot)
     val zone = remember { ZoneId.systemDefault() }
-    Row(
-        modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        tiles.forEach { t ->
+    // In the narrow background column beside the home card (STR-01) the tiles wrap into rows of two.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth()) {
+    val perRow = if (maxWidth < 360.dp) 2 else 4
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    tiles.chunked(perRow).forEach { rowTiles ->
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        rowTiles.forEach { t ->
             val value = if (t.kind == SystemTileKind.Time) {
                 DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a", Locale.getDefault()).format(Instant.ofEpochMilli(snapshot.now).atZone(zone))
             } else L10n.tr(t.value)
             val detail = L10n.tr(t.detail.ifEmpty { t.kind.label })
             Tile(value.ifEmpty { "-" }, detail, onClick = { onOpenPanel(t.kind) }, description = "${L10n.tr(t.kind.label)}: $value")
         }
+    }
+    }
+    }
     }
 }
 

@@ -117,6 +117,7 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(0) } // EXT-10: the app the phone's arrow keys have highlighted in the drawer
     var menuKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(drawerOpen) { selected = 0 }
     var drag by remember { mutableStateOf<Pair<String, FRect>?>(null) }
     var guides by remember { mutableStateOf<List<Guide>>(emptyList()) }
     var resizePreview by remember { mutableStateOf<Pair<String, FRect>?>(null) } // HOM-13: a widget being resized

@@ -551,7 +551,6 @@ object LaunchpadSettings {
 
     fun markRead(key: String) { _read.value = _read.value + key }
 
-    /** Forget read keys for notifications that no longer exist. */
     /**
      * Forgets read marks and expired snoozes for notifications that are gone. An empty feed is not trusted: it is also what
      * the listener reports while it reconnects or before the first load, and acting on it would turn every read
@@ -563,6 +562,7 @@ object LaunchpadSettings {
         pruneSnoozed(activeKeys, now)
     }
 
+    /** Forget read keys for notifications that no longer exist. */
     fun pruneRead(activeKeys: Set<String>) {
         val cur = _read.value
         if (cur.any { it !in activeKeys }) _read.value = cur.filter { it in activeKeys }.toSet()

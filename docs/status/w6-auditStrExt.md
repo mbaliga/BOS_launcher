@@ -36,3 +36,7 @@ Status column is the status after this audit; "built" means compiles, wired, cov
 ## Not changed on purpose
 
 Offer policy prompts once before honouring a pre-set Always setting (spec: "offers once, then per setting").
+
+## Second review
+
+Re-read the diff. Fixed: the desktop drawer's highlighted app index was not reset when the drawer closed by a click, so Enter on reopening could open a stale selection (now reset when the drawer toggles); a dangling KDoc in LaunchpadSettings moved back onto `pruneRead`. All 23 IDs have a row; no status changed. Known gap: a genuinely emptied feed leaves stale read marks until the next non-empty feed.

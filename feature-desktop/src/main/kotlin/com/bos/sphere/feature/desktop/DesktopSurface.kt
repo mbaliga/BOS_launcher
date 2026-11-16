@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -115,6 +115,7 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
 
     var drawerOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf(0) } // EXT-10: the app the phone's arrow keys have highlighted in the drawer
     var menuKey by remember { mutableStateOf<String?>(null) }
     var drag by remember { mutableStateOf<Pair<String, FRect>?>(null) }
     var guides by remember { mutableStateOf<List<Guide>>(emptyList()) }
@@ -184,12 +185,17 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
                 InputCommand.Click -> { menuKey = null; hit()?.let { targets[it]?.action?.invoke() } ?: run { if (drawerOpen) drawerOpen = false else SyntheticTouch.tap(view, cursor.x, cursor.y) } }
                 InputCommand.SecondaryClick -> hit()?.let { k -> targets[k]?.secondary?.invoke() } ?: run { if (!drawerOpen) SyntheticTouch.longPress(view, cursor.x, cursor.y) }
                 is InputCommand.Scroll -> if (drawerOpen) scope.launch { gridState.scrollBy(cmd.dy * 3f) }
-                is InputCommand.Text -> { if (!drawerOpen) drawerOpen = true; query += cmd.text }
+                is InputCommand.Text -> { if (!drawerOpen) drawerOpen = true; query += cmd.text; selected = 0 }
                 is InputCommand.Key -> when (cmd.key) {
-                    PanelKey.Escape -> { if (menuKey != null) menuKey = null else if (drawerOpen) { drawerOpen = false; query = "" } }
-                    PanelKey.Backspace -> query = query.dropLast(1)
-                    PanelKey.Enter -> if (drawerOpen) filtered(apps, query).firstOrNull()?.let { launchHere(it); drawerOpen = false; query = "" }
-                    else -> Unit
+                    PanelKey.Escape -> { if (menuKey != null) menuKey = null else if (drawerOpen) { drawerOpen = false; query = ""; selected = 0 } }
+                    PanelKey.Backspace -> { query = DrawerKeys.backspace(query); selected = 0 }
+                    PanelKey.Enter -> if (drawerOpen) filtered(apps, query).let { it.getOrNull(selected.coerceIn(0, (it.size - 1).coerceAtLeast(0))) }?.let { launchHere(it); drawerOpen = false; query = ""; selected = 0 }
+                    PanelKey.Up, PanelKey.Down, PanelKey.Left, PanelKey.Right, PanelKey.Tab -> if (drawerOpen) {
+                        val list = filtered(apps, query)
+                        val cols = DrawerKeys.columns(sizePx.width * 0.82f / density.density - 32f, layout.cellDp)
+                        selected = DrawerKeys.step(selected, list.size, cmd.key, cols)
+                        list.getOrNull(selected)?.let { a -> val i = selected; if (gridState.layoutInfo.visibleItemsInfo.none { it.index == i }) scope.launch { gridState.scrollToItem(i) } }
+                    }
                 }
             }
         }
@@ -347,7 +353,7 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp),
                         decorationBox = { inner -> if (query.isEmpty()) Text(L10n.tr("Search apps"), color = MaterialTheme.colorScheme.onSurfaceVariant); inner() },
                     )
-                    DrawerGrid(filtered(apps, query), layout, gridState, ::launchHere, onLong = { menuKey = "drawer:" + it.key }, menuKey, { menuKey = null }, ::placeApp, ::launchOnOther, unregister = { k -> targets.remove("drawer:$k") }) { k, r, a, sec ->
+                    DrawerGrid(filtered(apps, query), layout, gridState, selectedIndex = selected, ::launchHere, onLong = { menuKey = "drawer:" + it.key }, menuKey, { menuKey = null }, ::placeApp, ::launchOnOther, unregister = { k -> targets.remove("drawer:$k") }) { k, r, a, sec ->
                         targets["drawer:$k"] = Target(r, 1, a, sec)
                     }
                 }
@@ -390,17 +396,18 @@ internal fun recentEntries(apps: List<AppEntry>, recentKeys: List<String>, n: In
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DrawerGrid(
-    list: List<AppEntry>, layout: DesktopLayout, state: LazyGridState,
+    list: List<AppEntry>, layout: DesktopLayout, state: LazyGridState, selectedIndex: Int,
     onLaunch: (AppEntry) -> Unit, onLong: (AppEntry) -> Unit, menuKey: String?, dismiss: () -> Unit,
     place: (AppEntry) -> Unit, openOther: (AppEntry) -> Unit,
     unregister: (String) -> Unit,
     register: (String, FRect, () -> Unit, (() -> Unit)?) -> Unit,
 ) {
     LazyVerticalGrid(GridCells.Adaptive(layout.cellDp.dp), state = state, modifier = Modifier.padding(top = 12.dp)) {
-        items(list, key = { it.key }) { a ->
+        itemsIndexed(list, key = { _, a -> a.key }) { index, a ->
             DisposableEffect(a.key) { onDispose { unregister(a.key) } }
             Box(
                 Modifier.padding(4.dp)
+                    .then(if (index == selectedIndex) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier)
                     .onGloballyPositioned { c -> c.boundsInRoot().let { register(a.key, FRect(it.left, it.top, it.right, it.bottom), { onLaunch(a) }, { onLong(a) }) } }
                     .combinedClickable(onClick = { onLaunch(a) }, onLongClick = { onLong(a) }),
                 contentAlignment = Alignment.Center,

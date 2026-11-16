@@ -78,4 +78,24 @@ class DigestWidgetTest {
         val v = sh.getViewFor(id)
         assertTrue(v.findViewById<TextView>(R.id.digest_title).text.isNotEmpty())
     }
+
+    @Test fun STR_11_theWidgetOnlyRepaintsWhenWhatItShowsHasChanged() {
+        val manager = AppWidgetManager.getInstance(app)
+        val sh = shadowOf(manager)
+        val id = sh.createWidget(DigestWidgetProvider::class.java, R.layout.widget_digest)
+        val ids = intArrayOf(id)
+        val items = listOf(n("a", "demo.chat", "Chat", "Hi", 5))
+        DigestWidget.update(app, manager, ids, items)
+        assertTrue("an unchanged model is not painted again", !DigestWidget.updateIfChanged(app, manager, ids, items))
+        // A delivery policy decides whether the item sits in the digest, so changing it changes what the widget shows.
+        val p = AppPolicy("demo.chat", DeliveryMode.Digest, listOf(23 * 60 + 59))
+        com.bos.sphere.core.data.LaunchpadSettings.setPolicy(p)
+        try {
+            assertTrue("a changed policy changes the model", DigestWidget.updateIfChanged(app, manager, ids, items))
+            assertTrue(!DigestWidget.updateIfChanged(app, manager, ids, items))
+            assertTrue("no placed widget means nothing to paint", !DigestWidget.updateIfChanged(app, manager, IntArray(0), items))
+        } finally {
+            com.bos.sphere.core.data.LaunchpadSettings.setPolicy(AppPolicy("demo.chat"))
+        }
+    }
 }

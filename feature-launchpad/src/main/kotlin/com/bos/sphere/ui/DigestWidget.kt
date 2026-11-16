@@ -21,7 +21,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -97,10 +96,27 @@ object DigestWidget {
     fun ids(context: Context, manager: AppWidgetManager = AppWidgetManager.getInstance(context)): IntArray =
         manager.getAppWidgetIds(ComponentName(context, DigestWidgetProvider::class.java))
 
+    @Volatile private var lastPainted: DigestWidgetModel? = null
+
     fun update(context: Context, manager: AppWidgetManager, ids: IntArray, items: List<HubNotification>) {
         if (ids.isEmpty()) return
-        val v = views(context, currentModel(context, items))
-        manager.updateAppWidget(ids, v)
+        val model = currentModel(context, items)
+        manager.updateAppWidget(ids, views(context, model))
+        lastPainted = model
+    }
+
+    /**
+     * Repaints only when what the widget shows has changed; returns whether it did. The collector calls this every
+     * minute as well as on every feed change, because a digest releases at a clock time with no event to announce it,
+     * and the system's own refresh is at best every 30 minutes.
+     */
+    fun updateIfChanged(context: Context, manager: AppWidgetManager, ids: IntArray, items: List<HubNotification>, now: Long = System.currentTimeMillis()): Boolean {
+        if (ids.isEmpty()) return false
+        val model = currentModel(context, items, now)
+        if (model == lastPainted) return false
+        manager.updateAppWidget(ids, views(context, model))
+        lastPainted = model
+        return true
     }
 
     /** Follows the notification feed and the rules; call from anything that runs while the app does. Safe to call repeatedly. */
@@ -110,15 +126,16 @@ object DigestWidget {
         if (job?.isActive == true) return
         val app = context.applicationContext
         LaunchpadSettings.init(app)
+        val minute = kotlinx.coroutines.flow.flow { while (true) { emit(Unit); kotlinx.coroutines.delay(60_000) } }
         job = scope.launch {
             combine(
                 NotificationProvider.notifications, LaunchpadSettings.rules, LaunchpadSettings.prefs,
-                LaunchpadSettings.policies, LaunchpadSettings.snoozed,
-            ) { items, _, _, _, _ -> items }
+                LaunchpadSettings.policies, LaunchpadSettings.snoozed, minute,
+            ) { values -> @Suppress("UNCHECKED_CAST") (values[0] as List<HubNotification>) }
                 .debounce(400)
                 .collect { items ->
                     val m = AppWidgetManager.getInstance(app)
-                    update(app, m, ids(app, m), items)
+                    updateIfChanged(app, m, ids(app, m), items)
                 }
         }
     }
@@ -142,5 +159,5 @@ class DigestWidgetProvider : AppWidgetProvider() {
 
 /** The latest feed value for one-shot reads (the provider's first paint). */
 internal object NotificationProviderSnapshot {
-    fun items(): List<HubNotification> = kotlinx.coroutines.runBlocking { NotificationProvider.notifications.first() }
+    fun items(): List<HubNotification> = NotificationProvider.snapshot
 }

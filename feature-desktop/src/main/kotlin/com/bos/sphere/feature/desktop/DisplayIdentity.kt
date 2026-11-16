@@ -16,5 +16,15 @@ object DisplayIdentity {
         return "res:${w}x$h:" + clean(name)
     }
 
+    /** A readable name for a stored identity, for the list of remembered displays (EXT-09). */
+    fun label(identity: String): String {
+        val parts = identity.split(":")
+        return when (parts.firstOrNull()) {
+            "res" -> if (parts.size >= 3) parts.drop(2).joinToString(":").replace('-', ' ').ifBlank { parts[1] } + " (" + parts[1] + ")" else identity
+            "dev" -> parts.drop(1).filter { it.isNotBlank() }.joinToString(" ").ifBlank { identity }
+            else -> identity
+        }
+    }
+
     private fun clean(s: String) = s.trim().lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-')
 }

@@ -23,6 +23,5 @@ class SurfaceFocus {
     /** The surface the phone panel drives right now, or null when none is visible. */
     fun focused(): Any? = windowFocused?.takeIf { it in visible } ?: visible.lastOrNull()
 
-    fun anyFocused(): Boolean = focused() != null
     fun isFocused(token: Any): Boolean = focused() === token
 }

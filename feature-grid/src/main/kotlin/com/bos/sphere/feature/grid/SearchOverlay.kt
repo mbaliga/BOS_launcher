@@ -217,6 +217,8 @@ internal fun SearchScreen(
     onRunAppAction: (AppEntry, MenuAction) -> Boolean = { _, _ -> false },
     adjacentSupported: Boolean = false,
     onAppActionChoices: (AppEntry, MenuAction) -> List<RadarChoice>? = { _, _ -> null },
+    /** Test seam (PAL-08): the number of other displays that can host an app; null asks the capability registry. */
+    otherDisplaysOverride: Int? = null,
 ) {
     val context = LocalContext.current
     // PAL-08: the chooser of an action that needs a pick (which display, which workspace), shown over Radar.
@@ -228,7 +230,7 @@ internal fun SearchScreen(
     val mapping = remember { ScopePrefixes.Mapping.decode(palette.prefs.scopeMapping()) }
     var aliasRev by remember { mutableStateOf(0) }
     var aliasFor by remember { mutableStateOf<AppEntry?>(null) }
-    val otherDisplays = remember { runCatching { com.bos.sphere.core.capabilities.CapabilityEvaluator.externalDisplays(com.bos.sphere.core.capabilities.CapabilityRegistry(context).snapshot()).count { it.canHostTasks == true } }.getOrDefault(0) }
+    val otherDisplays = remember { otherDisplaysOverride ?: runCatching { com.bos.sphere.core.capabilities.CapabilityEvaluator.externalDisplays(com.bos.sphere.core.capabilities.CapabilityRegistry(context).snapshot()).count { it.canHostTasks == true } }.getOrDefault(0) }
     val selectedHitHolder = remember { arrayOfNulls<String>(1) }
     val haptic = LocalHapticFeedback.current
     val keyboard = LocalSoftwareKeyboardController.current

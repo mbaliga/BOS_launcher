@@ -469,10 +469,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 // Workspace switching and the dock's focus and number shortcuts belong to the dock controller (DCK-05, WSP-07).
                 // INP-05: Dock 1 to 9 and the workspace step act with Radar, the drawer, Ground Control or the puck open (the controller
                 // falls back to the pin list when no rail is shown); "focus dock" closes whatever hides the rail so the rail can take focus.
-                com.bos.sphere.core.input.LauncherCommand.FocusDock -> {
-                    if (searchOpen || drawerOpen || wheelOpen || leftOpen || settingsOpen) { searchOpen = false; drawerOpen = false; wheelOpen = false; leftOpen = false; settingsOpen = false }
-                    dockController.handle(c)
-                }
+                com.bos.sphere.core.input.LauncherCommand.FocusDock -> com.bos.sphere.ui.FocusDockRouting.focusDock(
+                    c, overlayOpen = searchOpen || drawerOpen || wheelOpen || leftOpen || settingsOpen,
+                    closeOverlays = { searchOpen = false; drawerOpen = false; wheelOpen = false; leftOpen = false; settingsOpen = false },
+                    dock = dockController::handle,
+                )
                 else -> dockController.handle(c)
             }
         },

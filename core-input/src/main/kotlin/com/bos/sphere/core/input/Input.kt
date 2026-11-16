@@ -72,6 +72,12 @@ class ShortcutRegistry(private val defs: List<ShortcutDef> = DefaultShortcuts.al
 
     @Synchronized fun reset(c: LauncherCommand) { overrides.remove(c) }
 
+    /** True when the user changed (or unbound) [c]. */
+    @Synchronized fun isOverridden(c: LauncherCommand): Boolean = c in overrides
+
+    /** The factory chord of [c]. */
+    fun defaultFor(c: LauncherCommand): KeyChord? = defs.firstOrNull { it.command == c }?.default
+
     /** Only the user's changes, for the exported configuration. */
     @Synchronized fun export(): String = overrides.entries.joinToString(";") { "${it.key.name}=${it.value?.encode() ?: "-"}" }
 

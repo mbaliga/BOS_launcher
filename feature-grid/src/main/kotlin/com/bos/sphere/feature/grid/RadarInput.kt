@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
@@ -33,6 +34,8 @@ internal fun PointerType.toInputMode(): InputMode = if (this == PointerType.Mous
 internal fun Modifier.secondaryClick(onSecondary: () -> Unit): Modifier = composed {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
+    // INP-02: the pointer icon shown while hovering is reported through a seam, so a test can observe hover -> intended icon.
+    LaunchedEffect(hovered) { RadarHoverProbe.observer?.invoke(if (hovered) RADAR_POINTER_ICON else null) }
     Modifier
         .hoverable(source)
         .pointerHoverIcon(RADAR_POINTER_ICON)
@@ -49,6 +52,9 @@ internal fun Modifier.secondaryClick(onSecondary: () -> Unit): Modifier = compos
             }
         }
 }
+
+/** INP-02 test seam: told the icon a hovered Radar tile shows (null when the pointer leaves). Null in the app. */
+internal object RadarHoverProbe { @Volatile var observer: ((PointerIcon?) -> Unit)? = null }
 
 /** The pointer shape over a Radar tile (INP-02); a constant so a test can state it. */
 internal val RADAR_POINTER_ICON = PointerIcon.Hand

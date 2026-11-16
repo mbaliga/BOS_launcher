@@ -17,6 +17,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.MouseButton
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.rightClick
@@ -58,6 +60,26 @@ class InputW3UiTest {
         rule.waitForIdle()
         assertEquals(listOf("menu"), secondary)
         assertEquals(PointerIcon.Hand, RADAR_POINTER_ICON)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h700dp-port-xhdpi")
+    fun INP_02_hovering_a_radar_tile_reports_the_hand_icon_and_leaving_clears_it_and_a_finger_never_hovers() {
+        val seen = mutableListOf<PointerIcon?>()
+        RadarHoverProbe.observer = { seen += it }
+        try {
+            rule.setContent { Box(Modifier.fillMaxSize()) { Box(Modifier.size(80.dp).testTag("tile").secondaryClick {}) } }
+            rule.waitForIdle()
+            seen.clear() // the first report is the initial not-hovered state
+            rule.onNodeWithTag("tile").performTouchInput { click() }
+            rule.waitForIdle()
+            assertEquals("a finger tap never hovers", emptyList<PointerIcon?>(), seen)
+            rule.onNodeWithTag("tile").performMouseInput { moveTo(center) }
+            rule.waitForIdle()
+            assertEquals(listOf<PointerIcon?>(PointerIcon.Hand), seen)
+            rule.onNodeWithTag("tile").performMouseInput { moveTo(Offset(-50f, -50f)) }
+            rule.waitForIdle()
+            assertEquals(listOf<PointerIcon?>(PointerIcon.Hand, null), seen)
+        } finally { RadarHoverProbe.observer = null }
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h700dp-port-xhdpi")

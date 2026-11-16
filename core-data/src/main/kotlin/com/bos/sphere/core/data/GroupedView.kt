@@ -110,3 +110,36 @@ object GroupLogic {
             gs.group?.priority == GroupPriority.Priority && gs.sections.any { s -> s.items.any { it.key !in readKeys } }
         }?.group?.colorArgb
 }
+
+/** What the left-edge indicator (STR-09) shows about Priority groups. */
+data class PriorityWaiting(val count: Int, val accentArgb: Long?, val groupName: String?)
+
+object GroupWaiting {
+    /**
+     * Unread items that count towards the indicator, group-aware: a Priority group's items count even when the app is on a digest
+     * or silent in Launchpad, and a Quiet group's items never count (the group is folded). Without groups it is [WaitingLogic.waiting].
+     */
+    fun waiting(
+        items: List<HubNotification>, rules: List<Rule>, policies: List<AppPolicy>, readKeys: Set<String>,
+        snoozedUntil: Map<String, Long>, now: Long, zone: ZoneId, grouping: GroupResolver?,
+    ): List<HubNotification> {
+        if (grouping == null || grouping.config.groups.isEmpty()) return WaitingLogic.waiting(items, rules, policies, readKeys, snoozedUntil, now, zone)
+        return LaunchpadLogic.visible(items, rules, now).filter { n ->
+            val g = grouping.resolve(n).group
+            val pol = listOfNotNull(GroupLogic.effectivePolicy(n.packageName, g, policies))
+            g?.priority != GroupPriority.Quiet && !n.isOngoing && n.key !in readKeys &&
+                (g?.priority == GroupPriority.Priority || !LaunchpadLogic.isSilent(n, rules)) &&
+                !DeliveryLogic.isSilentHere(n, pol) && !DeliveryLogic.isHeld(n, pol, now, zone) &&
+                !SnoozeLogic.isSnoozed(n.key, snoozedUntil, now)
+        }
+    }
+
+    /** How many of [waiting] sit in Priority groups, and the colour of the first such group (in display order) that has one. */
+    fun priority(waiting: List<HubNotification>, grouping: GroupResolver?): PriorityWaiting {
+        if (grouping == null || grouping.config.groups.isEmpty()) return PriorityWaiting(0, null, null)
+        val byGroup = waiting.mapNotNull { grouping.resolve(it).group }.filter { it.priority == GroupPriority.Priority }
+        if (byGroup.isEmpty()) return PriorityWaiting(0, null, null)
+        val first = grouping.config.ordered.first { g -> byGroup.any { it.id == g.id } }
+        return PriorityWaiting(byGroup.size, first.colorArgb, first.name)
+    }
+}

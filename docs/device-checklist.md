@@ -116,3 +116,15 @@ Run `tools/device_nfr.sh` on the mid-range reference device for the rows marked 
 | NFR-15 | each background kind (black, wallpaper bright and dark, solid, gradient, texture, live scenes, Horizon, a bright photo): look at clock and labels; run an accessibility contrast check (Accessibility Scanner) on home, palette, settings | primary text 4.5:1; live scenes and Horizon are the unsampled cases to look at first | |
 | NFR-17 | Ground Control > Backup > Crash reports: force a crash on a debug build, share it, delete all | the share sheet is the only exit; no network traffic from Liftoff (check with a packet capture or `dumpsys netstats`) | |
 | NFR-19 | section 9, three-button and gesture navigation, on a notch device | every step in section 9 passes | |
+
+## Launchpad groups (wave 10 groups)
+
+- [ ] STR-13: Ground Control > Launchpad > Groups: create "Work" (Normal) and "Family" (Priority, pick a colour). Open Launchpad: the section titles are Family, Work, Everything else; the selected one is large and dark, the others small and grey.
+- [ ] STR-13: from a chat row open the menu (long press, then swipe right and More) > Move to group... > pick the person scope > Work. The same person's chats from a second messaging app (same name, or "Name (WhatsApp)") land in Work too.
+- [ ] STR-13: with the contacts grant off, the rule editor says contact conditions never match; turn the grant on from Groups settings (explanation first, CFG-07) and the "in my contacts" and "starred" conditions start to match; turn it off again and nothing crashes.
+- [ ] STR-13: set My last name, add the rule "sender last name is my last name" to Family: a message from someone with that surname shows in Family, in front of other sections, even if its app is on a digest.
+- [ ] STR-13, STR-09: a Priority notification arrives while the home is showing: the left-edge indicator is tinted, shows a star and TalkBack reads "N waiting, M priority". System Do Not Disturb behaves as before (nothing changed by groups).
+- [ ] STR-13, INP-01..03: with a keyboard only, reach a group title with the arrow keys, select it with Enter; in the manager, Move up and Move down reorder groups and rules; with a mouse, right-click a row opens the same menu.
+- [ ] STR-13, NFR-13: TalkBack reads each group title with its priority, each manager button with the group's name (for example "Move Work up"), and the rule summary and "matches N current notifications" line change as a live region while editing.
+- [ ] STR-13, CFG-04: delete a group, then Ground Control > Backup > restore the newest snapshot: the group, its assignments and rules are back. Export the setup, import on a second install: groups, links and rules arrive; cloud backup and device transfer do not carry them (bmgr restore leaves them empty).
+- [ ] STR-13: with 100+ real notifications from many apps, Launchpad opens and scrolls without a stall and the section order matches the manager.

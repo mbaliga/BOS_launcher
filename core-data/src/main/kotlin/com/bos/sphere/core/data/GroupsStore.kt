@@ -182,5 +182,12 @@ object GroupsSettings {
         edit { GroupsEdit.unlinkAlias(it, personId, alias) }
     }
 
+    /** CFG-04: snapshot first, then remove the person link with the assignments and rule conditions that used it. */
+    fun removePerson(personId: String) {
+        if (_config.value.person(personId) == null) return
+        DestructiveEdits.before("remove person link")
+        edit { GroupsEdit.removePerson(it, personId) }
+    }
+
     fun setMyLastName(name: String) = edit { GroupsEdit.setMyLastName(it, name) }
 }

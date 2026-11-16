@@ -118,6 +118,9 @@ internal fun SectionHeader(
     onKey: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
     extra: String = "",
     modifier: Modifier = Modifier,
+    /** STR-13: a group section's colour dot and priority badge. */
+    accent: Color? = null,
+    badge: String = "",
 ) {
     var focused by remember { mutableStateOf(false) }
     // The selected title is large and dark, the others small and grey (the owner's mock-up); there are no panes to scroll between.
@@ -135,6 +138,7 @@ internal fun SectionHeader(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = if (selected) 14.dp else 8.dp, bottom = if (selected) 6.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (accent != null) Box(Modifier.padding(end = 8.dp).size(10.dp).background(accent, CircleShape))
             val lead = sec.items.firstOrNull()
             if (lead != null && sec.key != LaunchpadLogic.FLAT_KEY && !sec.pinned && (sec.key.startsWith("app:") || sec.key.startsWith("appconv:"))) {
                 AppIcon(lead.packageName, sec.subtitle.ifBlank { sec.title }, 20, Modifier.padding(end = 8.dp))
@@ -153,6 +157,7 @@ internal fun SectionHeader(
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                 )
             }
+            if (badge.isNotEmpty()) Text("  $badge", color = LocalLp.current.dim, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             Text(
                 "  ${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp,
                 modifier = Modifier.padding(end = 4.dp),

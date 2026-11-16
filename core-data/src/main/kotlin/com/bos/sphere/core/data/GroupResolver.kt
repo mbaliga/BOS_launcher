@@ -265,7 +265,7 @@ object GroupSummaries {
             ConditionKind.LastNameIsMine -> (if (neg) "whose last name is not " else "whose last name is ") + myLastName.ifBlank { "(not set)" }
             ConditionKind.InContacts -> if (neg) "who is not in my contacts" else "who is in my contacts"
             ConditionKind.StarredContact -> if (neg) "who is not a starred contact" else "who is a starred contact"
-            ConditionKind.TimeWindow -> (if (neg) "outside " else "between ") + AppPolicy.formatMinutes(c.from) + (if (neg) " and " else " and ") + AppPolicy.formatMinutes(c.to)
+            ConditionKind.TimeWindow -> (if (neg) "outside " else "between ") + AppPolicy.formatMinutes(c.from) + (if (neg) " to " else " and ") + AppPolicy.formatMinutes(c.to)
         }
     }
 

@@ -97,6 +97,7 @@ fun LaunchpadRulesPane(modifier: Modifier = Modifier) {
     var adding by remember { mutableStateOf(false) }
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LaunchpadGroupsPane() // STR-13
         Text(L10n.tr("Default grouping"), color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GroupMode.entries.forEach { m ->

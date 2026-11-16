@@ -171,6 +171,10 @@ enum class RowCommand(val label: String) {
     Open("Open"), Dismiss("Dismiss"), MarkRead("Mark as read"), Snooze("Snooze"),
     MuteApp("Mute this app"), MakeRule("Make a rule"), HideApp("Hide this app"),
     PinSender("Pin this sender"), Reply("Reply"),
+    /** STR-13: opens the group picker for the row (move it, or always put its person or app in a group). */
+    MoveToGroup("Move to group..."),
+    /** STR-13: opens the group-rule editor with a starting rule made from the row. */
+    GroupRule("Make a rule from this"),
 }
 
 data class RowMenuContext(
@@ -196,6 +200,8 @@ object LaunchpadRowMenus {
         if (c.hasPackage) { add(RowCommand.MuteApp); add(RowCommand.HideApp) }
         if (c.hasSender) add(RowCommand.PinSender)
         add(RowCommand.MakeRule)
+        add(RowCommand.MoveToGroup)
+        add(RowCommand.GroupRule)
     }
 
     fun palette(c: RowMenuContext) = entries(c)

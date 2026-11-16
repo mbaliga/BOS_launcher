@@ -29,6 +29,8 @@ class LauncherStores private constructor(context: Context) {
         history.mirror = log::record
         log.seedFrom(history.events.value)
     }
+    /** HOM-22: what the user removed from the Recent landing; private usage history, never exported or backed up. */
+    val recentsState = RecentsStateStore(java.io.File(app.filesDir, RecentsStateStore.RELATIVE_PATH))
     val iconColors = IconColorStore(app.getSharedPreferences("icon_colors", Context.MODE_PRIVATE))
 
     companion object {
@@ -56,6 +58,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
                 cornerIconSize = it.cornerIconSize.coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
                 indicatorIntensity = it.indicatorIntensity.coerceIn(0f, 1f),
                 indicatorSpeed = it.indicatorSpeed.coerceIn(0f, 1f),
+                recentsLimit = HomeRecents.clampLimit(it.recentsLimit),
             )
         }
         if (next == _prefs.value) return
@@ -130,6 +133,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("cornersPerOri", next.cornersPerOrientation)
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name)
+            .putString("homeLanding", next.homeLanding.name).putInt("recentsLimit", next.recentsLimit)
+            .putBoolean("recentsUsage", next.recentsUseUsageAccess).putBoolean("minimalHints", next.minimalHints)
             .apply()
         DeviceBound.writePrefs(sp, device, next.backgroundPicturePath, next.leftWidgetId)
     }
@@ -251,6 +256,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             hotCornersOn = sp.getBoolean("hotCornersOn", d.hotCornersOn),
             hotCornerDwellMs = sp.getInt("hotCornerDwell", d.hotCornerDwellMs).coerceIn(0, 1000),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
+            homeLanding = enumOr(sp.getString("homeLanding", null), d.homeLanding),
+            recentsLimit = HomeRecents.clampLimit(sp.getInt("recentsLimit", d.recentsLimit)),
+            recentsUseUsageAccess = sp.getBoolean("recentsUsage", d.recentsUseUsageAccess),
+            minimalHints = sp.getBoolean("minimalHints", d.minimalHints),
         )
     }
 }

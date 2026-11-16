@@ -277,6 +277,8 @@ object Glyphs {
         CornerActionId.RingerSilent -> Silent
         CornerActionId.DoNotDisturb -> Moon
         CornerActionId.SystemSettings -> Gear
+        CornerActionId.OpenLaunchpad -> Bell
+        CornerActionId.CycleLanding -> Home
     }
 
     fun forGesture(g: HomeGesture): ImageVector = when (g) {

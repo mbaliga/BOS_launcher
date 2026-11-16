@@ -89,4 +89,14 @@ class ShortcutRebindW5Test {
         ShortcutEditor(b).resetAll(); ShortcutPersistence.save(b, slot)
         assertNull(slot.t)
     }
+
+    @Test fun CFG_01_resetNeverStealsAChordAnotherCommandNowHolds() {
+        val reg = ShortcutRegistry(); val ed = ShortcutEditor(reg)
+        ed.unbind(LauncherCommand.OpenDrawer)
+        ed.propose(LauncherCommand.EditMode, drawer) // EditMode takes Ctrl+D, which is OpenDrawer's default
+        assertEquals(ShortcutEditor.Outcome.Conflict(LauncherCommand.EditMode), ed.reset(LauncherCommand.OpenDrawer))
+        assertNull(reg.binding(LauncherCommand.OpenDrawer))
+        val chords = reg.all().mapNotNull { it.second }
+        assertEquals(chords.size, chords.toSet().size)
+    }
 }

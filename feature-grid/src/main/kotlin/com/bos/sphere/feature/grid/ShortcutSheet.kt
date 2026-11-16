@@ -138,7 +138,7 @@ fun ShortcutSheet(
                 Text(r.binding, color = HyleColors.Ink, fontSize = 14.sp, modifier = Modifier.widthIn(min = 120.dp).testTag("shortcut.binding.${r.command.name}"))
                 SheetAction(L10n.tr("Change"), "shortcut.change.${r.command.name}") { capturing = r.command; conflict = null; message = null }
                 SheetAction(L10n.tr("Unbind"), "shortcut.unbind.${r.command.name}") { done(editor.unbind(r.command)) }
-                SheetAction(L10n.tr("Reset"), "shortcut.reset.${r.command.name}") { done(editor.reset(r.command)) }
+                SheetAction(L10n.tr("Reset"), "shortcut.reset.${r.command.name}") { done(editor.reset(r.command), registry.defaultFor(r.command), r.command) }
             }
         }
         Text(L10n.tr("Moving around"), color = HyleColors.InkBright, fontSize = 13.sp, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))

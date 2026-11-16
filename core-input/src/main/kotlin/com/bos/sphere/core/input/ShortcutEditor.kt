@@ -47,7 +47,11 @@ class ShortcutEditor(private val registry: ShortcutRegistry) {
 
     /** Touch parity: a command can be unbound or reset to its default without pressing any key. */
     fun unbind(command: LauncherCommand): Outcome { registry.rebind(command, null); return Outcome.Unbound(command) }
-    fun reset(command: LauncherCommand): Outcome { registry.reset(command); return Outcome.Reset(command) }
+    /** Back to the factory chord; when another command holds that chord now, nothing changes and the clash is named (never a silent steal). */
+    fun reset(command: LauncherCommand): Outcome {
+        registry.defaultFor(command)?.let { d -> registry.conflictFor(d, command)?.let { return Outcome.Conflict(it) } }
+        registry.reset(command); return Outcome.Reset(command)
+    }
 
     /**
      * CFG-01: the answer to a [Outcome.Conflict] when the user chooses "swap". [command] takes [chord]; the command that held it

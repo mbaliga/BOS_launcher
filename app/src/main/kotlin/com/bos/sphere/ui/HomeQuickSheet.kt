@@ -67,11 +67,19 @@ fun HomeQuickSheet(
     onDismiss: () -> Unit,
     /** Widgets, folders, links, icon pack and hidden apps (HOM-02 to HOM-07). */
     onHomeItems: (() -> Unit)? = null,
+    /** HOM-22: the home landing and how to change it (a four-way segmented control at the top). */
+    landing: com.bos.sphere.core.data.HomeLanding = com.bos.sphere.core.data.HomeLanding.Selected,
+    onLanding: ((com.bos.sphere.core.data.HomeLanding) -> Unit)? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = HyleColors.Surface) {
         // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
         Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
             Text(L10n.tr("Home"), color = HyleColors.InkBright, fontSize = 20.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(bottom = 12.dp))
+            if (onLanding != null) {
+                Heading(L10n.tr("Home landing"))
+                com.bos.sphere.feature.grid.LandingSegmented(landing, onLanding)
+                Text(com.bos.sphere.feature.grid.HomeLandingCopy.description(landing), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
+            }
 
             // HOM-21: the rows come from ContextMenus.forHomeSheet, the model touch, right-click and the Menu key share.
             val timeOn = prefs.clockPosition != ClockPosition.Hidden
@@ -131,7 +139,7 @@ fun HomeQuickSheet(
 
             Spacer(Modifier.height(18.dp))
             val actions = rows.filterIsInstance<AppMenuEntry.Sheet>().map { it.action }
-            if (HomeSheetAction.EditHome in actions) { BigButton(Modifier.fillMaxWidth(), Glyphs.Apps, HomeSheetAction.EditHome.label) { onEdit?.invoke() }; Spacer(Modifier.height(10.dp)) }
+            if (HomeSheetAction.EditHome in actions) { BigButton(Modifier.fillMaxWidth(), Glyphs.Apps, if (landing == com.bos.sphere.core.data.HomeLanding.Selected) HomeSheetAction.EditHome.label else "Edit home pages") { onEdit?.invoke() }; Spacer(Modifier.height(10.dp)) }
             if (HomeSheetAction.Panels in actions) { BigButton(Modifier.fillMaxWidth(), Glyphs.Clock, HomeSheetAction.Panels.label) { onPanels?.invoke() }; Spacer(Modifier.height(10.dp)) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 BigButton(Modifier.weight(1f), Glyphs.Image, HomeSheetAction.Wallpaper.label, onWallpaper)

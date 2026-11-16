@@ -11,6 +11,8 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bos.sphere.core.catalog.Folder
@@ -332,6 +334,79 @@ class AppSmokeTest {
         RuntimeEnvironment.setQualifiers("+w360dp-h720dp-port"); rule.waitForIdle()
         back(sc)
         assertFalse(drawerOpen())
+    }
+
+    // ---- HOM-22: home landing
+
+    private fun setLanding(l: com.bos.sphere.core.data.HomeLanding) { LauncherStores.get(AppSmokeHarness.app).prefs.update { it.copy(homeLanding = l) }; settle() }
+    private fun showsLabel(label: String) = rule.onAllNodesWithContentDescription(label, substring = true).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()
+    private fun graphIds() = LauncherInput.focus.nodes().map { it.id }
+
+    @Test fun HOM_22_switchingTheLandingChangesWhatTheHomeShowsAndSwitchingBackRestoresTheOldHome() {
+        start()
+        assertTrue("Selected apps: the seeded apps are on the page grid", showsLabel("Camera"))
+        setLanding(com.bos.sphere.core.data.HomeLanding.Recents)
+        assertTrue("Recent apps with no history: the quiet empty state", rule.onAllNodesWithText("No recent apps yet").fetchSemanticsNodes().isNotEmpty())
+        assertFalse("Recent apps lists no app that was never opened", showsLabel("Delta"))
+        LauncherStores.get(AppSmokeHarness.app).history.record(AppSmokeHarness.appKey("Bravo"))
+        settle()
+        assertTrue("an opened app appears", showsLabel("Bravo"))
+        assertFalse(showsLabel("Delta"))
+        setLanding(com.bos.sphere.core.data.HomeLanding.AllApps)
+        for (l in listOf("Alpha", "Bravo", "Camera", "Delta")) assertTrue("$l in All apps", showsLabel(l))
+        assertTrue("All apps has type to filter", rule.onAllNodesWithText("Type to filter apps").fetchSemanticsNodes().isNotEmpty())
+        setLanding(com.bos.sphere.core.data.HomeLanding.Selected)
+        assertTrue("the original page grid is back, nothing was lost", showsLabel("Camera"))
+    }
+
+    @Test fun HOM_22_minimalShowsOnlyTheWallpaperAndTheFourHotspots() {
+        start()
+        assertTrue(graphIds().any { it.startsWith("dock.app:") })
+        setLanding(com.bos.sphere.core.data.HomeLanding.Minimal)
+        val ids = graphIds()
+        assertEquals("exactly the four hotspots are on the focus graph", setOf("minimal.corner.TopLeft", "minimal.corner.TopRight", "minimal.corner.BottomLeft", "minimal.corner.BottomRight"), ids.toSet())
+        assertFalse("no dock", ids.any { it.startsWith("dock.") })
+        for (l in listOf("Alpha", "Bravo", "Camera", "Delta")) assertFalse("no tile for $l", showsLabel(l))
+        for (d in listOf("Top left hotspot", "Top right hotspot", "Bottom left hotspot", "Bottom right hotspot")) rule.onNodeWithContentDescription(d, substring = true).assertIsDisplayed()
+        rule.onAllNodesWithContentDescription("Dock").fetchSemanticsNodes().let { assertTrue("the dock is not drawn", it.isEmpty()) }
+        setLanding(com.bos.sphere.core.data.HomeLanding.Selected)
+        assertTrue("dock and apps are back", graphIds().any { it.startsWith("dock.app:") } && showsLabel("Camera"))
+    }
+
+    @Test fun HOM_22_aHotspotRunsItsAssignedAction() {
+        val sc = start()
+        setLanding(com.bos.sphere.core.data.HomeLanding.Minimal)
+        rule.onNodeWithContentDescription("Top left hotspot", substring = true).performClick(); settle()
+        assertTrue("the top left hotspot is Radar", radarOpen())
+        back(sc, manual = true)
+        rule.onNodeWithContentDescription("Bottom left hotspot", substring = true).performClick(); settle()
+        assertTrue("the bottom left hotspot opens all apps (the drawer or the puck, by style)", LauncherInput.focus.anyLayerActive)
+    }
+
+    @Test fun HOM_22_groundControlHomeHasALandingRowWithADescriptionForEachLanding() {
+        start()
+        setLanding(com.bos.sphere.core.data.HomeLanding.Minimal)
+        rule.onNodeWithContentDescription("Bottom right hotspot", substring = true).performClick(); settle()
+        rule.onNodeWithContentDescription("Home screen").performClick(); settle()
+        assertTrue("the Home category has the landing row", rule.onAllNodesWithText("HOME LANDING").fetchSemanticsNodes().isNotEmpty())
+        for (d in listOf("Your own pages, folders and widgets", "The apps you opened most recently, newest first", "Every app from A to Z, with an index and type to filter", "Only the wallpaper and four corner hotspots"))
+            assertTrue("a one-line description: $d", rule.onAllNodesWithContentDescription(d, substring = true).fetchSemanticsNodes().isNotEmpty())
+    }
+
+    @Test fun HOM_22_theCycleCommandStepsThroughTheFourLandingsAndWrapsToSelected() {
+        val sc = start()
+        val seen = ArrayList<com.bos.sphere.core.data.HomeLanding>()
+        repeat(4) { AppSmokeHarness.press(sc, KeyEvent.KEYCODE_L, ctrl = true, shift = true); settle(); seen += LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.homeLanding }
+        assertEquals(listOf(com.bos.sphere.core.data.HomeLanding.Recents, com.bos.sphere.core.data.HomeLanding.AllApps, com.bos.sphere.core.data.HomeLanding.Minimal, com.bos.sphere.core.data.HomeLanding.Selected), seen)
+    }
+
+    @Test fun HOM_22_aFreshHomeOffersRecentAppsAsASecondLineAndTapSwitchesTheLanding() {
+        AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
+        scenario = AppSmokeHarness.launch(); rule.waitForIdle(); settle()
+        LauncherStores.get(AppSmokeHarness.app).prefs.update { it.copy(onboardingDone = true) } // the fresh home, as in HOM_01 (EditCardAppTest)
+        settle()
+        rule.onNodeWithText("Or show recent apps").performClick(); settle()
+        assertEquals(com.bos.sphere.core.data.HomeLanding.Recents, LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.homeLanding)
     }
 
     // ---- snapshot hygiene

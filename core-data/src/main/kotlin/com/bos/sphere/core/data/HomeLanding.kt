@@ -90,6 +90,16 @@ object MinimalHotspots {
             if (own == DefaultCorners[c] || (corners[c] == null)) defaults.getValue(c) else own
         }
 
+    /**
+     * What a hotspot runs: a single assignment, or the first item of a palette (a fan-out has no room on Minimal). A corner that
+     * holds a complication or a widget, or nothing, is not a hotspot.
+     */
+    fun itemOf(slot: CornerSlot): CornerItem? = when (slot) {
+        is CornerSlot.Single -> slot.item
+        is CornerSlot.Palette -> slot.items.firstOrNull()
+        else -> null
+    }
+
     /** The dot hint is drawn when the setting is on and the landing is Minimal. */
     fun hintsVisible(l: HomeLanding, hintsOn: Boolean): Boolean = l == HomeLanding.Minimal && hintsOn
 }

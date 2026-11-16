@@ -269,4 +269,13 @@ class HomeLandingTest {
         assertTrue(StateSchema.BACKUP_EXCLUDED_FILES.any { RecentsStateStore.RELATIVE_PATH.startsWith("$it/") })
         assertTrue(TimelineLogStore.RELATIVE_PATH in StateSchema.NEVER_EXPORTED_FILES)
     }
+
+    @Test fun HOM_22_aHotspotRunsASingleAssignmentOrThePaletteItsFirstItemAndNothingElse() {
+        val a = CornerItem.Action(CornerActionId.Search); val b = CornerItem.Action(CornerActionId.AllApps)
+        assertEquals(a, MinimalHotspots.itemOf(CornerSlot.Single(a)))
+        assertEquals(a, MinimalHotspots.itemOf(CornerSlot.Palette("p", listOf(a, b))))
+        assertEquals(null, MinimalHotspots.itemOf(CornerSlot.Palette("p", emptyList())))
+        assertEquals(null, MinimalHotspots.itemOf(CornerSlot.Empty))
+        assertEquals(null, MinimalHotspots.itemOf(CornerSlot.Widget(1, "w")))
+    }
 }

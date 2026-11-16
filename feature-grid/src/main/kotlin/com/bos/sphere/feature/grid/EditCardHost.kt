@@ -103,12 +103,13 @@ fun EditCardHost(
     modifier: Modifier = Modifier,
 ) {
     fun alphaNow() = EditCardGeometry.frame(target, progress.value, reduced).carouselAlpha
-    val show by remember { androidx.compose.runtime.derivedStateOf { progress.value > 0.01f } }
     val d = LocalDensity.current
     val dir = LocalLayoutDirection.current
     val drag = remember { AddCarouselDrag() }
     val focus = remember { FocusRequester() }
-    LaunchedEffect(focusAdd) { if (focusAdd) runCatching { focus.requestFocus() } }
+    val show by remember { androidx.compose.runtime.derivedStateOf { progress.value > 0.01f } }
+    // The filter field only exists once the card is up, so the request waits for it (and for a frame to lay it out).
+    LaunchedEffect(focusAdd, show) { if (focusAdd && show) { androidx.compose.runtime.withFrameNanos { }; runCatching { focus.requestFocus() } } }
     var hostOrigin by remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     // The rectangles are physical screen px, so the host lays out left to right and each panel gets the real direction back for its own content.
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {

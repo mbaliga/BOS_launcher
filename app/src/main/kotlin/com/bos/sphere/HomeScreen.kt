@@ -322,6 +322,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // HOM-12: while editing, the home is a card pushed to the start side; the page carousel and the add carousel fill the background.
     val editCard = rememberEditCardState(homeEdit.active)
     var editFocusAdd by remember { mutableStateOf(false) }
+    LaunchedEffect(homeEdit.active) { if (!homeEdit.active) editFocusAdd = false }
     val sounds = remember { UiSounds() }
     DisposableEffect(Unit) { onDispose { sounds.release(); VoiceInputManager.release() } }
     sounds.enabled = prefs.uiSounds

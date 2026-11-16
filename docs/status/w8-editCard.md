@@ -16,3 +16,7 @@ Decision record: `docs/decisions/editCard.md`. Spec rows HOM-01, HOM-04, HOM-05,
 | --- | --- |
 | HOM-12 | Device step: long press empty home or use the quick sheet Edit; see the home shrink to a card on the left with the page carousel on the right; drag an icon, drop it onto another, resize a widget, press Undo; delete and reorder pages and undo the delete; rotate; right-to-left language; TalkBack and a keyboard (arrows, Tab, Enter, Esc); animations off. Check the frame rate while the card transition runs. |
 | HOM-01 | Device step: clear data, first run: the home is one empty page with the hint and an empty dock; add an app from the carousel; upgrade over an install with a saved layout and see it unchanged. |
+
+## Review pass
+
+Adversarial review found one defect, fixed: the add carousel focus request (hint and empty long press open edit with the filter field focused) ran before the carousel existed and was swallowed, so focus never landed; it now waits for the card to be up, and the focus flag resets when edit mode ends so a second open focuses again. Everything else was verified wired (HomeScreen overlay, key Esc, Back, hint, long press, quick sheet Edit), the card is a single graphicsLayer on the live home, no old-behaviour tests stale, spec rows HOM-01/04/05/12 and WSP-05 updated, translations in `L10nW8editCard`. Notifications (Launchpad) card is another stream. Statuses unchanged: HOM-12 stays partial (no device run).

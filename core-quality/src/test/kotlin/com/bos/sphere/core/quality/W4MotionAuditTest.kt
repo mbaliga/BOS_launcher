@@ -40,6 +40,8 @@ class W4MotionAuditTest {
             "WheelDrawer.kt" to 5, "Complications.kt" to 4, "Tactile.kt" to 2,
             // the item glide to a new slot (edit mode) and the page-dot pill: short position/size springs
             "GridHome.kt" to 3,
+            // the edit card (HOM-12): one progress value read inside graphicsLayer; under reduced motion the card jumps and only the carousel cross-fades (160 ms)
+            "EditCardGeometry.kt" to 1,
             // press spring already snaps under reduced motion (`still`)
         )
         val gatedFiles = setOf("ContinuousHome.kt", "SettingsSpace.kt", "HomeScreen.kt")

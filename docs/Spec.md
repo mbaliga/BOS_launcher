@@ -268,18 +268,18 @@ Home is a host that renders the user's items through a selectable home style (Gr
 
 | ID | P | Requirement | Acceptance criteria |
 | --- | --- | --- | --- |
-| HOM-01 | M | Selectable resting surface | User picks Grid, List, XMB or DSi, paged or continuous. Switching keeps all items, folders and widgets. Each style meets INP-01 and the frame budget in section 13 |
+| HOM-01 | M | Selectable resting surface | User picks Grid, List, XMB or DSi, paged or continuous. Switching keeps all items, folders and widgets. Each style meets INP-01 and the frame budget in section 13. A fresh install starts with one empty page and an empty dock: no apps are placed, a quiet hint ("Long press to add apps") opens edit mode with the add carousel focused, and apps stay reachable through the add carousel, the app drawer, Radar and search. Existing users keep their saved layout untouched (the empty default is decided by the absence of a saved layout, never by overwriting one) |
 | HOM-02 | M | Item types | App, shortcut, folder, widget and file/link shortcut can all live on home and in the dock |
 | HOM-03 | M | Icon rendering | Adaptive icons render at correct shape and size with no dark tile behind them. Themed (monochrome) icons and icon packs are supported; per-item icon override |
-| HOM-04 | M | Folders | Create by dropping one item on another or from the menu; name, reorder, open by tap, click or Enter; searchable by name |
-| HOM-05 | M | App drawer | Full list with alphabetical index, type-to-filter, work and personal tabs, user tags and hidden apps |
+| HOM-04 | M | Folders | Create by dropping one item on another or from the menu; name, reorder, open by tap, click or Enter; searchable by name. The add carousel in edit mode has a Folders tab (new folder) beside Apps, Widgets and Shortcuts |
+| HOM-05 | M | App drawer | Full list with alphabetical index, type-to-filter, work and personal tabs, user tags and hidden apps. In edit mode the same inventory (hidden apps stay hidden) is the add carousel's Apps tab: alphabetical, type-to-filter, Personal and Work chips; a tap adds the app to the first free cell of the current page (next page with room, else a new page), and a long-press drag onto the card does the same |
 | HOM-06 | M | Profiles | Work profile apps are badged and can be paused. Private space appears only when unlocked (Android 15+) |
 | HOM-07 | M | Widgets | Add from a searchable picker, resize by handles and by keyboard, reconfigure, remove. Widgets restore after reboot and after provider update |
 | HOM-08 | M | Widgets mixed with tiles | Widgets occupy the same layout model as app tiles on the grid surface. On List, XMB and DSi, widgets live in a defined widget band or panel, not overlapping tiles |
 | HOM-09 | M | Notification badges | Dots with optional count on app items when notification access is granted; long-press or right-click previews notifications |
 | HOM-10 | M | Package changes | Install, update, uninstall, disable, archive and suspend are reflected within 1 second without restart; removed items leave no gaps or crashes |
 | HOM-11 | M | Adaptive layout | Grid dimensions derive from window size class and user density setting. Rotating, folding, resizing or moving displays reflows without losing positions; each size class keeps its own arrangement |
-| HOM-12 | M | Edit mode | Explicit edit mode with undo for the last 20 changes |
+| HOM-12 | M | Edit mode | Explicit edit mode with undo for the last 20 changes. Edit mode shrinks the live home into a rounded card (about 28 dp corners, scale about 0.7) pushed to the start side (left; right in RTL) with its outer edge partly off screen, still directly editable; the freed background holds a vertically scrolling page carousel of live thumbnails (current page highlighted, tap to show, Delete page with an undo notice, Add page, reorder by long-press drag or Move up and Move down; the last page cannot vanish: deleting it empties it) and the add carousel (Apps, Widgets, Folders, Shortcuts). Arrows, Tab and Enter reach everything, Esc or Done returns; reduced motion replaces the shrink with a cross-fade; the card is one graphicsLayer scale and translate on the live home, which keeps its state. The dock steps aside while the card is up |
 | HOM-13 | S | Free-form placement in T3 | On desktop surfaces, items may be placed off-grid with snap guides; widgets may overlap empty space but not each other |
 | HOM-14 | S | Widget stacks | Several widgets share one slot, switched by swipe, scroll wheel or keys |
 | HOM-15 | S | Files and recent documents | A home panel or widget lists recent files from granted sources and pinned folders |
@@ -326,7 +326,7 @@ The launcher has no way to keep its dock visible on top of other apps without an
 | WSP-02 | M | Open on display | Where more than one display can host tasks, every app action list includes "Open on \<display name>". Verified by the task appearing on that display |
 | WSP-03 | M | Open adjacent | Where SPK-02 confirms support, "Open beside" launches the app into split with the current task. Where unsupported, the action is not shown |
 | WSP-04 | M | Open with bounds | On displays in desktop windowing, launches may carry bounds (left half, right half, centred, full). Where bounds are ignored, the app opens normally and WSP-01's notice applies |
-| WSP-05 | M | App groups | A saved group of 2 to 4 apps with a layout preset launches with one action. Appears as a home item, dock item and palette result |
+| WSP-05 | M | App groups | A saved group of 2 to 4 apps with a layout preset launches with one action. Appears as a home item, dock item and palette result. The add carousel's Shortcuts tab offers App group |
 | WSP-06 | M | Launch animation | App opens animate from the source item using the public activity options. No custom return-to-home animation is attempted beyond what the system provides |
 
 App groups launch their members in sequence with a short delay and re-check the result of each. On T1 with no split support, a group opens its first app and offers the rest as a quick switcher.

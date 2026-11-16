@@ -213,10 +213,12 @@ class WorkspaceManager(
             val live = hooks().captureHome()
             val liveWidgets = hooks().captureWidgets()
             update { s -> s.copy(captureDue = null, workspaces = s.workspaces.map { if (it.id == due) it.copy(homeArrangement = live ?: it.homeArrangement, widgets = liveWidgets ?: it.widgets) else it }) }
-            hooks().applyHome(a.homeArrangement)
-            if (a.widgets.isNotEmpty()) hooks().applyWidgets(a.widgets)
-            hooks().applyNotificationScope(a.notificationApps)
-            hooks().onSwitched(a)
+            // Read the active workspace again: when it is the one that was just saved (a switch away and back), the saved home is the current one.
+            val now = current.active
+            hooks().applyHome(now.homeArrangement)
+            if (now.widgets.isNotEmpty()) hooks().applyWidgets(now.widgets)
+            hooks().applyNotificationScope(now.notificationApps)
+            hooks().onSwitched(now)
             return
         }
         hooks().applyHome(a.homeArrangement)

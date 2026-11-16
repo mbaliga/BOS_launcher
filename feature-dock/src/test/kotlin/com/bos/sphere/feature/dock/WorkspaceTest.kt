@@ -92,6 +92,22 @@ class WorkspaceTest {
         assertEquals(listOf<String?>(null), h.applied) // C had no arrangement of its own yet
     }
 
+    @Test fun WSP_12_switchingAwayAndBackWhileDetachedKeepsTheLiveHome() {
+        var attached = false
+        val h = Hooks(); h.home = "LIVE-A"
+        val hooks = object : WorkspaceHooks {
+            override val ready get() = attached
+            override fun captureHome() = h.captureHome()
+            override fun applyHome(arrangement: String?) = h.applyHome(arrangement)
+        }
+        val m = WorkspaceManager(InMemoryWorkspaceStore(), { hooks }, newId = { "id${n++}" })
+        val b = m.create("B")
+        m.switchTo(b); m.switchTo(DockWorkspaceState.DEFAULT_ID)
+        attached = true
+        m.applyActive()
+        assertEquals(listOf<String?>("LIVE-A"), h.applied)
+    }
+
     @Test fun WSP_12_deletingTheWorkspaceThatOwnsTheLiveHomeClearsTheDebt() {
         val hooks = object : WorkspaceHooks { override val ready get() = false }
         val m = WorkspaceManager(InMemoryWorkspaceStore(), { hooks }, newId = { "id${n++}" })

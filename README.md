@@ -72,3 +72,7 @@ Notes:
 - The **AGSL shader path is capability-gated to API 33+** — don't ungate it (flat fallback below 33).
 - **Play-Integrity posture: no root / no Shizuku dependency** — keep it.
 - `core-design` reimplements a Hyle-like palette — a tracked Hyle-consumer debt (see registry); do not "fix" it ad hoc.
+
+## Licence
+
+Licensed under the [Apache License 2.0](LICENSE) (SPDX: `Apache-2.0`). Copyright 2026 Madhav Baliga.

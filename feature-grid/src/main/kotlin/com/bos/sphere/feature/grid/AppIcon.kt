@@ -49,7 +49,13 @@ object IconCache {
     private val unbadged = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val unbadgedRev = androidx.compose.runtime.mutableIntStateOf(0)
     fun noteSource(key: String, source: com.bos.sphere.core.catalog.IconSource) {
-        if (com.bos.sphere.core.catalog.ProfileBadgeRule.systemBadgeLost(source) && unbadged.add(key)) unbadgedRev.intValue++
+        if (com.bos.sphere.core.catalog.ProfileBadgeRule.systemBadgeLost(source) && unbadged.add(key)) {
+            // Rasterising runs off the main thread and in plain JVM tests with no Compose host. A write to the global snapshot would
+            // leave Compose's GlobalSnapshotManager waiting on a posted apply that a reset looper can drop (its `sent` flag then
+            // stays set for the whole process and every later Compose test hangs on pending snapshot changes), so publish the
+            // revision through its own snapshot, which applies and notifies observers at once.
+            androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { unbadgedRev.intValue++ }
+        }
     }
     /** Reads snapshot state, so a caller recomposes when the icon turns out to have lost the system badge. */
     fun systemBadgeLost(key: String): Boolean { unbadgedRev.intValue; return key in unbadged }

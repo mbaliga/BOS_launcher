@@ -10,3 +10,7 @@
 ## Spec rows changed
 
 STR-01 and STR-10 (wording), STR-07 (sliver). Decision note: `docs/decisions/cardTune.md`.
+
+## Review (adversarial pass)
+
+Checked the diff, portrait/landscape/RTL/peek screenshots (narrow slice, no neighbour, four icon tiles), geometry (card left edge = 0.93 of width at rest, drag 1:1), return zone (48 dp, content inset to match), tile semantics and focus order, and stale neighbour references (none left). No defects found; testDebugUnitTest and assembleRelease pass.

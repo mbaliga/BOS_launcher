@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.flowOn
  */
 interface AppRepository {
     val apps: Flow<List<AppEntry>>
+
+    /** Plain launch for the safe-mode screen only, which deliberately avoids the launch layer; every other launch goes through `AppLauncher` (WSP-01). */
     fun launch(entry: AppEntry)
 
     /** Opens the system App-info screen for [entry] (profile-aware). */
@@ -43,7 +45,8 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
 
     override val apps: Flow<List<AppEntry>> = callbackFlow {
         fun emitSnapshot() {
-            trySend(loadAll())
+            // A callback runs on the worker thread: a profile that cannot be read at this moment (locked or just removed) must not take the process down. The snapshot is skipped, never emitted short, so no app is taken for uninstalled (HOM-10).
+            runCatching { loadAll() }.getOrNull()?.let { trySend(it) }
         }
 
         val callback = object : LauncherApps.Callback() {
@@ -96,12 +99,7 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
         }.sortedBy { it.label.lowercase() }
 
     override fun launch(entry: AppEntry) {
-        launcherApps.startMainActivity(
-            entry.componentName,
-            entry.user,
-            /* sourceBounds = */ null,
-            /* opts = */ null,
-        )
+        launcherApps.startMainActivity(entry.componentName, entry.user, null, null)
     }
 
     override fun openAppDetails(entry: AppEntry) {

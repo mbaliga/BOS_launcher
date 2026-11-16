@@ -37,6 +37,12 @@ data class DockWorkspaceState(
     val groups: List<AppGroup> = emptyList(),
     val sessions: List<Session> = emptyList(),
     val schedules: List<ScheduledLaunch> = emptyList(),
+    /**
+     * Set when the active workspace was changed while no home could be captured (a broadcast with the launcher screen gone):
+     * the live home still belongs to this workspace. [WorkspaceManager.applyActive] saves it there before applying the
+     * active one. Stored, so a process death in between loses nothing (WSP-12).
+     */
+    val captureDue: String? = null,
 ) {
     val active: Workspace get() = workspaces.firstOrNull { it.id == activeId } ?: workspaces.first()
 
@@ -45,6 +51,11 @@ data class DockWorkspaceState(
 
 /** Where the home stream plugs in: capture the arrangement being left, apply the one being entered. */
 interface WorkspaceHooks {
+    /**
+     * False while nothing can capture or apply a home (the launcher screen is not composed). A switch asked for then is held
+     * and carried out when the hooks are attached, so the arrangement being left is never lost (WSP-07, WSP-12).
+     */
+    val ready: Boolean get() = true
     fun captureHome(): String? = null
     fun applyHome(arrangement: String?) {}
     fun applyNotificationScope(allowed: Set<String>?) {}
@@ -143,7 +154,7 @@ class WorkspaceManager(
     fun delete(id: String) {
         if (current.workspaces.size <= 1 || current.workspaces.none { it.id == id }) return
         if (current.activeId == id) switchTo(current.workspaces.first { it.id != id }.id)
-        update { s -> s.copy(workspaces = s.workspaces.filter { it.id != id }) }
+        update { s -> s.copy(workspaces = s.workspaces.filter { it.id != id }, captureDue = s.captureDue.takeIf { it != id }) }
     }
 
     fun setNotificationApps(id: String, apps: Set<String>?) = update { s -> s.copy(workspaces = s.workspaces.map { if (it.id == id) it.copy(notificationApps = apps) else it }) }
@@ -155,8 +166,12 @@ class WorkspaceManager(
     /** Saves the arrangement being left, makes [id] active and applies its arrangement, pins and notification scope. */
     fun switchTo(id: String): Boolean {
         val target = current.workspaces.firstOrNull { it.id == id } ?: return false
-        if (id == current.activeId) return true
         val h = hooks()
+        if (id == current.activeId) return true
+        if (!h.ready) {
+            update { s -> s.copy(activeId = id, captureDue = s.captureDue ?: s.activeId) }
+            return true
+        }
         val leaving = h.captureHome()
         val leavingWidgets = h.captureWidgets()
         update { s ->
@@ -192,6 +207,18 @@ class WorkspaceManager(
     /** Re-applies the active workspace's hooks, for process start. */
     fun applyActive() {
         val a = current.active
+        val due = current.captureDue
+        if (due != null && hooks().ready) {
+            // The live home still holds the workspace that was left without a capture: save it there first (WSP-12).
+            val live = hooks().captureHome()
+            val liveWidgets = hooks().captureWidgets()
+            update { s -> s.copy(captureDue = null, workspaces = s.workspaces.map { if (it.id == due) it.copy(homeArrangement = live ?: it.homeArrangement, widgets = liveWidgets ?: it.widgets) else it }) }
+            hooks().applyHome(a.homeArrangement)
+            if (a.widgets.isNotEmpty()) hooks().applyWidgets(a.widgets)
+            hooks().applyNotificationScope(a.notificationApps)
+            hooks().onSwitched(a)
+            return
+        }
         hooks().applyHome(a.homeArrangement)
         if (a.widgets.isNotEmpty()) hooks().applyWidgets(a.widgets)
         hooks().applyNotificationScope(a.notificationApps)

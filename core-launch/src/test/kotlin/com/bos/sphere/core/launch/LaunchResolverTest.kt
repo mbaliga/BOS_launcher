@@ -48,3 +48,30 @@ class LaunchResolverTest {
     }
     @Test(expected = IllegalArgumentException::class) fun a_group_needs_two_apps() { AppGroup("solo", listOf(LaunchRequest(target))) }
 }
+
+class LaunchRequestW6Test {
+    private val target = LaunchTarget("com.example.app")
+    private val caps = LaunchCaps(displayIds = setOf(0), hostingDisplayIds = setOf(0), boundsHonoured = false, adjacentSupported = null)
+
+    @Test fun WSP_01_theResultNamesEveryDroppedPlacementAndAPlainRequestDropsNothing() {
+        val r = LaunchResolver.resolve(
+            LaunchRequest(target, displayId = 5, bounds = BoundsPreset.Full.on(100, 100), placement = Placement.Adjacent), caps,
+        )
+        assertEquals(setOf(DropReason.DisplayMissing, DropReason.BoundsIgnored, DropReason.AdjacentUnsupported), r.dropped.toSet())
+        assertTrue(LaunchResolver.resolve(LaunchRequest(target), caps).dropped.isEmpty())
+    }
+
+    @Test fun WSP_01_theNoticeForOneReasonIsShownOncePerSessionEvenAcrossRequests() {
+        val n = DropNotices()
+        val first = LaunchResolver.resolve(LaunchRequest(target, bounds = BoundsPreset.Full.on(10, 10)), caps).dropped
+        val second = LaunchResolver.resolve(LaunchRequest(target, bounds = BoundsPreset.LeftHalf.on(10, 10)), caps).dropped
+        assertEquals(listOf(DropReason.BoundsIgnored), n.fresh(first))
+        assertTrue(n.fresh(second).isEmpty())
+        // a different reason is still new
+        assertEquals(listOf(DropReason.DisplayMissing), n.fresh(listOf(DropReason.DisplayMissing)))
+    }
+
+    @Test fun WSP_01_everyDropReasonHasANoticeTextTheUserCanRead() {
+        DropReason.entries.forEach { assertTrue(it.name, it.message.length > 10) }
+    }
+}

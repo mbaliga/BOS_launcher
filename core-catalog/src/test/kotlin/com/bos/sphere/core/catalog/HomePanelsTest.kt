@@ -50,3 +50,31 @@ class HomePanelsTest {
         assertEquals(listOf("3"), RecentFilesModel.withinGrants(merged, setOf("B")).map { it.uri })
     }
 }
+
+class TimelineDayW6Test {
+    @Test
+    fun HOM_18_daysCountCalendarDaysAcrossAClockChange() {
+        // 2026-03-29 is the 23-hour day in Berlin: 00:30 the next morning is still tomorrow, not today.
+        val zone = java.util.TimeZone.getTimeZone("Europe/Berlin")
+        val z = zone.toZoneId()
+        val start = java.time.LocalDate.of(2026, 3, 29).atStartOfDay(z).toInstant().toEpochMilli()
+        val nextMorning = java.time.LocalDate.of(2026, 3, 30).atTime(0, 30).atZone(z).toInstant().toEpochMilli()
+        org.junit.Assert.assertEquals("Tomorrow", Timeline.dayLabel(start, nextMorning, zone))
+        org.junit.Assert.assertEquals("Today", Timeline.dayLabel(start, start + 60_000, zone))
+        // The 25-hour day: 23:30 of the same day is still today.
+        val fall = java.time.LocalDate.of(2026, 10, 25).atStartOfDay(z).toInstant().toEpochMilli()
+        val lateFall = java.time.LocalDate.of(2026, 10, 25).atTime(23, 30).atZone(z).toInstant().toEpochMilli()
+        org.junit.Assert.assertEquals("Today", Timeline.dayLabel(fall, lateFall, zone))
+    }
+
+    @Test
+    fun HOM_18_dayHeadingsOfSeveralDaysAreTranslatableKeysWithTheNumberApart() {
+        val d = 86_400_000L
+        org.junit.Assert.assertEquals("%d days ago" to 3, Timeline.dayParts(3 * d, 5))
+        org.junit.Assert.assertEquals("In %d days" to 4, Timeline.dayParts(0, 4 * d + 1))
+        org.junit.Assert.assertEquals("Today" to null, Timeline.dayParts(0, 5))
+        val rows = TimelineView.rows(listOf(TimelineEntry(5, "a", "A", false)), 3 * d)
+        org.junit.Assert.assertEquals("%d days ago", rows.single().dayKey)
+        org.junit.Assert.assertEquals(3, rows.single().dayArg)
+    }
+}

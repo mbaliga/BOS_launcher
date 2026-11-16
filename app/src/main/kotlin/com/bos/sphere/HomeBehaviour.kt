@@ -43,6 +43,16 @@ fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<Stri
     }
 }
 
+/** HOM-12: what edit mode asks of the item host: keep removals undoable while it lasts, settle them when it ends. */
+interface HomeEditHooks {
+    fun begin(pages: List<com.bos.sphere.core.data.HomePage>)
+    /** The arrangement [pages] is now current (a change, or an echo of our own write). */
+    fun observed(pages: List<com.bos.sphere.core.data.HomePage>)
+    /** An undo or redo took the arrangement from [before] to [after]. */
+    fun revived(before: List<com.bos.sphere.core.data.HomePage>, after: List<com.bos.sphere.core.data.HomePage>)
+    fun end(pages: List<com.bos.sphere.core.data.HomePage>)
+}
+
 /** HOM-12: edit mode state for the live home; see [com.bos.sphere.core.catalog.LayoutEditSession]. */
 class HomeEditState internal constructor(private val layoutStore: HomeLayoutStore) {
     private var session: LayoutEditSession? = null
@@ -52,11 +62,20 @@ class HomeEditState internal constructor(private val layoutStore: HomeLayoutStor
     val canRedo: Boolean get() { rev; return session?.canRedo == true }
     val undoDepth: Int get() { rev; return session?.undoDepth ?: 0 }
 
-    fun enter() { session = LayoutEditSession(layoutStore.layout.value); rev++ }
-    fun exit() { session?.exit(); session = null; rev++ }
-    fun undo() { session?.undo()?.let { layoutStore.replace(it) }; rev++ }
-    fun redo() { session?.redo()?.let { layoutStore.replace(it) }; rev++ }
-    internal fun observe(layout: com.bos.sphere.core.data.HomeLayout) { if (session?.observe(layout) == true) rev++ }
+    /** Set by the screen once the item host exists. */
+    var hooks: HomeEditHooks? = null
+
+    fun enter() { session = LayoutEditSession(layoutStore.layout.value); hooks?.begin(layoutStore.layout.value.pages); rev++ }
+    fun exit() {
+        if (session != null) hooks?.end(layoutStore.layout.value.pages)
+        session?.exit(); session = null; rev++
+    }
+    fun undo() { val was = layoutStore.layout.value.pages; session?.undo()?.let { layoutStore.replace(it); hooks?.revived(was, it.pages) }; rev++ }
+    fun redo() { val was = layoutStore.layout.value.pages; session?.redo()?.let { layoutStore.replace(it); hooks?.revived(was, it.pages) }; rev++ }
+    internal fun observe(layout: com.bos.sphere.core.data.HomeLayout) {
+        if (session != null) hooks?.observed(layout.pages)
+        if (session?.observe(layout) == true) rev++
+    }
 }
 
 @Composable

@@ -80,6 +80,15 @@ class DockExtUiTest {
         assertNotNull(Shadows.shadowOf(n.actions.single().actionIntent).savedIntent.component)
     }
 
+    @Test fun WSP_05_theQuickSwitcherSaysSoWhenNotificationsAreOffInsteadOfDoingNothing() {
+        val nm = context.getSystemService(NotificationManager::class.java)
+        val rest = listOf(LaunchRequest(LaunchTarget("com.example.b")))
+        Shadows.shadowOf(nm).setNotificationsEnabled(false)
+        assertEquals(false, QuickSwitcher.post(context, "Study", rest))
+        Shadows.shadowOf(nm).setNotificationsEnabled(true)
+        assertEquals(true, QuickSwitcher.post(context, "Study", rest))
+    }
+
     @Test fun WSP_12_explicitIntentsSwitchWorkspacesByNameAndByStepWithoutAnActivity() {
         val mgr = WorkspaceRepository.get(context)
         val work = mgr.create("Auto-" + System.nanoTime())

@@ -76,7 +76,10 @@ class FileWorkspaceStore(private val file: File, private val deviceFile: File? =
 /** One manager per process, reloaded from the file after process death. */
 object WorkspaceRepository {
     @Volatile private var instance: WorkspaceManager? = null
-    @Volatile var hooks: WorkspaceHooks = object : WorkspaceHooks {}
+    /** What stands in while the launcher screen is not composed: a switch is held until real hooks attach (WSP-12). */
+    val DETACHED: WorkspaceHooks = object : WorkspaceHooks { override val ready: Boolean get() = false }
+    @Volatile var hooks: WorkspaceHooks = DETACHED
+
     private val writer = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "dock-store").apply { isDaemon = true } }
 
     fun get(context: Context): WorkspaceManager = instance ?: synchronized(this) {

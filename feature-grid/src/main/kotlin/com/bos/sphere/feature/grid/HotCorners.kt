@@ -71,6 +71,8 @@ fun Modifier.hotCorners(): Modifier = composed {
                     val ev = awaitPointerEvent(PointerEventPass.Initial)
                     val c = ev.changes.firstOrNull() ?: continue
                     if (c.type != PointerType.Mouse) { tracker.reset(); revealed = null; continue }
+                    // A surface above the home (Radar, the drawer, Ground Control, a menu) owns the pointer: no reveal and no click through it.
+                    if (LauncherInput.overlayOpen) { timer?.cancel(); tracker.reset(); revealed = null; continue }
                     val dragging = ev.changes.any { it.pressed } && ev.type != PointerEventType.Press
                     if (ev.type == PointerEventType.Press && ev.buttons.isPrimaryPressed) {
                         tracker.onClick()?.let { hot ->

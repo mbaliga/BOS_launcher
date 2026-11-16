@@ -79,12 +79,15 @@ object FileIndexer {
         if (mediaGranted && isActive()) runCatching { val l = scanMedia(context); if (isActive()) add(idx.reconcile("media", l)) }
         val trees = FileGrants.trees(context)
         for (t in trees) { if (!isActive()) return FileIndex.Diff(added, removed, changed); runCatching { val l = scanTree(context, t, isActive); if (isActive()) add(idx.reconcile("tree:$t", l)) } }
-        // Revoked folders disappear from the index.
-        val live = trees.map { "tree:$it" }.toSet()
-        idx.sources().filter { it.startsWith("tree:") && it !in live }.forEach { removed += idx.dropSource(it) }
+        // Revoked folders and a revoked media permission take their entries out of the index.
+        staleSources(idx.sources(), mediaGranted, trees.map { "tree:$it" }.toSet()).forEach { removed += idx.dropSource(it) }
         FileIndexHolder.save(context)
         return FileIndex.Diff(added, removed, changed)
     }
+
+    /** The index sources that no longer have a grant behind them: folders the user revoked, and "media" without a media permission (PAL-11). */
+    internal fun staleSources(sources: Set<String>, mediaGranted: Boolean, liveTrees: Set<String>): List<String> =
+        sources.filter { (it.startsWith("tree:") && it !in liveTrees) || (it == "media" && !mediaGranted) }
 
     private fun scanMedia(c: Context): List<FileEntry> {
         val base = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)

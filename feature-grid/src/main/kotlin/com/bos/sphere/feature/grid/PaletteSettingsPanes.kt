@@ -127,7 +127,7 @@ fun SearchHistoryPane() {
     var aliases by remember { mutableStateOf(PaletteHost.aliases(context)) }
     Column {
         Text(L10n.tr("Radar ranks the things you pick more often higher. This is kept on this device only and never sent anywhere."), color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(vertical = 6.dp))
-        ActionRow(label = L10n.tr("Forget what Radar learned"), summary = if (done) L10n.tr("Forgotten") else null, onClick = { PaletteHost.resetLearning(context); done = true })
+        ActionRow(label = L10n.tr("Forget what Radar learned"), summary = if (done) L10n.tr("Forgotten") else null, onClick = { RadarLearning.forget(context); done = true })
         aliases.entries.sortedBy { it.value.lowercase() }.forEach { (pkg, alias) ->
             ActionRow(label = alias, summary = pkg + " · " + L10n.tr("Tap to remove this alias"), onClick = { PaletteHost.setAlias(context, pkg, ""); aliases = PaletteHost.aliases(context) })
         }

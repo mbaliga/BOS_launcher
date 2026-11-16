@@ -19,6 +19,15 @@ object DeepSearchLogic {
 
     fun authority(pkg: String) = "$pkg.search"
 
+    /** The authority is only trusted when the package that owns it is the one that was approved (another app could claim the name first). */
+    fun ownsAuthority(pkg: String, providerPackage: String?): Boolean = providerPackage == pkg
+
+    /** Rows may point at content, file or web uris as docs/SEARCH_PROVIDER.md allows; intent, script and bare-path schemes are dropped. */
+    fun safeUri(raw: String?): String? {
+        val scheme = raw?.substringBefore(':', "")?.lowercase().orEmpty()
+        return raw?.takeIf { scheme == "content" || scheme == "file" || scheme == "https" || scheme == "http" }
+    }
+
     fun parseKind(s: String?): HitKind = when (s?.trim()?.lowercase()) {
         "image" -> HitKind.Image
         "video" -> HitKind.Video
@@ -32,7 +41,7 @@ object DeepSearchLogic {
     /** Maps one cursor row (column name to string value) to a hit; null when it has no uri. */
     fun parseRow(pkg: String, row: Map<String, String?>): SearchHit? {
         fun v(k: String) = row[k]?.takeIf { it.isNotBlank() }
-        val uri = v("uri") ?: return null
+        val uri = safeUri(v("uri")) ?: return null
         val title = v("title") ?: uri.substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
         val id = v("_id") ?: uri
         return SearchHit(
@@ -44,7 +53,7 @@ object DeepSearchLogic {
             kind = parseKind(v("kind")),
             uri = uri,
             mime = v("mime"),
-            thumbUri = v("thumb"),
+            thumbUri = safeUri(v("thumb")),
             sourcePackage = pkg,
             score = (v("score")?.toFloatOrNull() ?: 0.5f).coerceIn(0f, 1f),
         )
@@ -62,7 +71,7 @@ class DeepSearch(private val context: Context, private val approvedExtra: () -> 
     fun unavailableSources(): Set<String> = unavailable.toSet()
 
     private fun providerPresent(pkg: String): Boolean = runCatching {
-        context.packageManager.resolveContentProvider(DeepSearchLogic.authority(pkg), 0) != null
+        DeepSearchLogic.ownsAuthority(pkg, context.packageManager.resolveContentProvider(DeepSearchLogic.authority(pkg), 0)?.packageName)
     }.getOrDefault(false)
 
     override suspend fun search(query: String, limit: Int): List<SearchHit> {

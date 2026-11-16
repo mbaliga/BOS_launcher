@@ -637,9 +637,9 @@ internal fun ResultPreview(
                 }
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
-                if (tile is Tile.App) Text("OPTIONS", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                if (tile is Tile.App) Text(L10n.tr("Options").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                     modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF241F37)).clickable { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
-                Text("OPEN", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+                Text(L10n.tr("Open").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                     modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
             }
         }

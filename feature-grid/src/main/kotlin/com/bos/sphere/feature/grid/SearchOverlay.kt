@@ -603,6 +603,8 @@ internal object ContactHabits {
     fun record(c: android.content.Context, id: Long, ch: Channel) {
         sp(c).edit().putString("ch:$id", ch.name).putLong("at:$id", System.currentTimeMillis()).apply()
     }
+    /** PAL-09 reset: forget the channel and the time of every person reached through Radar. */
+    fun clear(c: android.content.Context) { runCatching { sp(c).edit().clear().apply() } }
     /** People reached through Radar, newest first. */
     fun recentIds(c: android.content.Context): List<Long> =
         sp(c).all.keys.filter { it.startsWith("at:") }.mapNotNull { k -> (sp(c).getLong(k, 0L)).takeIf { it > 0 }?.let { k.removePrefix("at:").toLongOrNull()?.to(it) } }

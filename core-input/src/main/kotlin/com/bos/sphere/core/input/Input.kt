@@ -82,13 +82,24 @@ class ShortcutRegistry(private val defs: List<ShortcutDef> = DefaultShortcuts.al
     @Synchronized fun export(): String = overrides.entries.joinToString(";") { "${it.key.name}=${it.value?.encode() ?: "-"}" }
 
     @Synchronized fun import(raw: String) {
-        overrides.clear()
+        val parsed = LinkedHashMap<LauncherCommand, KeyChord?>()
         raw.split(";").filter { it.isNotBlank() }.forEach { part ->
             val (k, v) = part.split("=", limit = 2).takeIf { it.size == 2 } ?: return@forEach
             val cmd = runCatching { LauncherCommand.valueOf(k) }.getOrNull() ?: return@forEach
             // A part that does not parse is ignored; it must never unbind a command by accident.
-            overrides[cmd] = if (v == "-") null else (KeyChord.decode(v) ?: return@forEach)
+            parsed[cmd] = if (v == "-") null else (KeyChord.decode(v) ?: return@forEach)
         }
+        // A hand-edited or merged file must not bind two commands to one chord: the later clashing part is dropped (INP-10).
+        val effective = HashMap<LauncherCommand, KeyChord?>()
+        defs.forEach { effective[it.command] = it.default }
+        parsed.forEach { (c, chord) -> effective[c] = chord }
+        val kept = LinkedHashMap<LauncherCommand, KeyChord?>()
+        parsed.forEach { (c, chord) ->
+            val clash = chord != null && effective.any { (other, oc) -> other != c && oc == chord && (other !in parsed || other in kept) }
+            if (clash) effective[c] = defs.firstOrNull { it.command == c }?.default else kept[c] = chord
+        }
+        overrides.clear()
+        overrides.putAll(kept)
     }
 }
 

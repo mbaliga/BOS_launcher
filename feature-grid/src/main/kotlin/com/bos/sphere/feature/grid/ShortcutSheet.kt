@@ -102,6 +102,7 @@ fun ShortcutSheet(
         if (o !is ShortcutEditor.Outcome.Conflict && o !is ShortcutEditor.Outcome.Refused) (save ?: { LauncherShortcuts.save(context) })()
     }
     GlassDialog(title = L10n.tr("Keyboard shortcuts"), onDismiss = onDismiss, width = 640.dp) {
+        Text(L10n.tr(KeyLabels.SCOPE_NOTE), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
         Text(L10n.tr(KeyLabels.META_NOTE), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
         message?.let { Text(it, color = HyleColors.InkBright, fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp).semantics { liveRegion = LiveRegionMode.Polite }) }
         DisposableEffect(capturing != null) { DialogKeyGate.passThrough = capturing != null; onDispose { DialogKeyGate.passThrough = false } }

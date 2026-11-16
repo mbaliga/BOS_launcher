@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.grid
 
+import com.bos.sphere.feature.search.palette.PaletteHost
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -45,6 +46,15 @@ import dev.aarso.search.palette.StableOrder
 /** Last hub results per query, so reopening Radar and typing the same query shows them at once (PAL-12). Process-local, never persisted. */
 internal object RadarMemory {
     val hits = QueryCache<Map<SearchCategory, List<SearchHit>>>(capacity = 8)
+}
+
+/** PAL-09 reset: everything Radar learned from selections, including the people habits and the remembered results, is forgotten. */
+internal object RadarLearning {
+    fun forget(context: android.content.Context) {
+        PaletteHost.resetLearning(context)
+        ContactHabits.clear(context)
+        RadarMemory.hits.clear()
+    }
 }
 
 /** PAL-09 and PAL-12 for streamed hub hits: ranked by match blended with local history, and stable under the selection. */

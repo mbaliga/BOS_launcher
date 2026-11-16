@@ -1068,7 +1068,7 @@ private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(48.dp)
-            .semantics { contentDescription = "Search apps" }
+            .semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Search apps") }
             .clickable(role = Role.Button, onClick = onClick),
     ) {
         Canvas(Modifier.fillMaxSize()) {

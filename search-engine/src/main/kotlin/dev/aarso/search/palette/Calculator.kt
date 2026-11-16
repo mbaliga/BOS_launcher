@@ -19,8 +19,21 @@ object Calculator {
     fun evaluate(input: String): CalcResult? {
         val q = input.trim()
         if (q.isEmpty() || q.length > 120) return null
-        Units.convert(q)?.let { return it }
-        return arithmetic(q)
+        val n = decimalCommaToPoint(q)
+        Units.convert(n)?.let { return it.copy(expression = q) }
+        return arithmetic(n)?.copy(expression = q)
+    }
+
+    /**
+     * "1,5 * 2" is a calculation in the many locales that write a decimal comma. A comma is read as the decimal mark only
+     * when the text has no point and no comma group is exactly three digits ("1,000" stays unrecognised, as a thousands
+     * separator would be a guess either way).
+     */
+    internal fun decimalCommaToPoint(q: String): String {
+        if (',' !in q || '.' in q) return q
+        val bad = Regex("""\d,\d{3}(?!\d)""").containsMatchIn(q)
+        val lone = Regex("""(?<!\d),|,(?!\d)""").containsMatchIn(q)
+        return if (bad || lone) q else Regex("""(?<=\d),(?=\d)""").replace(q, ".")
     }
 
     private fun arithmetic(q: String): CalcResult? {
@@ -155,7 +168,8 @@ object Units {
         add(Kind.Length, 0.3048, "ft", "ft", "foot", "feet")
         add(Kind.Length, 0.9144, "yd", "yd", "yard", "yards")
         add(Kind.Length, 1609.344, "mi", "mi", "mile", "miles")
-        add(Kind.Length, 1852.0, "nmi", "nmi", "nm")
+        add(Kind.Length, 1e-9, "nm", "nm", "nanometer", "nanometers", "nanometre", "nanometres")
+        add(Kind.Length, 1852.0, "nmi", "nmi")
         // mass (base gram)
         add(Kind.Mass, 0.001, "mg", "mg", "milligram", "milligrams")
         add(Kind.Mass, 1.0, "g", "g", "gram", "grams")

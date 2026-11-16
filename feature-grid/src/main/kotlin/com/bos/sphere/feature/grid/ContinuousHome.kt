@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -141,9 +142,11 @@ fun ContinuousHome(
     extras: HomeExtras? = null,
     extraKeys: List<String> = emptyList(),
     topLevel: List<String> = emptyList(),
+    /** HOM-16: forward the scroll position to the system wallpaper (home is drawn over it). */
+    wallpaperScroll: Boolean = false,
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds, gestures, extras, extraKeys, topLevel)
+        ContinuousImpl(apps, crossCount.coerceAtLeast(1), landscape, style, onLaunch, onLongPress, modifier, contentPadding, iconScale, spacing, showLabels, sounds, gestures, extras, extraKeys, topLevel, wallpaperScroll)
     }
 }
 
@@ -172,6 +175,7 @@ private fun ContinuousImpl(
     extras: HomeExtras?,
     extraKeys: List<String>,
     topLevel: List<String>,
+    wallpaperScroll: Boolean = false,
 ) {
     val rows = remember(apps, extras, extraKeys, topLevel) { HomeInterleave.merge(apps, { it.key }, if (extras == null) emptyList() else extraKeys, topLevel) }
     val density = LocalDensity.current
@@ -206,6 +210,22 @@ private fun ContinuousImpl(
         val fadeEnd = with(density) { (if (landscape) padR else padB).toPx() }
 
         val stillCells = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+        if (wallpaperScroll) {
+            // HOM-16: along the scroll axis for a horizontal grid; a vertical one has no sideways travel and sends the centred offset.
+            val extentPxNow = with(density) { extent.dp.toPx() }
+            val beforePx = with(density) { (if (landscape) padL else padT).toPx() }
+            val afterPx = with(density) { (if (landscape) padR else padB).toPx() }
+            val progress by remember(gridState, rows.size, crossCount, landscape, extentPxNow, beforePx, afterPx) {
+                derivedStateOf {
+                    val info = gridState.layoutInfo
+                    val viewport = if (landscape) info.viewportSize.width else info.viewportSize.height
+                    com.bos.sphere.core.catalog.WallpaperScroll.gridProgress(
+                        gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset, extentPxNow, rows.size, crossCount, beforePx, afterPx, viewport.toFloat(),
+                    )
+                }
+            }
+            WallpaperScrollEffect(true, progress, com.bos.sphere.core.catalog.WallpaperScroll.GRID_PAGES, scrollsAcross = landscape)
+        }
         // NFR-13: one linear reading order for TalkBack, by item index, whichever way the grid flows.
         Box(
             Modifier

@@ -89,14 +89,23 @@ class ShortcutRegistry(private val defs: List<ShortcutDef> = DefaultShortcuts.al
             // A part that does not parse is ignored; it must never unbind a command by accident.
             parsed[cmd] = if (v == "-") null else (KeyChord.decode(v) ?: return@forEach)
         }
-        // A hand-edited or merged file must not bind two commands to one chord: the later clashing part is dropped (INP-10).
-        val effective = HashMap<LauncherCommand, KeyChord?>()
-        defs.forEach { effective[it.command] = it.default }
-        parsed.forEach { (c, chord) -> effective[c] = chord }
-        val kept = LinkedHashMap<LauncherCommand, KeyChord?>()
-        parsed.forEach { (c, chord) ->
-            val clash = chord != null && effective.any { (other, oc) -> other != c && oc == chord && (other !in parsed || other in kept) }
-            if (clash) effective[c] = defs.firstOrNull { it.command == c }?.default else kept[c] = chord
+        // A hand-edited or merged file must not bind two commands to one chord (INP-10). A command nobody wrote a part for
+        // keeps its binding; between two parts the earlier one wins. A dropped part falls back to its default chord, and if
+        // that is taken as well (by a kept override or another command's default) the command is left unbound, so after the
+        // import no two commands ever share a chord. Each command changes at most twice, so the loop ends.
+        val kept = LinkedHashMap(parsed)
+        fun effectiveOf(c: LauncherCommand): KeyChord? = if (c in kept) kept[c] else defs.firstOrNull { it.command == c }?.default
+        while (true) {
+            val clash = defs.map { it.command }.filter { effectiveOf(it) != null }.groupBy { effectiveOf(it) }.values.firstOrNull { it.size > 1 } ?: break
+            val order = kept.keys.toList()
+            val winner = clash.firstOrNull { it !in kept } ?: clash.minByOrNull { order.indexOf(it) }!!
+            val losers = clash.filter { it != winner && it in kept }
+            if (losers.isEmpty()) break // only possible with duplicate default chords in the definitions themselves
+            for (c in losers) {
+                kept.remove(c)
+                val back = effectiveOf(c)
+                if (back != null && defs.any { it.command != c && effectiveOf(it.command) == back }) kept[c] = null
+            }
         }
         overrides.clear()
         overrides.putAll(kept)

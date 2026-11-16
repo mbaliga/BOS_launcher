@@ -10,6 +10,9 @@ import kotlin.math.min
  */
 object WallpaperMath {
 
+    /** What [WallpaperScroll.send] hands the wallpaper: a [position] counted in pages out of [pages]. */
+    data class Send(val position: Float, val pages: Int)
+
     /** x offset in 0..1 for [page] of [pageCount] (or a continuous [position] in pages). */
     fun xOffset(position: Float, pageCount: Int): Float =
         if (pageCount <= 1) 0.5f else (position / (pageCount - 1)).coerceIn(0f, 1f)
@@ -53,4 +56,36 @@ object WallpaperMath {
         fun ch(f: Float) = ((f + m) * 255f + 0.5f).toInt().coerceIn(0, 255)
         return (0xFF shl 24) or (ch(r) shl 16) or (ch(g) shl 8) or ch(b)
     }
+}
+
+
+/**
+ * HOM-16: what each home style forwards to the wallpaper. Styles that scroll across (paged grid, a
+ * horizontal continuous grid or DSi, the XMB's category bar) forward their position; styles that
+ * scroll only up and down (list, vertical continuous or DSi) have no sideways travel, so they send the
+ * fixed centre offset (0.5) rather than none, which also clears the offset a previous style left behind.
+ * With animations off ([reduced]) the position snaps to the settled page instead of following the finger.
+ */
+object WallpaperScroll {
+    /** The offset sent by a style that does not move the wallpaper. */
+    val Centred = WallpaperMath.Send(0f, 1)
+
+    fun send(position: Float, pageCount: Int, scrollsAcross: Boolean, reduced: Boolean): WallpaperMath.Send {
+        if (!scrollsAcross || pageCount <= 1) return Centred
+        val p = position.coerceIn(0f, (pageCount - 1).toFloat())
+        return WallpaperMath.Send(if (reduced) Math.round(p).toFloat() else p, pageCount)
+    }
+
+    /** Where a continuous grid is, 0..1, from what its lazy state reports. A list that fits in the viewport is at 0. */
+    fun gridProgress(firstIndex: Int, firstOffsetPx: Int, itemExtentPx: Float, totalItems: Int, crossCount: Int, padBeforePx: Float, padAfterPx: Float, viewportPx: Float): Float {
+        if (totalItems <= 0 || crossCount <= 0 || itemExtentPx <= 0f) return 0f
+        val lines = (totalItems + crossCount - 1) / crossCount
+        val maxScroll = lines * itemExtentPx + padBeforePx + padAfterPx - viewportPx
+        if (maxScroll <= 0f) return 0f
+        val scrolled = (firstIndex / crossCount) * itemExtentPx + firstOffsetPx
+        return (scrolled / maxScroll).coerceIn(0f, 1f)
+    }
+
+    /** A continuous grid's progress is forwarded as two pages (0 at the start, 1 at the end). */
+    const val GRID_PAGES = 2
 }

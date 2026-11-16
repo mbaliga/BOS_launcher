@@ -14,6 +14,10 @@ val gitSha = git("rev-parse", "--short", "HEAD").ifEmpty { "unknown" }
 val gitDate = git("show", "-s", "--format=%cs", "HEAD").ifEmpty { "unknown" }
 val gitCount = git("rev-list", "--count", "HEAD").toIntOrNull() ?: 1
 
+// CFG-17: whether the Lab category is listed in release builds. Default true while the project is alpha; the owner flips
+// the default before a public build, or a build passes -Pliftoff.lab=false.
+val labVisibleRelease: Boolean = (findProperty("liftoff.lab") as String?)?.trim()?.lowercase() != "false"
+
 // INP-01, INP-05: the app module's own JVM + Robolectric test setup (same offline runtime jars as feature-grid).
 val robolectricRuntime14: Configuration by configurations.creating { isTransitive = false }
 val robolectricRuntime15: Configuration by configurations.creating { isTransitive = false }
@@ -42,7 +46,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // CFG-17: the Lab (spikes) category is always listed in debug builds.
+            buildConfigField("boolean", "LAB_VISIBLE", "true")
+        }
         release {
+            // CFG-17: alpha default is visible so spikes can run on the release APK; -Pliftoff.lab=false hides it (docs/decisions/CFG-17.md).
+            buildConfigField("boolean", "LAB_VISIBLE", labVisibleRelease.toString())
             // Optimised (R8) build for daily use; signed with the debug key so it installs without a keystore.
             isMinifyEnabled = true
             isShrinkResources = true

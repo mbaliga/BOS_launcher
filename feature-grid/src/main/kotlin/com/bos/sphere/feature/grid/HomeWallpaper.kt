@@ -11,17 +11,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import com.bos.sphere.core.catalog.WallpaperBridge
 
+/** Test seam: where forwarded offsets go instead of the system wallpaper (position in pages, page count). Null in the app. */
+internal val LocalWallpaperForward = androidx.compose.runtime.staticCompositionLocalOf<((Float, Int) -> Unit)?> { null }
+
 /**
  * HOM-16: while home is drawn over the system wallpaper, forwards the scroll position (in pages)
  * to the wallpaper so a live or panoramic wallpaper follows the pages.
  */
 @Composable
-fun WallpaperScrollEffect(enabled: Boolean, position: Float, pageCount: Int) {
+fun WallpaperScrollEffect(enabled: Boolean, position: Float, pageCount: Int, scrollsAcross: Boolean = true) {
     if (!enabled) return
+    // HOM-16: animations off snaps to the settled page; a style that only scrolls up and down sends the centred offset.
+    val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    val sent = com.bos.sphere.core.catalog.WallpaperScroll.send(position, pageCount, scrollsAcross, reduced)
     val context = LocalContext.current
     val view = LocalView.current
     val bridge = remember(context) { WallpaperBridge(context) }
-    LaunchedEffect(position, pageCount, view.windowToken) { bridge.forwardOffset(view.windowToken, position, pageCount) }
+    val forward = LocalWallpaperForward.current
+    LaunchedEffect(sent, view.windowToken) { if (forward != null) forward(sent.position, sent.pages) else bridge.forwardOffset(view.windowToken, sent.position, sent.pages) }
 }
 
 /** The accent to use: derived from the system wallpaper when [fromWallpaper], else [fallback]. Updates when the wallpaper changes. */

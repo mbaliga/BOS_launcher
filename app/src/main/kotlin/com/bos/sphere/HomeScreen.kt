@@ -215,7 +215,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
     SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }) // HOM-11: one arrangement per window size class
-    val homeEdit = rememberHomeEdit(stores.layout) // HOM-12
+    val homeEdit = rememberHomeEdit(stores.layout, remember(context) { WorkspaceHomeDockPins(com.bos.sphere.feature.dock.WorkspaceRepository.get(context)) }) // HOM-12 (layout and dock pins share one undo)
     var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18
     val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()
     val landscapeCorners by stores.shortcuts.landscapeCorners.collectAsStateWithLifecycle()
@@ -904,6 +904,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
+                        wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, // HOM-16
                     )
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
@@ -958,6 +959,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
+                        wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, // HOM-16
                     )
                     SettingsHoldBand()
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
@@ -973,6 +975,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
+                        wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, // HOM-16
                     )
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
@@ -987,6 +990,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages),
                     )
+                    // HOM-16: the list only scrolls up and down, so the wallpaper gets the fixed centred offset.
+                    com.bos.sphere.feature.grid.WallpaperScrollEffect(prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, 0f, 1, scrollsAcross = false)
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
                 }

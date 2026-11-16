@@ -750,7 +750,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 },
         )
     }
-    if (m.lab.isNotEmpty()) {
+    if (m.lab.isNotEmpty() && LabGate.visible()) { // CFG-17
         out += SettingCategory(
             x("Lab"), Glyphs.Sliders,
             listOf<SettingItem>(SettingItem.Action(x("Copy all results"), Glyphs.Info, "", onClick = { m.copyText(m.lab.joinToString("\n\n") { "${it.title}\n${it.result}" }) })) +

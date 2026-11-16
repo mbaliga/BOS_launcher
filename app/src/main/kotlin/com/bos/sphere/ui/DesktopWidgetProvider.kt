@@ -39,4 +39,16 @@ class DesktopWidgetProvider(context: Context) : DesktopWidgetHost {
     override fun isBound(appWidgetId: Int): Boolean = LauncherWidgetHost.shared(app).providerInfo(appWidgetId) != null
 
     override fun release(appWidgetId: Int) = LauncherWidgetHost.shared(app).deleteWidget(appWidgetId)
+
+    /** HOM-13: the provider's own resize rules (`resizeMode`, `minResizeWidth` / `minResizeHeight`, else its minimum), in dp. */
+    override fun resizeLimits(appWidgetId: Int, density: Float): com.bos.sphere.feature.desktop.ResizeLimits? {
+        val info = LauncherWidgetHost.shared(app).providerInfo(appWidgetId) ?: return null
+        val d = density.coerceAtLeast(0.5f)
+        return com.bos.sphere.feature.desktop.ResizeLimits(
+            minWidthDp = (if (info.minResizeWidth > 0) info.minResizeWidth else info.minWidth) / d,
+            minHeightDp = (if (info.minResizeHeight > 0) info.minResizeHeight else info.minHeight) / d,
+            horizontal = info.resizeMode and android.appwidget.AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0,
+            vertical = info.resizeMode and android.appwidget.AppWidgetProviderInfo.RESIZE_VERTICAL != 0,
+        )
+    }
 }

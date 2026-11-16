@@ -127,7 +127,8 @@ object HomeRekey {
         fun sw(k: String) = if (k == oldKey) newKey else k
         return state.copy(
             pages = state.pages.map { p -> p.copy(keys = p.keys.map(::sw)) },
-            dock = state.dock.map(::sw),
+            // HOM-07: a widget pinned to the rail is the entry `pin:widget:<key>`; it follows the new id too.
+            dock = state.dock.map { e -> if (e == "pin:widget:$oldKey") "pin:widget:$newKey" else sw(e) },
             folders = state.folders.mapValues { (_, f) -> f.copy(keys = f.keys.map(::sw)) },
             items = state.items.mapKeys { (k, _) -> sw(k) }.mapValues { (_, d) ->
                 when {

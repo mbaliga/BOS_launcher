@@ -4,6 +4,7 @@ import android.graphics.drawable.Drawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -66,6 +69,8 @@ class HomeExtras(
     val onAction: (ItemAction) -> Unit = {},
     /** HOM-17: the usage split the Usage tile draws as a bar inside itself (empty: no bar). */
     val usageSlices: List<com.bos.sphere.core.catalog.UsageSlice> = emptyList(),
+    /** HOM-15: the first few recent files for the Files tile (thumbnail or just the name); empty draws the plain glyph. */
+    val fileCells: List<FileTileCell> = emptyList(),
 ) {
     private val owned: Set<String> = state.nonAppKeys().toSet()
     fun owns(key: String) = key in owned
@@ -83,7 +88,7 @@ fun ExtraItemFace(key: String, extras: HomeExtras, size: Dp, modifier: Modifier 
             // INP-11: an app, link or file dropped on the tile is filed into the folder.
             if (folder != null) FolderTile(folder, extras.resolveApp, size, onOpen = {}, modifier = modifier.launcherDropTarget { r -> FolderDrop.file(extras, key, r).also { n -> if (n > 0) android.widget.Toast.makeText(context, L10n.tr("Added %d to folder", n), android.widget.Toast.LENGTH_SHORT).show() } > 0 }, interactive = false)
         }
-        else -> extras.state.items[key]?.let { ItemGlyphTile(it, extras.shortcutIcon, size, modifier, extras.usageSlices) }
+        else -> extras.state.items[key]?.let { ItemGlyphTile(it, extras.shortcutIcon, size, modifier, extras.usageSlices, extras.fileCells) }
     }
 }
 
@@ -94,7 +99,7 @@ fun extraLabel(key: String, extras: HomeExtras): String = when (ItemKeys.kind(ke
 }
 
 @Composable
-fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifier: Modifier = Modifier, usageSlices: List<com.bos.sphere.core.catalog.UsageSlice> = emptyList()) {
+fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifier: Modifier = Modifier, usageSlices: List<com.bos.sphere.core.catalog.UsageSlice> = emptyList(), fileCells: List<FileTileCell> = emptyList()) {
     val shape = RoundedCornerShape(22)
     var bmp by remember(def.key) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(def.key) {
@@ -104,11 +109,14 @@ fun ItemGlyphTile(def: ItemDef, iconOf: (ItemDef) -> Drawable?, size: Dp, modifi
     }
     Box(modifier.size(size).clip(shape).background(Color(0x26FFFFFF), shape), contentAlignment = Alignment.Center) {
         val b = bmp
+        val filesOn = def.kind == ItemKind.Link && fileCells.isNotEmpty() && com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target) == com.bos.sphere.core.catalog.PanelTab.Files
         if (b != null) Image(b, null, contentScale = ContentScale.Fit, modifier = Modifier.size(size))
-        else Text(
+        else if (!filesOn) Text(
             when (def.kind) { ItemKind.Link -> com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target)?.let { panelGlyph(it) } ?: if (def.isFile) "▤" else "↗"; ItemKind.Group -> "▦"; else -> def.label.take(1).uppercase().ifEmpty { "•" } },
             color = HyleColors.InkBright, fontSize = (size.value * 0.42f).sp,
         )
+        // HOM-15: the Files tile shows its first few files: a thumbnail where the platform gave one, the file's name where it did not.
+        if (filesOn) FileTileCells(fileCells, size)
         // HOM-17: the Usage tile carries the split bar itself, along its lower edge.
         if (def.kind == ItemKind.Link && com.bos.sphere.core.catalog.HomePanelLinks.tabOf(def.target) == com.bos.sphere.core.catalog.PanelTab.Usage) {
             val seg = remember(usageSlices) { com.bos.sphere.core.catalog.UsageTileBar.segments(usageSlices) }
@@ -178,5 +186,28 @@ internal object FolderDrop {
         r.appKeys.forEach { extras.onDropOnto(it, folderKey) }
         if (r.items.isNotEmpty()) extras.onDropItems(folderKey, r.items)
         return r.appKeys.size + r.items.size
+    }
+}
+
+/** HOM-15: one cell of the Files tile. */
+class FileTileCell(val name: String, val image: ImageBitmap?)
+
+/** HOM-15: up to four files as a 2 x 2 block inside the tile. */
+@Composable
+fun FileTileCells(cells: List<FileTileCell>, size: Dp, modifier: Modifier = Modifier) {
+    val gap = size / 28
+    val cellSize = (size * 0.8f - gap) / 2
+    androidx.compose.foundation.layout.Column(modifier.size(size), verticalArrangement = Arrangement.spacedBy(gap, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
+        cells.take(4).chunked(2).forEach { row ->
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                row.forEach { c ->
+                    Box(Modifier.size(cellSize).clip(RoundedCornerShape(12)).background(Color(0x33FFFFFF)).semantics { contentDescription = c.name }, contentAlignment = Alignment.Center) {
+                        val img = c.image
+                        if (img != null) Image(img, null, contentScale = ContentScale.Crop, modifier = Modifier.size(cellSize))
+                        else Text(c.name, color = HyleColors.Ink, fontSize = (size.value * 0.1f).coerceAtLeast(7f).sp, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(2.dp))
+                    }
+                }
+            }
+        }
     }
 }

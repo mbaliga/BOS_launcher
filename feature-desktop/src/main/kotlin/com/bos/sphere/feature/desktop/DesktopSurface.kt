@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -68,6 +69,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+
+/** Test tag of the move handle (long-press for the menu) of widget item [itemId]. */
+fun moveHandleTag(itemId: String) = "desktop.move.$itemId"
 
 private class Target(val rect: FRect, val layer: Int, val action: () -> Unit, val secondary: (() -> Unit)?)
 
@@ -114,6 +118,7 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
     var menuKey by remember { mutableStateOf<String?>(null) }
     var drag by remember { mutableStateOf<Pair<String, FRect>?>(null) }
     var guides by remember { mutableStateOf<List<Guide>>(emptyList()) }
+    var resizePreview by remember { mutableStateOf<Pair<String, FRect>?>(null) } // HOM-13: a widget being resized
     var cursorPos by remember { mutableStateOf<Offset?>(null) }
     val cursor = remember { CursorModel(1f, 1f) }
     val targets = remember { LinkedHashMap<String, Target>() }
@@ -195,7 +200,7 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
     ) {
         // Placed items (HOM-13). Positions are stored in dp and clamped to the current work area.
         for (item in profile.items) {
-            val live = drag?.takeIf { it.first == item.id }?.second ?: FreeformPlacement.clamp(item.rect(), container)
+            val live = resizePreview?.takeIf { it.first == item.id }?.second ?: drag?.takeIf { it.first == item.id }?.second ?: FreeformPlacement.clamp(item.rect(), container)
             val entry = if (item.isWidget) null else appFor(item.id)
             if (!item.isWidget && entry == null) continue
             // A removed or recomposed-away item must not stay clickable through the phone trackpad.
@@ -250,12 +255,36 @@ fun DesktopSurface(controller: DesktopController, displayId: () -> Int, identity
                     // The handle: drag to move, long-press for the menu (a secondary click from the phone's trackpad opens it too).
                     Box(
                         Modifier.align(Alignment.TopCenter).padding(top = 2.dp).size(48.dp, 16.dp).clip(RoundedCornerShape(8.dp))
-                            .background(Color.Black.copy(alpha = 0.35f)).then(gestures),
+                            .background(Color.Black.copy(alpha = 0.35f)).testTag(moveHandleTag(item.id)).then(gestures),
                     ) { Box(Modifier.align(Alignment.Center).size(24.dp, 3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.8f))) }
+                    // HOM-13: resize after placement: drag this corner (snaps to whole cells, never over another widget, kept in the profile).
+                    val limits = widgetHost.resizeLimits(hosted, density.density)
+                    if (limits == null || limits.horizontal || limits.vertical) WidgetResizeHandle(
+                        scale = layout.scale, key = item.id, modifier = Modifier.align(Alignment.BottomEnd),
+                        onPreview = { dx, dy ->
+                            resizePreview = DesktopWidgets.resizedRect(profile, item.id, item.w + dx, item.h + dy, layout.cellDp, container, limits)?.let { item.id to it }
+                        },
+                        onCommit = { dx, dy ->
+                            commit(DesktopWidgets.resize(profile, item.id, item.w + dx, item.h + dy, layout.cellDp, container, limits))
+                            resizePreview = null
+                        },
+                        onCancel = { resizePreview = null },
+                    )
                 } else ClockWidget()
                 DropdownMenu(expanded = menuKey == item.id, onDismissRequest = { menuKey = null }) {
                     if (entry != null) {
                         DropdownMenuItem(text = { Text(L10n.tr("Open on phone")) }, onClick = { menuKey = null; launchOnOther(entry) })
+                    }
+                    if (hosted != null && widgetHost != null) {
+                        // HOM-13: the size menu: the same resize rules as the handle, one cell at a time.
+                        val limits = widgetHost.resizeLimits(hosted, density.density)
+                        listOf(Triple(L10n.tr("Wider"), 1, 0), Triple(L10n.tr("Narrower"), -1, 0), Triple(L10n.tr("Taller"), 0, 1), Triple(L10n.tr("Shorter"), 0, -1))
+                            .filter { (_, dc, dr) -> (dc == 0 || limits?.horizontal != false) && (dr == 0 || limits?.vertical != false) }.forEach { (label, dc, dr) ->
+                            DropdownMenuItem(text = { Text(label) }, onClick = {
+                                menuKey = null
+                                commit(DesktopWidgets.resizeByCells(profile, item.id, dc, dr, layout.cellDp, container, limits))
+                            })
+                        }
                     }
                     DropdownMenuItem(text = { Text(L10n.tr("Remove from desktop")) }, onClick = {
                         menuKey = null

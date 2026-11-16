@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +52,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.role
@@ -259,6 +261,18 @@ private fun DockSlot(
     val desc = item.label + if (item.recentlyUsed) ", " + L10n.tr("used this session") else ""
     val shape = RoundedCornerShape(16.dp)
 
+    val reorderDrag = Modifier.pointerInput(index, count) {
+        detectDragGesturesAfterLongPress(
+            onDragStart = { drag = 0f },
+            onDragEnd = {
+                val to = DockReorder.targetIndex(index, drag, slotPx, count)
+                drag = 0f
+                if (to != index) actions.onReorder(index, to)
+            },
+            onDragCancel = { drag = 0f },
+        ) { change, amount -> change.consume(); drag += if (horizontal) amount.x else amount.y }
+    }
+
     Box(
         Modifier.size(boxW, boxH)
             .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; alpha = if (drag != 0f) 0.8f else 1f }
@@ -280,19 +294,9 @@ private fun DockSlot(
                 }
             }
             .clickable { actions.onLaunch(item, index) }
-            .then(
-                if (reorderable) Modifier.pointerInput(index, count) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = { drag = 0f },
-                        onDragEnd = {
-                            val to = DockReorder.targetIndex(index, drag, slotPx, count)
-                            drag = 0f
-                            if (to != index) actions.onReorder(index, to)
-                        },
-                        onDragCancel = { drag = 0f },
-                    ) { change, amount -> change.consume(); drag += if (horizontal) amount.x else amount.y }
-                } else Modifier,
-            )
+            // HOM-02: an icon slot starts a reorder with a long press anywhere on it. A widget slot does not: the hosted view takes the touches that
+            // start on it (its own taps, scrolls and long-presses), so its reorder lives on the grip strip drawn above it.
+            .then(if (reorderable && !wide) reorderDrag else Modifier)
             .semantics {
                 contentDescription = desc
                 role = Role.Button
@@ -304,7 +308,15 @@ private fun DockSlot(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (wide) widget!!(item, boxW, boxH) else icon(item, 40.dp)
+        if (wide) {
+            widget!!(item, boxW, boxH)
+            // HOM-02: the grip strip along the slot's top edge: long-press and drag reorders the widget, a plain drag on it scrolls the rail.
+            if (reorderable) Box(
+                Modifier.align(Alignment.TopCenter).fillMaxWidth().height(WIDGET_GRIP).testTag(widgetGripTag(item.ref.encode()))
+                    .semantics { contentDescription = L10n.tr("Drag to reorder") }.then(reorderDrag),
+                contentAlignment = Alignment.TopCenter,
+            ) { Box(Modifier.padding(top = 4.dp).size(24.dp, 3.dp).clip(CircleShape).background(HyleColors.InkDim.copy(alpha = 0.7f))) }
+        } else icon(item, 40.dp)
         if (item.recentlyUsed) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).size(8.dp).clip(CircleShape).background(HyleColors.Violet))
         if (showNumbers && index < 9) Text("${index + 1}", color = HyleColors.OnAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.TopStart).padding(2.dp).clip(CircleShape).background(HyleColors.Violet).padding(horizontal = 5.dp))
@@ -346,3 +358,6 @@ private fun TransportButton(kind: Transport, enabled: Boolean, description: Stri
     )
 }
 
+/** HOM-02: height of the reorder grip over a widget slot, and its test tag. */
+internal val WIDGET_GRIP = 16.dp
+fun widgetGripTag(encodedRef: String) = "dock.widgetGrip.$encodedRef"

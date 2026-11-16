@@ -23,7 +23,16 @@ interface DesktopWidgetHost {
 
     /** Frees [appWidgetId] when its desktop item is removed. */
     fun release(appWidgetId: Int)
+
+    /** What the provider allows when the widget is resized after it is placed; null when unknown (any size from one cell up). */
+    fun resizeLimits(appWidgetId: Int, density: Float): ResizeLimits? = null
 }
+
+/**
+ * HOM-13: a provider's resize rules in dp: the smallest size it supports (`minResizeWidth` / `minResizeHeight`, else its minimum)
+ * and which axes may change at all (`resizeMode`).
+ */
+data class ResizeLimits(val minWidthDp: Float = 0f, val minHeightDp: Float = 0f, val horizontal: Boolean = true, val vertical: Boolean = true)
 
 object DesktopWidgetSlot {
     @Volatile var provider: DesktopWidgetHost? = null
@@ -75,5 +84,57 @@ object DesktopWidgets {
         val others = profile.items.filter { it.isWidget && it.id != itemId }.map { it.rect() }
         val res = FreeformPlacement.placeWidget(rect, others, container, threshold) ?: return profile to emptyList()
         return profile.copy(items = profile.items.map { if (it.id == itemId) it.copy(x = res.rect.left, y = res.rect.top) else it }) to res.guides
+    }
+
+    /** Widget item [itemId] of [profile], if there is one. */
+    fun widgetItem(profile: DesktopProfile, itemId: String): PlacedItem? = profile.items.firstOrNull { it.id == itemId && it.isWidget }
+
+    /**
+     * HOM-13, resize after placement. The new box keeps the widget's top-left corner and snaps to whole cells: it is as close to
+     * [wantedW] x [wantedH] as the rules allow. A change is limited to what the provider supports ([limits]: smallest size, axes),
+     * at least one cell, inside [container], and never over another widget; when the wanted size would overlap a neighbour or leave
+     * the work area, the largest size that does not is used (shrunk a cell at a time). Null when nothing different is possible.
+     */
+    fun resizedRect(profile: DesktopProfile, itemId: String, wantedW: Float, wantedH: Float, cell: Float, container: FRect, limits: ResizeLimits? = null): FRect? {
+        val item = widgetItem(profile, itemId) ?: return null
+        val c = cell.coerceAtLeast(1f)
+        val others = profile.items.filter { it.isWidget && it.id != itemId }.map { it.rect() }
+        val cur = item.rect()
+        fun cells(dp: Float) = kotlin.math.round(dp / c).toInt().coerceAtLeast(1)
+        fun floorCells(dp: Float) = kotlin.math.floor(dp / c).toInt().coerceAtLeast(1)
+        val minCols = if (limits == null) 1 else kotlin.math.ceil(limits.minWidthDp / c).toInt().coerceAtLeast(1)
+        val minRows = if (limits == null) 1 else kotlin.math.ceil(limits.minHeightDp / c).toInt().coerceAtLeast(1)
+        val maxCols = floorCells(container.right - cur.left + FRect.EPS)
+        val maxRows = floorCells(container.bottom - cur.top + FRect.EPS)
+        val horizontal = limits?.horizontal ?: true
+        val vertical = limits?.vertical ?: true
+        val wantCols = cells(wantedW).coerceIn(minCols.coerceAtMost(maxCols), maxCols)
+        val wantRows = cells(wantedH).coerceIn(minRows.coerceAtMost(maxRows), maxRows)
+        val widths = if (horizontal) (wantCols downTo minCols.coerceAtMost(wantCols)).map { it * c } else listOf(cur.width)
+        val heights = if (vertical) (wantRows downTo minRows.coerceAtMost(wantRows)).map { it * c } else listOf(cur.height)
+        var best: FRect? = null
+        var bestArea = -1f
+        var bestDist = Float.MAX_VALUE
+        for (w in widths) for (h in heights) {
+            val r = FRect(cur.left, cur.top, cur.left + w, cur.top + h)
+            if (!r.inside(container) || others.any { it.overlaps(r) }) continue
+            val area = w * h
+            val dist = kotlin.math.abs(w - wantedW) + kotlin.math.abs(h - wantedH)
+            if (area > bestArea + 0.001f || (kotlin.math.abs(area - bestArea) <= 0.001f && dist < bestDist)) { best = r; bestArea = area; bestDist = dist }
+        }
+        return best?.takeIf { kotlin.math.abs(it.width - cur.width) > 0.001f || kotlin.math.abs(it.height - cur.height) > 0.001f }
+    }
+
+    /** [resizedRect] applied: the profile with widget [itemId] at its new size (unchanged when no different size is possible). */
+    fun resize(profile: DesktopProfile, itemId: String, wantedW: Float, wantedH: Float, cell: Float, container: FRect, limits: ResizeLimits? = null): DesktopProfile {
+        val r = resizedRect(profile, itemId, wantedW, wantedH, cell, container, limits) ?: return profile
+        return profile.copy(items = profile.items.map { if (it.id == itemId) it.copy(w = r.width, h = r.height) else it })
+    }
+
+    /** The size menu's step: [dCols] and [dRows] whole cells wider or taller (negative: smaller) than the widget is now. */
+    fun resizeByCells(profile: DesktopProfile, itemId: String, dCols: Int, dRows: Int, cell: Float, container: FRect, limits: ResizeLimits? = null): DesktopProfile {
+        val item = widgetItem(profile, itemId) ?: return profile
+        val c = cell.coerceAtLeast(1f)
+        return resize(profile, itemId, (kotlin.math.round(item.w / c).toInt() + dCols) * c, (kotlin.math.round(item.h / c).toInt() + dRows) * c, c, container, limits)
     }
 }

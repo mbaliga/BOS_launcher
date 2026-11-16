@@ -42,4 +42,13 @@ class CapabilityEvaluatorTest {
         val text = CapabilityEvaluator.asText(i)
         CapabilityEvaluator.evaluate(i).forEach { assertTrue(it.title, text.contains(it.title)) }
     }
+    @Test fun CFG_08_everyRowOfTheSection3TableHasAReportRow() {
+        val ids = CapabilityEvaluator.evaluate(phone).map { it.id }.toSet()
+        // One id per row of the spec's platform table (section 3), in table order.
+        val table = listOf("home_role", "launcher_apps", "pin_shortcuts", "widgets", "notification_access", "usage_access", "launch_display",
+            "launch_bounds", "windowing_mode", "launch_adjacent", "window_mgmt", "recents", "external_desktop", "global_keys", "toggle_radios",
+            "open_shade", "clipboard_history", "folders", "background_launch", "system_handoff")
+        assertEquals(emptyList<String>(), table.filter { it !in ids })
+        assertTrue(CapabilityEvaluator.evaluate(phone).filter { it.state == CapState.Off }.all { it.reason != null })
+    }
 }

@@ -128,14 +128,16 @@ object CapabilityEvaluator {
             Capability("toggle_radios", "Toggle Wi-Fi, Bluetooth, data", Access.No, CapState.Off, "Blocked for apps since Android 10; the state row opens system panels"),
             Capability("open_shade", "Open the notification shade", Access.Partial, CapState.Unknown, "No stable public API; run the Lab spike SPK-04"),
             Capability("clipboard_history", "Background clipboard history", Access.No, CapState.Off, "Readable only while a launcher surface is focused"),
+            Capability("background_launch", "Start activities from the background", Access.Partial, CapState.Off, "Background launch limits apply; scheduled launches arrive as a notification action"),
+            Capability("system_handoff", "Uninstall, app info, default-app settings", Access.Yes, CapState.On, reason = "Always hands off to the system screens"),
             Capability(
                 "speech", "On-device speech recognition", Access.Yes,
                 when (i.speechOnDevice) { true -> CapState.On; false -> CapState.Off; null -> CapState.Unknown },
                 if (i.speechOnDevice == false) "No on-device recogniser; voice entry is hidden" else null,
             ),
-            Capability("keyboard", "Hardware keyboard", Access.Yes, if (i.hasKeyboard) CapState.On else CapState.Off),
-            Capability("pointer", "Mouse or trackpad", Access.Yes, if (i.hasPointer) CapState.On else CapState.Off),
-            Capability("controller", "Game controller", Access.Yes, if (i.hasController) CapState.On else CapState.Off),
+            Capability("keyboard", "Hardware keyboard", Access.Yes, if (i.hasKeyboard) CapState.On else CapState.Off, if (i.hasKeyboard) null else "No hardware keyboard is attached"),
+            Capability("pointer", "Mouse or trackpad", Access.Yes, if (i.hasPointer) CapState.On else CapState.Off, if (i.hasPointer) null else "No mouse or trackpad is attached"),
+            Capability("controller", "Game controller", Access.Yes, if (i.hasController) CapState.On else CapState.Off, if (i.hasController) null else "No game controller is attached"),
             OemNotes.row(i.manufacturer),
         )
     }

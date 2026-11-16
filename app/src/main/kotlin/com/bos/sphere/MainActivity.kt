@@ -55,7 +55,8 @@ class MainActivity : ComponentActivity() {
         com.bos.sphere.feature.grid.LauncherShortcuts.reload(this) // INP-10: saved key bindings, read off the main thread
         // CFG-09: the start is recorded first, so a crash below counts towards safe mode.
         com.bos.sphere.feature.desktop.DesktopController.get(this).start()
-        com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
+        // A recreate in the same process (state handed back) is a configuration change, not a restart after a crash: it is not a start.
+        if (savedInstanceState == null) com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
         // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
         runCatching { StateService.bridgeBuild31(applicationContext) }
         runCatching { StateService.get(this).guardPlatformRestore() } // NFR-18: drop device-bound widget ids and picture after a platform restore
@@ -153,7 +154,7 @@ class MainActivity : ComponentActivity() {
     // EXT-02: tell the desktop feature where this home activity runs, so the offer is skipped where the platform gives home.
     override fun onStart() {
         super.onStart()
-        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStarted(this, display?.displayId ?: 0)
+        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStarted(this, runCatching { display?.displayId }.getOrNull() ?: 0) // a context not tied to a display (a headless host) reads as the default display
     }
 
     override fun onStop() {

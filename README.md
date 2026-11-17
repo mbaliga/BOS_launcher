@@ -26,6 +26,8 @@ surface settings, and app management.
 Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`, `:haptics`,
 `:assistant`. (The hub / settings UI currently lives in `:app/ui` and will graduate to modules.)
 
+Multi-platform porting (plan only, nothing built): see [`docs/PORTING_PLAN.md`](docs/PORTING_PLAN.md).
+
 ## What works now
 
 - **Real home app:** manifest HOME + DEFAULT, `RoleManager.ROLE_HOME` request with a

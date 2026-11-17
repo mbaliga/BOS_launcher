@@ -82,6 +82,7 @@ class RadarHostileQueriesW20Test {
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    // Wave 21: in Flat the typed Clear X now sits inside the glass field (same 48 dp target); RadarGlassW21UiTest asserts where.
     fun NFR_13_theClearAndCloseButtonsOfTheQueryLineAre48dpTouchTargets() {
         for (layout in listOf(SearchLayout.Flat)) {
             rule.mainClock.autoAdvance = false

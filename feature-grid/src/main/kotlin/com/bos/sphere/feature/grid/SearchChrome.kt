@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,6 +49,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -225,23 +228,36 @@ internal fun ScopeToken(
     fanDown: Boolean = false,
     /** False draws only the glyph and the mark, so a narrow query line keeps its room (the scope is still named for TalkBack). */
     showLabel: Boolean = true,
+    /** Wave 21: the plain token wears a glass pill (it sits inside the glass field) and keeps a 48 dp touch target. */
+    glass: Boolean = false,
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         if (plain) {
             // The query line: "Everything 🌐 ⇅". Tapping fans the scopes out (downward from the top line), right-aligned (macOS-style).
             val dim = Color(0xB3FFFFFF)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.alpha(if (open) 0f else 1f).clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
-            ) {
-                if (showLabel) Text(scopeLabel(shown, webLabel), color = dim, fontSize = 16.sp, maxLines = 1)
-                Icon(scopeGlyph(shown), if (showLabel) null else scopeLabel(shown, webLabel), tint = dim, modifier = Modifier.padding(start = if (showLabel) 8.dp else 0.dp).size(20.dp))
+            val ink = if (glass) GlassSpec.content(true) else dim
+            val tokenContent: @Composable () -> Unit = {
+                if (showLabel) Text(scopeLabel(shown, webLabel), color = ink, fontSize = 16.sp, maxLines = 1)
+                Icon(scopeGlyph(shown), if (showLabel) null else scopeLabel(shown, webLabel), tint = ink, modifier = Modifier.padding(start = if (showLabel) 8.dp else 0.dp).size(20.dp))
                 Column(Modifier.padding(start = 2.dp)) {
-                    Icon(Glyphs.Up, null, tint = dim, modifier = Modifier.size(10.dp).offset(y = 2.dp))
-                    Icon(Glyphs.Down, null, tint = dim, modifier = Modifier.size(10.dp).offset(y = (-2).dp))
+                    Icon(Glyphs.Up, null, tint = ink, modifier = Modifier.size(10.dp).offset(y = 2.dp))
+                    Icon(Glyphs.Down, null, tint = ink, modifier = Modifier.size(10.dp).offset(y = (-2).dp))
                 }
             }
+            if (glass) {
+                // Wave 21: a quiet glass pill inside the glass field; the clickable area is the full 48 dp height (NFR-13).
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.alpha(if (open) 0f else 1f).heightIn(min = GlassSpec.Target).clip(RoundedCornerShape(24.dp)).clickable { open = true }
+                        .semantics { role = androidx.compose.ui.semantics.Role.Button },
+                ) {
+                    Row(Modifier.glass(RoundedCornerShape(50), strength = GlassSpec.NESTED_STRENGTH).padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { tokenContent() }
+                }
+            } else Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.alpha(if (open) 0f else 1f).clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
+            ) { tokenContent() }
             if (open) {
                 androidx.compose.ui.window.Popup(
                     alignment = if (fanDown) Alignment.TopEnd else Alignment.BottomEnd,

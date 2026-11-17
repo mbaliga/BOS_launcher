@@ -3,6 +3,7 @@ package com.bos.sphere.feature.grid
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.platform.testTag
 import android.content.Intent
 import com.bos.sphere.core.design.predictiveBackLayer
 import androidx.compose.animation.AnimatedVisibility
@@ -72,6 +73,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.bos.sphere.core.data.CornerActionId
@@ -229,8 +231,11 @@ internal fun SearchScreen(
     learnedOverride: Map<String, dev.aarso.search.palette.UsageRecord>? = null,
     /** Test seam (wave 18): the clock the decay of old habits is measured against. */
     nowMillis: () -> Long = { System.currentTimeMillis() },
+    /** Test seam (wave 21): whether the push-to-talk button exists; null asks the device (an on-device recogniser is needed, INP-13). */
+    voiceAvailable: Boolean? = null,
 ) {
     val context = LocalContext.current
+    val voiceOn = remember(context, voiceAvailable) { voiceAvailable ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     // PAL-08: the chooser of an action that needs a pick (which display, which workspace), shown over Radar.
     var picker by remember { mutableStateOf<RadarPickerState?>(null) }
     // PAL-02, PAL-09: plain app queries also match aliases, initials and a typo, and learn from selections.
@@ -458,6 +463,9 @@ internal fun SearchScreen(
     }
     val showKeyboard = { runCatching { focus.requestFocus(); keyboard?.show() }; Unit }
 
+    // Wave 21: the glass is darkened only as far as the measured background behind it needs for AA text (NFR-15), usually not at all.
+    val cfgNow = androidx.compose.ui.platform.LocalConfiguration.current
+    val shades = rememberGlassShades(com.bos.sphere.core.data.BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2), prefs.radarIntensity, cfgNow.screenWidthDp, cfgNow.screenHeightDp)
     CompositionLocalProvider(LocalResultScale provides scale.floatValue, LocalRadarSelection provides selectedKey) {
     Box(Modifier.fillMaxSize().radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey)) {
         SearchBackdrop(Modifier.fillMaxSize())
@@ -465,7 +473,7 @@ internal fun SearchScreen(
         // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
         // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
-            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight)) {
+            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = if (voiceOn) RadarMicBarHeight else 0.dp).clipToBounds()) {
                 val emptyHint = if (data.blank && (selected == null || selected == SearchCategory.Apps) && data.tiles(selected).isEmpty()) L10n.tr("Rings fill up as you use Radar") else null
                 if (flatMode) {
                     // Typing, or the Flat layout at rest (what you open most): a plain results list below the query line.
@@ -528,37 +536,36 @@ internal fun SearchScreen(
                     }
                 }
             }
-            // The one text field, always visible at the top: placeholder, query, scope, clear or close, and push-to-talk (INP-13).
+            // The one text field, always visible at the top: scope menu (Flat), placeholder, query and the Clear X inside it, glass (wave 21);
+            // Close stays outside as a glass circle while the query is empty. Push-to-talk (INP-13) is at the bottom centre.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().height(RadarQueryBarHeight).padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().height(RadarQueryBarHeight).padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
             ) {
-                Box(
-                    Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Color(0x26FFFFFF)).padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    if (query.isEmpty()) Text(L10n.tr("Search"), color = Color(0x99FFFFFF), fontSize = 20.sp, maxLines = 1)
-                    QueryInput(field, { field = it }, go, focus, Color.White, 20.sp, Modifier.fillMaxWidth())
+                GlassField(Modifier.weight(1f).fillMaxHeight().testTag(RADAR_FIELD_TAG), shade = shades.top) {
+                    if (flatMode) ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label, fanDown = true, showLabel = selected != null, glass = true, modifier = Modifier.padding(start = 6.dp))
+                    Box(Modifier.weight(1f).padding(start = if (flatMode) 8.dp else 20.dp, end = if (query.isEmpty()) 20.dp else 0.dp), contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) Text(L10n.tr("Search"), color = GlassSpec.hint(true), fontSize = 20.sp, maxLines = 1)
+                        QueryInput(field, { field = it }, go, focus, GlassSpec.content(true), 20.sp, Modifier.fillMaxWidth())
+                    }
+                    if (query.isNotEmpty()) {
+                        // Wave 21 (owner): the X is inside the field at its trailing end, 48 dp target, 20 dp glyph, only with text.
+                        GlassButton(onClick = { setQuery(""); runCatching { focus.requestFocus() } }, description = L10n.tr("Clear"), filled = false, modifier = Modifier.padding(end = 2.dp)) {
+                            Icon(Glyphs.Close, null, tint = GlassSpec.content(true), modifier = Modifier.size(20.dp))
+                        }
+                    }
                 }
-                if (flatMode) {
-                    ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label, fanDown = true, showLabel = selected != null)
-                    Icon(
-                        Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
-                        modifier = Modifier.padding(start = 2.dp).size(48.dp).clip(CircleShape).clickable { setQuery("") }.padding(15.dp), // 48 dp touch target (NFR-13)
-                    )
-                } else if (typing) {
-                    // Wave 20: the Orbit stays while typing; the wheel is its scope, so only the clear button joins the line.
-                    Icon(
-                        Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
-                        modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),
-                    )
-                } else {
-                    Icon(
-                        Glyphs.Close, L10n.tr("Close"), tint = Color.White,
-                        modifier = Modifier.padding(start = 2.dp).size(48.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(12.dp), // 48 dp touch target (NFR-13)
-                    )
+                if (query.isEmpty()) {
+                    // Close and Clear are never both visible: Close is outside the field, a glass circle, while there is nothing to clear.
+                    GlassButton(onClick = onDismiss, description = L10n.tr("Close"), shade = shades.top, modifier = Modifier.padding(start = 8.dp)) {
+                        Icon(Glyphs.Close, null, tint = GlassSpec.content(true), modifier = Modifier.size(22.dp))
+                    }
                 }
-                PushToTalkButton(onText = { setQuery(it) }, modifier = Modifier.padding(start = 4.dp))
+            }
+            // Wave 21 (owner): the mic for voice input sits at the centre of the bottom, above the keyboard and the gesture bar
+            // (the inset padding above), 56 dp, in every layout and orientation; space is reserved for it so it never covers a result.
+            if (voiceOn) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight), contentAlignment = Alignment.Center) {
+                PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, shade = shades.bottom)
             }
         }
         aliasFor?.let { a ->
@@ -569,7 +576,7 @@ internal fun SearchScreen(
             RadarActionList(
                 menuFor(t), navNow.menuIndex,
                 onPick = { i -> nav = navNow.copy(menuOpen = false); menuFor(t).getOrNull(i)?.let { runMenu(t, it) } },
-                modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(end = 16.dp, bottom = 64.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(end = 16.dp, bottom = 64.dp + (if (voiceOn) RadarMicBarHeight else 0.dp)),
             )
         }
         previewTile?.let { t ->
@@ -651,6 +658,12 @@ internal object ContactHabits {
 
 /** The height of the query line at the top of Radar, below the status bar and cutout. */
 internal val RadarQueryBarHeight = 64.dp
+
+/** Wave 21: the bottom strip that holds the mic (a 56 dp button and 8 dp above and below); reserved only when the mic exists. */
+internal val RadarMicBarHeight = 72.dp
+
+/** Test tag of the glass field (its bounds hold the scope menu, the text and the Clear X). */
+internal const val RADAR_FIELD_TAG = "radarField"
 
 /** How many of the apps you open most the resting Radar lists (the four rings hold 5 + 9 + 13 + 17). */
 private const val RADAR_RESTING_APPS = 44

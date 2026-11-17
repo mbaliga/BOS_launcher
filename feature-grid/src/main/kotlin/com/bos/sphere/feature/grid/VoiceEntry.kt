@@ -11,7 +11,6 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -44,7 +43,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 
 /** What the voice control does at a moment. */
@@ -142,9 +140,9 @@ internal fun onDeviceSpeechAvailable(context: Context): Boolean =
  * held) works too. Draws nothing when the device has no on-device recogniser. The text goes to [onText] as it comes.
  */
 @Composable
-fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier) {
+fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f) {
     val context = LocalContext.current
-    val available = remember(context) { PushToTalk.visible(onDeviceSpeechAvailable(context)) }
+    val available = remember(context, availableOverride) { availableOverride ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     if (!available) return
     var listening by remember { mutableStateOf(false) }
     val latestText by rememberUpdatedState(onText)
@@ -160,11 +158,12 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier) {
     }
     DisposableEffect(ptt) { onDispose { ptt.dispose() } }
     val label = L10n.tr("Speak to search")
+    // Wave 21: glass (violet-tinted while listening), 56 dp, the same hold-to-talk behaviour.
     Box(
         modifier
-            .size(48.dp)
+            .size(GlassSpec.BigButton)
+            .glass(CircleShape, tint = if (listening) Color(0xFFB9A8FF) else Color.White, pressed = listening, shade = shade)
             .clip(CircleShape)
-            .background(if (listening) Color(0x66B9A8FF) else Color(0x22FFFFFF))
             .pointerInput(ptt) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
@@ -183,6 +182,6 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier) {
             .semantics { role = Role.Button; contentDescription = label; onClick(label = label) { ptt.toggle(); listening = ptt.listening; true } },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Glyphs.Mic, null, tint = HyleColors.InkBright, modifier = Modifier.size(22.dp))
+        Icon(Glyphs.Mic, null, tint = GlassSpec.content(true), modifier = Modifier.size(24.dp))
     }
 }

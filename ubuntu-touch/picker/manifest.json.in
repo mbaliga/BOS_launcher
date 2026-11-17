@@ -1,0 +1,15 @@
+{
+    "name": "liftoff.mbaliga",
+    "description": "Liftoff app picker (Ubuntu Touch reframe of the Android launcher)",
+    "architecture": "@CLICK_ARCH@",
+    "title": "Liftoff",
+    "hooks": {
+        "liftoff": {
+            "apparmor": "liftoff.apparmor",
+            "desktop": "liftoff.desktop"
+        }
+    },
+    "version": "0.1.0",
+    "maintainer": "OWNER-FILL <owner@example.invalid>",
+    "framework": "@CLICK_FRAMEWORK@"
+}

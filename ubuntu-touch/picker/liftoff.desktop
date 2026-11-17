@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Liftoff
+Comment=App picker (Ubuntu Touch reframe of Liftoff / BOS Launcher)
+Exec=env QML_XHR_ALLOW_FILE_READ=1 qmlscene %u qml/Main.qml
+Icon=assets/liftoff.svg
+Terminal=false
+Type=Application
+X-Lomiri-Touch=true
+X-Ubuntu-Touch=true

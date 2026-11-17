@@ -77,6 +77,13 @@ function cardMatrix(L, cx, cy, stageW, stageH, persp) {
     m = mul(T(po[0], po[1], 0), m);
     return mul(m, T(-cx, -cy, 0));                        // item-local -> about its centre
 }
+// Same transform for a QML Item whose top-left sits at (x, y) in the stage: QML applies
+// Item.transform in item-local coordinates and then adds (x, y), so wrap the stage-space matrix.
+function cardMatrixLocal(L, x, y, w, h, stageW, stageH, persp) {
+    var m = cardMatrix(L, x + w / 2, y + h / 2, stageW, stageH, persp);
+    var T = function (a, b) { return [1,0,0,a, 0,1,0,b, 0,0,1,0, 0,0,0,1]; };
+    return mul(T(-x, -y), mul(m, T(x, y)));
+}
 function project(m, x, y) {
     var X = m[0]*x + m[1]*y + m[3], Y = m[4]*x + m[5]*y + m[7], W = m[12]*x + m[13]*y + m[15];
     return [X / W, Y / W];
@@ -108,6 +115,6 @@ function globeProject(g, yaw, pitch, W, H, zoom) {
 
 if (typeof module !== "undefined" && module.exports) {
     module.exports = { P: P, STEP_DEG: STEP_DEG, RANGE: RANGE, clamp: clamp, smooth01: smooth01,
-        magAtF: magAtF, txAtF: txAtF, cardLayout: cardLayout, cardMatrix: cardMatrix, project: project,
+        magAtF: magAtF, txAtF: txAtF, cardLayout: cardLayout, cardMatrix: cardMatrix, cardMatrixLocal: cardMatrixLocal, project: project,
         globeItems: globeItems, globeProject: globeProject };
 }

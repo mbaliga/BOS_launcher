@@ -66,6 +66,15 @@ test("cardMatrix equals direct perspective projection", () => {
   }
 });
 
+test("cardMatrixLocal maps local points to stage-minus-origin", () => {
+  const L = M.cardLayout(5, 4.4, 1), x = 157, y = 107, w = 86, h = 86;
+  const g = M.cardMatrix(L, x + w / 2, y + h / 2, 400, 300, 600), l = M.cardMatrixLocal(L, x, y, w, h, 400, 300, 600);
+  for (const [px, py] of [[0, 0], [w, 0], [w / 2, h / 2], [w, h]]) {
+    const [sx, sy] = M.project(g, x + px, y + py), [lx, ly] = M.project(l, px, py);
+    close(lx + x, sx, 1e-9, "x"); close(ly + y, sy, 1e-9, "y");
+  }
+});
+
 test("pinned landmarks (guards against regenerating vectors from broken code)", () => {
   assert.equal(M.magAtF(0, 1.85), 1.85);
   assert.equal(M.txAtF(0, 1.85), 0);

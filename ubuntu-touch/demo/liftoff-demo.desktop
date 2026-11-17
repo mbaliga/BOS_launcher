@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Liftoff (prototype demo)
+Comment=The HTML prototype of the Liftoff coverflow and globe. A demo, not a launcher.
+Exec=webapp-container --enable-addressbar=false www/index.html
+Icon=assets/liftoff.svg
+Terminal=false
+Type=Application
+X-Lomiri-Touch=true
+X-Ubuntu-Touch=true

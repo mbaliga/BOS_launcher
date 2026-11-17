@@ -21,7 +21,6 @@ object Keys {
  * A is Enter, B is back/Esc, X opens the menu, Start opens the palette like its shortcut.
  */
 object ControllerKeys {
-    fun isController(keyCode: Int) = keyCode in 96..110
     /** The key a controller button stands for, or the same code when it is not a controller button. */
     fun translate(keyCode: Int): Int = when (keyCode) {
         Keys.BUTTON_A -> Keys.DPAD_CENTER

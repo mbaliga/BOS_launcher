@@ -3,31 +3,38 @@
 > **Constellation** · `state: active` · public · [registry: `Personal-Tracker/CONSTELLATION.md`](https://github.com/mbaliga/Personal-Tracker/blob/main/CONSTELLATION.md)
 > Sphere/coverflow Android launcher (Compose, no AOSP fork).
 
-A landscape-first Android launcher whose home surface is the surface of a sphere: apps live on
-a coverflow "equator" with a continuous magnification lens at the front-center tangent point.
-Built from scratch in **Kotlin + Jetpack Compose** (no AOSP/Pixel fork), with AGSL materials
-gated for capable devices. See the build brief for the full vision (M0–M5).
-
-This repository implements the **M0 scaffold through most of M1–M2** — a daily-drivable landscape
-coverflow you can set as default, plus the all-apps globe, type-to-search, a pull-down hub, live
-surface settings, and app management.
+A landscape-first Android launcher. Since wave 16 the default landing is **Glance** (a near-empty home: clock and date,
+the music playing, optional weather ambience, hotspots and a surface indicator) over a two-slot, signal-driven background;
+the paged Pages home, the Recent apps and All apps landings and the original sphere/coverflow style are one setting away
+(Ground Control > Home > Landing). Built from scratch in **Kotlin + Jetpack Compose** (no AOSP/Pixel fork), with AGSL materials
+gated for capable devices. The product spec is `docs/Spec.md`; how far each requirement is lives in `docs/SPEC_STATUS.md`
+(decisions in `docs/decisions/README.md`).
 
 ## Module layout
 
 | Module | Responsibility |
 |---|---|
-| `:app` | Single-Activity Compose host, manifest (HOME + DEFAULT), set-as-default flow, `HomeScreen` |
-| `:core-design` | Hyle/Aarso design system — color, type, shapes, `SphereTheme`, the 8 named motion primitives |
-| `:core-data` | `AppRepository` over `LauncherApps` exposing a live `Flow<List<AppEntry>>` |
-| `:feature-sphere` | `SphereGeometry` (ported `magAt`/`txAt`), `SphereState`, `CoverflowLayer`, all-apps `Globe`, and `LauncherSurface` (unified gestures) |
-| `:feature-search` | App search (the shared search engine behind an app vocabulary) + the always-on keyboard |
-| `:search-engine` | Vendored `search-core` from Shared-Libraries-asoc: query language, facets, relative dates, natural-language interpretation, ranking |
-| `:crash-recovery` | Vendored `crash-recovery` 1.4.0 from Shared-Libraries-asoc: the crash splash and recovery screen (readable report, Copy, Save, Share, Continue, loop-gated Reset), plain android.widget |
-| `:feature-grid` | The **Pages** home (default): paged grid / circle / coverflow pages, corners + radial palettes, complications, peek widgets, wheel + list drawers, network dot grid, the XMB-style settings space and its synthesized UI sounds |
+| `:app` | Single-Activity Compose host, manifest (HOME + DEFAULT), set-as-default flow, `HomeScreen`, Ground Control settings, the recovery wiring |
+| `:core-design` | Hyle/Aarso design system: color, type, shapes, themes, motion, the in-app translation tables (`L10n`, 8 languages) |
+| `:core-data` | Preference stores, the state export/import codec, `AppRepository` over `LauncherApps`, crash-loop guard (`CrashLoopGuard`), one-time retired-key cleanup (`RetiredPrefKeys`) |
+| `:core-catalog` | Home item catalog, drawer, widgets, badges, profiles, package reconcile |
+| `:core-capabilities` | Capability report and OEM notes (CFG-08, NFR-21) |
+| `:core-launch` | Launching apps, shortcuts and intents |
+| `:core-input` | Shortcut registry, key routing, context menus, the puck, gestures |
+| `:core-quality` | Budgets, contrast and accessibility helpers, and the NFR audit tests |
+| `:core-signals` | The signal level that drives the background and the media/now-playing state |
+| `:feature-sphere` | `SphereGeometry`, `SphereState`, `CoverflowLayer`, all-apps `Globe` (the Sphere style) |
+| `:feature-grid` | The Pages home, Glance and the other landings, the two-slot `SignalBackground`, corners and palettes, Radar's screen (Flat, Filmstrip, Orbit), the XMB-style settings space |
+| `:feature-search` | Radar's providers and wiring (apps, settings, files, shortcuts, calculator) over the shared engine, plus the always-on keyboard |
+| `:feature-dock` | The dock, workspaces and the Desktop-class footprint |
+| `:feature-desktop` | The desktop surface and its widgets |
+| `:feature-launchpad` | Launchpad (the left card), the Recents panel (right card) and notification groups |
+| `:search-engine` | Vendored `search-core` from Shared-Libraries-asoc: query language, facets, relative dates, natural-language interpretation, ranking; and the Radar provider model |
+| `:crash-recovery` | Vendored `crash-recovery` 1.4.0 from Shared-Libraries-asoc: the crash splash and recovery screen (readable report, Copy, Save, Share, Continue, loop-gated Reset), plain android.widget; our Safe mode is its second layer |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
 
-Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`, `:haptics`,
-`:assistant`. (The hub / settings UI currently lives in `:app/ui` and will graduate to modules.)
+Removed in wave 15 and later: the background gallery and its picture and wallpaper options, Radar's typed prefixes and `!bang`
+syntax, the bottom search field, and the full-screen portrait Launchpad.
 
 ## What works now
 
@@ -47,7 +54,7 @@ Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`
 - **Live surface settings:** the prototype's sliders (perspective / spacing / turn / depth /
   min-scale / focus / arc / tilt) + row mode, tuning the equator in real time.
 - **App management:** long-press → App info / Hide-Unhide / Uninstall.
-- **Hyle identity:** theme, the 8 motion primitives, dot-grid substrate, ambient chrome
+- **Hyle identity:** theme, the named motion curves, dot-grid substrate, ambient chrome
   (clock / weather / battery / now-playing / settings gear).
 
 ## Pages home (default style)

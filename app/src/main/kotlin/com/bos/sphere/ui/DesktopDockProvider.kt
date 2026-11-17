@@ -40,9 +40,6 @@ object DesktopDockProvider : DesktopDock {
 
     /** True when the dock of [displayId] handled the command. */
     fun handle(displayId: Int, command: LauncherCommand): Boolean = controllers[displayId]?.handle(command) == true
-
-    fun controllerFor(displayId: Int): DockController? = controllers[displayId]
-
     @Composable
     override fun Content(state: DesktopDockState, modifier: Modifier) {
         val context = LocalContext.current

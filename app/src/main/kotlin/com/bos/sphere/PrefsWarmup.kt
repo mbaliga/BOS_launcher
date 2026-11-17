@@ -19,6 +19,8 @@ object PrefsWarmup {
         val app = context.applicationContext
         Thread {
             FILES.forEach { name -> runCatching { app.getSharedPreferences(name, Context.MODE_PRIVATE).all } }
+            // CFG-03: retired keys of waves 15 to 19 are removed once, off the main thread, after the files are loaded.
+            runCatching { com.bos.sphere.core.data.RetiredPrefKeys.purgeOnce(app) }
         }.apply { this.name = "liftoff-prefs-warmup"; isDaemon = true }.start()
     }
 }

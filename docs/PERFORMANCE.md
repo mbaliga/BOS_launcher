@@ -34,3 +34,7 @@ Crash reports are written by `CrashReports` to `files/crash-reports/` in app-pri
 ## Soak loop (Soak row of the test plan)
 
 `tools/soak.sh [seconds]`: Home, drawer swipe, typing, back, rotation, launching another app, recents round trip and a process kill every 50 iterations, for 7200 s by default, with an ANR and crash check every 10 iterations. On failure it leaves `tools/soak-out/` (logcat, process dump, `/data/anr`). Schedule it nightly on the mid-range device from a host with adb.
+
+## Modules and the size note (wave 20)
+
+`:crash-recovery` (wave 18) is a dependency-free module of plain `android.widget` views, so it adds no Compose or library weight to cold start; it installs one uncaught-exception handler in `Application.onCreate` as the first statement (NFR-02 cost: one object allocation, no I/O). Wave 20 removed code and strings nothing called any more (the dead search session and menu glue, the voice button, 89 unused translation keys in all eight tables), which only shrinks the APK; no size was measured on a release build here beyond the 25 MB gate (`checkReleaseApkSize`). The baseline profile (`app/src/main/baseline-prof.txt`) lists rules by class name, and `BaselineProfileTest` fails when a rule names a class that no longer exists, so a rename or deletion cannot leave a stale rule. The one-time retired-key cleanup (`RetiredPrefKeys`) runs on the existing `PrefsWarmup` background thread and touches three small files once per install.

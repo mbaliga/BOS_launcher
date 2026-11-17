@@ -251,8 +251,6 @@ data class LauncherPrefs(
     val recentsLimit: Int = HomeRecents.DEFAULT_LIMIT,
     /** Add apps opened elsewhere (usage access, when granted) to the Recent landing. */
     val recentsUseUsageAccess: Boolean = true,
-    /** The faint dot that marks each hotspot on the Minimal landing. */
-    val minimalHints: Boolean = true,
     /** STR-14: what the right-hand side holds: the Recents panel (default), the dock rail's edge reveal, or nothing. */
     val rightSide: RightSide = RightSide.RecentsPanel,
 

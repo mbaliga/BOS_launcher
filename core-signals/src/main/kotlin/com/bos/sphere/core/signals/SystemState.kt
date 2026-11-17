@@ -31,28 +31,3 @@ object SystemStateLogic {
     }
 }
 
-/** Battery and connectivity snapshots (state only; Android does not let apps toggle the radios). */
-class SystemStateSource(context: Context) {
-    private val app = context.applicationContext
-
-    fun battery(): BatteryState {
-        val i: Intent? = app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        return SystemStateLogic.battery(
-            i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1,
-            i?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100,
-            i?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1,
-        )
-    }
-
-    fun connectivity(): ConnectivityState = runCatching {
-        val cm = app.getSystemService(ConnectivityManager::class.java)
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return ConnectivityState(LinkKind.None, false)
-        val kind = when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> LinkKind.Wifi
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> LinkKind.Cellular
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> LinkKind.Ethernet
-            else -> LinkKind.Other
-        }
-        ConnectivityState(kind, caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
-    }.getOrDefault(ConnectivityState(LinkKind.None, false))
-}

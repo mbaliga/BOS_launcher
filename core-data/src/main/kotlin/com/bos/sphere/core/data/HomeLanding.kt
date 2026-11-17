@@ -104,6 +104,4 @@ object MinimalHotspots {
         else -> null
     }
 
-    /** The dot hint is drawn when the setting is on and the landing is Minimal. */
-    fun hintsVisible(l: HomeLanding, hintsOn: Boolean): Boolean = l == HomeLanding.Minimal && hintsOn
 }

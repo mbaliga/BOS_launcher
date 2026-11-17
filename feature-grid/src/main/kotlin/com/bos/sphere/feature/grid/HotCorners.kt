@@ -35,13 +35,6 @@ class HotCornerBinding(
     val onActivate: (HotCornerId) -> Unit,
 )
 
-fun Corner.toHot(): HotCornerId = when (this) {
-    Corner.TopLeft -> HotCornerId.TopLeft
-    Corner.TopRight -> HotCornerId.TopRight
-    Corner.BottomRight -> HotCornerId.BottomRight
-    Corner.BottomLeft -> HotCornerId.BottomLeft
-}
-
 fun HotCornerId.toCorner(): Corner = when (this) {
     HotCornerId.TopLeft -> Corner.TopLeft
     HotCornerId.TopRight -> Corner.TopRight

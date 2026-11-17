@@ -14,8 +14,6 @@ internal val L10nW15recentsEnglish: Set<String> = setOf(
     "Dock rail",
     "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing",
     "The right side is off. Turn it on in Ground Control, Home, Right side.",
-    "Open recents panel",
-    "Recents panel. Return to home",
 )
 
 internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
@@ -32,8 +30,6 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "Barra del dock",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "Qué abre un deslizamiento desde el borde derecho: las apps recientes, la barra del dock o nada",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "El lado derecho está desactivado. Actívalo en Ground Control, Inicio, Lado derecho.",
-        "Open recents panel" to "Abrir el panel de recientes",
-        "Recents panel. Return to home" to "Panel de recientes. Volver al inicio",
     ),
     "fr" to mapOf(
         "Just now" to "À l'instant",
@@ -48,8 +44,6 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "Barre du dock",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "Ce que provoque un balayage depuis le bord droit : les apps récentes, la barre du dock ou rien",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "Le côté droit est désactivé. Activez-le dans Ground Control, Accueil, Côté droit.",
-        "Open recents panel" to "Ouvrir le panneau des récents",
-        "Recents panel. Return to home" to "Panneau des récents. Retour à l'accueil",
     ),
     "de" to mapOf(
         "Just now" to "Gerade eben",
@@ -64,8 +58,6 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "Dock-Leiste",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "Was ein Wischen vom rechten Rand öffnet: die zuletzt verwendeten Apps, die Dock-Leiste oder nichts",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "Die rechte Seite ist aus. Einschalten unter Ground Control, Start, Rechte Seite.",
-        "Open recents panel" to "Zuletzt-verwendet-Panel öffnen",
-        "Recents panel. Return to home" to "Zuletzt-verwendet-Panel. Zurück zum Start",
     ),
     "pt" to mapOf(
         "Just now" to "Agora mesmo",
@@ -80,8 +72,6 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "Barra do dock",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "O que um deslize a partir da borda direita abre: os apps recentes, a barra do dock ou nada",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "O lado direito está desativado. Ative em Ground Control, Início, Lado direito.",
-        "Open recents panel" to "Abrir o painel de recentes",
-        "Recents panel. Return to home" to "Painel de recentes. Voltar ao início",
     ),
     "hi" to mapOf(
         "Just now" to "अभी",
@@ -96,8 +86,6 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "डॉक बार",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "दाएँ किनारे से स्वाइप करने पर क्या खुले: हाल के ऐप, डॉक बार या कुछ नहीं",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "दायाँ किनारा बंद है। Ground Control, होम, दायाँ किनारा में चालू करें।",
-        "Open recents panel" to "हाल के ऐप पैनल खोलें",
-        "Recents panel. Return to home" to "हाल के ऐप पैनल। होम पर लौटें",
     ),
     "zh" to mapOf(
         "Just now" to "刚刚",
@@ -112,8 +100,6 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "Dock 栏",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "从右边缘滑入时打开什么：最近使用的应用、Dock 栏或无",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "右侧已关闭。请在 Ground Control、主屏幕、右侧中开启。",
-        "Open recents panel" to "打开最近使用面板",
-        "Recents panel. Return to home" to "最近使用面板。返回主屏幕",
     ),
     "ja" to mapOf(
         "Just now" to "たった今",
@@ -128,8 +114,6 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "Dock バー",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "右端からのスワイプで開くもの：最近のアプリ、Dock バー、またはなし",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "右側はオフです。Ground Control、ホーム、右側でオンにできます。",
-        "Open recents panel" to "最近のパネルを開く",
-        "Recents panel. Return to home" to "最近のパネル。ホームに戻る",
     ),
     "ar" to mapOf(
         "Just now" to "الآن",
@@ -144,7 +128,5 @@ internal val L10nW15recents: Map<String, Map<String, String>> = mapOf(
         "Dock rail" to "شريط الإرساء",
         "What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing" to "ما يفتحه السحب من الحافة اليمنى: التطبيقات الأخيرة أو شريط الإرساء أو لا شيء",
         "The right side is off. Turn it on in Ground Control, Home, Right side." to "الجانب الأيمن متوقف. فعّله من Ground Control، الرئيسية، الجانب الأيمن.",
-        "Open recents panel" to "فتح لوحة الأخيرة",
-        "Recents panel. Return to home" to "لوحة الأخيرة. العودة إلى الرئيسية",
     ),
 )

@@ -66,14 +66,13 @@ class HomeLandingTest {
     }
 
     @Test fun HOM_22_theLandingIsAnExportedPlainPrefAndRoundTripsThroughTheSettingsDocument() {
-        val doc = SettingsCodec.encode(LauncherPrefs(homeLanding = HomeLanding.Recents, recentsLimit = 40, recentsUseUsageAccess = false, minimalHints = false))
+        val doc = SettingsCodec.encode(LauncherPrefs(homeLanding = HomeLanding.Recents, recentsLimit = 40, recentsUseUsageAccess = false))
         val prefs = doc.getJSONObject("prefs")
         assertEquals("Recents", prefs.getString("homeLanding"))
         val back = SettingsCodec.decode(doc).prefs
         assertEquals(HomeLanding.Recents, back.homeLanding)
         assertEquals(40, back.recentsLimit)
         assertFalse(back.recentsUseUsageAccess)
-        assertFalse(back.minimalHints)
     }
 
     @Test fun HOM_22_anOlderSettingsFileWithoutTheLandingImportsAsTheDefaultGlance() {
@@ -127,12 +126,6 @@ class HomeLandingTest {
     @Test fun HOM_22_INP_16_everyMinimalDefaultIsAnInternalActionTheHomeRuns() {
         for ((_, s) in MinimalHotspots.defaults) assertTrue(((s as CornerSlot.Single).item as CornerItem.Action).id.internal)
         assertEquals(setOf(Corner.TopLeft, Corner.TopRight, Corner.BottomLeft, Corner.BottomRight), MinimalHotspots.defaults.keys)
-    }
-
-    @Test fun HOM_22_theDotHintShowsOnlyOnMinimalAndOnlyWhenOn() {
-        assertTrue(MinimalHotspots.hintsVisible(HomeLanding.Minimal, true))
-        assertFalse(MinimalHotspots.hintsVisible(HomeLanding.Minimal, false))
-        assertFalse(MinimalHotspots.hintsVisible(HomeLanding.Selected, true))
     }
 
     @Test fun HOM_22_INP_07_theCycleActionIsAnInternalCornerActionSoItCanBeAssignedToACornerOrGesture() {

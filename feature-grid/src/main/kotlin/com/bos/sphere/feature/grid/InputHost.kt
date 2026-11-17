@@ -140,8 +140,6 @@ object LauncherInput {
         return consumed
     }
 
-    /** Test and tooling hook: what a key would do right now. */
-    internal fun routeFor(keyCode: Int, ctrl: Boolean = false, alt: Boolean = false, shift: Boolean = false): KeyRoute = router.route(keyCode, ctrl, alt, shift)
 }
 
 /** Items register here with their bounds so [FocusGraph] can pick the next one; focus itself stays with Compose. */
@@ -331,9 +329,3 @@ fun Modifier.launcherItem(
 /** A container whose children read in a fixed linear order for TalkBack and keyboard traversal (NFR-13). */
 fun Modifier.linearTraversal(): Modifier = semantics { isTraversalGroup = true }
 
-/** Window size in dp, used by hot corners and gesture exclusions. */
-@Composable
-fun rememberWindowDp(): Pair<Float, Float> {
-    val c = LocalConfiguration.current
-    return c.screenWidthDp.toFloat() to c.screenHeightDp.toFloat()
-}

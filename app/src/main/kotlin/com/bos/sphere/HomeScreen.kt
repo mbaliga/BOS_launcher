@@ -949,14 +949,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !rightOpen, revealSlideDp, mirrored = launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
             .launchpadEdgeDrag(rightReveal, recentsEnabled && !leftOpen, rightSlideDp, mirrored = !launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
             .glanceWakeOnTouch { glanceWake.intValue++ }
-            .rightEdgeSwipe(prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail && !leftOpen, rtl = launchpadRtl) { openRecents() }
-            .leftSwipe(
-            enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && !rightOpen && !launchpadRtl &&
-                (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous),
-            atFirstPage = { true },
-            onOpen = { leftOpen = true },
-            edgeDp = 28f,
-        ),
+            .rightEdgeSwipe(prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail && !leftOpen, rtl = launchpadRtl) { openRecents() },
     ) {
         EditCardOverlay(
             card = editCard, homeEdit = homeEdit, stores = stores, homeItems = homeItems, pages = pages, layout = layout, preserve = preserve,
@@ -1697,12 +1690,11 @@ private fun LeftWidgetPage(
 }
 
 /** Opens the left page on a rightward swipe that starts while the first home page is settled. */
-private fun Modifier.leftSwipe(enabled: Boolean, atFirstPage: () -> Boolean, onOpen: () -> Unit, edgeDp: Float = 0f): Modifier =
+private fun Modifier.leftSwipe(enabled: Boolean, atFirstPage: () -> Boolean, onOpen: () -> Unit): Modifier =
     if (!enabled) this else this.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
             if (!atFirstPage()) return@awaitEachGesture
-            if (edgeDp > 0f && down.position.x > edgeDp * density) return@awaitEachGesture
             val slop = viewConfiguration.touchSlop
             var dx = 0f
             var dy = 0f

@@ -4,7 +4,6 @@ package com.bos.sphere.core.design
 internal val L10nMore2English: Set<String> = setOf(
     "Any app",
     "Apps that handle it",
-    "Compact keeps square cells; higher spreads the icons into the free space without resizing them.",
     "Denser grid",
     "Memory",
     "Pinch changes grid density",
@@ -23,7 +22,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "es" to mapOf(
         "Any app" to "Cualquier app",
         "Apps that handle it" to "Apps que lo gestionan",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "Compacto mantiene celdas cuadradas; más abre los iconos en el espacio libre sin cambiar su tamaño.",
         "Denser grid" to "Cuadrícula más densa",
         "Memory" to "Memoria",
         "Pinch changes grid density" to "Pellizcar cambia la densidad",
@@ -40,7 +38,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "fr" to mapOf(
         "Any app" to "N'importe quelle app",
         "Apps that handle it" to "Apps compatibles",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "Compact garde des cellules carrées ; plus élevé écarte les icônes dans l'espace libre sans les redimensionner.",
         "Denser grid" to "Grille plus dense",
         "Memory" to "Mémoire",
         "Pinch changes grid density" to "Le pincement change la densité",
@@ -57,7 +54,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "de" to mapOf(
         "Any app" to "Beliebige App",
         "Apps that handle it" to "Apps dafür",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "Kompakt hält quadratische Zellen; höher verteilt die Symbole in den freien Platz, ohne sie zu verkleinern.",
         "Denser grid" to "Dichteres Raster",
         "Memory" to "Arbeitsspeicher",
         "Pinch changes grid density" to "Zwicken ändert die Rasterdichte",
@@ -74,7 +70,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "pt" to mapOf(
         "Any app" to "Qualquer app",
         "Apps that handle it" to "Apps que o abrem",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "Compacto mantém células quadradas; mais espalha os ícones pelo espaço livre sem redimensioná-los.",
         "Denser grid" to "Grade mais densa",
         "Memory" to "Memória",
         "Pinch changes grid density" to "Pinçar muda a densidade",
@@ -91,7 +86,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "hi" to mapOf(
         "Any app" to "कोई भी ऐप",
         "Apps that handle it" to "इसे संभालने वाले ऐप्स",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "कॉम्पैक्ट वर्गाकार कोशिकाएँ रखता है; अधिक होने पर आइकन आकार बदले बिना खाली जगह में फैलते हैं।",
         "Denser grid" to "घना ग्रिड",
         "Memory" to "मेमोरी",
         "Pinch changes grid density" to "पिंच से ग्रिड घनत्व बदलें",
@@ -108,7 +102,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "zh" to mapOf(
         "Any app" to "任意应用",
         "Apps that handle it" to "可处理的应用",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "紧凑保持方形单元；更高会把图标散开到空白处而不改变大小。",
         "Denser grid" to "更密的网格",
         "Memory" to "内存",
         "Pinch changes grid density" to "捏合改变网格密度",
@@ -125,7 +118,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "ja" to mapOf(
         "Any app" to "任意のアプリ",
         "Apps that handle it" to "対応するアプリ",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "コンパクトは正方形のセルを保ち、大きくすると、サイズを変えずに空きへアイコンを広げます。",
         "Denser grid" to "より密なグリッド",
         "Memory" to "メモリ",
         "Pinch changes grid density" to "ピンチでグリッド密度を変更",
@@ -142,7 +134,6 @@ internal val L10nMore2: Map<String, Map<String, String>> = mapOf(
     "ar" to mapOf(
         "Any app" to "أي تطبيق",
         "Apps that handle it" to "التطبيقات التي تدعمه",
-        "Compact keeps square cells; higher spreads the icons into the free space without resizing them." to "المدمج يحافظ على خلايا مربعة؛ والأعلى يوزّع الأيقونات في المساحة الفارغة دون تغيير حجمها.",
         "Denser grid" to "شبكة أكثف",
         "Memory" to "الذاكرة",
         "Pinch changes grid density" to "القرص يغيّر كثافة الشبكة",

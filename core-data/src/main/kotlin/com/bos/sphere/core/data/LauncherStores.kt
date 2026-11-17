@@ -136,7 +136,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("glanceContent", GlanceContent.encode(next.glanceContent)).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
             .putInt("glanceControlsSec", next.glanceControlsSeconds).putString("glanceWeather", next.glanceWeatherIntensity.name).putBoolean("glanceIndicator", next.glanceIndicator)
             .putInt("recentsLimit", next.recentsLimit)
-            .putBoolean("recentsUsage", next.recentsUseUsageAccess).putBoolean("minimalHints", next.minimalHints)
+            .putBoolean("recentsUsage", next.recentsUseUsageAccess)
             .putString("rightSide", next.rightSide.name)
             .apply()
         // Wave 15: the keys of the removed background gallery are deleted once, so nothing of it lingers.
@@ -266,7 +266,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             glanceIndicator = sp.getBoolean("glanceIndicator", d.glanceIndicator),
             recentsLimit = HomeRecents.clampLimit(sp.getInt("recentsLimit", d.recentsLimit)),
             recentsUseUsageAccess = sp.getBoolean("recentsUsage", d.recentsUseUsageAccess),
-            minimalHints = sp.getBoolean("minimalHints", d.minimalHints),
             rightSide = RightSide.parse(sp.getString("rightSide", null)),
         )
     }

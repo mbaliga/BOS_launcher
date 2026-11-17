@@ -83,22 +83,3 @@ class PaletteEngine(
 
     fun cancelProviders() = registry.providers().forEach { runCatching { it.cancel() } }
 }
-
-/** Keeps the row under the selection where it is while late providers add results (PAL-12). */
-object StableMerge {
-    /**
-     * [shown] is what the user sees now, [ideal] the freshly ranked list. Everything up to and including the selected
-     * row keeps its position (its data is refreshed); the rest follows the new ranking; pinned-last rows stay last.
-     */
-    fun merge(shown: List<PaletteResult>, ideal: List<PaletteResult>, selectedId: String?): List<PaletteResult> {
-        val body = ideal.filter { !it.pinnedLast }
-        val tail = ideal.filter { it.pinnedLast }
-        val shownBody = shown.filter { !it.pinnedLast }
-        val at = if (selectedId == null) -1 else shownBody.indexOfFirst { it.id == selectedId }
-        if (at < 0) return body + tail
-        val fresh = body.associateBy { it.id }
-        val prefix = shownBody.take(at + 1).map { fresh[it.id] ?: it }
-        val used = prefix.map { it.id }.toSet()
-        return prefix + body.filter { it.id !in used } + tail
-    }
-}

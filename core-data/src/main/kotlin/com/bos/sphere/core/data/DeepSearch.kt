@@ -67,9 +67,6 @@ class DeepSearch(private val context: Context, private val approvedExtra: () -> 
     /** Packages whose provider resolves right now. Ones that denied us earlier are left out. */
     fun installedSources(): List<String> = (DeepSearchLogic.knownSources + approvedExtra().sorted()).distinct().filter { it !in unavailable && providerPresent(it) }
 
-    /** Sources that refused access (SecurityException) during this process's lifetime. */
-    fun unavailableSources(): Set<String> = unavailable.toSet()
-
     private fun providerPresent(pkg: String): Boolean = runCatching {
         DeepSearchLogic.ownsAuthority(pkg, context.packageManager.resolveContentProvider(DeepSearchLogic.authority(pkg), 0)?.packageName)
     }.getOrDefault(false)

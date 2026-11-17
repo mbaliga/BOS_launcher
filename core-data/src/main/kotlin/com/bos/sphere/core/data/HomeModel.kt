@@ -244,6 +244,8 @@ data class LauncherPrefs(
     val recentsUseUsageAccess: Boolean = true,
     /** The faint dot that marks each hotspot on the Minimal landing. */
     val minimalHints: Boolean = true,
+    /** STR-14: what the right-hand side holds: the Recents panel (default), the dock rail's edge reveal, or nothing. */
+    val rightSide: RightSide = RightSide.RecentsPanel,
 
     val healthSource: HealthSourcePref = HealthSourcePref.Phone,
     /** An always-open keyboard that searches apps as you type — the old-school-phone mode. */
@@ -452,6 +454,8 @@ enum class CornerActionId(val label: String, val internal: Boolean = false) {
     OpenLaunchpad("Launchpad", internal = true),
     /** HOM-22: steps the home landing; assignable to a corner or a gesture. */
     CycleLanding("Cycle home landing", internal = true),
+    /** STR-14: opens the Recents panel (the right-hand card); assignable to a corner or a gesture. */
+    OpenRecents("Open recents", internal = true),
 }
 
 /** One thing a corner (or a palette entry) can do. */

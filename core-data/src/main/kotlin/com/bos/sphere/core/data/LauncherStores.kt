@@ -134,6 +134,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("wheelGrouping", next.wheelGrouping.name)
             .putString("homeLanding", next.homeLanding.name).putInt("recentsLimit", next.recentsLimit)
             .putBoolean("recentsUsage", next.recentsUseUsageAccess).putBoolean("minimalHints", next.minimalHints)
+            .putString("rightSide", next.rightSide.name)
             .apply()
         // Wave 15: the keys of the removed background gallery are deleted once, so nothing of it lingers.
         if (RetiredBackgroundKeys.KEYS.any { it != "bgPicture" && sp.contains(it) }) {
@@ -258,6 +259,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             recentsLimit = HomeRecents.clampLimit(sp.getInt("recentsLimit", d.recentsLimit)),
             recentsUseUsageAccess = sp.getBoolean("recentsUsage", d.recentsUseUsageAccess),
             minimalHints = sp.getBoolean("minimalHints", d.minimalHints),
+            rightSide = RightSide.parse(sp.getString("rightSide", null)),
         )
     }
 }

@@ -173,3 +173,15 @@ Nothing here has been confirmed on a device. Compare every item with the owner's
 - [ ] HOM-16: Settings backdrop "Background, dimmed" shows the chosen items still, dimmed, behind Ground Control; "Pitch black" stays black.
 - [ ] HOM-16: Intensity Subtle is visibly fainter than Normal for every item.
 - [ ] NFR-13: with TalkBack on, the home and Radar announce the signal once ("Signal: good, Wi-Fi") and the background is not focusable.
+## Recents panel (wave 15, STR-14)
+
+- [ ] STR-14: from the home, drag in from the right edge: the home shrinks into the same rounded card as Launchpad, pushed to the LEFT, following the finger; a short drag springs back, a long one or a fling settles open in about 0.45 s. A thin sliver of the card stays at the left edge; tap it, drag it back, press Back or Esc: home returns. Compare the card, scrim and sliver with Launchpad on the other side.
+- [ ] STR-14, INP-08: the edge swipe does not fight the system back gesture on a gesture-navigation device (the right edge back gesture of the system may win in the first few dp; the 28 dp zone and the handle are the fallback). The slim handle on the right edge opens the panel with a tap; the corner and gesture action "Open recents" and Ctrl+R open it.
+- [ ] STR-14: launch three apps from Liftoff, go home, open the panel: they are listed newest first, one row each, with "Recent" and how long ago; the one line under the title says Android does not tell a launcher which apps are still running. Relaunch one: it moves to the top.
+- [ ] STR-14: grant usage access, open an app from a notification and from the system share sheet, leave it, return to Liftoff and open the panel: the apps appear ordered by when you left them; without the grant only apps opened from Liftoff appear and the empty state offers "Allow usage access".
+- [ ] STR-14: long press, right-click (mouse) and the Menu key on a row open the app menu with "Remove from recents"; the app disappears and returns after you use it again. "Clear all" empties the list. Tap a row: the app opens.
+- [ ] STR-14, RTL: switch to Arabic: the card goes to the RIGHT, the sliver and handle are on the right, the swipe comes from the LEFT edge; Launchpad is then on the left edge.
+- [ ] STR-14: Ground Control > Home > Right side: Recents panel, Dock rail, Off. With Dock rail and the dock turned on, the right-edge swipe reveals the dock rail; with the dock off nothing is turned on by it. With Off there is no handle and no swipe.
+- [ ] STR-14, NFR-14: Remove animations on: the card snaps and the panel cross-fades. Font size 200 percent and display size large: rows and the header wrap, nothing overlaps the sliver, Clear all is reachable.
+- [ ] STR-14, NFR-13: TalkBack reads each row as "Name, Recent, N min ago", the sliver as "Home card. Return to home", the handle as "Open recents". With a keyboard, Tab and arrows reach each row and Clear all; Enter opens, Menu opens the menu, Esc returns.
+- [ ] STR-14, NFR-05: with the profiler on a device, open and close the panel ten times: no more than 1 percent janky frames; the home keeps its state (scroll position, open folder) after returning.

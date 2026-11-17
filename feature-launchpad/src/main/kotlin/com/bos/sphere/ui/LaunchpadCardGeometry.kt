@@ -11,6 +11,11 @@ enum class CardEdge {
         fun forLaunchpad(rtl: Boolean) = if (rtl) Left else Right
         /** Home edit: the mirror image of Launchpad, so the page carousel takes the opposite side. */
         fun forEdit(rtl: Boolean) = if (rtl) Right else Left
+        /**
+         * STR-14: the Recents panel is the mirror image of Launchpad: the card goes to the left in left-to-right layouts and to the right in
+         * right-to-left ones. The same geometry, card layer, scrim and settle are used (parameterized by this edge, not forked).
+         */
+        fun forRecents(rtl: Boolean) = if (rtl) Right else Left
     }
 }
 

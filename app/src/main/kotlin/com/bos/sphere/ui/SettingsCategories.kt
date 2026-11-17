@@ -263,6 +263,13 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     preview = { com.bos.sphere.feature.grid.LandingChoiceList(p.homeLanding, { l -> upd { it.copy(homeLanding = l) } }) },
                 ) { l -> upd { it.copy(homeLanding = l) } },
             )
+            // STR-14: what a swipe from the right edge does. The dock stays optional: "Dock rail" only reveals it, it never turns it on.
+            add(
+                SettingItem.Choice(
+                    x("Right side"), Glyphs.Apps, com.bos.sphere.core.data.RightSide.entries, p.rightSide, { x(it.label) },
+                    hint = x("What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing"),
+                ) { v -> upd { it.copy(rightSide = v) } },
+            )
             if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Recents) {
                 add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })
                 add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Uses usage access when it is allowed; otherwise only apps opened from Liftoff are listed")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })

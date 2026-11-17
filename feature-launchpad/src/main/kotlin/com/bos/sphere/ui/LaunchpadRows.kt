@@ -371,7 +371,7 @@ private fun RowButton(label: String, onClick: () -> Unit) {
     Text(
         label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1,
         modifier = Modifier.padding(start = 6.dp).heightIn(min = 32.dp).clip(RoundedCornerShape(16.dp)).background(BlueDark)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
     )
 }
 
@@ -381,7 +381,7 @@ private fun ActionChip(label: String, accent: Boolean, onClick: () -> Unit) {
         label, color = if (accent) Color.White else LocalLp.current.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
         modifier = Modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(16.dp))
             .background(if (accent) BlueDark else LocalLp.current.surface)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
     )
 }
 
@@ -410,7 +410,7 @@ internal fun ReplyRow(action: HubAction, hint: String?, onSend: (String) -> Unit
             L10n.tr("Send"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
             modifier = Modifier.heightIn(min = 36.dp).clip(RoundedCornerShape(18.dp))
                 .background(if (ReplyLogic.canSend(text)) BlueDark else LocalLp.current.dim)
-                .clickable(enabled = ReplyLogic.canSend(text)) { onSend(text); text = "" }
+                .clickable(enabled = ReplyLogic.canSend(text), role = androidx.compose.ui.semantics.Role.Button) { onSend(text); text = "" }
                 .padding(horizontal = 16.dp, vertical = 9.dp),
         )
     }
@@ -485,7 +485,7 @@ internal fun RowMenuSheet(
 @Composable
 private fun SheetLine(label: String, expandable: Boolean, expanded: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick).padding(horizontal = 20.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = LocalLp.current.ink2, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))

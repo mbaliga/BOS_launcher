@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -188,12 +189,18 @@ internal fun CarouselButton(
         prominent -> HyleColors.OnAccent
         else -> HyleColors.InkBright
     }
-    Text(
-        glyph ?: label, color = fg, fontSize = 13.sp, fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Normal,
-        modifier = Modifier
-            .background(if (prominent && enabled) HyleColors.Violet else HyleColors.InkDim.copy(alpha = 0.14f), shape)
+    // NFR-13: the pill is drawn small, the touch target around it is at least 48 dp square.
+    Box(
+        Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = if (glyph != null) 14.dp else 14.dp, vertical = 8.dp)
             .semantics { role = Role.Button; contentDescription = description ?: label; if (!enabled) disabled() },
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            glyph ?: label, color = fg, fontSize = 13.sp, fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier
+                .background(if (prominent && enabled) HyleColors.Violet else HyleColors.InkDim.copy(alpha = 0.14f), shape)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+    }
 }

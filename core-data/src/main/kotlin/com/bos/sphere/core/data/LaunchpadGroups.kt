@@ -212,11 +212,12 @@ object GroupsEdit {
             rules = c.rules.map { r -> r.copy(conditions = r.conditions.map { x -> if (x.kind == ConditionKind.PersonIs && x.value in oldIds) x.copy(value = merged.id) else x }) })
     }
 
-    /** Takes [alias] (a sender name) out of person [personId]; a person left with no alias is removed with its assignments. */
+    /** Takes [alias] (a sender name) out of person [personId]; a person left with no alias is removed with its assignments and the rules that required it. */
     fun unlinkAlias(c: GroupsConfig, personId: String, alias: String): GroupsConfig {
         val k = PersonNames.key(alias)
         val p = c.person(personId) ?: return c
         val rest = p.aliases.filter { PersonNames.key(it) != k }
+        if (rest.size == p.aliases.size) return c // not one of this person's names: nothing to unlink
         return if (rest.size <= 1 && p.contactKey == null) removePerson(c, personId)
         else c.copy(people = c.people.map { if (it.id == personId) it.copy(aliases = rest) else it })
     }
@@ -224,8 +225,15 @@ object GroupsEdit {
     fun removePerson(c: GroupsConfig, personId: String) = c.copy(
         people = c.people.filterNot { it.id == personId },
         assignments = c.assignments.filterNot { it.kind == AssignKind.Person && it.target == personId },
-        rules = c.rules.map { r -> r.copy(conditions = r.conditions.filterNot { it.kind == ConditionKind.PersonIs && it.value == personId }) }
-            .filter { it.conditions.isNotEmpty() },
+        // A rule that required this person can never match again, so it goes; keeping it without that condition would let it
+        // match everyone who fits its other conditions ("Priya, on weekdays" would become "anyone, on weekdays"). A negated
+        // condition ("not this person") has nothing left to exclude and is simply dropped.
+        rules = c.rules.filterNot { r -> r.conditions.any { it.kind == ConditionKind.PersonIs && it.value == personId && !it.negate } }
+            .mapNotNull { r ->
+                val left = r.conditions.filterNot { it.kind == ConditionKind.PersonIs && it.value == personId }
+                // Only a rule emptied by this removal goes; one that had no readable condition before (its conditions are from a newer build) stays.
+                if (left.isEmpty() && r.conditions.isNotEmpty()) null else r.copy(conditions = left)
+            },
     )
 }
 

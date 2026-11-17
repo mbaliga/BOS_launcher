@@ -88,8 +88,8 @@ internal fun MoreLine(hidden: Int, expanded: Boolean, id: String, onClick: () ->
         if (expanded) L10n.tr("Show fewer") else L10n.tr("+%d more", hidden),
         color = BlueLight, fontSize = 13.sp, fontWeight = FontWeight.Medium,
         modifier = Modifier.padding(start = RoomyList.H_PAD_DP.dp + 3.dp + 10.dp + RoomyList.ICON_DP.dp + 12.dp)
-            .heightIn(min = 40.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp).testTag("lp.more.$id"),
+            .heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) // NFR-13: 48 dp target, announced as a button
+            .padding(horizontal = 12.dp, vertical = 14.dp).testTag("lp.more.$id"),
     )
 }
 
@@ -114,18 +114,25 @@ internal fun SectionStrip(sections: List<Section>, listState: LazyListState, hea
     ) {
         items(sections, key = { it.key }) { s ->
             val on = s.key == current
-            Text(
-                s.title, color = if (on) LocalLp.current.bg else LocalLp.current.ink2, fontSize = 13.sp,
-                fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.heightIn(min = 40.dp, max = 40.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp))
-                    .background(if (on) LocalLp.current.ink else LocalLp.current.surface)
+            // The chip is drawn 40 dp high; its touch target is 48 dp (NFR-13).
+            Box(
+                Modifier.heightIn(min = 48.dp)
                     .semantics { selected = on; role = androidx.compose.ui.semantics.Role.Tab; contentDescription = L10n.tr("Jump to %s", s.title) }
                     .clickable {
                         val i = headIndex[s.key] ?: -1
                         if (i >= 0) scope.launch { if (motion.reduced) listState.scrollToItem(i) else listState.animateScrollToItem(i) }
                     }
-                    .padding(horizontal = 14.dp, vertical = 7.dp).testTag("lp.strip.${s.key}"),
-            )
+                    .testTag("lp.strip.${s.key}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    s.title, color = if (on) LocalLp.current.bg else LocalLp.current.ink2, fontSize = 13.sp,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.heightIn(min = 40.dp, max = 40.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp))
+                        .background(if (on) LocalLp.current.ink else LocalLp.current.surface)
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                )
+            }
         }
     }
 }

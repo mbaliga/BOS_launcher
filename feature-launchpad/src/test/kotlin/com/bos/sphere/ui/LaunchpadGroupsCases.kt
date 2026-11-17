@@ -126,6 +126,7 @@ abstract class LaunchpadGroupsCases(private val orientation: String) : Launchpad
         shown("Promos"); shown("Everything else"); shown("Quiet", substring = true)
         shown("Priority", substring = true)
         shown("Priya Sharma")
+        scrollTo("Priya Sharma (SMS)", substring = true) // the list is one long scroll; the second app's row may be just below the first (wave 13: 48 dp targets made the strip and "+N more" taller)
         assertTrue("the priority rows of both apps sit under Family", rule.onAllNodesWithText("Priya Sharma (SMS)", substring = true).fetchSemanticsNodes().isNotEmpty())
         // Updated from the old accordion ("work rows are not shown until Work is selected"): nothing is hidden behind a selection any more.
         shown("Deck is ready")

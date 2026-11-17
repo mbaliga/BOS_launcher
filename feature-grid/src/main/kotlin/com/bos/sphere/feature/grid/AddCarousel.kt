@@ -109,13 +109,13 @@ fun AddCarousel(
                         modifier = Modifier.weight(1f).background(HyleColors.InkDim.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 8.dp)
                             .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
                             .semantics { contentDescription = L10n.tr("Filter apps") },
-                        decorationBox = { inner -> Box { if (query.isEmpty()) Text(L10n.tr("Filter apps"), color = HyleColors.InkDim, fontSize = 14.sp); inner() } },
+                        decorationBox = { inner -> Box { if (query.isEmpty()) Text(L10n.tr("Filter apps"), color = HyleColors.Ink, fontSize = 14.sp); inner() } },
                     )
                     if (hasWork) {
                         listOf<Pair<Boolean?, String>>(null to "All", false to "Personal", true to "Work").forEach { (v, l) ->
                             val on = scope == v
                             Text(
-                                L10n.tr(l), fontSize = 12.sp, color = if (on) HyleColors.OnAccent else HyleColors.InkDim,
+                                L10n.tr(l), fontSize = 12.sp, color = if (on) HyleColors.OnAccent else HyleColors.Ink, // the normal ink: the dim ink on its own tint is under 4.5 to 1 in the dark theme (NFR-15)
                                 modifier = Modifier.background(if (on) HyleColors.Violet else HyleColors.InkDim.copy(alpha = 0.14f), RoundedCornerShape(50))
                                     .clickable { scope = v }.padding(horizontal = 10.dp, vertical = 6.dp)
                                     .semantics { role = Role.Tab; selected = on },
@@ -190,7 +190,7 @@ fun EmptyHomeHint(onOpen: () -> Unit, modifier: Modifier = Modifier, onShowRecen
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
             Text(
-                L10n.tr("Long press to add apps"), color = HyleColors.InkDim, fontSize = 15.sp,
+                L10n.tr("Long press to add apps"), color = HyleColors.Ink, fontSize = 15.sp,
                 modifier = Modifier.background(HyleColors.InkDim.copy(alpha = 0.10f), RoundedCornerShape(50)).clickable(onClickLabel = L10n.tr("Add to home"), onClick = onOpen)
                     .padding(horizontal = 18.dp, vertical = 10.dp)
                     .semantics { role = Role.Button; contentDescription = L10n.tr("Long press to add apps") },

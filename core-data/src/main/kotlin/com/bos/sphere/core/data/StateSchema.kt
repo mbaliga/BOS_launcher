@@ -110,11 +110,21 @@ class StateDocument(val json: JSONObject) {
     fun settingsDocument(): JSONObject? = section(StateSchema.K_SETTINGS)?.let { JSONObject(it.toString()) }
 
     companion object {
+        /**
+         * NFR-17: the platform's JSON parser puts the whole input after its position ("Unterminated object at character 25 of {...}").
+         * The file holds names, people links and the user's last name, and this text is shown in a dialog, so only the part before the
+         * input is kept.
+         */
+        fun describe(e: JSONException): String =
+            POSITION.find(e.message ?: "")?.value ?: "Invalid JSON" // "Value Sharma of type ..." and the like quote the input: dropped
+
+        private val POSITION = Regex("^[A-Za-z' :]{1,60} at character \\d+")
+
         fun parse(text: String): StateDocument {
             val o = try {
                 JSONObject(text)
             } catch (e: JSONException) {
-                throw StateFormatException("Not a Liftoff state file: ${e.message}", e)
+                throw StateFormatException("Not a Liftoff state file: ${describe(e)}", e)
             }
             // A bare settings document is accepted and wrapped, so a settings-only file can be imported (CFG-11).
             if (o.optString(StateSchema.K_FORMAT) == StateSchema.SETTINGS_FORMAT) {

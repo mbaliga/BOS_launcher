@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -201,6 +202,7 @@ private fun rememberContactRows(query: String, contacts: ContactSource?, want: B
 }
 
 /** The search screen proper; internal so tests can start it with a query and a category. */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class) // requestInputMode: a navigation key is keyboard mode (wave 22)
 @Composable
 internal fun SearchScreen(
     apps: List<AppEntry>,
@@ -248,6 +250,13 @@ internal fun SearchScreen(
     val haptic = LocalHapticFeedback.current
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
+    // Wave 22 (audit): a hardware keyboard or d-pad reaches the Clear/Close button and the mic (Shift+Tab or Up from the field; Tab or Down
+    // when there is nothing to walk); while one of them has focus the keys belong to the focus system and the button (Enter, Space, Tab).
+    val inputModeManager = androidx.compose.ui.platform.LocalInputModeManager.current
+    val controlFocus = remember { FocusRequester() }
+    val micFocus = remember { FocusRequester() }
+    var barFocused by remember { mutableStateOf(false) }
+    var micFocused by remember { mutableStateOf(false) }
     var field by remember { mutableStateOf(TextFieldValue(initialQuery, TextRange(initialQuery.length))) }
     var userCat by remember { mutableStateOf(initialCategory) }
     var expandedContact by remember { mutableStateOf<Long?>(null) }
@@ -436,6 +445,17 @@ internal fun SearchScreen(
         if (previewTile != null) return@handler false
         if (ev.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && RadarKeyMap.hardware(ev)) tracker.onKey()
         val key = RadarKeyMap.radarKey(ev) ?: return@handler false
+        if ((barFocused || micFocused) && key != RKey.Escape) return@handler false // a button has focus: Tab, arrows, Enter and Space are theirs
+        if (!navNow.menuOpen) {
+            // A navigation key means keyboard mode: a clickable only takes focus in keyboard mode, and the system switches a moment after this handler.
+            val toBar = key == RKey.ShiftTab || (key == RKey.Tab && navNow.count == 0) || (key == RKey.Up && !navNow.active)
+            val toMic = voiceOn && key == RKey.Down && navNow.count == 0
+            if (toBar || toMic) {
+                inputModeManager.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
+                val to = if (toBar) controlFocus else micFocus
+                if (runCatching { to.requestFocus(); true }.getOrDefault(false)) return@handler true
+            }
+        }
         val sel = field.selection
         val caret = CaretContext(queryBlank = query.isBlank(), atStart = sel.collapsed && sel.start == 0, atEnd = sel.collapsed && sel.end == query.length)
         val r = RadarKeyboard.reduce(navNow, key, caret) { i -> navTiles.getOrNull(i)?.let { menuFor(it).size } ?: ResultMenus.forKind(ResultKind.Other).size }
@@ -473,7 +493,9 @@ internal fun SearchScreen(
         // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
         // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
-            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = if (voiceOn) RadarMicBarHeight else 0.dp).clipToBounds()) {
+            // Wave 22 (audit): the results are one reading group, so TalkBack reads the field, its buttons, the whole results area and the mic last
+            // (the Orbit rings are a group inside it); without the groups the ring indices 1, 2 ... sorted after the mic, which has index 0.
+            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = if (voiceOn) RadarMicBarHeight else 0.dp).clipToBounds().semantics { isTraversalGroup = true }) {
                 val emptyHint = if (data.blank && (selected == null || selected == SearchCategory.Apps) && data.tiles(selected).isEmpty()) L10n.tr("Rings fill up as you use Radar") else null
                 if (flatMode) {
                     // Typing, or the Flat layout at rest (what you open most): a plain results list below the query line.
@@ -496,7 +518,7 @@ internal fun SearchScreen(
                         val wheelRow: @Composable () -> Unit = {
                             // "SEARCH" ends just left of the centre line and the wheel starts just right of it.
                             Row(Modifier.fillMaxWidth()) {
-                                QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp))
+                                QueryDisplay(onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp))
                                 Box(Modifier.weight(1f)) {
                                     CategoryWheel(
                                         selected = selected, counts = counts,
@@ -511,7 +533,7 @@ internal fun SearchScreen(
                             Orbit(
                                 tiles = if (orbitTyped) ringTiles else data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
                                 actions = tileActions, centreFromBottom = centre,
-                                modifier = Modifier.fillMaxSize().padding(bottom = if (orbitTyped) RadarStripHeight else 0.dp),
+                                modifier = Modifier.fillMaxSize().padding(bottom = if (orbitTyped) RadarStripHeight else 0.dp).semantics { isTraversalGroup = true }, // the rings read by their index as one unit, before the wheel and the strip (wave 22)
                                 onVisibleCount = { orbitVisible = it }, emptyHint = emptyHint,
                                 tierNames = if (orbitTyped) RadarRings.queryTierNames else RadarRings.tierNames,
                             )
@@ -546,18 +568,18 @@ internal fun SearchScreen(
                     if (flatMode) ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label, fanDown = true, showLabel = selected != null, glass = true, modifier = Modifier.padding(start = 6.dp))
                     Box(Modifier.weight(1f).padding(start = if (flatMode) 8.dp else 20.dp, end = if (query.isEmpty()) 20.dp else 0.dp), contentAlignment = Alignment.CenterStart) {
                         if (query.isEmpty()) Text(L10n.tr("Search"), color = GlassSpec.hint(true), fontSize = 20.sp, maxLines = 1)
-                        QueryInput(field, { field = it }, go, focus, GlassSpec.content(true), 20.sp, Modifier.fillMaxWidth())
+                        QueryInput(field, { field = it }, go, focus, GlassSpec.content(true), 20.sp, Modifier.fillMaxWidth().onFocusChanged { if (it.hasFocus) { barFocused = false; micFocused = false } })
                     }
                     if (query.isNotEmpty()) {
                         // Wave 21 (owner): the X is inside the field at its trailing end, 48 dp target, 20 dp glyph, only with text.
-                        GlassButton(onClick = { setQuery(""); runCatching { focus.requestFocus() } }, description = L10n.tr("Clear"), filled = false, modifier = Modifier.padding(end = 2.dp)) {
+                        GlassButton(onClick = { setQuery(""); barFocused = false; showKeyboard() }, description = L10n.tr("Clear"), filled = false, modifier = Modifier.padding(end = 2.dp).focusRequester(controlFocus).onFocusChanged { barFocused = it.hasFocus }) {
                             Icon(Glyphs.Close, null, tint = GlassSpec.content(true), modifier = Modifier.size(20.dp))
                         }
                     }
                 }
                 if (query.isEmpty()) {
                     // Close and Clear are never both visible: Close is outside the field, a glass circle, while there is nothing to clear.
-                    GlassButton(onClick = onDismiss, description = L10n.tr("Close"), shade = shades.top, modifier = Modifier.padding(start = 8.dp)) {
+                    GlassButton(onClick = onDismiss, description = L10n.tr("Close"), shade = shades.top, modifier = Modifier.padding(start = 8.dp).focusRequester(controlFocus).onFocusChanged { barFocused = it.hasFocus }) {
                         Icon(Glyphs.Close, null, tint = GlassSpec.content(true), modifier = Modifier.size(22.dp))
                     }
                 }
@@ -565,7 +587,7 @@ internal fun SearchScreen(
             // Wave 21 (owner): the mic for voice input sits at the centre of the bottom, above the keyboard and the gesture bar
             // (the inset padding above), 56 dp, in every layout and orientation; space is reserved for it so it never covers a result.
             if (voiceOn) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight), contentAlignment = Alignment.Center) {
-                PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, shade = shades.bottom)
+                PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, shade = shades.bottom, modifier = Modifier.focusRequester(micFocus), onFocusChange = { micFocused = it })
             }
         }
         aliasFor?.let { a ->
@@ -668,155 +690,6 @@ internal const val RADAR_FIELD_TAG = "radarField"
 /** How many of the apps you open most the resting Radar lists (the four rings hold 5 + 9 + 13 + 17). */
 private const val RADAR_RESTING_APPS = 44
 
-private sealed interface Row {
-    val key: String
-    data class Header(val title: String) : Row { override val key get() = "h:$title" }
-    data class App(val app: AppEntry) : Row { override val key get() = "a:${app.key}" }
-    data class Person(val c: ContactRow) : Row { override val key get() = "c:${c.hit.id}" }
-    data object AllowContacts : Row { override val key get() = "allow" }
-    data class Web(val row: WebRow, val index: Int) : Row { override val key get() = "w:$index" }
-    data class Hint(val text: String) : Row { override val key get() = "hint:$text" }
-}
-
-/**
- * Chips + the sectioned result list, for the overlay and for the always-on keyboard (which owns the
- * field and passes its text as [query]; [onQueryChange] is called when a chip rewrites it).
- */
-@Composable
-fun SearchResults(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    apps: List<AppEntry>,
-    recent: List<AppEntry>,
-    prefs: LauncherPrefs,
-    contacts: ContactSource?,
-    onLaunch: (AppEntry) -> Unit,
-    onLongPressApp: (AppEntry) -> Unit,
-    onOpenIntent: (Intent) -> Unit,
-    onRequestContactsPermission: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val wantContacts = prefs.searchContacts && contacts != null
-    val (rows, permitted) = rememberContactRows(query, contacts, wantContacts)
-
-    val trimmed = query.trim()
-    val ranked = remember(apps, query) { if (trimmed.isEmpty()) emptyList() else AppSearch.rank(apps, trimmed, limit = 8) }
-    val categories = remember(apps) { apps.map { AppSearch.categoryNameOf(it.packageName) }.distinct().sorted() }
-    val chips = remember(query, categories) { suggest(query, categories) }
-    val data = remember(query, ranked, rows, prefs.webEngine, prefs.searchWeb, prefs.searchContacts, permitted, wantContacts) {
-        sections(
-            trimmed, prefs.webEngine, ranked, if (wantContacts) rows else emptyList(),
-            searchWeb = prefs.searchWeb, searchContacts = wantContacts,
-            hasContactsPermission = permitted,
-        )
-    }
-    val list = remember(data, recent, trimmed) {
-        buildList<Row> {
-            if (trimmed.isEmpty()) {
-                if (recent.isNotEmpty()) {
-                    add(Row.Header(L10n.tr("Recent")))
-                    recent.take(8).forEach { add(Row.App(it)) }
-                }
-                add(Row.Hint(L10n.tr("Type to find apps, people and the web. Try kind: or used:today")))
-                return@buildList
-            }
-            for (kind in data.order) when (kind) {
-                SectionKind.Apps -> { add(Row.Header(L10n.tr("Apps"))); data.apps.forEach { add(Row.App(it)) } }
-                SectionKind.Contacts -> {
-                    add(Row.Header(L10n.tr("Contacts")))
-                    data.contacts.forEach { add(Row.Person(it)) }
-                    if (data.askContactsPermission) add(Row.AllowContacts)
-                }
-                SectionKind.Web -> { add(Row.Header(L10n.tr("Web"))); data.web.forEachIndexed { i, w -> add(Row.Web(w, i)) } }
-            }
-            if (data.order.isEmpty()) add(Row.Hint(L10n.tr("No matches for “%s”", trimmed)))
-        }
-    }
-
-    Column(modifier) {
-        if (chips.isNotEmpty()) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
-            ) {
-                chips.forEach { s -> SuggestionChip(s) { onQueryChange(s.insertion) } }
-            }
-        }
-        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-            items(list, key = { it.key }) { row ->
-                when (row) {
-                    is Row.Header -> Text(
-                        row.title.uppercase(), color = HyleColors.InkDim, fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp,
-                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp, start = 4.dp),
-                    )
-                    is Row.Hint -> Text(row.text, color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(top = 16.dp, start = 4.dp))
-                    is Row.App -> AppRow(row.app, onLaunch, onLongPressApp)
-                    is Row.Person -> PersonRow(row.c, onOpenIntent)
-                    Row.AllowContacts -> SimpleRow(Glyphs.Person, L10n.tr("Allow contacts to find people"), dim = true, onClick = onRequestContactsPermission)
-                    is Row.Web -> WebRowView(row.row, onOpenIntent, onQueryChange, query)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuggestionChip(s: Suggestion, onClick: () -> Unit) {
-    val accent = s.kind == SuggestionKind.Key || s.kind == SuggestionKind.Value
-    Text(
-        s.label,
-        color = if (accent) HyleColors.Violet else HyleColors.Ink,
-        fontSize = 13.sp,
-        maxLines = 1,
-        modifier = Modifier
-            .padding(end = 8.dp)
-            .background(HyleColors.Surface, RoundedCornerShape(50))
-            .border(1.dp, if (accent) HyleColors.Violet.copy(alpha = 0.5f) else HyleColors.Hairline, RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .semantics { role = androidx.compose.ui.semantics.Role.Button }
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun AppRow(app: AppEntry, onLaunch: (AppEntry) -> Unit, onLong: (AppEntry) -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = { onLaunch(app) }, onLongClick = { onLong(app) })
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-    ) {
-        AppIcon(app, 42.dp)
-        Text(app.label, color = HyleColors.InkBright, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 14.dp))
-    }
-}
-
-@Composable
-private fun PersonRow(c: ContactRow, onOpenIntent: (Intent) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 4.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f).clickable { onOpenIntent(ContactActions.openContact(c.hit)) },
-        ) {
-            Box(
-                Modifier.size(38.dp).background(HyleColors.VioletSoft, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(ContactLogic.initials(c.hit.name), color = HyleColors.InkBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Text(
-                c.hit.name, color = HyleColors.InkBright, fontSize = 15.sp, maxLines = 1,
-                overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp),
-            )
-        }
-        c.channels.forEach { ch ->
-            ChannelButton(ch) { ContactActions.intentFor(ch, c.hit)?.let(onOpenIntent) }
-        }
-    }
-}
-
 @Composable
 internal fun ChannelButton(ch: Channel, onClick: () -> Unit) {
     val glyph = when (ch) {
@@ -827,10 +700,10 @@ internal fun ChannelButton(ch: Channel, onClick: () -> Unit) {
         Channel.Telegram -> TelegramGlyph
         Channel.Signal -> SignalGlyph
     }
-    val desc = when (ch) {
+    val desc = L10n.tr(when (ch) {
         Channel.Call -> "Call"; Channel.Sms -> "Message"; Channel.Email -> "Email"
         Channel.WhatsApp -> "WhatsApp"; Channel.Telegram -> "Telegram"; Channel.Signal -> "Signal"
-    }
+    })
     Box(
         Modifier
             .padding(start = 5.dp)
@@ -842,29 +715,6 @@ internal fun ChannelButton(ch: Channel, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(glyph, desc, tint = HyleColors.Violet, modifier = Modifier.size(16.dp))
-    }
-}
-
-@Composable
-internal fun SimpleRow(icon: ImageVector, text: String, dim: Boolean = false, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
-    ) {
-        Icon(icon, null, tint = if (dim) HyleColors.InkDim else HyleColors.Violet, modifier = Modifier.size(20.dp))
-        Text(
-            text, color = if (dim) HyleColors.InkDim else HyleColors.InkBright, fontSize = 14.sp, maxLines = 1,
-            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 14.dp),
-        )
-    }
-}
-
-@Composable
-private fun WebRowView(row: WebRow, onOpenIntent: (Intent) -> Unit, onQueryChange: (String) -> Unit, query: String) {
-    when (row) {
-        is WebRow.Open -> SimpleRow(Glyphs.Globe, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
-        is WebRow.Search -> SimpleRow(Glyphs.Search, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
-        is WebRow.PlayStore -> SimpleRow(Glyphs.Apps, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
     }
 }
 

@@ -4,6 +4,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -459,27 +461,37 @@ internal fun ResultStrip(
 ) {
     val z = LocalResultScale.current
     val selectedKey = LocalRadarSelection.current
+    // Wave 22 (audit): every pill is a 48 dp high labelled button (the pill keeps its look inside it), and the strip grows with a big text
+    // size instead of clipping the pill (it used to be a fixed 52 dp high with 6 dp padding, so a 34 dp pill was the target).
     androidx.compose.foundation.layout.Row(
-        modifier.fillMaxWidth().height(RadarStripHeight).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier.fillMaxWidth().heightIn(min = RadarStripHeight).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         tiles.forEach { t ->
-            Text(
-                t.caption(), color = Color.White, fontSize = (13 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 260.dp).radarSelectedRing(selectedKey == t.key, androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x33FFFFFF))
+            Box(
+                Modifier.heightIn(min = 48.dp)
                     .secondaryClick { actions.onSecondary(t) }
                     .combinedClickable(onClick = { actions.onTap(t) }, onLongClick = { actions.onLongPress(t) })
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
-            )
+                    .semantics { role = Role.Button},
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    t.caption(), color = Color.White, fontSize = (13 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 260.dp).radarSelectedRing(selectedKey == t.key, androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x33FFFFFF))
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                )
+            }
         }
         if (filenames != null) {
-            Text(
-                filenames, color = Color(0xCCFFFFFF), fontSize = (13 * z).sp, maxLines = 1,
-                modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x1FFFFFFF)).clickable(onClick = onFilenames)
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
-            )
+            Box(Modifier.heightIn(min = 48.dp).clickable(onClick = onFilenames).semantics { role = Role.Button }, contentAlignment = Alignment.Center) {
+                Text(
+                    filenames, color = Color(0xCCFFFFFF), fontSize = (13 * z).sp, maxLines = 1,
+                    modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x1FFFFFFF))
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                )
+            }
         }
     }
 }

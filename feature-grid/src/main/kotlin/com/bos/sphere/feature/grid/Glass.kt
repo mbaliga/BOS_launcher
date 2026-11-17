@@ -1,6 +1,5 @@
 package com.bos.sphere.feature.grid
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.clickable
@@ -188,9 +187,6 @@ fun GlassField(
     )
 }
 
-/** A thin glass-coloured border for places that cannot draw behind (a Popup, a dialog): the same hairline, no gradient. */
-fun glassBorder(dark: Boolean = true): BorderStroke = BorderStroke(GlassSpec.Hairline, if (dark) Color(0x33FFFFFF) else Color(0x3314151A))
-
 private fun DrawScope.drawGlassOutline(outline: Outline, brush: Brush, style: DrawStyle = Fill) {
     when (outline) {
         is Outline.Rectangle -> drawRect(brush, outline.rect.topLeft, outline.rect.size, style = style)
@@ -244,7 +240,13 @@ internal object GlassShade {
         return hi
     }
 
-    /** The zones, in dp, where Radar's glass sits on a [wDp] x [hDp] screen: the top bar (field, Close) and the bottom centre (the mic). */
+    /**
+     * The zones, in dp, where Radar's glass sits on a [wDp] x [hDp] screen: the top bar (field, Close) and the bottom centre (the mic).
+     * Wave 22 (audit): these are the positions with no status-bar inset and the keyboard closed. The field really sits below the status bar
+     * and cutout and the mic rides above the keyboard; measured on the default pair, a top zone of 8 to 84 dp needs a shade of 0.77 (not
+     * 0.37) and a mic zone from 140 dp above the bottom needs 0.46, from 300 dp 0.64 (not 0.40). They are NOT applied: that would turn the
+     * default glass much darker, which is the owner's call (docs/status/w22-auditGlass.md).
+     */
     internal fun topZone(wDp: Float) = floatArrayOf(16f, wDp - 12f, 8f, 60f)
     internal fun bottomZone(wDp: Float, hDp: Float) = floatArrayOf(wDp / 2 - 28f, wDp / 2 + 28f, hDp - 64f, hDp - 8f)
 

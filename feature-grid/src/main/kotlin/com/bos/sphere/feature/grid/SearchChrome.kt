@@ -176,38 +176,15 @@ internal fun CategoryWheel(
     }
 }
 
-@Composable
-internal fun BlinkingCaret(height: Dp, color: Color = Color.White, modifier: Modifier = Modifier) {
-    // NFR-14: with system animations off the caret stays solid instead of blinking.
-    val still = com.bos.sphere.core.design.rememberMotionPrefs().reduced
-    val t = if (still) null else rememberInfiniteTransition(label = "caret").animateFloat(0f, 1f, infiniteRepeatable(tween(1060, easing = LinearEasing)), label = "c")
-    Box(modifier.padding(start = 2.dp).width(2.dp).height(height).graphicsLayer { alpha = if (t == null || t.value < 0.5f) 1f else 0f }.background(color))
-}
-
 /**
- * SEARCH, or the typed query once there is one (large, light) with a blinking caret and a clear
- * button. Sits left of the wheel, right-aligned against it.
+ * The "SEARCH" label left of the wheel at rest, right-aligned against it; a tap raises the keyboard. Wave 22 (audit): the typed-query
+ * branch (a large query with a blinking caret and its own clear button) belonged to the old bottom field layout and was never drawn
+ * once the one glass field moved to the top, so it and the caret were removed.
  */
 @Composable
-internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
+internal fun QueryDisplay(onTap: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier.height(WheelHeight).clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onTap), contentAlignment = Alignment.CenterEnd) {
-        if (query.isEmpty()) {
-            Text(L10n.tr("SEARCH"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End) {
-                Box(
-                    Modifier.size(28.dp).clip(CircleShape).background(Color(0x33FFFFFF)).clickable(onClick = onClear),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Glyphs.Close, L10n.tr("Clear"), tint = Color.White, modifier = Modifier.size(14.dp)) }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    query, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Light, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End, lineHeight = 32.sp,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                BlinkingCaret(30.dp)
-            }
-        }
+        Text(L10n.tr("SEARCH"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
     }
 }
 

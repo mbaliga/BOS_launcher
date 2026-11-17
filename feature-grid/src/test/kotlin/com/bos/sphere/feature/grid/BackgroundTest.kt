@@ -15,7 +15,8 @@ class BackgroundTest {
         assertEquals(24, BackgroundPresets.solids.size)
         assertEquals(20, BackgroundPresets.gradients.size)
         assertEquals(15, BackgroundPresets.textures.size)
-        assertEquals(13, BackgroundPresets.lives.size)
+        // PAL-24: 14 since the Breathing dots scene joined the live list.
+        assertEquals(14, BackgroundPresets.lives.size)
         assertEquals(listOf("horizon"), BackgroundPresets.pictures.map { it.id })
     }
 
@@ -84,9 +85,9 @@ class BackgroundTest {
 
     @Test fun liveListKeepsOldIdsAndAddsNew() {
         val ids = BackgroundPresets.lives.map { it.id }
-        assertEquals(13, ids.size)
+        assertEquals(14, ids.size)
         assertEquals(listOf("aurora", "starfield", "waves", "fireflies", "nebula", "rain", "ribbon", "bokeh"), ids.take(8))
-        assertEquals(listOf("lava", "snow", "matrix", "orbits", "plasma"), ids.drop(8))
+        assertEquals(listOf("lava", "snow", "matrix", "orbits", "plasma", "breathing-dots"), ids.drop(8)) // PAL-24 appended the last
         assertEquals(ids, BackgroundPresets.allIds(BackgroundKind.Live))
         assertTrue(BackgroundPresets.allIds(BackgroundKind.Black).isEmpty())
     }

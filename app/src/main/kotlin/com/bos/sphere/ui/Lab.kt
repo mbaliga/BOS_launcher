@@ -83,8 +83,24 @@ fun rememberLabEntries(inputs: CapabilityInputs, results: SnapshotStateMap<Strin
             val text = com.bos.sphere.feature.grid.OrbitFeelCapture.snippet(com.bos.sphere.feature.grid.OrbitFeel.current)
             runCatching { app.getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Orbit feel defaults", text)) }
             put("feel:export", "Copied. Paste over the defaults in OrbitFeelValues, then commit:\n$text")
-        }) + listOf(
+        }) + radarSignalLabEntries(app) { k, v -> put(k, v) } + listOf(
             LabEntry("input", "Input devices", "keyboard=${inputs.hasKeyboard} pointer=${inputs.hasPointer} controller=${inputs.hasController}", null),
+        )
+    }
+}
+
+/**
+ * PAL-24 (CFG-17): one row per signal state the Radar background can be forced into, so every state can be seen on a phone
+ * with one tap; "Live" goes back to the phone's real connectivity. The Lab category itself is gated by LabGate (debug and alpha builds).
+ */
+internal fun radarSignalLabEntries(app: Context, remember: (String, String) -> Unit = { _, _ -> }): List<LabEntry> {
+    val store = com.bos.sphere.core.data.LauncherStores.get(app).prefs
+    val current = store.prefs.value.radarSignalForce
+    return com.bos.sphere.core.data.SignalForce.entries.map { f ->
+        LabEntry(
+            "radarSignal:${f.name}", "Radar signal: ${f.label}",
+            if (f == current) "Showing now. Open Radar to look." else "Tap to force the Radar background to this state" + if (f == com.bos.sphere.core.data.SignalForce.Live) " (the phone's real connectivity)" else "",
+            { store.update { it.copy(radarSignalForce = f) }; remember("radarSignalForce", f.name) },
         )
     }
 }

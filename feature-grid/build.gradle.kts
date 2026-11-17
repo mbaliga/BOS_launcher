@@ -53,6 +53,7 @@ dependencies {
     implementation(project(":search-engine"))
     implementation(project(":core-catalog"))
     implementation(project(":core-capabilities"))
+    implementation(project(":core-signals"))
     implementation(project(":core-input"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

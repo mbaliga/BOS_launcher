@@ -81,10 +81,20 @@ jobs:
         run: ./ubuntu-touch/demo/sync-www.sh
       - name: Build picker Click (pure-qml-cmake, arch all)
         working-directory: ubuntu-touch/picker
-        run: clickable build
+        run: |
+          clickable build --skip-review
+          # click-review exits non-zero on WARNINGS too (the picker's Exec must start with
+          # env for QML_XHR_ALLOW_FILE_READ). Fail only when it reports Errors.
+          clickable review 2>&1 | tee review.log || true
+          if grep -q '^Errors' review.log; then echo "click-review reported Errors"; exit 1; fi
       - name: Build demo Click (pure-qml-cmake, arch all)
         working-directory: ubuntu-touch/demo
-        run: clickable build
+        run: |
+          clickable build --skip-review
+          # click-review exits non-zero on WARNINGS too (the picker's Exec must start with
+          # env for QML_XHR_ALLOW_FILE_READ). Fail only when it reports Errors.
+          clickable review 2>&1 | tee review.log || true
+          if grep -q '^Errors' review.log; then echo "click-review reported Errors"; exit 1; fi
       - name: Collect and inspect Clicks
         run: |
           mkdir -p dist

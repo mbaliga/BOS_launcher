@@ -13,6 +13,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
@@ -276,6 +278,8 @@ internal fun Orbit(
     onVisibleCount: (Int) -> Unit = {},
     /** Wave 18: a quiet line under the wheel while there is nothing to show yet ("Rings fill up as you use Radar"). */
     emptyHint: String? = null,
+    /** Wave 20: the TalkBack names of the tiers, innermost first (match tiers while a query is typed). */
+    tierNames: List<String> = RadarRings.tierNames,
 ) {
     // NFR-14: with system animations off the rings do not creep by themselves (a drag still turns them).
     val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
@@ -390,14 +394,14 @@ internal fun Orbit(
                 Modifier
                     .offset { IntOffset(cx.roundToInt(), (cy - radii[r]).roundToInt()) }
                     .size(1.dp)
-                    .semantics { heading(); contentDescription = L10n.tr(RadarRings.tierName(r)) },
+                    .semantics { heading(); contentDescription = L10n.tr(tierNames[r.coerceIn(0, tierNames.lastIndex)]) },
             )
         }
 
         shown.forEachIndexed { i, tile ->
             val (ring, baseAngle) = placements[i]
             val dir = if (ring % 2 == 1) -1.0 else 1.0
-            val tierDescription = L10n.tr(RadarRings.tierName(ring))
+            val tierDescription = L10n.tr(tierNames[ring.coerceIn(0, tierNames.lastIndex)])
             Column(
                 Modifier
                     .width(colW)
@@ -432,6 +436,49 @@ internal fun Orbit(
             Text(
                 emptyHint, color = Color.White.copy(alpha = 0.6f), fontSize = (13 * z).sp, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.TopCenter).offset { IntOffset(0, (cy + with(density) { (WheelHeight / 2 + 14.dp).toPx() }).roundToInt()) }.padding(horizontal = 32.dp),
+            )
+        }
+    }
+}
+
+/** Height of the typed Orbit's result strip; the rings are centred above it. */
+internal val RadarStripHeight = 52.dp
+
+/**
+ * Wave 20: the compact strip under the typed Orbit rings: the web hand-off rows (and a Filenames refinement when files can be
+ * searched) as one scrolling line of pills, so they stay one tap away and the rings keep the screen.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ResultStrip(
+    tiles: List<Tile>,
+    filenames: String?,
+    actions: TileActions,
+    onFilenames: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val z = LocalResultScale.current
+    val selectedKey = LocalRadarSelection.current
+    androidx.compose.foundation.layout.Row(
+        modifier.fillMaxWidth().height(RadarStripHeight).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tiles.forEach { t ->
+            Text(
+                t.caption(), color = Color.White, fontSize = (13 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 260.dp).radarSelectedRing(selectedKey == t.key, androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x33FFFFFF))
+                    .secondaryClick { actions.onSecondary(t) }
+                    .combinedClickable(onClick = { actions.onTap(t) }, onLongClick = { actions.onLongPress(t) })
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+            )
+        }
+        if (filenames != null) {
+            Text(
+                filenames, color = Color(0xCCFFFFFF), fontSize = (13 * z).sp, maxLines = 1,
+                modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x1FFFFFFF)).clickable(onClick = onFilenames)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
             )
         }
     }

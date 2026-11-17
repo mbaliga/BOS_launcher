@@ -79,19 +79,19 @@ class OrbitTypingW20UiTest {
         val tiles = orbitTiles()
         assertTrue("typed results are drawn on the rings", tiles.isNotEmpty())
         assertEquals("Bravo", tiles.first().first)
-        assertEquals("Most used", tiles.first().second)
+        assertEquals("Best match", tiles.first().second)
         // The Flat list's section header is not drawn: the Orbit is what stays.
         assertEquals(0, rule.onAllNodesWithText("Applications", substring = false).fetchSemanticsNodes().size)
         val headings = rule.onAllNodes(SemanticsMatcher("ring heading") { it.config.contains(SemanticsProperties.Heading) }).fetchSemanticsNodes()
             .map { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() }
-        assertEquals("Most used", headings.first())
+        assertEquals("Best match", headings.first())
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun PAL_07_typedOrbitRingOrderIsTheTileOrderTheKeysWalk() {
         open(SearchLayout.Orbit, "a") // Alpha, Bravo, Charlie, Delta, India ... all contain an a
         val names = orbitTiles().map { it.first }
-        val order = listOf("Most used", "Often used", "Sometimes", "Rarely")
+        val order = listOf("Best match", "Close", "Related", "Other")
         val tiers = orbitTiles().map { order.indexOf(it.second) }
         assertTrue(names.isNotEmpty())
         assertEquals("never back to an inner ring", tiers.sorted(), tiers)
@@ -112,4 +112,41 @@ class OrbitTypingW20UiTest {
         rule.mainClock.advanceTimeBy(600)
         assertTrue(rule.onAllNodesWithText("Bravo").fetchSemanticsNodes().isNotEmpty())
     }
+
+    private fun shoot(name: String) {
+        rule.mainClock.advanceTimeBy(600)
+        val view = rule.activity.findViewById<android.view.View>(android.R.id.content)
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        rule.runOnUiThread { view.draw(Canvas(bmp)) }
+        File(outDir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
+    fun PAL_18_stripKeepsTheWebRowsOneTapAwayBelowTheRingsPortraitDark() {
+        open(SearchLayout.Orbit, "bra")
+        rule.onAllNodesWithText("for “bra”", substring = true).fetchSemanticsNodes().let { assertTrue("web row on the strip", it.isNotEmpty()) }
+        // The engine hand-off is the first pill, the Play Store row after it.
+        val strip = SearchData(query = "bra", apps = emptyList(), contacts = emptyList(), askContacts = false,
+            web = com.bos.sphere.feature.search.sections("bra", LauncherPrefs().webEngine, emptyList<AppEntry>(), emptyList<ContactRow>(), searchWeb = true, searchContacts = false).web,
+            webFirst = false, hits = emptyMap(), askFiles = false, deepHint = false).stripTiles()
+        assertTrue((strip.first() as Tile.Web).row is com.bos.sphere.feature.search.WebRow.Search)
+        // The web rows are not rings tiles: no traversal index on them.
+        assertTrue(orbitTiles().none { it.first.startsWith("Search ") })
+        shoot("w20-typed-orbit-portrait-dark")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-notnight-xhdpi")
+    fun shot_typedOrbitPortraitLight() { open(SearchLayout.Orbit, "a"); assertTrue(orbitTiles().size >= 5); shoot("w20-typed-orbit-portrait-light") }
+
+    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi")
+    fun shot_typedOrbitLandscapeDark() {
+        open(SearchLayout.Orbit, "a")
+        assertTrue(orbitTiles().isNotEmpty())
+        assertEquals("Best match", orbitTiles().first().second)
+        assertTrue(rule.onAllNodesWithText("Search Play Store for", substring = true).fetchSemanticsNodes().isNotEmpty())
+        shoot("w20-typed-orbit-landscape-dark")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-notnight-xhdpi")
+    fun shot_typedOrbitLandscapeLight() { open(SearchLayout.Orbit, "bra"); assertTrue(orbitTiles().isNotEmpty()); shoot("w20-typed-orbit-landscape-light") }
 }

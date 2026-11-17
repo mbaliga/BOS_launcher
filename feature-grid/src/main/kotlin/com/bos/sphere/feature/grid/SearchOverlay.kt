@@ -328,6 +328,14 @@ internal fun SearchScreen(
         )
     }
     val selected: SearchCategory? = userCat
+    // Wave 20: the Orbit stays while typing: results on the rings by rank (stable between keystrokes), web hand-offs on the strip.
+    val orbitTyped = typing && layout == SearchLayout.Orbit
+    val lastRingKeys = remember { arrayOf<List<String>>(emptyList()) }
+    val ringTiles = remember(data, selected, orbitTyped) {
+        if (!orbitTyped) emptyList() else RadarRings.stableOrder(lastRingKeys[0], data.ringTiles(selected), { it.key })
+    }
+    val stripTiles = remember(data, orbitTyped) { if (orbitTyped) data.stripTiles() else emptyList() }
+    androidx.compose.runtime.SideEffect { lastRingKeys[0] = if (orbitTyped) ringTiles.map { it.key } else emptyList() }
     val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
 
     // ---- suggestions
@@ -392,8 +400,9 @@ internal fun SearchScreen(
     val setWheel: (SearchCategory?) -> Unit = { c -> userCat = c; expandedContact = null }
 
     // ---- keyboard (PAL-07): the same model walks Flat, Orbit and Filmstrip results.
-    val navTiles = remember(data, selected, flatMode, layout, orbitVisible) {
+    val navTiles = remember(data, selected, flatMode, layout, orbitVisible, orbitTyped, ringTiles, stripTiles) {
         if (flatMode) flatTiles(data, selected)
+        else if (orbitTyped) ringTiles.take(orbitVisible) + stripTiles
         else data.tiles(selected).let { if (layout == SearchLayout.Orbit) it.take(orbitVisible) else it }
     }
     val navNow = nav.withCount(navTiles.size)
@@ -472,7 +481,7 @@ internal fun SearchScreen(
                     // and the Filmstrip runs beneath it.
                     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                         val availH = maxHeight
-                        val below = if (layout == SearchLayout.Orbit) 0.dp else 182.dp // room the strip needs under the wheel
+                        val below = if (layout == SearchLayout.Orbit) (if (orbitTyped) RadarStripHeight else 0.dp) else 182.dp // room the strip needs under the wheel
                         val centre = ((availH - below) / 2).coerceAtLeast(WheelHeight / 2 + 8.dp)
                         val wheelRow: @Composable () -> Unit = {
                             // "SEARCH" ends just left of the centre line and the wheel starts just right of it.
@@ -490,9 +499,17 @@ internal fun SearchScreen(
                         }
                         if (layout == SearchLayout.Orbit) {
                             Orbit(
-                                tiles = data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
-                                actions = tileActions, centreFromBottom = centre, modifier = Modifier.fillMaxSize(),
+                                tiles = if (orbitTyped) ringTiles else data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
+                                actions = tileActions, centreFromBottom = centre,
+                                modifier = Modifier.fillMaxSize().padding(bottom = if (orbitTyped) RadarStripHeight else 0.dp),
                                 onVisibleCount = { orbitVisible = it }, emptyHint = emptyHint,
+                                tierNames = if (orbitTyped) RadarRings.queryTierNames else RadarRings.tierNames,
+                            )
+                            if (orbitTyped) ResultStrip(
+                                tiles = stripTiles,
+                                filenames = if (filesAvailable) L10n.tr("Filenames") else null,
+                                actions = tileActions, onFilenames = { setWheel(SearchCategory.Files); touched = true },
+                                modifier = Modifier.align(Alignment.BottomCenter),
                             )
                             Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
                             expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { ContactChannelBar(it, onOpenIntent) } }

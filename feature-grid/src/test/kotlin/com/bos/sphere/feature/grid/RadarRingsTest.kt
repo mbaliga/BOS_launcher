@@ -158,4 +158,48 @@ class RadarRingsTest {
         repeat(rings.size) { nav = RadarKeyboard.reduce(nav, RKey.Up).nav }
         assertEquals(0, nav.selected)
     }
+
+    @Test fun PAL_18_aTypedQueryNamesTheTiersByMatch() {
+        assertEquals(listOf("Best match", "Close", "Related", "Other"), RadarRings.queryTierNames)
+        assertEquals("Best match", RadarRings.tierName(0, query = true))
+        assertEquals("Other", RadarRings.tierName(7, query = true))
+        assertEquals("Most used", RadarRings.tierName(0))
+    }
+
+    private fun ids(n: Int) = List(n) { "k$it" }
+
+    @Test fun PAL_12_stableOrderKeepsTheBestMatchFirstAndRingsByRank() {
+        val ranked = ids(20)
+        val out = RadarRings.stableOrder(listOf("k3", "k2", "k1", "k0"), ranked, { it })
+        assertEquals("k0", out.first()) // Enter opens it
+        // Ring 0 is the five best by rank, whatever the old order; the ring-1 results stay behind them.
+        assertEquals(ranked.take(5).toSet(), out.take(5).toSet())
+        assertEquals(ranked.subList(5, 14).toSet(), out.subList(5, 14).toSet())
+        assertEquals(ranked.size, out.size)
+    }
+
+    @Test fun PAL_12_resultsKeepTheirPlaceFromOneKeystrokeToTheNext() {
+        val first = RadarRings.stableOrder<String>(emptyList(), listOf("a", "b", "c", "d", "e", "f", "g"), { it })
+        // The next keystroke ranks the same results differently and adds one; nobody changes ring except across the boundary.
+        val next = RadarRings.stableOrder(first, listOf("a", "x", "e", "d", "c", "b", "f", "g"), { it })
+        assertEquals("a", next.first())
+        val ring0 = next.take(5)
+        assertEquals(listOf("a", "x", "e", "d", "c").toSet(), ring0.toSet())
+        // b, c, d, e keep their old relative order inside the ring (b was before c before d before e) wherever they stay.
+        val kept = ring0.filter { it in setOf("c", "d", "e") }
+        assertEquals(listOf("c", "d", "e"), kept)
+        assertEquals(listOf("b", "f", "g").toSet(), next.drop(5).toSet())
+    }
+
+    @Test fun PAL_12_stableOrderWithOneOrNoResultsIsTheInput() {
+        assertEquals(emptyList<String>(), RadarRings.stableOrder<String>(listOf("a"), emptyList(), { it }))
+        assertEquals(listOf("a"), RadarRings.stableOrder(listOf("b"), listOf("a"), { it }))
+    }
+
+    @Test fun PAL_12_resultsBeyondEveryRingStayAtTheEndInRankOrder() {
+        val ranked = ids(60)
+        val out = RadarRings.stableOrder(ranked.reversed(), ranked, { it })
+        assertEquals(60, out.size)
+        assertEquals(ranked.drop(44), out.drop(44))
+    }
 }

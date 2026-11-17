@@ -143,6 +143,17 @@ internal class SearchData(
         return out
     }
 
+    /** Wave 20: the typed Orbit's ring results: [tiles] without the web hand-off rows, which sit on the result strip instead. */
+    fun ringTiles(cat: SearchCategory?): List<Tile> = tiles(cat).filter { it !is Tile.Web }
+
+    /** Wave 20: the web hand-off rows ("Search <engine> for ...", the page of a URL, the Play Store row) for the compact strip: the URL's own row, then the engine, then the app store. */
+    fun stripTiles(): List<Tile> {
+        if (blank) return emptyList()
+        val rows = tilesFor(SearchCategory.Web).filterIsInstance<Tile.Web>()
+        // The browser hand-off is the first pill (it is the tap people want, and the strip scrolls); the app store comes after it.
+        return rows.sortedBy { when (it.row) { is WebRow.Open -> 0; is WebRow.Search -> 1; is WebRow.PlayStore -> 2 } }
+    }
+
     private fun tilesFor(cat: SearchCategory): List<Tile> = when (cat) {
         SearchCategory.Apps -> apps.map { Tile.App(it, nesting.byApp[it.key].orEmpty()) }
         SearchCategory.Contacts -> buildList {

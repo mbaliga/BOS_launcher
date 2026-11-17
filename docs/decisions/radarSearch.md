@@ -47,4 +47,4 @@ Definition (`RadarRings.kt`, pure and tested):
 - Flat at rest used to show nothing; it now lists "Most used" apps and people in the same order. Filmstrip at rest uses the
   same order.
 
-Wave 20 (owner): typing now keeps the Orbit on screen when the Orbit is the layout in use (`RadarLayoutPolicy.showsFlatList`); the Filmstrip still gives way to the typed list, and the refinement suggestion chips (Filenames, Kinds) are only in the list views; the wheel scopes the Orbit.
+Wave 20 (owner): typing now keeps the Orbit on screen when the Orbit is the layout in use; see orbitTyping.md.

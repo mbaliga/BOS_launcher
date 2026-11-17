@@ -68,7 +68,38 @@ internal object RadarRings {
     /** The TalkBack names of the tiers, innermost first. These are L10n keys. */
     val tierNames: List<String> = listOf("Most used", "Often used", "Sometimes", "Rarely")
 
-    fun tierName(ring: Int): String = tierNames[ring.coerceIn(0, tierNames.lastIndex)]
+    /** Wave 20: while a query is typed the rings are match tiers, so the words say so (L10n keys, innermost first). */
+    val queryTierNames: List<String> = listOf("Best match", "Close", "Related", "Other")
+
+    fun tierName(ring: Int, query: Boolean = false): String =
+        (if (query) queryTierNames else tierNames).let { it[ring.coerceIn(0, it.lastIndex)] }
+
+    /** The full capacity of each ring (5, 9, 13, 17): the ring boundaries the typed order keeps stable against. */
+    val capacities: List<Int> = List(MAX_RINGS) { capacity(it) }
+
+    /**
+     * Wave 20 (PAL-12, PAL-18): [ranked] is the typed result order, best match first. The ring of each result is its rank's
+     * ring ([assign]); this only decides the order inside a ring so tiles keep their place from one keystroke to the next:
+     * a result that was on screen before stays ahead of newcomers in its ring, in its old order. The best match is always
+     * first (Enter opens it), and a result changes ring only when its rank crosses a ring boundary. Results no ring has room
+     * for follow in rank order.
+     */
+    fun <T> stableOrder(previous: List<String>, ranked: List<T>, key: (T) -> String, limits: List<Int> = capacities): List<T> {
+        if (ranked.size < 2) return ranked
+        val rings = assign(ranked.size, limits)
+        val before = previous.withIndex().associate { it.value to it.index }
+        val out = ArrayList<T>(ranked.size)
+        for (r in limits.indices) {
+            val members = ranked.withIndex().filter { rings.getOrNull(it.index) == r }
+            if (members.isEmpty()) continue
+            val pinned = if (r == 0) members.first() else null
+            val rest = members.filter { it !== pinned }.sortedWith(compareBy({ before[key(it.value)] ?: Int.MAX_VALUE }, { it.index }))
+            if (pinned != null) out += pinned.value
+            rest.forEach { out += it.value }
+        }
+        for (i in rings.size until ranked.size) out += ranked[i]
+        return out
+    }
 
     /** How many results each ring takes: its capacity, limited by [room] (how many of its slots fit on the screen). */
     fun limits(room: List<Int>): List<Int> = List(MAX_RINGS) { r -> minOf(capacity(r), room.getOrElse(r) { 0 }).coerceAtLeast(0) }

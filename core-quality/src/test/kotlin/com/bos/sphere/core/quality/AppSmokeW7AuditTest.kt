@@ -12,7 +12,7 @@ class AppSmokeW7AuditTest {
 
     @Test fun NFR_11_aRecreateInTheSameProcessIsNotCountedAsAStartByTheCrashLoopGuard() {
         assertTrue("a recreate hands the state back and must not count as a start",
-            main.contains("if (savedInstanceState == null) com.bos.sphere.core.data.CrashLoopGuard.onStart(this"))
+            main.contains("CrashLoopMath.countsAsStart(savedInstanceState != null, com.bos.sphere.core.data.CrashLoopGuard.countedInThisProcess)) com.bos.sphere.core.data.CrashLoopGuard.onStart(this")) // wave 20: the rule moved into the pure CrashLoopMath.countsAsStart (a recreate or a second start in the same process never counts)
         assertTrue(smoke.contains("NFR_11_aRecreateOfTheActivityInTheSameProcessIsNotTakenForACrashLoop"))
     }
 

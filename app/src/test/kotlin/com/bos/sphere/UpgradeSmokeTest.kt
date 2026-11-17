@@ -368,18 +368,59 @@ class UpgradeSmokeTest {
     }
 
     /**
-     * The finding about the owner's "stopped twice in a row": the loop guard counts STARTS that did not live 30 seconds, not crashes. Two
-     * starts with no exception anywhere (an install over a running launcher kills it and starts it again; so does the system reclaiming
-     * a launcher that has not been up for 30 seconds) put the third start in safe mode, with no crash report because there was no crash.
-     * Pinned here as the current behaviour, see docs/decisions/startupCrashes.md.
+     * The finding about the owner's "stopped twice in a row" (wave 18): the loop guard counted STARTS that did not live 30 seconds, not crashes.
+     * Wave 19 (the owner's decision, docs/decisions/startupCrashes.md): safe mode is for crashes. The same scenario, two quick starts with no
+     * exception anywhere (an install over the running launcher: the OS exit record is REASON_USER_REQUESTED or REASON_OTHER), is NOT safe mode.
+     * This test was named CFG_09_twoRapidStartsWithoutAnyCrashAreSafeModeToo and asserted the opposite.
      */
-    @Test fun CFG_09_twoRapidStartsWithoutAnyCrashAreSafeModeToo() {
+    @Test fun CFG_09_twoRapidStartsWithoutAnyCrashAreNotSafeMode() {
         prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
-        startAndSurvive(); scenario!!.close(); scenario = null
+        for (reason in listOf(null, android.app.ApplicationExitInfo.REASON_USER_REQUESTED, android.app.ApplicationExitInfo.REASON_OTHER, android.app.ApplicationExitInfo.REASON_LOW_MEMORY)) {
+            AppSmokeHarness.resetProcess()
+            AppSmokeHarness.previousProcessExit(reason)
+            startAndSurvive(); AppSmokeHarness.closeLikeAKill(scenario!!); scenario = null
+        }
         AppSmokeHarness.resetProcess()
+        AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_USER_REQUESTED)
         startAndSurvive()
-        assertTrue("no exception was thrown, yet the guard chose safe mode", CrashLoopGuard.safeMode)
-        assertFalse("and there is no report to show for it", CrashRecoveryHost.hasReport(app))
+        assertFalse("no crash anywhere, so no safe mode", CrashLoopGuard.safeMode)
+    }
+
+    @Test fun CFG_09_twoCountedCrashesInARowAreSafeMode() {
+        prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
+        startAndSurvive(); AppSmokeHarness.closeLikeAKill(scenario!!); scenario = null
+        for (n in 1..2) {
+            AppSmokeHarness.resetProcess()
+            AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_ANR)
+            startAndSurvive()
+            assertEquals("after crash $n", n == 2, CrashLoopGuard.safeMode)
+            AppSmokeHarness.closeLikeAKill(scenario!!); scenario = null
+        }
+    }
+
+    @Test fun CFG_09_theMarkerClearedByAStableRunMakesTheNextCrashTheFirstAgain() {
+        prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
+        startAndSurvive(); AppSmokeHarness.closeLikeAKill(scenario!!); scenario = null
+        AppSmokeHarness.resetProcess(); AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_CRASH)
+        startAndSurvive(); AppSmokeHarness.closeLikeAKill(scenario!!); scenario = null
+        CrashLoopGuard.onStable(app) // the run stayed up 30 s: the marker is gone
+        AppSmokeHarness.resetProcess(); AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_CRASH)
+        startAndSurvive()
+        assertFalse("a crash after a stable run is a first crash", CrashLoopGuard.safeMode)
+    }
+
+    @Test fun CFG_09_aCleanFinishClearsTheStartingMarker() {
+        prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
+        startAndSurvive(); scenario!!.close(); scenario = null // a real finish: onDestroy with isFinishing
+        assertTrue("marker cleared", app.getSharedPreferences("crash_loop", Context.MODE_PRIVATE).getBoolean("stable", false))
+    }
+
+    @Test fun CFG_09_theOldRapidStartCounterOfEarlierBuildsIsIgnored() {
+        prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
+        prefs("crash_loop") { putLong("last", System.currentTimeMillis()); putBoolean("stable", false); putInt("rapid", 5) }
+        AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_CRASH)
+        startAndSurvive()
+        assertFalse("an earlier build's rapid counter is not crash evidence", CrashLoopGuard.safeMode)
     }
 
     @Test fun CFG_09_noUpgradeShapeLeavesTheCrashLoopGuardInSafeMode() {

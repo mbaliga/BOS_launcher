@@ -51,6 +51,12 @@ object CrashRecoveryHost {
         if (src.exists()) src.copyTo(File(files(context), RETAINED), overwrite = true)
     }
 
+    /** Below API 30 (no exit history): a JVM crash report was written at or after [since], pending or already shown. */
+    fun reportSince(context: Context, since: Long): Boolean = runCatching {
+        File(files(context), LIBRARY_REPORT).takeIf { it.exists() }?.lastModified()?.let { it >= since } == true ||
+            File(files(context), RETAINED).takeIf { it.exists() }?.lastModified()?.let { it >= since } == true
+    }.getOrDefault(false)
+
     /** A report exists that safe mode can show (the library's pending one, or the last one shown before Continue). */
     fun hasReport(context: Context): Boolean = runCatching {
         CrashRecovery.pending(context) != null || File(files(context), RETAINED).exists()

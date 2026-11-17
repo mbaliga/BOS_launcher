@@ -20,8 +20,13 @@ class RecoveryDecisionTest {
         assertEquals(Screen.SafeMode, RecoveryDecision.screen(false, false, 5))
     }
 
-    @Test fun CFG_09_theLoopGuardStillDecidesOnItsOwn() {
+    @Test fun CFG_09_theLoopGuardStillDecidesOnItsOwn_nowFromCounted_crashesNotRapidStarts() {
         assertEquals(Screen.SafeMode, RecoveryDecision.screen(false, true, 0))
+    }
+
+    @Test fun CFG_09_theLibraryStreakPathIsUnchangedByTheGuardChange() {
+        assertEquals(Screen.Home, RecoveryDecision.screen(false, false, 1))
+        assertEquals(Screen.SafeMode, RecoveryDecision.screen(false, false, RecoveryDecision.LOOP_STREAK))
     }
 
     @Test fun CFG_09_theLoopStreakIsTwoMatchingTheLibrarysRepeatThreshold() {

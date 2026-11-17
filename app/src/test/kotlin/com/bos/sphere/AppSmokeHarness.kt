@@ -59,9 +59,26 @@ internal object AppSmokeHarness {
             LauncherInput.overlayOpen = false
         }
         HomeOpenRequests.folder.value = null
+        CrashLoopGuard.exitProbe = { null } // a fresh process: no exit record unless a test says one
         runCatching { // CrashLoopGuard.safeMode is a process value: a new process decides it again in onStart
             Class.forName("com.bos.sphere.core.data.CrashLoopGuard").getDeclaredField("safeMode").apply { isAccessible = true }.setBoolean(CrashLoopGuard, false)
         }
+    }
+
+    /**
+     * Ends the activity the way the OS ends a process: a real finish clears the guard's "starting" marker (a clean exit, CFG-09), a kill does not,
+     * so the marker is put back after the scenario closes.
+     */
+    fun closeLikeAKill(sc: androidx.test.core.app.ActivityScenario<*>) {
+        val sp = app.getSharedPreferences("crash_loop", android.content.Context.MODE_PRIVATE)
+        val saved = sp.all
+        sc.close()
+        sp.edit().clear().apply { for ((k, v) in saved) when (v) { is Long -> putLong(k, v); is Boolean -> putBoolean(k, v); is Int -> putInt(k, v) } }.commit()
+    }
+
+    /** Wave 19: what the OS exit history would say about the previous process (null: no record, as for a kill nobody recorded). */
+    fun previousProcessExit(reason: Int?) {
+        CrashLoopGuard.exitProbe = { if (reason == null) null else com.bos.sphere.core.data.CrashLoopMath.Exit(reason, System.currentTimeMillis() + 60_000) }
     }
 
     /** A new process over the same preference files: the first one lived past the crash-loop window. */

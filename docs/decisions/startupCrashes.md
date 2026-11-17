@@ -53,11 +53,23 @@ library's `maybeShowRecovery` and `captureExitDeath` (a few small files; it is t
 
 What the evidence does support, stated as a likely explanation and not a proven one:
 
-* `CrashLoopGuard` counts STARTS that did not stay up for 30 seconds, not crashes. `UpgradeSmokeTest.CFG_09_twoRapidStartsWithoutAnyCrashAreSafeModeToo` starts the launcher twice with no exception anywhere and gets
+* `CrashLoopGuard` counts STARTS that did not stay up for 30 seconds, not crashes. `UpgradeSmokeTest.CFG_09_twoRapidStartsWithoutAnyCrashAreSafeModeToo` (wave 18; now `...AreNotSafeMode`) started the launcher twice with no exception anywhere and gets
   safe mode on the second. An install over the running launcher kills the process and starts it again; installing two builds within half a minute, or the system reclaiming a launcher that had been up for less than 30 s, does the same. The screen's wording
   ("stopped twice in a row right after starting") is the guard's, whatever stopped it.
 * The screenshot showed safe mode with a snapshot from the same day (17/11/2026 14:10), which a stable start writes; before this wave there was no crash report path at all, so a real crash would also have shown only that screen.
 
 What would settle it: on the owner's phone, after this build, if safe mode appears again: "View crash report". A real crash shows the splash first and a report; safe mode with the plain line "No crash report was saved for this start" means two quick starts without a crash (the guard), or a kill with no record (Android 11 and up record native crashes, ANRs and crashes through the exit history, which the shared utility now reads).
 
-Recommendation, not done (it changes CFG-09 and needs the owner's call): make the guard count crashes (a recovery-screen report or a crash-shaped exit record) instead of starts, so that installs and system kills cannot put the launcher in safe mode.
+## Owner decision (wave 19): safe mode is for crashes
+
+The owner's intent follows from the screen's own text ("Liftoff stopped twice in a row right after starting") and CFG-09: safe mode is for a launcher that CRASHED. Counting rapid starts put a person in safe mode after
+an install over the running launcher, a Home press and relaunch, or an app replacement, with no crash and no report. That was a defect, so the recommendation above is now done.
+
+* `CrashLoopMath` no longer counts starts. `decide(prev, now, previousEndedInCrash)` counts crashes: the marker ("starting" with the start time, `lastWasStable = false`) must still be set AND `endedInCrash` must hold.
+* `endedInCrash` (pure): API 30 and up, the newest exit record of our process (`ActivityManager.getHistoricalProcessExitReasons`) at or after the marker time is REASON_CRASH, REASON_CRASH_NATIVE, REASON_ANR or REASON_INITIALIZATION_FAILURE.
+  REASON_USER_REQUESTED, REASON_OTHER (package replacement), REASON_USER_STOPPED, REASON_DEPENDENCY_DIED, low-memory kills, REASON_SIGNALED and the system removing the task never count. Below API 30 (the app's minSdk is 31, so this is defensive) a start counts only when a JVM crash report was written since the marker.
+* Two counted crashes, the second run having died within 30 seconds of its start, give safe mode. A slower crash restarts the streak at one; any start that follows no crash resets it to zero.
+* The marker is cleared by 30 s of stability (`onStable`) and by a clean finish (`MainActivity.onDestroy` with `isFinishing`). The library streak path (`consecutiveCount >= 2`) is unchanged.
+* The old "rapid" preference is ignored, so a marker an earlier build left cannot be read as a crash.
+* The Safe mode text stays true: it now appears only after two crashes. Tests: `CrashLoopMathTest`, `UpgradeSmokeTest.CFG_09_twoRapidStartsWithoutAnyCrashAreNotSafeMode` (the exact scenario found, which asserted the opposite before), `AppSmokeTest.NFR_11_aRestartInSafeModeNeverRestoresAndKeepsTheRecord`.
+

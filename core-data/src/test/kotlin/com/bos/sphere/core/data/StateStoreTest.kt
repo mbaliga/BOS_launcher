@@ -80,14 +80,18 @@ class StateStoreTest {
         assertTrue(SafeMode.widgetsEnabled(false))
     }
 
+    // Wave 19: was "two starts within 30 seconds enter safe mode" (it counted starts, not crashes). Now two CRASHED starts do.
     @Test
-    fun CFG_09_twoStartsWithin30SecondsEnterSafeMode() {
-        val (s1, safe1) = CrashLoopMath.decide(null, 0)
+    fun CFG_09_twoCrashedStartsWithin30SecondsEnterSafeMode() {
+        val (s1, safe1) = CrashLoopMath.decide(null, 0, false)
         assertFalse(safe1)
-        val (_, safe2) = CrashLoopMath.decide(s1, 20_000)
-        assertTrue(safe2)
-        val (_, safe3) = CrashLoopMath.decide(CrashLoopMath.markStable(s1), 20_000)
-        assertFalse(safe3)
+        val (s2, safe2) = CrashLoopMath.decide(s1, 20_000, true)
+        assertFalse(safe2)
+        val (_, safe3) = CrashLoopMath.decide(s2, 25_000, true)
+        assertTrue(safe3)
+        val (_, safe4) = CrashLoopMath.decide(CrashLoopMath.markStable(s2), 25_000, true)
+        assertFalse(safe4)
+        assertFalse("two quick starts without a crash are not safe mode", CrashLoopMath.decide(s1, 20_000, false).second)
     }
 
     // ---- build 31 bridge ----------------------------------------------------------------------

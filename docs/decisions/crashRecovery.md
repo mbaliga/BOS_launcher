@@ -47,7 +47,7 @@ Next start, in order:
    deletes the report and continues. Copy, Save file, Email and WhatsApp act on the user's tap and leave the report in place. **Reset Liftoff's data** is
    offered only when the library's streak is 2 or more.
 4. The relaunched `MainActivity` finds no report, so it runs on. After `CrashLoopGuard.onStart` it asks `RecoveryDecision.screen(false, guardSaysSafe, streak)`
-   (pure, in core-data). Safe mode when `CrashLoopGuard.safeMode` (two starts within 30 s with no 30 s stable run between) OR the library's
+   (pure, in core-data). Safe mode when `CrashLoopGuard.safeMode` (wave 19: two counted crashes, the second within 30 s of its start; before wave 19 it was two rapid starts, see `startupCrashes.md`) OR the library's
    `consecutiveCount` is at least 2 (the app crashed again within a minute of the previous crash, after the user had the recovery screen).
    Otherwise the normal home.
 5. **Safe mode** is unchanged for its purpose: widgets and extras off, the plain app grid, "Restore last snapshot", "Carry on". It gains one
@@ -62,7 +62,7 @@ What resets what:
 | pending report (`crash_recovery_report.txt`) | Continue, Discard (library) |
 | copy for safe mode (`crash_recovery_last_shown.txt`) | overwritten by the next shown report; never uploaded; excluded from backup |
 | library streak | a normal (non safe mode) start that stays up 30 s (`MainActivity` stable timer, `CrashRecovery.clearStreak`); "Carry on" and "Restore" in safe mode; the library's own reset |
-| `CrashLoopGuard` rapid count | the same 30 s stable timer; "Carry on" and "Restore" in safe mode |
+| `CrashLoopGuard` crash count and "starting" marker | the same 30 s stable timer, a clean finish of `MainActivity`; "Carry on" and "Restore" in safe mode |
 | exit-history watermark | advanced by the library for each native / ANR death it reports, and by `CrashRecoveryHost` past the OS exit record of a JVM crash (see next section) |
 
 Streak window: the library counts crashes within 60 s of each other. A user who reads the report for longer than a minute and then crashes
@@ -107,4 +107,4 @@ reports are saved locally and shared by explicit action, which the local copy di
 ## Not done, on purpose
 
 * No device verification (see `docs/device-checklist.md`, section "Crash recovery screen and startup crashes").
-* The loop guard still counts starts, not crashes (see `docs/decisions/startupCrashes.md`).
+* (Done in wave 19, owner decision) the loop guard counted starts, not crashes; it now counts crashes from the exit record (see `docs/decisions/startupCrashes.md`).

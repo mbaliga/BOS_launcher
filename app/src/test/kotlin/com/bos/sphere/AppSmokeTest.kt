@@ -258,11 +258,17 @@ class AppSmokeTest {
         val sc = start(restoreSurfaces = true)
         key(sc, KeyEvent.KEYCODE_D, ctrl = true)
         assertEquals(OpenSurface.Drawer, OpenSurfaceStore.get(AppSmokeHarness.app).last())
-        sc.close(); scenario = null
-        // no stable start in between: this start follows the last one within the crash-loop window, which is safe mode
+        AppSmokeHarness.closeLikeAKill(sc); scenario = null
+        // Wave 19 (was: any rapid start): the previous run crashed within the window, and the run before it was a start with no stable run: safe mode.
+        // Two counted crashes are needed, so the first crash is recorded by an earlier start.
         AppSmokeHarness.resetProcess()
+        AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_CRASH)
         scenario = AppSmokeHarness.launch(); rule.waitForIdle()
-        assertTrue("the guard put this start in safe mode", CrashLoopGuard.safeMode)
+        AppSmokeHarness.closeLikeAKill(scenario!!); scenario = null
+        AppSmokeHarness.resetProcess()
+        AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_CRASH)
+        scenario = AppSmokeHarness.launch(); rule.waitForIdle()
+        assertTrue("two counted crashes put this start in safe mode", CrashLoopGuard.safeMode)
         assertFalse("safe mode never restores a surface", drawerOpen())
         assertEquals("the record is kept for the next normal start", OpenSurface.Drawer, OpenSurfaceStore.get(AppSmokeHarness.app).last())
     }

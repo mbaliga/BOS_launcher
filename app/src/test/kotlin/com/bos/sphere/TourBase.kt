@@ -65,7 +65,7 @@ abstract class TourBase {
     protected fun settingsShown() = descShown("Close settings")
     protected fun quickSheetShown() = textShown("HOME LANDING")
     protected fun editShown() = descShown("Page carousel")
-    protected fun controlsShown() = descShown("Next track")
+    protected fun controlsShown() = descShown("Next")
 
     enum class Surface { Home, Launchpad, Recents, Radar, Drawer, Settings, QuickSheet, Edit }
 

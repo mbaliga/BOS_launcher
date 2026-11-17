@@ -231,7 +231,6 @@ internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End, lineHeight = 32.sp,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                BlinkingCaret(30.dp)
             }
         }
     }

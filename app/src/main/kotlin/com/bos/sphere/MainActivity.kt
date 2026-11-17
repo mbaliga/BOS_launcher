@@ -58,8 +58,8 @@ class MainActivity : ComponentActivity() {
         com.bos.sphere.feature.grid.LauncherShortcuts.reload(this) // INP-10: saved key bindings, read off the main thread
         // CFG-09: the start is recorded first (the "starting" marker); a crash below counts towards safe mode on the NEXT start, if the exit record says crash.
         com.bos.sphere.feature.desktop.DesktopController.get(this).start()
-        // A recreate in the same process (state handed back) is a configuration change, not a restart after a crash: it is not a start.
-        if (savedInstanceState == null) com.bos.sphere.core.data.CrashLoopGuard.onStart(this, jvmReportSince = { com.bos.sphere.CrashRecoveryHost.reportSince(this, it) })
+        // A recreate in the same process is a configuration change, not a start; a saved state in a NEW process (after a crash) still is one.
+        if (com.bos.sphere.core.data.CrashLoopMath.countsAsStart(savedInstanceState != null, com.bos.sphere.core.data.CrashLoopGuard.countedInThisProcess)) com.bos.sphere.core.data.CrashLoopGuard.onStart(this, jvmReportSince = { com.bos.sphere.CrashRecoveryHost.reportSince(this, it) })
         // Second layer: the user continued past the recovery screen and the app crashed again (streak >= 2): safe mode as well.
         if (com.bos.sphere.core.data.RecoveryDecision.screen(false, com.bos.sphere.core.data.CrashLoopGuard.safeMode, com.bos.sphere.CrashRecoveryHost.liveStreak(this)) == com.bos.sphere.core.data.RecoveryDecision.Screen.SafeMode) com.bos.sphere.core.data.CrashLoopGuard.enterSafeMode()
         // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).

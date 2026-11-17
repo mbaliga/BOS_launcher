@@ -19,6 +19,14 @@ Nothing here was run on a device. Statuses are the audit's view of the code and 
 | PAL-21 | built | Unchanged: no network class in Radar or the engine (tests assert). |
 | INP-12 | partial | Gap found and stated, owner decision needed: Radar calls `keyboard.show()` on every open regardless of the per-orientation option (default off), so the option only governs the drawer's filter field. Focus lands in the field on open (tested for all layouts and both orientations, so a hardware keyboard types at once). Changing Radar to honour the option would stop the keyboard rising by default; that was not done without the owner. Soft keyboard behaviour is device-only. |
 
+## Second-pass review (adversarial)
+
+Verified the first-pass fixes: `liveStreak` reads the library's `count<TAB>millis` file format exactly (library window is 60 s, so the 30 min cap only expires stale streaks); the `0 until WINDOW_MS` clock fix and the `forgottenAt` stamp (and its clamp to now) are right and their tests fail without them; the stamp survives `ContactHabits.clear` only because it is written after it (order matters, kept). Found and fixed one real defect the first pass missed:
+
+- CFG-09: `MainActivity` skipped `CrashLoopGuard.onStart` whenever `savedInstanceState != null`. The system hands a saved state to the first activity of a NEW process after a crash or a low-memory kill (the home was stopped earlier, so it has one), so exactly the restarts after a crash were not recorded and the loop was never counted. It now counts a start unless it is a recreate inside a process that already counted one (`CrashLoopMath.countsAsStart`, `CrashLoopGuard.countedInThisProcess`; test `CFG_09_aSavedStateInANewProcessAfterACrashIsStillAStartButARotationIsNot`).
+
+Observed, not changed: the resting Radar loads `forgottenAt` asynchronously, so its very first frame after open may rank with the pre-reset launch log for a moment; the Lab "Crash on purpose" row stays visible in release builds while `LAB_VISIBLE` is its alpha default (owner flips it before a public build, CFG-17); `docs/SPEC_STATUS.md` still has stale PAL-13 / PAL-19 text (owner-merged file). `docs/TEST_COVERAGE.md` was regenerated from the sources again, so every row names an existing test.
+
 ## Hunt results
 
 - Crash-recovery handler order: ledger handler wraps the library handler (library installed first); both run for every uncaught exception. No init runs before `install` in our `Application`; ContentProvider and androidx.startup initialisers do, which the OS exit record covers on the next start.

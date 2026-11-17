@@ -127,4 +127,11 @@ class CrashLoopMathTest {
         val counted = all.filter { CrashLoopMath.endedInCrash(34, State(0, false, 0), CrashLoopMath.Exit(it, 1), false) }.toSet()
         assertEquals(setOf(Exit.REASON_ANR, Exit.REASON_CRASH, Exit.REASON_CRASH_NATIVE, Exit.REASON_INITIALIZATION_FAILURE), counted)
     }
+
+    @Test fun CFG_09_aSavedStateInANewProcessAfterACrashIsStillAStartButARotationIsNot() {
+        assertTrue(CrashLoopMath.countsAsStart(hasSavedState = false, alreadyCountedInThisProcess = false))
+        assertTrue("restored by the system into a new process", CrashLoopMath.countsAsStart(hasSavedState = true, alreadyCountedInThisProcess = false))
+        assertFalse("a rotation in the same process", CrashLoopMath.countsAsStart(hasSavedState = true, alreadyCountedInThisProcess = true))
+        assertTrue(CrashLoopMath.countsAsStart(hasSavedState = false, alreadyCountedInThisProcess = true))
+    }
 }

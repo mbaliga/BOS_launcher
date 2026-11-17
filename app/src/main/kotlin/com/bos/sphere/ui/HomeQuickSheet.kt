@@ -81,6 +81,26 @@ fun HomeQuickSheet(
                 Text(com.bos.sphere.feature.grid.HomeLandingCopy.description(landing), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
             }
 
+            if (landing == com.bos.sphere.core.data.HomeLanding.Glance) {
+                // HOM-23: the Glance quick settings: content, hotspots and the background (Landing is above, Edit home pages below).
+                Heading(L10n.tr("Glance content"))
+                val cur = com.bos.sphere.core.data.GlanceContent.presetOf(prefs.glanceContent)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    for (pr in com.bos.sphere.core.data.GlancePreset.entries.filter { it != com.bos.sphere.core.data.GlancePreset.Custom }) {
+                        Chip(null, L10n.tr(pr.label), cur == pr) { update { it.copy(glanceContent = com.bos.sphere.core.data.GlanceContent.applyPreset(it.glanceContent, pr)) } }
+                    }
+                }
+                Heading(L10n.tr("Hotspots"))
+                val hc = com.bos.sphere.core.data.GlanceHotspots.presetOf(prefs.glanceHotspots)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    for (pr in com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }) {
+                        Chip(null, L10n.tr(pr.label), hc == pr) { update { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(pr) ?: it.glanceHotspots) } }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                BigButton(Modifier.fillMaxWidth(), Glyphs.Image, L10n.tr("Background"), onWallpaper)
+            }
+
             // HOM-21: the rows come from ContextMenus.forHomeSheet, the model touch, right-click and the Menu key share.
             val timeOn = prefs.clockPosition != ClockPosition.Hidden
             val batteryOn = StripItem.Battery in prefs.strip

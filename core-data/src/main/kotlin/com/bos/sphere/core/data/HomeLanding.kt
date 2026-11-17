@@ -11,15 +11,20 @@ enum class HomeLanding(val label: String) {
     Recents("Recent apps"),
     /** Every app alphabetically in the chosen home style, with the drawer's index and type-to-filter. */
     AllApps("All apps"),
-    /** Only the wallpaper and the four hotspots. */
-    Minimal("Minimal");
+    /** HOM-23: the Glance home (wave 16): the clock and date, the music line, the weather ambience and up to four hotspots. The enum name stays for stored values. */
+    Minimal("Glance");
 
     /** The next landing in the order above; the last wraps to the first (the "Cycle home landing" command). */
     fun next(): HomeLanding = entries[(ordinal + 1) % entries.size]
 
     companion object {
         /** A stored name, or [Selected] for a missing or unknown one (a newer build's value never breaks an older one). */
-        fun parse(name: String?): HomeLanding = entries.firstOrNull { it.name == name } ?: Selected
+        fun parse(name: String?): HomeLanding = parseOrNull(name) ?: Selected
+
+        fun parseOrNull(name: String?): HomeLanding? = if (name == "Glance") Minimal else entries.firstOrNull { it.name == name }
+
+        /** HOM-23: the Glance landing (the stored name is still "Minimal"). */
+        val Glance: HomeLanding get() = Minimal
     }
 }
 

@@ -147,7 +147,7 @@ class HomeLandingUiTest {
         rule.setContent { var cur by remember { mutableStateOf(HomeLanding.Selected) }; Box(Modifier.padding(16.dp).background(Color(0xFF16181F))) { LandingSegmented(cur, { cur = it; picked += it }) } }
         for (l in HomeLanding.entries) rule.onNodeWithContentDescription(l.label).assertIsDisplayed()
         rule.onNodeWithContentDescription("Selected apps").assertIsSelected()
-        rule.onNodeWithContentDescription("Minimal").performClick()
+        rule.onNodeWithContentDescription("Glance").performClick() // wave 16: the fourth landing is labelled Glance
         rule.onNodeWithContentDescription("Recent apps").performClick()
         assertEquals(listOf(HomeLanding.Minimal, HomeLanding.Recents), picked)
         shoot("segmented_portrait")

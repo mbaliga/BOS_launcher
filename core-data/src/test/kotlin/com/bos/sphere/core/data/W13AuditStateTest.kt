@@ -96,7 +96,7 @@ class W13AuditStateTest {
         assertEquals(30, back.recentsLimit)
         assertFalse(back.minimalHints)
         val old = SettingsCodec.decode(JSONObject().put("format", StateSchema.SETTINGS_FORMAT).put("version", 1)).prefs
-        assertEquals(HomeLanding.Selected, old.homeLanding)
+        assertEquals(HomeLanding.Glance, old.homeLanding) // wave 16: the default landing is Glance
     }
 
     @Test fun HOM_01_anImportedEmptyHomeOrAnyOtherSavedHomeIsNeverTakenForAFreshInstall() {

@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -49,14 +50,28 @@ class HomeLandingQuickSheetTest {
         rule.onNodeWithContentDescription("Recent apps").performClick()
         assertEquals(HomeLanding.Recents, seen.prefs.homeLanding)
         rule.onNodeWithContentDescription("Recent apps").assertIsSelected()
-        rule.onNodeWithContentDescription("Minimal").performClick()
+        rule.onNodeWithContentDescription("Glance").performClick() // wave 16: the fourth landing is labelled Glance
         assertEquals(HomeLanding.Minimal, seen.prefs.homeLanding)
     }
 
     @Test fun HOM_22_editHomePagesIsOfferedOnEveryLandingButSelectedApps() {
         val seen = Seen(); sheet(HomeLanding.Minimal, seen)
-        rule.onNodeWithText("Edit home pages").assertIsDisplayed().performClick()
+        // wave 16: the Glance quick sheet is longer (content and hotspot rows), so the entry is scrolled to before it is checked
+        rule.onNodeWithText("Edit home pages").performScrollTo().performClick()
         assertEquals(1, seen.edit)
+    }
+
+    @Test fun HOM_23_theGlanceQuickSheetOffersContentHotspotsBackgroundLandingAndEditHomePages() {
+        val seen = Seen(); sheet(HomeLanding.Glance, seen)
+        rule.onNodeWithText("GLANCE CONTENT").assertIsDisplayed()
+        rule.onNodeWithText("HOTSPOTS").performScrollTo().assertExists()
+        rule.onNodeWithText("Background").performScrollTo().assertExists()
+        rule.onNodeWithText("HOME LANDING").assertExists()
+        rule.onNodeWithText("Edit home pages").performScrollTo().assertExists()
+        rule.onNodeWithText("Date + Weather").performClick()
+        assertEquals(setOf(com.bos.sphere.core.data.GlanceItem.Date, com.bos.sphere.core.data.GlanceItem.Weather, com.bos.sphere.core.data.GlanceItem.NowPlaying), seen.prefs.glanceContent)
+        rule.onNodeWithText("Two (bottom)").performScrollTo().performClick()
+        assertEquals(setOf(com.bos.sphere.core.data.Corner.BottomLeft, com.bos.sphere.core.data.Corner.BottomRight), seen.prefs.glanceHotspots)
     }
 
     @Test fun HOM_22_selectedAppsKeepsItsOwnEditHomeEntry() {

@@ -375,14 +375,15 @@ class AppSmokeTest {
         assertTrue("the original page grid is back, nothing was lost", showsLabel("Camera"))
     }
 
-    @Test fun HOM_22_minimalShowsOnlyTheWallpaperAndTheFourHotspots() {
+    // Wave 16 (HOM-23): the fourth landing is the Glance home. The hotspot ids are unchanged; the clock is a focus node too, and the dots are gone.
+    @Test fun HOM_22_glanceShowsOnlyTheClockAndTheFourHotspotsOnTheGraph() {
         start()
         assertTrue(graphIds().any { it.startsWith("dock.app:") })
         setLanding(com.bos.sphere.core.data.HomeLanding.Minimal)
         val ids = graphIds()
-        assertEquals("exactly the four hotspots are on the focus graph", setOf("minimal.corner.TopLeft", "minimal.corner.TopRight", "minimal.corner.BottomLeft", "minimal.corner.BottomRight"), ids.toSet())
+        assertEquals("exactly the clock and the four hotspots are on the focus graph", setOf("glance.clock", "minimal.corner.TopLeft", "minimal.corner.TopRight", "minimal.corner.BottomLeft", "minimal.corner.BottomRight"), ids.toSet())
         assertFalse("no dock", ids.any { it.startsWith("dock.") })
-        for (l in listOf("Alpha", "Bravo", "Camera", "Delta")) assertFalse("no tile for $l", showsLabel(l))
+        for (l in listOf("Alpha", "Bravo", "Delta")) assertFalse("no tile for $l", showsLabel(l)) // wave 16: Camera is the top left hotspot's own action, so its name is on screen
         for (d in listOf("Top left hotspot", "Top right hotspot", "Bottom left hotspot", "Bottom right hotspot")) rule.onNodeWithContentDescription(d, substring = true).assertIsDisplayed()
         rule.onAllNodesWithContentDescription("Dock").fetchSemanticsNodes().let { assertTrue("the dock is not drawn", it.isEmpty()) }
         setLanding(com.bos.sphere.core.data.HomeLanding.Selected)
@@ -392,20 +393,22 @@ class AppSmokeTest {
     @Test fun HOM_22_aHotspotRunsItsAssignedAction() {
         val sc = start()
         setLanding(com.bos.sphere.core.data.HomeLanding.Minimal)
-        rule.onNodeWithContentDescription("Top left hotspot", substring = true).performClick(); settle()
-        assertTrue("the top left hotspot is Radar", radarOpen())
+        // wave 16: the Glance hotspots are the corner assignments as they are (the owner's reference: camera top left, music top right, apps bottom left, search bottom right)
+        rule.onNodeWithContentDescription("Bottom right hotspot", substring = true).performClick(); settle()
+        assertTrue("the bottom right hotspot is Radar", radarOpen())
         back(sc, manual = true)
         rule.onNodeWithContentDescription("Bottom left hotspot", substring = true).performClick(); settle()
         assertTrue("the bottom left hotspot opens all apps (the drawer or the puck, by style)", LauncherInput.focus.anyLayerActive)
     }
 
     @Test fun HOM_22_groundControlHomeHasALandingRowWithADescriptionForEachLanding() {
-        start()
+        val sc = start()
         setLanding(com.bos.sphere.core.data.HomeLanding.Minimal)
-        rule.onNodeWithContentDescription("Bottom right hotspot", substring = true).performClick(); settle()
+        rule.onNodeWithContentDescription("Top left hotspot", substring = true).assertIsDisplayed() // wave 16: Glance hotspots are the factory corners; settings come from Launchpad's neighbour, the quick sheet
+        AppSmokeHarness.press(sc, KeyEvent.KEYCODE_COMMA, ctrl = true); settle()
         rule.onNodeWithContentDescription("Home screen").performClick(); settle()
         assertTrue("the Home category has the landing row", rule.onAllNodesWithText("HOME LANDING").fetchSemanticsNodes().isNotEmpty())
-        for (d in listOf("Your own pages, folders and widgets", "The apps you opened most recently, newest first", "Every app from A to Z, with an index and type to filter", "Only the wallpaper and four corner hotspots"))
+        for (d in listOf("Your own pages, folders and widgets", "The apps you opened most recently, newest first", "Every app from A to Z, with an index and type to filter", "A quiet clock and date, the music playing, and up to four corner hotspots"))
             assertTrue("a one-line description: $d", rule.onAllNodesWithContentDescription(d, substring = true).fetchSemanticsNodes().isNotEmpty())
     }
 
@@ -419,7 +422,7 @@ class AppSmokeTest {
     @Test fun HOM_22_aFreshHomeOffersRecentAppsAsASecondLineAndTapSwitchesTheLanding() {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
         scenario = AppSmokeHarness.launch(); rule.waitForIdle(); settle()
-        LauncherStores.get(AppSmokeHarness.app).prefs.update { it.copy(onboardingDone = true) } // the fresh home, as in HOM_01 (EditCardAppTest)
+        LauncherStores.get(AppSmokeHarness.app).prefs.update { it.copy(onboardingDone = true, homeLanding = com.bos.sphere.core.data.HomeLanding.Selected) } // the fresh Selected apps home, as in HOM_01 (EditCardAppTest); wave 16: Glance is the default landing
         settle()
         rule.onNodeWithText("Or show recent apps").performClick(); settle()
         assertEquals(com.bos.sphere.core.data.HomeLanding.Recents, LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.homeLanding)

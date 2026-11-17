@@ -42,6 +42,8 @@ class W4MotionAuditTest {
             "GridHome.kt" to 3,
             // the edit card (HOM-12): one progress value read inside graphicsLayer; under reduced motion the card jumps and only the carousel cross-fades (160 ms)
             "EditCardGeometry.kt" to 1,
+            // the Glance surface indicator's fade (HOM-23): one alpha read in graphicsLayer, a 600 ms tween that is 0 ms under reduced motion
+            "GlanceHome.kt" to 1,
             // press spring already snaps under reduced motion (`still`)
         )
         val gatedFiles = setOf("ContinuousHome.kt", "SettingsSpace.kt", "HomeScreen.kt")

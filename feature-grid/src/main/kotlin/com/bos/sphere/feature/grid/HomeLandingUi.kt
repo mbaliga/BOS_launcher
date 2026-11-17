@@ -71,7 +71,7 @@ object HomeLandingCopy {
         HomeLanding.Selected -> L10n.tr("Your own pages, folders and widgets")
         HomeLanding.Recents -> L10n.tr("The apps you opened most recently, newest first")
         HomeLanding.AllApps -> L10n.tr("Every app from A to Z, with an index and type to filter")
-        HomeLanding.Minimal -> L10n.tr("Only the wallpaper and four corner hotspots")
+        HomeLanding.Minimal -> L10n.tr("A quiet clock and date, the music playing, and up to four corner hotspots")
     }
 
     fun label(l: HomeLanding): String = L10n.tr(l.label)
@@ -200,6 +200,9 @@ fun MinimalHotspotLayer(
     showHints: Boolean,
     onRun: (CornerItem, Corner) -> Unit,
     modifier: Modifier = Modifier,
+    /** HOM-23: draw the assigned action's glyph in the corner (the Glance home); off on the plain hotspot layer. */
+    showIcons: Boolean = false,
+    iconTint: Color = Color.White.copy(alpha = 0.6f),
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
@@ -212,6 +215,7 @@ fun MinimalHotspotLayer(
                         .semantics { role = Role.Button; contentDescription = spoken }
                         .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClickLabel = what) { onRun(h.item, h.screen) },
                 ) {
+                    if (showIcons) Box(Modifier.align(Alignment.Center)) { ItemGlyph(h.item, appsByKey, 24.dp, iconTint) }
                     if (showHints) {
                         val inset = 14.dp
                         Box(

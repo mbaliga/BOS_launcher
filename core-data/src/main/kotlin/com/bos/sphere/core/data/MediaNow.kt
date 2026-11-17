@@ -138,6 +138,9 @@ object MediaNow {
         _info.value = null
     }
 
+    /** Tests only: publishes [info] as if a session had reported it (Robolectric has no media sessions). */
+    fun publishForTest(info: MediaInfo?) { _info.value = info }
+
     fun playPause() {
         val c = current ?: return
         if (c.playbackState?.state?.let(MediaLogic::isPlaying) == true) c.transportControls.pause() else c.transportControls.play()

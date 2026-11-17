@@ -237,7 +237,17 @@ data class LauncherPrefs(
 
     // --- home landing (HOM-22)
     /** What the home shows: the user's pages, the recent apps, every app, or only the wallpaper and the four hotspots. */
-    val homeLanding: HomeLanding = HomeLanding.Selected,
+    val homeLanding: HomeLanding = HomeLanding.Glance,
+    /** HOM-23: which items the Glance home shows (time, date, weather, now playing, battery); default Time + Date + music. */
+    val glanceContent: Set<GlanceItem> = GlanceContent.DEFAULT,
+    /** HOM-23: which hotspots are on, by physical corner (default all four). */
+    val glanceHotspots: Set<Corner> = GlanceHotspots.ALL,
+    /** HOM-23: seconds of inactivity before the pop-in music controls pop out (2 to 10). */
+    val glanceControlsSeconds: Int = GlanceControls.DEFAULT_SECONDS,
+    /** HOM-23: strength of the weather ambience (Subtle default). */
+    val glanceWeatherIntensity: RadarIntensity = RadarIntensity.Subtle,
+    /** HOM-23: the small surface indicator at the bottom centre. */
+    val glanceIndicator: Boolean = true,
     /** How many recent apps the Recent landing keeps, [HomeRecents.MIN_LIMIT]..[HomeRecents.MAX_LIMIT]. */
     val recentsLimit: Int = HomeRecents.DEFAULT_LIMIT,
     /** Add apps opened elsewhere (usage access, when granted) to the Recent landing. */

@@ -253,7 +253,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val corners = com.bos.sphere.core.data.CornerSets.select(portraitCorners, landscapeCorners, prefs.cornersPerOrientation, isLandscape)
     // HOM-22: on the Minimal landing the four corners are the hotspots: a corner still on the factory assignment gets the Minimal default, an assigned one keeps its own.
     val landing = prefs.homeLanding
-    val activeCorners = if (HomeLandingRules.isHotspotOnly(landing)) MinimalHotspots.effective(corners) else corners
+    // HOM-23 (wave 16): the Glance home uses the corner assignments as they are (the factory set is the owner's reference: camera, music, apps, search).
+    val activeCorners = corners
     val capacityOf: (PageLayout) -> Int = { it.capacity(isLandscape, prefs) }
     // HOM-01 / HOM-02: folders, shortcuts, links and widget tiles share the pages with apps on every home style.
     val extrasStore = remember { com.bos.sphere.core.catalog.HomeExtrasStore.get(context) }
@@ -381,6 +382,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val placements = remember(activeCorners, rotation, prefs.cornersFollowDevice) {
         cornerPlacements(activeCorners, rotation, prefs.cornersFollowDevice)
     }
+
+    // HOM-23: the screen corners whose hotspot is on (the physical corner under each decides; a disabled hotspot draws nothing and does nothing).
+    val glanceOn = remember(prefs.glanceHotspots, rotation, prefs.cornersFollowDevice) { com.bos.sphere.core.data.GlanceHotspots.enabledOnScreen(prefs.glanceHotspots, rotation, prefs.cornersFollowDevice) }
+    val glanceHotspotItems = remember(placements, glanceOn) { placements.filter { it.screen in glanceOn }.mapNotNull { p -> com.bos.sphere.core.data.GlanceHotspots.itemOf(p.slot)?.let { com.bos.sphere.feature.grid.Hotspot(p.screen, it) } } }
 
     fun openAllApps(anchor: Corner?) {
         if (com.bos.sphere.feature.grid.AllAppsOpening.surfaceFor(prefs.drawerStyle) == com.bos.sphere.feature.grid.AllAppsSurface.Puck) {
@@ -566,12 +571,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         hotCornerDwellMs = if (prefs.hotCornersOn) prefs.hotCornerDwellMs.toLong() else 0L,
         cornerLabel = { hot ->
             val slot = placements.firstOrNull { it.screen == hot.toCorner() }?.slot
-            if (landing == HomeLanding.Minimal) slot?.let(MinimalHotspots::itemOf)?.let { com.bos.sphere.feature.grid.itemLabel(it, appsByKey) }
+            if (landing == HomeLanding.Glance) slot?.takeIf { hot.toCorner() in glanceOn }?.let(MinimalHotspots::itemOf)?.let { com.bos.sphere.feature.grid.itemLabel(it, appsByKey) }
             else slot?.takeIf { it is CornerSlot.Single }?.let { slotSummary(it, appsByKey) }
         },
         onCornerActivate = { hot ->
             placements.firstOrNull { it.screen == hot.toCorner() }?.let { p ->
-                if (landing == HomeLanding.Minimal) MinimalHotspots.itemOf(p.slot)?.let { runItem(it, p.screen) }
+                if (landing == HomeLanding.Glance) { if (p.screen in glanceOn) MinimalHotspots.itemOf(p.slot)?.let { runItem(it, p.screen) } }
                 else (p.slot as? CornerSlot.Single)?.let { runItem(it.item, p.screen) }
             }
         },
@@ -672,14 +677,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val indicatorTarget = IndicatorColors.argb(reading, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, prefs.indicatorInvert)
     val indicatorColor by androidx.compose.animation.animateColorAsState(Color(indicatorTarget.toInt()), com.bos.sphere.core.design.rememberMotionPrefs().gate(androidx.compose.animation.core.tween(800)), label = "indicator")
 
+    val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(prefs.mediaControls || (landing == HomeLanding.Glance && com.bos.sphere.core.data.GlanceItem.NowPlaying in prefs.glanceContent)) // STR-06, HOM-23: one media source for the strip and the Glance music line
+
     // ---- weather (opt-in; needs approximate location)
     val weatherSource = remember { WeatherSource(context) }
     val weather by weatherSource.weather.collectAsStateWithLifecycle()
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) weatherSource.refresh(force = true)
     }
-    LaunchedEffect(prefs.clockShowWeather) {
-        if (prefs.clockShowWeather) {
+    val weatherWanted = prefs.clockShowWeather || (landing == HomeLanding.Glance && com.bos.sphere.core.data.GlanceItem.Weather in prefs.glanceContent) // HOM-23: Glance weather is the one network user too
+    LaunchedEffect(weatherWanted) {
+        if (weatherWanted) {
             if (weatherSource.hasPermission()) weatherSource.refresh() else locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
         }
     }
@@ -687,7 +695,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val observer = LifecycleEventObserver { _, e ->
             if (e == Lifecycle.Event.ON_START) {
                 indicator.start()
-                if (prefs.clockShowWeather) weatherSource.refresh()
+                if (weatherWanted) weatherSource.refresh()
             }
             if (e == Lifecycle.Event.ON_STOP) indicator.stop()
         }
@@ -833,9 +841,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
     }
     @Composable
-    fun Background() {
+    fun Background(baseFill: Boolean = true) {
         // HOM-16 (wave 15): the two signal-driven slots; the same composable is behind every surface.
-        com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), baseFill = true)
+        com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), baseFill = baseFill)
         // NFR-15: keeps clock and labels at WCAG AA over whatever the background draws behind them.
         com.bos.sphere.feature.grid.HomeScrim(
             com.bos.sphere.feature.grid.rememberHomeScrim(com.bos.sphere.core.data.BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2), prefs.radarIntensity, com.bos.sphere.feature.grid.isDarkSurface()),
@@ -1001,7 +1009,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             val landingMotion = com.bos.sphere.core.design.rememberMotionPrefs()
             androidx.compose.animation.Crossfade(landing, Modifier.fillMaxSize(), animationSpec = tween(landingMotion.crossFadeMs(220)), label = "landing") { shown ->
             if (shown != HomeLanding.Selected) {
-                Background()
+                if (shown != HomeLanding.Glance) Background()
                 val look = com.bos.sphere.feature.grid.LandingLook(
                     style = prefs.homeStyle, columns = prefs.continuousColumns, scrollHorizontal = scrollHorizontal, padding = scrollPadding, iconScale = prefs.iconScale,
                     spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds, gestures = homeGestureSpec,
@@ -1024,12 +1032,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         Corners()
                     }
                     else -> {
-                        // Minimal: the wallpaper and the four hotspots, nothing else. The gesture layer keeps swipes, pinch, double tap and long press working.
-                        Box(Modifier.fillMaxSize().homeGestures(homeGestureSpec) { true })
-                        com.bos.sphere.feature.grid.MinimalHotspotLayer(
-                            hotspots = placements.mapNotNull { p -> MinimalHotspots.itemOf(p.slot)?.let { com.bos.sphere.feature.grid.Hotspot(p.screen, it) } },
-                            appsByKey = appsByKey, showHints = MinimalHotspots.hintsVisible(shown, prefs.minimalHints),
+                        // HOM-23: the Glance home: clock and date, the music line with pop-in controls, the weather ambience, the hotspots and the surface indicator.
+                        // The signal background and its scrim go in as the underlay, above the weather, so the glow lines and the dot grid stay readable over it.
+                        com.bos.sphere.feature.grid.GlanceSurface(
+                            prefs = prefs, weather = weather, media = mediaInfo,
+                            hotspots = glanceHotspotItems, appsByKey = appsByKey,
+                            rightDestinations = com.bos.sphere.core.data.RightSideDestinations.of(prefs.rightSide),
+                            hasLaunchpad = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off,
                             onRun = { item, screen -> runItem(item, screen) },
+                            onClockTap = { runner.run(CornerActionId.Clock) },
+                            onPrevious = { com.bos.sphere.core.data.MediaNow.previous() },
+                            onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() },
+                            onNext = { com.bos.sphere.core.data.MediaNow.next() },
+                            gestures = homeGestureSpec,
+                            underlay = { Background(baseFill = false) },
                         )
                     }
                 }
@@ -1157,7 +1173,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
 
         // Media controls: a track + prev / play / next strip while something is playing.
-        val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(prefs.mediaControls)
         androidx.compose.animation.AnimatedVisibility(
             visible = mediaInfo != null && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
@@ -1178,7 +1193,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
-            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && landing != HomeLanding.Minimal, // HOM-12, HOM-22: no dock on Minimal: the dock steps aside while the home is a card
+            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && (landing != HomeLanding.Glance || prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail), // HOM-12, HOM-23: no dock on Glance unless the right side is the dock rail: the dock steps aside while the home is a card
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,

@@ -30,19 +30,22 @@ class HomeLandingTest {
 
     // ---- the setting
 
-    @Test fun HOM_22_aFreshInstallKeepsSelectedAppsAndTheLandingIsPersistedByName() {
-        assertEquals(HomeLanding.Selected, LauncherPrefs().homeLanding)
+    // Wave 16 (HOM-23, owner request): the default landing is now Glance, so the next four tests assert that instead of Selected apps.
+    @Test fun HOM_22_aFreshInstallLandsOnGlanceAndTheLandingIsPersistedByName() {
+        assertEquals(HomeLanding.Glance, LauncherPrefs().homeLanding)
         val sp = MapSharedPreferences()
         val store = LauncherPrefsStore(sp)
-        store.update { it.copy(homeLanding = HomeLanding.Minimal) }
+        store.update { it.copy(homeLanding = HomeLanding.Recents) }
+        assertEquals("Recents", sp.getString("homeLanding", null))
+        assertEquals(HomeLanding.Recents, LauncherPrefsStore(sp).prefs.value.homeLanding)
+        store.update { it.copy(homeLanding = HomeLanding.Glance) } // the stored name of Glance stays "Minimal" for older readers
         assertEquals("Minimal", sp.getString("homeLanding", null))
-        assertEquals(HomeLanding.Minimal, LauncherPrefsStore(sp).prefs.value.homeLanding)
     }
 
-    @Test fun HOM_22_anUnknownStoredLandingFallsBackToSelectedAndTheLimitIsClamped() {
+    @Test fun HOM_22_anUnknownStoredLandingFallsBackToTheDefaultAndTheLimitIsClamped() {
         val sp = MapSharedPreferences(mapOf("homeLanding" to "Hologram", "recentsLimit" to 500))
         val p = LauncherPrefsStore(sp).prefs.value
-        assertEquals(HomeLanding.Selected, p.homeLanding)
+        assertEquals(HomeLanding.Glance, p.homeLanding)
         assertEquals(HomeRecents.MAX_LIMIT, p.recentsLimit)
         assertEquals(HomeRecents.MIN_LIMIT, LauncherPrefsStore(MapSharedPreferences()).apply { update { it.copy(recentsLimit = 1) } }.prefs.value.recentsLimit)
         assertEquals(HomeLanding.Selected, HomeLanding.parse(null))
@@ -73,10 +76,10 @@ class HomeLandingTest {
         assertFalse(back.minimalHints)
     }
 
-    @Test fun HOM_22_anOlderSettingsFileWithoutTheLandingImportsAsSelectedApps() {
+    @Test fun HOM_22_anOlderSettingsFileWithoutTheLandingImportsAsTheDefaultGlance() {
         val doc = SettingsCodec.encode(LauncherPrefs())
         doc.getJSONObject("prefs").remove("homeLanding")
-        assertEquals(HomeLanding.Selected, SettingsCodec.decode(doc).prefs.homeLanding)
+        assertEquals(HomeLanding.Glance, SettingsCodec.decode(doc).prefs.homeLanding)
     }
 
     // ---- rules per landing

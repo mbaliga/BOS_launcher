@@ -132,7 +132,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("cornersPerOri", next.cornersPerOrientation)
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name)
-            .putString("homeLanding", next.homeLanding.name).putInt("recentsLimit", next.recentsLimit)
+            .putString("homeLanding", next.homeLanding.name).putBoolean("landingChosen", LandingMigration.markerOnSave(next.homeLanding, sp.getBoolean("landingChosen", false)))
+            .putString("glanceContent", GlanceContent.encode(next.glanceContent)).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
+            .putInt("glanceControlsSec", next.glanceControlsSeconds).putString("glanceWeather", next.glanceWeatherIntensity.name).putBoolean("glanceIndicator", next.glanceIndicator)
+            .putInt("recentsLimit", next.recentsLimit)
             .putBoolean("recentsUsage", next.recentsUseUsageAccess).putBoolean("minimalHints", next.minimalHints)
             .putString("rightSide", next.rightSide.name)
             .apply()
@@ -255,7 +258,12 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             hotCornersOn = sp.getBoolean("hotCornersOn", d.hotCornersOn),
             hotCornerDwellMs = sp.getInt("hotCornerDwell", d.hotCornerDwellMs).coerceIn(0, 1000),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
-            homeLanding = enumOr(sp.getString("homeLanding", null), d.homeLanding),
+            homeLanding = LandingMigration.resolve(sp.getString("homeLanding", null), sp.getBoolean("landingChosen", false)),
+            glanceContent = GlanceContent.decode(sp.getString("glanceContent", null)),
+            glanceHotspots = GlanceHotspots.decode(sp.getString("glanceHotspots", null)),
+            glanceControlsSeconds = GlanceControls.clampSeconds(sp.getInt("glanceControlsSec", d.glanceControlsSeconds)),
+            glanceWeatherIntensity = enumOr(sp.getString("glanceWeather", null), d.glanceWeatherIntensity),
+            glanceIndicator = sp.getBoolean("glanceIndicator", d.glanceIndicator),
             recentsLimit = HomeRecents.clampLimit(sp.getInt("recentsLimit", d.recentsLimit)),
             recentsUseUsageAccess = sp.getBoolean("recentsUsage", d.recentsUseUsageAccess),
             minimalHints = sp.getBoolean("minimalHints", d.minimalHints),

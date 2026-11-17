@@ -274,9 +274,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })
                 add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Uses usage access when it is allowed; otherwise only apps opened from Liftoff are listed")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })
             }
-            if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Minimal) {
-                add(SettingItem.Toggle(x("Show corner dots"), Glyphs.Dial, p.minimalHints, x("A faint dot marks each of the four hotspots")) { v -> upd { it.copy(minimalHints = v) } })
-            }
+            if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Glance) addAll(glanceSettings(p) { f -> upd(f) })
             add(
                 SettingItem.Choice(
                     x("Style"), Glyphs.Apps, HomeStyle.entries, p.homeStyle, { x(homeStyleName(it)) },
@@ -803,3 +801,36 @@ private fun ChipRowItem(label: String, selected: Boolean, onClick: () -> Unit) {
 /** The summary line of the Background row: the two slots, "Spire + Breathing dots". */
 private fun com.bos.sphere.core.data.LauncherPrefs.backgroundSummary(): String =
     com.bos.sphere.core.data.BackgroundChoice(backgroundSlot1, backgroundSlot2).items.joinToString(" + ") { com.bos.sphere.core.design.L10n.tr(it.label) }.ifEmpty { com.bos.sphere.core.design.L10n.tr("None") }
+
+
+/** HOM-23: the Glance settings rows (content presets and free toggles, hotspot presets and corners, controls timeout, weather strength, indicator). */
+internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): List<SettingItem> = buildList {
+    val preset = com.bos.sphere.core.data.GlanceContent.presetOf(p.glanceContent)
+    add(
+        SettingItem.Choice(
+            x("Glance content"), Glyphs.Clock, com.bos.sphere.core.data.GlancePreset.entries.filter { it != com.bos.sphere.core.data.GlancePreset.Custom }, preset.takeIf { it != com.bos.sphere.core.data.GlancePreset.Custom } ?: com.bos.sphere.core.data.GlancePreset.TimeDate, { x(it.label) },
+            hint = x("What the Glance home shows in the middle. The toggles below mix it freely."),
+        ) { v -> upd { it.copy(glanceContent = com.bos.sphere.core.data.GlanceContent.applyPreset(it.glanceContent, v)) } },
+    )
+    for (item in com.bos.sphere.core.data.GlanceItem.entries) {
+        add(SettingItem.Toggle(x(item.label), Glyphs.Dial, item in p.glanceContent) { on -> upd { it.copy(glanceContent = if (on) it.glanceContent + item else it.glanceContent - item) } })
+    }
+    val hp = com.bos.sphere.core.data.GlanceHotspots.presetOf(p.glanceHotspots)
+    add(
+        SettingItem.Choice(
+            x("Hotspots"), Glyphs.Dial, com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }, hp.takeIf { it != com.bos.sphere.core.data.HotspotPreset.Custom } ?: com.bos.sphere.core.data.HotspotPreset.Four, { x(it.label) },
+            hint = x("How many corner hotspots the Glance home draws. What each runs is set under Corners."),
+        ) { v -> upd { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(v) ?: it.glanceHotspots) } },
+    )
+    for (c in com.bos.sphere.core.data.Corner.entries) {
+        add(SettingItem.Toggle(x("%s hotspot", x(c.label)), Glyphs.Dial, c in p.glanceHotspots) { on -> upd { it.copy(glanceHotspots = if (on) it.glanceHotspots + c else it.glanceHotspots - c) } })
+    }
+    add(SettingItem.Stepper(x("Controls hide after (seconds)"), Glyphs.Clock, p.glanceControlsSeconds, com.bos.sphere.core.data.GlanceControls.MIN_SECONDS..com.bos.sphere.core.data.GlanceControls.MAX_SECONDS, x("The music controls pop out after this long without a touch")) { v -> upd { it.copy(glanceControlsSeconds = com.bos.sphere.core.data.GlanceControls.clampSeconds(v)) } })
+    add(
+        SettingItem.Choice(
+            x("Weather effect"), Glyphs.Sun, com.bos.sphere.core.data.RadarIntensity.entries, p.glanceWeatherIntensity, { x(it.label) },
+            hint = x("A quiet ambience behind the clock that follows the weather. It needs Weather in the content."),
+        ) { v -> upd { it.copy(glanceWeatherIntensity = v) } },
+    )
+    add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("A small row at the bottom: Launchpad, home and the right-hand panel")) { v -> upd { it.copy(glanceIndicator = v) } })
+}

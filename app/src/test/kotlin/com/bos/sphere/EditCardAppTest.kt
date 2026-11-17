@@ -53,7 +53,7 @@ class EditCardAppTest {
         val stores = LauncherStores.get(AppSmokeHarness.app)
         settle()
         // Onboarding is not what is under test: finish it so the home is what the person sees.
-        stores.prefs.update { it.copy(onboardingDone = true) }
+        stores.prefs.update { it.copy(onboardingDone = true, homeLanding = com.bos.sphere.core.data.HomeLanding.Selected) } // wave 16: the default landing is Glance; these tests are about the Selected apps home
         settle()
         return stores
     }

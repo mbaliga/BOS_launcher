@@ -33,4 +33,27 @@ class W6RadarLearningTest {
         assertNull(ContactHabits.last(context, 7L))
         assertNull(RadarMemory.hits.get("ma"))
     }
+
+    /** Wave 20 audit: the rings also read the home's launch history, which "Forget" does not own, so forgetting must hide what came before it. */
+    @Test fun PAL_09_forgettingAlsoHidesTheEarlierLaunchHistoryFromTheRings() {
+        val now = 1_800_000_000_000L
+        val log = listOf(com.bos.sphere.core.data.LaunchEvent("a", now - 5_000, 9), com.bos.sphere.core.data.LaunchEvent("a", now - 1_000, 9))
+        assertEquals(0L, RadarLearning.forgottenAt(context))
+        RadarLearning.forget(context, now - 2_000)
+        assertEquals(now - 2_000, RadarLearning.forgottenAt(context))
+        val scores = RadarHabits.scores(log, emptyMap(), now, since = RadarLearning.forgottenAt(context))
+        assertEquals("only the launch after the reset still counts", 1.0, scores.getValue("app:a"), 0.01)
+        assertTrue(RadarHabits.scores(log, emptyMap(), now, since = now).isEmpty())
+        // The people habits clear wiped the file: the stamp must survive that clear and must not look like a person.
+        assertTrue(ContactHabits.recentIds(context).isEmpty())
+    }
+
+    @Test fun PAL_09_aResetStampFromAClockThatHasSinceGoneBackNeverHidesLaunchesMadeAfterNow() {
+        RadarLearning.forget(context, 9_000_000_000_000L) // stamped in a "future" the clock has since left
+        val now = 1_800_000_000_000L
+        val log = listOf(com.bos.sphere.core.data.LaunchEvent("old", now - 1_000, 9), com.bos.sphere.core.data.LaunchEvent("new", now + 500, 9))
+        val s = RadarHabits.scores(log, emptyMap(), now, since = RadarLearning.forgottenAt(context).coerceAtMost(now)) // what SearchOverlay does
+        assertTrue("before the clamped stamp: forgotten", "app:old" !in s)
+        assertEquals("after it: counted", 1.0, s.getValue("app:new"), 0.01)
+    }
 }

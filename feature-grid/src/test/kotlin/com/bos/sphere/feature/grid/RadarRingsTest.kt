@@ -202,4 +202,46 @@ class RadarRingsTest {
         assertEquals(60, out.size)
         assertEquals(ranked.drop(44), out.drop(44))
     }
+
+    // ---- wave 20 audit
+
+    @Test fun PAL_09_aTenThousandEntryLaunchLogScoresQuicklyAndExactly() {
+        val log = List(10_000) { LaunchEvent(if (it % 2 == 0) "even" else "odd", now - (it % 30) * day / 3, 9) }
+        val t0 = System.nanoTime()
+        val s = RadarHabits.scores(log, emptyMap(), now)
+        assertTrue("scoring 10,000 launches took ${(System.nanoTime() - t0) / 1_000_000} ms", (System.nanoTime() - t0) / 1_000_000 < 500)
+        assertEquals(2, s.size)
+        assertTrue(s.getValue("app:even") > s.getValue("app:odd")) // the even ones include the age-zero launches
+    }
+
+    @Test fun PAL_09_aClockStepBackNeverGivesANegativeOrInfiniteScore() {
+        val log = listOf(LaunchEvent("x", now + 400 * day, 9), LaunchEvent("y", Long.MIN_VALUE / 2, 9), LaunchEvent("z", now, 9))
+        val s = RadarHabits.scores(log, mapOf("app:l" to UsageRecord(3, Long.MAX_VALUE / 2)), now)
+        s.values.forEach { assertTrue("$it", it.isFinite() && it >= 0.0) }
+        assertEquals(1.0, s.getValue("app:x"), 1e-9)
+        assertEquals(3.0, s.getValue("app:l"), 1e-9)
+    }
+
+    @Test fun PAL_18_hiddenAndUninstalledAppsNeverGetATileWhateverTheirHistory() {
+        val shown = app("Shown"); val hidden = app("Hidden") // the caller passes only visible, installed apps
+        val log = List(50) { LaunchEvent(hidden.key, now - day, 9) } + List(2) { LaunchEvent(shown.key, now - day, 9) } + List(9) { LaunchEvent("gone.pkg/Main#0", now, 9) }
+        val ranked = RadarHabits.rankApps(listOf(shown), recent = listOf(shown), scores = RadarHabits.scores(log, emptyMap(), now))
+        assertEquals(listOf("Shown"), ranked.map { it.label })
+    }
+
+    @Test fun PAL_18_aWorkProfileCopyOfAnAppIsAnotherEntryWithItsOwnUse() {
+        val a = AppEntry("p.a", ComponentName("p.a", "M"), "A", Process.myUserHandle()) { null }
+        val work = AppEntry("p.a", ComponentName("p.a", "M"), "A", android.os.UserHandle.getUserHandleForUid(10 * 100000 + 10001)) { null }
+        assertTrue("the user is part of the key", a.key != work.key)
+        val log = List(3) { LaunchEvent(work.key, now - day, 9) } + List(1) { LaunchEvent(a.key, now - day, 9) }
+        assertEquals(listOf(work.key, a.key), RadarHabits.rankApps(listOf(a, work), emptyList(), RadarHabits.scores(log, emptyMap(), now)).map { it.key })
+    }
+
+    @Test fun PAL_18_ringsNeverAssignMoreResultsThanTheyHoldAndZeroRoomGivesNothing() {
+        assertTrue(RadarRings.assign(0, RadarRings.limits(listOf(9, 9, 9, 9))).isEmpty())
+        assertTrue(RadarRings.assign(10, RadarRings.limits(emptyList())).isEmpty())
+        assertEquals(44, RadarRings.assign(10_000, RadarRings.limits(listOf(99, 99, 99, 99))).size)
+        assertEquals(listOf("Most used", "Often used", "Sometimes", "Rarely"), (0..3).map { RadarRings.tierName(it) })
+        assertEquals("Rarely", RadarRings.tierName(99)); assertEquals("Most used", RadarRings.tierName(-3))
+    }
 }

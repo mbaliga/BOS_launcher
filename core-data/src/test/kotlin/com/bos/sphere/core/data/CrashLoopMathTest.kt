@@ -98,4 +98,40 @@ class CrashLoopMathTest {
         assertTrue(ended(Exit.REASON_USER_REQUESTED, sdk = 29, pending = true))
         assertFalse(CrashLoopMath.endedInCrash(29, marker.copy(lastWasStable = true), null, true))
     }
+
+    // ---- wave 20 audit
+
+    @Test fun CFG_09_aClockThatWentBackNeverCountsTheNextCrashAsInsideTheWindow() {
+        val prev = State(lastStart = 500_000, lastWasStable = false, crashes = 1)
+        val (next, safe) = CrashLoopMath.decide(prev, now = 100_000, previousEndedInCrash = true) // the clock is now 400 s EARLIER than the marker
+        assertFalse("a negative age is not 'within 30 seconds'", safe)
+        assertEquals(1, next.crashes)
+    }
+
+    @Test fun CFG_09_aCrashExactlyAtTheWindowEdgeStartsANewStreak() {
+        val prev = State(0, false, 1)
+        assertTrue(CrashLoopMath.decide(prev, CrashLoopMath.WINDOW_MS - 1, true).second)
+        assertFalse(CrashLoopMath.decide(prev, CrashLoopMath.WINDOW_MS, true).second)
+    }
+
+    @Test fun CFG_09_aMarkerFromTheFutureIsNotCrashEvidenceEvenWithACrashRecord() {
+        // The exit record is stamped by the same clock as the marker; a record from before a clock step cannot be at or after a marker written after it.
+        val prev = State(lastStart = 900_000, lastWasStable = false, crashes = 0)
+        assertFalse(CrashLoopMath.endedInCrash(34, prev, CrashLoopMath.Exit(Exit.REASON_CRASH, 100_000), false))
+    }
+
+    @Test fun CFG_09_everyCrashReasonConstantIsCountedAndNoOtherKnownReasonIs() {
+        val all = listOf(Exit.REASON_ANR, Exit.REASON_CRASH, Exit.REASON_CRASH_NATIVE, Exit.REASON_DEPENDENCY_DIED, Exit.REASON_EXCESSIVE_RESOURCE_USAGE,
+            Exit.REASON_EXIT_SELF, Exit.REASON_FREEZER, Exit.REASON_INITIALIZATION_FAILURE, Exit.REASON_LOW_MEMORY, Exit.REASON_OTHER, Exit.REASON_PERMISSION_CHANGE,
+            Exit.REASON_SIGNALED, Exit.REASON_UNKNOWN, Exit.REASON_USER_REQUESTED, Exit.REASON_USER_STOPPED)
+        val counted = all.filter { CrashLoopMath.endedInCrash(34, State(0, false, 0), CrashLoopMath.Exit(it, 1), false) }.toSet()
+        assertEquals(setOf(Exit.REASON_ANR, Exit.REASON_CRASH, Exit.REASON_CRASH_NATIVE, Exit.REASON_INITIALIZATION_FAILURE), counted)
+    }
+
+    @Test fun CFG_09_aSavedStateInANewProcessAfterACrashIsStillAStartButARotationIsNot() {
+        assertTrue(CrashLoopMath.countsAsStart(hasSavedState = false, alreadyCountedInThisProcess = false))
+        assertTrue("restored by the system into a new process", CrashLoopMath.countsAsStart(hasSavedState = true, alreadyCountedInThisProcess = false))
+        assertFalse("a rotation in the same process", CrashLoopMath.countsAsStart(hasSavedState = true, alreadyCountedInThisProcess = true))
+        assertTrue(CrashLoopMath.countsAsStart(hasSavedState = false, alreadyCountedInThisProcess = true))
+    }
 }

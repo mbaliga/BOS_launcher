@@ -108,3 +108,12 @@ reports are saved locally and shared by explicit action, which the local copy di
 
 * No device verification (see `docs/device-checklist.md`, section "Crash recovery screen and startup crashes").
 * (Done in wave 19, owner decision) the loop guard counted starts, not crashes; it now counts crashes from the exit record (see `docs/decisions/startupCrashes.md`).
+
+## Wave 20 audit changes
+
+* The library's streak is read through `CrashRecoveryHost.liveStreak` (30 minute window, never from the future), not `consecutiveCount`. The library keeps the count until a
+  stable start or its own reset, so a streak of 2 left by a safe mode the user swiped away put every later start in safe mode again. `RecoveryDecision` is unchanged and still pure.
+* `CrashLoopMath.decide` counts a crash as "inside the window" only for an age of 0 to 29 999 ms: a clock set back no longer counts as inside it.
+* Known limits, not changed: the library's handler is installed in `Application.onCreate`, so a crash in a ContentProvider or `androidx.startup` initialiser (which run before it) writes no
+  JVM report; the OS exit record (REASON_CRASH or REASON_INITIALIZATION_FAILURE) is what the next start reads for it. Exception messages are printed as the library receives them: our own
+  code must not put user text in an exception message (see NFR-17 audit). A release build's frames are R8 renamed; `mapping.txt` of the build decodes them.

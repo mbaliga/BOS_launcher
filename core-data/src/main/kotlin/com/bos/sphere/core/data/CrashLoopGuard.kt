@@ -46,19 +46,29 @@ object CrashLoopMath {
         if (prev == null) return State(now, false, 0) to false
         val crashes = when {
             !previousEndedInCrash -> 0
-            now - prev.lastStart < WINDOW_MS -> prev.crashes + 1
+            now - prev.lastStart in 0 until WINDOW_MS -> prev.crashes + 1 // a clock set back (negative age) is not 'within 30 seconds'
             else -> 1
         }
         return State(now, false, crashes) to (crashes >= 2)
     }
 
     fun markStable(s: State) = s.copy(lastWasStable = true, crashes = 0)
+
+    /**
+     * Is this activity creation a start to record? A recreate in the SAME process (rotation, theme) is not; but the system also hands a saved
+     * state to the first activity of a NEW process after a crash or a low-memory kill, and that start must be recorded or the loop is never seen.
+     */
+    fun countsAsStart(hasSavedState: Boolean, alreadyCountedInThisProcess: Boolean): Boolean = !hasSavedState || !alreadyCountedInThisProcess
 }
 
 object CrashLoopGuard {
     private const val FILE = "crash_loop"
 
     @Volatile var safeMode: Boolean = false
+        private set
+
+    /** True once [onStart] ran in this process (see [CrashLoopMath.countsAsStart]). */
+    @Volatile var countedInThisProcess: Boolean = false
         private set
 
     /** Where the previous process's exit record comes from; replaced in tests. Never throws. */
@@ -76,6 +86,7 @@ object CrashLoopGuard {
         context: Context, now: Long = System.currentTimeMillis(),
         sdk: Int = android.os.Build.VERSION.SDK_INT, jvmReportSince: (Long) -> Boolean = { false },
     ) {
+        countedInThisProcess = true
         val sp = TolerantPrefs.of(context, FILE)
         // "rapid" was the old start counter (waves before 19): it is ignored, so an old marker cannot count as a crash.
         val prev = if (sp.contains("last") && sp.contains("crashes")) CrashLoopMath.State(sp.getLong("last", 0), sp.getBoolean("stable", false), sp.getInt("crashes", 0)) else null

@@ -50,11 +50,22 @@ internal object RadarMemory {
 
 /** PAL-09 reset: everything Radar learned from selections, including the people habits and the remembered results, is forgotten. */
 internal object RadarLearning {
-    fun forget(context: android.content.Context) {
+    private const val STAMP = "forgottenAt"
+    private fun sp(c: Context) = c.getSharedPreferences("search_habits", Context.MODE_PRIVATE) // excluded from backup (backup_rules.xml)
+
+    /**
+     * [now] is stamped so the resting Radar ignores the home's launch log from before this moment: the log belongs to the home (recents,
+     * suggestions), so it is not deleted, but without the stamp the rings would look exactly as before the reset.
+     */
+    fun forget(context: Context, now: Long = System.currentTimeMillis()) {
         PaletteHost.resetLearning(context)
         ContactHabits.clear(context)
         RadarMemory.hits.clear()
+        runCatching { sp(context).edit().putLong(STAMP, now).apply() }
     }
+
+    /** When the user last forgot what Radar learned; 0 when never. Never later than the clock says now (a clock set back). */
+    fun forgottenAt(context: Context): Long = runCatching { sp(context).getLong(STAMP, 0L) }.getOrDefault(0L)
 }
 
 /** PAL-09 and PAL-12 for streamed hub hits: ranked by match blended with local history, and stable under the selection. */

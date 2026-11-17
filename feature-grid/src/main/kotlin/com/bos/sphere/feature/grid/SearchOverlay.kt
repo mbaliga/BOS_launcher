@@ -262,7 +262,7 @@ internal fun SearchScreen(
     var nav by remember { mutableStateOf(RadarNav(0)) }
     var orbitVisible by remember { mutableStateOf(Int.MAX_VALUE) }
     val typing = trimmed.isNotEmpty()
-    val flatMode = typing || layout == SearchLayout.Flat
+    val flatMode = RadarLayoutPolicy.showsFlatList(layout, typing)
 
     PaletteTraceEffects(query) // NFR-03 / NFR-04: trace sections for the macrobenchmarks
     LaunchedEffect(Unit) {
@@ -392,8 +392,8 @@ internal fun SearchScreen(
     val setWheel: (SearchCategory?) -> Unit = { c -> userCat = c; expandedContact = null }
 
     // ---- keyboard (PAL-07): the same model walks Flat, Orbit and Filmstrip results.
-    val navTiles = remember(data, selected, typing, layout, orbitVisible) {
-        if (typing || layout == SearchLayout.Flat) flatTiles(data, selected)
+    val navTiles = remember(data, selected, flatMode, layout, orbitVisible) {
+        if (flatMode) flatTiles(data, selected)
         else data.tiles(selected).let { if (layout == SearchLayout.Orbit) it.take(orbitVisible) else it }
     }
     val navNow = nav.withCount(navTiles.size)
@@ -523,6 +523,12 @@ internal fun SearchScreen(
                 }
                 if (flatMode) {
                     ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label, fanDown = true, showLabel = selected != null)
+                    Icon(
+                        Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
+                        modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),
+                    )
+                } else if (typing) {
+                    // Wave 20: the Orbit stays while typing; the wheel is its scope, so only the clear button joins the line.
                     Icon(
                         Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
                         modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),

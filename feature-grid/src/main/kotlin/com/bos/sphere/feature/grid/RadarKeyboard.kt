@@ -117,4 +117,11 @@ object RadarLayoutPolicy {
     /** With a keyboard or pointer driving, results default to Flat unless the user pinned a layout. */
     fun effective(preferred: SearchLayout, pinned: Boolean, mode: InputMode): SearchLayout =
         if (!pinned && (mode == InputMode.Keyboard || mode == InputMode.Pointer)) SearchLayout.Flat else preferred
+
+    /**
+     * Wave 20 (owner): the Orbit stays on screen while typing, best match on the innermost ring (PAL-18). Flat is the list
+     * always; the Filmstrip still gives way to the typed list.
+     */
+    fun showsFlatList(layout: SearchLayout, typing: Boolean): Boolean =
+        layout == SearchLayout.Flat || (typing && layout != SearchLayout.Orbit)
 }

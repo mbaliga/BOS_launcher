@@ -8,7 +8,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+import com.bos.sphere.CrashRecoveryHost
 import com.bos.sphere.core.data.CrashLoopGuard
+import dev.aarso.crashrecovery.CrashRecovery
 import com.bos.sphere.core.data.LauncherAppsAppRepository
 import com.bos.sphere.core.data.SafeMode
 import com.bos.sphere.core.data.StateService
@@ -34,6 +37,10 @@ fun SafeModeScreen(onContinue: () -> Unit) {
     val service = remember { StateService.get(context) }
     val offer = remember { SafeMode.plan(true, service.snapshots.list()) }
     var message by remember { mutableStateOf<String?>(null) }
+    // Wave 18: the report itself is the shared recovery screen's; safe mode only offers to open it again (docs/decisions/crashRecovery.md).
+    var hasReport by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { hasReport = withContext(Dispatchers.IO) { CrashRecoveryHost.hasReport(context) } }
+    val activity = remember(context) { generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }.filterIsInstance<android.app.Activity>().firstOrNull() }
 
     com.bos.sphere.feature.grid.SafeModeView(
         apps = apps.map { com.bos.sphere.feature.grid.SafeApp(it.key, it.label) },
@@ -44,11 +51,12 @@ fun SafeModeScreen(onContinue: () -> Unit) {
             offer.restoreFrom?.let { snap ->
                 scope.launch {
                     runCatching { withContext(Dispatchers.IO) { service.restore(snap.id) } }
-                        .onSuccess { reloadAfterStateChange(context); CrashLoopGuard.clear(context); onContinue() }
+                        .onSuccess { reloadAfterStateChange(context); CrashLoopGuard.clear(context); CrashRecovery.clearStreak(context); onContinue() }
                         .onFailure { message = L10n.tr("Restore failed: %s", it.message ?: "") }
                 }
             }
         },
-        onCarryOn = { CrashLoopGuard.clear(context); onContinue() },
+        onCarryOn = { CrashLoopGuard.clear(context); CrashRecovery.clearStreak(context); onContinue() },
+        onViewReport = if (hasReport && activity != null) ({ CrashRecoveryHost.reopen(activity) }) else null,
     )
 }

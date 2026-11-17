@@ -56,7 +56,7 @@ object WeatherCodes {
  */
 class WeatherSource(context: Context) {
     private val ctx = context.applicationContext
-    private val prefs = ctx.getSharedPreferences("weather", Context.MODE_PRIVATE)
+    private val prefs = TolerantPrefs.of(ctx, "weather")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _weather = MutableStateFlow(readCache())
     val weather: StateFlow<WeatherInfo?> = _weather.asStateFlow()

@@ -30,9 +30,9 @@ data class LayoutsBySizeClass(val byClass: Map<String, HomeLayout> = emptyMap(),
 
 /** Persistence of [LayoutsBySizeClass] (SharedPreferences, one entry per class). */
 class SizeClassLayoutStore(context: Context) {
-    private val sp = context.applicationContext.getSharedPreferences("home_layout_by_class", Context.MODE_PRIVATE)
+    private val sp = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, "home_layout_by_class")
     /** NFR-18: real widget ids live in the device file; the backed-up file holds re-add markers ([com.bos.sphere.core.data.WidgetIdSplit]). */
-    private val device = context.applicationContext.getSharedPreferences(com.bos.sphere.core.data.DeviceBound.FILE, Context.MODE_PRIVATE)
+    private val device = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, com.bos.sphere.core.data.DeviceBound.FILE)
     private var data: LayoutsBySizeClass = read()
 
     /** Makes [sc] active: saves [current] under [previous], returns the layout to show. */

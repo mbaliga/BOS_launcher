@@ -111,6 +111,8 @@ fun SafeModeView(
     onOpen: (SafeApp) -> Unit,
     onRestore: () -> Unit,
     onCarryOn: () -> Unit,
+    /** Wave 18: opens the shared crash-recovery screen for the newest report; null when no report was kept (then a plain line says so). */
+    onViewReport: (() -> Unit)? = null,
 ) {
     Box(Modifier.fillMaxSize().background(HyleColors.Background)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp)) {
@@ -123,12 +125,17 @@ fun SafeModeView(
                 if (restoreLabel != null) TextButtonPill(L10n.tr("Restore last snapshot (%s)", restoreLabel), primary = true, onClick = onRestore)
                 TextButtonPill(L10n.tr("Carry on"), onClick = onCarryOn)
             }
+            if (onViewReport != null) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp)) { TextButtonPill(L10n.tr("View crash report"), onClick = onViewReport) }
+            } else {
+                Text(L10n.tr("No crash report was saved for this start. A crash before Liftoff could record it, or a system kill, leaves none."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
             if (restoreLabel == null) {
                 Text(L10n.tr("There is no snapshot to restore yet."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             }
             message?.let { Text(it, color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)) }
             LazyVerticalGrid(GridCells.Adaptive(88.dp), Modifier.fillMaxSize().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(apps.sortedBy { it.label.lowercase() }, key = { it.key }) { app ->
+                items(apps.distinctBy { it.key }.sortedBy { it.label.lowercase() }, key = { it.key }) { app -> // distinctBy: the escape hatch must not throw on a duplicated key (wave 18)
                     Text(
                         app.label, color = HyleColors.InkBright, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().clickable { onOpen(app) }.padding(vertical = 14.dp, horizontal = 4.dp),

@@ -32,7 +32,8 @@ class StateBackupExclusionTest {
     fun CFG_01_everyPreferenceFileInTheSourceIsEitherExportedOrExcludedFromBackup() {
         val exported = setOf("launcher_prefs", "home_layout", "shortcuts", "launchpad_rules", "hidden_apps", "state_meta") + PrefFilesSource.ALLOWED
         val excluded = StateSchema.NEVER_EXPORTED_STORES + StateSchema.BACKUP_EXCLUDED_PREF_FILES + "search_habits"
-        val rx = Regex("""getSharedPreferences\(\s*"([A-Za-z0-9_]+)"""")
+        // Wave 18: stores open their files through TolerantPrefs.of(context, "name") as well as getSharedPreferences("name"); both count.
+        val rx = Regex("""(?:getSharedPreferences\(\s*|TolerantPrefs\.of\([^,()]+(?:\([^()]*\))?[^,()]*,\s*)"([A-Za-z0-9_]+)"""")
         val found = HashSet<String>()
         root().walkTopDown()
             .onEnter { it.name != "build" && it.name != ".git" && it.name != "test" }

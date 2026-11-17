@@ -15,6 +15,10 @@
     <exclude domain="sharedpref" path="launchpad_groups.xml" />
     <exclude domain="file" path="palette-files.idx" />
     <exclude domain="file" path="crash-reports" />
+    <exclude domain="file" path="crash_recovery_report.txt" />
+    <exclude domain="file" path="crash_recovery_streak.txt" />
+    <exclude domain="file" path="crash_recovery_exit_seen.txt" />
+    <exclude domain="file" path="crash_recovery_last_shown.txt" />
     <exclude domain="database" path="." />
     <exclude domain="file" path="state/snapshots" />
     <exclude domain="file" path="index" />

@@ -75,31 +75,23 @@ class NfrWiringTest {
     }
 
     // ---- NFR-17
-    @Test fun NFR_17_shareBodyKeepsTheReportAndSaysItWasShareByTheUser() {
-        val dir = tmp.newFolder("crash")
-        val r = CrashReports(dir)
-        val f = r.record(IllegalStateException("boom"), "main", 1700000000000L)
-        val body = CrashShare.body(r.textForSharing(f))
-        assertTrue(body.contains("IllegalStateException: boom"))
-        assertTrue(body.contains("never uploaded"))
-        assertTrue(body.contains("Liftoff never sends reports by itself"))
-        assertEquals("java.lang.IllegalStateException: boom", CrashShare.summary(f))
-    }
-
-    @Test fun NFR_17_ledgerLineShowsPercentAndTarget() {
-        assertEquals("99.50% of recorded sessions ended without a crash (target 99.8%)", CrashShare.ledgerLine(99.5))
-    }
-
-    @Test fun NFR_17_theOnlyWayOutIsTheShareSheetAndGroundControlOffersIt() {
-        val pane = text("app/src/main/kotlin/com/bos/sphere/ui/CrashReportsPane.kt")
-        assertTrue(pane.contains("ACTION_SEND") && pane.contains("createChooser"))
-        assertFalse(pane.contains("HttpURLConnection") || pane.contains("openConnection"))
-        // Reachable from Ground Control (Backup category).
-        assertTrue(text("app/src/main/kotlin/com/bos/sphere/ui/BackupPane.kt").contains("crashReportsItem()"))
-        // Sharing happens only in a click handler of an ActionRow, never from the crash handler or the application class.
+    /** Wave 18: the report, its format and the share sheet belong to the shared :crash-recovery utility; the launcher keeps no copy. */
+    @Test fun NFR_17_theLauncherKeepsNoReportFormatOfItsOwnAndTheLedgerNeverUsesIntents() {
+        assertFalse(Repo.file("core-quality/src/main/kotlin/com/bos/sphere/core/quality/CrashShare.kt").exists())
+        assertFalse(Repo.file("core-quality/src/main/kotlin/com/bos/sphere/core/quality/CrashReports.kt").exists())
+        assertFalse(text("core-quality/src/main/kotlin/com/bos/sphere/core/quality/CrashFreeLedger.kt").contains("Intent"))
         val app = text("app/src/main/kotlin/com/bos/sphere/LiftoffApplication.kt")
         assertFalse(app.contains("ACTION_SEND"))
-        assertFalse(text("core-quality/src/main/kotlin/com/bos/sphere/core/quality/CrashReports.kt").contains("Intent"))
+    }
+
+    @Test fun NFR_17_sharingIsTheLibrarysExplicitShareSheetAndGroundControlOnlyPreviewsIt() {
+        val pane = text("app/src/main/kotlin/com/bos/sphere/ui/CrashReportsPane.kt")
+        assertFalse(pane.contains("HttpURLConnection") || pane.contains("openConnection"))
+        assertTrue(pane.contains("previewIntent"))
+        assertTrue(text("app/src/main/kotlin/com/bos/sphere/ui/BackupPane.kt").contains("crashReportsItem()"))
+        val lib = text("crash-recovery/src/main/java/dev/aarso/crashrecovery/CrashRecoveryActivity.kt")
+        assertTrue(lib.contains("ACTION_SEND") && lib.contains("createChooser"))
+        assertFalse(lib.contains("HttpURLConnection") || lib.contains("openConnection"))
     }
 
     // ---- NFR-12

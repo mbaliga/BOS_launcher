@@ -83,7 +83,9 @@ fun rememberLabEntries(inputs: CapabilityInputs, results: SnapshotStateMap<Strin
             val text = com.bos.sphere.feature.grid.OrbitFeelCapture.snippet(com.bos.sphere.feature.grid.OrbitFeel.current)
             runCatching { app.getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Orbit feel defaults", text)) }
             put("feel:export", "Copied. Paste over the defaults in OrbitFeelValues, then commit:\n$text")
-        }) + radarSignalLabEntries(app) { k, v -> put(k, v) } + listOf(
+        }) + radarSignalLabEntries(app) { k, v -> put(k, v) } + LabCrash.entry(
+            results, armedAt = { results["crashArmedAt"]?.toLongOrNull() }, setArmed = { t -> if (t == null) results.remove("crashArmedAt") else results["crashArmedAt"] = t.toString() },
+        ) + listOf(
             LabEntry("input", "Input devices", "keyboard=${inputs.hasKeyboard} pointer=${inputs.hasPointer} controller=${inputs.hasController}", null),
         )
     }

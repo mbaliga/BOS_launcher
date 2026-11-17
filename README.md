@@ -22,6 +22,7 @@ surface settings, and app management.
 | `:feature-sphere` | `SphereGeometry` (ported `magAt`/`txAt`), `SphereState`, `CoverflowLayer`, all-apps `Globe`, and `LauncherSurface` (unified gestures) |
 | `:feature-search` | App search (the shared search engine behind an app vocabulary) + the always-on keyboard |
 | `:search-engine` | Vendored `search-core` from Shared-Libraries-asoc: query language, facets, relative dates, natural-language interpretation, ranking |
+| `:crash-recovery` | Vendored `crash-recovery` 1.4.0 from Shared-Libraries-asoc: the crash splash and recovery screen (readable report, Copy, Save, Share, Continue, loop-gated Reset), plain android.widget |
 | `:feature-grid` | The **Pages** home (default): paged grid / circle / coverflow pages, corners + radial palettes, complications, peek widgets, wheel + list drawers, network dot grid, the XMB-style settings space and its synthesized UI sounds |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
 

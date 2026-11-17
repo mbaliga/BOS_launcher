@@ -36,7 +36,7 @@ class OpenSurfaceStore(private val sp: SharedPreferences) {
         private const val KEY = "openSurface"
         @Volatile private var shared: OpenSurfaceStore? = null
         fun get(context: android.content.Context): OpenSurfaceStore = shared ?: synchronized(this) {
-            shared ?: OpenSurfaceStore(context.applicationContext.getSharedPreferences(FILE, android.content.Context.MODE_PRIVATE)).also { shared = it }
+            shared ?: OpenSurfaceStore(TolerantPrefs.of(context.applicationContext, FILE)).also { shared = it }
         }
     }
 }

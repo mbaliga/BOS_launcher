@@ -43,7 +43,7 @@ enum class TimelineDepth(val label: String, val opens: Int) {
 
 /** Panel settings. Kept in the existing home state preference file under its own keys. */
 class HomePanelPrefs(context: Context) {
-    private val sp = context.applicationContext.getSharedPreferences("home_state", Context.MODE_PRIVATE)
+    private val sp = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, "home_state")
 
     var usageRange: UsageRange
         get() = UsageRange.entries.firstOrNull { it.name == sp.getString("panel.usage", null) } ?: UsageRange.Today

@@ -35,19 +35,21 @@ import kotlinx.coroutines.withContext
  * could only repeat the order. Hidden apps never appear; the list is bounded by Settings (8 to 48).
  */
 @Composable
-fun rememberRecentApps(context: Context, stores: LauncherStores, apps: List<AppEntry>, hidden: Set<String>, prefs: LauncherPrefs): State<List<AppEntry>> {
+fun rememberRecentApps(context: Context, stores: LauncherStores, apps: List<AppEntry>, hidden: Set<String>, prefs: LauncherPrefs, profile: RecentsProfile = RecentsProfile.Both): State<List<AppEntry>> {
     val active = prefs.homeLanding == HomeLanding.Recents
     val appsIn = remember { MutableStateFlow(emptyList<RecentCandidate>()) }
     val hiddenIn = remember { MutableStateFlow(emptySet<String>()) }
     val limitIn = remember { MutableStateFlow(HomeRecents.DEFAULT_LIMIT) }
     val usageIn = remember { MutableStateFlow(true) }
     val tick = remember { MutableStateFlow(0) }
+    val profileIn = remember { MutableStateFlow(RecentsProfile.Both) }
     SideEffect {
         val me = android.os.Process.myUserHandle()
         appsIn.value = apps.map { RecentCandidate(it.key, it.packageName, it.user != me) }
         hiddenIn.value = hidden
         limitIn.value = prefs.recentsLimit
         usageIn.value = prefs.recentsUseUsageAccess
+        profileIn.value = profile
     }
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
@@ -58,9 +60,10 @@ fun rememberRecentApps(context: Context, stores: LauncherStores, apps: List<AppE
     val usage = remember(context) { UsageRecents(context) }
     val keys by (if (active) {
         remember(stores, usage) {
+            // own: the larger log (5000), a superset of the 400-entry history, so a heavy user's few favourites do not leave the list short.
             HomeRecents.flow(
-                own = stores.history.events, usageTick = tick.map { }, usageReader = { usage.sightings() }, apps = appsIn, hidden = hiddenIn,
-                state = stores.recentsState.state, limit = limitIn, profile = flowOf(RecentsProfile.Both), useUsage = usageIn, selfPackage = context.packageName,
+                own = stores.timelineLog.events, usageTick = tick.map { }, usageReader = { usage.sightings() }, apps = appsIn, hidden = hiddenIn,
+                state = stores.recentsState.state, limit = limitIn, profile = profileIn, useUsage = usageIn, selfPackage = context.packageName,
             )
         }
     } else remember { emptyFlow<List<String>>() }).collectAsStateWithLifecycle(initialValue = emptyList())

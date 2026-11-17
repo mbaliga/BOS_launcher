@@ -28,7 +28,8 @@ import kotlinx.coroutines.flow.map
  * active class.
  */
 @Composable
-fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<String> = emptySet()) {
+fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<String> = emptySet(), onRebased: () -> Unit = {}) {
+    val rebased by rememberUpdatedState(onRebased)
     val installed by rememberUpdatedState(installedKeys)
     val context = LocalContext.current
     val cfg: Configuration = LocalConfiguration.current
@@ -39,7 +40,7 @@ fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<Stri
         val now = layoutStore.layout.value
         val next = store.activate(sc, now, active)
         active = sc
-        if (next != now) layoutStore.replace(next)
+        if (next != now) { layoutStore.replace(next); rebased() } // HOM-12: not an edit: an open edit session starts over from here
         // A layout stored under another class may remember removals for apps uninstalled since.
         if (installed.isNotEmpty()) layoutStore.pruneRemoved(installed)
         layoutStore.layout.collect { store.record(sc, it) }
@@ -80,6 +81,8 @@ class HomeEditState internal constructor(private val layoutStore: HomeLayoutStor
         if (pins != null && ws != null) dock?.write(ws, pins)
         layoutStore.replace(r.layout); hooks?.revived(was, r.layout.pages)
     }
+    /** HOM-12: the arrangement was swapped for another window size class (rotation, folding); undo cannot cross that. */
+    fun rebase() { session?.rebase(layoutStore.layout.value, dock?.view() ?: DockPinsView("", emptyList())); rev++ }
     fun undo() { write(layoutStore.layout.value.pages, session?.undo()); rev++ }
     fun redo() { write(layoutStore.layout.value.pages, session?.redo()); rev++ }
     /** HOM-12: the rail's pin list changed (a move to the dock, a pin, an unpin, a reorder). */

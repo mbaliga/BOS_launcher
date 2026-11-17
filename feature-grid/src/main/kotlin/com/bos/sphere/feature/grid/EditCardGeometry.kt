@@ -36,6 +36,13 @@ object EditCardGeometry {
     const val OFF_SCREEN = 0.04f
     const val MIN_COLUMN_FRACTION = 0.26f
 
+    /**
+     * HOM-12: the width (local dp) of the strip at a page edge where a dragged tile dwells to turn the page. The card is drawn at
+     * about 0.6 to 0.68 and its outer 4% is off screen, so the same strip would be only ~20 px of glass on the start side; while
+     * editing it is doubled so the on-screen strip stays about as wide as on the full-size home.
+     */
+    fun pageEdgeZoneDp(editing: Boolean): Float = if (editing) 56f else 28f
+
     /** The end state of the card for a [widthPx] by [heightPx] window. [topReservePx] / [bottomReservePx] keep the banner and bars clear. */
     data class Target(
         val scale: Float,
@@ -98,6 +105,9 @@ object EditCardGeometry {
         fun lerp(a: Float, b: Float) = a + (b - a) * p
         return Frame(lerp(1f, t.scale), lerp(0f, t.translationX), lerp(0f, t.translationY), CORNER_DP * p, p, p)
     }
+
+    /** [r] (px inside the host that fills the window) moved by the host's position in the window, for comparison with pointer positions in window px. */
+    fun inWindow(r: EdgeRect, originX: Float, originY: Float): EdgeRect = EdgeRect(r.left + originX, r.top + originY, r.right + originX, r.bottom + originY)
 
     /** True when the point (x, y) in screen px is on the card (a tap there while it is a Launchpad card brings the home back). */
     fun hitsCard(t: Target, x: Float, y: Float): Boolean = x >= t.card.left && x <= t.card.right && y >= t.card.top && y <= t.card.bottom

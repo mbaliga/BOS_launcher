@@ -137,7 +137,7 @@ fun EditCardHost(
             AddCarousel(
                 apps = apps, onHome = onHome, hasWork = hasWork, isWork = isWork, onAddApp = onAddApp,
                 onWidget = onWidget, onFolder = onFolder, onShortcut = onShortcut, onLink = onLink, onFile = onFile,
-                cardRect = { target.card }, drag = drag, focusRequester = focus,
+                cardRect = { EditCardGeometry.inWindow(target.card, hostOrigin.x, hostOrigin.y) }, drag = drag, focusRequester = focus, // cardRect: the drag position is in window px, the card in this host's px
                 modifier = Modifier.place(target.addBand), compact = target.landscape, onGroup = onGroup,
             )
             }

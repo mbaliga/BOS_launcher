@@ -28,12 +28,17 @@ object HomePageOps {
      */
     fun delete(pages: List<HomePage>, index: Int, capacityOf: (PageLayout) -> Int): Result {
         if (index !in pages.indices) return Result(pages, emptySet(), index.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))
-        if (pages.size == 1) {
-            val p = pages[0]
+        // A stored page that overflowed into several visual pages is one page: deleting any chunk deletes it whole (otherwise its items
+        // would join a sibling chunk and overflow straight back, so the page could never be removed).
+        val g = groupOf(pages, index)
+        val whole = if (g.last > g.first) pages.take(g.first) + pages[g.first].copy(keys = g.flatMap { pages[it].keys }) + pages.drop(g.last + 1) else pages
+        val at = g.first
+        if (whole.size == 1) {
+            val p = whole[0]
             return Result(listOf(p.copy(keys = emptyList(), id = if (p.id == 0L) 1L else p.id)), p.keys.toSet(), 0)
         }
-        val out = HomeLayoutMath.deletePage(pages, index, capacityOf)
-        return Result(out, emptySet(), (index - 1).coerceIn(0, out.lastIndex))
+        val out = HomeLayoutMath.deletePage(whole, at, capacityOf)
+        return Result(out, emptySet(), (at - 1).coerceIn(0, out.lastIndex))
     }
 
     /** Moves the page group holding [index] by [delta] groups (-1 = up/earlier, +1 = down/later). Null when it cannot move. */

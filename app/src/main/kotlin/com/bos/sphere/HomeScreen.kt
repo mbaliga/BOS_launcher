@@ -229,11 +229,15 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
     // HOM-22: the live Recent apps (only collected while that landing is on) and whether usage access is granted.
-    val landingRecents by rememberRecentApps(context, stores, apps, hidden, storedPrefs)
+    var recentsProfile by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(com.bos.sphere.core.data.RecentsProfile.Both) } // HOM-22: the Recent apps landing's Personal / Work filter
+    val recentsHasWork = remember(apps) { val me = android.os.Process.myUserHandle(); apps.any { it.user != me } }
+    // A saved Work / Personal filter must not outlive the work profile: with no chips to change it the list would stay empty for good.
+    val recentsFilter = if (recentsHasWork) recentsProfile else com.bos.sphere.core.data.RecentsProfile.Both
+    val landingRecents by rememberRecentApps(context, stores, apps, hidden, storedPrefs, recentsFilter)
     val usageAccessOn by rememberUsageAccess(context, storedPrefs.homeLanding == HomeLanding.Recents)
     var menuRecents by remember { mutableStateOf(false) } // the open app menu was opened from the Recent apps landing
-    SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }) // HOM-11: one arrangement per window size class
     val homeEdit = rememberHomeEdit(stores.layout, remember(context) { WorkspaceHomeDockPins(com.bos.sphere.feature.dock.WorkspaceRepository.get(context)) }) // HOM-12 (layout and dock pins share one undo)
+    SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }, onRebased = { homeEdit.rebase() }) // HOM-11: one arrangement per window size class; HOM-12: a swap is not an undoable edit
     var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18
     val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()
     val landscapeCorners by stores.shortcuts.landscapeCorners.collectAsStateWithLifecycle()
@@ -249,7 +253,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val corners = com.bos.sphere.core.data.CornerSets.select(portraitCorners, landscapeCorners, prefs.cornersPerOrientation, isLandscape)
     // HOM-22: on the Minimal landing the four corners are the hotspots: a corner still on the factory assignment gets the Minimal default, an assigned one keeps its own.
     val landing = prefs.homeLanding
-    val activeCorners = if (landing == HomeLanding.Minimal) MinimalHotspots.effective(corners) else corners
+    val activeCorners = if (HomeLandingRules.isHotspotOnly(landing)) MinimalHotspots.effective(corners) else corners
     val capacityOf: (PageLayout) -> Int = { it.capacity(isLandscape, prefs) }
     // HOM-01 / HOM-02: folders, shortcuts, links and widget tiles share the pages with apps on every home style.
     val extrasStore = remember { com.bos.sphere.core.catalog.HomeExtrasStore.get(context) }
@@ -454,7 +458,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             CornerActionId.AllApps -> openAllApps(anchor)
             CornerActionId.Notifications -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true
             CornerActionId.LauncherSettings -> openSettings(CATEGORY_HOME)
-            CornerActionId.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true
+            CornerActionId.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true // Launchpad off: the Minimal top-right hotspot (and a corner) opens the notification hub like "Notifications" does, never nothing
             CornerActionId.CycleLanding -> cycleLanding()
             else -> Unit
         }
@@ -974,6 +978,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     HomeLanding.Recents -> {
                         com.bos.sphere.feature.grid.RecentsLanding(
                             recents = landingRecents, look = look, usageAccessOn = usageAccessOn,
+                            hasWork = recentsHasWork, profile = recentsFilter, onProfile = { recentsProfile = it }, topInset = scrollTop,
                             onGrantUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
                             onLaunch = ::launch, onLongPress = { menuRecents = true; menuApp = it },
                         )
@@ -1100,8 +1105,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
             }
             // HOM-01: an empty home says how to fill it; the hint opens edit mode with the add carousel focused.
-            if (landing == HomeLanding.Selected && prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged && !homeEdit.active && !leftActive &&
-                com.bos.sphere.core.data.FreshHome.isEmpty(pages)
+            if (prefs.homeStyle == HomeStyle.Grid && prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Paged && !homeEdit.active && !leftActive &&
+                HomeLandingRules.showsEmptyHomeHint(landing, com.bos.sphere.core.data.FreshHome.isEmpty(pages))
             ) {
                 com.bos.sphere.feature.grid.EmptyHomeHint(
                     onOpen = { editFocusAdd = true; homeEdit.enter() }, modifier = Modifier.align(Alignment.Center),
@@ -1109,7 +1114,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 )
             }
             // HOM-08: widgets and the item strip live in a band on the scrolling homes, never over their tiles.
-            if (landing == HomeLanding.Selected && (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous)) {
+            if (HomeLandingRules.hasPages(landing) && (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous)) {
                 homeItems.Band(layout.pages, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), prefs.homeStyle)
             }
 
@@ -1440,7 +1445,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 extraEntries = com.bos.sphere.feature.dock.AppActionList.build(appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect()) { menuApp = null }
                     .map { it.label to it.run } + homeItems.appMenuEntries(app) { menuApp = null } +
                     // HOM-22: on the Recent apps landing the app menu also offers to take the app off the list, or to clear the list.
-                    (if (menuRecents) listOf(
+                    (if (menuRecents && HomeLandingRules.hasRecentsMenu(landing)) listOf(
                         L10n.tr("Remove from recents") to { stores.recentsState.remove(app.key); menuApp = null },
                         L10n.tr("Clear recents") to { stores.recentsState.clear(); menuApp = null },
                     ) else emptyList()),

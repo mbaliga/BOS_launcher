@@ -591,7 +591,7 @@ fun GridHome(
                                                     if (probe != null && probe.hitKey != dragKey) dropTracker.update(probe.hitKey, probe.dx, probe.dy, probe.cell, now) else dropTracker.reset()
                                                     ontoArmed = dropTracker.armedKey
                                                 }
-                                                val edge = 28.dp.toPx()
+                                                val edge = EditCardGeometry.pageEdgeZoneDp(editNow).dp.toPx() // HOM-12: wider while the home is a scaled card
                                                 val (along, extent) = if (st.paging == PagingAxis.Horizontal) {
                                                     c.position.x to size.width.toFloat()
                                                 } else {

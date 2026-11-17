@@ -144,6 +144,13 @@ object RecentsStateCodec {
         return RecentsState(cleared, removed)
     }
 
+    /**
+     * A removal or clear stamped after [now] was written while the clock was ahead (a wrong date since corrected): it would hide every launch
+     * until the clock caught up, so on load it is pulled back to [now]. Launches seen since then are newer than it and show again.
+     */
+    fun clampTo(s: RecentsState, now: Long): RecentsState =
+        RecentsState(minOf(s.clearedAt, now), s.removedAt.mapValues { minOf(it.value, now) })
+
     /** Removals at or before a clear are redundant; dropping them keeps the file small. */
     fun tidy(s: RecentsState): RecentsState =
         s.copy(removedAt = s.removedAt.filterValues { it > s.clearedAt }.entries.sortedByDescending { it.value }.take(MAX_REMOVED).associate { it.key to it.value })
@@ -154,7 +161,7 @@ object RecentsStateCodec {
  * `files/usage` (listed in [StateSchema.NEVER_EXPORTED_FILES], so it is never exported, never in system backup). Reading and
  * writing run on [io]; [state] changes at once.
  */
-class RecentsStateStore(private val file: File, private val io: Executor = SHARED_IO) {
+class RecentsStateStore(private val file: File, private val io: Executor = SHARED_IO, private val clock: () -> Long = System::currentTimeMillis) {
     private val lock = Any()
     private val _state = MutableStateFlow(RecentsState())
     val state: StateFlow<RecentsState> = _state.asStateFlow()
@@ -165,7 +172,7 @@ class RecentsStateStore(private val file: File, private val io: Executor = SHARE
         io.execute {
             val read = runCatching { if (file.exists()) RecentsStateCodec.decode(file.readText()) else RecentsState() }.getOrDefault(RecentsState())
             synchronized(lock) {
-                var s = read
+                var s = RecentsStateCodec.clampTo(read, clock())
                 for (op in pendingOps) s = op(s)
                 val changed = pendingOps.isNotEmpty()
                 pendingOps = ArrayList()

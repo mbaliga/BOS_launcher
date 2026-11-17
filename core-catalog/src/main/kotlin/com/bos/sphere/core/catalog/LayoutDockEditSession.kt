@@ -73,6 +73,18 @@ class LayoutDockEditSession(
 
     fun exit() { active = false; past.clear(); future.clear() }
 
+    /**
+     * HOM-12: the arrangement was replaced by something that is not an edit (a window size class change on rotation or folding, which
+     * swaps in that class's own arrangement). The history of the old one cannot be undone into the new one, so it ends here and
+     * [layout] / [pins] become the baseline; the store's echo of the same layout is then ignored by [observe].
+     */
+    fun rebase(layout: HomeLayout, pins: DockPinsView) {
+        if (!active) return
+        past.clear(); future.clear()
+        this.layout = layout
+        this.pins = pins
+    }
+
     private fun push(e: Entry) { past.addLast(e); while (past.size > limit) past.removeFirst(); future.clear() }
 
     private fun joinable(): Entry? = past.lastOrNull()?.takeIf { now() - it.at <= coalesceMs }

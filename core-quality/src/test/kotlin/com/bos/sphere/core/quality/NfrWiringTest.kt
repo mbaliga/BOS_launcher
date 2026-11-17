@@ -103,7 +103,7 @@ class NfrWiringTest {
 
     @Test fun NFR_12_preferenceFilesHomeNeedsAreWarmedFromTheApplication() {
         val warm = text("app/src/main/kotlin/com/bos/sphere/PrefsWarmup.kt")
-        val names = Regex("""getSharedPreferences\("([a-z_]+)"""").findAll(text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt")).map { it.groupValues[1] }.toList()
+        val names = Regex("""(?:getSharedPreferences|TolerantPrefs\.of)\((?:app, )?"([a-z_]+)"""").findAll(text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt")).map { it.groupValues[1] }.toList()
         assertTrue(names.size >= 5)
         names.forEach { assertTrue("$it not warmed", warm.contains("\"$it\"")) }
         assertTrue(warm.contains("hidden_apps") && warm.contains("crash_loop"))
@@ -220,7 +220,7 @@ class NfrWiringTest {
         // Durable state is in SharedPreferences files that survive process death, reboot and package update; the warm-up
         // list must cover every file LauncherStores opens (see NFR_12_preferenceFilesHomeNeedsAreWarmedFromTheApplication).
         val stores = text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt")
-        assertTrue(Regex("""getSharedPreferences\("""").findAll(stores).count() >= 5)
+        assertTrue(Regex("""(?:getSharedPreferences|TolerantPrefs\.of)\((?:app, )?"""").findAll(stores).count() >= 5) // wave 18: the stores open their files through TolerantPrefs.of, which wraps getSharedPreferences
         // Surfaces that hold only transient state (open palette, drawer) are reset on process death by design: stateNotNeeded.
         assertTrue(text("app/src/main/AndroidManifest.xml").contains("android:stateNotNeeded=\"true\""))
     }

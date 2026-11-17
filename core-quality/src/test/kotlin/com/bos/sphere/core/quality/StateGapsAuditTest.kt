@@ -19,8 +19,8 @@ class StateGapsAuditTest {
 
     @Test fun NFR_18_theLiveStoresAreBuiltOverTheExcludedDeviceFileAndAllThreeRuleFilesExcludeIt() {
         val stores = text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt")
-        assertTrue(stores.contains("LauncherPrefsStore(app.getSharedPreferences(\"launcher_prefs\", Context.MODE_PRIVATE), deviceBound)"))
-        assertTrue(stores.contains("ShortcutStore(app.getSharedPreferences(\"shortcuts\", Context.MODE_PRIVATE), deviceBound)"))
+        assertTrue(stores.contains("LauncherPrefsStore(TolerantPrefs.of(app, \"launcher_prefs\"), deviceBound)"))
+        assertTrue(stores.contains("ShortcutStore(TolerantPrefs.of(app, \"shortcuts\"), deviceBound)"))
         val dx = text("app/src/main/res/xml/data_extraction_rules.xml")
         val cloud = dx.substringAfter("<cloud-backup").substringBefore("</cloud-backup>")
         val transfer = dx.substringAfter("<device-transfer").substringBefore("</device-transfer>")
@@ -75,7 +75,7 @@ class StateGapsAuditTest {
             "core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/SizeClassLayouts.kt",
         )
         for (f in stores) assertTrue("$f must use WidgetIdSplit", text(f).contains("WidgetIdSplit.putString"))
-        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt").contains("HomeLayoutStore(app.getSharedPreferences(\"home_layout\", Context.MODE_PRIVATE), deviceBound)"))
+        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt").contains("HomeLayoutStore(TolerantPrefs.of(app, \"home_layout\"), deviceBound)"))
         // No store writes the raw encoded arrangement to its file any more.
         assertFalse(text("core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/HomeExtrasStore.kt").contains("putString(\"extras\""))
         assertFalse(text("core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/SizeClassLayouts.kt").contains("putString(\"pages:"))

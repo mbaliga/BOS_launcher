@@ -21,6 +21,12 @@ Stream: the Glance home (default landing, clock and date, now-playing with pop-i
 - `HomeLandingUiTest`, `HomeLandingQuickSheetTest`, `AppSmokeTest`: the fourth landing is labelled Glance, its description changed, the hotspots are the factory corners, and the Glance quick sheet is longer (the "Edit home pages" entry is scrolled to).
 - `W4MotionAuditTest`: the audit allow-list lists `GlanceHome.kt` with one gated fade.
 
+## Review pass (adversarial finisher)
+
+- Defect fixed: the Glance indicator's spoken description said "Recent apps are on the right edge" whenever the right side was not Off, including when it is the Dock rail. It now names each destination honestly (new string "Dock is on the right edge", 8 languages).
+- Checked by reading: default and migration (`LandingMigration`, marker only written for a non-default or an earlier choice), HomeScreen wiring (`GlanceSurface` composed on the Glance landing, corner dwell label and activation filtered by enabled hotspots, one media source), no hidden APIs added, the recents file and its privacy class are untouched by this stream, weather layer draws from precomputed arrays and brushes, reduced motion gates, clock kept LTR in RTL while the indicator mirrors.
+- Not verified here: any behaviour on a device, profiling (NFR-05), contrast over every background and weather pair (NFR-15).
+
 ## Residue
 
 - Device checks (checklist rows above).

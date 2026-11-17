@@ -356,7 +356,8 @@ internal fun GlanceIndicator(hasLaunchpad: Boolean, right: List<RightDestination
     val spoken = buildString {
         append(L10n.tr("Glance home"))
         if (hasLaunchpad) append(". ").append(L10n.tr("Launchpad is on the left edge"))
-        if (right.isNotEmpty()) append(". ").append(L10n.tr("Recent apps are on the right edge"))
+        // Honest wording: say what the right edge really is (the recents panel or the dock rail), not always "recent apps".
+        for (d in right) append(". ").append(L10n.tr(if (d == RightDestination.Recents) "Recent apps are on the right edge" else "Dock is on the right edge"))
     }
     Row(
         modifier.padding(bottom = 18.dp).graphicsLayer { alpha = a }.semantics { contentDescription = spoken }.clearAndSetSemanticsKeep(spoken),

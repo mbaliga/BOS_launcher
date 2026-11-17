@@ -14,6 +14,7 @@ object StateMigrations {
 
     private val steps: Map<Int, (JSONObject) -> JSONObject> = mapOf(
         1 to ::v1ToV2,
+        2 to ::v2ToV3,
     )
 
     /** Versions that have a migration step. Tests require a fixture file for each, so a new version cannot ship without one. */
@@ -36,6 +37,17 @@ object StateMigrations {
             v++
         }
         return Result(StateDocument(cur), from, false, applied)
+    }
+
+    // v3 (wave 15): the old background gallery is gone. Its keys are dropped from the settings; a file that carried them
+    // gets the default pair (Spire + Breathing dots) because no slots are stored. Everything else survives untouched.
+    private fun v2ToV3(old: JSONObject): JSONObject {
+        val out = JSONObject(old.toString())
+        val settings = out.optJSONObject(StateSchema.K_SETTINGS) ?: return out
+        settings.put("settingsVersion", StateSchema.SETTINGS_CURRENT)
+        val prefs = settings.optJSONObject("prefs") ?: return out
+        RetiredBackgroundKeys.KEYS.forEach { prefs.remove(it) }
+        return out
     }
 
     // v1: flat prefs at the top, layoutPages as a string, corners/gestures as maps.

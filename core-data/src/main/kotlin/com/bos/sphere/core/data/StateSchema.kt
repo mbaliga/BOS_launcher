@@ -20,12 +20,13 @@ import org.json.JSONObject
  */
 object StateSchema {
     const val FORMAT = "liftoff-state"
-    const val CURRENT = 2
+    /** 3 (wave 15): the old background gallery settings are retired; see [StateMigrations] and docs/decisions/backgroundsReset.md. */
+    const val CURRENT = 3
     const val OLDEST = 1
 
     /** The separable settings document (CFG-11) has its own format name and version. */
     const val SETTINGS_FORMAT = "liftoff-settings"
-    const val SETTINGS_CURRENT = 1
+    const val SETTINGS_CURRENT = 2
 
     const val K_FORMAT = "format"
     const val K_VERSION = "schemaVersion"

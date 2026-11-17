@@ -154,18 +154,4 @@ class AdaptiveWidgetsTest {
         assertEquals(1, RecentFilesModel.merge(listOf(a, b), 1).size)
         assertEquals("2 h ago", RecentFilesModel.age(10_000_000, 10_000_000 - 7_300_000))
     }
-
-    @Test
-    fun HOM_16_wallpaperOffsetsAndAccent() {
-        assertEquals(0.5f, WallpaperMath.xOffset(0f, 1), 0f)
-        assertEquals(0.5f, WallpaperMath.xOffset(1f, 3), 0f)
-        assertEquals(1f, WallpaperMath.xOffset(9f, 3), 0f)
-        assertEquals(0.5f, WallpaperMath.xStep(3), 0f)
-        val vivid = 0xFF2040E0.toInt()
-        val got = WallpaperMath.accent(listOf(0xFF808080.toInt(), vivid), 0xFFFFFFFF.toInt())
-        assertEquals(vivid, got)
-        assertEquals(0xFF123456.toInt(), WallpaperMath.accent(listOf(0xFF808080.toInt()), 0xFF123456.toInt()))
-        val dark = WallpaperMath.accent(listOf(0xFF100030.toInt()), 0)
-        assertTrue((dark shr 16 and 0xFF) + (dark shr 8 and 0xFF) + (dark and 0xFF) > 300 || (dark and 0xFF) >= 150)
-    }
 }

@@ -62,14 +62,14 @@ class W4MotionAuditTest {
     }
 
     // ------------------------------------------------------------------ NFR-15
-    @Test fun NFR_15_liveScenesAndHorizonAreSampledForTheScrimOffTheMainThread() {
+    /** Wave 15: the live scenes and the Horizon picture are gone; the two slots are sampled the same way, from the real painters. */
+    @Test fun NFR_15_theBackgroundItemsAreSampledForTheScrimOffTheMainThread() {
         val t = text("$grid/HomeLegibility.kt")
-        assertTrue(t.contains("kind == BackgroundKind.Live -> runCatching { liveSampleColors(preset, colorA) }"))
-        assertTrue(t.contains("horizonSampleColors(context)"))
-        assertTrue("sampling runs on Dispatchers.Default", t.indexOf("Dispatchers.Default") in 0 until t.indexOf("kind == BackgroundKind.Live -> runCatching"))
-        val b = text("$grid/Backgrounds.kt")
-        assertTrue(b.contains("CanvasDrawScope()"))
-        assertTrue("a small bitmap", Regex("""SAMPLE_W = \d+""").find(b)!!.value.filter { it.isDigit() }.toInt() <= 64)
+        assertTrue(t.contains("BackgroundSamples.colors(choice, intensity, dark)"))
+        assertTrue("sampling runs on Dispatchers.Default", t.indexOf("Dispatchers.Default") in 0 until t.indexOf("BackgroundSamples.colors(choice, intensity, dark)"))
+        assertTrue(t.contains("CanvasDrawScope()"))
+        assertTrue("the real painters are drawn", t.contains("BackgroundPainter("))
+        assertTrue("a small bitmap", Regex("""private const val W = \d+""").find(t)!!.value.filter { it.isDigit() }.toInt() <= 64)
     }
 
     @Test fun NFR_15_reachesAaIsStrengthenedAutomaticallyAndShownInTheLab() {

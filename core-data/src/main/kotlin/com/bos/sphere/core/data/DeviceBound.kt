@@ -3,7 +3,7 @@ package com.bos.sphere.core.data
 import android.content.SharedPreferences
 
 /**
- * NFR-18: values that mean something on one device only (app widget ids, the path of the private background picture).
+ * NFR-18: values that mean something on one device only (app widget ids).
  * They are kept in their own preference file, [FILE], which the platform backup and device transfer rules exclude, instead
  * of beside the setup in `launcher_prefs` and `shortcuts` (which are backed up and exported).
  *
@@ -13,26 +13,24 @@ import android.content.SharedPreferences
  */
 object DeviceBound {
     const val FILE = "device_bound"
+    /** Wave 15: the private background picture is gone with the old gallery; its key is only ever removed. */
     private const val PICTURE = "bgPicture"
     private const val LEFT_WIDGET = "leftWidgetId"
-
-    fun pictureOf(sp: SharedPreferences, device: SharedPreferences?): String =
-        (device?.getString(PICTURE, null) ?: sp.getString(PICTURE, "")) ?: ""
 
     fun leftWidgetOf(sp: SharedPreferences, device: SharedPreferences?, default: Int): Int =
         if (device != null && device.contains(LEFT_WIDGET)) device.getInt(LEFT_WIDGET, default) else sp.getInt(LEFT_WIDGET, default)
 
-    fun writePrefs(sp: SharedPreferences, device: SharedPreferences?, picture: String, leftWidget: Int) {
-        if (device == null) { sp.edit().putString(PICTURE, picture).putInt(LEFT_WIDGET, leftWidget).apply(); return }
-        device.edit().putString(PICTURE, picture).putInt(LEFT_WIDGET, leftWidget).apply()
-        if (sp.contains(PICTURE) || sp.contains(LEFT_WIDGET)) sp.edit().remove(PICTURE).remove(LEFT_WIDGET).apply()
+    fun writePrefs(sp: SharedPreferences, device: SharedPreferences?, leftWidget: Int) {
+        if (device == null) { sp.edit().putInt(LEFT_WIDGET, leftWidget).apply(); return }
+        device.edit().putInt(LEFT_WIDGET, leftWidget).apply()
+        if (sp.contains(LEFT_WIDGET)) sp.edit().remove(LEFT_WIDGET).apply()
+        if (device.contains(PICTURE)) device.edit().remove(PICTURE).apply()
     }
 
     /** Moves the two values an older build wrote into the main file over to the device file. */
     fun migratePrefs(sp: SharedPreferences, device: SharedPreferences?) {
         if (device == null || !(sp.contains(PICTURE) || sp.contains(LEFT_WIDGET))) return
         val e = device.edit()
-        if (sp.contains(PICTURE) && !device.contains(PICTURE)) e.putString(PICTURE, sp.getString(PICTURE, "") ?: "")
         if (sp.contains(LEFT_WIDGET) && !device.contains(LEFT_WIDGET)) e.putInt(LEFT_WIDGET, sp.getInt(LEFT_WIDGET, -1))
         e.apply()
         sp.edit().remove(PICTURE).remove(LEFT_WIDGET).apply()

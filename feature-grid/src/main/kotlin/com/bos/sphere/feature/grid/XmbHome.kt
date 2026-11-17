@@ -233,12 +233,10 @@ fun XmbHome(
     extras: HomeExtras? = null,
     extraKeys: List<String> = emptyList(),
     topLevel: List<String> = emptyList(),
-    /** HOM-16: forward the category bar's sideways position to the system wallpaper (home is drawn over it). */
-    wallpaperScroll: Boolean = false,
 ) {
     // Physical coordinates: layout and swipes must not mirror under RTL.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        XmbHomeImpl(apps, recent, categoryOf, onLaunch, onLongPress, modifier.homeGestures(gestures), contentPadding, showLabels, sounds, extras, extraKeys, topLevel, wallpaperScroll)
+        XmbHomeImpl(apps, recent, categoryOf, onLaunch, onLongPress, modifier.homeGestures(gestures), contentPadding, showLabels, sounds, extras, extraKeys, topLevel)
     }
 }
 
@@ -256,7 +254,6 @@ private fun XmbHomeImpl(
     extras: HomeExtras?,
     extraKeys: List<String>,
     topLevel: List<String>,
-    wallpaperScroll: Boolean = false,
 ) {
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
@@ -273,7 +270,6 @@ private fun XmbHomeImpl(
     // Keep the selection valid if the categories shrink under us.
     if (catPos > lastCat.coerceAtLeast(0)) catPos = lastCat.coerceAtLeast(0).toFloat()
 
-    if (wallpaperScroll) WallpaperScrollEffect(true, catPos, cats.size) // HOM-16: the bar moves sideways, one slot per category
     val shownCat by remember { derivedStateOf { catPos.roundToInt().coerceIn(0, lastCat.coerceAtLeast(0)) } }
     val shownRows = cats.getOrNull(shownCat)?.rows.orEmpty()
     val lastApp = shownRows.lastIndex

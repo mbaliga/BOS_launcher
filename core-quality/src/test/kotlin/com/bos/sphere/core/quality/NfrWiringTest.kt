@@ -101,12 +101,10 @@ class NfrWiringTest {
     }
 
     // ---- NFR-12
-    @Test fun NFR_12_photoPickerCopiesTheFileOffTheMainThread() {
-        val home = text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt")
-        val start = home.indexOf("val photoPicker")
-        val block = home.substring(start, home.indexOf("var pickingLeft", start))
-        assertTrue(block.contains("Dispatchers.IO"))
-        assertTrue("the copy must be inside withContext", block.indexOf("copyTo") > block.indexOf("withContext"))
+    /** Wave 15: the background photo picker was removed with the old gallery; there is no picker copy left to run on the main thread. */
+    @Test fun NFR_12_noBackgroundPhotoPickerRemainsAndLeftoverPicturesArePurgedOffTheMainThread() {
+        assertFalse(text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt").contains("photoPicker"))
+        assertTrue(text("app/src/main/kotlin/com/bos/sphere/MainActivity.kt").contains("Thread { StateService.get(applicationContext).purgeBackgroundPictures() }"))
     }
 
     @Test fun NFR_12_preferenceFilesHomeNeedsAreWarmedFromTheApplication() {

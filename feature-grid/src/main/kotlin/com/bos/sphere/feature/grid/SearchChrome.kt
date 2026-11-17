@@ -82,35 +82,10 @@ import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------- backdrop
 
-/** Black, or the bundled picture (cropped, gently scrimmed, drifting slowly when [motion]). */
+/** Wave 15: Radar's own base is plain black; the background items ([SignalBackground]) are drawn over it by the search overlay. */
 @Composable
-internal fun SearchBackdrop(style: com.bos.sphere.core.data.SearchBackdropStyle, motionRequested: Boolean, modifier: Modifier = Modifier) {
-    // NFR-14: with system animations off the backdrop holds still, whatever the setting says.
-    val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
-    val picture = style == com.bos.sphere.core.data.SearchBackdropStyle.Picture
-    Box(modifier.background(Color.Black)) {
-        // PAL-24: the Radar scope (sweep, ping, signal view) is drawn by RadarBackgroundHost above this backdrop; the old green sweep is retired.
-        if (picture) {
-            val drift = if (motion) {
-                rememberInfiniteTransition(label = "backdrop").animateFloat(
-                    -1f, 1f, infiniteRepeatable(tween(26_000, easing = LinearEasing), RepeatMode.Reverse), label = "drift",
-                )
-            } else null
-            Image(
-                painter = painterResource(R.drawable.search_backdrop),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().graphicsLayer {
-                    val d = drift?.value ?: 0f
-                    val s = if (drift != null) 1.12f else 1f
-                    scaleX = s; scaleY = s
-                    translationX = d * size.width * 0.035f
-                    translationY = d * size.height * 0.015f
-                },
-            )
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x66000000), Color(0x33000000), Color(0x80000000)))))
-        }
-    }
+internal fun SearchBackdrop(modifier: Modifier = Modifier) {
+    Box(modifier.background(Color.Black))
 }
 
 // ---------------------------------------------------------------- category wheel + query

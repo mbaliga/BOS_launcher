@@ -19,7 +19,7 @@ class RadarFrameBudgetTest {
         val comic = ComicLines()
         val line = GlowLinesMath.CENTRE_LINES.maxByOrNull { it.size }!!
         val buf = FloatArray(line.size * 4); val tmp = FloatArray(2)
-        val fade = Fade()
+        val fade = Fade(); val ease = LevelEase()
         // Warm up (class loading, JIT), then measure.
         fun frame(t: Long) {
             DotGridMath.fillBuckets(dots, t, false, buckets, counts)
@@ -30,7 +30,9 @@ class RadarFrameBudgetTest {
                 GlowLinesMath.calm(tmp[0], 0.4f)
             }
             fade.step(1f, t, 400, false)
-            ScopeMath.sweepAngle(t); ScopeMath.pingProgress(t)
+            ScopeMath.sweepAngle(t); ScopeMath.pingProgress(t, 5000f)
+            ease.step(if (t % 3 == 0L) 4 else 1, t * 16, false)
+            BackgroundCurves.at(BackgroundCurves.BEAM_REACH, 2.5f)
         }
         for (t in 0L until 200L) frame(t * 16)
         val before = allocatedBytes()
@@ -43,7 +45,7 @@ class RadarFrameBudgetTest {
     @Test fun PAL_24_drawFunctionsDoNotConstructPathsOrCollections() {
         val dir = listOf("src/main/kotlin/com/bos/sphere/feature/grid", "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid").map { File(it) }.first { it.exists() }
         val bodies = ArrayList<Pair<String, String>>()
-        for (name in listOf("SignalViews.kt", "RadarBackground.kt", "ComicLines.kt", "RadarBackdropMath.kt", "GlowLinesMath.kt")) {
+        for (name in listOf("SignalViews.kt", "SignalBackground.kt", "LivingWallpapers.kt", "BackgroundCurves.kt", "ComicLines.kt", "RadarBackdropMath.kt", "GlowLinesMath.kt")) {
             val text = File(dir, name).readText()
             Regex("""(override )?fun (draw\w*|fill\w*|slice|pulse|calm|step)\(""").findAll(text).forEach { m ->
                 var i = text.indexOf('{', m.range.last); var depth = 0; val start = i
@@ -62,7 +64,7 @@ class RadarFrameBudgetTest {
 
     @Test fun PAL_24_infiniteMotionIsOneSharedClockThatReadsMotionPrefsAndFocus() {
         val dir = listOf("src/main/kotlin/com/bos/sphere/feature/grid", "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid").map { File(it) }.first { it.exists() }
-        val text = File(dir, "RadarBackground.kt").readText()
+        val text = File(dir, "SignalBackground.kt").readText()
         assertTrue(text.contains("rememberMotionPrefs()"))
         assertTrue(text.contains("isWindowFocused"))
         assertTrue(text.contains("Lifecycle.State.RESUMED"))

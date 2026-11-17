@@ -42,6 +42,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import com.bos.sphere.core.data.BackgroundChoice
+import com.bos.sphere.core.data.BgItem
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.RadarIntensity
 import com.bos.sphere.core.data.SignalForce
@@ -55,9 +57,8 @@ import com.bos.sphere.core.signals.SignalState
 import kotlin.math.hypot
 
 /**
- * PAL-24: the Radar background. One Canvas, one animation clock, no recomposition per frame: every layer reads the
- * clock inside the draw lambda. Layers, bottom to top: breathing dot grid, scope rings and crosshair, the signal view,
- * comic lines (no signal only), sweep wedge, ping ring, centre dot. Decoration only: its semantics are cleared.
+ * PAL-24, HOM-16: the background. One Canvas, one animation clock, no recomposition per frame: every layer reads the
+ * clock inside the draw lambda. Layers: see [BackgroundPainter]. Decoration only: its semantics are cleared.
  */
 
 /**
@@ -101,18 +102,18 @@ internal fun rememberRadarActive(): Boolean {
     return resumed && LocalWindowInfo.current.isWindowFocused
 }
 
-/** What the background draws, from Ground Control's settings. */
-internal data class RadarBackdropConfig(
-    val sweep: Boolean = true,
-    val viewId: String = SignalViews.DEFAULT,
-    val comic: Boolean = true,
+/**
+ * What the background draws: the two slots, how strongly, on a dark or a light surface. [baseFill] paints the base colour
+ * (black, or a quiet light grey) too; surfaces that already have their own base leave it off.
+ */
+internal data class BackgroundConfig(
+    val choice: BackgroundChoice = BackgroundChoice.DEFAULT,
     val intensity: RadarIntensity = RadarIntensity.Normal,
     val dark: Boolean = true,
-    /** Paint the base colour (black / white) too; the Radar already has its own base. */
     val baseFill: Boolean = false,
 ) {
     val strength: Float get() = if (intensity == RadarIntensity.Subtle) 0.6f else 1f
-    companion object { fun from(p: LauncherPrefs, dark: Boolean = true) = RadarBackdropConfig(p.radarSweep, p.radarSignalView, p.radarComicNoSignal, p.radarIntensity, dark) }
+    companion object { fun from(p: LauncherPrefs, dark: Boolean = true, baseFill: Boolean = false) = BackgroundConfig(BackgroundChoice(p.backgroundSlot1, p.backgroundSlot2), p.radarIntensity, dark, baseFill) }
 }
 
 private fun ink(dark: Boolean) = if (dark) 0xFFFFFFFF.toInt() else 0xFF101016.toInt()
@@ -125,8 +126,8 @@ internal class DotPainter(val w: Float, val h: Float, private val density: Float
     private val counts = IntArray(DotGridMath.BUCKETS)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
 
-    fun draw(canvas: android.graphics.Canvas, tMs: Long, still: Boolean, dark: Boolean, strength: Float) {
-        DotGridMath.fillBuckets(layout, tMs, still, buckets, counts)
+    fun draw(canvas: android.graphics.Canvas, tMs: Long, still: Boolean, dark: Boolean, strength: Float, amplitude: Float = DotGridMath.BASE_AMPLITUDE, lit: Float = 1f) {
+        DotGridMath.fillBuckets(layout, tMs, still, buckets, counts, amplitude, lit)
         val rgb = ink(dark)
         val tone = if (dark) 1f else 0.6f
         for (k in 1 until DotGridMath.BUCKETS) {
@@ -145,8 +146,8 @@ internal class DotPainter(val w: Float, val h: Float, private val density: Float
     }
 }
 
-/** Rings, crosshair, sweep wedge, ping and centre dot of the scope, built once per size and config. */
-internal class ScopePainter(val w: Float, val h: Float, private val density: Float, dark: Boolean, private val strength: Float) {
+/** Rings, crosshair, sweep wedge, ping and centre dot of the scope, built once per size and surface tone. */
+internal class ScopePainter(val w: Float, val h: Float, private val density: Float, dark: Boolean) {
     private val c = Offset(w / 2f, h / 2f)
     private val maxR = 0.5f * hypot(w, h)
     private val tone = if (dark) 1f else 0.6f
@@ -156,25 +157,26 @@ internal class ScopePainter(val w: Float, val h: Float, private val density: Flo
     private val wedge = Brush.sweepGradient(
         colorStops = arrayOf(
             0f to Color.Transparent, 0.80f to Color.Transparent,
-            0.93f to inkC.copy(alpha = 0.035f * strength * tone), 1f to inkC.copy(alpha = 0.075f * strength * tone),
+            0.93f to inkC.copy(alpha = 0.035f * tone), 1f to inkC.copy(alpha = 0.075f * tone),
         ),
         center = c,
     )
 
-    fun drawStatic(s: DrawScope) = with(s) {
+    fun drawStatic(s: DrawScope, strength: Float) = with(s) {
         for (f in ScopeMath.RINGS) drawCircle(inkC.copy(alpha = 0.07f * strength * tone), radius = maxR * f, center = c, style = hair)
         drawLine(inkC.copy(alpha = 0.06f * strength * tone), Offset(c.x - maxR, c.y), Offset(c.x + maxR, c.y), 1f * density)
         drawLine(inkC.copy(alpha = 0.06f * strength * tone), Offset(c.x, c.y - maxR), Offset(c.x, c.y + maxR), 1f * density)
     }
 
-    fun drawMoving(s: DrawScope, tMs: Long, still: Boolean) = with(s) {
+    /** [wedgeGain] 0..1 scales the wedge, [pingEveryMs] is the gap between pings (<= 0 = none); both come from the signal level. */
+    fun drawMoving(s: DrawScope, tMs: Long, still: Boolean, strength: Float, wedgeGain: Float, pingEveryMs: Float) = with(s) {
         val angle = if (still) ScopeMath.STILL_ANGLE else ScopeMath.sweepAngle(tMs)
         rotate(angle, c) {
-            drawCircle(wedge, radius = maxR, center = c)
-            drawLine(inkC.copy(alpha = 0.09f * strength * tone), c, Offset(c.x + maxR, c.y), 1.4f * density)
+            drawCircle(wedge, radius = maxR, center = c, alpha = strength * wedgeGain)
+            drawLine(inkC.copy(alpha = 0.09f * strength * tone * wedgeGain), c, Offset(c.x + maxR, c.y), 1.4f * density)
         }
         if (!still) {
-            val p = ScopeMath.pingProgress(tMs)
+            val p = ScopeMath.pingProgress(tMs, pingEveryMs)
             if (p >= 0f) drawCircle(inkC.copy(alpha = 0.26f * ScopeMath.pingAlpha(p) * strength * tone), radius = maxR * 0.9f * ScopeMath.pingRadius(p), center = c, style = pingStroke)
         }
         drawCircle(inkC.copy(alpha = 0.16f * strength * tone), radius = 1.5f * density, center = c)
@@ -197,36 +199,47 @@ internal class ComicPainter(val w: Float, val h: Float, private val density: Flo
     }
 }
 
-/** One frame of everything, from per-size painters. Shared by the composable and the draw tests. */
-internal class RadarBackdropPainter(w: Float, h: Float, density: Float, private val cfg: RadarBackdropConfig, registry: List<SignalView> = SignalViews.views) {
+/**
+ * One frame of everything, from per-size painters. Layers, bottom to top: the base, the living wallpaper, the grain over it,
+ * the effects (in slot order), the comic lines (no signal only). Shared by the composable and the draw tests.
+ */
+internal class BackgroundPainter(w: Float, h: Float, density: Float, private val cfg: BackgroundConfig, registry: List<SignalView> = SignalViews.views) {
     private val geo = RadarGeometry(w, h, density)
-    private val dots = DotPainter(w, h, density)
-    private val scope = ScopePainter(w, h, density, cfg.dark, cfg.strength)
-    private val view: SignalPainter? = SignalViews.forId(cfg.viewId, registry)?.prepare(geo)
+    private val ordered: List<BgItem> = cfg.choice.items.sortedBy { if (it.living) 0 else 1 }
+    private val painters: Array<SignalPainter> = ordered.mapNotNull { SignalViews.forItem(it, registry)?.prepare(geo) }.toTypedArray()
+    private val lit = ordered.any { it.living || it == BgItem.BottomGlow }
+    private val grain = GrainPainter(w, h)
     private val comic = ComicPainter(w, h, density, cfg.dark)
     private val params = SignalDrawParams().also { it.dark = cfg.dark; it.intensity = cfg.strength }
     private val comicFade = Fade()
+    private val ease = LevelEase()
 
     fun draw(s: DrawScope, signal: SignalState?, tMs: Long, still: Boolean) {
         val canvas = s.drawContext.canvas.nativeCanvas
         if (cfg.baseFill) s.drawRect(if (cfg.dark) Color.Black else Color(0xFFF3F3F6))
-        dots.draw(canvas, tMs, still, cfg.dark, cfg.strength)
-        if (cfg.sweep) scope.drawStatic(s)
-        val wantComic = cfg.comic && signal != null && !signal.hasSignal
+        val state = signal ?: PENDING
+        val wantComic = signal != null && !signal.hasSignal
         val shown = comicFade.step(if (wantComic) 1f else 0f, tMs, 400, still)
         params.timeMs = tMs; params.still = still; params.comicShown = shown
-        view?.draw(s, signal ?: PENDING, params)
+        params.level = ease.step(signal?.level, tMs, still)
+        var grained = false
+        for (i in painters.indices) {
+            painters[i].draw(s, state, params)
+            if (!grained && lit && (i == painters.lastIndex || !ordered[i + 1].living && ordered[i + 1] != BgItem.BottomGlow)) { grain.draw(canvas, if (cfg.dark) 0.9f * cfg.strength else 0.3f); grained = true }
+        }
         if (shown > 0.01f) comic.draw(canvas, tMs, still, shown, cfg.strength)
-        if (cfg.sweep) scope.drawMoving(s, tMs, still)
     }
 
-    private companion object { val PENDING = SignalState.NoSignal }
+    private companion object { val PENDING = SignalState.forced(3) }
 }
 
-/** The background itself: pass the signal (null = not known yet) and the clock; [still] draws the reduced-motion frame. */
+/**
+ * The background of the app, as a pure drawing: pass the signal (null = not known yet, drawn calm and without comic lines) and
+ * the clock; [still] draws the reduced-motion frame. Surfaces use [SignalBackground]; tests and thumbnails use this.
+ */
 @Composable
-internal fun RadarBackground(
-    config: RadarBackdropConfig,
+internal fun SignalBackgroundCanvas(
+    config: BackgroundConfig,
     signal: State<SignalState?>,
     clock: RadarClock,
     still: Boolean,
@@ -234,26 +247,10 @@ internal fun RadarBackground(
 ) {
     Box(
         modifier.fillMaxSize().clearAndSetSemantics { }.drawWithCache {
-            val painter = RadarBackdropPainter(size.width, size.height, density, config)
+            val painter = BackgroundPainter(size.width, size.height, density, config)
             onDrawBehind {
                 val t = if (still) ScopeMath.STILL_TIME_MS else clock.now()
                 painter.draw(this, signal.value, t, still)
-            }
-        },
-    )
-}
-
-/** Reusable breathing dot grid (owner's design, docs/design/radar-dot-grid.md) on black, or its inverse when [dark] is false. */
-@Composable
-fun BreathingDotGrid(modifier: Modifier = Modifier, dark: Boolean = true, motion: Boolean = true) {
-    val reduced = rememberMotionPrefs().reduced || !motion
-    val clock = rememberRadarClock(active = rememberRadarActive(), reduced = reduced)
-    Box(
-        modifier.clearAndSetSemantics { }.drawWithCache {
-            val painter = DotPainter(size.width, size.height, density)
-            onDrawBehind {
-                drawRect(if (dark) Color.Black else Color(0xFFF3F3F6))
-                painter.draw(drawContext.canvas.nativeCanvas, if (reduced) 0L else clock.now(), reduced, dark, 1f)
             }
         },
     )
@@ -287,18 +284,25 @@ internal fun rememberRadarSignal(force: SignalForce, wanted: Boolean): State<Sig
     return remember(force) { derivedStateOf { if (force == SignalForce.Live) live.value else SignalState.forced(force.level) } }
 }
 
-/** What Radar puts behind its content: the background plus a polite description of the signal for TalkBack. */
+/**
+ * THE background composable (HOM-16, PAL-24): every surface that draws a background uses this one. It reads the two slots, the
+ * intensity and the Lab signal override from [prefs], follows the phone's signal (collected only while it is composed and the
+ * activity is started), runs one shared clock only while the screen is on and the window focused (and never under reduced
+ * motion), and announces the signal level to TalkBack once, politely, as a 1 dp live region. Place it as the bottom layer of a
+ * `Box`; it fills the box, has no touch handling and no other semantics. [dark] false draws the quiet light variant;
+ * [baseFill] paints the black (or light) base too. [animate] false draws one static frame (thumbnails, Settings backdrop).
+ */
 @Composable
-internal fun RadarBackgroundHost(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = true) {
-    val reduced = rememberMotionPrefs().reduced
+fun SignalBackground(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = true, baseFill: Boolean = false, animate: Boolean = true, announce: Boolean = true) {
+    val reduced = rememberMotionPrefs().reduced || !animate
     val active = rememberRadarActive()
-    val clock = rememberRadarClock(active, reduced)
-    val cfg = RadarBackdropConfig.from(prefs, dark)
-    val showsSignal = cfg.viewId != SignalViews.OFF || cfg.comic
-    val signal = rememberRadarSignal(prefs.radarSignalForce, showsSignal)
-    RadarBackground(cfg, signal, clock, reduced, modifier)
+    val clock = rememberRadarClock(active && animate, reduced)
+    val cfg = remember(prefs.backgroundSlot1, prefs.backgroundSlot2, prefs.radarIntensity, dark, baseFill) { BackgroundConfig.from(prefs, dark, baseFill) }
+    val shows = cfg.choice.items.isNotEmpty()
+    val signal = rememberRadarSignal(prefs.radarSignalForce, shows)
+    SignalBackgroundCanvas(cfg, signal, clock, reduced, modifier)
     val s = signal.value
-    if (showsSignal && s != null) {
+    if (announce && shows && s != null) {
         Box(Modifier.size(1.dp).semantics { liveRegion = LiveRegionMode.Polite; contentDescription = signalDescription(s) })
     }
 }

@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.grid
 
+import com.bos.sphere.core.data.BgItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -232,11 +233,10 @@ class RadarBackgroundMathTest {
 
     // ----------------------------------------------------------------- registry
 
-    @Test fun PAL_24_signalViewRegistryListsOffAndGlowLinesAndFallsBack() {
-        assertEquals(listOf("off", "glow"), SignalViews.options.map { it.id })
-        assertTrue(SignalViews.forId("off") == null)
-        assertEquals("glow", SignalViews.forId("glow")!!.id)
-        assertEquals("glow", SignalViews.forId("removed-later")!!.id)
+    @Test fun HOM_16_signalViewRegistryHasOneViewPerItemAndNoneHasNoView() {
+        assertEquals(BgItem.entries.filter { it != BgItem.None }.map { it.id }, SignalViews.views.map { it.id })
+        BgItem.entries.filter { it != BgItem.None }.forEach { assertEquals(it.id, SignalViews.forItem(it)!!.id) }
+        assertTrue(SignalViews.forItem(BgItem.None) == null)
     }
 
     @Test fun PAL_24_aSecondViewPlugsInThroughTheSameInterfaceWithoutTouchingTheHost() {
@@ -246,9 +246,9 @@ class RadarBackgroundMathTest {
             override fun prepare(geo: RadarGeometry): SignalPainter { prepared++; return object : SignalPainter { override fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope, signal: com.bos.sphere.core.signals.SignalState, p: SignalDrawParams) {} } }
         }
         val registry = SignalViews.views + dummy
-        assertEquals("dummy", SignalViews.forId("dummy", registry)!!.id)
-        assertEquals("glow", SignalViews.forId("nope", registry)!!.id)
-        SignalViews.forId("dummy", registry)!!.prepare(RadarGeometry(100f, 200f, 1f))
+        assertEquals(BgItem.Spire.id, SignalViews.forItem(BgItem.Spire, registry)!!.id)
+        assertTrue("an item missing from a registry has no view", SignalViews.forItem(BgItem.Beam, listOf(dummy)) == null)
+        dummy.prepare(RadarGeometry(100f, 200f, 1f))
         assertEquals(1, prepared)
     }
 }

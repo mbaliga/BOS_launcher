@@ -398,11 +398,11 @@ class ScreenshotTest {
         override fun deepSources() = emptyList<String>()
     }
 
-    private fun searchShot(name: String, layout: com.bos.sphere.core.data.SearchLayout, query: String, cat: com.bos.sphere.core.data.SearchCategory?, style: com.bos.sphere.core.data.SearchBackdropStyle = com.bos.sphere.core.data.SearchBackdropStyle.Picture) {
+    private fun searchShot(name: String, layout: com.bos.sphere.core.data.SearchLayout, query: String, cat: com.bos.sphere.core.data.SearchCategory?, backgroundChoice: com.bos.sphere.core.data.BackgroundChoice = com.bos.sphere.core.data.BackgroundChoice.DEFAULT) {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             SearchScreen(
-                apps = apps, recent = apps.take(9), prefs = LauncherPrefs(searchLayout = layout, searchBackdrop = true, searchBackdropStyle = style, searchMotion = true), contacts = null,
+                apps = apps, recent = apps.take(9), prefs = LauncherPrefs(searchLayout = layout, backgroundSlot1 = backgroundChoice.slot1, backgroundSlot2 = backgroundChoice.slot2, searchMotion = true), contacts = null,
                 onLaunch = {}, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {},
                 hub = fakeHub, onOpenHit = null, onRunAction = {}, onRequestFilePermission = {}, sounds = null,
                 initialQuery = query, initialCategory = cat,
@@ -421,7 +421,7 @@ class ScreenshotTest {
     fun searchOrbit() = searchShot("11-search-orbit", com.bos.sphere.core.data.SearchLayout.Orbit, "", null)
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun searchRadar() = searchShot("11b-search-radar", com.bos.sphere.core.data.SearchLayout.Orbit, "", null, com.bos.sphere.core.data.SearchBackdropStyle.Radar)
+    fun searchRadar() = searchShot("11b-search-radar", com.bos.sphere.core.data.SearchLayout.Orbit, "", null, com.bos.sphere.core.data.BackgroundChoice(com.bos.sphere.core.data.BgItem.GlowLines, com.bos.sphere.core.data.BgItem.RadarSweep))
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun searchFlat() = searchShot("12-search-flat", com.bos.sphere.core.data.SearchLayout.Flat, "ma", null)
@@ -441,11 +441,12 @@ class ScreenshotTest {
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun backgroundsShot() {
         rule.mainClock.autoAdvance = false
+        // Wave 15: the nine background items at the best signal, as the Ground Control thumbnails draw them.
         rule.setContent {
             androidx.compose.foundation.layout.Column {
-                for (k in listOf(com.bos.sphere.core.data.BackgroundKind.Gradient, com.bos.sphere.core.data.BackgroundKind.Texture, com.bos.sphere.core.data.BackgroundKind.Live)) {
+                for (row in com.bos.sphere.core.data.BgItem.entries.filter { it != com.bos.sphere.core.data.BgItem.None }.chunked(3)) {
                     androidx.compose.foundation.layout.Row(Modifier.weight(1f)) {
-                        BackgroundPresets.of(k).take(4).forEach { BackgroundLayer(k, it.id, 0xFF0A0B10, 0xFF2A1B5E, Modifier.weight(1f).fillMaxSize(), animate = false) }
+                        row.forEach { Box(Modifier.weight(1f).fillMaxSize()) { BackgroundThumbnail(it, com.bos.sphere.core.data.SignalForce.Excellent, com.bos.sphere.core.data.RadarIntensity.Normal) } }
                     }
                 }
             }

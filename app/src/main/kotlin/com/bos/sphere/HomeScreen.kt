@@ -98,7 +98,6 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.positionChange
 import com.bos.sphere.core.data.ActionCandidates
 import com.bos.sphere.core.data.ActionPrefs
-import com.bos.sphere.feature.grid.observeBackgroundTouch
 import com.bos.sphere.feature.dock.dockShortcuts
 import com.bos.sphere.ui.DockLayer
 import com.bos.sphere.feature.dock.trackLastTouch
@@ -566,20 +565,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         if (com.bos.sphere.core.data.CornerSets.writesLandscape(prefs.cornersPerOrientation, isLandscape)) stores.shortcuts.setLandscapeCorner(c, slot) else stores.shortcuts.setCorner(c, slot)
     }
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            val dest = java.io.File(context.noBackupFilesDir, "background_${System.currentTimeMillis()}.img") // NFR-18: never in a platform backup
-            // NFR-12: the copy runs on the IO dispatcher; only the preference update comes back to the main thread.
-            scope.launch {
-                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { context.contentResolver.openInputStream(uri)?.use { i -> dest.outputStream().use { o -> i.copyTo(o) } } }.isSuccess }
-                if (ok && dest.length() > 0) {
-                    val old = prefs.backgroundPicturePath
-                    stores.prefs.update { it.copy(backgroundKind = com.bos.sphere.core.data.BackgroundKind.Picture, backgroundPreset = "photo", backgroundPicturePath = dest.absolutePath) }
-                    if (old.isNotEmpty()) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { java.io.File(old).delete() } }
-                }
-            }
-        }
-    }
     androidx.compose.runtime.SideEffect { com.bos.sphere.feature.search.palette.PaletteWorkspaces.names = { com.bos.sphere.feature.dock.WorkspaceRepository.get(context).names() } }
     var pickingLeft by remember { mutableStateOf(false) }
     val homeItems = rememberHomeItems(
@@ -652,7 +637,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     com.bos.sphere.ui.ApplyTheming(prefs.themeMode, prefs.accentColor)
     val iconColors by stores.iconColors.colors.collectAsStateWithLifecycle()
     // HOM-16: with home over the system wallpaper, the accent is derived from it.
-    val homeAccent = com.bos.sphere.feature.grid.rememberHomeAccent(prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, prefs.accentColor)
+    val homeAccent = prefs.accentColor
     val iconTheme = remember(prefs.iconShape, prefs.iconTint, prefs.iconPlate, prefs.accentColor, iconColors, homeAccent) {
         IconTheme(prefs.iconShape, prefs.iconTint, prefs.iconPlate, homeAccent, iconColors)
     }
@@ -824,21 +809,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
     }
-    val bgTouch = remember { mutableStateOf<com.bos.sphere.feature.grid.TouchPoint?>(null) }
     @Composable
     fun Background() {
-        com.bos.sphere.feature.grid.BackgroundLayer(
-            kind = prefs.backgroundKind,
-            preset = prefs.backgroundPreset,
-            colorA = prefs.backgroundColorA,
-            colorB = prefs.backgroundColorB,
-            modifier = Modifier.fillMaxSize(),
-            touch = bgTouch,
-            picturePath = prefs.backgroundPicturePath,
-        )
-        // NFR-15: keeps clock and labels at WCAG AA over whatever wallpaper is behind them.
+        // HOM-16 (wave 15): the two signal-driven slots; the same composable is behind every surface.
+        com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), baseFill = true)
+        // NFR-15: keeps clock and labels at WCAG AA over whatever the background draws behind them.
         com.bos.sphere.feature.grid.HomeScrim(
-            com.bos.sphere.feature.grid.rememberHomeScrim(prefs.backgroundKind, prefs.backgroundPreset, prefs.backgroundColorA, prefs.backgroundColorB, prefs.backgroundPicturePath),
+            com.bos.sphere.feature.grid.rememberHomeScrim(com.bos.sphere.core.data.BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2), prefs.radarIntensity),
         )
         IndicatorLayer(
             reading = reading,
@@ -917,7 +894,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     CompositionLocalProvider(LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail) {
     Box(
-        modifier = Modifier.fillMaxSize().onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { homeEdit.exit(); true } else false }.observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
+        modifier = Modifier.fillMaxSize().onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { homeEdit.exit(); true } else false }.trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
             .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off, revealSlideDp, mirrored = launchpadRtl).leftSwipe(
             enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && !launchpadRtl &&
@@ -972,7 +949,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     style = prefs.homeStyle, columns = prefs.continuousColumns, scrollHorizontal = scrollHorizontal, padding = scrollPadding, iconScale = prefs.iconScale,
                     spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds, gestures = homeGestureSpec,
                     categoryOf = { com.bos.sphere.feature.search.AppSearch.categoryNameOf(it.packageName) },
-                    wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System,
                 )
                 when (shown) {
                     HomeLanding.Recents -> {
@@ -1011,7 +987,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
-                        wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, // HOM-16
                     )
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
@@ -1066,7 +1041,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
-                        wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, // HOM-16
                     )
                     SettingsHoldBand()
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
@@ -1082,7 +1056,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         iconScale = prefs.iconScale, spacing = prefs.iconSpacing, showLabels = prefs.showLabels, sounds = sounds,
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
-                        wallpaperScroll = prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, // HOM-16
                     )
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
@@ -1097,8 +1070,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages),
                     )
-                    // HOM-16: the list only scrolls up and down, so the wallpaper gets the fixed centred offset.
-                    com.bos.sphere.feature.grid.WallpaperScrollEffect(prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, 0f, 1, scrollsAcross = false)
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
                     Corners()
                 }
@@ -1346,7 +1317,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
                 pickAppFor = { id -> pickFor = id },
-                pickBackgroundPhoto = { photoPicker.launch("image/*") },
                 pickLeftWidget = { pickingLeft = true; widgetPicker.launch() },
                 leftWidgetLabel = leftWidgetName,
                 prefs = prefs,
@@ -1420,11 +1390,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {
-                    com.bos.sphere.feature.grid.BackgroundLayer(
-                        kind = prefs.backgroundKind, preset = prefs.backgroundPreset,
-                        colorA = prefs.backgroundColorA, colorB = prefs.backgroundColorB,
-                        modifier = Modifier.fillMaxSize(), animate = false, picturePath = prefs.backgroundPicturePath,
-                    )
+                    com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), baseFill = true, animate = false, announce = false)
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = prefs.settingsDim.coerceIn(0f, 1f))))
                 }
             },

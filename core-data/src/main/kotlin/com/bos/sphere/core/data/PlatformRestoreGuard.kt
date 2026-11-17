@@ -4,7 +4,7 @@ import java.io.File
 import java.util.UUID
 
 /**
- * NFR-18: widget ids and the picked background picture belong to one device, but they live in files that also hold
+ * NFR-18: widget ids belong to one device, but they live in files that also hold
  * setup (`launcher_prefs`, `shortcuts`), so the platform's backup and device transfer carry them. A file-level exclusion
  * cannot separate them, so a restore is detected and they are removed afterwards.
  *
@@ -15,7 +15,7 @@ import java.util.UUID
  * recognised as a restore (stated limit; the state-file import path never carried these values).
  */
 object PlatformRestoreGuard {
-    data class Result(val restored: Boolean, val widgetsCleared: List<PendingWidget>, val backgroundCleared: Boolean)
+    data class Result(val restored: Boolean, val widgetsCleared: List<PendingWidget>)
 
     fun check(
         bound: File,
@@ -28,7 +28,7 @@ object PlatformRestoreGuard {
         val boundId = runCatching { bound.readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
         val localId = runCatching { local.readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
         val restored = boundId != null && boundId != localId
-        var result = Result(false, emptyList(), false)
+        var result = Result(false, emptyList())
         if (restored) result = clear(shortcuts, prefs, extras, deleteFile).copy(restored = true)
         if (boundId == null || restored || localId == null) {
             val fresh = UUID.randomUUID().toString()
@@ -52,21 +52,10 @@ object PlatformRestoreGuard {
             if (cur.leftPage == LeftPage.Widget) cleared += PendingWidget("leftPage", "", "")
             prefs.update { it.copy(leftWidgetId = d.leftWidgetId) }
         }
-        val hadPicture = cur.backgroundPicturePath.isNotEmpty()
-        if (hadPicture) {
-            deleteFile(cur.backgroundPicturePath)
-            prefs.update {
-                it.copy(
-                    backgroundPicturePath = "",
-                    backgroundKind = if (it.backgroundKind == BackgroundKind.Picture) d.backgroundKind else it.backgroundKind,
-                    backgroundPreset = if (it.backgroundPreset == "photo") d.backgroundPreset else it.backgroundPreset,
-                )
-            }
-        }
         if (cleared.isNotEmpty()) {
             val e = extras.read()
             extras.write(e.copy(widgets = e.widgets.filterNot { w -> cleared.any { it.slot == w.slot } } + cleared))
         }
-        return Result(true, cleared, hadPicture)
+        return Result(true, cleared)
     }
 }

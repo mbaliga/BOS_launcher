@@ -18,13 +18,13 @@ class RehydrationTest {
     fun NFR_11_theDeviceBoundFileTheKeyboardSlotAndTheWorkWidgetRecordSurviveARestart() {
         val main = MapSharedPreferences(); val corners = MapSharedPreferences(); val device = MapSharedPreferences()
         val extrasFile = File(tmp.root, "extras.json")
-        LauncherPrefsStore(main, device).update { it.copy(leftPage = LeftPage.Widget, leftWidgetId = 12, backgroundPicturePath = "/nb/background_9.img", restoreOpenSurfaces = true) }
+        LauncherPrefsStore(main, device).update { it.copy(leftPage = LeftPage.Widget, leftWidgetId = 12, restoreOpenSurfaces = true) }
         ShortcutStore(corners, device).setCorner(Corner.BottomRight, CornerSlot.Widget(5, "Clock"))
         StateExtrasStore(extrasFile).write(StateExtras(keyboardShortcuts = "OpenPalette=C:76", widgets = listOf(PendingWidget("corner.TopLeft", "Mail", "com.mail/.W", work = true))))
 
         // New process: new store objects over the same persisted maps and files.
         val prefs = LauncherPrefsStore(main, device).prefs.value
-        assertEquals(12, prefs.leftWidgetId); assertEquals("/nb/background_9.img", prefs.backgroundPicturePath); assertTrue(prefs.restoreOpenSurfaces)
+        assertEquals(12, prefs.leftWidgetId); assertTrue(prefs.restoreOpenSurfaces)
         assertEquals(CornerSlot.Widget(5, "Clock"), ShortcutStore(corners, device).corners.value[Corner.BottomRight])
         val e = StateExtrasStore(extrasFile).read()
         assertEquals("OpenPalette=C:76", e.keyboardShortcuts)

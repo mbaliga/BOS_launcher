@@ -143,15 +143,12 @@ class ReducedMotionUiTest {
         assertEquals(0, px and 0xFFFFFF)
     }
 
-    @Test fun NFR_15_solidAndGradientBackgroundsAreSampledFromTheirRealColours() {
-        assertEquals(listOf(0xFFF1EBDD.toInt()), WallpaperSamples.staticColors(com.bos.sphere.core.data.BackgroundKind.Solid, "ivory", 0, 0))
-        val g = WallpaperSamples.staticColors(com.bos.sphere.core.data.BackgroundKind.Gradient, "candy", 0, 0)
-        assertEquals(3, g.size)
-        assertTrue(WallpaperSamples.staticColors(com.bos.sphere.core.data.BackgroundKind.Live, "aurora", 0, 0).isEmpty())
-        // The brightest built-in solid needs a real scrim for light text; the darkest needs none.
-        val ivory = HomeLegibility.plan(listOf(Contrast.WHITE), WallpaperSamples.staticColors(com.bos.sphere.core.data.BackgroundKind.Solid, "ivory", 0, 0))
-        val ink = HomeLegibility.plan(listOf(Contrast.WHITE), WallpaperSamples.staticColors(com.bos.sphere.core.data.BackgroundKind.Solid, "ink", 0, 0))
-        assertTrue(ivory.alpha > 0.4 && ivory.reachesAa)
-        assertEquals(0.0, ink.alpha, 0.0)
+    /** Wave 15: solid and gradient backgrounds are gone; None is the pure black every text style already reaches AA on. */
+    @Test fun NFR_15_noneIsSampledAsPureBlackAndNeedsNoScrim() {
+        val none = BackgroundSamples.colors(com.bos.sphere.core.data.BackgroundChoice(com.bos.sphere.core.data.BgItem.None, com.bos.sphere.core.data.BgItem.None), com.bos.sphere.core.data.RadarIntensity.Normal, true)
+        assertEquals(listOf(0xFF000000.toInt()), none)
+        assertEquals(0.0, HomeLegibility.plan(listOf(Contrast.WHITE), none).alpha, 0.0)
+        val light = BackgroundSamples.colors(com.bos.sphere.core.data.BackgroundChoice(com.bos.sphere.core.data.BgItem.None, com.bos.sphere.core.data.BgItem.None), com.bos.sphere.core.data.RadarIntensity.Normal, false)
+        assertEquals(listOf(0xFFF3F3F6.toInt()), light)
     }
 }

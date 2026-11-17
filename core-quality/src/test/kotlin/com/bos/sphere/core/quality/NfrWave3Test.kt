@@ -32,11 +32,12 @@ class NfrWave3Test {
         assertTrue(t.contains("semantics { heading() }"))
     }
 
-    @Test fun NFR_15_texturesLiveScenesAndHorizonAreSampledForTheHomeScrim() {
+    /** Wave 15: textures, live scenes and the Horizon picture are gone; every item of the two-slot model is sampled from its real painter. */
+    @Test fun NFR_15_everyBackgroundItemIsSampledForTheHomeScrim() {
         val t = text("$grid/HomeLegibility.kt")
-        assertTrue(t.contains("kind == BackgroundKind.Texture"))
-        assertTrue(t.contains("kind == BackgroundKind.Live"))
-        assertTrue(t.contains("horizonSampleColors"))
+        assertTrue(t.contains("BackgroundSamples"))
+        assertTrue(t.contains("SignalViews.views"))
+        assertTrue(t.contains("rememberHomeScrim(choice: BackgroundChoice"))
     }
 
     @Test fun NFR_01_NFR_05_macrobenchmarkIsOneGradleFlagAndDeviceStepsAreOneScript() {

@@ -13,12 +13,14 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.PathParser
+import com.bos.sphere.core.data.BgItem
 import com.bos.sphere.core.signals.SignalState
 
 /**
- * PAL-24: pluggable ways of showing signal on the Radar background. A [SignalView] is stateless and cheap to hold; it
- * prepares a [SignalPainter] once per window size (paths, paints, buffers), and the painter draws one frame from a
- * [SignalState] and the shared clock without allocating. More views are added by listing them in [SignalViews.views].
+ * PAL-24, HOM-16: the items a background slot can hold (wave 15: five living wallpapers and four effects), each a way of
+ * showing signal. A [SignalView] is stateless and cheap to hold; it prepares a [SignalPainter] once per window size (paths,
+ * paints, buffers), and the painter draws one frame from a [SignalState], the eased level and the shared clock without
+ * allocating. The registry is [SignalViews.views], one entry per [BgItem]; the living wallpapers are in LivingWallpapers.kt.
  */
 internal class RadarGeometry(val w: Float, val h: Float, val density: Float) {
     val portrait: Boolean get() = h > w
@@ -34,6 +36,8 @@ internal class SignalDrawParams {
     var intensity: Float = 1f
     /** 0..1: how much the comic lines currently cover the screen (glow lines hide as it rises). */
     var comicShown: Float = 0f
+    /** The signal level eased over about a second, 0..4 (fractional); see [BackgroundCurves]. */
+    var level: Float = 3f
 }
 
 internal interface SignalPainter {
@@ -48,25 +52,17 @@ internal interface SignalView {
 }
 
 internal object SignalViews {
-    const val OFF = "off"
-    const val GLOW = "glow"
-    const val DEFAULT = GLOW
+    /** One view per item, in the order Ground Control lists them: the living wallpapers, then the effects. */
+    val views: List<SignalView> = listOf(BeamView, SpireView, HaloView, LaserView, ShaftView, GlowLinesView, BreathingDotsView, BottomGlowView, RadarSweepView)
 
-    /** The views, in the order Ground Control lists them. The owner will add more ways to view signal here. */
-    val views: List<SignalView> = listOf(GlowLinesView)
-
-    class Option(val id: String, val label: String)
-
-    val options: List<Option> = listOf(Option(OFF, "Off")) + views.map { Option(it.id, it.label) }
-
-    /** The view for a stored id; null = Off. An unknown id (a view removed later) falls back to the default view. */
-    fun forId(id: String, registry: List<SignalView> = views): SignalView? = if (id == OFF) null else registry.firstOrNull { it.id == id } ?: registry.firstOrNull { it.id == DEFAULT }
+    /** The view of [item], or null for None (and for an id missing from a test registry). */
+    fun forItem(item: BgItem, registry: List<SignalView> = views): SignalView? = if (item == BgItem.None) null else registry.firstOrNull { it.id == item.id }
 }
 
 /** "Glow lines": the owner's eight bracket lines with blue pulses whose count, speed and brightness encode the signal level. */
 internal object GlowLinesView : SignalView {
-    override val id = SignalViews.GLOW
-    override val label = "Glow lines"
+    override val id = BgItem.GlowLines.id
+    override val label = BgItem.GlowLines.label
     private const val BLUE = 0xFF078EFB.toInt()
 
     override fun prepare(geo: RadarGeometry): SignalPainter = GlowPainter(geo)
@@ -140,6 +136,32 @@ internal object GlowLinesView : SignalView {
                     }
                 }
             }
+        }
+    }
+}
+
+/** "Breathing dots": the owner's dot grid; the breath gets deeper and the lit area wider with the level. */
+internal object BreathingDotsView : SignalView {
+    override val id = BgItem.BreathingDots.id
+    override val label = BgItem.BreathingDots.label
+    override fun prepare(geo: RadarGeometry): SignalPainter = object : SignalPainter {
+        private val dots = DotPainter(geo.w, geo.h, geo.density)
+        override fun draw(scope: DrawScope, signal: SignalState, p: SignalDrawParams) {
+            dots.draw(scope.drawContext.canvas.nativeCanvas, p.timeMs, p.still, p.dark, p.intensity, BackgroundCurves.at(BackgroundCurves.DOTS_AMPLITUDE, p.level), BackgroundCurves.at(BackgroundCurves.DOTS_LIT, p.level))
+        }
+    }
+}
+
+/** "Radar sweep": rings, crosshair, a turning wedge and a ping; the wedge brightens and the pings come more often with the level (none with no signal). */
+internal object RadarSweepView : SignalView {
+    override val id = BgItem.RadarSweep.id
+    override val label = BgItem.RadarSweep.label
+    override fun prepare(geo: RadarGeometry): SignalPainter = object : SignalPainter {
+        private val light = ScopePainter(geo.w, geo.h, geo.density, false); private val night = ScopePainter(geo.w, geo.h, geo.density, true)
+        override fun draw(scope: DrawScope, signal: SignalState, p: SignalDrawParams) {
+            val sp = if (p.dark) night else light
+            sp.drawStatic(scope, p.intensity)
+            sp.drawMoving(scope, p.timeMs, p.still, p.intensity, BackgroundCurves.at(BackgroundCurves.SWEEP_WEDGE, p.level), BackgroundCurves.at(BackgroundCurves.PING_EVERY_MS, p.level))
         }
     }
 }

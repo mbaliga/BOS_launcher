@@ -59,8 +59,8 @@ class StateService private constructor(context: Context) {
         return PlatformRestoreGuard.check(File(root, "device-binding"), File(app.noBackupFilesDir, "device-binding"), s.shortcuts, s.prefs, extras)
     }
 
-    /** NFR-18: moves a picture an older build left in the backed-up files directory. Copies a file, so call it off the main thread. */
-    fun migrateBackgroundPictures(): Int = runCatching { BackgroundPictures.migrate(app.filesDir, app.noBackupFilesDir, LauncherStores.get(app).prefs) }.getOrDefault(0)
+    /** Wave 15: deletes the pictures of the removed background gallery. Touches files, so call it off the main thread. */
+    fun purgeBackgroundPictures(): Int = runCatching { BackgroundPictures.purge(app.filesDir, app.noBackupFilesDir) }.getOrDefault(0)
 
     fun currentParts(): StateParts = applier.current()
 

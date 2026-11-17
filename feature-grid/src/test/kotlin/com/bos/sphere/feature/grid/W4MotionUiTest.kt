@@ -1,6 +1,9 @@
 package com.bos.sphere.feature.grid
 
 import androidx.activity.ComponentActivity
+import com.bos.sphere.core.data.BackgroundChoice
+import com.bos.sphere.core.data.BgItem
+import com.bos.sphere.core.data.RadarIntensity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
@@ -37,32 +40,27 @@ class W4MotionUiTest {
 
     private val inks = listOf(0xFFE7E9F0.toInt(), 0xFFC9CDD6.toInt())
 
-    @Test fun NFR_15_everyLiveSceneIsSampledOffAFrameAndGetsAPlanThatReachesAa() {
-        com.bos.sphere.feature.grid.BackgroundPresets.lives.forEach { scene ->
-            val samples = liveSampleColors(scene.id, 0xFF6C5CE7)
-            assertEquals("${scene.id} samples", 25 * LIVE_SAMPLE_TIMES.size, samples.size)
+    /** Wave 15: the live scenes and the Horizon picture are gone; every item of the new background model is sampled the same way. */
+    @Test fun NFR_15_everyBackgroundItemIsSampledOffAFrameAndGetsAPlanThatReachesAa() {
+        val choices = BgItem.entries.filter { it != BgItem.None }.map { BackgroundChoice(it, BgItem.None) } + BackgroundChoice.DEFAULT
+        choices.forEach { choice ->
+            val name = choice.items.joinToString("+") { it.id }
+            val samples = BackgroundSamples.colors(choice, RadarIntensity.Normal, dark = true)
+            assertEquals("$name samples", 25 * 2 * 4, samples.size)
             assertTrue(samples.all { (it ushr 24) == 0xFF })
             val plan = HomeLegibility.plan(inks, samples)
-            assertTrue("${scene.id} reaches AA", plan.reachesAa)
-            samples.forEach { w -> inks.forEach { t -> assertTrue("${scene.id}", Contrast.ratio(t, Contrast.blend(plan.scrimColor, w, plan.alpha)) >= Contrast.AA_NORMAL - 0.02) } }
+            assertTrue("$name reaches AA", plan.reachesAa)
+            samples.forEach { w -> inks.forEach { t -> assertTrue(name, Contrast.ratio(t, Contrast.blend(plan.scrimColor, w, plan.alpha)) >= Contrast.AA_NORMAL - 0.02) } }
         }
     }
 
-    @Test fun NFR_15_liveSamplingIsDeterministicAndNotJustTheFallbackGrey() {
-        val a = liveSampleColors("aurora", 0xFF6C5CE7)
-        val b = liveSampleColors("aurora", 0xFF6C5CE7)
+    @Test fun NFR_15_samplingIsDeterministicAndNotJustTheFallbackGrey() {
+        val a = BackgroundSamples.colors(BackgroundChoice(BgItem.Spire, BgItem.None), RadarIntensity.Normal, true)
+        val b = BackgroundSamples.colors(BackgroundChoice(BgItem.Spire, BgItem.None), RadarIntensity.Normal, true)
         assertEquals(a, b)
         assertTrue("not all mid-grey", a.any { it != 0xFF808080.toInt() })
-        // A different scene gives different pixels, so the sampler is really drawing the scene it was asked for.
-        assertTrue(a != liveSampleColors("lava", 0xFF6C5CE7))
-    }
-
-    @Test fun NFR_15_horizonPictureIsDecodedSmallAndSampled() {
-        val samples = horizonSampleColors(rule.activity)
-        assertEquals(25, samples.size)
-        val plan = HomeLegibility.plan(inks, samples)
-        assertTrue(plan.reachesAa)
-        samples.forEach { w -> inks.forEach { t -> assertTrue(Contrast.ratio(t, Contrast.blend(plan.scrimColor, w, plan.alpha)) >= Contrast.AA_NORMAL - 0.02) } }
+        // A different item gives different pixels, so the sampler is really drawing the item it was asked for.
+        assertTrue(a != BackgroundSamples.colors(BackgroundChoice(BgItem.Laser, BgItem.None), RadarIntensity.Normal, true))
     }
 
     @Test fun NFR_14_hostDrivenAnimatedGoToPageLandsImmediatelyUnderReducedMotion() {

@@ -729,7 +729,6 @@ fun GridHome(
             }
         }
 
-        WallpaperScrollEffect(prefs.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System, pagerState.currentPage + pagerState.currentPageOffsetFraction, pageCount)
         PageIndicator(
             count = pageCount,
             current = pagerState.currentPage,

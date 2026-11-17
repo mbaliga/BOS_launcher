@@ -42,7 +42,6 @@ class LandingLook(
     val sounds: UiSounds?,
     val gestures: HomeGestureSpec?,
     val categoryOf: (AppEntry) -> String,
-    val wallpaperScroll: Boolean,
 )
 
 /**
@@ -56,19 +55,18 @@ internal fun LandingList(list: List<AppEntry>, look: LandingLook, ordered: Boole
         HomeStyle.Grid -> ContinuousHome(
             apps = list, crossCount = look.columns, landscape = look.scrollHorizontal, style = ContinuousStyle.Plain, onLaunch = onLaunch, onLongPress = onLongPress,
             modifier = Modifier.fillMaxSize(), contentPadding = look.padding, iconScale = look.iconScale, spacing = look.spacing, showLabels = look.showLabels,
-            sounds = look.sounds, gestures = look.gestures, wallpaperScroll = look.wallpaperScroll, jump = jump,
+            sounds = look.sounds, gestures = look.gestures, jump = jump,
         )
         HomeStyle.Dsi -> ContinuousHome(
             apps = list, crossCount = 3, landscape = look.scrollHorizontal, style = ContinuousStyle.Dsi, onLaunch = onLaunch, onLongPress = onLongPress,
             modifier = Modifier.fillMaxSize(), contentPadding = look.padding, iconScale = look.iconScale, spacing = look.spacing, showLabels = look.showLabels,
-            sounds = look.sounds, gestures = look.gestures, wallpaperScroll = look.wallpaperScroll, jump = jump,
+            sounds = look.sounds, gestures = look.gestures, jump = jump,
         )
         HomeStyle.List -> if (ordered) RecentsListHome(list, onLaunch, onLongPress, Modifier.fillMaxSize(), look.padding, look.iconScale, look.showLabels, look.gestures)
         else ListHome(list, onLaunch, onLongPress, Modifier.fillMaxSize(), look.padding, look.iconScale, look.showLabels, look.gestures)
         HomeStyle.Psp -> XmbHome(
             apps = list, recent = if (ordered) list else emptyList(), categoryOf = look.categoryOf, onLaunch = onLaunch, onLongPress = onLongPress,
             modifier = Modifier.fillMaxSize(), contentPadding = look.padding, showLabels = look.showLabels, sounds = look.sounds, gestures = look.gestures,
-            wallpaperScroll = look.wallpaperScroll,
         )
     }
 }
@@ -107,7 +105,7 @@ fun RecentsLanding(
             val padR = look.padding.calculateRightPadding(LayoutDirection.Ltr)
             val listLook = remember(look, padL, padR) {
                 LandingLook(look.style, look.columns, look.scrollHorizontal, PaddingValues(start = padL, end = padR, top = 4.dp, bottom = look.padding.calculateBottomPadding()),
-                    look.iconScale, look.spacing, look.showLabels, look.sounds, look.gestures, look.categoryOf, look.wallpaperScroll)
+                    look.iconScale, look.spacing, look.showLabels, look.sounds, look.gestures, look.categoryOf)
             }
             Column(Modifier.fillMaxSize().safeDrawingPadding().padding(top = topInset)) {
                 RecentsProfileChips(profile, onProfile, Modifier.padding(horizontal = padL.coerceAtMost(24.dp), vertical = 4.dp))
@@ -157,7 +155,7 @@ fun AllAppsLanding(
     val padR = look.padding.calculateRightPadding(LayoutDirection.Ltr)
     val listLook = remember(look, padL, padR) {
         LandingLook(look.style, look.columns, look.scrollHorizontal, PaddingValues(start = padL, end = padR, top = 4.dp, bottom = look.padding.calculateBottomPadding()),
-            look.iconScale, look.spacing, look.showLabels, look.sounds, look.gestures, look.categoryOf, look.wallpaperScroll)
+            look.iconScale, look.spacing, look.showLabels, look.sounds, look.gestures, look.categoryOf)
     }
     Column(modifier.fillMaxSize().safeDrawingPadding().padding(top = topInset)) {
         DrawerFilterBar(filter, Modifier.padding(horizontal = padL.coerceAtMost(24.dp)))

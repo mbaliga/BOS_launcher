@@ -103,7 +103,6 @@ class SettingsModel(
     val isLandscape: Boolean,
     val chosenApp: (CornerActionId) -> String?,
     val pickLeftWidget: () -> Unit,
-    val pickBackgroundPhoto: () -> Unit,
     val leftWidgetLabel: String?,
     val pickAppFor: (CornerActionId) -> Unit,
     val motionAvailable: Boolean,
@@ -604,12 +603,12 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Settings backdrop"), Glyphs.Moon, com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { x(it.label) },
-                    hint = x("Settings use your wallpaper, dimmed — or pitch black."),
+                    hint = x("Settings use your background, dimmed, or pitch black."),
                     preview = {
                         VisualChoice(com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { v -> upd { it.copy(settingsBackdrop = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { b ->
                             if (b == com.bos.sphere.core.data.SettingsBackdrop.Black) androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
                             else androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                                com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, p.backgroundPreset, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxSize(), animate = false, picturePath = p.backgroundPicturePath)
+                                com.bos.sphere.feature.grid.SignalBackground(p, Modifier.fillMaxSize(), baseFill = true, animate = false, announce = false)
                                 androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = p.settingsDim)))
                             }
                         }
@@ -619,37 +618,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             if (p.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Wallpaper) {
                 add(SettingItem.Slider(x("Backdrop dimming"), Glyphs.Moon, p.settingsDim, 0.2f..0.95f, pct(p.settingsDim)) { v -> upd { it.copy(settingsDim = v) } })
             }
-            add(
-                SettingItem.Pane(x("Background"), Glyphs.Image, x(p.backgroundKind.name)) {
-                    val kinds = com.bos.sphere.core.data.BackgroundKind.entries
-                    VisualChoice(kinds, p.backgroundKind, { k ->
-                        upd { it.copy(backgroundKind = k, backgroundPreset = com.bos.sphere.feature.grid.BackgroundPresets.default(k)) }
-                    }, { x(it.name) }, columns = 3, previewHeight = 90.dp) { k ->
-                        com.bos.sphere.feature.grid.BackgroundLayer(k, com.bos.sphere.feature.grid.BackgroundPresets.default(k), p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false, picturePath = p.backgroundPicturePath)
-                    }
-                    val presets = com.bos.sphere.feature.grid.BackgroundPresets.of(p.backgroundKind).let { base ->
-                        if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Picture && p.backgroundPicturePath.isNotEmpty()) base + com.bos.sphere.feature.grid.BackgroundPreset("photo", x("My photo")) else base
-                    }
-                    if (presets.isNotEmpty()) {
-                        Sub(p.backgroundKind.name)
-                        VisualChoice(presets, presets.firstOrNull { it.id == p.backgroundPreset } ?: presets.first(), { pr -> upd { it.copy(backgroundPreset = pr.id) } }, { it.label }, columns = 3, previewHeight = 90.dp) { pr ->
-                            com.bos.sphere.feature.grid.BackgroundLayer(p.backgroundKind, pr.id, p.backgroundColorA, p.backgroundColorB, Modifier.fillMaxWidth().height(90.dp), animate = false, picturePath = p.backgroundPicturePath)
-                        }
-                    }
-                    if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Solid || p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Gradient) {
-                        Sub("Your own colour")
-                        ColorPicker(p.backgroundColorA, { v -> upd { it.copy(backgroundColorA = v, backgroundPreset = "custom") } })
-                        if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Gradient) {
-                            Sub("Second colour")
-                            ColorPicker(p.backgroundColorB, { v -> upd { it.copy(backgroundColorB = v, backgroundPreset = "custom") } })
-                        }
-                    }
-                    if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.Picture) {
-                        com.bos.sphere.feature.grid.ActionRow(label = x("Choose a photo…"), summary = if (p.backgroundPicturePath.isEmpty()) null else x("Replace"), onClick = m.pickBackgroundPhoto)
-                    }
-                    if (p.backgroundKind == com.bos.sphere.core.data.BackgroundKind.System) note("Your phone's wallpaper shows through.")
-                },
-            )
+            add(SettingItem.Pane(x("Background"), Glyphs.Image, p.backgroundSummary()) { com.bos.sphere.feature.grid.BackgroundPane(p, m.updatePrefs) }) // HOM-16
         },
     )
 
@@ -667,12 +636,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 },
             ) { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } },
             SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: Radar opens as a flat list while a keyboard or mouse is in use")) { v -> upd { it.copy(searchLayoutPinned = v) } },
-            SettingItem.Choice(
-                x("Background"), Glyphs.Image, com.bos.sphere.core.data.SearchBackdropStyle.entries,
-                if (p.searchBackdrop) p.searchBackdropStyle else com.bos.sphere.core.data.SearchBackdropStyle.None, { x(it.label) },
-                hint = x("A picture, plain black, or a radar scope with a turning sweep"),
-            ) { v -> upd { it.copy(searchBackdropStyle = v, searchBackdrop = true) } },
-            SettingItem.Pane(x("Radar background"), Glyphs.Radar, "") { com.bos.sphere.feature.grid.RadarBackgroundPane(p, m.updatePrefs) }, // PAL-24
             SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly; off keeps them still until you move them")) { v -> upd { it.copy(searchMotion = v) } },
             SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("DuckDuckGo understands !bangs: type !g for Google, !gi for images, !yt for YouTube.")) { v -> upd { it.copy(webEngine = v) } },
             SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },
@@ -829,3 +792,7 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
 private fun ChipRowItem(label: String, selected: Boolean, onClick: () -> Unit) {
     com.bos.sphere.feature.grid.ActionRow(label = label, selected = selected, onClick = onClick)
 }
+
+/** The summary line of the Background row: the two slots, "Spire + Breathing dots". */
+private fun com.bos.sphere.core.data.LauncherPrefs.backgroundSummary(): String =
+    com.bos.sphere.core.data.BackgroundChoice(backgroundSlot1, backgroundSlot2).items.joinToString(" + ") { com.bos.sphere.core.design.L10n.tr(it.label) }.ifEmpty { com.bos.sphere.core.design.L10n.tr("None") }

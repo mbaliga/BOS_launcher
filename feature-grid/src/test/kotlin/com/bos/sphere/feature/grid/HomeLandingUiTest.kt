@@ -193,7 +193,7 @@ class HomeLandingUiTest {
     // ---- Recent apps and All apps
 
     private fun look(style: HomeStyle, landscape: Boolean = false) = LandingLook(
-        style, 4, landscape, androidx.compose.foundation.layout.PaddingValues(16.dp), 0.8f, 0.5f, true, null, null, { "Tools" }, false,
+        style, 4, landscape, androidx.compose.foundation.layout.PaddingValues(16.dp), 0.8f, 0.5f, true, null, null, { "Tools" },
     )
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

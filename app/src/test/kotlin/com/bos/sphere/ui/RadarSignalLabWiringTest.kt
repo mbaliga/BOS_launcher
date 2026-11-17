@@ -20,10 +20,12 @@ class RadarSignalLabWiringTest {
         for (state in listOf("Live", "No signal", "Weak", "Fair", "Good", "Excellent")) assertTrue(state, data.contains("\"$state\""))
     }
 
-    @Test fun PAL_24_radarCategoryHasTheRadarBackgroundPane() {
+    /** Wave 15: the Radar-only pane became the one Background pane (HOM-16), which Radar shares with the home. */
+    @Test fun PAL_24_theBackgroundPaneReplacesTheRadarOnlyPaneAndHoldsTheLabSignalControls() {
         val cats = text("app/src/main/kotlin/com/bos/sphere/ui/SettingsCategories.kt")
-        assertTrue(cats.contains("x(\"Radar background\")"))
-        assertTrue(cats.contains("RadarBackgroundPane(p, m.updatePrefs)"))
+        assertTrue(cats.contains("BackgroundPane(p, m.updatePrefs)"))
+        assertTrue(!cats.contains("RadarBackgroundPane"))
+        assertTrue(text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/BackgroundPane.kt").contains("Preview signal"))
     }
 
     @Test fun PAL_24_noNewPermissionIsDeclaredForTheSignalSource() {

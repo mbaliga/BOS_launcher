@@ -30,11 +30,11 @@ class GrantCallSitesTest {
 
 /** NFR-18: device-bound values are kept out of platform restore and the guard that removes the rest is installed at start. */
 class PlatformRestoreWiringTest {
-    @Test fun NFR_18_theGuardRunsAtStartAndNewBackgroundPicturesLiveInTheNoBackupDirectory() {
+    /** Wave 15: no background picture is written any more, so the no-backup picture check became "none is written". */
+    @Test fun NFR_18_theGuardRunsAtStartAndNoBackgroundPictureIsWrittenAnywhere() {
         val main = Repo.file("app/src/main/kotlin/com/bos/sphere/MainActivity.kt").readText()
         assertTrue(main.contains("guardPlatformRestore()"))
         val home = Repo.file("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt").readText()
-        assertTrue(home.contains("noBackupFilesDir, \"background_"))
-        assertTrue(!home.contains("filesDir, \"background_"))
+        assertTrue(!home.contains("background_"))
     }
 }

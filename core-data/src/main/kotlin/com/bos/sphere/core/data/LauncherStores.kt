@@ -59,7 +59,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
                 indicatorIntensity = it.indicatorIntensity.coerceIn(0f, 1f),
                 indicatorSpeed = it.indicatorSpeed.coerceIn(0f, 1f),
                 recentsLimit = HomeRecents.clampLimit(it.recentsLimit),
-            )
+            ).let { p -> BackgroundChoice.normalised(p.backgroundSlot1, p.backgroundSlot2).let { c -> p.copy(backgroundSlot1 = c.slot1, backgroundSlot2 = c.slot2) } }
         }
         if (next == _prefs.value) return
         _prefs.value = next
@@ -70,7 +70,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putFloat("iconScale", next.iconScale)
             .putBoolean("labels", next.showLabels)
             .putBoolean("suggestion", next.showSuggestion)
-            .putBoolean("wallpaper", next.showWallpaper)
             .putBoolean("cornersFollow", next.cornersFollowDevice)
             .putString("pPaging", next.portraitPaging.name)
             .putString("lPaging", next.landscapePaging.name)
@@ -86,17 +85,15 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("strip", next.strip.entries.joinToString(",") { "${it.key.name}:${it.value.name}" })
             .putFloat("iconSpacing", next.iconSpacing)
             .putString("healthSource", next.healthSource.name)
-            .putString("bgKind", next.backgroundKind.name).putString("bgPreset", next.backgroundPreset)
-            .putLong("bgA", next.backgroundColorA).putLong("bgB", next.backgroundColorB)
             .putString("webEngine", next.webEngine.name)
             .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
             .putString("leftPage", next.leftPage.name).putBoolean("launchpadRail", next.launchpadRail).putString("lpTheme", next.launchpadTheme.name)
             .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
             .putFloat("spacingV", next.spacingV).putFloat("gridBias", next.gridBias).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
             .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
-            .putString("searchLayout", next.searchLayout.name).putBoolean("searchBackdrop", next.searchBackdrop).putString("searchBdStyle", next.searchBackdropStyle.name).putInt("homePage", next.homePage).putString("pageTransition", next.pageTransition.name).putBoolean("mediaControls", next.mediaControls)
+            .putString("searchLayout", next.searchLayout.name).putInt("homePage", next.homePage).putString("pageTransition", next.pageTransition.name).putBoolean("mediaControls", next.mediaControls)
             .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
-            .putBoolean("radarSweep", next.radarSweep).putString("radarSignalView", next.radarSignalView).putBoolean("radarComic", next.radarComicNoSignal)
+            .putString("bgSlot1", next.backgroundSlot1.id).putString("bgSlot2", next.backgroundSlot2.id)
             .putString("radarIntensity", next.radarIntensity.name).putString("radarSignalForce", next.radarSignalForce.name)
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
@@ -138,11 +135,17 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("homeLanding", next.homeLanding.name).putInt("recentsLimit", next.recentsLimit)
             .putBoolean("recentsUsage", next.recentsUseUsageAccess).putBoolean("minimalHints", next.minimalHints)
             .apply()
-        DeviceBound.writePrefs(sp, device, next.backgroundPicturePath, next.leftWidgetId)
+        // Wave 15: the keys of the removed background gallery are deleted once, so nothing of it lingers.
+        if (RetiredBackgroundKeys.KEYS.any { it != "bgPicture" && sp.contains(it) }) {
+            sp.edit().also { e -> RetiredBackgroundKeys.KEYS.forEach { e.remove(it) } }.apply()
+        }
+        DeviceBound.writePrefs(sp, device, next.leftWidgetId)
     }
 
     private fun read(): LauncherPrefs {
         val d = LauncherPrefs()
+        // Wave 15: any stored choice of the old background gallery is ignored; no stored slots means the default pair.
+        val bg = BackgroundChoice.fromStored(sp.getString("bgSlot1", null), sp.getString("bgSlot2", null))
         return LauncherPrefs(
             homeStyle = enumOr(sp.getString("style", null), d.homeStyle),
             homeScroll = enumOr(sp.getString("homeScroll", null), d.homeScroll),
@@ -156,7 +159,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
                 .coerceIn(LauncherPrefs.MIN_ICON_SCALE, LauncherPrefs.MAX_ICON_SCALE),
             showLabels = sp.getBoolean("labels", d.showLabels),
             showSuggestion = sp.getBoolean("suggestion", d.showSuggestion),
-            showWallpaper = sp.getBoolean("wallpaper", d.showWallpaper),
             cornersFollowDevice = sp.getBoolean("cornersFollow", d.cornersFollowDevice),
             portraitPaging = enumOr(sp.getString("pPaging", null), d.portraitPaging),
             landscapePaging = enumOr(sp.getString("lPaging", null), d.landscapePaging),
@@ -179,16 +181,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             } ?: d.strip,
             iconSpacing = sp.getFloat("iconSpacing", d.iconSpacing).coerceIn(0f, 1f),
             healthSource = enumOr(sp.getString("healthSource", null), d.healthSource),
-            // Older installs stored "show wallpaper" as a switch; it is now a background kind.
-            backgroundKind = sp.getString("bgKind", null)?.let { n -> BackgroundKind.entries.firstOrNull { it.name == n } }
-                ?: if (sp.getBoolean("wallpaper", false)) BackgroundKind.System else d.backgroundKind,
-            backgroundPreset = sp.getString("bgPreset", d.backgroundPreset) ?: d.backgroundPreset,
-            backgroundColorA = sp.getLong("bgA", d.backgroundColorA),
-            backgroundColorB = sp.getLong("bgB", d.backgroundColorB),
             webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
             searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
             searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
-            backgroundPicturePath = DeviceBound.pictureOf(sp, device),
+            backgroundSlot1 = bg.slot1, backgroundSlot2 = bg.slot2,
             leftPage = runCatching { LeftPage.valueOf(sp.getString("leftPage", null) ?: "") }.getOrDefault(d.leftPage),
             leftWidgetId = DeviceBound.leftWidgetOf(sp, device, d.leftWidgetId),
             launchpadRail = sp.getBoolean("launchpadRail", d.launchpadRail),
@@ -202,15 +198,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             gridInsetBottom = sp.getFloat("gridInsetBottom", d.gridInsetBottom),
             labelScale = sp.getFloat("labelScale", d.labelScale),
             searchLayout = runCatching { SearchLayout.valueOf(sp.getString("searchLayout", null) ?: "") }.getOrDefault(d.searchLayout),
-            searchBackdrop = sp.getBoolean("searchBackdrop", d.searchBackdrop),
-            searchBackdropStyle = enumOr(sp.getString("searchBdStyle", null), d.searchBackdropStyle),
             homePage = sp.getInt("homePage", d.homePage).coerceAtLeast(0),
             pageTransition = enumOr(sp.getString("pageTransition", null), d.pageTransition),
             mediaControls = sp.getBoolean("mediaControls", d.mediaControls),
             searchMotion = sp.getBoolean("searchMotion", d.searchMotion),
-            radarSweep = sp.getBoolean("radarSweep", d.radarSweep),
-            radarSignalView = sp.getString("radarSignalView", null) ?: d.radarSignalView,
-            radarComicNoSignal = sp.getBoolean("radarComic", d.radarComicNoSignal),
             radarIntensity = enumOr(sp.getString("radarIntensity", null), d.radarIntensity),
             radarSignalForce = enumOr(sp.getString("radarSignalForce", null), d.radarSignalForce),
             searchFiles = sp.getBoolean("searchFiles", d.searchFiles),

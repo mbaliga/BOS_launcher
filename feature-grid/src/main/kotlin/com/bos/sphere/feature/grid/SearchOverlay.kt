@@ -438,8 +438,8 @@ internal fun SearchScreen(
 
     CompositionLocalProvider(LocalResultScale provides scale.floatValue, LocalRadarSelection provides selectedKey) {
     Box(Modifier.fillMaxSize().radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey)) {
-        SearchBackdrop(if (prefs.searchBackdrop) prefs.searchBackdropStyle else com.bos.sphere.core.data.SearchBackdropStyle.None, prefs.searchMotion, Modifier.fillMaxSize())
-        RadarBackgroundHost(prefs, Modifier.fillMaxSize()) // PAL-24: dot grid, scope sweep, signal view, comic lines
+        SearchBackdrop(Modifier.fillMaxSize())
+        SignalBackground(prefs, Modifier.fillMaxSize()) // HOM-16, PAL-24: the two background items, the same on every surface
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
             if (flatMode) {
                 // Typing, or the Flat layout at rest (recent apps and people): a plain results list on top, the query sits at the bottom above the keyboard.

@@ -27,9 +27,10 @@ class StateGapsAuditTest {
         for (body in listOf(cloud, transfer, text("app/src/main/res/xml/backup_rules.xml"))) assertTrue(body.contains("""domain="sharedpref" path="device_bound.xml""""))
     }
 
-    @Test fun NFR_18_thePictureIsWrittenToTheNoBackupDirectoryAndOlderOnesAreMovedAtStart() {
-        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateService.kt").contains("BackgroundPictures.migrate(app.filesDir, app.noBackupFilesDir"))
-        assertFalse(text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt").contains("filesDir, \"background_"))
+    /** Wave 15: the background picture went with the old gallery (docs/decisions/backgroundsReset.md); this replaces the wave 4 test that moved pictures to the no-backup directory. */
+    @Test fun NFR_18_leftoverBackgroundPicturesArePurgedAtStartAndNothingWritesThemAnymore() {
+        assertTrue(text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateService.kt").contains("BackgroundPictures.purge(app.filesDir, app.noBackupFilesDir)"))
+        assertFalse(text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt").contains("background_"))
     }
 
     @Test fun CFG_07_stepCountingAndWeatherStayOutsideTheGrantScreenBecauseTheSpecListsFourGrants() {

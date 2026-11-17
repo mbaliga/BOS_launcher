@@ -81,7 +81,7 @@ object SettingsCodec {
         val src = settings?.optJSONObject("prefs") ?: JSONObject()
         val raw = LinkedHashMap<String, Any?>()
         src.keys().forEach { k ->
-            if (k in StateSchema.DEVICE_BOUND_PREF_KEYS) return@forEach
+            if (k in StateSchema.DEVICE_BOUND_PREF_KEYS || k in RetiredBackgroundKeys.KEYS) return@forEach // wave 15: the old background choice maps to the default pair
             raw[k] = when (val v = src.get(k)) {
                 is JSONArray -> List(v.length()) { v.getString(it) }.toSet()
                 else -> v
@@ -90,14 +90,12 @@ object SettingsCodec {
         val sp = MapSharedPreferences(raw)
         val read = LauncherPrefsStore(sp).prefs.value
         val unknown = JSONObject()
-        src.keys().forEach { k -> if (k !in sp.accessed && k !in StateSchema.DEVICE_BOUND_PREF_KEYS) unknown.put(k, src.get(k)) }
+        src.keys().forEach { k -> if (k !in sp.accessed && k !in StateSchema.DEVICE_BOUND_PREF_KEYS && k !in RetiredBackgroundKeys.KEYS) unknown.put(k, src.get(k)) }
         // This is an install that already has a setup, and device-bound values restart empty.
         val d = LauncherPrefs()
         val safe = read.copy(
             onboardingDone = true,
             leftWidgetId = d.leftWidgetId,
-            backgroundPicturePath = d.backgroundPicturePath,
-            backgroundKind = if (read.backgroundKind == BackgroundKind.Picture) d.backgroundKind else read.backgroundKind,
         )
         return Decoded(safe, unknown)
     }

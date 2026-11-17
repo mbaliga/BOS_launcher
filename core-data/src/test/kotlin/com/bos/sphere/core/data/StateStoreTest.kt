@@ -101,7 +101,8 @@ class StateStoreTest {
         assertEquals(HomeScroll.Continuous, parts.prefs.homeScroll)
         assertEquals(0.62f, parts.prefs.iconScale, 0f)
         assertEquals(mapOf(StripItem.Time to StripZone.Left, StripItem.Battery to StripZone.Right), parts.prefs.strip)
-        assertEquals(BackgroundKind.System, parts.prefs.backgroundKind)
+        // Wave 15: build 31 stored a "show wallpaper" switch; the old background gallery is gone, so it maps to the default pair.
+        assertEquals(BackgroundChoice.DEFAULT, BackgroundChoice(parts.prefs.backgroundSlot1, parts.prefs.backgroundSlot2))
         assertEquals(UiLanguage.German, parts.prefs.language)
         assertEquals(3, parts.layout.pages.first().keys.size)
         assertEquals(PageShape.Circle, parts.layout.pages[1].layout.shape)
@@ -112,7 +113,7 @@ class StateStoreTest {
         assertEquals(GroupMode.App, parts.launchpadPrefs.defaultMode)
         // Through the file and back: every section equal except the device-bound values, which must not travel.
         val back = StateCodec.decode(StateDocument.parse(StateCodec.export(parts, 1L).encode())).parts
-        val expectedPrefs = parts.prefs.copy(leftWidgetId = -1, backgroundPicturePath = "", onboardingDone = true)
+        val expectedPrefs = parts.prefs.copy(leftWidgetId = -1, onboardingDone = true)
         assertEquals(expectedPrefs, back.prefs)
         assertEquals(parts.layout, back.layout)
         assertEquals(parts.corners + (Corner.TopRight to CornerSlot.Empty), back.corners)

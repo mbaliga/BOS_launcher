@@ -71,7 +71,7 @@ class StateApplier(
 
     /**
      * Applies the sections in [present] (a settings-only file leaves layout and shortcuts alone). Values that belong
-     * to this device (widget bindings, the picked background picture) are kept from the live state.
+     * to this device (widget bindings) are kept from the live state.
      */
     fun apply(parts: StateParts, present: Set<String> = StateSchema.KNOWN_TOP) {
         if (StateSchema.K_SETTINGS in present) {
@@ -79,7 +79,6 @@ class StateApplier(
             prefs.update {
                 parts.prefs.copy(
                     leftWidgetId = cur.leftWidgetId,
-                    backgroundPicturePath = cur.backgroundPicturePath,
                     onboardingDone = true,
                 )
             }

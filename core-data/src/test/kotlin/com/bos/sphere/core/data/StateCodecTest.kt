@@ -153,8 +153,8 @@ class StateCodecTest {
     fun CFG_04_applyThenExportIsStable_andImportKeepsDeviceBoundValues() {
         val src = StateTestSupport.Process(extrasFile = tmp.newFile("a.json"))
         val dst = StateTestSupport.Process(extrasFile = tmp.newFile("b.json"))
-        // The destination has its own widget and picture.
-        dst.prefs.update { it.copy(leftWidgetId = 5, backgroundPicturePath = "/mine.img") }
+        // The destination has its own widget.
+        dst.prefs.update { it.copy(leftWidgetId = 5) }
         dst.shortcuts.setCorner(Corner.TopRight, CornerSlot.Widget(3, "Mine"))
         val files = StateTestSupport.build31Files()
         val parts = Build31Bridge.fromPrefFiles(files)
@@ -164,7 +164,6 @@ class StateCodecTest {
         dst.applier.apply(dec.parts, dec.present)
         assertEquals(HomeStyle.Psp, dst.prefs.prefs.value.homeStyle)
         assertEquals(5, dst.prefs.prefs.value.leftWidgetId)
-        assertEquals("/mine.img", dst.prefs.prefs.value.backgroundPicturePath)
         assertTrue(dst.prefs.prefs.value.onboardingDone)
         assertEquals(CornerSlot.Widget(3, "Mine"), dst.shortcuts.corners.value[Corner.TopRight])
         assertEquals(src.layout.layout.value.pages.map { it.keys }, dst.layout.layout.value.pages.map { it.keys })

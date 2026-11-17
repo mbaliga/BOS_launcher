@@ -9,22 +9,25 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/** NFR-18: widget ids and the private background picture path live in the excluded device file, not in the backed-up files. */
+/**
+ * NFR-18: widget ids live in the excluded device file, not in the backed-up files. Wave 15: the private background picture
+ * went with the removed background gallery, so its path is no longer stored; the leftover key and files are removed.
+ */
 class DeviceBoundTest {
     @get:Rule val tmp = TemporaryFolder()
 
     @Test
-    fun NFR_18_widgetIdsAndThePicturePathAreWrittenToTheDeviceFileAndNeverToTheBackedUpPrefs() {
+    fun NFR_18_widgetIdsAreWrittenToTheDeviceFileAndNeverToTheBackedUpPrefs() {
         val main = MapSharedPreferences(); val corners = MapSharedPreferences(); val device = MapSharedPreferences()
         val prefs = LauncherPrefsStore(main, device)
         val sc = ShortcutStore(corners, device)
-        prefs.update { it.copy(leftPage = LeftPage.Widget, leftWidgetId = 77, backgroundKind = BackgroundKind.Picture, backgroundPicturePath = "/nb/background_1.img") }
+        prefs.update { it.copy(leftPage = LeftPage.Widget, leftWidgetId = 77) }
         sc.setCorner(Corner.TopLeft, CornerSlot.Widget(41, "Clock"))
         sc.setLandscapeCorner(Corner.TopRight, CornerSlot.Widget(42, "Weather"))
         sc.setCorner(Corner.BottomLeft, CornerSlot.Single(CornerItem.App("a/.A#0")))
 
         assertFalse(main.contains("leftWidgetId")); assertFalse(main.contains("bgPicture"))
-        assertEquals(77, device.getInt("leftWidgetId", -1)); assertEquals("/nb/background_1.img", device.getString("bgPicture", null))
+        assertEquals(77, device.getInt("leftWidgetId", -1)); assertFalse(device.contains("bgPicture"))
         assertFalse("no widget id in the backed-up shortcuts file", corners.all.values.any { it.toString().contains("\"widget\"") })
         assertTrue(device.getString("corner.TopLeft", "")!!.contains("\"widget\""))
         assertFalse("other slots stay in the main file", device.contains("corner.BottomLeft"))
@@ -32,21 +35,19 @@ class DeviceBoundTest {
         // A second process over the same files reads the same values.
         val prefs2 = LauncherPrefsStore(main, device); val sc2 = ShortcutStore(corners, device)
         assertEquals(77, prefs2.prefs.value.leftWidgetId)
-        assertEquals("/nb/background_1.img", prefs2.prefs.value.backgroundPicturePath)
         assertEquals(CornerSlot.Widget(41, "Clock"), sc2.corners.value[Corner.TopLeft])
         assertEquals(CornerSlot.Widget(42, "Weather"), sc2.explicitLandscapeCorners()[Corner.TopRight])
     }
 
     @Test
-    fun NFR_18_aRestoreThatBringsBackOnlyTheMainFilesShowsEmptyCornersAndNoWidgetOrPicture() {
+    fun NFR_18_aRestoreThatBringsBackOnlyTheMainFilesShowsEmptyCornersAndNoWidget() {
         val main = MapSharedPreferences(); val corners = MapSharedPreferences(); val device = MapSharedPreferences()
         ShortcutStore(corners, device).setCorner(Corner.TopLeft, CornerSlot.Widget(41, "Clock"))
-        LauncherPrefsStore(main, device).update { it.copy(leftWidgetId = 5, backgroundPicturePath = "/x/background_2.img") }
+        LauncherPrefsStore(main, device).update { it.copy(leftWidgetId = 5) }
         val freshDevice = MapSharedPreferences() // the excluded file is not restored
         assertEquals(CornerSlot.Empty, ShortcutStore(corners, freshDevice).corners.value[Corner.TopLeft])
         val p = LauncherPrefsStore(main, freshDevice).prefs.value
         assertEquals(LauncherPrefs().leftWidgetId, p.leftWidgetId)
-        assertEquals("", p.backgroundPicturePath)
     }
 
     @Test
@@ -59,7 +60,7 @@ class DeviceBoundTest {
         val device = MapSharedPreferences()
         val p = LauncherPrefsStore(main, device).prefs.value
         val sc = ShortcutStore(corners, device)
-        assertEquals(9, p.leftWidgetId); assertEquals("/files/background_3.img", p.backgroundPicturePath)
+        assertEquals(9, p.leftWidgetId)
         assertEquals(HomeStyle.Dsi, p.homeStyle)
         assertFalse(main.contains("leftWidgetId")); assertFalse(main.contains("bgPicture"))
         assertEquals(CornerSlot.Widget(31, "Notes"), sc.corners.value[Corner.TopLeft])
@@ -79,18 +80,13 @@ class DeviceBoundTest {
     }
 
     @Test
-    fun NFR_18_aPictureFromAnOlderBuildIsMovedToTheNoBackupDirectoryAndThePathFollows() {
-        val files = tmp.newFolder("files"); val noBackup = File(tmp.root, "nobackup")
-        val old = File(files, BackgroundPictures.fileName(111L)).also { it.writeText("img") }
+    fun HOM_16_leftoverPicturesOfTheRemovedBackgroundGalleryArePurgedAndOtherFilesKept() {
+        val files = tmp.newFolder("files"); val noBackup = tmp.newFolder("nobackup")
+        File(files, "background_111.img").writeText("img"); File(noBackup, "background_222.img").writeText("img")
         val other = File(files, "keep.txt").also { it.writeText("k") }
-        val prefs = LauncherPrefsStore(MapSharedPreferences(), MapSharedPreferences())
-        prefs.update { it.copy(backgroundKind = BackgroundKind.Picture, backgroundPicturePath = old.absolutePath) }
-        assertEquals(1, BackgroundPictures.migrate(files, noBackup, prefs))
-        val dest = File(noBackup, old.name)
-        assertTrue(dest.readText() == "img"); assertFalse(old.exists()); assertTrue(other.exists())
-        assertEquals(dest.absolutePath, prefs.prefs.value.backgroundPicturePath)
-        assertEquals("a second run has nothing to move", 0, BackgroundPictures.migrate(files, noBackup, prefs))
-        assertTrue(BackgroundPictures.isPictureName(BackgroundPictures.fileName(5L)))
+        assertEquals(2, BackgroundPictures.purge(files, noBackup))
+        assertTrue(other.exists()); assertFalse(File(files, "background_111.img").exists()); assertFalse(File(noBackup, "background_222.img").exists())
+        assertEquals("a second run has nothing to remove", 0, BackgroundPictures.purge(files, noBackup))
     }
 
     @Test

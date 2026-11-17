@@ -81,15 +81,23 @@ internal object DotGridMath {
     /** Brightness of a dot: envelope scaled by breath (a dot never fully fades inside the envelope: 45 to 100 percent). */
     fun brightness(env: Float, breath: Float): Float = env * (0.45f + 0.55f * breath)
 
+    /** The breath depth of the owner's grid (0.55 = the 45 to 100 percent above); wave 15 lets the signal level change it. */
+    const val BASE_AMPLITUDE = 0.55f
+
+    /** Brightness with a chosen breath [amplitude] (0 steady .. 1 to nothing); [BASE_AMPLITUDE] equals [brightness]. */
+    fun brightness(env: Float, breath: Float, amplitude: Float): Float = env * ((1f - amplitude) + amplitude * breath)
+
     /**
      * Sort the dots into [BUCKETS] arrays of x,y pairs; returns nothing, fills [counts] (dots per bucket). Buckets must
      * be able to hold `layout.count * 2` floats. [still] freezes the grid at mid-breath.
      */
-    fun fillBuckets(layout: DotGridLayout, tMs: Long, still: Boolean, buckets: Array<FloatArray>, counts: IntArray) {
+    fun fillBuckets(layout: DotGridLayout, tMs: Long, still: Boolean, buckets: Array<FloatArray>, counts: IntArray, amplitude: Float = BASE_AMPLITUDE, lit: Float = 1f) {
         java.util.Arrays.fill(counts, 0)
         for (i in 0 until layout.count) {
             val b = if (still) STILL_BREATH else breath(tMs, layout.dist[i], layout.phase[i])
-            val k = bucketOf(brightness(layout.env[i], b))
+            // [lit] < 1 shrinks the lit area: the envelope reaches zero at that fraction of the grid's radius
+            val env = if (lit >= 1f) layout.env[i] else (1f - layout.dist[i] / lit).coerceAtLeast(0f)
+            val k = bucketOf(brightness(env, b, amplitude))
             if (k == 0) continue
             val c = counts[k]
             buckets[k][c * 2] = layout.xy[i * 2]; buckets[k][c * 2 + 1] = layout.xy[i * 2 + 1]
@@ -114,8 +122,13 @@ internal object ScopeMath {
     fun sweepAngle(tMs: Long): Float = (tMs % SWEEP_PERIOD_MS).toFloat() / SWEEP_PERIOD_MS * 360f
 
     /** 0..1 progress of the ping in its life, or -1 when none is showing. */
-    fun pingProgress(tMs: Long): Float {
-        val into = tMs % PING_EVERY_MS
+    fun pingProgress(tMs: Long): Float = pingProgress(tMs, PING_EVERY_MS.toFloat())
+
+    /** The same with a chosen gap between pings (wave 15: the signal level sets it); [everyMs] <= 0 means no ping at all. */
+    fun pingProgress(tMs: Long, everyMs: Float): Float {
+        if (everyMs <= 0f) return -1f
+        val every = everyMs.toLong().coerceAtLeast(PING_LIFE_MS + 1)
+        val into = tMs % every
         return if (into < PING_LIFE_MS) into.toFloat() / PING_LIFE_MS else -1f
     }
 

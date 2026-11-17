@@ -89,11 +89,6 @@ enum class HealthSourcePref(val label: String) { Phone("Phone sensor"), HealthCo
 /** Where in the strip an item sits. */
 enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right("Right") }
 
-/** What sits behind everything on the home screen. */
-enum class BackgroundKind(val label: String) {
-    Black("Black"), System("Wallpaper"), Solid("Solid"), Gradient("Gradient"), Texture("Texture"), Live("Live"), Picture("Picture"),
-}
-
 /** Web search engine for the "search the web" rows. DuckDuckGo is the default so !bangs work (!g, !gi, !yt, !w …). */
 /** How the search screen presents results. */
 enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
@@ -105,16 +100,13 @@ enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Wid
 /** The clock as one line ("23:02   18°C") or time over a second line. */
 enum class ClockLayout(val label: String) { Inline("One line"), Stacked("Two lines") }
 
-/** What fills the background of Radar (search). */
-/** PAL-24: how strong the Radar background layers are drawn. */
+/** How strong the background items are drawn (Ground Control > Background > Intensity). */
 enum class RadarIntensity(val label: String) { Subtle("Subtle"), Normal("Normal") }
 
 /** PAL-24: the Lab override of the live signal (Live = read the phone). Level 0..4 for the forced ones. */
 enum class SignalForce(val label: String, val level: Int) {
     Live("Live", -1), NoSignal("No signal", 0), Weak("Weak", 1), Fair("Fair", 2), Good("Good", 3), Excellent("Excellent", 4),
 }
-
-enum class SearchBackdropStyle(val label: String) { Picture("Picture"), None("Plain black"), Radar("Radar sweep") }
 
 /** How pages change when you swipe between them. */
 enum class PageTransition(val label: String) { Slide("Slide"), Fade("Fade"), Zoom("Zoom"), Cube("Cube"), Flip("Flip"), Stack("Stack") }
@@ -125,7 +117,7 @@ enum class SwitchStyle(val label: String) { IconText("Icons + text"), TextOnly("
 /** Light or dark Launchpad (System follows the phone). */
 enum class LaunchpadTheme(val label: String) { Dark("Dark"), Light("Light"), System("Follow the phone") }
 
-enum class SettingsBackdrop(val label: String) { Wallpaper("Wallpaper, dimmed"), Black("Pitch black") }
+enum class SettingsBackdrop(val label: String) { Wallpaper("Background, dimmed"), Black("Pitch black") }
 
 enum class WebEngine(val label: String, private val template: String) {
     DuckDuckGo("DuckDuckGo", "https://duckduckgo.com/?q=%s"),
@@ -221,8 +213,6 @@ data class LauncherPrefs(
     val iconScale: Float = DEFAULT_ICON_SCALE,
     val showLabels: Boolean = false,
     val showSuggestion: Boolean = true,
-    /** false = opaque Hyle substrate (the reference look); true = the system wallpaper shows through. */
-    val showWallpaper: Boolean = false,
     /** true = corner slots stay pinned to the device's physical corners as it rotates. */
     val cornersFollowDevice: Boolean = true,
     /** Which way pages turn, per orientation. Swipes on the other axis are free for gestures. */
@@ -258,15 +248,10 @@ data class LauncherPrefs(
     val healthSource: HealthSourcePref = HealthSourcePref.Phone,
     /** An always-open keyboard that searches apps as you type — the old-school-phone mode. */
     val alwaysKeyboard: Boolean = false,
-    // --- background
-    val backgroundKind: BackgroundKind = BackgroundKind.Black,
-    /** Preset id within the kind (e.g. "aurora", "grain", "dusk"); ignored for Black / System. */
-    val backgroundPreset: String = "",
-    /** App-private copy of the photo chosen as the background (Picture → "photo"); empty = none. */
-    val backgroundPicturePath: String = "",
-    /** Custom colours: Solid uses A; Gradient uses A → B; textures and live scenes tint with A. */
-    val backgroundColorA: Long = 0xFF0A0B10,
-    val backgroundColorB: Long = 0xFF2A1B5E,
+
+    // --- background (wave 15): two signal-driven slots, see BackgroundChoice
+    val backgroundSlot1: BgItem = BackgroundChoice.DEFAULT.slot1,
+    val backgroundSlot2: BgItem = BackgroundChoice.DEFAULT.slot2,
 
     // --- search
     val webEngine: WebEngine = WebEngine.DuckDuckGo,
@@ -292,10 +277,6 @@ data class LauncherPrefs(
     /** App label text scale. */
     val labelScale: Float = 1f,
     val searchLayout: SearchLayout = SearchLayout.Filmstrip,
-    /** The bundled backdrop picture behind search (off = plain black). */
-    val searchBackdrop: Boolean = true,
-    /** Picture / plain black / animated radar sweep behind Radar. [searchBackdrop] = false still forces plain black. */
-    val searchBackdropStyle: SearchBackdropStyle = SearchBackdropStyle.Picture,
     /** The page the Home button returns to. */
     val homePage: Int = 0,
     val pageTransition: PageTransition = PageTransition.Slide,
@@ -304,12 +285,7 @@ data class LauncherPrefs(
     /** Filmstrip / orbit keep drifting slowly; off = still until you move them. */
     val searchMotion: Boolean = true,
     val searchFiles: Boolean = true,
-    /** PAL-24: the rotating scope sweep and ping behind Radar. */
-    val radarSweep: Boolean = true,
-    /** PAL-24: the id of the active signal view ("off", "glow"); see SignalViews in feature-grid. */
-    val radarSignalView: String = "glow",
-    /** PAL-24: comic focus lines at the screen edges while there is no connectivity (the only use of that effect). */
-    val radarComicNoSignal: Boolean = true,
+    /** Wave 15: the Intensity of the background items (Subtle, Normal). Named for the wave 14 Radar setting it replaces. */
     val radarIntensity: RadarIntensity = RadarIntensity.Normal,
     /** PAL-24: Lab override of the signal state (Live = the phone's real state). */
     val radarSignalForce: SignalForce = SignalForce.Live,

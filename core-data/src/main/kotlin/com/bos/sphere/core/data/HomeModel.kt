@@ -393,7 +393,6 @@ data class LauncherPrefs(
         const val DEFAULT_ICON_SCALE = 0.82f
         const val MIN_ICON_SCALE = 0.5f
         const val MAX_ICON_SCALE = 0.95f
-        const val MAX_ICON_SPACING = 1f
         const val MIN_CLOCK_SIZE = 14f
         const val MAX_CLOCK_SIZE = 96f
         const val MIN_CORNER_ICON = 20f

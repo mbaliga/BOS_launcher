@@ -44,7 +44,6 @@ object ScheduleNotificationsApi {
 
 internal object ScheduleNotifications {
     private const val CHANNEL = "liftoff_scheduled"
-    const val EXTRA_LABEL = "com.bos.sphere.extra.LABEL"
 
     fun runIntent(context: Context, target: RunTarget): Intent =
         Intent(context, RunActivity::class.java).setAction(AutomationIntents.ACTION_RUN)

@@ -252,7 +252,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val isPortrait = !isLandscape
     // INP-15: one set of corner assignments, or a separate landscape set; every corner style draws whichever is active.
     val corners = com.bos.sphere.core.data.CornerSets.select(portraitCorners, landscapeCorners, prefs.cornersPerOrientation, isLandscape)
     // HOM-22: on the Minimal landing the four corners are the hotspots: a corner still on the factory assignment gets the Minimal default, an assigned one keeps its own.

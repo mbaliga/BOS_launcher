@@ -74,7 +74,6 @@ internal class WeatherBrushes(val w: Float, val h: Float, dark: Boolean, effect:
     val stormCloud: Brush = Brush.radialGradient(listOf(Color(0xFF55607A).copy(alpha = 0.6f), Color(0xFF55607A).copy(alpha = 0f)), Offset.Zero, 100f)
     val fogH = h * 0.35f
     val fog: Brush = Brush.verticalGradient(listOf(Color.Transparent, fogTone.copy(alpha = 0.5f), Color.Transparent), 0f, fogH)
-    val needsFog = effect == GlanceWeatherEffect.Fog
 }
 
 private fun frac(x: Float) = x - floor(x)

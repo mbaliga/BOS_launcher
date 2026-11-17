@@ -46,7 +46,6 @@ class HotCornerTracker(dwellMs: Long = DEFAULT_DWELL_MS, val zoneDp: Float = DEF
     companion object {
         const val DEFAULT_DWELL_MS = 150L
         const val DEFAULT_ZONE_DP = 28f
-        const val MAX_DWELL_MS = 1000L
 
         /** The corner zone containing the point, or null. Sizes in the same unit as [zone]. */
         fun zoneAt(x: Float, y: Float, width: Float, height: Float, zone: Float): HotCornerId? {

@@ -35,7 +35,7 @@
   - Flow-based API for voice results (interim and final).
   - startListening() / stopListening() lifecycle management.
   - RecognitionListener implementation with robust error handling.
-- **VoiceAssistantButton:** Fully wired Compose button with SpeechRecognizer integration.
+- **VoiceAssistantButton:** (removed in wave 20, unreferenced; the voice entry lives in feature-grid) Fully wired Compose button with SpeechRecognizer integration.
   - Real-time listening state (button highlights when active).
   - Automatic voice input callback on speech recognition.
   - Proper resource cleanup via DisposableEffect.

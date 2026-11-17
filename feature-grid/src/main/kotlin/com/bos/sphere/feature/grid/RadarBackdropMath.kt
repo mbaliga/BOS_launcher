@@ -1,7 +1,6 @@
 package com.bos.sphere.feature.grid
 
 import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.sin
@@ -161,4 +160,3 @@ internal class Fade(var value: Float = 0f) {
 }
 
 internal fun fract(x: Float): Float = x - floor(x)
-internal fun absF(x: Float) = abs(x)

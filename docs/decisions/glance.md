@@ -11,7 +11,7 @@ Owner request (authoritative, overrides the first-run default of wave 8 and the 
 | HOM-23 | none | New: the Glance home. |
 | STR-06, INP-16, INP-17 | media strip, dwell reveal, corner keyboard | one added sentence each (Glance uses the media source; disabled hotspots have no reveal and are not focus nodes). |
 | Minimal hotspot defaults (Radar, Launchpad, drawer, Ground Control) | Substituted for factory corners on Minimal | Removed: Glance uses the corner assignments as they are; the factory set is already the owner's reference (Camera top-left, Music top-right, All apps bottom-left, Search bottom-right). `MinimalHotspots.effective` stays in core-data, unused, because its tests encode a pure rule. |
-| "Show corner dots" (`minimalHints`) | A faint dot per hotspot | Not drawn on Glance (the hotspot draws its action glyph). The pref and field stay so exports keep round-tripping. |
+| "Show corner dots" (`minimalHints`) | A faint dot per hotspot | Not drawn on Glance (the hotspot draws its action glyph). Wave 20: the pref and its stored key were removed; an old export that carries it drops the key on import and the one-time `RetiredPrefKeys` cleanup removes it from the private file. |
 
 ## Default and migration
 

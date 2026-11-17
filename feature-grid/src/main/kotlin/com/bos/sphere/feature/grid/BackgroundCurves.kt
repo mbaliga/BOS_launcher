@@ -9,8 +9,6 @@ import com.bos.sphere.core.data.BgItem
  * second instead of jumping. The tables are the one place where "signal 1 looks like this, signal 4 like that" is written.
  */
 internal object BackgroundCurves {
-    /** Level changes ease over this long (ms). */
-    const val EASE_MS = 1000
     const val MAX_LEVEL = 4f
 
     /** Value of [table] (five entries, level 0..4) at the fractional [level]. */

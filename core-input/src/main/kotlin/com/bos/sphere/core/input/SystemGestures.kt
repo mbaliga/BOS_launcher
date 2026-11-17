@@ -18,8 +18,4 @@ object SystemGestureZones {
         Swipe.Down -> y <= top
         Swipe.Left, Swipe.Right -> x <= side || x >= width - side
     }
-
-    /** Any band at all: used when only the position is known. */
-    fun inAnyBand(x: Float, y: Float, width: Float, height: Float, side: Float, bottom: Float, top: Float): Boolean =
-        x <= side || x >= width - side || y >= height - bottom || y <= top
 }

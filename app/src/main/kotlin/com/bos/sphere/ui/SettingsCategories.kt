@@ -193,7 +193,6 @@ private fun Sub(text: String) {
 
 fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     val p = m.prefs
-    val vSpacing = if (p.spacingV >= 0f) p.spacingV else p.iconSpacing
     val out = ArrayList<SettingCategory>()
     fun upd(f: (LauncherPrefs) -> LauncherPrefs) = m.updatePrefs(f)
     // What the active home style can use. Items that only mean something on the paged grid (pages,

@@ -117,9 +117,15 @@ internal data class BackgroundConfig(
     val intensity: RadarIntensity = RadarIntensity.Normal,
     val dark: Boolean = true,
     val baseFill: Boolean = false,
+    /**
+     * Wave 22: Radar draws glass (a field and Close at the top, the mic at the bottom centre) over this background. With [glass] the
+     * painters keep their brightest parts out of those places (the Spire's base and bloom sit higher, its tip stops below the top bar),
+     * so the glass stays clear instead of needing a dark shade under it. Home and every other surface leave it off and are unchanged.
+     */
+    val glass: Boolean = false,
 ) {
     val strength: Float get() = if (intensity == RadarIntensity.Subtle) 0.6f else 1f
-    companion object { fun from(p: LauncherPrefs, dark: Boolean = true, baseFill: Boolean = false) = BackgroundConfig(BackgroundChoice(p.backgroundSlot1, p.backgroundSlot2), p.radarIntensity, dark, baseFill) }
+    companion object { fun from(p: LauncherPrefs, dark: Boolean = true, baseFill: Boolean = false, glass: Boolean = false) = BackgroundConfig(BackgroundChoice(p.backgroundSlot1, p.backgroundSlot2), p.radarIntensity, dark, baseFill, glass) }
 }
 
 private fun ink(dark: Boolean) = if (dark) 0xFFFFFFFF.toInt() else 0xFF101016.toInt()
@@ -210,7 +216,7 @@ internal class ComicPainter(val w: Float, val h: Float, private val density: Flo
  * the effects (in slot order), the comic lines (no signal only). Shared by the composable and the draw tests.
  */
 internal class BackgroundPainter(w: Float, h: Float, density: Float, private val cfg: BackgroundConfig, registry: List<SignalView> = SignalViews.views) {
-    private val geo = RadarGeometry(w, h, density)
+    private val geo = RadarGeometry(w, h, density, cfg.glass)
     private val ordered: List<BgItem> = cfg.choice.items.sortedBy { if (it.living) 0 else 1 }
     private val painters: Array<SignalPainter> = ordered.mapNotNull { SignalViews.forItem(it, registry)?.prepare(geo) }.toTypedArray()
     private val lit = ordered.any { it.living || it == BgItem.BottomGlow }
@@ -314,11 +320,11 @@ fun isDarkSurface(): Boolean = com.bos.sphere.core.design.HyleTheme.variant != c
  * [baseFill] paints the black (or light) base too. [animate] false draws one static frame (thumbnails, Settings backdrop).
  */
 @Composable
-fun SignalBackground(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = isDarkSurface(), baseFill: Boolean = false, animate: Boolean = true, announce: Boolean = true) {
+fun SignalBackground(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = isDarkSurface(), baseFill: Boolean = false, animate: Boolean = true, announce: Boolean = true, glass: Boolean = false) {
     val reduced = rememberMotionPrefs().reduced || !animate
     val active = rememberRadarActive()
     val clock = rememberRadarClock(active && animate, reduced)
-    val cfg = remember(prefs.backgroundSlot1, prefs.backgroundSlot2, prefs.radarIntensity, dark, baseFill) { BackgroundConfig.from(prefs, dark, baseFill) }
+    val cfg = remember(prefs.backgroundSlot1, prefs.backgroundSlot2, prefs.radarIntensity, dark, baseFill, glass) { BackgroundConfig.from(prefs, dark, baseFill, glass) }
     val shows = cfg.choice.items.isNotEmpty()
     val signal = rememberRadarSignal(prefs.radarSignalForce, shows)
     SignalBackgroundCanvas(cfg, signal, clock, reduced, modifier)

@@ -203,12 +203,17 @@ internal object BeamView : SignalView {
  * brightens.
  */
 internal object SpireView : SignalView {
+    /** dp from the top of the window that the tip stays below when Radar's glass is on (the top bar is 64 dp plus the status bar). */
+    const val GLASS_TOP_DP = 84f
     override val id = BgItem.Spire.id
     override val label = BgItem.Spire.label
     override fun prepare(geo: RadarGeometry): SignalPainter = SpirePainter(geo)
 
     private class SpirePainter(geo: RadarGeometry) : WallpaperPainter(geo) {
-        private val baseY = geo.h * 0.64f
+        /** Wave 22: under Radar's glass the base and bloom sit 10 percent of the height higher (away from the mic) and the tip stops [GLASS_TOP_DP] below the top (clear of the field). */
+        private val lift = if (geo.glass) geo.h * 0.10f else 0f
+        private val baseY = geo.h * 0.64f - lift
+        private val tipFloor = if (geo.glass) GLASS_TOP_DP * geo.density else 0f
         private val halfBase = minOf(geo.w * 0.40f, geo.h * 0.38f)
         private val cusp = Path().apply {
             moveTo(0f, -1f); cubicTo(0.03f, -0.55f, 0.12f, -0.12f, 1f, 0f); lineTo(-1f, 0f); cubicTo(-0.12f, -0.12f, -0.03f, -0.55f, 0f, -1f); close()
@@ -221,7 +226,8 @@ internal object SpireView : SignalView {
         override fun draw(scope: DrawScope, signal: SignalState, p: SignalDrawParams) {
             val c = scope.drawContext.canvas.nativeCanvas
             val g = gain(p)
-            val h = BackgroundCurves.at(BackgroundCurves.SPIRE_HEIGHT, p.level) * geo.h * breath(p, 8000f)
+            // The tip keeps its place (the base moved up by [lift] and the cusp is that much shorter) unless it would enter the top bar.
+            val h = maxOf(0f, minOf(BackgroundCurves.at(BackgroundCurves.SPIRE_HEIGHT, p.level) * geo.h * breath(p, 8000f) - lift, baseY - tipFloor))
             val rise = baseY / geo.h
             val coreB = BackgroundCurves.at(BackgroundCurves.SPIRE_CORE, p.level)
             val bl = BackgroundCurves.at(BackgroundCurves.SPIRE_BLOOM, p.level)

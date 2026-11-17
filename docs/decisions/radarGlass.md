@@ -22,9 +22,12 @@ field row, next to Close/Clear.
    glyph at the trailing end, shown only while the field has text, labelled "Clear", focusable and operable from a keyboard. There is no
    Clear button beside the field any more.
    - **Close and Clear are never both visible.** With text: Clear (inside). With no text: Close, a 48 dp glass circle outside the field at
-     its trailing end. Decision: Close now shows with an empty query in **all three layouts** (Flat used to show a Clear X there, which
-     had nothing to clear; a Close is the useful button on an empty Flat). The brief asked for it in Orbit and Filmstrip only; Flat gets it
-     too so no layout has an unexplained gap.
+     its trailing end, in Orbit and Filmstrip. **Wave 22 decision: Flat has no Close.** Wave 21 added one to Flat as well; the owner asked
+     only for the X inside the field, and nothing requires a visible Close in Flat: Flat is the layout hardware keyboard and pointer users get
+     (PAL-18), where Esc leaves (PAL-07); Back and the back gesture leave for everyone else; NFR-13 asks for labelled 48 dp targets on the
+     controls that exist, not for a second way out. So in Flat the field takes the whole width and the only X is the Clear inside it
+     (with text). `PAL_18_flatHasNoCloseBesideTheFieldOnlyTheXInsideItWhenThereIsText`; Orbit and Filmstrip keep Close
+     (`PAL_18_orbitAndFilmstripStillHaveCloseWhileTheQueryIsEmpty`). If a visible exit is wanted in Flat, restore `!flatMode` in `SearchScreen`.
    - The scope menu was outside the field (Flat only; Orbit and Filmstrip use the wheel as the scope). It is now **inside the field at its
      leading end** as a quiet glass pill (48 dp tall touch target).
    - Right-to-left mirrors the whole row (leading/trailing, no left/right literals); tested.
@@ -58,28 +61,61 @@ icons in `GlassSpec.content(dark)` and hints in `GlassSpec.hint(dark)`; if the s
 
 ## Legibility (NFR-15)
 
-White text on 8 to 16 percent white over a wallpaper is fine on dark pixels and fails where the background is bright (Beam's white
-tip rises from the bottom centre, exactly where the mic sits; some effects reach the top bar). Instead of tinting everything darker,
-the glass is darkened only as far as needed, from measured pixels:
+White text on 8 to 16 percent white over a wallpaper is fine on dark pixels and fails where the background is bright. Wave 21 darkened the
+glass with a black shade under it, measured from pixels; with the default pair (Spire + Breathing dots) that was 0.37 (top) and 0.40
+(bottom), and the glass looked smoky. Wave 22 finds the better answer in three steps and keeps the shade only where a pair still needs it.
 
-- `GlassShade.compute` paints the background in use (the real painters, as `BackgroundSamples` does) into a small bitmap at levels 4, 2
-  and 0 and 7 clock values, reads every pixel in the two places the glass sits (the top bar; the bottom centre), and `shadeFor` finds the
-  least black laid under the glass (0 to 0.92) that keeps white text and the 80 percent white placeholder at 4.7:1 or better over the
-  strongest white the glass can add on a content pixel (`GlassSpec.worstWhiteAlpha`: brightest corner, pressed, the little sheen that
-  reaches the text, and the scope pill on top of the field).
-- `rememberGlassShades` runs it off the main thread when the background, the intensity or the window size changes (once, not per frame);
-  `SearchScreen` hands the top and bottom shade to the field, Close and the mic. Until it lands the glass is clear.
-- With the default pair (Spire + Breathing dots) the shades are 0.37 (top) and 0.40 (bottom): the blue spire's base sits under the mic.
-  Pure black, dark effects and most pairs need none or little.
-- The placeholder is 80 percent white (`0xCC`), up from 60 percent, so it also reaches AA.
-- Test: `RadarGlassContrastW21Test` renders every valid background pair (nine items and None), both intensities for the default pair, in
-  portrait and landscape, at levels 0 and 4 and clock values the sampler did not use, and asserts text and placeholder contrast over the
-  strongest glass in the field, Close and mic zones (measured minimum 6.25 for text, 4.70 for the placeholder).
+1. **Move the bright part away from the glass (Radar only).** `BackgroundConfig.glass` (Radar passes `glass = true`; Home and every other
+   surface are unchanged). The Spire's base and bloom sit 10 percent of the height higher, and its tip keeps its place but stops 84 dp below
+   the top, so the tip no longer enters the field at level 4 and the bloom no longer sits under the mic. (Measured: the 0.37 came from the tip
+   in the top bar at level 4 and from the comic-line grey at level 0; the 0.40 from the bloom under the mic.)
+2. **Judge each piece of glass by what it carries.** The field carries text (4.5:1, placeholder at 80 percent white also 4.5:1); the scope pill's
+   label is glass on glass (4.5:1, nested, pressable); Close and the mic carry only an icon (3:1, the non-text criterion). Wave 21
+   measured all of them as pressed, nested text, which over-darkened the icon-only buttons and the field (the field is not pressable and
+   holds no nested glass over its text). `GlassShade.Carries` = `Text` / `Label` / `Icon`; `GlassShades(top, bottom, close)`.
+3. **A shade only where still needed.** `GlassShade.compute` renders the background (the real painters, with `glass = true`) at levels 4, 2
+   and 0 and seven clock values, reads the pixels in the field, the pill, the Close circle and the mic zones, and `shadeFor` finds the least
+   black that keeps each criterion (target plus 0.2). `rememberGlassShades` runs it off the main thread when the background, intensity or
+   window size changes.
+
+Result: the default pair needs **0.00** (field, Close and mic), over the 0.2 goal; the glass is clear. Over all valid pairs, both
+orientations, levels 0 and 4, the measured minimum is 4.71 for field text, 4.70 for the placeholder and 3.23 for icons (`RadarGlassContrastW21Test`,
+864 frames). 80 background and size cases still need some shade (at most 0.58: bright wallpapers such as Beam, Shaft and Laser reach the
+field, Close or the mic, and only those keep a shade; the tests print which). A per-region luminance map (shading only the few cells a
+bright tip covers) was considered and not built: for the default pair geometry removed the need, and the other pairs' bright areas cover
+the whole zone, not a few cells.
 
 Other Radar text (results, headers) is unchanged and unaffected by the glass.
+
+## Layout: the mic strip, the wheel, the rings (wave 22)
+
+Each piece has its own region. The query line is the top 64 dp; the **mic strip** is the bottom 72 dp (reserved, centred); the **results area**
+is what is left between them, clipped to its own bounds. Inside the results area:
+- The **category wheel** is sized to the room: `WheelSpec.fit` gives 1, 3 or 5 rows (odd, the selected one in the middle) of `WheelSpec.rowFor(fontScale)`
+  (34 dp, or 1.5 lines of the label at large text, so labels never overlap at font scale 2.0). Its labels fade to nothing half a row
+  outside its own box (`wheelLabelAlpha`), so no glyph is cut at an edge. Wave 21 always drew five 34 dp rows plus faint extras, which in landscape ran
+  into the strip and, in the Filmstrip, into the tiles.
+- The **Filmstrip** keeps its 182 dp under the wheel when there is room, and gives way (down to nothing) before the wheel loses its one row,
+  clipped to its own band.
+- The **Orbit** rings are centred on the wheel; tiles stay clear of the wheel text, whose columns now grow with the font scale.
+- Tests: `RadarGlassW22Test` runs 4 window sizes (360x640, 411x891, 640x360, 891x411 dp) x 4 layouts x font scale 1.0 and 2.0, each with the
+  keyboard closed and then faked open (40 percent of the window), and checks the mic's bounds against the wheel box, its labels, every
+  visible result, and the Filmstrip band against the wheel. Screenshots `w22-*.png` were read.
+- Rejected: moving the mic into the "free gap" at the bottom centre of the wheel. The wheel is centred, the free gap depends on the rows and
+  the font, and a reserved strip is the only layout where the bounds can be asserted.
+
+## Frame cost (wave 22, NFR-05)
+
+`Modifier.glass` builds `GlassLayers` once per size and look in `drawWithCache`; `GlassLayers.draw` only issues five draw calls with stored brushes.
+`RadarGlassFrameCostW22Test` draws every kind of glass piece (field, shaded Close, listening pressed mic in RTL, nested pill, light glass)
+2000 times and measures the thread's allocated bytes (352 over 2000 frames, 136 of them the test harness itself), checks the source of
+`draw` for brush, list or Path construction, and scans the glass, the Radar screen and the painters for `RenderEffect`, `blur`, `BlurMaskFilter`
+and the like (none).
 
 ## Not done / limits
 
 - No backdrop blur (above).
 - The scope popup list (Flat) is still plain text over the background, as before; it is not part of the top or bottom bar.
-- Keyboard-open placement is tested with faked IME and navigation-bar insets; not seen on a device.
+- Keyboard-open placement is tested with faked IME and navigation-bar insets; not seen on a device. In landscape with the keyboard up the results area is a
+  few dozen dp: the wheel shows one row and the Filmstrip is clipped or gone; the owner may want the mic hidden then.
+- The mic's listening state is not announced as a state description (needs a string in eight languages).

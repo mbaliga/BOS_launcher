@@ -71,6 +71,7 @@ import com.bos.sphere.core.data.AppEntry
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -470,7 +471,7 @@ internal fun SearchScreen(
     CompositionLocalProvider(LocalResultScale provides scale.floatValue, LocalRadarSelection provides selectedKey) {
     Box(Modifier.fillMaxSize().radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey)) {
         SearchBackdrop(Modifier.fillMaxSize())
-        SignalBackground(prefs, Modifier.fillMaxSize(), dark = true) // Radar is black in every theme; HOM-16, PAL-24: the two background items, the same on every surface
+        SignalBackground(prefs, Modifier.fillMaxSize(), dark = true, glass = true) // Radar is black in every theme; HOM-16, PAL-24: the two background items, the same on every surface
         // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
         // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
@@ -492,18 +493,24 @@ internal fun SearchScreen(
                     // and the Filmstrip runs beneath it.
                     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                         val availH = maxHeight
-                        val below = if (layout == SearchLayout.Orbit) (if (orbitTyped) RadarStripHeight else 0.dp) else 182.dp // room the strip needs under the wheel
-                        val centre = ((availH - below) / 2).coerceAtLeast(WheelHeight / 2 + 8.dp)
+                        val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+                        // Room the strip needs under the wheel (the Filmstrip: 182 dp). When the free area is short (landscape, keyboard up, big text)
+                        // the strip gives way, down to nothing, before the wheel loses its one row, so the two never overlap.
+                        val below = if (layout == SearchLayout.Orbit) (if (orbitTyped) RadarStripHeight else 0.dp) else minOf(182.dp, (availH - WheelSpec.rowFor(fontScale) - 8.dp).coerceAtLeast(0.dp))
+                        // Wave 22: the wheel takes only the rows (1, 3 or 5, taller with a bigger font) that fit in what the results leave
+                        // free, so its box, its labels and the "SEARCH" caption always sit inside the results area, which itself ends above the mic strip.
+                        val wheel = WheelSpec.fit((availH - below).value, fontScale)
+                        val centre = ((availH - below) / 2).coerceAtLeast(wheel.height / 2)
                         val wheelRow: @Composable () -> Unit = {
                             // "SEARCH" ends just left of the centre line and the wheel starts just right of it.
                             Row(Modifier.fillMaxWidth()) {
-                                QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp))
+                                QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp), height = wheel.height)
                                 Box(Modifier.weight(1f)) {
                                     CategoryWheel(
                                         selected = selected, counts = counts,
                                         onSelect = { setWheel(it); touched = true },
                                         onTick = { tick() }, onTouch = { touched = true },
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().testTag(RADAR_WHEEL_TAG), spec = wheel,
                                     )
                                 }
                             }
@@ -511,7 +518,7 @@ internal fun SearchScreen(
                         if (layout == SearchLayout.Orbit) {
                             Orbit(
                                 tiles = if (orbitTyped) ringTiles else data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
-                                actions = tileActions, centreFromBottom = centre,
+                                actions = tileActions, centreFromBottom = centre, wheel = wheel,
                                 modifier = Modifier.fillMaxSize().padding(bottom = if (orbitTyped) RadarStripHeight else 0.dp),
                                 onVisibleCount = { orbitVisible = it }, emptyHint = emptyHint,
                                 tierNames = if (orbitTyped) RadarRings.queryTierNames else RadarRings.tierNames,
@@ -522,15 +529,15 @@ internal fun SearchScreen(
                                 actions = tileActions, onFilenames = { setWheel(SearchCategory.Files); touched = true },
                                 modifier = Modifier.align(Alignment.BottomCenter),
                             )
-                            Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
+                            Box(Modifier.offset(y = centre - wheel.height / 2)) { wheelRow() }
                             expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
                         } else {
-                            Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
+                            Box(Modifier.offset(y = centre - wheel.height / 2)) { wheelRow() }
                             // The strip rides the top of the keyboard so nothing is left hanging under its caption.
                             Filmstrip(
                                 tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                                 expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                                actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp),
+                                actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max = below).clipToBounds().padding(bottom = 4.dp),
                                 emptyHint = emptyHint,
                             )
                         }
@@ -557,9 +564,11 @@ internal fun SearchScreen(
                         }
                     }
                 }
-                if (query.isEmpty()) {
+                if (query.isEmpty() && !flatMode) {
                     // Close and Clear are never both visible: Close is outside the field, a glass circle, while there is nothing to clear.
-                    GlassButton(onClick = onDismiss, description = L10n.tr("Close"), shade = shades.top, modifier = Modifier.padding(start = 8.dp)) {
+                    // Wave 22: not in Flat. The owner asked only for the X inside the field; Flat is the keyboard and pointer layout, where Esc and Back leave
+                    // (PAL-07) and nothing in the spec asks for a visible Close, so the field gets the whole width (docs/decisions/radarGlass.md).
+                    GlassButton(onClick = onDismiss, description = L10n.tr("Close"), shade = shades.close, modifier = Modifier.padding(start = 8.dp)) {
                         Icon(Glyphs.Close, null, tint = GlassSpec.content(true), modifier = Modifier.size(22.dp))
                     }
                 }
@@ -664,6 +673,8 @@ internal val RadarQueryBarHeight = 64.dp
 /** Wave 21: the bottom strip that holds the mic (a 56 dp button and 8 dp above and below); reserved only when the mic exists. */
 internal val RadarMicBarHeight = 72.dp
 
+/** Wave 22: test tag of the category wheel's own box (its labels are drawn only inside it). */
+internal const val RADAR_WHEEL_TAG = "radarWheel"
 
 /** Test tag of the glass field (its bounds hold the scope menu, the text and the Clear X). */
 internal const val RADAR_FIELD_TAG = "radarField"

@@ -26,3 +26,10 @@ Reproduction (injected touch swipes, `GlanceEdgesSmokeTest`): on build 48 the ed
 
 - Real edge swipe on a gesture-navigation phone, the system back zone conflict, fade timing and look of the quiet handles and dot with real notifications: device rows only.
 - No app-level (whole HomeScreen) screenshot: Robolectric's capture of the full app times out; the surface plus handles screenshots in feature-grid stand in.
+
+## Adversarial review (wave 17)
+
+- Root cause confirmed: with the old behaviour restored in `HomeChromeRules` (no left or right handle on Glance), 9 of 29 `GlanceEdgesSmokeTest` tests fail (handles, taps, Launchpad Off and rail cases); the injected edge swipes, shortcut and corner action pass either way, as the decision doc says.
+- Checked: fresh default state (Glance, leftPage Launchpad) opens Launchpad by swipe, handle, indicator glyph, Ctrl+N and corner action; right side mirrors for recents; Launchpad Off removes every left affordance; RTL swaps the physical edges; no `systemGestureExclusion` in main sources; the Glance screenshots are as calm as the reference (handles are 3 dp bars, indicator unchanged in look).
+- No defects found; no code changed in review. Full `testDebugUnitTest assembleRelease` is green.
+- Still a device step: a real edge swipe on a gesture-navigation phone (the system back zone may still win for the first dp); the tappable handle and indicator glyph are the reliable path.

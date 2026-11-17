@@ -209,17 +209,10 @@ internal fun CategoryWheel(
     }
 }
 
-@Composable
-internal fun BlinkingCaret(height: Dp, color: Color = Color.White, modifier: Modifier = Modifier) {
-    // NFR-14: with system animations off the caret stays solid instead of blinking.
-    val still = com.bos.sphere.core.design.rememberMotionPrefs().reduced
-    val t = if (still) null else rememberInfiniteTransition(label = "caret").animateFloat(0f, 1f, infiniteRepeatable(tween(1060, easing = LinearEasing)), label = "c")
-    Box(modifier.padding(start = 2.dp).width(2.dp).height(height).graphicsLayer { alpha = if (t == null || t.value < 0.5f) 1f else 0f }.background(color))
-}
-
 /**
- * SEARCH, or the typed query once there is one (large, light) with a blinking caret and a clear
- * button. Sits left of the wheel, right-aligned against it.
+ * The "SEARCH" label left of the wheel at rest, right-aligned against it; a tap raises the keyboard. Wave 22 (audit): the typed-query
+ * branch (a large query with a blinking caret and its own clear button) belonged to the old bottom field layout and was never drawn
+ * once the one glass field moved to the top, so it and the caret were removed.
  */
 @Composable
 internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier, height: Dp = WheelHeight) {
@@ -366,25 +359,6 @@ private fun scopeGlyph(c: SearchCategory?): ImageVector = when (c) {
     SearchCategory.Apps -> Glyphs.Apps
     SearchCategory.Contacts -> Glyphs.Person
     SearchCategory.Files -> FolderGlyph
-}
-
-// ---------------------------------------------------------------- suggestion card
-
-/** The macOS suggestion menu: grey bold section headers over rows, hairline between groups. */
-@Composable
-internal fun SuggestionGroups(groups: List<SuggGroup>, onPick: (SuggItem) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
-    Column(modifier) {
-        groups.forEachIndexed { gi, g ->
-            if (gi > 0) Box(Modifier.padding(horizontal = 14.dp, vertical = 2.dp).fillMaxWidth().height(0.5.dp).background(Color(0x33FFFFFF)))
-            Text(g.header, color = Color(0x99FFFFFF), fontSize = if (compact) 11.sp else 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = if (compact) 6.dp else 8.dp, bottom = 1.dp))
-            g.items.forEach { item ->
-                Text(
-                    item.label, color = if (item.accent) HyleColors.VioletSoft else Color.White, fontSize = if (compact) 14.sp else 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().clickable { onPick(item) }.padding(horizontal = 14.dp, vertical = if (compact) 5.dp else 8.dp),
-                )
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------- tile faces

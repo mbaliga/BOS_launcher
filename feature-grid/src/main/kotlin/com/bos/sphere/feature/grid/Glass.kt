@@ -2,6 +2,8 @@ package com.bos.sphere.feature.grid
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -185,11 +187,14 @@ fun GlassButton(
 ) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
+    // Wave 22 (second audit): a keyboard or d-pad user needs to see where focus is (there is no indication on these buttons otherwise).
+    val focused by source.collectIsFocusedAsState()
     Box(
         modifier
             .size(size)
             .then(if (filled) Modifier.glass(shape, tint, pressed, dark, shade = shade) else if (pressed) Modifier.glass(shape, tint, true, dark, strength = 0.7f) else Modifier)
             .clip(shape)
+            .then(if (focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = description },
         contentAlignment = Alignment.Center,

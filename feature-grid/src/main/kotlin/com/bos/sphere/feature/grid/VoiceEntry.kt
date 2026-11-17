@@ -26,10 +26,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.border
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -71,14 +73,22 @@ class PushToTalk(
     var listening = false
         private set(v) { if (field != v) { field = v; onListening(v) } }
 
+    private var session = 0
+    private var disposed = false
+
     fun press() {
-        if (listening) return
+        if (disposed || listening) return
         if (!hasPermission()) { askPermission(); return }
         listening = true
+        // Wave 22 (audit): each press is a session; a late callback of an older session (a recogniser that was still finishing) or of a
+        // control that has left the screen is ignored, so it can neither end the new listening nor write into a closed Radar. A blank
+        // result (silence) never replaces what is in the field.
+        val id = ++session
+        fun live() = id == session && !disposed
         recogniser.start(
-            onPartial = { onText(it) },
-            onFinal = { onText(it); listening = false },
-            onError = { listening = false },
+            onPartial = { if (live() && it.isNotBlank()) onText(it) },
+            onFinal = { if (live()) { if (it.isNotBlank()) onText(it); listening = false } },
+            onError = { if (live()) listening = false },
         )
     }
 
@@ -87,7 +97,7 @@ class PushToTalk(
     /** A tap for TalkBack and keyboard users, who cannot hold: it flips between listening and not. */
     fun toggle() { if (listening) release() else press() }
 
-    fun dispose() { release(); recogniser.release() }
+    fun dispose() { release(); disposed = true; recogniser.release() }
 
     companion object {
         /** On-device only: the control is hidden when there is no on-device recogniser, whatever else is installed. */
@@ -140,13 +150,18 @@ internal fun onDeviceSpeechAvailable(context: Context): Boolean =
  * held) works too. Draws nothing when the device has no on-device recogniser. The text goes to [onText] as it comes.
  */
 @Composable
-fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f) {
+fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}) {
     val context = LocalContext.current
     val available = remember(context, availableOverride) { availableOverride ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     if (!available) return
     var listening by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
     val latestText by rememberUpdatedState(onText)
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    // Wave 22 (audit): a refusal (also a permanent one, which returns at once with no dialog) used to be silent; say what to do. Nothing listens
+    // after a grant until the next press (INP-13).
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) runCatching { android.widget.Toast.makeText(context, L10n.tr("Microphone is off. Allow it in Settings to speak to search."), android.widget.Toast.LENGTH_LONG).show() }
+    }
     val ptt = remember(context) {
         PushToTalk(
             AndroidOnDeviceRecogniser(context),
@@ -164,6 +179,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
             .size(GlassSpec.BigButton)
             .glass(CircleShape, tint = if (listening) Color(0xFFB9A8FF) else Color.White, pressed = listening, shade = shade)
             .clip(CircleShape)
+            .then(if (focused) Modifier.border(2.dp, Color.White, CircleShape) else Modifier) // a visible keyboard focus (second audit)
             .pointerInput(ptt) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
@@ -178,6 +194,8 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
                     true
                 } else false
             }
+            // A key held down when focus moves away never sends its key-up: stop listening then (the finger case ends with the pointer).
+            .onFocusChanged { f -> focused = f.hasFocus; onFocusChange(f.hasFocus); if (!f.hasFocus && ptt.listening) { ptt.release(); listening = false } }
             .focusable()
             .semantics { role = Role.Button; contentDescription = label; onClick(label = label) { ptt.toggle(); listening = ptt.listening; true } },
         contentAlignment = Alignment.Center,

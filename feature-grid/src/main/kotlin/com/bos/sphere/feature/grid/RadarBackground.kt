@@ -198,11 +198,11 @@ internal class ComicPainter(val w: Float, val h: Float, private val density: Flo
 }
 
 /** One frame of everything, from per-size painters. Shared by the composable and the draw tests. */
-internal class RadarBackdropPainter(w: Float, h: Float, density: Float, private val cfg: RadarBackdropConfig) {
+internal class RadarBackdropPainter(w: Float, h: Float, density: Float, private val cfg: RadarBackdropConfig, registry: List<SignalView> = SignalViews.views) {
     private val geo = RadarGeometry(w, h, density)
     private val dots = DotPainter(w, h, density)
     private val scope = ScopePainter(w, h, density, cfg.dark, cfg.strength)
-    private val view: SignalPainter? = SignalViews.forId(cfg.viewId)?.prepare(geo)
+    private val view: SignalPainter? = SignalViews.forId(cfg.viewId, registry)?.prepare(geo)
     private val comic = ComicPainter(w, h, density, cfg.dark)
     private val params = SignalDrawParams().also { it.dark = cfg.dark; it.intensity = cfg.strength }
     private val comicFade = Fade()

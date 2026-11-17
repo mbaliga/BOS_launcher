@@ -19,4 +19,6 @@ Screenshots from the render tests are written to `feature-grid/build/screenshots
 
 Open question for the owner (docs/decisions/radarSignal.md): TelephonyCallback signal levels were not used because the permission needed could not be confirmed offline; asking for READ_PHONE_STATE would give real cellular bars. Cellular level uses the capabilities' dBm meanwhile.
 
+Review pass: the eight `GlowLinesSvg` paths were compared string-for-string with `radar-glow-lines.svg` (identical, same order). Defects fixed: the retired `RadarSweep` composable (green scope, its own infinite transition that did not read motion prefs) was dead code and is deleted, so the only infinite transition in the Radar background is the shared clock that does read them; the "pluggable SignalView" claim had no proof, so `SignalViews.forId` and `RadarBackdropPainter` now take a registry and a test registers a second dummy view through the same interface. The pixel comparison with the reference frames stays visual, not asserted.
+
 Residue (device only): real signal changes and airplane mode, battery over 10 minutes, frame rate, comparison of the sweep against the recording, light Radar surface (Radar's own base is black in every theme today, so the host passes the dark variant).

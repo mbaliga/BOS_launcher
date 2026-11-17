@@ -60,7 +60,7 @@ internal object SignalViews {
     val options: List<Option> = listOf(Option(OFF, "Off")) + views.map { Option(it.id, it.label) }
 
     /** The view for a stored id; null = Off. An unknown id (a view removed later) falls back to the default view. */
-    fun forId(id: String): SignalView? = if (id == OFF) null else views.firstOrNull { it.id == id } ?: views.firstOrNull { it.id == DEFAULT }
+    fun forId(id: String, registry: List<SignalView> = views): SignalView? = if (id == OFF) null else registry.firstOrNull { it.id == id } ?: registry.firstOrNull { it.id == DEFAULT }
 }
 
 /** "Glow lines": the owner's eight bracket lines with blue pulses whose count, speed and brightness encode the signal level. */

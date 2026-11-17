@@ -238,4 +238,17 @@ class RadarBackgroundMathTest {
         assertEquals("glow", SignalViews.forId("glow")!!.id)
         assertEquals("glow", SignalViews.forId("removed-later")!!.id)
     }
+
+    @Test fun PAL_24_aSecondViewPlugsInThroughTheSameInterfaceWithoutTouchingTheHost() {
+        var prepared = 0
+        val dummy = object : SignalView {
+            override val id = "dummy"; override val label = "Dummy"
+            override fun prepare(geo: RadarGeometry): SignalPainter { prepared++; return object : SignalPainter { override fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope, signal: com.bos.sphere.core.signals.SignalState, p: SignalDrawParams) {} } }
+        }
+        val registry = SignalViews.views + dummy
+        assertEquals("dummy", SignalViews.forId("dummy", registry)!!.id)
+        assertEquals("glow", SignalViews.forId("nope", registry)!!.id)
+        SignalViews.forId("dummy", registry)!!.prepare(RadarGeometry(100f, 200f, 1f))
+        assertEquals(1, prepared)
+    }
 }

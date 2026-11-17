@@ -1207,6 +1207,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,
             bottomPlan = bottomPlan,
+            alwaysShown = HomeChromeRules.forcesDock(landing, chromeSettings),
         )
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).

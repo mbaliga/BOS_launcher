@@ -125,6 +125,8 @@ fun BoxScope.DockLayer(
     homeExtras: com.bos.sphere.feature.grid.HomeExtras? = null,
     /** HOM-19: where the bottom rail and what rides on it sit above the bottom clock and page dots; null keeps the fixed margins. */
     bottomPlan: com.bos.sphere.feature.dock.HomeBottomStack.Plan? = null,
+    /** W20 (HOM-23): Glance with Right side = Dock rail shows the rail even while the dock setting is off (the dot says "Show the dock"). */
+    alwaysShown: Boolean = false,
 ) {
     val context = LocalContext.current
     val stores = remember { LauncherStores.get(context) }
@@ -183,6 +185,7 @@ fun BoxScope.DockLayer(
     val tierNow = remember { CapabilityEvaluator.tier(launcher.inputs()) }
     if (visible) GroupShelfSlot(wsState.groups, wsState.dock.groupShelf, wsState.dock.isEnabled(tierNow), bottomPlan?.shelfBottomDp, onRun = { g -> scope.launch { launcher.runGroup(g) } })
     if (visible) DockHost(
+        alwaysShown = alwaysShown,
         unavailableApps = unavailableApps,
         apps = apps, launcher = launcher, controller = controller, refreshKey = homeSignal,
         onLaunchApp = onLaunch, onOpenPanel = { panelOpen = true }, inputIsKeyboard = keyboardMode,

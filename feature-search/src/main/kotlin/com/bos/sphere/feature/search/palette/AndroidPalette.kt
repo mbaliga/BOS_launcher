@@ -148,18 +148,6 @@ class AndroidPalette(context: Context, private val scope: CoroutineScope = Corou
     fun hubProviders(): List<SearchProvider> =
         listOf(settingsProvider, calculatorProvider, shortcutProvider, launcherActions, fileProvider).map { adapt(it) }
 
-    /** The full engine for callers that want results, scopes, ranking and streaming (the palette UI). */
-    fun engine(webTemplate: () -> String = { "https://duckduckgo.com/?q=%s" }, apps: () -> List<AppRecord> = { AndroidApps.records(app, prefs.aliases()) }): PaletteEngine {
-        val usage = prefs.loadUsage()
-        val registry = ProviderRegistry(
-            listOf(
-                dev.aarso.search.palette.AppProvider(apps),
-                calculatorProvider, settingsProvider, shortcutProvider, launcherActions, fileProvider,
-            ),
-        )
-        return PaletteEngine(registry, Ranker(usage), WebFallback(webTemplate, strings))
-    }
-
     fun adapt(p: PaletteProvider): SearchProvider = SearchProvider { q, limit ->
         p.query(PaletteQuery(q, PaletteScope.Everything), limit).map { PaletteHits.toHit(app, it) }
     }

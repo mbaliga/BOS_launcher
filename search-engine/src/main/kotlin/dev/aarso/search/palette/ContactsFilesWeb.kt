@@ -1,50 +1,5 @@
 package dev.aarso.search.palette
 
-/** A contact as the Android layer reads it. */
-data class ContactRecord(val id: Long, val lookupKey: String, val name: String, val phone: String? = null, val email: String? = null)
-
-/**
- * Contacts (PAL-10). Without permission the provider yields exactly one enable row in the Contacts scope and
- * nothing else; with permission each contact offers call, message and open.
- */
-class ContactsProvider(
-    private val hasPermission: () -> Boolean,
-    private val lookup: suspend (String, Int) -> List<ContactRecord>,
-    private val strings: PaletteStrings = PaletteStrings(),
-    private val enableInEverything: Boolean = false,
-) : PaletteProvider {
-    override val id = "contacts"
-    override val scope = PaletteScope.Contacts
-    override val slow = true
-
-    override fun serves(requested: PaletteScope) =
-        requested == PaletteScope.Contacts || (requested == PaletteScope.Everything && (hasPermission() || enableInEverything))
-
-    private fun enableRow() = PaletteResult(
-        "contacts:enable", id, scope, strings.enableContacts, null, 0.3,
-        listOf(ResultAction(ResultActionId.EnablePermission)), mapOf("permission" to "READ_CONTACTS"), learn = false,
-    )
-
-    override suspend fun query(q: PaletteQuery, limit: Int): List<PaletteResult> {
-        if (!hasPermission()) return listOf(enableRow())
-        val nq = TextMatch.norm(q.text)
-        if (nq.isEmpty()) return emptyList()
-        return lookup(q.text.trim(), limit).mapNotNull { c ->
-            val s = TextMatch.score(nq, TextMatch.Target(c.name))
-            if (s <= 0) return@mapNotNull null
-            PaletteResult(
-                id = "contact:${c.id}", provider = id, scope = scope, title = c.name, subtitle = c.phone ?: c.email, score = s * 0.9,
-                actions = buildList {
-                    if (c.phone != null) { add(ResultAction(ResultActionId.Call)); add(ResultAction(ResultActionId.Message)) }
-                    if (c.email != null) add(ResultAction(ResultActionId.Email))
-                    add(ResultAction(ResultActionId.OpenContact))
-                },
-                payload = mapOf("contactId" to c.id.toString(), "lookupKey" to c.lookupKey, "phone" to (c.phone ?: ""), "email" to (c.email ?: "")),
-            )
-        }.sortedByDescending { it.score }.take(limit)
-    }
-}
-
 /** One indexed file or document. [source] is "media" or "tree:<uri>" so reconciliation is per source. */
 data class FileEntry(val uri: String, val name: String, val mime: String?, val size: Long, val modified: Long, val source: String, val folder: String = "")
 
@@ -171,11 +126,4 @@ class WebFallback(
             return sb.toString()
         }
     }
-}
-
-/** Store lookup as a provider so it needs no special case in the UI (PAL-15). */
-class StoreLookupProvider(private val web: WebFallback) : PaletteProvider {
-    override val id = "store"
-    override val scope = PaletteScope.Apps
-    override suspend fun query(q: PaletteQuery, limit: Int): List<PaletteResult> = listOfNotNull(web.storeRow(q.text))
 }

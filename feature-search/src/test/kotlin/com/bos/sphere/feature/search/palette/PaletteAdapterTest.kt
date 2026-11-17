@@ -17,31 +17,6 @@ import org.junit.Test
 class PaletteAdapterTest {
     private val full = MenuContext(isApp = true, canUninstall = true, otherDisplays = 2, adjacentSupported = true)
 
-    @Test fun PAL_08_appActionsComeFromTheOneMenuModel() {
-        val ids = PaletteMenus.appActions(full).map { it.id }
-        assertEquals(
-            listOf(ResultActionId.Open, ResultActionId.OpenOnDisplay, ResultActionId.OpenBeside, ResultActionId.AppInfo, ResultActionId.AddToDock, ResultActionId.AddToWorkspace, ResultActionId.Uninstall),
-            ids,
-        )
-    }
-
-    @Test fun PAL_08_longPressRightClickAndPaletteListsAreIdentical() {
-        for (c in listOf(full, MenuContext(), MenuContext(otherDisplays = 1, inDock = true), MenuContext(canUninstall = false, onHome = true))) {
-            val menu = ContextMenus.onLongPress(c).map { it.action.name }
-            assertEquals(menu, ContextMenus.onSecondaryClick(c).map { it.action.name })
-            assertEquals(menu, PaletteMenus.appActions(c).map { it.id.name })
-        }
-    }
-
-    @Test fun PAL_08_conditionalActionsAreOmittedWhenUnsupported() {
-        val ids = PaletteMenus.appActions(MenuContext(canUninstall = false)).map { it.id }
-        assertTrue(ResultActionId.OpenOnDisplay !in ids && ResultActionId.OpenBeside !in ids && ResultActionId.Uninstall !in ids)
-    }
-
-    @Test fun PAL_08_everyMenuActionMapsToAnEngineActionId() {
-        MenuAction.entries.forEach { assertEquals(it.name, PaletteMenus.toId(it).name) }
-    }
-
     private val reg = ShortcutRegistry()
 
     private fun key(code: Int, ch: Int, ctrl: Boolean = false, alt: Boolean = false) = TypeToSearch.onKey(code, ch, ctrl, alt, false, false, reg)

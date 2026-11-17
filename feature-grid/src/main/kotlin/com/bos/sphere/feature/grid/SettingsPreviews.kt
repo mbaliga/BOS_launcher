@@ -196,32 +196,6 @@ fun <T> VisualChoice(
     }
 }
 
-/** A grid of [PreviewCard]s for a multi-choice setting. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun <T> VisualMultiChoice(
-    options: List<T>,
-    selected: Set<T>,
-    onToggle: (T, Boolean) -> Unit,
-    label: (T) -> String,
-    columns: Int = 3,
-    previewHeight: Dp = 84.dp,
-    preview: @Composable BoxScope.(T) -> Unit,
-) {
-    FlowRow(
-        maxItemsInEachRow = columns,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-    ) {
-        options.forEach { o ->
-            val on = o in selected
-            PreviewCard(label(o), on, { onToggle(o, !on) }, Modifier.weight(1f), previewHeight) { preview(o) }
-        }
-        repeat((columns - options.size % columns) % columns) { Spacer(Modifier.weight(1f)) }
-    }
-}
-
 // ----------------------------------------------------------------------------------------------
 // Real-component previews
 // ----------------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@ Owner request: a home that can land on recent apps, with Selected apps, Recent a
 
 ## The setting
 - `LauncherPrefs.homeLanding` (`HomeLanding`: Selected, Recents, AllApps, Minimal), stored as a plain pref `homeLanding` in `launcher_prefs`. It is exported with the settings and not device-bound. An unknown or missing value reads as Selected, so an older export imports unchanged.
-- Also stored: `recentsLimit` (8 to 48, default 24), `recentsUsage` (use usage access when granted, default on), `minimalHints` (the dot per hotspot, default on).
+- Also stored: `recentsLimit` (8 to 48, default 24), `recentsUsage` (use usage access when granted, default on), `minimalHints` (the dot per hotspot, default on; removed in wave 20, see the glance record).
 - Global, not per workspace: the workspace model keeps only an opaque `homeArrangement` snapshot and no home settings, so a landing per workspace would be a new model. Revisit if workspaces gain home settings.
 - Switching changes only this pref. Pages, folders, widgets, tags and hidden apps are never rewritten.
 - Default stays Selected apps. Making Recents the default is a one-line change (`LauncherPrefs.homeLanding` default) and an owner choice. The empty-home hint gains "Or show recent apps" in the UI step.

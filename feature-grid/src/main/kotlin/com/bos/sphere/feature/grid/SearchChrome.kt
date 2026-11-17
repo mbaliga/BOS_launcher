@@ -338,15 +338,6 @@ internal fun SuggestionGroups(groups: List<SuggGroup>, onPick: (SuggItem) -> Uni
     }
 }
 
-@Composable
-internal fun SuggestionCard(groups: List<SuggGroup>, onPick: (SuggItem) -> Unit, modifier: Modifier = Modifier) {
-    SuggestionGroups(
-        groups, onPick,
-        compact = true,
-        modifier = modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFA1F2024)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(14.dp)).padding(bottom = 6.dp),
-    )
-}
-
 // ---------------------------------------------------------------- tile faces
 
 internal fun hitGlyph(hit: SearchHit): ImageVector = hit.actionId?.let { Glyphs.forAction(it) } ?: when (hit.kind) {

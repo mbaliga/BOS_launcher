@@ -34,10 +34,6 @@ class LaunchExecutor(
     /** Drop reasons not yet shown this session. */
     fun freshNotices(result: LaunchResult): List<DropReason> = notices.fresh(result.resolution.dropped)
 
-    /** Launches the members one after another, re-checking each result (WSP-05). */
-    suspend fun launchGroup(group: AppGroup, gapMs: Long = 350): List<LaunchResult> =
-        launchPlan(GroupPlan(GroupMode.Bounds, group.members, emptyList()), gapMs).results
-
     /** Runs a planned group or restored session in sequence; a step that fails is retried once (WSP-05, WSP-09). */
     suspend fun launchPlan(plan: GroupPlan, gapMs: Long = 350): GroupOutcome = GroupRunner.run(plan, gapMs, { delay(it) }) { launch(it) }
 

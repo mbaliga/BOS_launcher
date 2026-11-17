@@ -104,7 +104,7 @@ app (MainActivity, HomeScreen, UI chrome)
 
 **Key files:**
 - `Color.kt` — Hyle palette: Violet accent, background/surface/ink, hairlines, provenance (on-device warm radium / cloud cyan).
-- `Motion.kt` — Eight named motion primitives (Breath, Stir, Reform, Reach, Erupt, Coalesce, Give, Settle) mapped to Compose AnimationSpecs.
+- `Motion.kt` — The named motion curves still in use (Reach, Give, Settle) and the two house easings, as Compose animation specs. (The other five of the original eight, Breath, Stir, Reform, Erupt and Coalesce, were unused and removed in wave 20.)
 - `Type.kt` — Hyle typography: display (clock hero), headline (widget numbers), body (labels), label (chrome).
 - `Shape.kt` — Corner radii: large (app tiles, hub), medium, small (buttons, chips).
 - `Theme.kt` — SphereTheme Composable wrapping Material3 with Hyle overrides.

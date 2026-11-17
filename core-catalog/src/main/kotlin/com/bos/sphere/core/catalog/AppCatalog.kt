@@ -43,8 +43,6 @@ class AppCatalog(context: Context) {
         icons.get(a.record.key) ?: activityIcon()?.also { icons.put(a.record.key, it) }
 
     fun evict(keys: Set<String>) = keys.forEach { icons.remove(it) }
-    fun clearIcons() = icons.evictAll()
-
     // ---- profiles (HOM-06) ---------------------------------------------------------------
 
     fun kindOf(user: UserHandle): ProfileKind {
@@ -128,6 +126,4 @@ class AppCatalog(context: Context) {
             }.getOrNull()
         }
     }
-
-    fun installedProviderIds(): Set<String> = AppWidgetManager.getInstance(app).installedProviders.map { it.provider.flattenToString() }.toSet()
 }

@@ -90,11 +90,10 @@ class W13AuditStateTest {
     }
 
     @Test fun CFG_01_theLandingSettingsRoundTripAndAnOlderSettingsFileKeepsTheDefaults() {
-        val prefs = LauncherPrefs(homeLanding = HomeLanding.AllApps, recentsLimit = 30, minimalHints = false)
+        val prefs = LauncherPrefs(homeLanding = HomeLanding.AllApps, recentsLimit = 30)
         val back = SettingsCodec.decode(SettingsCodec.encode(prefs)).prefs
         assertEquals(HomeLanding.AllApps, back.homeLanding)
         assertEquals(30, back.recentsLimit)
-        assertFalse(back.minimalHints)
         val old = SettingsCodec.decode(JSONObject().put("format", StateSchema.SETTINGS_FORMAT).put("version", 1)).prefs
         assertEquals(HomeLanding.Glance, old.homeLanding) // wave 16: the default landing is Glance
     }

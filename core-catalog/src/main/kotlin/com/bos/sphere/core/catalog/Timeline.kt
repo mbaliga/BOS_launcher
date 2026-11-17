@@ -10,9 +10,6 @@ import com.bos.sphere.core.data.LaunchEvent
 data class TimelineEntry(val timeMs: Long, val key: String, val label: String, val scheduled: Boolean, val id: String = "")
 
 object Timeline {
-    /** The launch history keeps at most this many opens. */
-    const val HISTORY_MAX = 400
-
     /** HOM-18: the timeline log keeps this many opens ([com.bos.sphere.core.data.TimelineLogCodec.MAX]). */
     const val LOG_MAX = com.bos.sphere.core.data.TimelineLogCodec.MAX
 

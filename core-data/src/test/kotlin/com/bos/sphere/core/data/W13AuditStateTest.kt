@@ -134,4 +134,19 @@ class W13AuditStateTest {
         val thrown = runCatching { StateDocument.parse("{\"myLastName\":\"Sharma\",") }.exceptionOrNull()
         assertTrue(thrown is StateFormatException)
     }
+
+    @Test fun NFR_17_theErrorTextNeverQuotesTheInputInAnyParserMessage() {
+        for (m in listOf("Value Sharma of type java.lang.String cannot be converted to JSONObject", "Value [\"Priya\"] of type org.json.JSONArray cannot be converted to JSONObject", "End of input at character 40 of {\"a\":\"Priya\""))
+            assertFalse(StateDocument.describe(org.json.JSONException(m)).let { it.contains("Sharma") || it.contains("Priya") })
+        assertEquals("End of input at character 40", StateDocument.describe(org.json.JSONException("End of input at character 40 of {}")))
+    }
+
+    @Test fun STR_13_unlinkingANameThatIsNotThePersonsLeavesThePersonAndTheNoReadableRuleStays() {
+        var c = GroupsEdit.addGroup(GroupsConfig(), "Work", id = "work")
+        c = GroupsEdit.linkSenders(c, "Priya S", "Priya Sharma", id = "p:1")
+        assertEquals(c, GroupsEdit.unlinkAlias(c, "p:1", "Somebody Else"))
+        // A rule whose conditions are all unreadable has none in memory; removing an unrelated person must not delete it.
+        c = c.copy(rules = listOf(GroupRule("empty", emptyList(), "work", false)))
+        assertEquals(listOf("empty"), GroupsEdit.removePerson(c, "p:1").rules.map { it.id })
+    }
 }

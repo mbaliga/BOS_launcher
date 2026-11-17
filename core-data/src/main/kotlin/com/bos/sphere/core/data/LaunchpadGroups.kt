@@ -217,6 +217,7 @@ object GroupsEdit {
         val k = PersonNames.key(alias)
         val p = c.person(personId) ?: return c
         val rest = p.aliases.filter { PersonNames.key(it) != k }
+        if (rest.size == p.aliases.size) return c // not one of this person's names: nothing to unlink
         return if (rest.size <= 1 && p.contactKey == null) removePerson(c, personId)
         else c.copy(people = c.people.map { if (it.id == personId) it.copy(aliases = rest) else it })
     }
@@ -228,8 +229,11 @@ object GroupsEdit {
         // match everyone who fits its other conditions ("Priya, on weekdays" would become "anyone, on weekdays"). A negated
         // condition ("not this person") has nothing left to exclude and is simply dropped.
         rules = c.rules.filterNot { r -> r.conditions.any { it.kind == ConditionKind.PersonIs && it.value == personId && !it.negate } }
-            .map { r -> r.copy(conditions = r.conditions.filterNot { it.kind == ConditionKind.PersonIs && it.value == personId }) }
-            .filter { it.conditions.isNotEmpty() },
+            .mapNotNull { r ->
+                val left = r.conditions.filterNot { it.kind == ConditionKind.PersonIs && it.value == personId }
+                // Only a rule emptied by this removal goes; one that had no readable condition before (its conditions are from a newer build) stays.
+                if (left.isEmpty() && r.conditions.isNotEmpty()) null else r.copy(conditions = left)
+            },
     )
 }
 

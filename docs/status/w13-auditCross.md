@@ -37,6 +37,13 @@ Scope: the persisted state added in waves 8 to 12 (groups, rules, person links, 
 - `docs/device-checklist.md`: stale "(when the UI lands)" removed from the Recent apps row; the restore row now says groups are not restored by a platform restore; new section "Cross-cutting audit (wave 13)".
 - `docs/SPEC_STATUS.md` was not edited (rule). Stale text in it, for the merge: the STR-01 row still carries the wave 6 sentences "landscape strip and portrait takeover" and "the strip layout is landscape 0.86, portrait full" ahead of the wave 8 card text; the card text is the current behaviour. `docs/Spec.md` row for recent app history updated.
 
+## Second review (adversarial)
+
+- The JSON error text fix was incomplete: other parser messages ("Value Sharma of type java.lang.String cannot be converted to JSONObject") quote the input before the word "of". `StateDocument.describe` now keeps only a "<words> at character N" position and otherwise says "Invalid JSON" (`NFR_17_theErrorTextNeverQuotesTheInputInAnyParserMessage`).
+- `GroupsEdit.unlinkAlias` removed a person that had a single alias when asked to unlink a name that was not theirs; it now changes nothing in that case, and `GroupsSettings.unlinkAlias` takes no snapshot for a no-op (`STR_13_unlinkingANameThatIsNotThePersonsLeavesThePerson...`).
+- `GroupsEdit.removePerson` deleted every rule with no readable condition, including a rule whose conditions all come from a newer build (kept in the entry extras); only rules emptied by the removal go now (same test).
+- Checked and found sound: backup and transfer exclusion lists (both rule files and the Kotlin sets agree), snapshot hooks on every destructive groups edit, landing prefs clamping on import, L10n literals in the new screens (no bare strings or templates found), logging (only the opt-in monitor, no personal labels).
+
 ## Residue
 
 | ID | Needs |

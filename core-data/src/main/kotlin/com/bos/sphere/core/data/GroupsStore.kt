@@ -226,6 +226,7 @@ object GroupsSettings {
 
     fun linkSenders(nameA: String, nameB: String, contactKey: String? = null) = edit { GroupsEdit.linkSenders(it, nameA, nameB, contactKey) }
     fun unlinkAlias(personId: String, alias: String) {
+        if (GroupsEdit.unlinkAlias(_config.value, personId, alias) == _config.value) return
         DestructiveEdits.before("unlink person")
         edit { GroupsEdit.unlinkAlias(it, personId, alias) }
     }

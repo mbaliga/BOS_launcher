@@ -115,7 +115,10 @@ class StateDocument(val json: JSONObject) {
          * The file holds names, people links and the user's last name, and this text is shown in a dialog, so only the part before the
          * input is kept.
          */
-        fun describe(e: JSONException): String = (e.message ?: "").substringBefore(" of ").take(120)
+        fun describe(e: JSONException): String =
+            POSITION.find(e.message ?: "")?.value ?: "Invalid JSON" // "Value Sharma of type ..." and the like quote the input: dropped
+
+        private val POSITION = Regex("^[A-Za-z' :]{1,60} at character \\d+")
 
         fun parse(text: String): StateDocument {
             val o = try {

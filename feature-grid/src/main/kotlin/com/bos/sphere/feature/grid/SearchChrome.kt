@@ -94,10 +94,42 @@ internal fun SearchBackdrop(modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------- category wheel + query
 
 private val WheelRow = 34.dp
+/** The wheel at its roomiest: five rows. */
 internal val WheelHeight = WheelRow * 5
 
 /** How far above and below the middle of the wheel its labels are still bright enough to be in the way of a tile. */
 internal val WheelRowHalfVisible = WheelRow * 1.6f
+
+/**
+ * Wave 22: the wheel sized to the room it really has. [rows] is odd (the selected label sits in the middle row) and [row] grows with the
+ * font scale so two labels never overlap; [height] is the wheel's own box, which is the only place a label is drawn.
+ */
+internal data class WheelSpec(val rows: Int, val row: Dp) {
+    val height: Dp get() = row * rows
+    /** How far from the middle a tile must stay clear: the labels that are still bright. */
+    val halfVisible: Dp get() = row * minOf(1.6f, rows / 2f + 0.1f)
+
+    companion object {
+        val Default = WheelSpec(5, WheelRow)
+        /** Row height in dp for [fontScale]: 34 dp, or 1.5 lines of the 16 sp label when the text is larger. */
+        fun rowFor(fontScale: Float): Dp = maxOf(WheelRow.value, 16f * fontScale * 1.5f).dp
+        /** The most rows (1, 3 or 5) that fit in [freeDp] (the free height, keeping 8 dp of air), never fewer than one. */
+        fun fit(freeDp: Float, fontScale: Float): WheelSpec {
+            val row = rowFor(fontScale)
+            val n = ((freeDp - 8f) / row.value).toInt().coerceIn(1, 5)
+            return WheelSpec(if (n % 2 == 0) n - 1 else n, row)
+        }
+    }
+}
+
+/**
+ * Opacity of the wheel label [d] rows from the selected one (0 is the selected label) in a wheel of [rows] rows: the old falloff, ramped
+ * to nothing over the last half row, so no glyph is drawn outside the wheel's box and the edge of the results area never cuts one in half.
+ */
+internal fun wheelLabelAlpha(d: Float, rows: Int = 5): Float {
+    val a = d.coerceAtLeast(0f)
+    return (1f / (1f + 0.9f * a * a)) * ((rows / 2f - a) * 2f).coerceIn(0f, 1f)
+}
 
 /**
  * The slot-machine category wheel: [selected] sits bright in the middle, its neighbours dim away
@@ -111,6 +143,7 @@ internal fun CategoryWheel(
     onTick: () -> Unit,
     onTouch: () -> Unit,
     modifier: Modifier = Modifier,
+    spec: WheelSpec = WheelSpec.Default,
 ) {
     val cats: List<SearchCategory?> = listOf(null) + SearchCategory.entries
     fun idx(c: SearchCategory?) = cats.indexOf(c).toFloat()
@@ -124,10 +157,10 @@ internal fun CategoryWheel(
     LaunchedEffect(selected) {
         if (!dragging) { raw[0] = idx(selected); pos.animateTo(idx(selected), spring(stiffness = 380f)) }
     }
-    val rowPx = with(LocalDensity.current) { WheelRow.toPx() }
+    val rowPx = with(LocalDensity.current) { spec.row.toPx() }
     Box(
         modifier
-            .height(WheelHeight)
+            .height(spec.height)
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragStart = { dragging = true; onTouchNow() },
@@ -155,7 +188,7 @@ internal fun CategoryWheel(
                     .offset { IntOffset(0, ((i - pos.value) * rowPx).roundToInt()) }
                     .graphicsLayer {
                         val d = abs(i - pos.value)
-                        alpha = (1f / (1f + 0.9f * d * d)) * (if (empty) 0.55f else 1f)
+                        alpha = wheelLabelAlpha(d, spec.rows) * (if (empty) 0.55f else 1f)
                     }
                     .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {
                         onTouchNow(); if (cat != selected) { onTickNow(); onSelectNow(cat) }
@@ -189,8 +222,8 @@ internal fun BlinkingCaret(height: Dp, color: Color = Color.White, modifier: Mod
  * button. Sits left of the wheel, right-aligned against it.
  */
 @Composable
-internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier.height(WheelHeight).clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onTap), contentAlignment = Alignment.CenterEnd) {
+internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier, height: Dp = WheelHeight) {
+    Box(modifier.height(height).clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onTap), contentAlignment = Alignment.CenterEnd) {
         if (query.isEmpty()) {
             Text(L10n.tr("SEARCH"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
         } else {

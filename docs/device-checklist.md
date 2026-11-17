@@ -244,6 +244,15 @@ Nothing here has been confirmed on a device. Decisions: `docs/decisions/crashRec
 - [ ] NFR-15: in the same checks the placeholder "Search", typed text, the X, the scope pill and the mic stay easy to read at No signal and at Excellent (Lab > Radar signal); over Beam the mic may look darker than the field (the measured shade), never washed out.
 - [ ] PAL-18, INP-13: the mic is at the centre of the bottom in Orbit, Filmstrip and Flat, portrait and landscape, and can be reached with one thumb on a tall phone; it is 56 dp, press-and-hold listens, release searches; with a pen or mouse a click-and-hold works; TalkBack says "Speak to search".
 - [ ] INP-12, NFR-13: with the software keyboard open the mic sits just above the keyboard (not under it), stays centred, and no result, ring or the web row strip is hidden behind it; with the three-button and gesture navigation bars it clears the bar. On a phone with no on-device speech recogniser there is no mic and no empty strip.
-- [ ] PAL-18: type a word: the X appears inside the field at its right end (left in a right-to-left language) and clears the text with one tap; Close is gone while it shows; clear the text and Close is back outside the field. The X is easy to hit with a thumb (48 dp).
+- [ ] PAL-18: type a word: the X appears inside the field at its right end (left in a right-to-left language) and clears the text with one tap; Close is gone while it shows; clear the text and Close is back outside the field (Orbit and Filmstrip; Flat has no Close, Esc or Back leaves). The X is easy to hit with a thumb (48 dp).
 - [ ] PAL-18: Flat layout: the scope menu is a small glass pill at the left end of the field and opens the scope list downward.
 - [ ] NFR-05: scroll and rotate Radar over a living wallpaper for a minute with the glass on: no jank beyond the budget (the glass is drawn from cached brushes, nothing is blurred).
+
+## Radar clearer glass and landscape layout (wave 22, glassFix)
+
+- [ ] NFR-15, PAL-18: Radar over the default pair (Spire + Breathing dots) at No signal and at Excellent: the field, Close and the mic are clear glass (the background shows through them, no smoky dark patch); the Spire's tip stops below the field and its glow sits above the mic. Home behind Radar is unchanged. Placeholder, typed text, X and mic icon stay easy to read in daylight.
+- [ ] NFR-15: over Beam, Shaft and Laser (the pairs that still keep a shade under a piece of glass) the text and icons are readable and the shade does not look like a grey patch.
+- [ ] PAL-18, INP-13: landscape, Orbit, Filmstrip and Flat, with the keyboard closed and open: the wheel's labels are whole (none cut at the bottom), the mic does not overlap the wheel, a ring or a result, and the wheel shows fewer rows when the room is short.
+- [ ] NFR-13, PAL-18: Settings > Display > Font size at the largest: the wheel labels do not overlap each other, the mic is still centred and whole.
+- [ ] PAL-18: Flat with an empty query has no Close button, only the scope pill and the placeholder; Esc and Back close Radar.
+- [ ] NFR-05: with the glass on, a minute of scrolling and rotating Radar over Spire, Beam and Halo stays within 1 percent janky frames (`gfxinfo`).

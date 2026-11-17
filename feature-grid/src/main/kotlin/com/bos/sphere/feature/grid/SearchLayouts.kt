@@ -274,6 +274,8 @@ internal fun Orbit(
     /** Distance from the bottom edge to the common centre of the rings (the middle of the category wheel). */
     centreFromBottom: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    /** Wave 22: the wheel's size, so tiles stay clear of what is really drawn. */
+    wheel: WheelSpec = WheelSpec.Default,
     /** Reports how many of [tiles] have a slot on screen, so the keyboard never selects one that is not drawn. */
     onVisibleCount: (Int) -> Unit = {},
     /** Wave 18: a quiet line under the wheel while there is nothing to show yet ("Rings fill up as you use Radar"). */
@@ -351,10 +353,10 @@ internal fun Orbit(
         // way round. Within a ring the best result sits straight above the centre and the rest alternate outward.
         val boxW = colWPx + with(density) { 8.dp.toPx() }
         val boxH = tilePx + with(density) { 26.dp.toPx() }
-        val textLeft = with(density) { 90.dp.toPx() }
-        val textRight = with(density) { 100.dp.toPx() }
-        val textHalfH = with(density) { (WheelRowHalfVisible).toPx() }
-        val placements = remember(wPx, hPx, tiles.size, motion, cy) {
+        val textLeft = with(density) { 90.dp.toPx() * maxOf(1f, density.fontScale) }
+        val textRight = with(density) { 100.dp.toPx() * maxOf(1f, density.fontScale) }
+        val textHalfH = with(density) { wheel.halfVisible.toPx() }
+        val placements = remember(wPx, hPx, tiles.size, motion, cy, wheel, density.fontScale) {
             // Candidate angles per ring, best position first.
             val candidates = ArrayList<List<Double>>()
             val pts = ArrayList<Offset>()
@@ -435,7 +437,7 @@ internal fun Orbit(
         if (emptyHint != null && tiles.isEmpty()) {
             Text(
                 emptyHint, color = Color.White.copy(alpha = 0.6f), fontSize = (13 * z).sp, textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.TopCenter).offset { IntOffset(0, (cy + with(density) { (WheelHeight / 2 + 14.dp).toPx() }).roundToInt()) }.padding(horizontal = 32.dp),
+                modifier = Modifier.align(Alignment.TopCenter).offset { IntOffset(0, (cy + with(density) { (wheel.height / 2 + 14.dp).toPx() }).roundToInt()) }.padding(horizontal = 32.dp),
             )
         }
     }

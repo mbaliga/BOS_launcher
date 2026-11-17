@@ -29,6 +29,7 @@ Rectangle {
     }
 
     function scan() {
+        watchdog.stop();   // folder became Ready: do not let the stale timeout fire and skip a directory
         var d = dirs[dirIndex];
         note(d + ": listing OK, " + fl.count + " .desktop files");
         for (var i = 0; i < fl.count; i++) readOne(fl.get(i, "fileURL").toString(), fl.get(i, "fileName"));

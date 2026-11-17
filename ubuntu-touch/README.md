@@ -11,6 +11,8 @@ permission for the picker.
 | U0 spike | `picker/qml/SpikePage.qml` | In-app probe: can this confined app list and read `.desktop` files? Prints a verdict | probe code runs on desktop Qt (BUILT-HERE, proves nothing about confinement); verdict NEEDS-DEVICE-VALIDATION |
 | U2 demo | `demo/` | `docs/spherelauncher13.html` in `webapp-container`; no inventory, no launching | Click build CI-LANE-WRITTEN; run NEEDS-DEVICE-VALIDATION |
 
+Caveat: the demo's `webapp-container --enable-addressbar=false www/index.html` Exec line (relative local path, no `file://` URL) is CODE-ONLY and may need a different form on a real device.
+
 ## Behaviour you should expect
 - Until the spike has found a real inventory the picker shows 15 **demo entries** under a banner saying so;
   tapping one only shows "launching is disabled". It never presents demo entries as installed apps.

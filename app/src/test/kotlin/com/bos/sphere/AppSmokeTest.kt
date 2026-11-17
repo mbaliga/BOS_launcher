@@ -104,6 +104,22 @@ class AppSmokeTest {
         assertFalse(radarOpen()); assertFalse(drawerOpen())
     }
 
+    /** Wave 15 (HOM-16): a fresh install draws the default pair behind the home and the signal level is announced once. */
+    @Test fun HOM_16_aFreshHomeHasTheDefaultBackgroundPairAndAnnouncesTheSignalOnce() {
+        AppSmokeHarness.configure { it.copy(radarSignalForce = com.bos.sphere.core.data.SignalForce.Good) }
+        start()
+        val p = LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value
+        assertEquals(com.bos.sphere.core.data.BackgroundChoice.DEFAULT, com.bos.sphere.core.data.BackgroundChoice(p.backgroundSlot1, p.backgroundSlot2))
+        assertEquals(1, rule.onAllNodesWithContentDescription("Signal: good, Wi-Fi").fetchSemanticsNodes().size)
+    }
+
+    @Test fun HOM_16_withBothSlotsNoneTheHomeDrawsAndAnnouncesNoBackground() {
+        AppSmokeHarness.configure { it.copy(backgroundSlot1 = com.bos.sphere.core.data.BgItem.None, backgroundSlot2 = com.bos.sphere.core.data.BgItem.None, radarSignalForce = com.bos.sphere.core.data.SignalForce.Good) }
+        start()
+        assertEquals(0, rule.onAllNodesWithContentDescription("Signal: good, Wi-Fi").fetchSemanticsNodes().size)
+        rule.onNodeWithContentDescription("Dock").assertIsDisplayed()
+    }
+
     @Test fun HOM_01_thePageGridShowsAppsAndAFolderAndTheFolderOpens() {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
         AppSmokeHarness.configure { it.copy(appsOnHome = AppsOnHome.PinnedOnly) }

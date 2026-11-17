@@ -815,7 +815,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), baseFill = true)
         // NFR-15: keeps clock and labels at WCAG AA over whatever the background draws behind them.
         com.bos.sphere.feature.grid.HomeScrim(
-            com.bos.sphere.feature.grid.rememberHomeScrim(com.bos.sphere.core.data.BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2), prefs.radarIntensity),
+            com.bos.sphere.feature.grid.rememberHomeScrim(com.bos.sphere.core.data.BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2), prefs.radarIntensity, com.bos.sphere.feature.grid.isDarkSurface()),
         )
         IndicatorLayer(
             reading = reading,
@@ -1390,7 +1390,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {
-                    com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), baseFill = true, animate = false, announce = false)
+                    com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), dark = true, baseFill = true, animate = false, announce = false)
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = prefs.settingsDim.coerceIn(0f, 1f))))
                 }
             },

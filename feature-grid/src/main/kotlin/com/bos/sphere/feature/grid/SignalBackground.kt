@@ -284,16 +284,20 @@ internal fun rememberRadarSignal(force: SignalForce, wanted: Boolean): State<Sig
     return remember(force) { derivedStateOf { if (force == SignalForce.Live) live.value else SignalState.forced(force.level) } }
 }
 
+/** True unless the current theme variant is Light: the surface the background is drawn on is dark. */
+@Composable
+fun isDarkSurface(): Boolean = com.bos.sphere.core.design.HyleTheme.variant != com.bos.sphere.core.design.ThemeVariant.Light
+
 /**
  * THE background composable (HOM-16, PAL-24): every surface that draws a background uses this one. It reads the two slots, the
  * intensity and the Lab signal override from [prefs], follows the phone's signal (collected only while it is composed and the
  * activity is started), runs one shared clock only while the screen is on and the window focused (and never under reduced
  * motion), and announces the signal level to TalkBack once, politely, as a 1 dp live region. Place it as the bottom layer of a
- * `Box`; it fills the box, has no touch handling and no other semantics. [dark] false draws the quiet light variant;
+ * `Box`; [dark] defaults to the current theme (the light theme draws the quiet light variant); it fills the box, has no touch handling and no other semantics. [dark] false draws the quiet light variant;
  * [baseFill] paints the black (or light) base too. [animate] false draws one static frame (thumbnails, Settings backdrop).
  */
 @Composable
-fun SignalBackground(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = true, baseFill: Boolean = false, animate: Boolean = true, announce: Boolean = true) {
+fun SignalBackground(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = isDarkSurface(), baseFill: Boolean = false, animate: Boolean = true, announce: Boolean = true) {
     val reduced = rememberMotionPrefs().reduced || !animate
     val active = rememberRadarActive()
     val clock = rememberRadarClock(active && animate, reduced)

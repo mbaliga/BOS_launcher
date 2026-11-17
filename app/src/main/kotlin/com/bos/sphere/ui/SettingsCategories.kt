@@ -608,7 +608,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                         VisualChoice(com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { v -> upd { it.copy(settingsBackdrop = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { b ->
                             if (b == com.bos.sphere.core.data.SettingsBackdrop.Black) androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
                             else androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                                com.bos.sphere.feature.grid.SignalBackground(p, Modifier.fillMaxSize(), baseFill = true, animate = false, announce = false)
+                                com.bos.sphere.feature.grid.SignalBackground(p, Modifier.fillMaxSize(), dark = true, baseFill = true, animate = false, announce = false)
                                 androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = p.settingsDim)))
                             }
                         }

@@ -89,7 +89,6 @@ enum class HealthSourcePref(val label: String) { Phone("Phone sensor"), HealthCo
 /** Where in the strip an item sits. */
 enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right("Right") }
 
-/** Web search engine for the "search the web" rows. DuckDuckGo is the default so !bangs work (!g, !gi, !yt, !w …). */
 /** How the search screen presents results. */
 enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
 
@@ -126,7 +125,7 @@ enum class WebEngine(val label: String, private val template: String) {
     Bing("Bing", "https://www.bing.com/search?q=%s"),
     Startpage("Startpage", "https://www.startpage.com/do/search?q=%s");
 
-    /** The results URL for [query] (URL-encoded). Bangs are just text; DuckDuckGo interprets them. */
+    /** The results URL for [query] (URL-encoded). The text is sent as typed. */
     fun url(query: String): String = template.replace("%s", java.net.URLEncoder.encode(query.trim(), "UTF-8"))
 }
 

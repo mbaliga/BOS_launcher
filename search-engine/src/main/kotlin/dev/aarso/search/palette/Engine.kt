@@ -17,19 +17,19 @@ class Plan(val scoped: ScopedQuery, val providers: List<PaletteProvider>) {
 data class Batch(val providerId: String, val results: List<PaletteResult>, val timedOut: Boolean = false)
 
 /**
- * The palette engine (PAL-06, PAL-09, PAL-12, PAL-14): parse the scope prefix, fan out to providers, stream each
+ * The palette engine (PAL-06, PAL-09, PAL-12, PAL-14): take the scope from the wheel, fan out to providers, stream each
  * answer as it lands, rank by match blended with local history, and always end with the web fallback.
  */
 class PaletteEngine(
     val registry: ProviderRegistry,
-    val prefixes: PrefixTable = PrefixTable(),
     val ranker: Ranker = Ranker(),
     val web: WebFallback = WebFallback(),
     private val slowTimeoutMs: Long = 1500,
     private val perProviderLimit: Int = 8,
 ) {
-    fun plan(raw: String): Plan {
-        val sq = prefixes.parse(raw)
+    /** [scope] comes from the category wheel; the text is searched as typed. */
+    fun plan(raw: String, scope: PaletteScope = PaletteScope.Everything): Plan {
+        val sq = ScopedQuery(scope, raw.trim())
         return Plan(sq, registry.forScope(sq.scope))
     }
 
@@ -58,8 +58,8 @@ class PaletteEngine(
     }
 
     /** Awaits every provider and returns the final ranked list (used by tests and non-streaming callers). */
-    suspend fun search(raw: String): List<PaletteResult> {
-        val plan = plan(raw)
+    suspend fun search(raw: String, scope: PaletteScope = PaletteScope.Everything): List<PaletteResult> {
+        val plan = plan(raw, scope)
         val all = stream(plan).toList().flatMap { it.results }
         return finalList(plan, all)
     }

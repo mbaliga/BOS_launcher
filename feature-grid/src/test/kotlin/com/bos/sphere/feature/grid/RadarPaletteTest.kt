@@ -48,7 +48,7 @@ class RadarPaletteTest {
         }
     }
 
-    @Test fun PAL_06_aBangOrUrlQueryStillRunsOnEnterThroughTheWebRow() {
+    @Test fun PAL_06_aUrlQueryStillRunsOnEnterThroughTheWebRow() {
         val d = data("example.com", webFirst = true)
         val e = d.enterTile(null) as Tile.Web
         assertTrue(e.row is WebRow.Open)
@@ -97,20 +97,6 @@ class RadarPaletteTest {
         assertEquals("b", HubOrdering.order(emptyMap(), fresh, null, ranker)[SearchCategory.Actions]!!.first().id)
         ranker.reset()
         assertEquals("a", HubOrdering.order(emptyMap(), fresh, null, ranker)[SearchCategory.Actions]!!.first().id)
-    }
-
-    @Test fun PAL_13_prefixLettersAreEditableAndOneSettingWithTheWheel() {
-        val m = ScopePrefixes.DEFAULT
-        val changed = PrefixEditing.change(m, SearchCategory.Files, "d") as PrefixEditing.Result.Saved
-        assertEquals('d', changed.mapping.letterOf(SearchCategory.Files))
-        // The typed prefix, the wheel and the stored form all follow the new letter.
-        assertEquals(SearchCategory.Files to "budget", ScopePrefixes.parse("d budget", changed.mapping))
-        assertEquals("d budget", ScopePrefixes.applyWheel("budget", SearchCategory.Files, changed.mapping))
-        assertEquals(SearchCategory.Files, ScopePrefixes.Mapping.decode(changed.mapping.encode()).categoryOf('d'))
-        // Clashes and non-letters are refused with a reason.
-        assertTrue(PrefixEditing.change(m, SearchCategory.Files, "a") is PrefixEditing.Result.Refused)
-        assertTrue(PrefixEditing.change(m, SearchCategory.Files, "7") is PrefixEditing.Result.Refused)
-        assertTrue(PrefixEditing.change(m, SearchCategory.Files, "") is PrefixEditing.Result.Refused)
     }
 
     @Test fun PAL_03_launcherCommandsHaveATouchPathAndAnActionId() {

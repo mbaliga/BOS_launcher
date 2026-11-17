@@ -1355,6 +1355,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             settingsSource = settingsSource,
             initialQuery = typedQuery,
+            launchHistory = history, // wave 18: which ring an app sits on before anything is typed
             onRunCommand = { name, index ->
                 // PAL-03: "Switch to workspace Work" names a workspace by position; every other command is a launcher command.
                 if (name == "GoToWorkspace" && index != null) com.bos.sphere.feature.dock.WorkspaceRepository.get(context).switchToIndex(index)

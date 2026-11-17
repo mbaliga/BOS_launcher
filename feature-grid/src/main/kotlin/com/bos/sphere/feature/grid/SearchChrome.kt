@@ -93,6 +93,9 @@ internal fun SearchBackdrop(modifier: Modifier = Modifier) {
 private val WheelRow = 34.dp
 internal val WheelHeight = WheelRow * 5
 
+/** How far above and below the middle of the wheel its labels are still bright enough to be in the way of a tile. */
+internal val WheelRowHalfVisible = WheelRow * 1.6f
+
 /**
  * The slot-machine category wheel: [selected] sits bright in the middle, its neighbours dim away
  * above and below. Drag vertically or tap a label to change; each step calls [onTick].
@@ -218,18 +221,22 @@ internal fun ScopeToken(
     plain: Boolean = false,
     /** What "The web" is called in the list: the chosen search engine. */
     webLabel: String = L10n.tr("The web"),
+    /** The query line is at the top of the screen, so the scopes fan out downward (wave 18). */
+    fanDown: Boolean = false,
+    /** False draws only the glyph and the mark, so a narrow query line keeps its room (the scope is still named for TalkBack). */
+    showLabel: Boolean = true,
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         if (plain) {
-            // The bottom query line: "Everything 🌐 ⇅". Tapping fans the scopes out upward, right-aligned (macOS-style).
+            // The query line: "Everything 🌐 ⇅". Tapping fans the scopes out (downward from the top line), right-aligned (macOS-style).
             val dim = Color(0xB3FFFFFF)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.alpha(if (open) 0f else 1f).clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(horizontal = 6.dp, vertical = 6.dp),
             ) {
-                Text(scopeLabel(shown, webLabel), color = dim, fontSize = 16.sp, maxLines = 1)
-                Icon(scopeGlyph(shown), null, tint = dim, modifier = Modifier.padding(start = 8.dp).size(20.dp))
+                if (showLabel) Text(scopeLabel(shown, webLabel), color = dim, fontSize = 16.sp, maxLines = 1)
+                Icon(scopeGlyph(shown), if (showLabel) null else scopeLabel(shown, webLabel), tint = dim, modifier = Modifier.padding(start = if (showLabel) 8.dp else 0.dp).size(20.dp))
                 Column(Modifier.padding(start = 2.dp)) {
                     Icon(Glyphs.Up, null, tint = dim, modifier = Modifier.size(10.dp).offset(y = 2.dp))
                     Icon(Glyphs.Down, null, tint = dim, modifier = Modifier.size(10.dp).offset(y = (-2).dp))
@@ -237,12 +244,12 @@ internal fun ScopeToken(
             }
             if (open) {
                 androidx.compose.ui.window.Popup(
-                    alignment = Alignment.BottomEnd,
+                    alignment = if (fanDown) Alignment.TopEnd else Alignment.BottomEnd,
                     onDismissRequest = { open = false },
                     properties = androidx.compose.ui.window.PopupProperties(focusable = true),
                 ) {
                     // Furthest scope on top, "Everything" last — sitting exactly where the label was.
-                    val order: List<SearchCategory?> = listOf(SearchCategory.Files, SearchCategory.Actions, SearchCategory.Web, SearchCategory.Contacts, SearchCategory.Apps, null)
+                    val order: List<SearchCategory?> = listOf(SearchCategory.Files, SearchCategory.Actions, SearchCategory.Web, SearchCategory.Contacts, SearchCategory.Apps, null).let { if (fanDown) it.asReversed() else it }
                     Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(horizontal = 6.dp)) {
                         order.forEach { opt ->
                             val on = opt == scope
@@ -443,9 +450,6 @@ internal fun TileFace(tile: Tile, size: Dp, modifier: Modifier = Modifier) {
             },
             size, modifier,
         )
-        is Tile.Bang -> Box(modifier.size(size).clip(RoundedCornerShape(size * 0.26f)).background(Color(0xFF1D2A3E)), contentAlignment = Alignment.Center) {
-            Text("!${tile.code}", color = Color(0xFF9CC4FF), fontSize = (size.value * 0.28f).sp, fontWeight = FontWeight.SemiBold)
-        }
         is Tile.Allow -> WebFace(if (tile.files) FolderGlyph else Glyphs.Person, size, modifier)
         is Tile.Setting -> WebFace(Glyphs.Sliders, size, modifier)
     }

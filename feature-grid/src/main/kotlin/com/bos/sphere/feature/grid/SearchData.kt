@@ -55,10 +55,17 @@ internal sealed interface Tile {
     data class Person(val c: ContactRow) : Tile { override val key get() = "c:${c.hit.id}" }
     data class Hit(val hit: SearchHit) : Tile { override val key get() = "h:${hit.id}" }
     data class Web(val row: WebRow, val index: Int) : Tile { override val key get() = "w:$index" }
-    data class Bang(val code: String, val name: String, val rewritten: String) : Tile { override val key get() = "b:$code" }
     data class Allow(val files: Boolean) : Tile { override val key get() = if (files) "allow:files" else "allow:contacts" }
     /** A Ground Control setting as a Radar result (CFG-05); it opens Ground Control on that row. */
     data class Setting(val entry: SettingEntry) : Tile { override val key get() = "set:${entry.id}" }
+}
+
+/** The key Radar learns selections under (PaletteHost.learn), so a tile finds its use in [SearchData.habit]. */
+internal fun Tile.habitKey(): String = when (this) {
+    is Tile.App -> RadarHabits.appKey(app)
+    is Tile.Person -> "contact:${c.hit.id}"
+    is Tile.Hit -> hit.extras["usage"] ?: hit.id
+    else -> key
 }
 
 internal fun Tile.caption(): String = when (this) {
@@ -67,12 +74,9 @@ internal fun Tile.caption(): String = when (this) {
     is Tile.Hit -> hit.title
     is Tile.Web -> when (row) {
         is WebRow.Open -> row.label
-        is WebRow.BangSearch -> row.label
         is WebRow.Search -> row.label
         is WebRow.PlayStore -> row.label
-        is WebRow.BangHints -> ""
     }
-    is Tile.Bang -> "!$code  $name"
     is Tile.Allow -> if (files) L10n.tr("Allow file access") else L10n.tr("Allow contacts to find people")
     is Tile.Setting -> entry.title
 }
@@ -90,6 +94,8 @@ internal class SearchData(
     val deepHint: Boolean,
     /** Settings that match the query (CFG-05); shown with the Actions. */
     val settings: List<SettingEntry> = emptyList(),
+    /** Wave 18: decayed use per usage key (see [RadarHabits]); orders "Everything" before anything is typed. */
+    val habit: Map<String, Double> = emptyMap(),
 ) {
     val blank = query.isBlank()
 
@@ -103,7 +109,7 @@ internal class SearchData(
     fun count(cat: SearchCategory): Int = when (cat) {
         SearchCategory.Apps -> apps.size
         SearchCategory.Contacts -> contacts.size
-        SearchCategory.Web -> web.count { it !is WebRow.BangHints } + (hits[cat]?.size ?: 0)
+        SearchCategory.Web -> web.size + (hits[cat]?.size ?: 0)
         SearchCategory.Actions -> actionHits.size + settings.size
         else -> hits[cat]?.size ?: 0
     }
@@ -116,21 +122,24 @@ internal class SearchData(
             .firstOrNull { count(it) > 0 } ?: SearchCategory.Apps
     }
 
-    /** "Everything": a mix, best matches first — apps, people, actions, files, web (web first for bangs/URLs). */
+    /** "Everything": a mix, best matches first — apps, people, actions, files, web (web first for URLs). */
     fun tiles(cat: SearchCategory?): List<Tile> {
         if (cat != null) return tilesFor(cat)
-        // PAL-06: the web hand-off is always the last result, bang and URL queries included (Enter still reaches it first, see webFirst).
+        // PAL-06: the web hand-off is always the last result, URL queries included (Enter still reaches it first, see webFirst).
         val order = listOf(SearchCategory.Apps, SearchCategory.Contacts, SearchCategory.Actions, SearchCategory.Files, SearchCategory.Web)
         // Round-robin so every kind of result shows up near the centre, not just the first kind.
         // Before anything is typed, "Everything" is only what you really used: recent apps and people.
         // Actions, files and web rows are suggestions, not recents, so they wait for their own category.
         val usable = if (blank) order.filter { it == SearchCategory.Apps || it == SearchCategory.Contacts } else order
-        val mixed = usable.filter { it != SearchCategory.Web }.map { tilesFor(it).filter { t -> t !is Tile.Allow && t !is Tile.Bang } }
+        // Wave 18: at rest the apps and people you use most come first (apps before people when equally used); the Orbit
+        // lays them out ring by ring in this order.
+        if (blank) return usable.flatMap { tilesFor(it).filter { t -> t !is Tile.Allow } }.sortedByDescending { habit[it.habitKey()] ?: 0.0 }
+        val mixed = usable.filter { it != SearchCategory.Web }.map { tilesFor(it).filter { t -> t !is Tile.Allow } }
         val out = ArrayList<Tile>()
         answer?.let { out += Tile.Hit(it) }
         var i = 0
         while (out.size < 40 && mixed.any { i < it.size }) { mixed.forEach { l -> l.getOrNull(i)?.let { t -> if (out.none { o -> o.key == t.key }) out.add(t) } }; i++ }
-        if (SearchCategory.Web in usable) out += tilesFor(SearchCategory.Web).filter { t -> t !is Tile.Allow && t !is Tile.Bang }
+        if (SearchCategory.Web in usable) out += tilesFor(SearchCategory.Web).filter { t -> t !is Tile.Allow }
         return out
     }
 
@@ -144,23 +153,22 @@ internal class SearchData(
             if (askFiles) add(Tile.Allow(files = true))
             hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
         }
-        // PAL-06 / PAL-15: any hits and the bang chips first, then the app-store lookup, and the hand-off to the browser last.
+        // PAL-06 / PAL-15: any hits first, then the app-store lookup, and the hand-off to the browser last.
         SearchCategory.Web -> buildList {
             hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
-            web.forEach { w -> if (w is WebRow.BangHints) w.chips.forEach { add(Tile.Bang(it.code, it.name, it.rewritten)) } }
             web.withIndex().filter { it.value is WebRow.PlayStore }.forEach { add(Tile.Web(it.value, it.index)) }
-            web.withIndex().filter { it.value !is WebRow.PlayStore && it.value !is WebRow.BangHints }.forEach { add(Tile.Web(it.value, it.index)) }
+            web.withIndex().filter { it.value !is WebRow.PlayStore }.forEach { add(Tile.Web(it.value, it.index)) }
         }
         SearchCategory.Actions -> actionHits.sortedByDescending { it.copyText != null }.map<SearchHit, Tile> { Tile.Hit(it) } + settings.map { Tile.Setting(it) }
     }
 
     /**
-     * What Enter runs (PAL-05, PAL-06): a bang or URL query goes to the web row that opens it, even though the web rows
+     * What Enter runs (PAL-05, PAL-06): a URL query goes to the web row that opens it, even though the web rows
      * sit last; otherwise the top result, which is the inline answer when there is one.
      */
     fun enterTile(cat: SearchCategory?): Tile? {
         if (webFirst && (cat == null || cat == SearchCategory.Web)) {
-            tilesFor(SearchCategory.Web).firstOrNull { it is Tile.Web && (it.row is WebRow.Open || it.row is WebRow.BangSearch) }?.let { return it }
+            tilesFor(SearchCategory.Web).firstOrNull { it is Tile.Web && it.row is WebRow.Open }?.let { return it }
         }
         return tiles(cat).firstOrNull()
     }
@@ -187,7 +195,6 @@ internal fun buildSuggestionGroups(
 ): List<SuggGroup> {
     val q = query.trim()
     if (q.isEmpty()) return emptyList()
-    if (WebSearch.hasBang(q)) return emptyList() // the Web section already has the bang search
     val chips = suggest(query, appCategories)
     val kinds = chips.filter { it.kind == SuggestionKind.Key || it.kind == SuggestionKind.Value }
         .map { SuggItem(it.label, it.insertion, null, accent = true) }

@@ -213,3 +213,11 @@ Nothing here has been confirmed on a device. Owner bug report on build 48: "The 
 - [ ] STR-01: Launchpad set to Off in Ground Control: no left handle, dot or indicator glyph; the edge swipe does nothing; nothing looks dead. Rail setting on: the rail shows on Glance as on the other landings.
 - [ ] STR-01, STR-14, RTL: Arabic: the Launchpad handle and swipe are on the RIGHT edge, recents on the LEFT; the indicator mirrors.
 - [ ] HOM-23, NFR-13: TalkBack: swipe to the handles (focusable buttons labelled "Open Launchpad" and "Open recents"), double tap opens; with a keyboard Tab reaches the indicator buttons.
+
+## Radar search cleanup, query line at the top, Orbit tiers (wave 18, radarSearch)
+
+- [ ] PAL-06, PAL-13 (removed): open Radar, type `w bows of denmark`: the list shows "Search Play Store for ..." and "Search <engine> for ..." only, no `!g Google`, `!gi`, `!yt`, `!w` chips, no letter-and-space hint anywhere (empty state, Flat at rest, Ground Control > Radar has no "Search prefixes" row).
+- [ ] INP-12: Orbit, Filmstrip and Flat, portrait and landscape, with a cutout: the query line is at the top below the status bar and cutout; with the software keyboard up the results end above the keyboard and none hides under it; the keyboard and a hardware keyboard type into the field the moment Radar opens.
+- [ ] PAL-18: use a few apps different numbers of times over a few days, open Radar in Orbit with an empty query: the most used sit on the innermost ring and the less used outward; the rings are centred on the free area below the query line; Spire and Breathing dots stay readable behind the faint ring guides.
+- [ ] PAL-18, NFR-13: TalkBack in Orbit: tiles read best first and each says its tier ("Most used", "Often used", "Sometimes", "Rarely"); with a fresh install (nothing learned) the quiet line "Rings fill up as you use Radar" shows in Orbit, Filmstrip and Flat.
+- [ ] PAL-18, PAL-07: hardware keyboard in Orbit: Down and Up walk the results innermost ring first and outward; Enter opens, Esc closes; the wheel still moves with Left and Right.

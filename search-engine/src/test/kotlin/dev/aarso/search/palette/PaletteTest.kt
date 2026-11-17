@@ -272,47 +272,21 @@ class PaletteTest {
         assertEquals(setOf("url"), row.payload.keys)
     }
 
-    // ---------------------------------------------------------------- PAL-13
-    @Test fun PAL_13_prefixesScopeTheQuery() {
-        val t = PrefixTable()
-        assertEquals(ScopedQuery(PaletteScope.Apps, "gm", "a"), t.parse("a gm"))
-        assertEquals(PaletteScope.Files, t.parse("f report").scope)
-        assertEquals("report", t.parse("f report").rest)
-        assertEquals(PaletteScope.Settings, t.parse("S wifi").scope)
-        assertEquals(PaletteScope.Contacts, t.parse("c anna").scope)
-        assertEquals(PaletteScope.Everything, t.parse("a").scope)           // no space: still typing a word
-        assertEquals(PaletteScope.Everything, t.parse("apple pie").scope)
-        assertEquals("", t.parse("a ").rest)
-        assertEquals(PaletteScope.Apps, t.parse("a ").scope)
-    }
-
-    @Test fun PAL_13_prefixesAreListedAndEditable() {
-        val t = PrefixTable()
-        assertTrue(t.entries().map { it.first }.containsAll(listOf("a", "f", "s", "c")))
-        assertEquals(PrefixTable.Edit.Ok, t.rename("f", "d"))
-        assertEquals(PaletteScope.Files, t.parse("d cv").scope)
-        assertEquals(PaletteScope.Everything, t.parse("f cv").scope)
-        assertEquals(PrefixTable.Edit.Taken(PaletteScope.Apps), t.set("a", PaletteScope.Files))
-        assertTrue(t.set("two words", PaletteScope.Apps) is PrefixTable.Edit.Invalid)
-        assertTrue(t.set("!x", PaletteScope.Apps) is PrefixTable.Edit.Invalid)
-        assertTrue(t.set("", PaletteScope.Apps) is PrefixTable.Edit.Invalid)
-        t.remove("d"); assertNull(t.scopeFor("d"))
-        t.reset(); assertEquals(PaletteScope.Files, t.scopeFor("f"))
-    }
-
-    @Test fun PAL_13_prefixTablePersists() {
-        val t = PrefixTable(); t.rename("a", "p")
-        val back = PrefixTable.deserialize(t.serialize())
-        assertEquals(t.entries(), back.entries())
-        assertEquals(PrefixTable().entries(), PrefixTable.deserialize(null).entries())
-        assertEquals(PrefixTable().entries(), PrefixTable.deserialize("garbage;x=Nope").entries().let { PrefixTable().entries() })
-    }
-
-    @Test fun PAL_13_scopeLimitsProviders() = runBlocking {
+    // ---------------------------------------------------------------- PAL-19 (the wheel scopes; typed prefixes are gone)
+    @Test fun PAL_19_aLeadingLetterAndSpaceIsPlainText() = runBlocking {
         val engine = PaletteEngine(ProviderRegistry(listOf(AppProvider({ APPS }), SettingsProvider { true }, CalculatorProvider())))
-        val settings = engine.search("s display").filter { !it.pinnedLast }
+        for (q in listOf("a settings", "f report", "s display", "w bows of denmark", "c anna")) {
+            val plan = engine.plan(q)
+            assertEquals(PaletteScope.Everything, plan.scope)
+            assertEquals(q, plan.text)
+        }
+    }
+
+    @Test fun PAL_19_scopeFromTheWheelLimitsProviders() = runBlocking {
+        val engine = PaletteEngine(ProviderRegistry(listOf(AppProvider({ APPS }), SettingsProvider { true }, CalculatorProvider())))
+        val settings = engine.search("display", PaletteScope.Settings).filter { !it.pinnedLast }
         assertTrue(settings.isNotEmpty() && settings.all { it.provider == "settings" })
-        val apps = engine.search("a settings").filter { !it.pinnedLast }
+        val apps = engine.search("settings", PaletteScope.Apps).filter { !it.pinnedLast }
         assertTrue(apps.all { it.provider == "apps" })
         assertTrue(engine.search("settings").any { it.provider == "settings" } && engine.search("settings").any { it.provider == "apps" })
     }

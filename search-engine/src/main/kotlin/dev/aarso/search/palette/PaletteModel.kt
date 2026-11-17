@@ -1,6 +1,6 @@
 package dev.aarso.search.palette
 
-/** What a palette search is limited to (PAL-13). One enum for prefixes, the category wheel and providers. */
+/** What a palette search is limited to (PAL-19). One enum for the category wheel and the providers. */
 enum class PaletteScope { Everything, Apps, Files, Settings, Contacts, Actions, Web }
 
 /**

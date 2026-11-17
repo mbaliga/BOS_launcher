@@ -48,8 +48,7 @@ fun suggest(text: String, categories: List<String>): List<Suggestion> {
     val cut = text.lastIndexOfAny(charArrayOf(' ', '\t', '\n')) + 1
     val prefix = text.substring(0, cut)
     val token = text.substring(cut)
-    if (com.bos.sphere.core.data.WebSearch.hasBang(text)) return emptyList()
-    if (token.isEmpty() || token.startsWith("!") || token.startsWith("-") || token.startsWith("(") || token.startsWith("/")) return emptyList()
+    if (token.isEmpty() || token.startsWith("-") || token.startsWith("(") || token.startsWith("/")) return emptyList()
     val out = ArrayList<Suggestion>()
 
     val colon = token.indexOf(':')
@@ -100,14 +99,8 @@ enum class SectionKind { Apps, Contacts, Web }
 sealed interface WebRow {
     /** Open a URL typed as the query. */
     data class Open(val label: String, val url: String) : WebRow
-    /** A `!bang` search, always sent through DuckDuckGo. */
-    data class BangSearch(val label: String, val url: String) : WebRow
     data class Search(val label: String, val url: String) : WebRow
     data class PlayStore(val label: String, val url: String, val marketUri: String) : WebRow
-    /** Tappable bang chips; each [Chip.rewritten] is the full new field text. */
-    data class BangHints(val chips: List<Chip>) : WebRow {
-        data class Chip(val code: String, val name: String, val rewritten: String)
-    }
 }
 
 /** Ordered result sections for one query, generic over the host's app and contact types. */
@@ -121,7 +114,7 @@ data class Sections<out A, out C>(
 )
 
 /**
- * Composes sections: Apps, Contacts, Web (always last) — except a bang or URL query puts Web first.
+ * Composes sections: Apps, Contacts, Web (always last) — except a URL query puts Web first.
  * [apps] are already ranked (see [AppSearch.rank]); [contacts] come from the contact source.
  */
 fun <A, C> sections(
@@ -135,36 +128,17 @@ fun <A, C> sections(
 ): Sections<A, C> {
     val q = query.trim()
     if (q.isEmpty()) return Sections(listOf(SectionKind.Apps), apps, emptyList(), emptyList(), false)
-    val bang = WebSearch.bang(q)
     val isUrl = WebSearch.looksLikeUrl(q)
     val web = ArrayList<WebRow>()
     if (searchWeb) {
         if (isUrl) web += WebRow.Open("Open ${q.removePrefix("https://").removePrefix("http://")}", WebSearch.toUrl(q))
-        if (bang != null || WebSearch.hasBang(q)) {
-            val code = bang?.code
-            val name = code?.let { WebSearch.bangLabel(it) }
-            web += WebRow.BangSearch(
-                "Search with !${code ?: "bang"}" + (name?.let { " ($it)" } ?: ""),
-                WebEngine.DuckDuckGo.url(q),
-            )
-        }
-        val plain = bang?.rest ?: q
-        if (bang == null || plain.isNotBlank()) {
-            if (!(bang != null && engine == WebEngine.DuckDuckGo)) {
-                web += WebRow.Search("Search ${engine.label} for “$plain”", engine.url(plain))
-            }
-            web += WebRow.PlayStore("Search Play Store for “$plain”", WebSearch.playStoreUrl(plain), WebSearch.playStoreMarketUri(plain))
-        }
-        if (engine == WebEngine.DuckDuckGo && bang == null && !WebSearch.hasBang(q)) {
-            web += WebRow.BangHints(
-                WebSearch.popularBangs.take(4).map { (code, name) -> WebRow.BangHints.Chip(code, name, "!$code $q") },
-            )
-        }
+        web += WebRow.Search("Search ${engine.label} for “$q”", engine.url(q))
+        web += WebRow.PlayStore("Search Play Store for “$q”", WebSearch.playStoreUrl(q), WebSearch.playStoreMarketUri(q))
     }
     val askPerm = searchContacts && !hasContactsPermission
     val showContacts = searchContacts && (contacts.isNotEmpty() || askPerm)
     val order = buildList {
-        val webFirst = searchWeb && (bang != null || isUrl || WebSearch.hasBang(q))
+        val webFirst = searchWeb && isUrl
         if (webFirst) add(SectionKind.Web)
         if (apps.isNotEmpty()) add(SectionKind.Apps)
         if (showContacts) add(SectionKind.Contacts)

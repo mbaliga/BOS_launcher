@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AppEntry
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.alpha
@@ -112,11 +113,12 @@ import kotlinx.coroutines.withContext
 
 /**
  * Universal search: apps, people (with the ways to reach them, BlackBerry style), actions, files
- * (including Fylz / Fotoz deep hits) and the web (DuckDuckGo by default so !bangs work).
+ * (including Fylz / Fotoz deep hits) and the web (the engine you chose; a leading letter and a space is just text).
  *
  * The layout follows [LauncherPrefs.searchLayout]: Filmstrip, Orbit (both with the category wheel)
- * or the macOS-style Flat list. The keyboard is the system IME; the layout reserves its space with
- * imePadding and works the same without it.
+ * or the macOS-style Flat list. The query line is always at the top, below the status bar and cutout; the results are
+ * below it and the system keyboard is at the bottom (the layout reserves its space with imePadding and works the
+ * same without it).
  *
  * New parameters sit after [modifier] so existing callers keep compiling. [onOpenHit] is the host's
  * chance to open a file hit (default: [openHitIntent] through [onOpenIntent]); action hits always
@@ -152,6 +154,8 @@ fun SearchOverlay(
     adjacentSupported: Boolean = false,
     /** PAL-08: the choices of an action that needs a pick ("Open on display" with several displays, "Add to workspace"); null = none to offer. */
     onAppActionChoices: (AppEntry, MenuAction) -> List<RadarChoice>? = { _, _ -> null },
+    /** Wave 18: the home's launch log; with what Radar learned it decides which ring an app sits on before anything is typed. */
+    launchHistory: List<com.bos.sphere.core.data.LaunchEvent> = emptyList(),
 ) {
     val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier.predictiveBackLayer(backProgress)) {
@@ -163,6 +167,7 @@ fun SearchOverlay(
             onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
             initialQuery = initialQuery, onRunCommand = onRunCommand,
             onRunAppAction = onRunAppAction, adjacentSupported = adjacentSupported, onAppActionChoices = onAppActionChoices,
+            launchHistory = launchHistory,
         )
     }
 }
@@ -219,6 +224,11 @@ internal fun SearchScreen(
     onAppActionChoices: (AppEntry, MenuAction) -> List<RadarChoice>? = { _, _ -> null },
     /** Test seam (PAL-08): the number of other displays that can host an app; null asks the capability registry. */
     otherDisplaysOverride: Int? = null,
+    launchHistory: List<com.bos.sphere.core.data.LaunchEvent> = emptyList(),
+    /** Test seam (wave 18): what Radar learned, key to use; null reads the palette's own store. */
+    learnedOverride: Map<String, dev.aarso.search.palette.UsageRecord>? = null,
+    /** Test seam (wave 18): the clock the decay of old habits is measured against. */
+    nowMillis: () -> Long = { System.currentTimeMillis() },
 ) {
     val context = LocalContext.current
     // PAL-08: the chooser of an action that needs a pick (which display, which workspace), shown over Radar.
@@ -226,8 +236,6 @@ internal fun SearchScreen(
     // PAL-02, PAL-09: plain app queries also match aliases, initials and a typo, and learn from selections.
     androidx.compose.runtime.SideEffect { AppSearch.appContext = context.applicationContext }
     val palette = remember { PaletteHost.get(context) }
-    // PAL-13, PAL-19: the editable scope prefixes, read once per open (Ground Control edits them).
-    val mapping = remember { ScopePrefixes.Mapping.decode(palette.prefs.scopeMapping()) }
     var aliasRev by remember { mutableStateOf(0) }
     var aliasFor by remember { mutableStateOf<AppEntry?>(null) }
     val otherDisplays = remember { otherDisplaysOverride ?: runCatching { com.bos.sphere.core.capabilities.CapabilityEvaluator.externalDisplays(com.bos.sphere.core.capabilities.CapabilityRegistry(context).snapshot()).count { it.canHostTasks == true } }.getOrDefault(0) }
@@ -241,8 +249,8 @@ internal fun SearchScreen(
     var dismissedFor by remember { mutableStateOf<String?>(null) }
     var touched by remember { mutableStateOf(false) }
     val query = field.text
-    // PAL-19: a typed prefix ("f budget") and the wheel are one setting; the search itself sees only the rest.
-    val searchText = ScopePrefixes.parse(query, mapping).second
+    // A plain query simply searches: no typed prefix is read from it (PAL-13 was removed in wave 18); the wheel is the scope.
+    val searchText = query
     val trimmed = searchText.trim()
     // PAL-18: a keyboard or pointer in use means Flat, unless the user pinned a layout.
     val hostMode = LocalInputMode.current.value.let { m -> if (m == InputMode.Touch) LauncherInput.tracker.mode.value else m }
@@ -286,8 +294,14 @@ internal fun SearchScreen(
             RadarMemory.hits.put(trimmed, ordered)
         }
     }
-    val ranked = remember(apps, recent, trimmed, aliasRev) {
-        if (trimmed.isEmpty()) recent.take(24) else AppSearch.rank(apps, trimmed, limit = 24)
+    // Wave 18: before anything is typed the order is how much you open each thing (decayed, so recent habits count more).
+    var learned by remember { mutableStateOf(learnedOverride ?: emptyMap()) }
+    LaunchedEffect(learnedOverride) {
+        learned = learnedOverride ?: withContext(Dispatchers.IO) { PaletteHost.usage(context).entries() }
+    }
+    val habit = remember(launchHistory, learned) { RadarHabits.scores(launchHistory, learned, nowMillis()) }
+    val ranked = remember(apps, recent, trimmed, aliasRev, habit) {
+        if (trimmed.isEmpty()) RadarHabits.rankApps(apps, recent, habit).take(RADAR_RESTING_APPS) else AppSearch.rank(apps, trimmed, limit = 24)
     }
     val web = remember(trimmed, prefs.webEngine, prefs.searchWeb) {
         if (trimmed.isEmpty()) emptyList() else sections(
@@ -296,15 +310,15 @@ internal fun SearchScreen(
         ).web
     }
     val webFirst = remember(trimmed, prefs.searchWeb) {
-        prefs.searchWeb && trimmed.isNotEmpty() && (WebSearch.bang(trimmed) != null || WebSearch.looksLikeUrl(trimmed) || WebSearch.hasBang(trimmed))
+        prefs.searchWeb && trimmed.isNotEmpty() && WebSearch.looksLikeUrl(trimmed)
     }
     val settingEntries = remember(settingsSource, trimmed, prefs.searchActions) {
         if (settingsSource == null || !prefs.searchActions || trimmed.length < 2) emptyList() else settingsSource.results(trimmed, 8)
     }
-    val data = remember(trimmed, ranked, contactRows, contactsPermitted, wantContacts, web, webFirst, hubMap, fileAccess, hub, prefs.searchFiles, settingEntries) {
+    val data = remember(trimmed, ranked, contactRows, contactsPermitted, wantContacts, web, webFirst, hubMap, fileAccess, hub, prefs.searchFiles, settingEntries, habit) {
         SearchData(
-            query = trimmed, apps = ranked,
-            contacts = if (wantContacts) contactRows else emptyList(),
+            query = trimmed, apps = ranked, habit = habit,
+            contacts = if (!wantContacts) emptyList() else if (trimmed.isEmpty()) contactRows.sortedByDescending { habit["contact:${it.hit.id}"] ?: 0.0 } else contactRows,
             askContacts = wantContacts && !contactsPermitted && (trimmed.length >= 2 || trimmed.isEmpty()),
             web = web, webFirst = webFirst,
             hits = hubMap,
@@ -313,7 +327,7 @@ internal fun SearchScreen(
             settings = settingEntries,
         )
     }
-    val selected: SearchCategory? = ScopePrefixes.effectiveScope(query, userCat, mapping)
+    val selected: SearchCategory? = userCat
     val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
 
     // ---- suggestions
@@ -356,15 +370,12 @@ internal fun SearchScreen(
             is Tile.Hit -> openHit(tile.hit)
             is Tile.Web -> when (val r = tile.row) {
                 is WebRow.Open -> onOpenIntent(WebSearch.intentFor(r.url))
-                is WebRow.BangSearch -> onOpenIntent(WebSearch.intentFor(r.url))
                 is WebRow.Search -> onOpenIntent(WebSearch.intentFor(r.url))
                 // PAL-15: the installed app store first (market link); the store's web page when none is visible to us.
                 is WebRow.PlayStore -> onOpenIntent(
                     Intent(Intent.ACTION_VIEW, android.net.Uri.parse(r.marketUri)).takeIf { it.resolveActivity(context.packageManager) != null } ?: WebSearch.intentFor(r.url),
                 )
-                is WebRow.BangHints -> Unit
             }
-            is Tile.Bang -> setQuery(tile.rewritten)
             is Tile.Allow -> if (tile.files) onRequestFilePermission() else onRequestContactsPermission()
             is Tile.Setting -> settingsSource?.open(tile.entry)
         }
@@ -376,9 +387,9 @@ internal fun SearchScreen(
         onDispose { if (LauncherDrops.onDragStart === h) LauncherDrops.onDragStart = null }
     }
     // PAL-20: long-press and right-click open the same preview on every result, in all three layouts.
-    val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }, onTouch = { touched = true })
-    val onPreview: (Tile) -> Unit = { t -> if (t !is Tile.Allow && t !is Tile.Bang) { tick(); previewTile = t } }
-    val setWheel: (SearchCategory?) -> Unit = { c -> userCat = c; setQuery(ScopePrefixes.applyWheel(field.text, c, mapping)); expandedContact = null }
+    val tileActions = TileActions(onTap = { tap(it) }, onLongPress = { t -> if (t !is Tile.Allow) { tick(); previewTile = t } }, onTouch = { touched = true })
+    val onPreview: (Tile) -> Unit = { t -> if (t !is Tile.Allow) { tick(); previewTile = t } }
+    val setWheel: (SearchCategory?) -> Unit = { c -> userCat = c; expandedContact = null }
 
     // ---- keyboard (PAL-07): the same model walks Flat, Orbit and Filmstrip results.
     val navTiles = remember(data, selected, typing, layout, orbitVisible) {
@@ -440,90 +451,91 @@ internal fun SearchScreen(
     Box(Modifier.fillMaxSize().radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey)) {
         SearchBackdrop(Modifier.fillMaxSize())
         SignalBackground(prefs, Modifier.fillMaxSize(), dark = true) // Radar is black in every theme; HOM-16, PAL-24: the two background items, the same on every surface
+        // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
+        // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
-            if (flatMode) {
-                // Typing, or the Flat layout at rest (recent apps and people): a plain results list on top, the query sits at the bottom above the keyboard.
-                FlatResults(
-                    data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
-                    onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
-                    onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
-                    plain = true, onPreview = onPreview,
-                    modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = if (typing) 64.dp else 112.dp, bottom = 58.dp),
-                )
-            } else {
-                // Idle browsing: the category wheel with Filmstrip or Orbit results.
-                val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts || selected == null }
-                // "SEARCH EVERYTHING" sits on the screen's vertical middle (as in the mock-ups), clamped so
-                // it never slips under the keyboard; the results orbit it or run in a strip beneath.
-                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val availH = maxHeight
-                    val fullH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
-                    val safeTop = with(androidx.compose.ui.platform.LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
-                    val below = if (layout == SearchLayout.Orbit) 14.dp else 182.dp // room the strip needs under the wheel
-                    val centre = (fullH / 2 - safeTop).coerceIn(WheelHeight / 2 + 20.dp, (availH - WheelHeight / 2 - below).coerceAtLeast(WheelHeight / 2 + 20.dp))
-                    val wheelRow: @Composable () -> Unit = {
-                        // "SEARCH" ends just left of the screen's centre line and the wheel starts just right of it.
-                        Row(Modifier.fillMaxWidth()) {
-                            QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp))
-                            Box(Modifier.weight(1f)) {
-                                CategoryWheel(
-                                    selected = selected, counts = counts,
-                                    onSelect = { setWheel(it); touched = true },
-                                    onTick = { tick() }, onTouch = { touched = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
+            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight)) {
+                val emptyHint = if (data.blank && (selected == null || selected == SearchCategory.Apps) && data.tiles(selected).isEmpty()) L10n.tr("Rings fill up as you use Radar") else null
+                if (flatMode) {
+                    // Typing, or the Flat layout at rest (what you open most): a plain results list below the query line.
+                    FlatResults(
+                        data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
+                        onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
+                        onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
+                        plain = true, onPreview = onPreview,
+                        modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
+                    )
+                } else {
+                    // Idle browsing: the category wheel with Filmstrip or Orbit results.
+                    val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts || selected == null }
+                    // The wheel sits in the middle of the free area below the query line; the Orbit's rings are centred on it
+                    // and the Filmstrip runs beneath it.
+                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val availH = maxHeight
+                        val below = if (layout == SearchLayout.Orbit) 0.dp else 182.dp // room the strip needs under the wheel
+                        val centre = ((availH - below) / 2).coerceAtLeast(WheelHeight / 2 + 8.dp)
+                        val wheelRow: @Composable () -> Unit = {
+                            // "SEARCH" ends just left of the centre line and the wheel starts just right of it.
+                            Row(Modifier.fillMaxWidth()) {
+                                QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp))
+                                Box(Modifier.weight(1f)) {
+                                    CategoryWheel(
+                                        selected = selected, counts = counts,
+                                        onSelect = { setWheel(it); touched = true },
+                                        onTick = { tick() }, onTouch = { touched = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
                             }
                         }
+                        if (layout == SearchLayout.Orbit) {
+                            Orbit(
+                                tiles = data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
+                                actions = tileActions, centreFromBottom = centre, modifier = Modifier.fillMaxSize(),
+                                onVisibleCount = { orbitVisible = it }, emptyHint = emptyHint,
+                            )
+                            Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
+                            expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
+                        } else {
+                            Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
+                            // The strip rides the top of the keyboard so nothing is left hanging under its caption.
+                            Filmstrip(
+                                tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
+                                expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
+                                actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp),
+                                emptyHint = emptyHint,
+                            )
+                        }
                     }
-                    if (layout == SearchLayout.Orbit) {
-                        Orbit(
-                            tiles = data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
-                            actions = tileActions, centreFromBottom = centre, modifier = Modifier.fillMaxSize(),
-                            onVisibleCount = { orbitVisible = it },
-                        )
-                        Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
-                        expanded?.let { Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) { ContactChannelBar(it, onOpenIntent) } }
-                    } else {
-                        Box(Modifier.offset(y = centre - WheelHeight / 2)) { wheelRow() }
-                        // The strip rides the top of the keyboard so nothing is left hanging under its caption.
-                        Filmstrip(
-                            tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
-                            expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                            actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 4.dp),
-                        )
-                    }
-                }
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        Glyphs.Close, L10n.tr("Close"), tint = Color.White,
-                        modifier = Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(9.dp),
-                    )
                 }
             }
-            // The one text field. Invisible while browsing (it still feeds the IME); the bottom query line while typing.
+            // The one text field, always visible at the top: placeholder, query, scope, clear or close, and push-to-talk (INP-13).
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .then(if (flatMode) Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp) else Modifier.size(1.dp).alpha(0f)),
+                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().height(RadarQueryBarHeight).padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
             ) {
-                Box(Modifier.weight(1f)) {
+                Box(
+                    Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(Color(0x26FFFFFF)).padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (query.isEmpty()) Text(L10n.tr("Search"), color = Color(0x99FFFFFF), fontSize = 20.sp, maxLines = 1)
                     QueryInput(field, { field = it }, go, focus, Color.White, 20.sp, Modifier.fillMaxWidth())
                 }
                 if (flatMode) {
-                    ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label)
+                    ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label, fanDown = true, showLabel = selected != null)
                     Icon(
                         Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
                         modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),
                     )
+                } else {
+                    Icon(
+                        Glyphs.Close, L10n.tr("Close"), tint = Color.White,
+                        modifier = Modifier.padding(start = 6.dp).size(36.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(9.dp),
+                    )
                 }
+                PushToTalkButton(onText = { setQuery(it) }, modifier = Modifier.padding(start = 4.dp))
             }
         }
-        // INP-13: push-to-talk, drawn only where an on-device recogniser exists; nothing listens until it is pressed.
-        PushToTalkButton(onText = { setQuery(it) }, modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).padding(end = 16.dp, bottom = 8.dp))
-        // PAL-13: the empty state lists the scope prefixes.
-        if (!typing && query.isBlank()) PrefixHints(mapping, onPick = { setQuery(it) }, modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(start = 16.dp, end = 64.dp, top = 52.dp))
         aliasFor?.let { a ->
             AliasDialog(a, PaletteHost.aliases(context)[a.packageName].orEmpty(), onSave = { v -> PaletteHost.setAlias(context, a.packageName, v); aliasRev++; aliasFor = null }, onDismiss = { aliasFor = null })
         }
@@ -567,7 +579,7 @@ private fun QueryInput(
 }
 
 /**
- * Enter / IME-Go: launch the top app result, otherwise open the first web row (a URL, a bang, or
+ * Enter / IME-Go: launch the top app result, otherwise open the first web row (a URL, or
  * the web search). Does nothing for a blank query.
  */
 fun submitSearch(
@@ -579,14 +591,12 @@ fun submitSearch(
 ) {
     val q = query.trim()
     if (q.isEmpty()) return
-    val bangOrUrl = WebSearch.bang(q) != null || WebSearch.looksLikeUrl(q)
-    val top = if (bangOrUrl && prefs.searchWeb) null else AppSearch.rank(apps, q, limit = 1).firstOrNull()
+    val top = if (WebSearch.looksLikeUrl(q) && prefs.searchWeb) null else AppSearch.rank(apps, q, limit = 1).firstOrNull()
     if (top != null) { onLaunch(top); return }
     if (!prefs.searchWeb) return
     val s = sections(q, prefs.webEngine, emptyList<AppEntry>(), emptyList<ContactHit>())
     val url = when (val first = s.web.firstOrNull()) {
         is WebRow.Open -> first.url
-        is WebRow.BangSearch -> first.url
         is WebRow.Search -> first.url
         is WebRow.PlayStore -> first.url
         else -> null
@@ -613,6 +623,12 @@ internal object ContactHabits {
     fun primaryFor(c: android.content.Context, id: Long, channels: List<Channel>): Channel? =
         last(c, id)?.takeIf { it in channels } ?: Channel.Call.takeIf { it in channels } ?: badgeChannel(channels)
 }
+
+/** The height of the query line at the top of Radar, below the status bar and cutout. */
+internal val RadarQueryBarHeight = 64.dp
+
+/** How many of the apps you open most the resting Radar lists (the four rings hold 5 + 9 + 13 + 17). */
+private const val RADAR_RESTING_APPS = 44
 
 private sealed interface Row {
     val key: String
@@ -809,28 +825,8 @@ internal fun SimpleRow(icon: ImageVector, text: String, dim: Boolean = false, on
 private fun WebRowView(row: WebRow, onOpenIntent: (Intent) -> Unit, onQueryChange: (String) -> Unit, query: String) {
     when (row) {
         is WebRow.Open -> SimpleRow(Glyphs.Globe, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
-        is WebRow.BangSearch -> SimpleRow(Glyphs.Search, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
         is WebRow.Search -> SimpleRow(Glyphs.Search, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
         is WebRow.PlayStore -> SimpleRow(Glyphs.Apps, row.label) { onOpenIntent(WebSearch.intentFor(row.url)) }
-        is WebRow.BangHints -> Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp, horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(L10n.tr("Try"), color = HyleColors.InkDim, fontSize = 12.sp)
-            Spacer(Modifier.width(8.dp))
-            row.chips.forEach { chip ->
-                Text(
-                    "!${chip.code}",
-                    color = HyleColors.Violet, fontSize = 13.sp,
-                    modifier = Modifier
-                        .padding(end = 6.dp)
-                        .background(HyleColors.Surface, RoundedCornerShape(50))
-                        .border(1.dp, HyleColors.Hairline, RoundedCornerShape(50))
-                        .clickable { onQueryChange(chip.rewritten) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                )
-            }
-        }
     }
 }
 

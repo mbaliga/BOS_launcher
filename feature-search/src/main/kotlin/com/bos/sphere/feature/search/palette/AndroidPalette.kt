@@ -23,7 +23,6 @@ import dev.aarso.search.palette.PaletteQuery
 import dev.aarso.search.palette.PaletteResult
 import dev.aarso.search.palette.PaletteScope
 import dev.aarso.search.palette.PaletteStrings
-import dev.aarso.search.palette.PrefixTable
 import dev.aarso.search.palette.ProviderRegistry
 import dev.aarso.search.palette.Ranker
 import dev.aarso.search.palette.SettingsProvider
@@ -45,17 +44,13 @@ fun paletteStrings() = PaletteStrings(
     calculatorHint = L10n.tr("Press Enter to copy"),
 )
 
-/** App-private persistence for what the palette learns (PAL-09) and the editable prefixes (PAL-13). Nothing leaves the device. */
+/** App-private persistence for what the palette learns (PAL-09). Nothing leaves the device. */
 class PalettePrefs(context: Context) {
     private val sp = context.applicationContext.getSharedPreferences("palette", Context.MODE_PRIVATE)
 
     fun loadUsage(): UsageStore = UsageStore.decode(sp.getString("usage", null))
     fun saveUsage(s: UsageStore) = sp.edit().putString("usage", s.encode()).apply()
     fun resetUsage() = sp.edit().remove("usage").apply()
-
-    /** The Radar scope-prefix mapping as stored by feature-grid's `ScopePrefixes.Mapping.encode` (PAL-13); null = defaults. */
-    fun scopeMapping(): String? = sp.getString("scopeMapping", null)
-    fun setScopeMapping(raw: String?) = sp.edit().apply { if (raw == null) remove("scopeMapping") else putString("scopeMapping", raw) }.apply()
 
     /** Packages of third-party search providers the user approved (PAL-17). */
     fun approvedSources(): Set<String> = sp.getStringSet("approvedSources", emptySet()).orEmpty().toSet()
@@ -64,8 +59,6 @@ class PalettePrefs(context: Context) {
         sp.edit().putStringSet("approvedSources", n).apply()
     }
 
-    fun loadPrefixes(): PrefixTable = PrefixTable.deserialize(sp.getString("prefixes", null))
-    fun savePrefixes(t: PrefixTable) = sp.edit().putString("prefixes", t.serialize()).apply()
     fun aliases(): Map<String, String> = sp.getString("aliases", "").orEmpty().lineSequence().mapNotNull { l -> l.split('\t', limit = 2).takeIf { it.size == 2 } }.associate { it[0] to it[1] }
     fun setAlias(packageName: String, alias: String) {
         val m = aliases().toMutableMap(); if (alias.isBlank()) m.remove(packageName) else m[packageName] = alias.trim()
@@ -164,7 +157,7 @@ class AndroidPalette(context: Context, private val scope: CoroutineScope = Corou
                 calculatorProvider, settingsProvider, shortcutProvider, launcherActions, fileProvider,
             ),
         )
-        return PaletteEngine(registry, prefs.loadPrefixes(), Ranker(usage), WebFallback(webTemplate, strings))
+        return PaletteEngine(registry, Ranker(usage), WebFallback(webTemplate, strings))
     }
 
     fun adapt(p: PaletteProvider): SearchProvider = SearchProvider { q, limit ->

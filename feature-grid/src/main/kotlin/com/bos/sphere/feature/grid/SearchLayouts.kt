@@ -2,6 +2,7 @@ package com.bos.sphere.feature.grid
 
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.gestures.calculateZoom
@@ -133,6 +134,8 @@ internal fun Filmstrip(
     footnote: String?,
     actions: TileActions,
     modifier: Modifier = Modifier,
+    /** Wave 18: a quiet line while there is nothing to show yet ("Rings fill up as you use Radar"). */
+    emptyHint: String? = null,
 ) {
     val z = LocalResultScale.current
     val selectedKey = LocalRadarSelection.current
@@ -177,7 +180,9 @@ internal fun Filmstrip(
 
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         if (n == 0) {
-            Box(Modifier.height(StripTile)) {}
+            Box(Modifier.height(StripTile), contentAlignment = Alignment.Center) {
+                if (emptyHint != null) Text(emptyHint, color = Color.White.copy(alpha = 0.6f), fontSize = (13 * z).sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
+            }
         } else {
             // The first tile starts exactly in the middle, and a flick settles on a tile (not between two).
             val sidePad = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.let { ((it - StripTile) / 2).coerceAtLeast(0.dp) }
@@ -269,6 +274,8 @@ internal fun Orbit(
     modifier: Modifier = Modifier,
     /** Reports how many of [tiles] have a slot on screen, so the keyboard never selects one that is not drawn. */
     onVisibleCount: (Int) -> Unit = {},
+    /** Wave 18: a quiet line under the wheel while there is nothing to show yet ("Rings fill up as you use Radar"). */
+    emptyHint: String? = null,
 ) {
     // NFR-14: with system animations off the rings do not creep by themselves (a drag still turns them).
     val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
@@ -331,55 +338,71 @@ internal fun Orbit(
         val edgeGuard = with(density) { 28.dp.toPx() }
         val margin = colWPx / 2f + edgeGuard
         // Ring gaps stay wider than a tile (face + caption) so rings revolving past each other never touch.
-        val gap = max(0.22f * wPx, with(density) { 92.dp.toPx() })
-        val radii = FloatArray(4) { 0.42f * wPx + it * gap }
-        val spacing = colWPx * 0.95f
+        // Wave 18: the rings are tiers (RadarRings): the first holds what you open most, then outward. The innermost
+        // ring starts clear of the category wheel at the centre.
+        val gap = with(density) { 92.dp.toPx() }
+        val radii = FloatArray(RadarRings.MAX_RINGS) { with(density) { 140.dp.toPx() } + it * gap }
 
-        // The rings are centred on the "SEARCH EVERYTHING" wheel at the screen's vertical middle and
-        // run all the way round. Slots start at the top of each ring and alternate outward, so the
-        // best matches sit straight above the wheel.
-        val wheelZoneW = with(density) { 150.dp.toPx() }
-        val wheelZoneH = with(density) { (WheelHeight / 2 + 8.dp).toPx() }
-        val slots = remember(wPx, hPx, tiles.size, motion, cy) {
-            val out = ArrayList<Pair<Int, Double>>() // ring, angle
-            for (r in radii.indices) {
-                val rad = radii[r]
-                val n = max(1, (2 * PI * rad / spacing).toInt())
-                val order = ArrayList<Double>()
-                for (k in 0 until n) order += -PI / 2 + k * 2 * PI / n + (if (r % 2 == 1) PI / n else 0.0)
-                order.sortBy { Math.abs(Math.atan2(sin(it + PI / 2), cos(it + PI / 2))) }
-                order.forEach { out += r to it }
-            }
-            // Moving: every slot stays, the tiles revolve through the whole screen like planets.
-            if (motion) return@remember out
-            // Still: keep only slots that are on screen, clear of the wheel text and of each other.
-            val boxW = colWPx + with(density) { 8.dp.toPx() }
-            val boxH = tilePx + with(density) { 26.dp.toPx() }
-            val kept = ArrayList<Pair<Int, Double>>()
+        // The rings are centred on the category wheel in the middle of the free area below the query line and run all the
+        // way round. Within a ring the best result sits straight above the centre and the rest alternate outward.
+        val boxW = colWPx + with(density) { 8.dp.toPx() }
+        val boxH = tilePx + with(density) { 26.dp.toPx() }
+        val textLeft = with(density) { 90.dp.toPx() }
+        val textRight = with(density) { 100.dp.toPx() }
+        val textHalfH = with(density) { (WheelRowHalfVisible).toPx() }
+        val placements = remember(wPx, hPx, tiles.size, motion, cy) {
+            // Candidate angles per ring, best position first.
+            val candidates = ArrayList<List<Double>>()
             val pts = ArrayList<Offset>()
-            for ((r, ang) in out) {
-                val pt = Offset(cx + radii[r] * cos(ang).toFloat(), cy + radii[r] * sin(ang).toFloat())
-                val onScreen = pt.x in margin..(wPx - margin) && pt.y in (tilePx * 0.6f)..(hPx - tilePx * 1.1f)
-                val onText = abs(pt.x - cx) < wheelZoneW + margin * 0.4f && abs(pt.y - cy) < wheelZoneH + tilePx * 0.6f
-                if (onScreen && !onText && pts.none { abs(it.x - pt.x) < boxW && abs(it.y - pt.y) < boxH }) { kept += r to ang; pts += pt }
+            for (r in radii.indices) {
+                val even = RadarRings.evenAngles(RadarRings.capacity(r), r)
+                    .sortedBy { Math.abs(Math.atan2(sin(it + PI / 2), cos(it + PI / 2))) }
+                if (motion) { candidates += even; continue } // Moving: every slot stays, the tiles revolve through the whole screen like planets.
+                // Still: keep only slots that are on screen, clear of the wheel text and of each other.
+                val kept = ArrayList<Double>()
+                for (ang in even) {
+                    val pt = Offset(cx + radii[r] * cos(ang).toFloat(), cy + radii[r] * sin(ang).toFloat())
+                    val onScreen = pt.x in margin..(wPx - margin) && pt.y in (tilePx * 0.6f)..(hPx - tilePx * 1.1f)
+                    val onText = (pt.x + tilePx / 2f) > cx - textLeft && (pt.x - tilePx / 2f) < cx + textRight && abs(pt.y - cy) < textHalfH + tilePx * 0.6f
+                    if (onScreen && !onText && pts.none { abs(it.x - pt.x) < boxW && abs(it.y - pt.y) < boxH }) { kept += ang; pts += pt }
+                }
+                candidates += kept
             }
-            kept
+            val rings = RadarRings.assign(tiles.size, RadarRings.limits(candidates.map { it.size }))
+            val used = IntArray(radii.size)
+            // A ring that is not full spreads its few tiles evenly when moving; when still they take the best positions.
+            val perRing = IntArray(radii.size).also { c -> rings.forEach { c[it]++ } }
+            rings.map { r ->
+                val k = used[r]++
+                r to (if (motion) RadarRings.evenAngles(perRing[r], r)[k] else candidates[r][k])
+            }
         }
 
-        val shown = tiles.take(slots.size)
+        val shown = tiles.take(placements.size)
         androidx.compose.runtime.SideEffect { onVisibleCount(shown.size) }
         Canvas(Modifier.fillMaxSize()) {
-            for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.10f), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
+            // Each ring is a faint tier guide; the inner tiers are a little brighter.
+            for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.16f - 0.035f * r), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
+        }
+        // TalkBack: one quiet heading per ring that has results, named for its tier.
+        placements.map { it.first }.distinct().forEach { r ->
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .offset { IntOffset(cx.roundToInt(), (cy - radii[r]).roundToInt()) }
+                    .size(1.dp)
+                    .semantics { heading(); contentDescription = L10n.tr(RadarRings.tierName(r)) },
+            )
         }
 
         shown.forEachIndexed { i, tile ->
-            val (ring, baseAngle) = slots[i]
+            val (ring, baseAngle) = placements[i]
             val dir = if (ring % 2 == 1) -1.0 else 1.0
+            val tierDescription = L10n.tr(RadarRings.tierName(ring))
             Column(
                 Modifier
                     .width(colW)
                     // NFR-13: the tiles circle the screen, so geometry means nothing to TalkBack; they read in rank order, best match first.
-                    .semantics(mergeDescendants = true) { traversalIndex = i.toFloat(); contentDescription = tile.caption() }
+                    .semantics(mergeDescendants = true) { traversalIndex = i.toFloat(); contentDescription = tile.caption(); stateDescription = tierDescription }
                     .offset {
                         val sway = dir * travel.floatValue / radii[ring].toDouble()
                         val a = baseAngle + sway
@@ -403,6 +426,12 @@ internal fun Orbit(
             Text(
                 footnote, color = Color.White.copy(alpha = 0.55f), fontSize = (11 * z).sp, maxLines = 1,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp),
+            )
+        }
+        if (emptyHint != null && tiles.isEmpty()) {
+            Text(
+                emptyHint, color = Color.White.copy(alpha = 0.6f), fontSize = (13 * z).sp, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.TopCenter).offset { IntOffset(0, (cy + with(density) { (WheelHeight / 2 + 14.dp).toPx() }).roundToInt()) }.padding(horizontal = 32.dp),
             )
         }
     }
@@ -443,7 +472,6 @@ internal fun FlatResults(
     /** Long-press / right-click on a result (the host shows the preview, the same one in all layouts). */
     onPreview: (Tile) -> Unit = {},
 ) {
-    if (data.blank) return
     val rows = remember(data, scope, suggestions) {
         buildList<FRow> {
             var si = 0
@@ -451,18 +479,25 @@ internal fun FlatResults(
             if (!plain) addSuggestions()
             for ((cat, title) in flatSections(data)) {
                 if (scope != null && scope != cat) continue
+                if (!restingShows(data, scope, cat)) continue
                 val tiles = data.tiles(cat)
                 val note = data.footnote(cat)
                 if (tiles.isEmpty() && note == null) continue
                 // Suggestion headers already say "Contacts"/"Web": the results get their own header below.
-                if (!(plain && cat == SearchCategory.Apps)) add(FRow.Header((if (plain && cat == SearchCategory.Web) L10n.tr("Web Suggestions") else title) + "​"))
+                // Wave 18: at rest the list is what you open most, most used first.
+                if (data.blank && cat == SearchCategory.Apps) add(FRow.Header(L10n.tr("Most used") + "​"))
+                else if (!(plain && cat == SearchCategory.Apps)) add(FRow.Header((if (plain && cat == SearchCategory.Web) L10n.tr("Web Suggestions") else title) + "​"))
                 tiles.forEach { add(FRow.Item(it)) }
                 if (note != null) add(FRow.Note(note))
             }
             if (plain) addSuggestions()
         }
     }
-    if (rows.isEmpty()) return
+    if (rows.isEmpty()) {
+        // Wave 18: nothing learned yet; a quiet line instead of an empty screen.
+        if (data.blank && scope == null) Text(L10n.tr("Rings fill up as you use Radar"), color = Color(0x99FFFFFF), fontSize = (14 * LocalResultScale.current).sp, modifier = modifier.padding(horizontal = 4.dp, vertical = 12.dp))
+        return
+    }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val selectedKey = LocalRadarSelection.current
     // The keyboard selection stays in view.
@@ -521,7 +556,11 @@ internal fun flatSections(data: SearchData): List<Pair<SearchCategory, String>> 
 
 /** The results the keyboard walks in the flat list (PAL-07), top to bottom as they are drawn. */
 internal fun flatTiles(data: SearchData, scope: SearchCategory?): List<Tile> =
-    if (data.blank) emptyList() else flatSections(data).filter { scope == null || scope == it.first }.flatMap { data.tiles(it.first) }
+    flatSections(data).filter { (scope == null || scope == it.first) && restingShows(data, scope, it.first) }.flatMap { data.tiles(it.first) }
+
+/** Before anything is typed, "Everything" lists only what you really use: apps and people (the same rule as [SearchData.tiles]). */
+internal fun restingShows(data: SearchData, scope: SearchCategory?, cat: SearchCategory): Boolean =
+    !(data.blank && scope == null && cat != SearchCategory.Apps && cat != SearchCategory.Contacts)
 
 @Composable
 private fun Divider() {
@@ -553,10 +592,6 @@ private fun FlatTileRow(
             val ctx = androidx.compose.ui.platform.LocalContext.current
             tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
         }
-        is Tile.Bang -> Text(
-            "!${tile.code}  ${tile.name}", color = HyleColors.VioletSoft, fontSize = (18 * z).sp,
-            modifier = Modifier.fillMaxWidth().then(selBg).clickable { onQueryChange(tile.rewritten) }.padding(horizontal = 16.dp, vertical = 11.dp),
-        )
         else -> Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier

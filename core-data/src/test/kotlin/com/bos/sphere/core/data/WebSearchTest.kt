@@ -24,17 +24,6 @@ class WebSearchTest {
         assertEquals("http://x.org", WebSearch.toUrl("http://x.org"))
     }
 
-    @Test fun bangs() {
-        assertEquals(Bang("yt", "cats"), WebSearch.bang("!yt cats"))
-        assertEquals(Bang("g", ""), WebSearch.bang("!g"))
-        assertEquals(Bang("w", "a b"), WebSearch.bang("  !W a b"))
-        assertNull(WebSearch.bang("cats !yt"))
-        assertNull(WebSearch.bang("! x"))
-        assertNull(WebSearch.bang("hello"))
-        assertTrue(WebSearch.hasBang("cats !yt"))
-        assertFalse(WebSearch.hasBang("wow!"))
-        assertTrue(WebSearch.popularBangs.any { it.first == "gi" })
-    }
 
     @Test fun playStore() {
         assertEquals("https://play.google.com/store/search?q=a+b&c=apps", WebSearch.playStoreUrl("a b"))

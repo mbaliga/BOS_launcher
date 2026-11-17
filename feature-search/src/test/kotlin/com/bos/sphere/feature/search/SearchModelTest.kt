@@ -34,33 +34,27 @@ class SearchModelTest {
         assertTrue(suggest("chess used:", cats).all { it.insertion.startsWith("chess used:") })
         assertTrue(suggest("a", cats).size <= 6)
         assertEquals(emptyList<Suggestion>(), suggest("", cats))
-        assertEquals(emptyList<Suggestion>(), suggest("!g cats", cats))
         assertEquals(emptyList<Suggestion>(), suggest("chess ", cats))
     }
 
     @Test fun appsContactsWebOrder() {
         val s = sections("chess", WebEngine.DuckDuckGo, listOf("Chess"), listOf("Chesney"))
         assertEquals(listOf(SectionKind.Apps, SectionKind.Contacts, SectionKind.Web), s.order)
-        assertEquals(3, s.web.size)
+        assertEquals(2, s.web.size)
         assertTrue(s.web[0] is WebRow.Search)
         assertTrue(s.web[1] is WebRow.PlayStore)
-        val hints = s.web[2] as WebRow.BangHints
-        assertEquals(4, hints.chips.size)
-        assertEquals("!g chess", hints.chips[0].rewritten)
     }
 
-    @Test fun noHintsForOtherEngines() {
-        val s = sections("chess", WebEngine.Google, listOf("x"), emptyList<String>())
-        assertTrue(s.web.none { it is WebRow.BangHints })
-        assertEquals(listOf(SectionKind.Apps, SectionKind.Web), s.order)
-    }
-
-    @Test fun bangPutsWebFirst() {
-        val s = sections("!yt cats", WebEngine.DuckDuckGo, listOf("YT"), emptyList<String>())
-        assertEquals(SectionKind.Web, s.order.first())
-        val b = s.web[0] as WebRow.BangSearch
-        assertTrue(b.label.startsWith("Search with !yt"))
-        assertTrue(b.url.startsWith("https://duckduckgo.com/?q=%21yt"))
+    /** Wave 18: the bang chips and the "!bang" syntax are gone; a leading letter and a space is just text. */
+    @Test fun PAL_06_aLeadingLetterAndSpaceIsPlainTextForTheWebRows() {
+        val s = sections("w bows of denmark", WebEngine.DuckDuckGo, emptyList<String>(), emptyList<String>())
+        assertEquals(listOf(SectionKind.Web), s.order)
+        assertEquals(2, s.web.size)
+        assertEquals("Search DuckDuckGo for “w bows of denmark”", (s.web[0] as WebRow.Search).label)
+        assertEquals("https://duckduckgo.com/?q=w+bows+of+denmark", (s.web[0] as WebRow.Search).url)
+        assertEquals("Search Play Store for “w bows of denmark”", (s.web[1] as WebRow.PlayStore).label)
+        val g = sections("chess", WebEngine.Google, listOf("x"), emptyList<String>())
+        assertEquals(listOf(SectionKind.Apps, SectionKind.Web), g.order)
     }
 
     @Test fun urlPutsOpenFirst() {

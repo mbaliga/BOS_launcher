@@ -42,6 +42,8 @@ class W6RadarPreviewUiTest {
                 apps = listOf(mail), recent = listOf(mail), prefs = LauncherPrefs(searchMotion = false, searchLayout = layout, searchLayoutPinned = true), contacts = null,
                 onLaunch = {}, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {},
                 hub = null, onOpenHit = null, onRunAction = {}, onRequestFilePermission = {}, sounds = null, initialQuery = query,
+                // Wave 18: Orbit and Filmstrip at rest show what is used (not the recents list), so Mail has been opened a few times.
+                launchHistory = RadarTestHabits.history(listOf(mail)), learnedOverride = emptyMap(), nowMillis = { RadarTestHabits.NOW },
             )
         }
         rule.mainClock.advanceTimeBy(1200)

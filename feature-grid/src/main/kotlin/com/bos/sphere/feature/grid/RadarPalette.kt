@@ -75,26 +75,6 @@ internal object HubOrdering {
 internal fun appUninstallIntent(app: AppEntry): Intent =
     Intent(Intent.ACTION_DELETE).setData(Uri.fromParts("package", app.packageName, null)).putExtra(Intent.EXTRA_USER, app.user).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-/** The empty state lists the scope prefixes (PAL-13); tapping one starts the query with it. They are edited in Ground Control. */
-@Composable
-internal fun PrefixHints(mapping: ScopePrefixes.Mapping, onPick: (String) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(L10n.tr("Start with a letter and a space to search one place"), color = Color(0xB3FFFFFF), fontSize = 12.sp)
-        Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SearchCategory.entries.forEach { c ->
-                val p = mapping.letterOf(c).toString()
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clip14().background(Color(0x22FFFFFF)).clickable { onPick("$p ") }.padding(horizontal = 12.dp, vertical = 6.dp),
-                ) {
-                    Text(p, color = Color(0xFFB9A8FF), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text(" " + L10n.tr(c.label), color = Color.White, fontSize = 13.sp)
-                }
-            }
-        }
-    }
-}
-
 private fun Modifier.clip14(): Modifier = this.clip(RoundedCornerShape(14.dp))
 
 /** PAL-02: the user's own name for an app, searched like its label. Empty clears it. */

@@ -406,6 +406,8 @@ class ScreenshotTest {
                 onLaunch = {}, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {},
                 hub = fakeHub, onOpenHit = null, onRunAction = {}, onRequestFilePermission = {}, sounds = null,
                 initialQuery = query, initialCategory = cat,
+                // Wave 18: the Orbit rings and the resting lists come from how much each app is opened.
+                launchHistory = RadarTestHabits.history(apps.take(9)), learnedOverride = emptyMap(), nowMillis = { RadarTestHabits.NOW },
             )
         }
         shoot(name, settleMs = 800)

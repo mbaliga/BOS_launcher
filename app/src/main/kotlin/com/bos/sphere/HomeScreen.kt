@@ -1520,7 +1520,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 extraEntries = com.bos.sphere.feature.dock.AppActionList.build(appLauncher, com.bos.sphere.feature.dock.WorkspaceRepository.get(context), app, lastTouch.sourceRect()) { menuApp = null }
                     .map { it.label to it.run } + homeItems.appMenuEntries(app) { menuApp = null } +
                     // HOM-22: on the Recent apps landing the app menu also offers to take the app off the list, or to clear the list.
-                    (if (menuRecents && HomeLandingRules.hasRecentsMenu(landing)) listOf(
+                    (if (menuRecents && (HomeLandingRules.hasRecentsMenu(landing) || rightOpen)) listOf( // STR-14: the Recents panel offers the same two entries
                         L10n.tr("Remove from recents") to { stores.recentsState.remove(app.key); menuApp = null },
                         L10n.tr("Clear recents") to { stores.recentsState.clear(); menuApp = null },
                     ) else emptyList()),

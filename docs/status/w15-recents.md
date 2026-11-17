@@ -13,3 +13,10 @@ Nothing here is device-confirmed. Robolectric has no compositor, no real gesture
 
 Decisions and spec changes: `docs/decisions/recents.md`.
 Shared-file edits (small, additive): `app/.../HomeScreen.kt` (state, second reveal and geometry, panel, card overlay, edge drag, handle, opener, visibility guards), `SettingsCategories.kt` (Right side row), `HomeModel.kt` (`rightSide`, `CornerActionId.OpenRecents`), `LauncherStores.kt` (persist `rightSide`), `Input.kt` (command and shortcut), `TouchPaths.kt`, `Glyphs.kt`, `L10n.kt` (two table merges). New files: `RightSide.kt`, `RecentsPanel.kt`, `RecentsPanelHost.kt`, `L10nW15recents.kt` and the tests above.
+
+## Review notes (adversarial pass)
+
+- Defect fixed: the app menu opened from a panel row did not offer "Remove from recents" and "Clear recents" unless the landing was Recent apps (`HomeScreen.kt`, condition now also true while the panel is open).
+- Verified by reading and tests: default `RightSide.RecentsPanel` on a fresh state and for installs with no stored value (`RightSide.parse`), reachable in `HomeScreen` (edge drag, handle, Ctrl+R, corner, gesture), no hidden APIs (public UsageEvents types only), usage reads run on `Dispatchers.Default`/IO, `usage/recents-state.txt` stays in the never-exported class, 8-language strings test green, reduced motion handled by the shared geometry.
+- Screenshots (`feature-grid/build/screenshots/recents_panel_*.png`) show the panel alone (portrait dark, landscape dark, light RTL, font 200, empty); the home-card plus panel composition is not captured and stays a device check.
+- Residue (device only): gesture feel next to the system back gesture, real usage log and background events, TalkBack, frame time.

@@ -87,6 +87,7 @@ android {
         unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->
             test.dependsOn(robolectricJars)
+            test.maxHeapSize = "2g" // wave 22: the tour suites keep a 500-app home, a seeded monkey walk and many Robolectric activities in one JVM; the default 512 MB made Compose "never idle" under GC pressure
             test.systemProperty("robolectric.offline", "true")
             test.systemProperty("robolectric.dependency.dir", robolectricJarDir.get().asFile.absolutePath)
         }

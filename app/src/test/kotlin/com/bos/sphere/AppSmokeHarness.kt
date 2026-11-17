@@ -40,6 +40,7 @@ internal object AppSmokeHarness {
 
     /** Clears the process-wide singletons the launcher keeps in statics (what a new process starts without). */
     fun resetProcess() {
+        runCatching { com.bos.sphere.core.data.GroupsSettings.restore(com.bos.sphere.core.data.GroupsConfig()) } // wave 22: the in-memory groups of an earlier test
         for ((cls, field) in listOf(
             "com.bos.sphere.core.data.LauncherStores" to "instance",
             "com.bos.sphere.core.data.OpenSurfaceStore" to "shared",
@@ -50,6 +51,7 @@ internal object AppSmokeHarness {
             "com.bos.sphere.feature.dock.WorkspaceRepository" to "instance",
             "com.bos.sphere.feature.grid.LauncherWidgetHost" to "shared",
             "com.bos.sphere.OverrideStoreHolder" to "store",
+            "com.bos.sphere.core.data.GroupsSettings" to "sp", // wave 22: the groups file of the previous test's application
         )) runCatching {
             Class.forName(cls).getDeclaredField(field).apply { isAccessible = true }.set(null, null)
         }

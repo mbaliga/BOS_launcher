@@ -1218,7 +1218,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // (low alpha, fading when idle, a dot instead of the pill) and no rail unless the rail setting is on.
         val quietLeft = HomeChromeRules.quiet(landing, ChromeElement.LeftHandle)
         val glanceMotionReduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
-        if (!leftOpen && HomeChromeRules.shows(landing, ChromeElement.LeftHandle, chromeSettings)) {
+        // Wave 22 (tour): also not while the Recents panel is open: the pushed-aside home card's sliver sits on the left edge, and the handle drawn over it opened Launchpad instead of returning home.
+        if (!leftOpen && !rightOpen && HomeChromeRules.shows(landing, ChromeElement.LeftHandle, chromeSettings)) {
             if (HomeChromeRules.shows(landing, ChromeElement.Rail, chromeSettings)) {
                 com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge))
             }

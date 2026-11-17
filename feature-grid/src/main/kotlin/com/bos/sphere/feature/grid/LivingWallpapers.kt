@@ -147,7 +147,7 @@ internal object BeamView : SignalView {
         private val across = if (portrait) geo.w else geo.h
         private val design = len * 1.25f
         private val bodyColors = intArrayOf(0xFFF1E6FF.toInt(), 0xF0C4A6F2.toInt(), 0xD88E6BD2.toInt(), 0x90593A9F.toInt(), 0x00331F73)
-        private val body = SoftBand(design, across * 0.014f, across * 0.58f, 0.85f, 40, bodyColors)
+        private val body = SoftBand(design, across * 0.014f, across * 0.58f, 0.85f, 112, bodyColors)
         private val tipPaint = shaderPaint(unitRadial(intArrayOf(0xFFFFFFFF.toInt(), 0x99D9C4FF.toInt(), 0x00B79BFF), floatArrayOf(0f, 0.3f, 1f))).also { it.xfermode = add }
         private val corePath = bandPath(len * 0.9f, across * 0.005f, across * 0.0012f, 1f)
         private val corePaint = shaderPaint(linear(0f, 0f, len * 0.9f, 0f, intArrayOf(0xFFFFFFFF.toInt(), 0xCCEBDDFF.toInt(), 0x00EBDDFF), floatArrayOf(0f, 0.5f, 1f))).also { it.xfermode = add }
@@ -404,7 +404,7 @@ internal object ShaftView : SignalView {
         private val ang = (atan2(y1 - y0, x1 - x0) * 180.0 / PI).toFloat()
         private val w0 = minOf(geo.w, geo.h) * (if (portrait) 0.30f else 0.26f)
         private val colors = intArrayOf(0x007C5AC8, 0xE07C5AC8.toInt(), 0xF06B3FC0.toInt(), 0xB04A2A9A.toInt(), 0x602E1B6B, 0x00201048)
-        private val band = SoftBand(len, w0 * 1.0f, w0 * 1.7f, 1f, 36, colors)
+        private val band = SoftBand(len, w0 * 1.0f, w0 * 1.7f, 1f, 96, colors)
         private val wash = shaderPaint(linear(0f, 0f, geo.w, geo.h, intArrayOf(0x330E0A24, 0x00000000, 0x00000000), floatArrayOf(0f, 0.5f, 1f)))
         private val hot = shaderPaint(unitRadial(intArrayOf(0x887C5AC8.toInt(), 0x336B3FC0, 0x00000000), floatArrayOf(0f, 0.5f, 1f))).also { it.xfermode = add }
 

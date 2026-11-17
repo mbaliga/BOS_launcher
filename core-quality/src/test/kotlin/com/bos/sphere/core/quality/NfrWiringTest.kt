@@ -69,7 +69,9 @@ class NfrWiringTest {
         val home = text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt")
         assertTrue(home.contains("HomeScrim("))
         // The scrim sits right after the wallpaper layer and before the indicator layer and the home content.
-        assertTrue(home.indexOf("BackgroundLayer(") < home.indexOf("HomeScrim(") && home.indexOf("HomeScrim(") < home.indexOf("IndicatorLayer("))
+        val bg = home.indexOf("SignalBackground(")
+        assertTrue("the home must draw SignalBackground", bg >= 0)
+        assertTrue(bg < home.indexOf("HomeScrim(") && home.indexOf("HomeScrim(") < home.indexOf("IndicatorLayer("))
     }
 
     // ---- NFR-17

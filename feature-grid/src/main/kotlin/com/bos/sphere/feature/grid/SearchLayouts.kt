@@ -124,6 +124,12 @@ private val StripTile = 76.dp
 private val StripGap = 14.dp
 private const val LOOP_COUNT = Int.MAX_VALUE
 
+/** The next frame time for an endless animation: the platform's infinite-animation policy decides (none on a device, so this is plain withFrameNanos there; a test that auto-advances its clock ends the loop). */
+private suspend fun infiniteFrameNanos(): Long {
+    val policy = kotlin.coroutines.coroutineContext[androidx.compose.ui.platform.InfiniteAnimationPolicy]
+    return if (policy != null) policy.onInfiniteOperation { androidx.compose.runtime.withFrameNanos { it } } else androidx.compose.runtime.withFrameNanos { it }
+}
+
 /**
  * A horizontal strip of large tiles. With [motion] and 5+ tiles it drifts slowly (about 12 dp/s)
  * and wraps seamlessly; it stops the instant the user touches it and resumes a moment after.
@@ -156,7 +162,9 @@ internal fun Filmstrip(
         var last = androidx.compose.runtime.withFrameNanos { it }
         var acc = 0f
         while (true) {
-            val now = androidx.compose.runtime.withFrameNanos { it }
+            // Wave 22 (tour): the drift is an endless animation, so it asks the platform's infinite-animation policy for its frames. On a device that is plain withFrameNanos; a UI test
+            // that auto-advances its clock ends the loop instead of never becoming idle (the seeded monkey walk hung on this in a busy state).
+            val now = infiniteFrameNanos()
             val dt = (now - last) / 1_000_000_000f
             last = now
             if (touching) { lastTouchAt = now; acc = 0f; continue }

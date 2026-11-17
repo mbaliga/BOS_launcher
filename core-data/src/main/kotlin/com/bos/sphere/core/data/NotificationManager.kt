@@ -120,6 +120,9 @@ object NotificationProvider {
     /** Display-only filter set by the active workspace (WSP-08): the apps allowed to show; null shows everything. */
     val displayFilter = MutableStateFlow<Set<String>?>(null)
 
+    /** Test seam (the listener service has no system behind it in a unit test): publishes [list] as the current feed. */
+    fun publishForTest(list: List<HubNotification>) { _state.value = list }
+
     internal fun onNotificationsChanged(notifs: List<HubNotification>) {
         _state.value = notifs
     }

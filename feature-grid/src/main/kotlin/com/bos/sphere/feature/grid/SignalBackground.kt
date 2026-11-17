@@ -68,7 +68,13 @@ import kotlin.math.hypot
 internal class RadarClock {
     val ms = mutableLongStateOf(0L)
     var live: State<Float>? = null
-    fun now(): Long = live?.let { (it.value * 1000f).toLong() } ?: ms.longValue
+    /** W20 audit: the last value of the live transition; when the clock pauses (window unfocused, screen off) the layers freeze here instead of snapping back to 0. */
+    private var frozen = -1L
+    fun now(): Long {
+        val l = live
+        if (l != null) { frozen = (l.value * 1000f).toLong(); return frozen }
+        return if (frozen >= 0L) frozen else ms.longValue
+    }
 }
 
 /** Tests provide a source that injects states; null = the phone's real connectivity. */

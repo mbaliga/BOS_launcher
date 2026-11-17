@@ -1,0 +1,15 @@
+{
+    "name": "liftoff-demo.mbaliga",
+    "description": "Liftoff prototype demo (HTML prototype in a webapp container; no app inventory, no launching)",
+    "architecture": "@CLICK_ARCH@",
+    "title": "Liftoff (prototype demo)",
+    "hooks": {
+        "liftoff-demo": {
+            "apparmor": "liftoff-demo.apparmor",
+            "desktop": "liftoff-demo.desktop"
+        }
+    },
+    "version": "0.1.0",
+    "maintainer": "OWNER-FILL <owner@example.invalid>",
+    "framework": "@CLICK_FRAMEWORK@"
+}

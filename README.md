@@ -26,6 +26,8 @@ surface settings, and app management.
 Planned (per the brief): `:feature-hub`, `:feature-settings`, `:feature-widgets`, `:haptics`,
 `:assistant`. (The hub / settings UI currently lives in `:app/ui` and will graduate to modules.)
 
+Multi-platform porting: plan in [`docs/PORTING_PLAN.md`](docs/PORTING_PLAN.md). Ubuntu Touch has an honest reframe (QML app picker + prototype demo Click, CI-LANE-WRITTEN, not device-verified): see [`ubuntu-touch/README.md`](ubuntu-touch/README.md). Nothing else is built.
+
 ## What works now
 
 - **Real home app:** manifest HOME + DEFAULT, `RoleManager.ROLE_HOME` request with a

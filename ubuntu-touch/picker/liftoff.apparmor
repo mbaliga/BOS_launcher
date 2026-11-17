@@ -1,6 +1,4 @@
 {
-    "policy_groups": [
-        "url_dispatcher"
-    ],
-    "policy_version": 16.04
+    "policy_groups": [],
+    "policy_version": 20.04
 }

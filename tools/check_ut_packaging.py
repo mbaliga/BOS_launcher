@@ -6,7 +6,7 @@ import json, os, re, sys, configparser
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 UT = os.path.join(ROOT, "ubuntu-touch")
 # Policy groups that exist in the common Lomiri set and that this project may request (F7: common only).
-ALLOWED = {"url_dispatcher", "webview", "networking", "audio", "content_exchange"}
+ALLOWED = {"webview", "networking", "audio", "content_exchange"}
 errors = []
 
 def err(m): errors.append(m)
@@ -25,6 +25,7 @@ def check(d, hook, network_ok):
         if not f or not os.path.isfile(os.path.join(base, f)): err(f"{d}: hook {kind} file {f!r} missing")
     aa = json.load(open(os.path.join(base, h["apparmor"])))
     if aa.get("template") not in (None, "ubuntu-sdk"): err(f"{d}: unconfined/custom template not allowed")
+    if str(aa.get("policy_version")) != "20.04": err(f"{d}: policy_version must be 20.04 for framework ubuntu-sdk-20.04 (click-review fails otherwise)")
     groups = set(aa.get("policy_groups", []))
     if not groups <= ALLOWED: err(f"{d}: non-common policy groups {groups - ALLOWED}")
     if not network_ok and "networking" in groups: err(f"{d}: networking not allowed (no-phoning-home rule)")

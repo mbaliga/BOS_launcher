@@ -16,7 +16,7 @@ Caveat: the demo's `webapp-container --enable-addressbar=false www/index.html` E
 ## Behaviour you should expect
 - Until the spike has found a real inventory the picker shows 15 **demo entries** under a banner saying so;
   tapping one only shows "launching is disabled". It never presents demo entries as installed apps.
-- Launching uses `Qt.openUrlExternally("appid://pkg/app/version")` (policy group `url_dispatcher`). Whether
+- Launching uses `Qt.openUrlExternally("appid://pkg/app/version")` (no policy group: `url_dispatcher` is not a valid group under `ubuntu-sdk-20.04`, per click-review in CI; whether the dispatch is still permitted is unverified). Whether
   Lomiri accepts that from this app, and whether confinement lets the spike read any `.desktop` file, is **unknown**.
 - Hub, voice, notifications, set-as-default: dropped (no Lomiri analogue). Globe math is ported and tested
   (`globeItems`/`globeProject`) but the globe view is not built in QML yet.

@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -128,6 +129,7 @@ object BackgroundPresets {
         "fireflies" to "Fireflies", "nebula" to "Nebula", "rain" to "Rain",
         "ribbon" to "Ribbon", "bokeh" to "Bokeh",
         "lava" to "Lava", "snow" to "Snow", "matrix" to "Matrix", "orbits" to "Orbits", "plasma" to "Plasma",
+        "breathing-dots" to "Breathing dots",
     )
 
     val solids: List<BackgroundPreset> = solidMap.map { BackgroundPreset(it.key, it.value.first) }
@@ -799,6 +801,7 @@ private fun DrawScope.drawLiveScene(
         "matrix" -> drawMatrix(cache, t, density)
         "orbits" -> drawOrbits(cache, t, density)
         "plasma" -> drawPlasma(cache, t)
+        "breathing-dots" -> drawBreathingDotsScene(cache, t, density, animate) // PAL-24: the owner's dot grid
         else -> drawAurora(cache, t)
     }
 }
@@ -872,6 +875,8 @@ private class LiveCache {
     var base = 0xFF000000.toInt()
     var brushes: Array<Brush> = emptyArray()
     var stroke = Stroke(1f)
+    /** PAL-24: the breathing-dots scene's painter, rebuilt when the size changes. */
+    var dots: DotPainter? = null
 
     fun ensure(width: Float, height: Float, density: Float, scene: String, tint: Int) {
         if (width == w && height == h && density == dens && scene == this.scene && tint == this.tint) return
@@ -1139,6 +1144,13 @@ private fun DrawScope.drawLava(c: LiveCache, t: Float) {
 }
 
 /** Large soft colour fields drifting on Lissajous paths. */
+/** PAL-24: "Breathing dots": near-white dots on the scene's near-black base, glowing and fading in slow waves. */
+private fun DrawScope.drawBreathingDotsScene(c: LiveCache, t: Float, density: Float, animate: Boolean) {
+    var p = c.dots
+    if (p == null || p.w != size.width || p.h != size.height) { p = DotPainter(size.width, size.height, density); c.dots = p }
+    p.draw(drawContext.canvas.nativeCanvas, (t * 1000f).toLong(), !animate, true, 1f)
+}
+
 private fun DrawScope.drawPlasma(c: LiveCache, t: Float) {
     val w = size.width; val h = size.height
     val big = max(w, h)

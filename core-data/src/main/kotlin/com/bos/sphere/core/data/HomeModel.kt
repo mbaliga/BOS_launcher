@@ -106,6 +106,14 @@ enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Wid
 enum class ClockLayout(val label: String) { Inline("One line"), Stacked("Two lines") }
 
 /** What fills the background of Radar (search). */
+/** PAL-24: how strong the Radar background layers are drawn. */
+enum class RadarIntensity(val label: String) { Subtle("Subtle"), Normal("Normal") }
+
+/** PAL-24: the Lab override of the live signal (Live = read the phone). Level 0..4 for the forced ones. */
+enum class SignalForce(val label: String, val level: Int) {
+    Live("Live", -1), NoSignal("No signal", 0), Weak("Weak", 1), Fair("Fair", 2), Good("Good", 3), Excellent("Excellent", 4),
+}
+
 enum class SearchBackdropStyle(val label: String) { Picture("Picture"), None("Plain black"), Radar("Radar sweep") }
 
 /** How pages change when you swipe between them. */
@@ -296,6 +304,15 @@ data class LauncherPrefs(
     /** Filmstrip / orbit keep drifting slowly; off = still until you move them. */
     val searchMotion: Boolean = true,
     val searchFiles: Boolean = true,
+    /** PAL-24: the rotating scope sweep and ping behind Radar. */
+    val radarSweep: Boolean = true,
+    /** PAL-24: the id of the active signal view ("off", "glow"); see SignalViews in feature-grid. */
+    val radarSignalView: String = "glow",
+    /** PAL-24: comic focus lines at the screen edges while there is no connectivity (the only use of that effect). */
+    val radarComicNoSignal: Boolean = true,
+    val radarIntensity: RadarIntensity = RadarIntensity.Normal,
+    /** PAL-24: Lab override of the signal state (Live = the phone's real state). */
+    val radarSignalForce: SignalForce = SignalForce.Live,
     val searchActions: Boolean = true,
     /** Ask installed Fylz / Fotoz for deep (text-in-image, content) matches. */
     val searchDeep: Boolean = true,

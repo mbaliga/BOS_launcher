@@ -96,6 +96,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
             .putString("searchLayout", next.searchLayout.name).putBoolean("searchBackdrop", next.searchBackdrop).putString("searchBdStyle", next.searchBackdropStyle.name).putInt("homePage", next.homePage).putString("pageTransition", next.pageTransition.name).putBoolean("mediaControls", next.mediaControls)
             .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
+            .putBoolean("radarSweep", next.radarSweep).putString("radarSignalView", next.radarSignalView).putBoolean("radarComic", next.radarComicNoSignal)
+            .putString("radarIntensity", next.radarIntensity.name).putString("radarSignalForce", next.radarSignalForce.name)
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
             .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
@@ -206,6 +208,11 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             pageTransition = enumOr(sp.getString("pageTransition", null), d.pageTransition),
             mediaControls = sp.getBoolean("mediaControls", d.mediaControls),
             searchMotion = sp.getBoolean("searchMotion", d.searchMotion),
+            radarSweep = sp.getBoolean("radarSweep", d.radarSweep),
+            radarSignalView = sp.getString("radarSignalView", null) ?: d.radarSignalView,
+            radarComicNoSignal = sp.getBoolean("radarComic", d.radarComicNoSignal),
+            radarIntensity = enumOr(sp.getString("radarIntensity", null), d.radarIntensity),
+            radarSignalForce = enumOr(sp.getString("radarSignalForce", null), d.radarSignalForce),
             searchFiles = sp.getBoolean("searchFiles", d.searchFiles),
             searchActions = sp.getBoolean("searchActions", d.searchActions),
             searchDeep = sp.getBoolean("searchDeep", d.searchDeep),

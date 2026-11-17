@@ -89,7 +89,7 @@ internal fun SearchBackdrop(style: com.bos.sphere.core.data.SearchBackdropStyle,
     val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
     val picture = style == com.bos.sphere.core.data.SearchBackdropStyle.Picture
     Box(modifier.background(Color.Black)) {
-        if (style == com.bos.sphere.core.data.SearchBackdropStyle.Radar) RadarSweep(motion, Modifier.fillMaxSize())
+        // PAL-24: the Radar scope (sweep, ping, signal view) is drawn by RadarBackgroundHost above this backdrop; the old green sweep is retired.
         if (picture) {
             val drift = if (motion) {
                 rememberInfiniteTransition(label = "backdrop").animateFloat(

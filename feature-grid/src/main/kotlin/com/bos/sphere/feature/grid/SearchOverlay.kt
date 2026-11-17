@@ -3,6 +3,7 @@ package com.bos.sphere.feature.grid
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.platform.testTag
 import android.content.Intent
 import com.bos.sphere.core.design.predictiveBackLayer
@@ -473,7 +474,7 @@ internal fun SearchScreen(
         // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
         // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
-            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = if (voiceOn) RadarMicBarHeight else 0.dp).clipToBounds()) {
+            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = if (voiceOn) RadarMicBarHeight else 0.dp).clipToBounds().semantics { isTraversalGroup = true }) {
                 val emptyHint = if (data.blank && (selected == null || selected == SearchCategory.Apps) && data.tiles(selected).isEmpty()) L10n.tr("Rings fill up as you use Radar") else null
                 if (flatMode) {
                     // Typing, or the Flat layout at rest (what you open most): a plain results list below the query line.
@@ -536,11 +537,12 @@ internal fun SearchScreen(
                     }
                 }
             }
+            // Wave 22 (NFR-13): the query line, the results and the mic are three traversal groups, so TalkBack walks them top to bottom (field, results, mic) whatever the composition order.
             // The one text field, always visible at the top: scope menu (Flat), placeholder, query and the Clear X inside it, glass (wave 21);
             // Close stays outside as a glass circle while the query is empty. Push-to-talk (INP-13) is at the bottom centre.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().height(RadarQueryBarHeight).padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+                modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().height(RadarQueryBarHeight).semantics { isTraversalGroup = true }.padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
             ) {
                 GlassField(Modifier.weight(1f).fillMaxHeight().testTag(RADAR_FIELD_TAG), shade = shades.top) {
                     if (flatMode) ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label, fanDown = true, showLabel = selected != null, glass = true, modifier = Modifier.padding(start = 6.dp))
@@ -564,7 +566,7 @@ internal fun SearchScreen(
             }
             // Wave 21 (owner): the mic for voice input sits at the centre of the bottom, above the keyboard and the gesture bar
             // (the inset padding above), 56 dp, in every layout and orientation; space is reserved for it so it never covers a result.
-            if (voiceOn) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight), contentAlignment = Alignment.Center) {
+            if (voiceOn) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight).semantics { isTraversalGroup = true }, contentAlignment = Alignment.Center) {
                 PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, shade = shades.bottom)
             }
         }
@@ -661,6 +663,7 @@ internal val RadarQueryBarHeight = 64.dp
 
 /** Wave 21: the bottom strip that holds the mic (a 56 dp button and 8 dp above and below); reserved only when the mic exists. */
 internal val RadarMicBarHeight = 72.dp
+
 
 /** Test tag of the glass field (its bounds hold the scope menu, the text and the Clear X). */
 internal const val RADAR_FIELD_TAG = "radarField"

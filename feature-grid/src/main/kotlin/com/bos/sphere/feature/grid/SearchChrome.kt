@@ -99,6 +99,15 @@ internal val WheelHeight = WheelRow * 5
 /** How far above and below the middle of the wheel its labels are still bright enough to be in the way of a tile. */
 internal val WheelRowHalfVisible = WheelRow * 1.6f
 
+/** Wave 22: how many rows from the selected one a label is still drawn; beyond it the label is fully transparent, so the edge of the results area (the mic strip, the keyboard) never cuts a glyph in half. */
+internal const val WheelFadeRows = 3.5f
+
+/** Opacity of the wheel label [d] rows from the selected one (0 is the selected label): the old falloff, faded to nothing by [WheelFadeRows]. */
+internal fun wheelLabelAlpha(d: Float): Float {
+    val a = d.coerceAtLeast(0f)
+    return (1f / (1f + 0.9f * a * a)) * (WheelFadeRows - a).coerceIn(0f, 1f)
+}
+
 /**
  * The slot-machine category wheel: [selected] sits bright in the middle, its neighbours dim away
  * above and below. Drag vertically or tap a label to change; each step calls [onTick].
@@ -155,7 +164,7 @@ internal fun CategoryWheel(
                     .offset { IntOffset(0, ((i - pos.value) * rowPx).roundToInt()) }
                     .graphicsLayer {
                         val d = abs(i - pos.value)
-                        alpha = (1f / (1f + 0.9f * d * d)) * (if (empty) 0.55f else 1f)
+                        alpha = wheelLabelAlpha(d) * (if (empty) 0.55f else 1f)
                     }
                     .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {
                         onTouchNow(); if (cat != selected) { onTickNow(); onSelectNow(cat) }

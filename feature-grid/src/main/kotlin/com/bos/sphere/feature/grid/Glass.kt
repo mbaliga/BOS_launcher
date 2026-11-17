@@ -1,6 +1,5 @@
 package com.bos.sphere.feature.grid
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.clickable
@@ -187,9 +186,6 @@ fun GlassField(
         content = content,
     )
 }
-
-/** A thin glass-coloured border for places that cannot draw behind (a Popup, a dialog): the same hairline, no gradient. */
-fun glassBorder(dark: Boolean = true): BorderStroke = BorderStroke(GlassSpec.Hairline, if (dark) Color(0x33FFFFFF) else Color(0x3314151A))
 
 private fun DrawScope.drawGlassOutline(outline: Outline, brush: Brush, style: DrawStyle = Fill) {
     when (outline) {

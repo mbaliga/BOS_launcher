@@ -153,4 +153,17 @@ class RadarAuditGlassW22UiTest {
         org.junit.Assert.assertTrue(ringTiles.isNotEmpty())
         org.junit.Assert.assertTrue("every ring tile sits inside a reading group", ringTiles.all { t -> groups.any { g -> g.boundsInRoot.let { b -> b.left <= t.boundsInRoot.left + 1 && b.right >= t.boundsInRoot.right - 1 && b.top <= t.boundsInRoot.top + 1 && b.bottom >= t.boundsInRoot.bottom - 1 } } })
     }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
+    fun PAL_18_closeLeavingWhileItHasFocusHandsTheKeysBackToRadar() {
+        open(SearchLayout.Orbit, "")
+        key(Key.DirectionUp)
+        rule.onNodeWithContentDescription("Close").assertIsFocused()
+        // text arrives (as a voice result would) while Close has keyboard focus: Close is replaced by Clear
+        rule.onNode(hasSetTextAction()).performTextReplacement("bra")
+        rule.mainClock.advanceTimeBy(500)
+        assertEquals(0, count("Close")); assertEquals(1, count("Clear"))
+        key(Key.Tab, shift = true)
+        rule.onNodeWithContentDescription("Clear").assertIsFocused()
+    }
 }

@@ -482,6 +482,10 @@ internal fun SearchScreen(
         if (first != null && first !is Tile.Person) tap(first) else submitSearch(searchText, apps, prefs, onLaunch, onOpenIntent)
     }
     val showKeyboard = { runCatching { focus.requestFocus(); keyboard?.show() }; Unit }
+    // Wave 22 (second audit): Close and Clear swap places as the text appears or empties (also by voice); a keyboard focus that sat on the one
+    // that left is gone with it, so the "a button has focus" flag is dropped and the field takes the focus back, otherwise every key is
+    // passed on to a button that no longer exists.
+    LaunchedEffect(query.isEmpty()) { if (barFocused) { barFocused = false; runCatching { focus.requestFocus() } } }
 
     // Wave 21: the glass is darkened only as far as the measured background behind it needs for AA text (NFR-15), usually not at all.
     val cfgNow = androidx.compose.ui.platform.LocalConfiguration.current
@@ -704,17 +708,19 @@ internal fun ChannelButton(ch: Channel, onClick: () -> Unit) {
         Channel.Call -> "Call"; Channel.Sms -> "Message"; Channel.Email -> "Email"
         Channel.WhatsApp -> "WhatsApp"; Channel.Telegram -> "Telegram"; Channel.Signal -> "Signal"
     })
+    // Wave 22 (second audit): a 48 dp touch target around the 32 dp look (NFR-13).
     Box(
         Modifier
-            .padding(start = 5.dp)
-            .size(32.dp)
-            .background(HyleColors.Surface, CircleShape)
-            .border(1.dp, HyleColors.Hairline, CircleShape)
+            .padding(start = 1.dp)
+            .size(48.dp)
+            .clip(CircleShape)
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = desc; role = androidx.compose.ui.semantics.Role.Button },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(glyph, desc, tint = HyleColors.Violet, modifier = Modifier.size(16.dp))
+        Box(Modifier.size(32.dp).background(HyleColors.Surface, CircleShape).border(1.dp, HyleColors.Hairline, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(glyph, desc, tint = HyleColors.Violet, modifier = Modifier.size(16.dp))
+        }
     }
 }
 

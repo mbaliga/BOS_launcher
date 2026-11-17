@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.border
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -154,6 +155,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
     val available = remember(context, availableOverride) { availableOverride ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     if (!available) return
     var listening by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
     val latestText by rememberUpdatedState(onText)
     // Wave 22 (audit): a refusal (also a permanent one, which returns at once with no dialog) used to be silent; say what to do. Nothing listens
     // after a grant until the next press (INP-13).
@@ -177,6 +179,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
             .size(GlassSpec.BigButton)
             .glass(CircleShape, tint = if (listening) Color(0xFFB9A8FF) else Color.White, pressed = listening, shade = shade)
             .clip(CircleShape)
+            .then(if (focused) Modifier.border(2.dp, Color.White, CircleShape) else Modifier) // a visible keyboard focus (second audit)
             .pointerInput(ptt) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
@@ -192,7 +195,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
                 } else false
             }
             // A key held down when focus moves away never sends its key-up: stop listening then (the finger case ends with the pointer).
-            .onFocusChanged { f -> onFocusChange(f.hasFocus); if (!f.hasFocus && ptt.listening) { ptt.release(); listening = false } }
+            .onFocusChanged { f -> focused = f.hasFocus; onFocusChange(f.hasFocus); if (!f.hasFocus && ptt.listening) { ptt.release(); listening = false } }
             .focusable()
             .semantics { role = Role.Button; contentDescription = label; onClick(label = label) { ptt.toggle(); listening = ptt.listening; true } },
         contentAlignment = Alignment.Center,

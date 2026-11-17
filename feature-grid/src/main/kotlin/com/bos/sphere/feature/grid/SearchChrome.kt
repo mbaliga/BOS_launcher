@@ -312,25 +312,6 @@ private fun scopeGlyph(c: SearchCategory?): ImageVector = when (c) {
     SearchCategory.Files -> FolderGlyph
 }
 
-// ---------------------------------------------------------------- suggestion card
-
-/** The macOS suggestion menu: grey bold section headers over rows, hairline between groups. */
-@Composable
-internal fun SuggestionGroups(groups: List<SuggGroup>, onPick: (SuggItem) -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
-    Column(modifier) {
-        groups.forEachIndexed { gi, g ->
-            if (gi > 0) Box(Modifier.padding(horizontal = 14.dp, vertical = 2.dp).fillMaxWidth().height(0.5.dp).background(Color(0x33FFFFFF)))
-            Text(g.header, color = Color(0x99FFFFFF), fontSize = if (compact) 11.sp else 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 14.dp, top = if (compact) 6.dp else 8.dp, bottom = 1.dp))
-            g.items.forEach { item ->
-                Text(
-                    item.label, color = if (item.accent) HyleColors.VioletSoft else Color.White, fontSize = if (compact) 14.sp else 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().clickable { onPick(item) }.padding(horizontal = 14.dp, vertical = if (compact) 5.dp else 8.dp),
-                )
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------- tile faces
 
 internal fun hitGlyph(hit: SearchHit): ImageVector = hit.actionId?.let { Glyphs.forAction(it) } ?: when (hit.kind) {

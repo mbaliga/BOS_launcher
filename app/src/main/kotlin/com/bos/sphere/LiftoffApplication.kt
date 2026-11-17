@@ -22,6 +22,16 @@ class LiftoffApplication : Application() {
         DebugStrictMode.installIfDebuggable(applicationInfo)
         HomeTiming.processStarted()
         PrefsWarmup.start(this)
+        // PAL-24 (wave 20 audit): the Lab's forced signal state never reaches a build without the Lab (import or upgrade can carry the pref).
+        com.bos.sphere.feature.grid.SignalForceGate.labAvailable = com.bos.sphere.ui.LabGate.visible()
+        if (!com.bos.sphere.ui.LabGate.visible()) {
+            Thread {
+                runCatching {
+                    val prefs = com.bos.sphere.core.data.LauncherStores.get(this).prefs
+                    if (prefs.prefs.value.radarSignalForce != com.bos.sphere.core.data.SignalForce.Live) prefs.update { it.copy(radarSignalForce = com.bos.sphere.core.data.SignalForce.Live) }
+                }
+            }.apply { name = "liftoff-signal-force-reset"; isDaemon = true }.start()
+        }
         runCatching {
             val ledger = CrashFreeLedger(File(filesDir, "crash-reports"))
             // Disk write kept off the main thread so process start stays clean under StrictMode (NFR-02, NFR-12).

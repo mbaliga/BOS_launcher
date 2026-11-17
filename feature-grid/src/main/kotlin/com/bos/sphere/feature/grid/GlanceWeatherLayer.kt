@@ -38,7 +38,7 @@ fun GlanceWeatherLayer(
     val reduced = rememberMotionPrefs().reduced
     val active = rememberRadarActive()
     val still = reduced || !animate
-    val clock = rememberRadarClock(active && animate, still)
+    val clock = rememberRadarClock(GlanceWeather.animates(reducedMotion = reduced, screenOn = active, surfaceVisible = animate), false)
     val shapes = remember { WeatherShapes() }
     val strength = GlanceWeather.strength(intensity)
     androidx.compose.foundation.layout.Box(

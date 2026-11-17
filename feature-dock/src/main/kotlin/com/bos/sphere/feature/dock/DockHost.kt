@@ -141,6 +141,8 @@ fun DockHost(
     widgetOther: (@Composable (DockItem, Dp, Dp) -> Unit)? = null,
     /** A desktop surface always shows its dock; the tier default only decides for the phone's home (DCK-04, DCK-07). */
     forceEnabled: Boolean = false,
+    /** W20 (HOM-23): the phone home shows the rail although the dock setting is off (Glance with Right side set to Dock rail); the rail stays in the focus graph. */
+    alwaysShown: Boolean = false,
     /** The edge the host surface reserved for this rail; the desktop surface decides its own (EXT-09). */
     edgeOverride: DockEdge? = null,
     /** INP-11: extra modifiers for the rail itself, applied in composition (the app adds the drop target that pins a dropped app or link). */
@@ -152,7 +154,7 @@ fun DockHost(
     val configuration = LocalConfiguration.current
     val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val tier = remember(configuration.screenWidthDp, refreshKey) { CapabilityEvaluator.tier(launcher.inputs()) }
-    if (!forceEnabled && !state.dock.isEnabled(tier)) return
+    if (!forceEnabled && !alwaysShown && !state.dock.isEnabled(tier)) return
 
     val hub = remember { DockHubHolder.hub(manager) }
     val instance = remember(displayId) { hub.forDisplay(displayId) }

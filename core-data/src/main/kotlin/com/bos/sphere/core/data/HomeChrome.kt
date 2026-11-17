@@ -49,6 +49,12 @@ object HomeChromeRules {
         }
     }
 
+    /**
+     * W20 audit (HOM-23, STR-14): Right side = Dock rail on Glance must actually show the rail, also on a phone where the dock setting is
+     * off by default; otherwise the indicator dot "Show the dock" and the edge swipe did nothing. Other landings keep the dock setting.
+     */
+    fun forcesDock(landing: HomeLanding, s: ChromeSettings): Boolean = landing == HomeLanding.Glance && s.rightSide == RightSide.DockRail
+
     /** Handles and the waiting indicator are drawn in their quiet form (low alpha, fading when idle) on Glance only. */
     fun quiet(landing: HomeLanding, element: ChromeElement): Boolean =
         landing == HomeLanding.Glance && (element == ChromeElement.LeftHandle || element == ChromeElement.RightHandle || element == ChromeElement.WaitingIndicator)

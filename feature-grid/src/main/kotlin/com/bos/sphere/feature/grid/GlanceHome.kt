@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,7 +89,6 @@ import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.data.WeatherCodes
 import com.bos.sphere.core.data.WeatherInfo
-import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.rememberMotionPrefs
 import com.bos.sphere.core.input.FocusKind
@@ -107,11 +107,24 @@ object GlanceText {
     /** The clock size in dp for a window of [w] x [h] dp at [fontScale]: it scales with the font but never outgrows the window. */
     fun clockSizeDp(w: Float, h: Float, fontScale: Float): Float {
         val base = minOf(w * 0.26f, h * 0.30f, 124f)
-        return (base * fontScale.coerceIn(1f, 2f)).coerceAtMost(w * 0.28f).coerceAtMost(h * 0.42f)
+        // W20 audit: and never wider than the room between the two 48 dp edge handles ("88:88" is about 2.6 em wide, tabular digits).
+        val room = ((w - 2f * CLOCK_SIDE_CLEAR_DP) / CLOCK_EM_WIDTH).coerceAtLeast(24f)
+        return (base * fontScale.coerceIn(1f, 2f)).coerceAtMost(w * 0.28f).coerceAtMost(h * 0.42f).coerceAtMost(room)
     }
+
+    /** Clear space on each side of the clock: the 48 dp edge handle plus a margin. */
+    const val CLOCK_SIDE_CLEAR_DP = 56f
+    /** The widest "HH:mm" in tabular digits, in em (four digits, the colon and the negative letter spacing), with a little air. */
+    const val CLOCK_EM_WIDTH = 2.7f
 
     /** The one-line music text: "Title · Artist", or the title alone. */
     fun nowPlayingLine(title: String, artist: String) = if (artist.isBlank()) title else "$title · $artist"
+
+    /**
+     * W20 audit: the line as drawn. Each part is a bidi isolate, so a right-to-left title next to a Latin artist (or the other way round) keeps
+     * its own order and the separator stays between them; with no artist it is the title alone. The spoken text stays [nowPlayingLine].
+     */
+    fun nowPlayingDisplay(title: String, artist: String) = if (artist.isBlank()) title else "\u2068$title\u2069 · \u2068$artist\u2069"
 }
 
 /**
@@ -152,8 +165,8 @@ fun GlanceSurface(
     val context = LocalContext.current
     val active = rememberRadarActive()
     val hideMs = GlanceControlsMs.of(prefs.glanceControlsSeconds)
-    val ink = if (dark) HyleColors.InkBright else Color(0xFF101016)
-    val inkDim = if (dark) Color(0xFF9A9AA6) else Color(0xFF55555F)
+    val ink = GlanceInk.clock(dark)
+    val inkDim = GlanceInk.secondary(dark)
 
     // The pop-in controls: one pure state value (see ControlsPop), a timer that fires at its hideAt.
     var pop by remember { mutableStateOf(ControlsPop()) }
@@ -201,6 +214,15 @@ fun GlanceSurface(
     }
 }
 
+/**
+ * W20 audit (NFR-15): the home scrim is sized so the theme's `InkBright` and `Ink` reach AA over every background; the Glance inks ARE those
+ * two (the date, the weather, the music line), no dimmer one, so the scrim covers them. Light values are the light theme's tokens.
+ */
+object GlanceInk {
+    fun clock(dark: Boolean): Color = if (dark) Color(0xFFE7E9F0) else Color(0xFF0E1018)
+    fun secondary(dark: Boolean): Color = if (dark) Color(0xFFC9CDD6) else Color(0xFF2A2E3A)
+}
+
 /** The controls timeout in milliseconds (setting seconds, clamped). */
 object GlanceControlsMs { fun of(seconds: Int): Long = com.bos.sphere.core.data.GlanceControls.clampSeconds(seconds) * 1000L }
 
@@ -228,15 +250,19 @@ private fun GlanceCentre(
     // The clock is not mirrored in right-to-left: digits keep their order.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Column(
-            modifier.padding(horizontal = 76.dp).clip(RoundedCornerShape(24.dp))
+            modifier.padding(horizontal = GlanceText.CLOCK_SIDE_CLEAR_DP.dp).clip(RoundedCornerShape(24.dp))
                 .launcherItem("glance.clock", focusable = true, onActivate = onClockTap, ringRadiusDp = 24f)
                 .clickable(onClickLabel = tapLabel, role = Role.Button, onClick = onClockTap),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (showTime) {
+                // W20 audit: the estimate above can be a little off for a font with wide digits: if the text still overflows its box it shrinks
+                // by a tenth until it fits (a state write from the text layout callback, the documented pattern), so it is never clipped.
+                var fit by remember(sizeDp) { mutableFloatStateOf(1f) }
                 Text(
                     time, color = ink, modifier = Modifier.semantics { testTag = "glance.time" }, maxLines = 1, softWrap = false, textAlign = TextAlign.Center,
-                    style = TextStyle(fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { sizeDp.dp.toSp() }, fontWeight = FontWeight.ExtraLight, fontFeatureSettings = "tnum", letterSpacing = (-1).sp),
+                    onTextLayout = { if (it.hasVisualOverflow && fit > 0.3f) fit *= 0.9f },
+                    style = TextStyle(fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (sizeDp * fit).dp.toSp() }, fontWeight = FontWeight.ExtraLight, fontFeatureSettings = "tnum", letterSpacing = (-1).sp),
                 )
             }
             if (showDate || showWeather) {
@@ -275,7 +301,7 @@ private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, show
     ) {
         Icon(Glyphs.Music, null, tint = tint, modifier = Modifier.size(16.dp))
         Text(
-            line, color = tint, fontSize = 14.sp, maxLines = 1, softWrap = false,
+            GlanceText.nowPlayingDisplay(media.title, media.artist), color = tint, fontSize = 14.sp, maxLines = 1, softWrap = false,
             overflow = if (marquee && overflow) TextOverflow.Clip else TextOverflow.Ellipsis,
             onTextLayout = { overflow = it.hasVisualOverflow },
             modifier = if (marquee && overflow) Modifier.basicMarquee(iterations = 3) else Modifier,
@@ -306,7 +332,6 @@ private fun ControlsPill(
         }
     }
     if (!composed) return
-    val line = GlanceText.nowPlayingLine(media.title, media.artist)
     Column(
         modifier.graphicsLayer {
             val p = progress.value
@@ -335,7 +360,7 @@ private fun ControlsPill(
             GlanceControlButton("glance.playpause", if (media.playing) MediaGlyphs.Pause else MediaGlyphs.Play, if (media.playing) L10n.tr("Pause") else L10n.tr("Play"), true, onPlayPause, big = true)
             GlanceControlButton("glance.next", MediaGlyphs.Next, L10n.tr("Next track"), media.canNext, onNext)
         }
-        Text(line, color = Color.White.copy(alpha = 0.78f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 8.dp, top = 2.dp))
+        Text(GlanceText.nowPlayingDisplay(media.title, media.artist), color = Color.White.copy(alpha = 0.78f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 8.dp, top = 2.dp))
     }
 }
 

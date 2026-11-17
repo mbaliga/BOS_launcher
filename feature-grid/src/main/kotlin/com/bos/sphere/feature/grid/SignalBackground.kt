@@ -68,7 +68,13 @@ import kotlin.math.hypot
 internal class RadarClock {
     val ms = mutableLongStateOf(0L)
     var live: State<Float>? = null
-    fun now(): Long = live?.let { (it.value * 1000f).toLong() } ?: ms.longValue
+    /** W20 audit: the last value of the live transition; when the clock pauses (window unfocused, screen off) the layers freeze here instead of snapping back to 0. */
+    private var frozen = -1L
+    fun now(): Long {
+        val l = live
+        if (l != null) { frozen = (l.value * 1000f).toLong(); return frozen }
+        return if (frozen >= 0L) frozen else ms.longValue
+    }
 }
 
 /** Tests provide a source that injects states; null = the phone's real connectivity. */
@@ -268,9 +274,20 @@ internal fun signalDescription(s: SignalState): String {
     return L10n.tr("Signal: %s, %s", level, kind)
 }
 
+/**
+ * W20 audit (PAL-24): the Lab can force a signal state (pref `radarSignalForce`). The Lab only exists in debug and alpha builds, but the
+ * pref also arrives through a settings import or an upgrade from such a build; in a build without the Lab it must never colour the real
+ * background. The app sets [labAvailable] once at start from its Lab gate; the default (true) keeps tests and previews unchanged.
+ */
+object SignalForceGate {
+    @Volatile var labAvailable: Boolean = true
+    fun effective(force: SignalForce, labAvailable: Boolean = this.labAvailable): SignalForce = if (labAvailable) force else SignalForce.Live
+}
+
 /** Live (or forced) signal as state; the live source is collected only while the host is in composition and the activity is started. */
 @Composable
-internal fun rememberRadarSignal(force: SignalForce, wanted: Boolean): State<SignalState?> {
+internal fun rememberRadarSignal(requestedForce: SignalForce, wanted: Boolean): State<SignalState?> {
+    val force = SignalForceGate.effective(requestedForce)
     val context = LocalContext.current
     val injected = LocalSignalSource.current
     val live = remember { mutableStateOf<SignalState?>(null) }

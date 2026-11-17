@@ -365,3 +365,8 @@ Status: PLAN. Nothing here is built, run on a device, signed or submitted. This 
 - **Skin contract (OQ-39, 2026-10-14):** proposed conformance level for this app: Level 1, cost class A (its own HyleColors object with drifted values). The owner chose Tier 1 (palette) everywhere first and every app declaring its own level; the assistant chose JSON, not XML, after the owner asked for a check; the draft spec is Personal-Tracker `porting/skin-contract/SPEC-DRAFT.md`. This is a proposal, not decided for this app.
 
 When the owner confirms or changes the line, this repo's original cells above stay as the engineering detail; only the verdicts and re-costs in program section 5A.12 change.
+
+## Status update 2026-11-17 (Ubuntu Touch)
+Owner request overrides the proposed no-port line for Ubuntu Touch. Built as a reframe: C0 vectors BUILT-HERE; U1 picker math + QML tests
+BUILT-HERE (desktop Qt 5.15, not a device); U0 verdict OPEN (NEEDS-DEVICE-VALIDATION); U2 demo packaging and the `ubuntu-touch.yml` lane are
+CI-LANE-WRITTEN. Details: `ubuntu-touch/README.md`, `docs/DEVICE_CHECKLIST_UT.md`.

@@ -29,11 +29,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +55,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -195,19 +199,28 @@ fun GlanceSurface(
                 // decoration for accessibility: the keyboard and TalkBack way to the controls is the music line (a button)
                 .clearAndSetSemantics { },
         )
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val cutoutTop = with(density) { WindowInsets.displayCutout.getTop(density).toDp() }
+        val safeTop = with(density) { WindowInsets.safeDrawing.getTop(density).toDp() }
+        val notchHeight = GlanceNotch.heightDp(cutoutTop.value).dp
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             GlanceCentre(prefs, weather, items, w, h, ink, inkDim, onClockTap, Modifier.align(Alignment.Center))
-            // Music at the top: a stable slot (its height is reserved), the line only while something plays.
-            Box(Modifier.align(Alignment.TopCenter).padding(top = 14.dp).height(40.dp)) {
+            // Music at the top: a stable slot (its height is reserved), the line only while something plays. W22: the line always sits below
+            // the notch's bottom edge (the notch hangs over the top of the screen), so it never moves and the notch never covers it.
+            val lineTop = maxOf(14.dp, notchHeight - safeTop + GlanceNotch.LINE_GAP_DP.dp)
+            Box(Modifier.align(Alignment.TopCenter).padding(top = lineTop).height(40.dp)) {
                 if (playing && media != null) {
-                    NowPlayingLine(media, inkDim, !reduced, shown = !pop.visible, onActivate = { tapSurface() })
+                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapSurface() })
                 }
             }
-            if (playing && media != null) {
-                ControlsPill(pop.visible, reduced, media, ink, Modifier.align(Alignment.TopCenter),
-                    onFingerDown = { pop = pop.fingerDown() }, onFingerUp = { pop = pop.fingerUp(SystemClock.uptimeMillis(), hideMs) },
-                    onPrevious = { interact(); onPrevious() }, onPlayPause = { interact(); onPlayPause() }, onNext = { interact(); onNext() })
-            }
+        }
+        // The notch is drawn from y = 0 of the window (behind the status bar and the cutout), outside the safe area.
+        if (playing && media != null) {
+            ControlsNotch(pop.visible, reduced, media, w, cutoutTop, Modifier.align(Alignment.TopCenter),
+                onFingerDown = { pop = pop.fingerDown() }, onFingerUp = { pop = pop.fingerUp(SystemClock.uptimeMillis(), hideMs) },
+                onPrevious = { interact(); onPrevious() }, onPlayPause = { interact(); onPlayPause() }, onNext = { interact(); onNext() })
+        }
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             GlanceHotspotLayer(hotspots, appsByKey, onRun, tint = inkDim)
             if (prefs.glanceIndicator) GlanceIndicator(hasLaunchpad, rightDestinations, awakeNonce, reduced, ink, Modifier.align(Alignment.BottomCenter), onOpenLaunchpad, onOpenRight)
         }
@@ -286,13 +299,13 @@ private fun GlanceCentre(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, shown: Boolean, onActivate: () -> Unit) {
+private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit) {
     var overflow by remember(media.title, media.artist) { mutableStateOf(false) }
     val line = GlanceText.nowPlayingLine(media.title, media.artist)
     val spoken = L10n.tr("Now playing: %s", line)
     val showLabel = L10n.tr("Show playback controls")
     Row(
-        Modifier.widthIn(max = 280.dp).graphicsLayer { alpha = if (shown) 1f else 0f }
+        Modifier.widthIn(max = 280.dp)
             .launcherItem("glance.nowplaying", focusable = true, onActivate = onActivate, ringRadiusDp = 16f)
             .clickable(onClickLabel = showLabel, role = Role.Button, onClick = onActivate)
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -310,12 +323,15 @@ private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, show
 }
 
 /**
- * The notch-like black pill that drops from the top edge: Previous, Play/Pause and Next (48 dp targets) above the title. A spring
- * scale and translate (about 250 ms); with reduced motion a fade. It stays composed only while it is on or animating out.
+ * The controls notch (W22): a black tab that hangs from the very top edge of the window (drawn from y = 0, behind the status bar and
+ * the display cutout), its top corners flaring out in concave curves and its bottom corners rounded. It holds only Previous,
+ * Play/Pause and Next as thin outline glyphs (48 dp targets, below the cutout); the title stays in the now-playing line under it.
+ * Drops from above the edge with a spring (about 250 ms) and retracts the same way; reduced motion is a fade. Composed only while on
+ * or animating out. [cutoutTop] pushes the icons down, never the shape.
  */
 @Composable
-private fun ControlsPill(
-    visible: Boolean, reduced: Boolean, media: MediaInfo, ink: Color, modifier: Modifier,
+internal fun ControlsNotch(
+    visible: Boolean, reduced: Boolean, media: MediaInfo, areaWidthDp: Float, cutoutTop: Dp, modifier: Modifier,
     onFingerDown: () -> Unit, onFingerUp: () -> Unit, onPrevious: () -> Unit, onPlayPause: () -> Unit, onNext: () -> Unit,
 ) {
     val fingerDown by androidx.compose.runtime.rememberUpdatedState(onFingerDown)
@@ -325,55 +341,60 @@ private fun ControlsPill(
     LaunchedEffect(visible, reduced) {
         if (visible) {
             composed = true
-            if (reduced) progress.animateTo(1f, tween(120)) else progress.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = 520f))
+            if (reduced) progress.animateTo(1f, tween(120)) else progress.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 420f))
         } else {
-            if (reduced) progress.animateTo(0f, tween(90)) else progress.animateTo(0f, tween(160))
+            if (reduced) progress.animateTo(0f, tween(90)) else progress.animateTo(0f, tween(180))
             composed = false
         }
     }
     if (!composed) return
-    Column(
+    val height = GlanceNotch.heightDp(cutoutTop.value).dp
+    Box(
         modifier.graphicsLayer {
             val p = progress.value
-            if (reduced) alpha = p.coerceIn(0f, 1f) else {
-                alpha = (p * 2f).coerceIn(0f, 1f)
-                val s = 0.72f + 0.28f * p
-                scaleX = s; scaleY = s
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
-                translationY = -(1f - p) * size.height
-            }
+            if (reduced) alpha = p.coerceIn(0f, 1f) else translationY = -(1f - p) * height.toPx()
         }
-            .widthIn(min = 232.dp, max = 320.dp)
-            .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp)).background(Color.Black)
-            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
+            .testTag("glance.notch")
+            // The box is as tall as the 48 dp targets need; the black shape is drawn only down to the notch's own bottom edge.
+            .width(GlanceNotch.widthDp(areaWidthDp).dp).height(cutoutTop + GlanceNotch.TARGET_DP.dp)
+            .drawBehind {
+                val path = NotchShape.path(size.width, height.toPx(), GlanceNotch.FLARE_DP.dp.toPx(), GlanceNotch.CORNER_DP.dp.toPx())
+                drawPath(path, Color.Black)
+                // The one allowed extra: a hairline lighter edge so the black tab still reads on a black surface.
+                drawPath(path, Color.White.copy(alpha = 0.16f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
+            }
             .pointerInput(Unit) { awaitEachGesture {
-                // A finger on the pill (even one a button consumed) holds the timer; lifting it restarts the timer.
+                // A finger on the notch (even one a button consumed) holds the timer; lifting it restarts the timer.
                 awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial); fingerDown()
                 do { val ev = awaitPointerEvent(PointerEventPass.Final) } while (ev.changes.any { it.pressed })
                 fingerUp()
-            } }
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            } },
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            GlanceControlButton("glance.prev", MediaGlyphs.Previous, L10n.tr("Previous track"), media.canPrev, onPrevious)
-            GlanceControlButton("glance.playpause", if (media.playing) MediaGlyphs.Pause else MediaGlyphs.Play, if (media.playing) L10n.tr("Pause") else L10n.tr("Play"), true, onPlayPause, big = true)
-            GlanceControlButton("glance.next", MediaGlyphs.Next, L10n.tr("Next track"), media.canNext, onNext)
-        }
-        Text(GlanceText.nowPlayingDisplay(media.title, media.artist), color = Color.White.copy(alpha = 0.78f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 8.dp, top = 2.dp))
+        // The three 48 dp targets, evenly spread over the straight body, starting below the cutout. A target is taller than the 32 dp
+        // body below the cutout; its icon sits in the upper part, the spare height is only touch area (inside this Box's bounds).
+        // Transport order is not mirrored in right-to-left (rewind left, forward right, like every player).
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { Row(
+            Modifier.padding(top = cutoutTop, start = GlanceNotch.FLARE_DP.dp, end = GlanceNotch.FLARE_DP.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Top,
+        ) {
+            GlanceControlButton("glance.prev", OutlineMediaGlyphs.Rewind, L10n.tr("Previous"), media.canPrev, onPrevious)
+            GlanceControlButton("glance.playpause", if (media.playing) OutlineMediaGlyphs.Pause else OutlineMediaGlyphs.Play, if (media.playing) L10n.tr("Pause") else L10n.tr("Play"), true, onPlayPause)
+            GlanceControlButton("glance.next", OutlineMediaGlyphs.Forward, L10n.tr("Next"), media.canNext, onNext)
+        } }
     }
 }
 
 @Composable
-private fun GlanceControlButton(id: String, glyph: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit, big: Boolean = false) {
+private fun GlanceControlButton(id: String, glyph: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.size(48.dp).clip(CircleShape)
+        Modifier.size(GlanceNotch.TARGET_DP.dp).clip(CircleShape)
+            .testTag(id)
             .launcherItem(id, focusable = enabled, onActivate = onClick, ringRadiusDp = 24f)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label }
             .graphicsLayer { alpha = if (enabled) 1f else 0.35f },
-        contentAlignment = Alignment.Center,
-    ) { Icon(glyph, null, tint = Color.White, modifier = Modifier.size(if (big) 26.dp else 22.dp)) }
+        contentAlignment = Alignment.TopCenter,
+    ) { Icon(glyph, null, tint = Color.White, modifier = Modifier.padding(top = GlanceNotch.ICON_TOP_DP.dp).size(GlanceNotch.ICON_DP.dp)) }
 }
 
 /**

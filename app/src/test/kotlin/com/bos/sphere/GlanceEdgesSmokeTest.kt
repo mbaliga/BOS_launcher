@@ -78,7 +78,7 @@ class GlanceEdgesSmokeTest {
     @Test fun STR_01_theEdgeSwipeWorksWhileTheMusicControlsArePoppedIn() {
         startFresh(); MediaNow.publishForTest(track); settle()
         rule.onRoot().performTouchInput { click(Offset(width * 0.5f, height * 0.72f)) }; settle(300)
-        assertTrue("controls are in", rule.onAllNodesWithContentDescriptionCount("Next track") > 0)
+        assertTrue("controls are in", rule.onAllNodesWithContentDescriptionCount("Next") > 0)
         swipeFromLeft(); assertTrue(launchpadShown())
     }
     @Test fun STR_01_aSwipeStartingAtAHotspotCornerOnTheLeftEdgeOpensLaunchpad() {

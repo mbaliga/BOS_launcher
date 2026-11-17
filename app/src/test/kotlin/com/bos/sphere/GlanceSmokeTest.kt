@@ -66,7 +66,7 @@ class GlanceSmokeTest {
     private fun settle(ms: Long = 1500) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Snapshot.sendApplyNotifications(); rule.mainClock.advanceTimeBy(ms); org.robolectric.shadows.ShadowLooper.idleMainLooper(); rule.mainClock.advanceTimeBy(ms) }
     private fun graphIds() = LauncherInput.focus.nodes().map { it.id }
     private fun hotspotCount() = graphIds().count { it.startsWith("minimal.corner.") }
-    private fun controlsShown() = rule.onAllNodesWithContentDescription("Next track").fetchSemanticsNodes().isNotEmpty()
+    private fun controlsShown() = rule.onAllNodesWithContentDescription("Next").fetchSemanticsNodes().isNotEmpty()
     private val track = MediaInfo("Someday Out of The Blue", "Artist", "pkg.music", playing = true, canPrev = true, canNext = true)
 
     @Test fun HOM_23_aFreshStateLandsOnTheGlanceHomeWithTheClockAndFourHotspotsAndNoHint() {

@@ -95,7 +95,7 @@ class GlanceHomeUiTest {
 
     private fun tag(t: String) = rule.onNodeWithTag(t, useUnmergedTree = true)
     private fun visible(desc: String) = rule.onAllNodesWithContentDescription(desc).fetchSemanticsNodes().isNotEmpty()
-    private fun controlsShown() = visible("Next track")
+    private fun controlsShown() = visible("Next")
 
     // ---- the centre
 
@@ -183,7 +183,7 @@ class GlanceHomeUiTest {
         assertFalse(controlsShown())
         rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
         rule.mainClock.advanceTimeBy(600)
-        assertTrue("controls pop in", controlsShown() && visible("Previous track") && visible("Pause"))
+        assertTrue("controls pop in", controlsShown() && visible("Previous") && visible("Pause"))
         shoot("portrait_controls")
         rule.mainClock.advanceTimeBy(3000)
         assertTrue("still there before the timeout", controlsShown())
@@ -199,7 +199,7 @@ class GlanceHomeUiTest {
         rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
         rule.mainClock.advanceTimeBy(600)
         rule.mainClock.advanceTimeBy(3000)
-        rule.onNodeWithContentDescription("Next track").performClick()
+        rule.onNodeWithContentDescription("Next").performClick()
         assertEquals(1, clicks[3])
         rule.mainClock.advanceTimeBy(3000)
         assertTrue("the press restarted the timer", controlsShown())

@@ -59,6 +59,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -138,6 +139,9 @@ fun GlanceSurface(
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Wave 17: the indicator's Launchpad glyph and its right-hand dots are real buttons. */
+    onOpenLaunchpad: () -> Unit = {},
+    onOpenRight: () -> Unit = {},
     gestures: HomeGestureSpec? = null,
     dark: Boolean = isDarkSurface(),
     underlay: @Composable () -> Unit = {},
@@ -192,7 +196,7 @@ fun GlanceSurface(
                     onPrevious = { interact(); onPrevious() }, onPlayPause = { interact(); onPlayPause() }, onNext = { interact(); onNext() })
             }
             GlanceHotspotLayer(hotspots, appsByKey, onRun, tint = inkDim)
-            if (prefs.glanceIndicator) GlanceIndicator(hasLaunchpad, rightDestinations, awakeNonce, reduced, ink, Modifier.align(Alignment.BottomCenter))
+            if (prefs.glanceIndicator) GlanceIndicator(hasLaunchpad, rightDestinations, awakeNonce, reduced, ink, Modifier.align(Alignment.BottomCenter), onOpenLaunchpad, onOpenRight)
         }
     }
 }
@@ -347,31 +351,43 @@ private fun GlanceControlButton(id: String, glyph: ImageVector, label: String, e
     ) { Icon(glyph, null, tint = Color.White, modifier = Modifier.size(if (big) 26.dp else 22.dp)) }
 }
 
-/** The small, quiet row at the bottom centre: Launchpad (list glyph), home (current, brighter), the right-side dots. Mirrors in RTL. */
+/**
+ * The small, quiet row at the bottom centre: Launchpad (list glyph), home (current, brighter, not interactive), the right-side dots.
+ * Wave 17: the list glyph and each dot are buttons (48 dp targets, labels) that open Launchpad and the right-hand destination.
+ * Mirrors in RTL.
+ */
 @Composable
-internal fun GlanceIndicator(hasLaunchpad: Boolean, right: List<RightDestination>, awakeNonce: Int, reduced: Boolean, ink: Color, modifier: Modifier = Modifier) {
+internal fun GlanceIndicator(
+    hasLaunchpad: Boolean, right: List<RightDestination>, awakeNonce: Int, reduced: Boolean, ink: Color, modifier: Modifier = Modifier,
+    onOpenLaunchpad: () -> Unit = {}, onOpenRight: () -> Unit = {},
+) {
     var awake by remember { mutableStateOf(true) }
     LaunchedEffect(awakeNonce) { awake = true; delay(4000); awake = false }
     val a by animateFloatAsState(if (awake) 1f else 0.38f, tween(if (reduced) 0 else 600), label = "glanceIndicator")
-    val spoken = buildString {
-        append(L10n.tr("Glance home"))
-        if (hasLaunchpad) append(". ").append(L10n.tr("Launchpad is on the left edge"))
-        // Honest wording: say what the right edge really is (the recents panel or the dock rail), not always "recent apps".
-        for (d in right) append(". ").append(L10n.tr(if (d == RightDestination.Recents) "Recent apps are on the right edge" else "Dock is on the right edge"))
-    }
     Row(
-        modifier.padding(bottom = 18.dp).graphicsLayer { alpha = a }.semantics { contentDescription = spoken }.clearAndSetSemanticsKeep(spoken),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier.padding(bottom = 4.dp).graphicsLayer { alpha = a },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (hasLaunchpad) Icon(Glyphs.Menu, null, tint = ink.copy(alpha = 0.55f), modifier = Modifier.size(16.dp))
-        Icon(Glyphs.Home, null, tint = ink, modifier = Modifier.size(18.dp))
-        if (right.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-            for (d in right) Box(Modifier.size(5.dp).background(ink.copy(alpha = 0.55f), CircleShape))
+        if (hasLaunchpad) IndicatorButton("glance.indicator.launchpad", L10n.tr("Open Launchpad"), onOpenLaunchpad) { Icon(Glyphs.Menu, null, tint = ink.copy(alpha = 0.55f), modifier = Modifier.size(16.dp)) }
+        // The current surface: not interactive, one spoken line.
+        Box(Modifier.size(32.dp).semantics { contentDescription = L10n.tr("Glance home") }, contentAlignment = Alignment.Center) { Icon(Glyphs.Home, null, tint = ink, modifier = Modifier.size(18.dp)) }
+        for (d in right) {
+            val label = L10n.tr(if (d == RightDestination.Recents) "Open recents" else "Show the dock")
+            IndicatorButton("glance.indicator.right.${d.name}", label, onOpenRight) { Box(Modifier.size(5.dp).background(ink.copy(alpha = 0.55f), CircleShape)) }
         }
     }
 }
 
-private fun Modifier.clearAndSetSemanticsKeep(text: String): Modifier = this.clearAndSetSemantics { contentDescription = text }
+@Composable
+private fun IndicatorButton(tag: String, label: String, onClick: () -> Unit, glyph: @Composable () -> Unit) {
+    Box(
+        Modifier.size(48.dp).clip(CircleShape).testTag(tag)
+            .launcherItem(tag, focusable = true, onActivate = onClick, ringRadiusDp = 24f)
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) { glyph() }
+}
 
 /** The hotspots: [MinimalHotspotLayer] with the assigned action's glyph drawn in each corner. */
 @Composable

@@ -122,16 +122,16 @@ fun rememberLaunchpadReveal(open: Boolean, onOpenChange: (Boolean) -> Unit): Lau
  * Drag from the screen edge the notifications sit beside (the left edge; the right edge when [mirrored], i.e. right-to-left):
  * the card follows the finger; a partial drag peeks and springs back.
  */
-fun Modifier.launchpadEdgeDrag(state: LaunchpadRevealState, enabled: Boolean, slideDp: Float, mirrored: Boolean = false): Modifier =
-    if (!enabled) this else this.pointerInput(state, slideDp, mirrored) { revealGestures(state, slideDp, closing = false, mirrored = mirrored) }
+fun Modifier.launchpadEdgeDrag(state: LaunchpadRevealState, enabled: Boolean, slideDp: Float, mirrored: Boolean = false, edgeDp: Float = RevealMath.EDGE_DP): Modifier =
+    if (!enabled) this else this.pointerInput(state, slideDp, mirrored, edgeDp) { revealGestures(state, slideDp, closing = false, mirrored = mirrored, edgeDp = edgeDp) }
 
 /** Drag the card back towards its home edge: Launchpad closes live. */
 fun Modifier.launchpadCloseDrag(state: LaunchpadRevealState, slideDp: Float, mirrored: Boolean = false): Modifier =
     this.pointerInput(state, slideDp, mirrored) { revealGestures(state, slideDp, closing = true, mirrored = mirrored) }
 
-private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGestures(state: LaunchpadRevealState, slideDp: Float, closing: Boolean, mirrored: Boolean) {
+private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.revealGestures(state: LaunchpadRevealState, slideDp: Float, closing: Boolean, mirrored: Boolean, edgeDp: Float = RevealMath.EDGE_DP) {
     val slidePx = slideDp * density
-    val edgePx = RevealMath.EDGE_DP * density
+    val edgePx = edgeDp * density
     try {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)

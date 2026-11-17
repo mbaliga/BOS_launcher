@@ -50,8 +50,7 @@ object HomeLandingRules {
     /** The grid, list, XMB or DSi style applies to every landing except Minimal. */
     fun usesHomeStyle(l: HomeLanding): Boolean = l != HomeLanding.Minimal
 
-    /** Clock, status strip, dock, page dots and tiles: none of them on Minimal. */
-    fun showsChrome(l: HomeLanding): Boolean = l != HomeLanding.Minimal
+    // Wave 17: showsChrome is gone; which element each landing draws is the explicit table in HomeChromeRules (HomeChrome.kt).
 
     /** The four hotspots are the only controls on Minimal; the other landings keep their usual corners. */
     fun isHotspotOnly(l: HomeLanding): Boolean = l == HomeLanding.Minimal

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -24,6 +25,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,7 +46,7 @@ import java.time.ZoneId
  * and a tap opens Launchpad.
  */
 @Composable
-fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier, quiet: Boolean = false) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     remember(ctx) { LaunchpadSettings.init(ctx); true }
     val items by NotificationProvider.notifications.collectAsStateWithLifecycle(remember { NotificationProvider.snapshot })
@@ -77,6 +79,7 @@ fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier)
         if (access) waiting.size else 0, headline, onOpen, modifier,
         priorityCount = if (access) priority?.count ?: 0 else 0,
         accent = priority?.takeIf { it.count > 0 }?.let { p -> p.accentArgb?.let { Color(it) } ?: BlueDark },
+        quiet = quiet,
     )
 }
 
@@ -106,9 +109,28 @@ fun WaitingIndicatorView(
     count: Int, headline: String?, onOpen: () -> Unit, modifier: Modifier = Modifier,
     /** STR-13: how many of the waiting items sit in Priority groups, and the colour to tint the indicator with (null: the usual blue). */
     priorityCount: Int = 0, accent: Color? = null,
+    /** Wave 17 (HOM-23): the Glance form: a small dot (a 48 dp target around it) in the group accent, no count and no headline. */
+    quiet: Boolean = false,
 ) {
     if (count <= 0) return
     val desc = if (priorityCount > 0) L10n.tr("%d waiting, %d priority. Launchpad", count, priorityCount) else L10n.tr("%d waiting. Launchpad", count)
+    if (quiet) {
+        val dot = if (priorityCount > 0 && accent != null) lpAccentFill(accent) else Color(0xFF3FA7E8)
+        androidx.compose.foundation.layout.Box(
+            modifier.focusProperties { canFocus = false }
+                .testTag("glance.waiting")
+                .semantics { contentDescription = desc; onClick(label = L10n.tr("Open")) { onOpen(); true } }
+                .pointerInput(Unit) { detectTapGestures { onOpen() } }
+                .width(48.dp).heightIn(min = 48.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.padding(start = 3.dp).width(if (priorityCount > 0) 8.dp else 6.dp).height(if (priorityCount > 0) 8.dp else 6.dp)
+                    .background(dot.copy(alpha = 0.9f), androidx.compose.foundation.shape.CircleShape),
+            )
+        }
+        return
+    }
     // The indicator hugs the physical left edge, where Launchpad opens from, so it is laid out left to right in every language.
     androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr) {
     Row(

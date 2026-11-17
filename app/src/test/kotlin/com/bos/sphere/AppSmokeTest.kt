@@ -381,7 +381,7 @@ class AppSmokeTest {
         assertTrue(graphIds().any { it.startsWith("dock.app:") })
         setLanding(com.bos.sphere.core.data.HomeLanding.Minimal)
         val ids = graphIds()
-        assertEquals("exactly the clock and the four hotspots are on the focus graph", setOf("glance.clock", "minimal.corner.TopLeft", "minimal.corner.TopRight", "minimal.corner.BottomLeft", "minimal.corner.BottomRight"), ids.toSet())
+        assertEquals("exactly the clock, the four hotspots and (wave 17) the two indicator buttons are on the focus graph", setOf("glance.clock", "glance.indicator.launchpad", "glance.indicator.right.Recents", "minimal.corner.TopLeft", "minimal.corner.TopRight", "minimal.corner.BottomLeft", "minimal.corner.BottomRight"), ids.toSet())
         assertFalse("no dock", ids.any { it.startsWith("dock.") })
         for (l in listOf("Alpha", "Bravo", "Delta")) assertFalse("no tile for $l", showsLabel(l)) // wave 16: Camera is the top left hotspot's own action, so its name is on screen
         for (d in listOf("Top left hotspot", "Top right hotspot", "Bottom left hotspot", "Bottom right hotspot")) rule.onNodeWithContentDescription(d, substring = true).assertIsDisplayed()

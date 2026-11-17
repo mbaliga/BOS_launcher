@@ -95,10 +95,10 @@ class HomeLandingTest {
     }
 
     @Test fun HOM_22_minimalDrawsNoChromeAndOnlyAllAppsHasTheIndexAndFilter() {
-        assertFalse(HomeLandingRules.showsChrome(HomeLanding.Minimal))
+        // Wave 17: showsChrome was removed (it hid the Launchpad handle on Glance); the per-element table is tested in HomeChromeRulesTest.
         assertFalse(HomeLandingRules.usesHomeStyle(HomeLanding.Minimal))
         assertTrue(HomeLandingRules.isHotspotOnly(HomeLanding.Minimal))
-        for (l in listOf(HomeLanding.Selected, HomeLanding.Recents, HomeLanding.AllApps)) { assertTrue(HomeLandingRules.showsChrome(l)); assertTrue(HomeLandingRules.usesHomeStyle(l)) }
+        for (l in listOf(HomeLanding.Selected, HomeLanding.Recents, HomeLanding.AllApps)) { assertTrue(HomeLandingRules.usesHomeStyle(l)) }
         assertEquals(listOf(HomeLanding.AllApps), HomeLanding.entries.filter { HomeLandingRules.hasAlphabetIndex(it) && HomeLandingRules.hasTypeToFilter(it) && HomeLandingRules.hasProfileTabs(it) })
         assertEquals(listOf(HomeLanding.Recents), HomeLanding.entries.filter { HomeLandingRules.hasRecentsMenu(it) })
         assertTrue(HomeLandingRules.showsEmptyHomeHint(HomeLanding.Selected, true))

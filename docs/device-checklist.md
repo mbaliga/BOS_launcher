@@ -199,3 +199,17 @@ Nothing here has been confirmed on a device. Compare with the owner's screenshot
 - [ ] HOM-23, INP-16, INP-17: Hotspots Four, Two, One, None; a disabled corner draws nothing and tapping or resting a mouse there does nothing; with None the edge swipes, long press (quick sheet with Glance content, Hotspots, Background, Landing, Edit home pages) and keyboard shortcuts still work. Tab and arrows reach each enabled hotspot.
 - [ ] HOM-23, NFR-13: TalkBack order: clock, date, weather, now playing, controls (after the tap, or Enter on the music line), hotspots; the indicator reads once.
 - [ ] HOM-23: light theme (quiet light surface, dark type), Arabic (indicator and panels mirror, the clock digits do not), font size 200 percent and large display size (the clock grows, the date wraps, nothing touches the hotspots or the music line).
+
+## Glance edges (wave 17, HOM-23, STR-01, STR-09, STR-14, INP-08, NFR-13, NFR-20)
+
+Nothing here has been confirmed on a device. Owner bug report on build 48: "The glance needs to have launchpad on the left. Why is that missing?" Decisions: `docs/decisions/glanceEdges.md`. Robolectric renders: `feature-grid/build/screenshots/glance_handles_*.png`.
+
+- [ ] STR-01, HOM-23, NFR-20: gesture navigation phone, Glance home: drag in from the PHYSICAL left edge. Record what happens: the system back gesture zone (about 24 to 30 dp) can take the first dp and cancel the stream; the Glance edge zone is 48 dp so a swipe that starts a little further in (where the handle is) should open Launchpad. NFR-20 forbids `systemGestureExclusion`, so the launcher never claims the zone. Note the dp at which the swipe starts to work, per device.
+- [ ] STR-01, HOM-23: the handle tap is the reliable path: tap the slim bar on the left edge (48 dp wide, 160 dp tall, centred): Launchpad opens. Same with three-button navigation.
+- [ ] HOM-23: the left and right handles are barely there: visible at low alpha after a touch, almost invisible after about 4 seconds, back on any touch; with Remove animations on they change instantly. Pure black surface still reads calm next to the owner's references.
+- [ ] STR-09, STR-13, HOM-23: with notification access on and an unread notification, a small dot shows above the left handle (the group colour and a star for a Priority group); tap it opens Launchpad; nothing waiting, no dot.
+- [ ] HOM-23: tap the list glyph at the bottom centre (Launchpad) and the right-hand dot: Launchpad and the recents panel open; the home glyph does nothing; each target is 48 dp (TalkBack: "Open Launchpad", "Open recents", "Glance home").
+- [ ] STR-14, HOM-23: drag in from the right edge, and tap the right handle: recents opens. Right side set to Dock rail or Off: no right handle.
+- [ ] STR-01: Launchpad set to Off in Ground Control: no left handle, dot or indicator glyph; the edge swipe does nothing; nothing looks dead. Rail setting on: the rail shows on Glance as on the other landings.
+- [ ] STR-01, STR-14, RTL: Arabic: the Launchpad handle and swipe are on the RIGHT edge, recents on the LEFT; the indicator mirrors.
+- [ ] HOM-23, NFR-13: TalkBack: swipe to the handles (focusable buttons labelled "Open Launchpad" and "Open recents"), double tap opens; with a keyboard Tab reaches the indicator buttons.

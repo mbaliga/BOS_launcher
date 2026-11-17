@@ -81,6 +81,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import com.bos.sphere.core.data.ChromeElement
+import com.bos.sphere.feature.grid.glanceWakeOnTouch
+import com.bos.sphere.core.data.HomeChromeRules
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -912,6 +916,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     )
     val rightSlideDp = revealSlideDp
     val recentsEnabled = prefs.rightSide == com.bos.sphere.core.data.RightSide.RecentsPanel
+    val chromeSettings = com.bos.sphere.core.data.ChromeSettings.of(prefs) // wave 17: the per-landing chrome table
+    val glanceWake = remember { mutableIntStateOf(0) } // wave 17: any touch wakes the quiet Glance handles
     LaunchedEffect(leftOpen) { if (leftOpen) rightOpen = false }
     LaunchedEffect(rightOpen) { if (rightOpen) leftOpen = false }
     LaunchedEffect(recentsEnabled) { if (!recentsEnabled) rightOpen = false }
@@ -940,8 +946,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     Box(
         modifier = Modifier.fillMaxSize().onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { homeEdit.exit(); true } else false }.trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
-            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !rightOpen, revealSlideDp, mirrored = launchpadRtl)
-            .launchpadEdgeDrag(rightReveal, recentsEnabled && !leftOpen, rightSlideDp, mirrored = !launchpadRtl)
+            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !rightOpen, revealSlideDp, mirrored = launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
+            .launchpadEdgeDrag(rightReveal, recentsEnabled && !leftOpen, rightSlideDp, mirrored = !launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
+            .glanceWakeOnTouch { glanceWake.intValue++ }
             .rightEdgeSwipe(prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail && !leftOpen, rtl = launchpadRtl) { openRecents() }
             .leftSwipe(
             enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && !rightOpen && !launchpadRtl &&
@@ -1045,6 +1052,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() },
                             onNext = { com.bos.sphere.core.data.MediaNow.next() },
                             gestures = homeGestureSpec,
+                            onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true },
+                            onOpenRight = { openRecents() },
                             underlay = { Background(baseFill = false) },
                         )
                     }
@@ -1174,7 +1183,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // Media controls: a track + prev / play / next strip while something is playing.
         androidx.compose.animation.AnimatedVisibility(
-            visible = mediaInfo != null && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
+            visible = mediaInfo != null && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && HomeChromeRules.shows(landing, ChromeElement.MediaStrip, chromeSettings.copy(mediaControls = true)),
             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
             exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
@@ -1193,7 +1202,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
-            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && (landing != HomeLanding.Glance || prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail), // HOM-12, HOM-23: no dock on Glance unless the right side is the dock rail: the dock steps aside while the home is a card
+            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.Dock, chromeSettings), // HOM-12, HOM-23: no dock on Glance unless the right side is the dock rail: the dock steps aside while the home is a card
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,
@@ -1202,7 +1211,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
-            visible = prefs.mediaControls && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
+            visible = HomeChromeRules.shows(landing, ChromeElement.MediaStrip, chromeSettings) && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen,
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         )
 
@@ -1212,14 +1221,24 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val leftEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) 1f else -1f, 0f)
         // The way into the left page on every home style: the unread strip, plus a slim edge handle
         // (tap it, or swipe in from the left edge) so it is always discoverable.
-        // HOM-22: Minimal draws no rail, handle or waiting dot; the edge swipe still opens Launchpad.
-        if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && HomeLandingRules.showsChrome(landing)) {
-            if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && prefs.launchpadRail) {
+        // Wave 17 (owner bug report on build 48): every landing draws its handles from the explicit table HomeChromeRules; Glance draws the quiet form
+        // (low alpha, fading when idle, a dot instead of the pill) and no rail unless the rail setting is on.
+        val quietLeft = HomeChromeRules.quiet(landing, ChromeElement.LeftHandle)
+        val glanceMotionReduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+        if (!leftOpen && HomeChromeRules.shows(landing, ChromeElement.LeftHandle, chromeSettings)) {
+            if (HomeChromeRules.shows(landing, ChromeElement.Rail, chromeSettings)) {
                 com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge))
             }
-            if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad && !prefs.launchpadRail) {
-                com.bos.sphere.ui.LaunchpadWaitingIndicator(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge).padding(bottom = 260.dp))
+            if (HomeChromeRules.shows(landing, ChromeElement.WaitingIndicator, chromeSettings)) {
+                if (quietLeft) com.bos.sphere.ui.LaunchpadWaitingIndicator(onOpen = { leftOpen = true }, quiet = true, modifier = Modifier.align(leftEdge).offset(y = (-(HomeChromeRules.HANDLE_HEIGHT_DP / 2f + 20f)).dp))
+                else com.bos.sphere.ui.LaunchpadWaitingIndicator(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge).padding(bottom = 260.dp))
             }
+            if (quietLeft) {
+                com.bos.sphere.feature.grid.GlanceEdgeHandle(
+                    label = L10n.tr("Open Launchpad"), tag = "glance.handle.left", rightEdge = launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = Color.White,
+                    onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge),
+                )
+            } else {
             Box(
                 Modifier.align(leftEdge).absolutePadding(left = 2.dp).width(5.dp).height(64.dp)
                     .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
@@ -1235,11 +1254,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         role = Role.Button,
                     ) { leftOpen = true },
             )
+            }
         }
 
-        // STR-14: the right-hand handle (a slim bar, tap it or swipe in from the right edge). Physical right edge; the left in right-to-left. Not on Minimal.
-        if (recentsEnabled && !rightOpen && !leftOpen && HomeLandingRules.showsChrome(landing)) {
+        // STR-14: the right-hand handle (a slim bar, tap it or swipe in from the right edge). Physical right edge; the left in right-to-left.
+        if (!rightOpen && !leftOpen && HomeChromeRules.shows(landing, ChromeElement.RightHandle, chromeSettings)) {
             val rightEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) -1f else 1f, 0f)
+            if (HomeChromeRules.quiet(landing, ChromeElement.RightHandle)) {
+                com.bos.sphere.feature.grid.GlanceEdgeHandle(
+                    label = L10n.tr("Open recents"), tag = "recents.handle", rightEdge = !launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = Color.White,
+                    onOpen = { openRecents() }, modifier = Modifier.align(rightEdge),
+                )
+            } else {
             Box(
                 Modifier.align(rightEdge).absolutePadding(right = if (launchpadRtl) 0.dp else 2.dp, left = if (launchpadRtl) 2.dp else 0.dp).width(5.dp).height(64.dp)
                     .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
@@ -1249,6 +1275,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     .semantics { contentDescription = L10n.tr("Open recents") }
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = L10n.tr("Open recents"), role = Role.Button) { openRecents() },
             )
+            }
         }
 
         // Old-school mode: an always-open keyboard that searches as you type.
@@ -1598,7 +1625,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             val reg = com.bos.sphere.core.catalog.WorkProfileState.start(context)
             onDispose { reg.close() }
         }
-        if (workPaused != null && !homeEdit.active && HomeLandingRules.showsChrome(landing)) {
+        if (workPaused != null && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.WorkPausedBanner, chromeSettings)) {
             Box(Modifier.fillMaxSize().safeDrawingPadding().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
                 com.bos.sphere.feature.grid.WorkPauseChip(workPaused, onToggle = { com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, workPaused != true) })
             }

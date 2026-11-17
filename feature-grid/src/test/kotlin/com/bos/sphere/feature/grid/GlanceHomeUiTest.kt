@@ -10,6 +10,8 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -280,21 +282,122 @@ class GlanceHomeUiTest {
 
     // ---- the indicator and the weather
 
+    // Wave 17 (owner bug report on build 48): the indicator's list glyph and right-hand dots are real 48 dp buttons; the current surface is not.
+    // Was: one merged spoken line "Glance home. Launchpad is on the left edge. Recent apps are on the right edge" that nothing could press.
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_theIndicatorReadsOnceAndCanBeTurnedOff() {
+    fun HOM_23_theIndicatorButtonsOpenLaunchpadAndTheRightSideAndTheHomeGlyphIsNotInteractive() {
         val on = androidx.compose.runtime.mutableStateOf(true)
+        val opened = ArrayList<String>()
         rule.setContent {
             GlanceSurface(
                 prefs = LauncherPrefs(glanceIndicator = on.value), weather = null, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
                 rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
                 onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
+                onOpenLaunchpad = { opened += "launchpad" }, onOpenRight = { opened += "right" },
             )
         }
-        val spoken = "Glance home. Launchpad is on the left edge. Recent apps are on the right edge"
-        assertEquals(1, rule.onAllNodesWithContentDescription(spoken).fetchSemanticsNodes().size)
+        val lp = tag("glance.indicator.launchpad"); val rt = tag("glance.indicator.right.Recents")
+        lp.assertIsDisplayed(); rt.assertIsDisplayed()
+        for (n in listOf(lp, rt)) { val b = n.fetchSemanticsNode().boundsInRoot; assertTrue("48 dp target", b.width >= 48f * 2f - 1f && b.height >= 48f * 2f - 1f) }
+        assertEquals(1, rule.onAllNodesWithContentDescription("Open Launchpad").fetchSemanticsNodes().size)
+        assertEquals(1, rule.onAllNodesWithContentDescription("Open recents").fetchSemanticsNodes().size)
+        rule.onNodeWithContentDescription("Glance home").assertHasNoClickAction()
+        lp.performClick(); rt.performClick()
+        assertEquals(listOf("launchpad", "right"), opened)
+        assertTrue("both are focus nodes", LauncherInput.focus.nodes().map { it.id }.containsAll(listOf("glance.indicator.launchpad", "glance.indicator.right.Recents")))
         Snapshot.withMutableSnapshot { on.value = false }
         rule.waitForIdle()
-        assertFalse(visible(spoken))
+        assertFalse(visible("Open Launchpad")); assertFalse(visible("Open recents")); assertFalse(visible("Glance home"))
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_23_theDockRailDestinationDotIsAButtonToo() {
+        val opened = ArrayList<String>()
+        rule.setContent {
+            GlanceSurface(
+                prefs = LauncherPrefs(), weather = null, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
+                rightDestinations = listOf(RightDestination.Dock), hasLaunchpad = false,
+                onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(), onOpenRight = { opened += "right" },
+            )
+        }
+        assertFalse("Launchpad off: no Launchpad glyph", visible("Open Launchpad"))
+        rule.onNodeWithContentDescription("Show the dock").performClick()
+        assertEquals(listOf("right"), opened)
+    }
+
+    // ---- the quiet edge handles (wave 17)
+
+    private fun handles(rtl: Boolean, wake: androidx.compose.runtime.MutableIntState, taps: MutableList<String>, dark: Boolean = true) = rule.setContent {
+        CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            Box(Modifier.fillMaxSize()) {
+                GlanceSurface(
+                    prefs = LauncherPrefs(), weather = null, media = null, hotspots = hotspots(), appsByKey = emptyMap(), rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
+                    onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, dark = dark, modifier = Modifier.fillMaxSize(),
+                )
+                val tint = if (dark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black
+                val red = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+                GlanceEdgeHandle("Open Launchpad", "glance.handle.left", rightEdge = rtl, wake = { wake.intValue }, reduced = red, tint = tint, onOpen = { taps += "left" },
+                    modifier = Modifier.align(androidx.compose.ui.BiasAbsoluteAlignment(if (rtl) 1f else -1f, 0f)))
+                GlanceEdgeHandle("Open recents", "recents.handle", rightEdge = !rtl, wake = { wake.intValue }, reduced = red, tint = tint, onOpen = { taps += "right" },
+                    modifier = Modifier.align(androidx.compose.ui.BiasAbsoluteAlignment(if (rtl) -1f else 1f, 0f)))
+            }
+        }
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_23_theQuietHandlesAre48By160FocusableLabelledAndTapOpen() {
+        val taps = ArrayList<String>(); val wake = androidx.compose.runtime.mutableIntStateOf(0)
+        handles(false, wake, taps)
+        for ((t, d) in listOf("glance.handle.left" to "Open Launchpad", "recents.handle" to "Open recents")) {
+            val b = tag(t).fetchSemanticsNode().boundsInRoot
+            assertEquals("$t is 48 dp wide", 48f * 2f, b.width, 1f)
+            assertEquals("$t is 160 dp tall", 160f * 2f, b.height, 1f)
+            assertTrue(d, rule.onAllNodesWithContentDescription(d).fetchSemanticsNodes().isNotEmpty())
+            tag(t).assertHasClickAction()
+        }
+        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals("left handle on the physical left edge", 0f, tag("glance.handle.left").fetchSemanticsNode().boundsInRoot.left, 1f)
+        assertEquals("right handle on the physical right edge", root.right, tag("recents.handle").fetchSemanticsNode().boundsInRoot.right, 1f)
+        tag("glance.handle.left").performClick(); tag("recents.handle").performClick()
+        assertEquals(listOf("left", "right"), taps)
+        shoot("handles_portrait_dark")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi")
+    fun HOM_23_theQuietHandlesInLandscape() {
+        handles(false, androidx.compose.runtime.mutableIntStateOf(0), ArrayList())
+        tag("glance.handle.left").assertIsDisplayed(); tag("recents.handle").assertIsDisplayed()
+        shoot("handles_landscape_dark")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "ldrtl-w411dp-h891dp-port-xhdpi")
+    fun HOM_23_inRightToLeftTheLaunchpadHandleIsOnTheRightAndRecentsOnTheLeft() {
+        handles(true, androidx.compose.runtime.mutableIntStateOf(0), ArrayList())
+        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals(root.right, tag("glance.handle.left").fetchSemanticsNode().boundsInRoot.right, 1f)
+        assertEquals(0f, tag("recents.handle").fetchSemanticsNode().boundsInRoot.left, 1f)
+        shoot("handles_portrait_rtl")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_23_theHandlesFadeWhenIdleAndReturnOnAnyTouch() {
+        val wake = androidx.compose.runtime.mutableIntStateOf(0)
+        handles(false, wake, ArrayList())
+        assertEquals(0.30f, GlanceHandleFade.alpha(true), 0f); assertEquals(0.06f, GlanceHandleFade.alpha(false), 0f)
+        assertTrue("the idle alpha is barely there", GlanceHandleFade.IDLE_ALPHA < GlanceHandleFade.AWAKE_ALPHA / 4f)
+        rule.mainClock.advanceTimeBy(GlanceHandleFade.IDLE_AFTER_MS + 1500)
+        Snapshot.withMutableSnapshot { wake.intValue++ }
+        rule.mainClock.advanceTimeBy(100)
+        rule.waitForIdle()
+        shoot("handles_awake_again")
+        tag("glance.handle.left").assertIsDisplayed()
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_23_theHandlesOnTheLightSurface() {
+        handles(false, androidx.compose.runtime.mutableIntStateOf(0), ArrayList(), dark = false)
+        tag("glance.handle.left").assertIsDisplayed()
+        shoot("handles_portrait_light")
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

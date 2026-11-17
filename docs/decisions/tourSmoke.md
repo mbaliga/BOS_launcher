@@ -27,6 +27,15 @@ Every surface is also rotated (landscape and back) while open, and the same surf
    platform's `InfiniteAnimationPolicy` for its frames (`infiniteFrameNanos` in `SearchLayouts.kt`): on a device no policy exists, so it is the same `withFrameNanos`; an auto-advancing test ends it.
    The monkey walk is the test (it failed before and passes now).
 
+## Second review (adversarial) findings, all fixed in the tests
+
+- The seeded work-profile app was only a launcher activity of user 10; the catalog lists `UserManager.userProfiles`, so the app was never shown and nothing looked for it. The seed now adds a managed profile to the shadow `UserManager`, and `HOM_06_busyTourTheWorkProfileAppIsOnTheDrawersWorkTab` asserts the app is absent from Personal and listed on the Work tab.
+- The drawer "filter" step typed letters as key events, which the drawer ignores by design (the filter is a text field; the keyboard setting focuses it); the step asserted nothing. The tour now types through the field's input action, asserts the match stays and the others drop, launches the app from the row and asserts the history entry.
+- A tautological `assertTrue(..., true)`, an unasserted Enter on a Radar result (fresh), a Clear all and a group-strip step that were skipped by an `if`: all now assert.
+- New: `STR_01_tourEdgeTapsWhileAnotherSurfaceIsOpenDoNotOpenLaunchpadOrRecents` (edge taps over Radar, the drawer and Ground Control open nothing underneath). It passed, so no defect there.
+- Confirmed the Recents-sliver tests fail without the `HomeScreen` change (3 of 3 failed with it reverted).
+- `docs/SPEC_STATUS.md` had a stale `Counts:` line since the wave 20/21 merge (153 rows claimed, 156 present), which failed `RepoHygieneAuditTest` at the base; the line now matches the rows.
+
 ## Test environment notes
 
 - The app unit tests now run with a 2 GB heap (`app/build.gradle.kts`): the tour keeps 500-app homes and many activities in one JVM, and the default 512 MB left Compose "never idle" under GC pressure.

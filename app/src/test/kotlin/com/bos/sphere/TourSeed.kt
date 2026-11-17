@@ -26,6 +26,8 @@ internal object TourSeed {
     fun workApp(label: String = "Workchat") {
         val shadow = org.robolectric.Shadows.shadowOf(AppSmokeHarness.app.getSystemService(android.content.Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps)
         val work = android.os.UserHandle::class.java.getDeclaredMethod("of", Int::class.javaPrimitiveType).invoke(null, 10) as android.os.UserHandle
+        // the catalog reads UserManager.userProfiles: without the profile the app is never listed (review finding: the first pass seeded the activity only)
+        org.robolectric.Shadows.shadowOf(AppSmokeHarness.app.getSystemService(android.content.Context.USER_SERVICE) as android.os.UserManager).addProfile(0, 10, "Work", 0x20 /* UserInfo.FLAG_MANAGED_PROFILE (hidden) */)
         val pkg = AppSmokeHarness.packageOf(label)
         val ai = android.content.pm.ApplicationInfo().apply { packageName = pkg; name = label; sourceDir = "/data/app/$pkg.apk"; nonLocalizedLabel = label }
         val info = android.content.pm.ActivityInfo().apply { packageName = pkg; name = "$pkg.Main"; applicationInfo = ai; nonLocalizedLabel = label; exported = true }

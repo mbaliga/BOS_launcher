@@ -4,6 +4,8 @@ import android.view.KeyEvent
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import com.bos.sphere.feature.grid.LauncherInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import com.bos.sphere.core.data.HomeLanding
@@ -46,7 +48,7 @@ class TourFreshSmokeTest : TourBase() {
         assertEquals(HomeLanding.Glance, stores.prefs.prefs.value.homeLanding)
         check("start", Surface.Home); assertFalse(controlsShown())
         tapAt(0.5f, 0.72f); assertTrue("a tap pops the controls in", controlsShown()); check("controls in", Surface.Home)
-        rotateAndCheck("controls in, rotated"); assertTrue("the controls survive a rotation or fade, never crash", true)
+        rotateAndCheck("controls in, rotated")
         // out again: a tap on the controls' empty area or inactivity pops them out
         waitFor("the controls pop out after inactivity", 12_000) { !controlsShown() }
         check("controls out", Surface.Home)
@@ -94,7 +96,8 @@ class TourFreshSmokeTest : TourBase() {
         swipeFromRight(); check("swipe", Surface.Recents); rotateAndCheck("recents")
         key(ESC); check("esc", Surface.Home)
         rule.onNodeWithTag("recents.handle", useUnmergedTree = true).performClick(); settle(); check("handle", Surface.Recents)
-        if (tagShown("recents.clearAll")) { rule.onNodeWithTag("recents.clearAll", useUnmergedTree = true).performClick(); settle(); check("clear all", Surface.Recents) }
+        assertTrue("Clear all is offered with a history", tagShown("recents.clearAll"))
+        rule.onNodeWithTag("recents.clearAll", useUnmergedTree = true).performClick(); settle(); check("clear all", Surface.Recents)
         waitFor("clear all left no rows (the list is rebuilt off the main thread)") { !tagShownPrefix("recents.row.") }
         back(); check("back", Surface.Home)
         key(KeyEvent.KEYCODE_R, ctrl = true); check("Ctrl+R", Surface.Recents)
@@ -112,15 +115,21 @@ class TourFreshSmokeTest : TourBase() {
         stores.shortcuts.setCorner(Corner.TopRight, CornerSlot.Single(CornerItem.Action(CornerActionId.Search))); settle()
         rule.onNodeWithTagOrDesc("Top right hotspot").performClick(); settle(); check("corner", Surface.Radar)
         key(KeyEvent.KEYCODE_D); key(KeyEvent.KEYCODE_E); check("typing 2", Surface.Radar)
+        val before = stores.history.events.value.size
         key(KeyEvent.KEYCODE_ENTER); check("Enter on a result")
-        back(); check("closed", Surface.Home)
+        assertFalse("Enter on a result closes Radar", radarShown())
+        assertTrue("Enter on a result launched it (recorded in the history)", stores.history.events.value.size > before)
+        check("closed", Surface.Home)
     }
 
     @Test fun HOM_01_tourDrawerOpensFiltersAndLaunchesAnApp() {
         startFresh()
         key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer); rotateAndCheck("drawer")
-        key(KeyEvent.KEYCODE_C); key(KeyEvent.KEYCODE_A); check("filter", Surface.Drawer)
-        key(KeyEvent.KEYCODE_ENTER); check("launch")
+        rule.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("cam"); settle(); check("filter", Surface.Drawer)
+        assertTrue("the filter keeps the match", LauncherInput.focus.nodes().any { it.id.startsWith("drawer.app.camera") })
+        assertFalse("and drops the others", LauncherInput.focus.nodes().any { it.id.startsWith("drawer.app.alpha") })
+        rule.onNodeWithText("Camera", useUnmergedTree = true).performClick(); settle(); check("launch")
+        assertTrue("the launch is recorded in the history", stores.history.events.value.any { it.key == AppSmokeHarness.appKey("Camera") })
         if (drawerShown()) back()
         check("closed", Surface.Home)
     }
@@ -185,6 +194,19 @@ class TourFreshSmokeTest : TourBase() {
         startFresh()
         key(KeyEvent.KEYCODE_R, ctrl = true); check("recents", Surface.Recents)
         onNodeTapSliver(); check("sliver", Surface.Home); assertFalse(launchpadShown())
+    }
+
+    /** Found by review: a surface drawn over the home must not leave an edge handle reachable. A tap on the physical edge middle while Radar, the drawer or Ground Control is open must not open Launchpad or Recents under or over it. */
+    @Test fun STR_01_tourEdgeTapsWhileAnotherSurfaceIsOpenDoNotOpenLaunchpadOrRecents() {
+        startFresh()
+        for ((name, opener) in listOf<Pair<String, () -> Unit>>(
+            "radar" to { key(KeyEvent.KEYCODE_SLASH, ctrl = true) }, "drawer" to { key(KeyEvent.KEYCODE_D, ctrl = true) }, "ground control" to { key(KeyEvent.KEYCODE_COMMA, ctrl = true) })) {
+            opener(); val shown = open(); assertFalse("$name opened", shown.contains(Surface.Home))
+            tapAt(0.02f, 0.5f); check("$name, left edge tapped"); assertFalse("$name: Launchpad opened by an edge tap", launchpadShown())
+            tapAt(0.98f, 0.5f); check("$name, right edge tapped"); assertFalse("$name: Recents opened by an edge tap", recentsShown())
+            assertEquals("$name stays open", shown, open())
+            back(); key(ESC); check("$name closed", Surface.Home)
+        }
     }
 
     // small helpers

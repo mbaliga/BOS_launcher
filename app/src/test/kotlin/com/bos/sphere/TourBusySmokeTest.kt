@@ -3,11 +3,14 @@ package com.bos.sphere
 import android.view.KeyEvent
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.LauncherStores
+import com.bos.sphere.feature.grid.LauncherInput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -27,8 +30,9 @@ import org.robolectric.annotation.GraphicsMode
 class TourBusySmokeTest : TourBase() {
     private val stores get() = LauncherStores.get(AppSmokeHarness.app)
 
+    private var workAppAdded = false
     private fun startBusy(landing: HomeLanding? = null) {
-        TourSeed.apps(); runCatching { TourSeed.workApp() }
+        TourSeed.apps(); workAppAdded = runCatching { TourSeed.workApp() }.isSuccess
         AppSmokeHarness.configureFresh { if (landing != null) it.copy(homeLanding = landing) else it }
         TourSeed.history("Alpha", "Bravo", "Tour 007", "Tour 250", "Camera")
         TourSeed.recordSends()
@@ -51,7 +55,8 @@ class TourBusySmokeTest : TourBase() {
         swipeFromLeft(); check("launchpad", Surface.Launchpad); rotateAndCheck("busy launchpad")
         assertTrue("the group section is listed", rowTagged("lp.group.").fetchSemanticsNodes().isNotEmpty())
         val strips = rowTagged("lp.strip.").fetchSemanticsNodes()
-        if (strips.size > 1) { rowTagged("lp.strip.").onFirst().performClick(); settle(); check("group selected", Surface.Launchpad) }
+        assertTrue("the group strip is present", strips.isNotEmpty())
+        run { rowTagged("lp.strip.").onFirst().performClick(); settle(); check("group selected", Surface.Launchpad) }
         val focusRows = rowTagged("lp.focus.").fetchSemanticsNodes()
         assertTrue("notification rows exist", focusRows.isNotEmpty())
         rowTagged("lp.focus.").onFirst().performClick(); settle(); check("notification tapped")
@@ -89,10 +94,25 @@ class TourBusySmokeTest : TourBase() {
     @Test fun HOM_01_busyTourDrawerFiltersAndLaunches() {
         startBusy()
         key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer); rotateAndCheck("busy drawer")
-        key(KeyEvent.KEYCODE_T); key(KeyEvent.KEYCODE_O); check("filter", Surface.Drawer)
-        key(KeyEvent.KEYCODE_ENTER); check("launch")
+        // the type-to-filter field is a text field: typed through its own input action (a key event does not reach it without the soft keyboard setting)
+        rule.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("tour 007"); settle(); check("filter", Surface.Drawer)
+        assertTrue("the filter keeps the match", drawerHas("tour007")); assertFalse("and drops the others", drawerHas("tour008"))
+        rule.onNodeWithText("Tour 007", useUnmergedTree = true).performClick(); settle(); check("launch")
+        assertTrue("the launch is recorded in the history", stores.history.events.value.any { it.key == AppSmokeHarness.appKey("Tour 007") })
         if (drawerShown()) { back(); check("closed", Surface.Home) }
     }
+
+    /** Review: the seeded work-profile app was never looked for (and was not even a profile of the UserManager), so a broken seed passed silently. The drawer shows it under its Work tab. */
+    @Test fun HOM_06_busyTourTheWorkProfileAppIsOnTheDrawersWorkTab() {
+        startBusy(); assertTrue("the work-profile seed was added", workAppAdded)
+        key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer)
+        assertFalse("the work app is not on the Personal tab", drawerHas("workchat"))
+        rule.onNodeWithText("Work", useUnmergedTree = true).performClick(); settle(); check("work tab", Surface.Drawer)
+        assertTrue("the work-profile app is listed on the Work tab (${LauncherInput.focus.nodes().map { it.id }.filter { it.startsWith("drawer.") }.take(10)})", drawerHas("workchat"))
+        rotateAndCheck("work tab")
+        back(); check("closed", Surface.Home)
+    }
+    private fun drawerHas(pkg: String) = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.app.$pkg") }
 
     @Test fun CFG_09_busyTourGroundControlWalksEveryCategoryAndTheLandingsRenderOnABusyState() {
         startBusy(HomeLanding.Selected)

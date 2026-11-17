@@ -46,7 +46,7 @@ object CrashLoopMath {
         if (prev == null) return State(now, false, 0) to false
         val crashes = when {
             !previousEndedInCrash -> 0
-            now - prev.lastStart < WINDOW_MS -> prev.crashes + 1
+            now - prev.lastStart in 0 until WINDOW_MS -> prev.crashes + 1 // a clock set back (negative age) is not 'within 30 seconds'
             else -> 1
         }
         return State(now, false, crashes) to (crashes >= 2)

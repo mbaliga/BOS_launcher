@@ -429,5 +429,31 @@ class UpgradeSmokeTest {
         assertFalse("a clean upgrade start is not a crash loop", CrashLoopGuard.safeMode)
     }
 
+    // ---- wave 20 audit: the library's crash streak path into safe mode, and the guard marker across an update
+
+    @Test fun CFG_09_aFreshStreakOfTwoPutsTheNextStartInSafeMode() {
+        prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
+        file("crash_recovery_streak.txt", "2\t${System.currentTimeMillis() - 5_000}")
+        startAndSurvive()
+        assertTrue("the user continued past the recovery screen and it crashed again", CrashLoopGuard.safeMode)
+    }
+
+    @Test fun CFG_09_aStreakOfTwoFromHoursAgoIsNotACrashLoopAnyMore() {
+        prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
+        file("crash_recovery_streak.txt", "2\t${System.currentTimeMillis() - 3 * 3_600_000L}") // left behind by a safe mode that was swiped away
+        startAndSurvive()
+        assertFalse("a stale streak must not trap the launcher in safe mode for ever", CrashLoopGuard.safeMode)
+    }
+
+    @Test fun CFG_09_aMarkerAnEarlierBuildLeftBehindAfterAnUpdateIsNotACrash() {
+        prefs("launcher_prefs") { putBoolean("onboardingDone", true) }
+        // The previous process was replaced by the update (REASON_OTHER), after an unstable start with one counted crash already on record.
+        prefs("crash_loop") { putLong("last", System.currentTimeMillis() - 10_000); putBoolean("stable", false); putInt("crashes", 1) }
+        AppSmokeHarness.previousProcessExit(android.app.ApplicationExitInfo.REASON_OTHER)
+        startAndSurvive()
+        assertFalse(CrashLoopGuard.safeMode)
+        assertEquals("the streak is broken by a start that follows no crash", 0, app.getSharedPreferences("crash_loop", Context.MODE_PRIVATE).getInt("crashes", -1))
+    }
+
     private fun com.bos.sphere.core.data.LauncherPrefs.pagesOk() = true
 }

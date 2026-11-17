@@ -20,7 +20,11 @@ object CrashRecoveryHost {
     const val APP_LABEL = "Liftoff"
     internal const val LIBRARY_REPORT = "crash_recovery_report.txt"
     internal const val LIBRARY_EXIT_SEEN = "crash_recovery_exit_seen.txt"
+    internal const val LIBRARY_STREAK = "crash_recovery_streak.txt"
     internal const val RETAINED = "crash_recovery_last_shown.txt"
+
+    /** How long after its newest crash the library's streak still counts as "crashed again after Continue" (30 minutes). */
+    const val LIVE_STREAK_MS = 30 * 60_000L
 
     private fun files(c: Context) = c.applicationContext.filesDir
 
@@ -50,6 +54,18 @@ object CrashRecoveryHost {
         val src = File(files(context), LIBRARY_REPORT)
         if (src.exists()) src.copyTo(File(files(context), RETAINED), overwrite = true)
     }
+
+    /**
+     * The library's crash streak, but only while it is recent. The library keeps the count until a stable start or its own reset, so a
+     * streak of 2 left by a safe mode that was swiped away would put every start of the next days into safe mode again. Safe mode
+     * needs a loop NOW: a streak whose newest crash is older than [LIVE_STREAK_MS], or stamped after [now] (a clock set back), is 0.
+     */
+    fun liveStreak(context: Context, now: Long = System.currentTimeMillis()): Int = runCatching {
+        val parts = File(files(context), LIBRARY_STREAK).takeIf { it.exists() }?.readText()?.split('\t') ?: return@runCatching 0
+        val count = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: return@runCatching 0
+        val at = parts.getOrNull(1)?.trim()?.toLongOrNull() ?: return@runCatching 0
+        if (now - at in 0..LIVE_STREAK_MS) count else 0
+    }.getOrDefault(0)
 
     /** Below API 30 (no exit history): a JVM crash report was written at or after [since], pending or already shown. */
     fun reportSince(context: Context, since: Long): Boolean = runCatching {

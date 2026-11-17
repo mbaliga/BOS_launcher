@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
         // A recreate in the same process (state handed back) is a configuration change, not a restart after a crash: it is not a start.
         if (savedInstanceState == null) com.bos.sphere.core.data.CrashLoopGuard.onStart(this, jvmReportSince = { com.bos.sphere.CrashRecoveryHost.reportSince(this, it) })
         // Second layer: the user continued past the recovery screen and the app crashed again (streak >= 2): safe mode as well.
-        if (com.bos.sphere.core.data.RecoveryDecision.screen(false, com.bos.sphere.core.data.CrashLoopGuard.safeMode, dev.aarso.crashrecovery.CrashRecovery.consecutiveCount(this)) == com.bos.sphere.core.data.RecoveryDecision.Screen.SafeMode) com.bos.sphere.core.data.CrashLoopGuard.enterSafeMode()
+        if (com.bos.sphere.core.data.RecoveryDecision.screen(false, com.bos.sphere.core.data.CrashLoopGuard.safeMode, com.bos.sphere.CrashRecoveryHost.liveStreak(this)) == com.bos.sphere.core.data.RecoveryDecision.Screen.SafeMode) com.bos.sphere.core.data.CrashLoopGuard.enterSafeMode()
         // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
         runCatching { StateService.bridgeBuild31(applicationContext) }
         runCatching { StateService.get(this).guardPlatformRestore() } // NFR-18: drop device-bound widget ids and picture after a platform restore

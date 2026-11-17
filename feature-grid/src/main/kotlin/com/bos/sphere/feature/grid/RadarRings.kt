@@ -34,9 +34,10 @@ internal object RadarHabits {
      * keeps a count and the last time, so its score is the count decayed from that time. The two overlap (a launch made
      * from Radar is in both), so the larger one wins instead of adding them up.
      */
-    fun scores(launches: List<LaunchEvent>, learned: Map<String, UsageRecord>, nowMillis: Long): Map<String, Double> {
+    fun scores(launches: List<LaunchEvent>, learned: Map<String, UsageRecord>, nowMillis: Long, since: Long = 0L): Map<String, Double> {
         val out = HashMap<String, Double>()
-        for (e in launches) out.merge("app:${e.key}", weight(e.timeMillis, nowMillis), Double::plus)
+        // [since]: the moment the user last chose "Forget what Radar learned"; the home's launch log is not Radar's to clear, so what came before is not counted.
+        for (e in launches) if (e.timeMillis > since) out.merge("app:${e.key}", weight(e.timeMillis, nowMillis), Double::plus)
         for ((k, u) in learned) {
             val w = u.count * weight(u.lastMillis, nowMillis)
             out[k] = max(out[k] ?: 0.0, w)

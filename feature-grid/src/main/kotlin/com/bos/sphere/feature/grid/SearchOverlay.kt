@@ -299,7 +299,9 @@ internal fun SearchScreen(
     LaunchedEffect(learnedOverride) {
         learned = learnedOverride ?: withContext(Dispatchers.IO) { PaletteHost.usage(context).entries() }
     }
-    val habit = remember(launchHistory, learned) { RadarHabits.scores(launchHistory, learned, nowMillis()) }
+    var forgottenAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) { forgottenAt = withContext(Dispatchers.IO) { RadarLearning.forgottenAt(context) } }
+    val habit = remember(launchHistory, learned, forgottenAt) { val now = nowMillis(); RadarHabits.scores(launchHistory, learned, now, since = forgottenAt.coerceAtMost(now)) }
     val ranked = remember(apps, recent, trimmed, aliasRev, habit) {
         if (trimmed.isEmpty()) RadarHabits.rankApps(apps, recent, habit).take(RADAR_RESTING_APPS) else AppSearch.rank(apps, trimmed, limit = 24)
     }
@@ -525,12 +527,12 @@ internal fun SearchScreen(
                     ScopeToken(selected, selected, { setWheel(it) }, plain = true, webLabel = prefs.webEngine.label, fanDown = true, showLabel = selected != null)
                     Icon(
                         Glyphs.Close, L10n.tr("Clear"), tint = Color(0xB3FFFFFF),
-                        modifier = Modifier.padding(start = 6.dp).size(32.dp).clip(CircleShape).clickable { setQuery("") }.padding(7.dp),
+                        modifier = Modifier.padding(start = 2.dp).size(48.dp).clip(CircleShape).clickable { setQuery("") }.padding(15.dp), // 48 dp touch target (NFR-13)
                     )
                 } else {
                     Icon(
                         Glyphs.Close, L10n.tr("Close"), tint = Color.White,
-                        modifier = Modifier.padding(start = 6.dp).size(36.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(9.dp),
+                        modifier = Modifier.padding(start = 2.dp).size(48.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(12.dp), // 48 dp touch target (NFR-13)
                     )
                 }
                 PushToTalkButton(onText = { setQuery(it) }, modifier = Modifier.padding(start = 4.dp))

@@ -159,6 +159,7 @@ class CrashRecoveryIntegrationTest {
     @Test fun CFG_09_theLibrarysPrivateFileNamesTheHostRelyOnStillMatch() {
         seedCrash()
         assertTrue(File(app.filesDir, CrashRecoveryHost.LIBRARY_REPORT).exists())
+        assertTrue("the streak file the host reads", File(app.filesDir, CrashRecoveryHost.LIBRARY_STREAK).exists())
         CrashRecovery.captureExitDeath(app, "Liftoff") // nothing to add; just must not throw
     }
 
@@ -209,5 +210,25 @@ class CrashRecoveryIntegrationTest {
         CrashRecoveryHost.onProcessStart(app)       // the start after Continue
         assertNull("no second, synthesised report for the same death", CrashRecovery.pending(app))
         assertEquals("and the streak was not bumped twice", before, CrashRecovery.consecutiveCount(app))
+    }
+
+    @Test fun CFG_09_theHostReadsTheStreakOnlyWhileItIsRecent() {
+        val now = 10_000_000_000L
+        File(app.filesDir, "crash_recovery_streak.txt").writeText("3\t${now - 60_000}")
+        assertEquals(3, CrashRecoveryHost.liveStreak(app, now))
+        File(app.filesDir, "crash_recovery_streak.txt").writeText("3\t${now - CrashRecoveryHost.LIVE_STREAK_MS - 1}")
+        assertEquals("older than the live window", 0, CrashRecoveryHost.liveStreak(app, now))
+        File(app.filesDir, "crash_recovery_streak.txt").writeText("3\t${now + 5_000}")
+        assertEquals("stamped in the future: the clock moved, it is not evidence", 0, CrashRecoveryHost.liveStreak(app, now))
+        File(app.filesDir, "crash_recovery_streak.txt").writeText("garbage")
+        assertEquals(0, CrashRecoveryHost.liveStreak(app, now))
+        File(app.filesDir, "crash_recovery_streak.txt").delete()
+        assertEquals(0, CrashRecoveryHost.liveStreak(app, now))
+    }
+
+    @Test fun CFG_09_theLiveStreakAgreesWithTheLibraryForACrashJustNow() {
+        seedCrash(); seedCrash()
+        assertEquals(CrashRecovery.consecutiveCount(app), CrashRecoveryHost.liveStreak(app))
+        assertEquals(2, CrashRecoveryHost.liveStreak(app))
     }
 }

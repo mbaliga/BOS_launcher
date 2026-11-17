@@ -404,7 +404,7 @@ The whole setup is one portable file, settings are a real screen rather than a p
 | CFG-06 | M | Onboarding | First run: set as home, choose home style, optional import. Nothing else is requested up front |
 | CFG-07 | M | Just-in-time grants | Notification access, usage access, contacts and folder access are requested when the user first touches the feature, each with a one-screen explanation of what is read and that it stays on device |
 | CFG-08 | M | Capability report | A settings page lists every capability from section 3 with its current state on this device and the reason for any that are off |
-| CFG-09 | M | Safe mode | If the launcher crashes twice within 30 seconds of start, it boots into a minimal grid surface with widgets disabled and offers restore from the last snapshot |
+| CFG-09 | M | Crash recovery and safe mode | Two layers. Layer 1 (wave 18, the shared `crash-recovery` utility from Shared-Libraries-asoc): after any crash, ANR or native crash, the next start shows the recovery screen instead of the home (splash, plain-language summary, "View the full report" with Copy, Save file, Email / share sheet and WhatsApp on the user's tap, Continue, Discard, and a Reset-data section only after a repeated crash). It is installed as the first statement of `Application.onCreate` and shown from the first statement of `MainActivity.onCreate`. Layer 2: if the launcher crashes again after Continue (the library's crash streak is 2 or more) or crashes twice within 30 seconds of start (the loop guard), it boots into safe mode: a minimal grid surface with widgets disabled, restore from the last snapshot, Carry on, and a "View crash report" button that opens the recovery screen for the newest report. The sequence and what resets each: `docs/decisions/crashRecovery.md` |
 | CFG-10 | S | Theming | Light, dark and wallpaper-derived palettes; density and type scale; all tokens come from the shared design system |
 | CFG-11 | S | Preferences file compatibility | The settings portion of the export is a separable document so it can later follow a shared cross-app preferences format |
 | CFG-12 | C | Import from other launchers | Read layout from a launcher backup format where it is documented |
@@ -445,7 +445,7 @@ Budgets are enforced by macrobenchmark tests in CI, with baseline profiles shipp
 
 ### Reliability
 
-- **NFR-09.** Crash-free sessions at or above 99.8% across the beta cohort; zero known crash on start.
+- **NFR-09.** Crash-free sessions at or above 99.8% across the beta cohort; zero known crash on start. Wave 18: crash capture is the shared `crash-recovery` utility (JVM crashes through its handler, native crashes and ANRs through `ApplicationExitInfo`); the launcher keeps only the local session ledger behind the crash-free percentage, shown in Ground Control > Backup > Crash reports. Upgrade-path smoke tests start the launcher over the state every earlier build wrote (`docs/decisions/startupCrashes.md`).
 - **NFR-10.** No ANR in the launcher process during a 2-hour scripted soak.
 - **NFR-11.** Full state restore after process death, reboot, package update, profile toggle and display hot-plug.
 - **NFR-12.** No main-thread disk or binder calls on the home render path (StrictMode clean in debug).
@@ -459,7 +459,7 @@ Budgets are enforced by macrobenchmark tests in CI, with baseline profiles shipp
 ### Privacy and permissions
 
 - **NFR-16.** The core flavour declares no `INTERNET` permission. Web results hand off to the browser.
-- **NFR-17.** No analytics, no crash upload. Crash reports are saved locally and shared only by explicit user action.
+- **NFR-17.** No analytics, no crash upload. Crash reports are saved locally and shared only by explicit user action. Wave 18: the report and its Copy, Save file, Email and WhatsApp / share-sheet actions are the shared recovery screen's, each on the user's own tap; the module has no dependency and the manifest gains no permission. The Ground Control "Crash reports" pane shows only whether a report is waiting, the local crash-free percentage and (debug and alpha Lab builds) a preview of the recovery screen with sample content.
 - **NFR-18.** Indexes, usage history and notification content are stored in app-private storage and excluded from export and from system cloud backup.
 
 | Permission or access | Needed for | When asked |

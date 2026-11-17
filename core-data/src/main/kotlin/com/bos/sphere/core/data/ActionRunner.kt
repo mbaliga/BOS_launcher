@@ -75,7 +75,7 @@ object ActionApps {
 
 /** The app the user picked for an app-backed action ([AppEntry.key]); null = let the system decide. */
 object ActionPrefs {
-    private fun sp(c: Context) = c.applicationContext.getSharedPreferences("action_apps", Context.MODE_PRIVATE)
+    private fun sp(c: Context) = TolerantPrefs.of(c.applicationContext, "action_apps")
     fun get(c: Context, id: CornerActionId): String? = sp(c).getString(id.name, null)
     fun set(c: Context, id: CornerActionId, key: String?) {
         sp(c).edit().apply { if (key == null) remove(id.name) else putString(id.name, key) }.apply()

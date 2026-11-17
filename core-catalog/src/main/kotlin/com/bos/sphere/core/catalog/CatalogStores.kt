@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** User tags per app (HOM-05), kept in SharedPreferences. */
 class TagStore(context: Context) {
-    private val sp = context.applicationContext.getSharedPreferences("home_tags", Context.MODE_PRIVATE)
+    private val sp = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, "home_tags")
     private val _tags = MutableStateFlow(TagCodec.decode(sp.getString("tags", "") ?: ""))
     val tags: StateFlow<Map<String, Set<String>>> = _tags.asStateFlow()
 
@@ -21,7 +21,7 @@ class TagStore(context: Context) {
 
 /** Per-item icon overrides and the chosen icon pack (HOM-03). */
 class IconOverrideStore(context: Context) {
-    private val sp = context.applicationContext.getSharedPreferences("home_icons", Context.MODE_PRIVATE)
+    private val sp = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, "home_icons")
     private val _overrides = MutableStateFlow(IconOverrideCodec.decode(sp.getString("overrides", "") ?: ""))
     val overrides: StateFlow<Map<String, String>> = _overrides.asStateFlow()
     private val _pack = MutableStateFlow(sp.getString("pack", null))
@@ -48,7 +48,7 @@ class IconOverrideStore(context: Context) {
 
 /** Badge display options (HOM-09): dots only, or dots with a count. */
 class BadgeSettings(context: Context) {
-    private val sp = context.applicationContext.getSharedPreferences("home_badges", Context.MODE_PRIVATE)
+    private val sp = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, "home_badges")
     var enabled: Boolean
         get() = sp.getBoolean("enabled", true)
         set(v) { sp.edit().putBoolean("enabled", v).apply() }
@@ -62,9 +62,9 @@ class BadgeSettings(context: Context) {
  * per size class (HOM-11). Survives process death through [HomeStateCodec].
  */
 class HomeStateStore(context: Context) {
-    private val sp = context.applicationContext.getSharedPreferences("home_state", Context.MODE_PRIVATE)
+    private val sp = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, "home_state")
     /** NFR-18: real widget ids live in the device file; the backed-up file holds re-add markers ([WidgetIdSplit]). */
-    private val device = context.applicationContext.getSharedPreferences(com.bos.sphere.core.data.DeviceBound.FILE, Context.MODE_PRIVATE)
+    private val device = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, com.bos.sphere.core.data.DeviceBound.FILE)
     private val _state = MutableStateFlow(read())
     val arrangements: StateFlow<SizeClassArrangements> = _state.asStateFlow()
 

@@ -18,12 +18,12 @@ class LauncherStores private constructor(context: Context) {
     private val app = context.applicationContext
 
     /** NFR-18: widget ids and the background picture path belong to one device; they live in a file the platform backup excludes. */
-    private val deviceBound = app.getSharedPreferences(DeviceBound.FILE, Context.MODE_PRIVATE)
+    private val deviceBound = TolerantPrefs.of(app, DeviceBound.FILE)
 
-    val prefs = LauncherPrefsStore(app.getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE), deviceBound)
-    val layout = HomeLayoutStore(app.getSharedPreferences("home_layout", Context.MODE_PRIVATE), deviceBound)
-    val shortcuts = ShortcutStore(app.getSharedPreferences("shortcuts", Context.MODE_PRIVATE), deviceBound)
-    val history = LaunchHistoryStore(app.getSharedPreferences("launch_history", Context.MODE_PRIVATE))
+    val prefs = LauncherPrefsStore(TolerantPrefs.of(app, "launcher_prefs"), deviceBound)
+    val layout = HomeLayoutStore(TolerantPrefs.of(app, "home_layout"), deviceBound)
+    val shortcuts = ShortcutStore(TolerantPrefs.of(app, "shortcuts"), deviceBound)
+    val history = LaunchHistoryStore(TolerantPrefs.of(app, "launch_history"))
     /** HOM-18: the larger, file-backed log the timeline reads; fed by every [history] record. */
     val timelineLog = TimelineLogStore(java.io.File(app.filesDir, TimelineLogStore.RELATIVE_PATH)).also { log ->
         history.mirror = log::record
@@ -31,7 +31,7 @@ class LauncherStores private constructor(context: Context) {
     }
     /** HOM-22: what the user removed from the Recent landing; private usage history, never exported or backed up. */
     val recentsState = RecentsStateStore(java.io.File(app.filesDir, RecentsStateStore.RELATIVE_PATH))
-    val iconColors = IconColorStore(app.getSharedPreferences("icon_colors", Context.MODE_PRIVATE))
+    val iconColors = IconColorStore(TolerantPrefs.of(app, "icon_colors"))
 
     companion object {
         @Volatile private var instance: LauncherStores? = null

@@ -108,6 +108,7 @@ dependencies {
     implementation(project(":feature-dock"))
     implementation(project(":feature-desktop"))
     implementation(project(":feature-launchpad"))
+    implementation(project(":crash-recovery"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.health.connect.client)

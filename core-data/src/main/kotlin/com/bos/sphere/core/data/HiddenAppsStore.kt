@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class HiddenAppsStore(context: Context) {
 
     private val prefs =
-        context.applicationContext.getSharedPreferences("hidden_apps", Context.MODE_PRIVATE)
+        TolerantPrefs.of(context.applicationContext, "hidden_apps")
 
     private val _hidden = MutableStateFlow(prefs.getStringSet(KEY, emptySet())!!.toSet())
     val hidden: StateFlow<Set<String>> = _hidden.asStateFlow()

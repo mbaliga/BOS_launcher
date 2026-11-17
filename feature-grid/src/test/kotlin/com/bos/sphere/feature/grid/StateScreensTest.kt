@@ -113,9 +113,48 @@ class StateScreensTest {
 
     private val apps = listOf("Zebra", "apple", "Mango", "Camera").mapIndexed { i, l -> SafeApp("k$i", l) }
 
-    private fun safeMode(restore: String?, message: String? = null, open: (SafeApp) -> Unit = {}, onRestore: () -> Unit = {}, carry: () -> Unit = {}, light: Boolean = false) {
+    private fun safeMode(restore: String?, message: String? = null, open: (SafeApp) -> Unit = {}, onRestore: () -> Unit = {}, carry: () -> Unit = {}, light: Boolean = false, onViewReport: (() -> Unit)? = null) {
         HyleTheme.apply(if (light) ThemeVariant.Light else ThemeVariant.Dark, 0xFF6D5BFF)
-        rule.setContent { SafeModeView(apps, restore, message, open, onRestore, carry) }
+        rule.setContent { SafeModeView(apps, restore, message, open, onRestore, carry, onViewReport) }
+    }
+
+    /** Wave 18: safe mode is the second layer; the report itself is the shared recovery screen, reachable by one button. */
+    @Test fun CFG_09_safeModeOffersASingleViewCrashReportButtonWhenAReportExists() {
+        var viewed = 0
+        safeMode("1/1/26 9:00", onViewReport = { viewed++ })
+        rule.onNodeWithText("View crash report").assertIsDisplayed().performClick()
+        assertEquals(1, viewed)
+        assertEquals(1, rule.onAllNodesWithTextCount("View crash report"))
+        rule.onNodeWithText("Restore last snapshot (1/1/26 9:00)").assertIsDisplayed()
+        rule.onNodeWithText("Carry on").assertIsDisplayed()
+        rule.onNodeWithText("Mango").assertIsDisplayed() // the plain app grid is still the main content
+        assertTrue(drawn(shoot("cfg09-safemode-viewreport-dark")) > 400)
+    }
+
+    @Test fun CFG_09_aDuplicatedAppKeyNeverCrashesTheEscapeHatch() {
+        HyleTheme.apply(ThemeVariant.Dark, 0xFF6D5BFF)
+        rule.setContent { SafeModeView(apps + apps, "now", null, {}, {}, {}, null) }
+        rule.onNodeWithText("Safe mode").assertIsDisplayed()
+    }
+
+    @Test fun CFG_09_withoutAReportSafeModeSaysSoInPlainWordsAndHasNoViewButton() {
+        safeMode("now")
+        rule.onNodeWithText("No crash report was saved for this start. A crash before Liftoff could record it, or a system kill, leaves none.").assertIsDisplayed()
+        assertEquals(0, rule.onAllNodesWithTextCount("View crash report"))
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
+    fun CFG_09_safeModeWithAReportFitsLandscapeAndStaysReadableInLight() {
+        safeMode("now", light = true, onViewReport = {})
+        rule.onNodeWithText("View crash report").assertIsDisplayed()
+        assertTrue(lum(shoot("cfg09-safemode-viewreport-land-light")) > 150)
+    }
+
+    @Test fun CFG_09_theReportButtonIsTranslatedInEveryLanguage() {
+        for (code in listOf("es", "fr", "de", "pt", "hi", "zh", "ja", "ar")) {
+            L10n.setLanguage(code)
+            assertTrue(code, L10n.tr("View crash report") != "View crash report")
+        }
     }
 
     @Test fun CFG_09_safeModeShowsAMinimalGridWithRestoreAndCarryOn() {

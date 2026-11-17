@@ -16,6 +16,9 @@ class W13CrossAuditTest {
     @Test fun NFR_17_nothingIsLoggedOrPrintedExceptByTheOptInPerformanceMonitor() {
         val sinks = Regex("""\bLog\.[dviwef]\(|\bprintln\(|printStackTrace\(|\bTimber\.""")
         val offenders = Repo.mainSources().filter { sinks.containsMatchIn(it.readText()) }.map(::rel).filter { !it.endsWith("PerformanceMonitor.kt") }
+            // Wave 18: the vendored shared crash-recovery utility writes its own capture to logcat (device-local, never leaves the phone
+            // unless the user attaches a bug report); these two files are the allow-listed exception (docs/decisions/crashRecovery.md).
+            .filter { it != "crash-recovery/src/main/java/dev/aarso/crashrecovery/CrashReport.kt" && it != "crash-recovery/src/main/java/dev/aarso/crashrecovery/CrashRecovery.kt" }
         assertEquals("these files log or print: $offenders", emptyList<String>(), offenders)
         // The monitor's own messages carry names of timed operations, never notification, sender or contact text.
         val monitor = text("core-data/src/main/kotlin/com/bos/sphere/core/data/PerformanceMonitor.kt")

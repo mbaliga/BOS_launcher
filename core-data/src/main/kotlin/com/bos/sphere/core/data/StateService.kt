@@ -47,7 +47,7 @@ class StateService private constructor(context: Context) {
         val s = LauncherStores.get(app)
         StateApplier(s.prefs, s.layout, s.shortcuts, LaunchpadSink.Live, live::read, live::write,
             hiddenApps = object : HiddenSink {
-                private val sp get() = app.getSharedPreferences("hidden_apps", Context.MODE_PRIVATE)
+                private val sp get() = TolerantPrefs.of(app, "hidden_apps")
                 override fun get(): Set<String> = sp.getStringSet("keys", emptySet())!!.toSet()
                 override fun set(keys: Set<String>) { sp.edit().putStringSet("keys", keys).apply() }
             })

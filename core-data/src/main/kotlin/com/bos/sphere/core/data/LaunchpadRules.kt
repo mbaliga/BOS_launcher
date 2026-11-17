@@ -518,7 +518,7 @@ object LaunchpadSettings {
     @Synchronized
     fun init(context: Context) {
         if (sp != null) return
-        val s = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val s = TolerantPrefs.of(context.applicationContext, FILE)
         sp = s
         _rules.value = LaunchpadJson.decodeRules(s.getString("rules", null))
         _prefs.value = LaunchpadJson.decodePrefs(s.getString("prefs", null))

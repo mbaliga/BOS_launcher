@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import java.io.File
 import java.util.concurrent.Executor
@@ -129,12 +130,13 @@ object HomeRecents {
         runningFirst: () -> String? = { null },
         selfPackage: String = "",
     ): Flow<List<String>> {
-        val sightings: Flow<List<UsageSighting>> = combine(usageTick, useUsage) { _, on -> if (on) usageReader() else emptyList() }
+        val sightings: Flow<List<UsageSighting>> = combine(usageTick, useUsage) { _, on -> if (on) runCatching { usageReader() }.getOrDefault(emptyList()) else emptyList() }
         return combine(own, sightings, apps, hidden, state) { o, u, a, h, s -> Inputs(o, u, a, h, s) }
             .combine(combine(limit, profile) { l, p -> l to p }) { i, (l, p) ->
                 compute(i.own, i.usage, i.apps, i.hidden, i.state, l, p, runningFirst(), selfPackage)
             }
             .distinctUntilChanged()
+            .catch { emit(emptyList()) } // wave 18: a failing source is an empty list, never an exception out of the home's first composition
             .flowOn(Dispatchers.Default)
     }
 
@@ -151,10 +153,11 @@ object HomeRecents {
         useUsage: Flow<Boolean>,
         selfPackage: String = "",
     ): Flow<List<RecentEntry>> {
-        val sightings: Flow<List<UsageSighting>> = combine(usageTick, useUsage) { _, on -> if (on) usageReader() else emptyList() }
+        val sightings: Flow<List<UsageSighting>> = combine(usageTick, useUsage) { _, on -> if (on) runCatching { usageReader() }.getOrDefault(emptyList()) else emptyList() }
         return combine(own, sightings, apps, hidden, state) { o, u, a, h, s -> Inputs(o, u, a, h, s) }
             .combine(combine(limit, profile) { l, p -> l to p }) { i, (l, p) -> entries(i.own, i.usage, i.apps, i.hidden, i.state, l, p, selfPackage) }
             .distinctUntilChanged()
+            .catch { emit(emptyList()) } // wave 18: as above
             .flowOn(Dispatchers.Default)
     }
 

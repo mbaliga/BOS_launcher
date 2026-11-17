@@ -168,7 +168,7 @@ object GroupsSettings {
     @Synchronized
     fun init(context: Context) {
         if (sp != null) return
-        val s = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val s = TolerantPrefs.of(context.applicationContext, FILE)
         sp = s
         _config.value = GroupsJson.decodeString(s.getString("config", null))
     }

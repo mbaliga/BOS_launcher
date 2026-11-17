@@ -79,7 +79,7 @@ class PuckActionsStore(private val sp: SharedPreferences) {
 
         /** One instance per process, so the Ground Control pane and the home screen's ring see the same list at once. */
         fun get(context: android.content.Context): PuckActionsStore = shared ?: synchronized(this) {
-            shared ?: PuckActionsStore(context.applicationContext.getSharedPreferences("puck_actions", android.content.Context.MODE_PRIVATE)).also { shared = it }
+            shared ?: PuckActionsStore(TolerantPrefs.of(context.applicationContext, "puck_actions")).also { shared = it }
         }
     }
 }

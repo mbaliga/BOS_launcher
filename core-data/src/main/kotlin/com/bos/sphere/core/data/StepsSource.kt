@@ -35,7 +35,7 @@ class StepsSource(context: Context) {
     private val ctx = context.applicationContext
     private val sm = ctx.getSystemService(SensorManager::class.java)
     private val sensor: Sensor? = sm?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-    private val prefs = ctx.getSharedPreferences("steps", Context.MODE_PRIVATE)
+    private val prefs = TolerantPrefs.of(ctx, "steps")
     private val _steps = MutableStateFlow<Int?>(null)
     val steps: StateFlow<Int?> = _steps.asStateFlow()
     private var running = false

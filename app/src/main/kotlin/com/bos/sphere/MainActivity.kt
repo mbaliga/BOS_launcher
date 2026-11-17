@@ -49,6 +49,9 @@ class MainActivity : ComponentActivity() {
     private var actionSeq = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Wave 18 (CFG-09, NFR-09): the shared crash-recovery screen comes first. With a crash pending it starts the recovery activity
+        // (splash, readable report, Share) and finishes this one before anything else runs, so nothing below can race it.
+        if (dev.aarso.crashrecovery.CrashRecovery.maybeShowRecovery(this, "Liftoff")) { super.onCreate(savedInstanceState); return }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleAction(intent)
@@ -57,6 +60,8 @@ class MainActivity : ComponentActivity() {
         com.bos.sphere.feature.desktop.DesktopController.get(this).start()
         // A recreate in the same process (state handed back) is a configuration change, not a restart after a crash: it is not a start.
         if (savedInstanceState == null) com.bos.sphere.core.data.CrashLoopGuard.onStart(this)
+        // Second layer: the user continued past the recovery screen and the app crashed again (streak >= 2): safe mode as well.
+        if (com.bos.sphere.core.data.RecoveryDecision.screen(false, com.bos.sphere.core.data.CrashLoopGuard.safeMode, dev.aarso.crashrecovery.CrashRecovery.consecutiveCount(this)) == com.bos.sphere.core.data.RecoveryDecision.Screen.SafeMode) com.bos.sphere.core.data.CrashLoopGuard.enterSafeMode()
         // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
         runCatching { StateService.bridgeBuild31(applicationContext) }
         runCatching { StateService.get(this).guardPlatformRestore() } // NFR-18: drop device-bound widget ids and picture after a platform restore
@@ -70,7 +75,10 @@ class MainActivity : ComponentActivity() {
         window.decorView.postDelayed({
             com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext)
             // A stable start is the last known good state: snapshot it so safe mode has something to restore (CFG-04).
-            if (!com.bos.sphere.core.data.CrashLoopGuard.safeMode) StateService.onStable(applicationContext)
+            if (!com.bos.sphere.core.data.CrashLoopGuard.safeMode) {
+                StateService.onStable(applicationContext)
+                dev.aarso.crashrecovery.CrashRecovery.clearStreak(applicationContext) // a normal start that stayed up is a recovery: the crash streak starts over
+            }
         }, com.bos.sphere.core.data.CrashLoopMath.WINDOW_MS)
         // Apply theme and language before the first frame so there is no flash of defaults.
         LauncherStores.get(this).prefs.prefs.value.let { p ->

@@ -114,7 +114,7 @@ Run `tools/device_nfr.sh` on the mid-range reference device for the rows marked 
 | NFR-13 | TalkBack on, every home style (Grid, List, Psp, Dsi), Continuous and Paged, Orbit, Filmstrip and Flat search; swipe through the whole screen | each item announces a name, order follows the intended order (Orbit: best match first), every action reachable | |
 | NFR-14 | Settings > Accessibility > Remove animations (or the three animation scales to 0), then open: palette, drawer (all styles), Ground Control, Launchpad, notifications hub, page home, XMB, Orbit | no spring, slide or loop; only fades and snaps; the Launchpad still slides briefly and linearly (known gap) | |
 | NFR-15 | each background kind (black, wallpaper bright and dark, solid, gradient, texture, live scenes, Horizon, a bright photo): look at clock and labels; run an accessibility contrast check (Accessibility Scanner) on home, palette, settings | primary text 4.5:1; live scenes and Horizon are the unsampled cases to look at first | |
-| NFR-17 | Ground Control > Backup > Crash reports: force a crash on a debug build, share it, delete all | the share sheet is the only exit; no network traffic from Liftoff (check with a packet capture or `dumpsys netstats`) | |
+| NFR-17 | Ground Control > Backup > Crash reports: use Lab > "Crash on purpose", then on the recovery screen share the report (Email / share sheet), Discard | the share sheet is the only exit; no network traffic from Liftoff (check with a packet capture or `dumpsys netstats`) | |
 | NFR-19 | section 9, three-button and gesture navigation, on a notch device | every step in section 9 passes | |
 
 ## Launchpad groups (wave 10 groups)
@@ -213,3 +213,14 @@ Nothing here has been confirmed on a device. Owner bug report on build 48: "The 
 - [ ] STR-01: Launchpad set to Off in Ground Control: no left handle, dot or indicator glyph; the edge swipe does nothing; nothing looks dead. Rail setting on: the rail shows on Glance as on the other landings.
 - [ ] STR-01, STR-14, RTL: Arabic: the Launchpad handle and swipe are on the RIGHT edge, recents on the LEFT; the indicator mirrors.
 - [ ] HOM-23, NFR-13: TalkBack: swipe to the handles (focusable buttons labelled "Open Launchpad" and "Open recents"), double tap opens; with a keyboard Tab reaches the indicator buttons.
+
+## Crash recovery screen and startup crashes (wave 18, CFG-09, NFR-09, NFR-17)
+
+Nothing here has been confirmed on a device. Decisions: `docs/decisions/crashRecovery.md` and `docs/decisions/startupCrashes.md`.
+
+- [ ] CFG-09: Ground Control > Lab > "Crash on purpose (test the recovery screen)": tap once (it says "Armed"), tap again within 5 seconds. Liftoff stops; on the next start the splash ("Well, that happened.") appears, not the home. "View the full report" shows the error, app, device and stack trace sections. Continue returns to a normal home.
+- [ ] NFR-17: on that screen tap Copy (paste it somewhere: the text is the report), Save file (the system file picker opens; nothing is written before you choose a place), Email (the share sheet opens with the report text). Check with a packet capture that Liftoff itself sends nothing.
+- [ ] CFG-09: crash on purpose twice within a minute without leaving the screens (Continue, crash again): the second recovery screen offers "Reset Liftoff's data"; Continue from it lands in safe mode (the plain app grid) with "View crash report", "Restore last snapshot" and "Carry on". "View crash report" opens the recovery screen again; "Carry on" returns to the normal home and the next crash shows the recovery screen only (no safe mode).
+- [ ] NFR-09: native crash and ANR path: with a debug build, kill the process from a shell (`adb shell am crash com.bos.sphere` for a JVM crash; `adb shell kill -SEGV <pid>` for a native-style death) and open Liftoff: the recovery screen shows an entry titled "Native crash" or "Crash" from the system exit history (Android 11 and up), once, and not a second time after Continue.
+- [ ] CFG-09: Ground Control > Backup > Crash reports (Lab visible): "Preview recovery screen" shows the screen with sample content marked as a preview; Continue only closes it; the pane says whether a real report is waiting and shows the crash-free percentage.
+- [ ] CFG-03, NFR-11: install this build over the build the owner had (the one that crashed twice), without clearing data: the launcher starts without the recovery screen. If it does show it, copy the report and attach it: it is the crash the upgrade-path suite did not reproduce.

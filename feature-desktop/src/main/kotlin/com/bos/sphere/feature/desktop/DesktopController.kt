@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 class DesktopController private constructor(private val app: Application) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val source = DisplaySource(app)
-    private val sp = app.getSharedPreferences("desktop_surface", Context.MODE_PRIVATE)
+    private val sp = com.bos.sphere.core.data.TolerantPrefs.of(app, "desktop_surface")
     val profiles = DesktopProfileRepository(object : KeyValue {
         override fun get(key: String) = sp.getString(key, null)
         override fun put(key: String, value: String) { sp.edit().putString(key, value).apply() }

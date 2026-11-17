@@ -104,6 +104,7 @@ import com.bos.sphere.ui.DockLayer
 import com.bos.sphere.feature.dock.trackLastTouch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -330,6 +331,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var wheelAnchor by remember { mutableStateOf(Corner.BottomLeft) }
     var hubOpen by remember { mutableStateOf(false) }
     var leftOpen by remember { mutableStateOf(false) }
+    // STR-14: the Recents panel, the right-hand mirror of Launchpad. Warm once opened so the list is ready on the next swipe.
+    var rightOpen by remember { mutableStateOf(false) }
+    var recentsWarm by remember { mutableStateOf(false) }
+    if (rightOpen) recentsWarm = true
+    val recentRows by rememberRecentRows(context, stores, apps, hidden, storedPrefs, active = storedPrefs.rightSide == com.bos.sphere.core.data.RightSide.RecentsPanel && recentsWarm)
+    val recentsUsageOn by rememberUsageAccess(context, rightOpen)
     var menuApp by remember { mutableStateOf<AppEntry?>(null) }
     var editCorner by remember { mutableStateOf<Corner?>(null) }
     var editGesture by remember { mutableStateOf<HomeGesture?>(null) }
@@ -450,6 +457,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         android.widget.Toast.makeText(context, L10n.tr("Home landing: %s", L10n.tr(next.label)), android.widget.Toast.LENGTH_SHORT).show()
     }
 
+    // STR-14: "Open recents" (edge swipe, handle, shortcut, corner or gesture). Recents panel: opens the right-hand card; Dock rail: reveals the
+    // existing dock rail; Off: says so (never nothing).
+    fun openRecents(): Boolean {
+        return when (prefs.rightSide) {
+            com.bos.sphere.core.data.RightSide.RecentsPanel -> { leftOpen = false; rightOpen = true; true }
+            com.bos.sphere.core.data.RightSide.DockRail -> { dockController.handle(com.bos.sphere.core.input.LauncherCommand.FocusDock); true }
+            com.bos.sphere.core.data.RightSide.Off -> {
+                android.widget.Toast.makeText(context, L10n.tr("The right side is off. Turn it on in Ground Control, Home, Right side."), android.widget.Toast.LENGTH_SHORT).show()
+                false
+            }
+        }
+    }
+
     fun internal(id: CornerActionId, anchor: Corner?) {
         when (id) {
             CornerActionId.GridDenser -> changeDensity(+1)
@@ -460,6 +480,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             CornerActionId.LauncherSettings -> openSettings(CATEGORY_HOME)
             CornerActionId.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true // Launchpad off: the Minimal top-right hotspot (and a corner) opens the notification hub like "Notifications" does, never nothing
             CornerActionId.CycleLanding -> cycleLanding()
+            CornerActionId.OpenRecents -> openRecents()
             else -> Unit
         }
     }
@@ -518,7 +539,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // INP-11: an app dragged out of the drawer with a mouse and dropped on the home is added to the current page.
     // ---- keyboard, pointer and controller (INP-04, INP-05, INP-16, HOM-21): shortcuts go to the same openers the touch paths use
     com.bos.sphere.feature.grid.LauncherInputWiring(
-        overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || leftOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
+        overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || leftOpen || rightOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
         onCommand = { c ->
             when (c) {
                 com.bos.sphere.core.input.LauncherCommand.OpenPalette -> { internal(CornerActionId.Search, null); true }
@@ -527,6 +548,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
                 com.bos.sphere.core.input.LauncherCommand.CycleLanding -> { cycleLanding(); true }
+                com.bos.sphere.core.input.LauncherCommand.OpenRecents -> openRecents()
+                com.bos.sphere.core.input.LauncherCommand.Dismiss -> if (rightOpen) { rightOpen = false; true } else dockController.handle(c)
                 // Workspace switching and the dock's focus and number shortcuts belong to the dock controller (DCK-05, WSP-07).
                 // INP-05: Dock 1 to 9 and the workspace step act with Radar, the drawer, Ground Control or the puck open (the controller
                 // falls back to the pin list when no rail is shown); "focus dock" closes whatever hides the rail so the rail can take focus.
@@ -774,7 +797,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // ---- Home press: collapse everything, back to the first page.
     LaunchedEffect(homeSignal) {
         if (homeSignal > 0) {
-            settingsOpen = false; drawerOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false; leftOpen = false
+            settingsOpen = false; drawerOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false; leftOpen = false; rightOpen = false
             menuApp = null; editCorner = null; editGesture = null; tileMenu = null; expandedWidget = null
             gridState.goToPage(prefs.homePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))
         }
@@ -897,6 +920,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.ui.CardEdge.forLaunchpad(launchpadRtl), launchpadDensity, launchpadMotion.reduced,
     )
     val revealSlideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * launchpadGeometry.dragTravelFraction
+    // STR-14: the Recents panel reuses the same geometry, card layer, scrim and settle with the opposite edge (not a fork).
+    val rightReveal = com.bos.sphere.ui.rememberLaunchpadReveal(rightOpen) { rightOpen = it }
+    val recentsGeometry = com.bos.sphere.ui.LaunchpadCardGeometry(
+        launchpadGeometry.widthPx, launchpadGeometry.heightPx, com.bos.sphere.ui.CardEdge.forRecents(launchpadRtl), launchpadDensity, launchpadMotion.reduced,
+    )
+    val rightSlideDp = revealSlideDp
+    val recentsEnabled = prefs.rightSide == com.bos.sphere.core.data.RightSide.RecentsPanel
+    LaunchedEffect(leftOpen) { if (leftOpen) rightOpen = false }
+    LaunchedEffect(rightOpen) { if (rightOpen) leftOpen = false }
+    LaunchedEffect(recentsEnabled) { if (!recentsEnabled) rightOpen = false }
+    // Back returns from the Recents panel (the system's predictive back, as Launchpad does).
+    com.bos.sphere.core.design.rememberPredictiveBackProgress(rightOpen) { rightOpen = false }
+    com.bos.sphere.feature.grid.FocusLayer(layer = com.bos.sphere.feature.grid.RECENTS_FOCUS_LAYER, active = rightOpen) {}
     // INP-01: Launchpad's open chord comes from the one shared registry (a rebinding in Ground Control reaches it), and while it is open it is a
     // layer of the shared focus graph (STR-08 keeps its own arrow, collapse and Esc handling inside the panel, so its rows are not graph nodes).
     val launchpadShortcuts = shortcutRegistry
@@ -919,8 +955,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     Box(
         modifier = Modifier.fillMaxSize().onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { homeEdit.exit(); true } else false }.observeBackgroundTouch(bgTouch).trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
-            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off, revealSlideDp, mirrored = launchpadRtl).leftSwipe(
-            enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && !launchpadRtl &&
+            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !rightOpen, revealSlideDp, mirrored = launchpadRtl)
+            .launchpadEdgeDrag(rightReveal, recentsEnabled && !leftOpen, rightSlideDp, mirrored = !launchpadRtl)
+            .rightEdgeSwipe(prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail && !leftOpen, rtl = launchpadRtl) { openRecents() }
+            .leftSwipe(
+            enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen && !rightOpen && !launchpadRtl &&
                 (prefs.homeStyle != HomeStyle.Grid || prefs.homeScroll == com.bos.sphere.core.data.HomeScroll.Continuous),
             atFirstPage = { true },
             onOpen = { leftOpen = true },
@@ -955,12 +994,30 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
         }
+        // STR-14: the Recents panel lies under the home card too (the card sits on the left with a sliver; the panel is full size and static).
+        val rightProgress = rightReveal.progress
+        val rightActive = recentsEnabled && (rightOpen || rightProgress > 0.001f)
+        if (rightActive) {
+            val rows = recentRows
+            com.bos.sphere.feature.grid.RecentsPanel(
+                rows = rows, now = remember(rows, rightOpen) { System.currentTimeMillis() }, usageAccessOn = recentsUsageOn,
+                sliverInsetDp = (recentsGeometry.returnZonePx / launchpadDensity).dp,
+                sliverOnLeft = recentsGeometry.edge == com.bos.sphere.ui.CardEdge.Left,
+                onLaunch = { app -> rightOpen = false; launch(app) },
+                onMenu = { menuRecents = true; menuApp = it },
+                onClearAll = { stores.recentsState.clear() },
+                onGrantUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
+                modifier = Modifier.graphicsLayer { alpha = recentsGeometry.pose(rightReveal.progress).backdropAlpha },
+                contentAlpha = { recentsGeometry.pose(rightReveal.progress).contentAlpha },
+            )
+        }
         val slideDp = revealSlideDp
         Box(
             Modifier.fillMaxSize().editCardLayer { editCard.frame() }.homeCardLayer(launchpadGeometry) { reveal.progress }
+                .homeCardLayer(recentsGeometry) { if (recentsEnabled) rightReveal.progress else 0f }
                 // Behind the card the home is inert for accessibility services; the card overlay below is the one control.
-                .then(if (leftOpen) Modifier.clearAndSetSemantics { } else Modifier)
-                .then(if (leftActive) Modifier.background(Color.Black) else Modifier)
+                .then(if (leftOpen || rightOpen) Modifier.clearAndSetSemantics { } else Modifier)
+                .then(if (leftActive || rightActive) Modifier.background(Color.Black) else Modifier)
                 .captureHome(homeCapture),
         ) {
             // HOM-22: one landing at a time; switching cross-fades (a short fade with reduced motion).
@@ -1123,11 +1180,15 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (leftOpen) {
             LaunchpadCardOverlay(launchpadGeometry, reveal, onReturn = { leftOpen = false }, slideDp = revealSlideDp)
         }
+        // STR-14: the same slice of the home card on the left while the Recents panel is open.
+        if (rightOpen) {
+            LaunchpadCardOverlay(recentsGeometry, rightReveal, onReturn = { rightOpen = false }, slideDp = rightSlideDp)
+        }
 
         // Media controls: a track + prev / play / next strip while something is playing.
         val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(prefs.mediaControls)
         androidx.compose.animation.AnimatedVisibility(
-            visible = mediaInfo != null && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
+            visible = mediaInfo != null && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
             exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
@@ -1146,7 +1207,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
-            visible = !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && landing != HomeLanding.Minimal, // HOM-12, HOM-22: no dock on Minimal: the dock steps aside while the home is a card
+            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && landing != HomeLanding.Minimal, // HOM-12, HOM-22: no dock on Minimal: the dock steps aside while the home is a card
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,
@@ -1155,7 +1216,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
-            visible = prefs.mediaControls && !leftOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
+            visible = prefs.mediaControls && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && landing != HomeLanding.Minimal,
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         )
 
@@ -1187,6 +1248,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         onClickLabel = L10n.tr("Open"),
                         role = Role.Button,
                     ) { leftOpen = true },
+            )
+        }
+
+        // STR-14: the right-hand handle (a slim bar, tap it or swipe in from the right edge). Physical right edge; the left in right-to-left. Not on Minimal.
+        if (recentsEnabled && !rightOpen && !leftOpen && HomeLandingRules.showsChrome(landing)) {
+            val rightEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) -1f else 1f, 0f)
+            Box(
+                Modifier.align(rightEdge).absolutePadding(right = if (launchpadRtl) 0.dp else 2.dp, left = if (launchpadRtl) 2.dp else 0.dp).width(5.dp).height(64.dp)
+                    .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
+            )
+            Box(
+                Modifier.align(rightEdge).width(24.dp).height(180.dp).then(Modifier.testTag("recents.handle"))
+                    .semantics { contentDescription = L10n.tr("Open recents") }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = L10n.tr("Open recents"), role = Role.Button) { openRecents() },
             )
         }
 

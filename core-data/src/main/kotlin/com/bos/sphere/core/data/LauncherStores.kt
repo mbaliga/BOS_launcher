@@ -137,6 +137,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("wheelGrouping", next.wheelGrouping.name)
             .putString("homeLanding", next.homeLanding.name).putInt("recentsLimit", next.recentsLimit)
             .putBoolean("recentsUsage", next.recentsUseUsageAccess).putBoolean("minimalHints", next.minimalHints)
+            .putString("rightSide", next.rightSide.name)
             .apply()
         DeviceBound.writePrefs(sp, device, next.backgroundPicturePath, next.leftWidgetId)
     }
@@ -267,6 +268,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             recentsLimit = HomeRecents.clampLimit(sp.getInt("recentsLimit", d.recentsLimit)),
             recentsUseUsageAccess = sp.getBoolean("recentsUsage", d.recentsUseUsageAccess),
             minimalHints = sp.getBoolean("minimalHints", d.minimalHints),
+            rightSide = RightSide.parse(sp.getString("rightSide", null)),
         )
     }
 }

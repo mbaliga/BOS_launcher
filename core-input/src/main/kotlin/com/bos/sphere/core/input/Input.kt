@@ -42,6 +42,8 @@ enum class LauncherCommand(val label: String) {
     CornerTopLeft("Top-left corner"), CornerTopRight("Top-right corner"), CornerBottomLeft("Bottom-left corner"), CornerBottomRight("Bottom-right corner"),
     /** HOM-22: step the home landing (Selected apps, Recent apps, All apps, Minimal). */
     CycleLanding("Cycle home landing"),
+    /** STR-14: open the Recents panel (the right-hand card). */
+    OpenRecents("Open recents"),
     Dismiss("Dismiss"),
 }
 
@@ -120,7 +122,7 @@ object DefaultShortcuts {
     private const val K_N = 42; private const val K_P = 44; private const val K_H = 36; private const val K_PERIOD = 56
     private const val K_ESC = 111; private const val K_1 = 8; private const val K_LB = 71; private const val K_RB = 72
     private const val K_TAB = 61; private const val K_L = 40; private const val K_F1 = 131; private const val K_Q = 45
-    private const val K_W = 51; private const val K_A = 29; private const val K_S = 47
+    private const val K_W = 51; private const val K_A = 29; private const val K_S = 47; private const val K_R = 46
 
     val all: List<ShortcutDef> = buildList {
         add(ShortcutDef(LauncherCommand.OpenPalette, KeyChord(K_SLASH, ctrl = true)))
@@ -139,6 +141,7 @@ object DefaultShortcuts {
         add(ShortcutDef(LauncherCommand.CornerBottomLeft, KeyChord(K_A, ctrl = true, shift = true)))
         add(ShortcutDef(LauncherCommand.CornerBottomRight, KeyChord(K_S, ctrl = true, shift = true)))
         add(ShortcutDef(LauncherCommand.CycleLanding, KeyChord(K_L, ctrl = true, shift = true)))
+        add(ShortcutDef(LauncherCommand.OpenRecents, KeyChord(K_R, ctrl = true)))
         add(ShortcutDef(LauncherCommand.Dismiss, KeyChord(K_ESC)))
     }
 }

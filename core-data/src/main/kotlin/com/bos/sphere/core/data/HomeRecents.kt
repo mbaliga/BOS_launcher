@@ -12,8 +12,14 @@ import java.io.File
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-/** One sighting of an app in the foreground from the system's usage log (needs usage access); plain data. */
-data class UsageSighting(val packageName: String, val timeMillis: Long)
+/**
+ * One sighting of an app from the system's usage log (needs usage access); plain data. [background] marks an event of the app going to
+ * the background (ACTIVITY_PAUSED, MOVE_TO_BACKGROUND), as opposed to coming to the foreground (STR-14); both place the app in time.
+ */
+data class UsageSighting(val packageName: String, val timeMillis: Long, val background: Boolean = false)
+
+/** STR-14: one row of the Recents panel: the app key and when it was last seen (launched by Liftoff, or last seen going to the background). */
+data class RecentEntry(val key: String, val timeMillis: Long)
 
 /** The apps the Recent landing may show, as plain data: [key] is [AppEntry.key]. */
 data class RecentCandidate(val key: String, val packageName: String, val workProfile: Boolean)
@@ -58,6 +64,25 @@ object HomeRecents {
         runningFirst: String? = null,
         selfPackage: String = "",
     ): List<String> {
+        val ordered = entries(own, usage, apps, hidden, state, limit, profile, selfPackage).map { it.key }
+        return if (runningFirst != null && runningFirst in ordered) listOf(runningFirst) + (ordered - runningFirst) else ordered
+    }
+
+    /**
+     * STR-14: the same list as [compute] with the time each app was last seen, newest first, one entry per app. This is the ONE source
+     * of the Recent apps landing (HOM-22) and the Recents panel (STR-14). An app's time is the latest of its Liftoff launches and its
+     * usage events (foreground or background), so an app opened from a notification and then left sorts by when it went to the background.
+     */
+    fun entries(
+        own: List<LaunchEvent>,
+        usage: List<UsageSighting>,
+        apps: List<RecentCandidate>,
+        hidden: Set<String>,
+        state: RecentsState = RecentsState(),
+        limit: Int = DEFAULT_LIMIT,
+        profile: RecentsProfile = RecentsProfile.Both,
+        selfPackage: String = "",
+    ): List<RecentEntry> {
         val byKey = apps.associateBy { it.key }
         val byPackage = apps.groupBy { it.packageName }
         val lastOwn = HashMap<String, Long>()
@@ -82,9 +107,8 @@ object HomeRecents {
             if (state.hides(k, t)) continue
             if (t >= (best[k] ?: Long.MIN_VALUE)) best[k] = t
         }
-        val ordered = best.entries.sortedWith(compareByDescending<Map.Entry<String, Long>> { it.value }.thenBy { it.key }).map { it.key }
-            .take(clampLimit(limit))
-        return if (runningFirst != null && runningFirst in ordered) listOf(runningFirst) + (ordered - runningFirst) else ordered
+        return best.entries.sortedWith(compareByDescending<Map.Entry<String, Long>> { it.value }.thenBy { it.key })
+            .take(clampLimit(limit)).map { RecentEntry(it.key, it.value) }
     }
 
     /**
@@ -110,6 +134,26 @@ object HomeRecents {
             .combine(combine(limit, profile) { l, p -> l to p }) { i, (l, p) ->
                 compute(i.own, i.usage, i.apps, i.hidden, i.state, l, p, runningFirst(), selfPackage)
             }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+    }
+
+    /** STR-14: [flow] with the time of each entry (the Recents panel shows "how long ago"). Same inputs, same rules, same thread. */
+    fun entriesFlow(
+        own: Flow<List<LaunchEvent>>,
+        usageTick: Flow<Unit>,
+        usageReader: () -> List<UsageSighting>,
+        apps: Flow<List<RecentCandidate>>,
+        hidden: Flow<Set<String>>,
+        state: Flow<RecentsState>,
+        limit: Flow<Int>,
+        profile: Flow<RecentsProfile>,
+        useUsage: Flow<Boolean>,
+        selfPackage: String = "",
+    ): Flow<List<RecentEntry>> {
+        val sightings: Flow<List<UsageSighting>> = combine(usageTick, useUsage) { _, on -> if (on) usageReader() else emptyList() }
+        return combine(own, sightings, apps, hidden, state) { o, u, a, h, s -> Inputs(o, u, a, h, s) }
+            .combine(combine(limit, profile) { l, p -> l to p }) { i, (l, p) -> entries(i.own, i.usage, i.apps, i.hidden, i.state, l, p, selfPackage) }
             .distinctUntilChanged()
             .flowOn(Dispatchers.Default)
     }

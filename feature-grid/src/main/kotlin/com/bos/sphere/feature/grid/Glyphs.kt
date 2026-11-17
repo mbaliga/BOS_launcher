@@ -279,6 +279,7 @@ object Glyphs {
         CornerActionId.SystemSettings -> Gear
         CornerActionId.OpenLaunchpad -> Bell
         CornerActionId.CycleLanding -> Home
+        CornerActionId.OpenRecents -> Apps
     }
 
     fun forGesture(g: HomeGesture): ImageVector = when (g) {

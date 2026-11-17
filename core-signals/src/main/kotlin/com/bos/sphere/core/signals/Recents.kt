@@ -11,6 +11,18 @@ import android.provider.Settings
 /** One foreground event from the usage log, as plain data. */
 data class UsageEv(val packageName: String, val timeMs: Long, val foreground: Boolean)
 
+/**
+ * STR-14: which usage events count. Public UsageStatsManager event types only (ACTIVITY_RESUMED / ACTIVITY_PAUSED, and their deprecated
+ * MOVE_TO_FOREGROUND / MOVE_TO_BACKGROUND twins): "dismissed to the background" is the last pause or move-to-background of an app.
+ */
+object UsageEventKinds {
+    @Suppress("DEPRECATION")
+    fun isForeground(type: Int): Boolean = type == UsageEvents.Event.ACTIVITY_RESUMED || type == UsageEvents.Event.MOVE_TO_FOREGROUND
+
+    @Suppress("DEPRECATION")
+    fun isBackground(type: Int): Boolean = type == UsageEvents.Event.ACTIVITY_PAUSED || type == UsageEvents.Event.MOVE_TO_BACKGROUND
+}
+
 /** Pure recents rules (DCK-02): newest first, one entry per app, never the excluded ones, and only apps seen in the foreground. */
 object RecentsLogic {
     fun recents(events: List<UsageEv>, exclude: Set<String>, limit: Int): List<String> =
@@ -40,7 +52,8 @@ class UsageRecents(private val context: Context) {
     fun settingsIntent(): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /**
-     * HOM-22: the foreground sightings of the last [windowMs] as plain data, for the Recent landing. Empty without the grant.
+     * HOM-22, STR-14: the foreground AND background sightings of the last [windowMs] as plain data, for the Recent landing and the Recents
+     * panel (one source). Empty without the grant.
      * Public UsageStatsManager events only; the platform has no public list of live tasks. Call it off the main thread.
      */
     fun sightings(windowMs: Long = 7L * 24 * 60 * 60 * 1000, now: Long = System.currentTimeMillis()): List<com.bos.sphere.core.data.UsageSighting> {
@@ -52,9 +65,8 @@ class UsageRecents(private val context: Context) {
             val e = UsageEvents.Event()
             while (q.hasNextEvent()) {
                 q.getNextEvent(e)
-                @Suppress("DEPRECATION")
-                val fg = e.eventType == UsageEvents.Event.ACTIVITY_RESUMED || e.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
-                if (fg) out += com.bos.sphere.core.data.UsageSighting(e.packageName, e.timeStamp)
+                if (UsageEventKinds.isForeground(e.eventType)) out += com.bos.sphere.core.data.UsageSighting(e.packageName, e.timeStamp)
+                else if (UsageEventKinds.isBackground(e.eventType)) out += com.bos.sphere.core.data.UsageSighting(e.packageName, e.timeStamp, background = true)
             }
             out
         }.getOrDefault(emptyList())

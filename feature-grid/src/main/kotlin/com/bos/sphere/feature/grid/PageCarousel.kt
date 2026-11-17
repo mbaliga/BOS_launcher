@@ -137,7 +137,8 @@ private fun PageThumb(
             if (page.keys.isEmpty()) Text(L10n.tr("Empty page"), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.align(Alignment.Center))
             Text("${index + 1}", color = if (selected) HyleColors.Violet else HyleColors.InkDim, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.TopStart).padding(10.dp))
         }
-        @Composable fun Buttons(m: Modifier) = Row(m, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        @Composable fun Buttons(m: Modifier) = androidx.compose.foundation.layout.FlowRow(m, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) { // wraps when the column is narrower than three 48 dp targets (NFR-13 keeps the size, the row wraps instead of clipping the last button)
             CarouselButton(L10n.tr("Move up"), enabled = index > 0, onClick = { onMove(-1) }, glyph = "↑", description = L10n.tr("Move page %d up", index + 1))
             CarouselButton(L10n.tr("Move down"), enabled = index < count - 1, onClick = { onMove(1) }, glyph = "↓", description = L10n.tr("Move page %d down", index + 1))
             CarouselButton(L10n.tr("Delete page"), onClick = onDelete, glyph = "×", danger = true, description = L10n.tr("Delete page %d", index + 1))

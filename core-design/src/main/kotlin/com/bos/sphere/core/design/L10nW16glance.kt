@@ -26,7 +26,7 @@ internal val L10nW16glanceEnglish: Set<String> = setOf(
     "Weather effect",
     "A quiet ambience behind the clock that follows the weather. It needs Weather in the content.",
     "Surface indicator",
-    "A small row at the bottom: Launchpad, home and the right-hand panel",
+    "A small row at the bottom: Comms, home and the right-hand panel",
 )
 
 internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
@@ -55,7 +55,7 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "Efecto del tiempo",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "Un ambiente discreto tras el reloj que sigue el tiempo. Necesita Tiempo en el contenido.",
         "Surface indicator" to "Indicador de superficie",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "Una fila pequeña abajo: Launchpad, inicio y el panel de la derecha",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "Una fila pequeña abajo: Comms, inicio y el panel de la derecha",
     ),
     "fr" to mapOf(
         "Glance" to "Aperçu",
@@ -82,7 +82,7 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "Effet météo",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "Une ambiance discrète derrière l'horloge qui suit la météo. Elle demande Météo dans le contenu.",
         "Surface indicator" to "Indicateur de surface",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "Une petite rangée en bas : Launchpad, accueil et le panneau de droite",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "Une petite rangée en bas : Comms, accueil et le panneau de droite",
     ),
     "de" to mapOf(
         "Glance" to "Überblick",
@@ -109,7 +109,7 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "Wettereffekt",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "Eine ruhige Stimmung hinter der Uhr, die dem Wetter folgt. Dafür muss Wetter im Inhalt aktiv sein.",
         "Surface indicator" to "Flächenanzeige",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "Eine kleine Zeile unten: Launchpad, Start und das rechte Panel",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "Eine kleine Zeile unten: Comms, Start und das rechte Panel",
     ),
     "pt" to mapOf(
         "Glance" to "Resumo",
@@ -136,7 +136,7 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "Efeito do tempo",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "Um ambiente discreto atrás do relógio que segue o tempo. Precisa de Tempo no conteúdo.",
         "Surface indicator" to "Indicador de superfície",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "Uma pequena linha em baixo: Launchpad, início e o painel da direita",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "Uma pequena linha em baixo: Comms, início e o painel da direita",
     ),
     "hi" to mapOf(
         "Glance" to "झलक",
@@ -163,7 +163,7 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "मौसम प्रभाव",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "घड़ी के पीछे मौसम के साथ चलता शांत माहौल। इसके लिए सामग्री में मौसम चाहिए।",
         "Surface indicator" to "सतह संकेतक",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "नीचे एक छोटी पंक्ति: Launchpad, होम और दायाँ पैनल",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "नीचे एक छोटी पंक्ति: Comms, होम और दायाँ पैनल",
     ),
     "zh" to mapOf(
         "Glance" to "概览",
@@ -190,7 +190,7 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "天气效果",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "时钟后方随天气变化的安静氛围。内容中需要包含天气。",
         "Surface indicator" to "界面指示器",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "底部一小行：Launchpad、主页和右侧面板",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "底部一小行：Comms、主页和右侧面板",
     ),
     "ja" to mapOf(
         "Glance" to "ひと目",
@@ -217,7 +217,7 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "天気エフェクト",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "天気に合わせて時計の背後に出る静かな演出。内容に天気が必要です。",
         "Surface indicator" to "サーフェスインジケーター",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "下部の小さな行: Launchpad、ホーム、右側のパネル",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "下部の小さな行: Comms、ホーム、右側のパネル",
     ),
     "ar" to mapOf(
         "Glance" to "نظرة",
@@ -244,6 +244,6 @@ internal val L10nW16glance: Map<String, Map<String, String>> = mapOf(
         "Weather effect" to "تأثير الطقس",
         "A quiet ambience behind the clock that follows the weather. It needs Weather in the content." to "أجواء هادئة خلف الساعة تتبع الطقس. تتطلب تفعيل الطقس في المحتوى.",
         "Surface indicator" to "مؤشر الأسطح",
-        "A small row at the bottom: Launchpad, home and the right-hand panel" to "صف صغير في الأسفل: Launchpad والرئيسية واللوحة اليمنى",
+        "A small row at the bottom: Comms, home and the right-hand panel" to "صف صغير في الأسفل: Comms والرئيسية واللوحة اليمنى",
     ),
 )

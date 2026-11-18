@@ -114,6 +114,6 @@ class RecentsPanelSmokeTest {
         rule.onNodeWithTag("recents.handle").performClick(); settle()
         assertTrue(panelOpen())
         AppSmokeHarness.press(sc, KeyEvent.KEYCODE_N, ctrl = true); settle()
-        assertFalse("opening Launchpad closes the recents panel", rule.onAllNodesWithTag("recents.panel").fetchSemanticsNodes().isNotEmpty())
+        assertFalse("opening Comms closes the recents panel", rule.onAllNodesWithTag("recents.panel").fetchSemanticsNodes().isNotEmpty())
     }
 }

@@ -119,7 +119,7 @@ class StrGroupsStateTest {
         GroupsSettings.moveGroup("work", 1)
         assertTrue("creating, renaming and reordering are not destructive", seen.isEmpty())
         GroupsSettings.deleteGroup("noise")
-        assertEquals(listOf("delete Launchpad group" to 4), seen) // the group was still there when the hook ran
+        assertEquals(listOf("delete Comms group" to 4), seen) // the group was still there when the hook ran
         assertNull(GroupsSettings.config.value.group("noise"))
         assertTrue(GroupsSettings.config.value.assignments.none { it.groupId == "noise" })
         GroupsSettings.deleteGroup("noise")
@@ -127,7 +127,7 @@ class StrGroupsStateTest {
         GroupsSettings.removeRule("r1")
         GroupsSettings.unassign(AssignKind.App, "com.nothing")
         GroupsSettings.unassign(AssignKind.Person, "p:1")
-        assertEquals(listOf("delete Launchpad group", "remove Launchpad group rule", "remove Launchpad assignment"), seen.map { it.first })
+        assertEquals(listOf("delete Comms group", "remove Comms group rule", "remove Comms assignment"), seen.map { it.first })
     }
 
     @Test fun STR_13_theStoreRestoresAndSnapshotsWholeConfigs() {

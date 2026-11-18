@@ -181,7 +181,7 @@ class HomeLandingItemsW24Test : TourBase() {
         openQuickSheet()
         rule.onNodeWithText("Files, usage and timeline").performScrollTo().performClick(); settle()
         // Wave 25 (hubData): the panels are views of the Launchpad hub now (no sheet of their own); its switcher scrolls on a narrow screen.
-        assertTrue("the Launchpad hub has the three panel views", textShown("Files") && textShown("Usage") && textShown("Timeline"))
+        assertTrue("the Comms hub has the three panel views", textShown("Files") && textShown("Usage") && textShown("Timeline"))
         rule.onNodeWithText("Timeline", useUnmergedTree = true).performScrollTo().performClick(); settle()
         waitFor("the timeline lists the seeded opens") { textShown("Bravo") && textShown("Alpha") }
         rule.onNodeWithText("Usage", useUnmergedTree = true).performScrollTo().performClick(); settle() // HOM-17: without usage access it explains how to grant it, and does not crash

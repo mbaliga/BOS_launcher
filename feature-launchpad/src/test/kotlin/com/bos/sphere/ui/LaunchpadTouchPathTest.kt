@@ -32,7 +32,7 @@ class LaunchpadTouchPathTest {
         var opened = 0
         rule.setContent { LaunchpadRail(onOpen = { opened++ }, source = flowOf(unread), accessOverride = true) }
         rule.waitForIdle()
-        rule.onNodeWithContentDescription("2 unread. Launchpad").performClick()
+        rule.onNodeWithContentDescription("2 unread. Comms").performClick()
         assertEquals(1, opened)
     }
 
@@ -40,7 +40,7 @@ class LaunchpadTouchPathTest {
         var opened = 0
         rule.setContent { LaunchpadRail(onOpen = { opened++ }, source = flowOf(unread), accessOverride = true) }
         rule.waitForIdle()
-        rule.onNodeWithContentDescription("2 unread. Launchpad").performTouchInput { swipeRight() }
+        rule.onNodeWithContentDescription("2 unread. Comms").performTouchInput { swipeRight() }
         assertEquals(1, opened)
     }
 
@@ -48,7 +48,7 @@ class LaunchpadTouchPathTest {
         var opened = 0
         rule.setContent { LaunchpadRail(onOpen = { opened++ }, source = flowOf(unread), accessOverride = false) }
         rule.waitForIdle()
-        rule.onNodeWithContentDescription("2 unread. Launchpad").assertDoesNotExistCompat()
+        rule.onNodeWithContentDescription("2 unread. Comms").assertDoesNotExistCompat()
     }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertDoesNotExistCompat() = assertDoesNotExist()

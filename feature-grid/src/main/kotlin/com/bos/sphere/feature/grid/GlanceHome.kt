@@ -460,7 +460,7 @@ internal fun GlanceIndicator(
         modifier.padding(bottom = 4.dp).graphicsLayer { alpha = a },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (hasLaunchpad) IndicatorButton("glance.indicator.launchpad", L10n.tr("Open Launchpad"), onOpenLaunchpad) { Icon(Glyphs.Menu, null, tint = ink.copy(alpha = 0.55f), modifier = Modifier.size(16.dp)) }
+        if (hasLaunchpad) IndicatorButton("glance.indicator.launchpad", L10n.tr("Open Comms"), onOpenLaunchpad) { Icon(Glyphs.Menu, null, tint = ink.copy(alpha = 0.55f), modifier = Modifier.size(16.dp)) }
         // The current surface: not interactive, one spoken line.
         Box(Modifier.size(32.dp).semantics { contentDescription = L10n.tr("Glance home") }, contentAlignment = Alignment.Center) { Icon(Glyphs.Home, null, tint = ink, modifier = Modifier.size(18.dp)) }
         for (d in right) {

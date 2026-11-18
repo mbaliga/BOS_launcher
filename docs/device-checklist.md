@@ -83,11 +83,11 @@ Record with: `adb logcat -b all -d > run.txt` after each section, and look for `
 
 ## State, backup and grants (wave 3 state stream)
 
-- [ ] NFR-18: `adb shell bmgr backupnow com.bos.sphere`, uninstall, reinstall, `adb shell bmgr restore` (or a device transfer): after the first start no corner or left-page widget is bound, the picked background picture is gone, and Ground Control > Backup lists the widgets under "Widgets to add again" with a Dismiss action. Layout, settings and Launchpad rules are intact. Launchpad groups, people links and the last name (`launchpad_groups`) are excluded from backup and transfer by design: after the restore the groups list is empty until the setup file is imported.
+- [ ] NFR-18: `adb shell bmgr backupnow com.bos.sphere`, uninstall, reinstall, `adb shell bmgr restore` (or a device transfer): after the first start no corner or left-page widget is bound, the picked background picture is gone, and Ground Control > Backup lists the widgets under "Widgets to add again" with a Dismiss action. Layout, settings and Comms rules are intact. Comms groups, people links and the last name (`launchpad_groups`) are excluded from backup and transfer by design: after the restore the groups list is empty until the setup file is imported.
 - [ ] NFR-18: an ordinary app update (install over the top) keeps every widget and the background picture.
 - [ ] CFG-02: from a setup file exported on another install, Add on each listed widget shows the system bind screen (when needed) and the provider's configure screen, then the widget lands in its corner. Repeat with a widget whose provider lives in the work profile (recorded limit: main profile only).
-- [ ] CFG-04: remove a Launchpad rule, then Backup > restore the newest snapshot: the rule is back.
-- [ ] CFG-07: from a clean install, press the microphone button in Radar, open the Launchpad access prompt, the Recents panel's access row and the dock's notification access: each shows the one-screen explanation before the system route.
+- [ ] CFG-04: remove a Comms rule, then Backup > restore the newest snapshot: the rule is back.
+- [ ] CFG-07: from a clean install, press the microphone button in Radar, open the Comms access prompt, the Recents panel's access row and the dock's notification access: each shows the one-screen explanation before the system route.
 - [ ] CFG-01: Ground Control > Home > Keyboard shortcuts: change a shortcut, export the setup, import it on a second install: the same key works there.
 ## Edit card and empty home (wave 8 editCard)
 
@@ -113,14 +113,14 @@ Run `tools/device_nfr.sh` on the mid-range reference device for the rows marked 
 | NFR-11 | section 4 of this file (kill, reboot, package update, profile toggle, display hot-plug) | every step in section 4 leaves state intact | |
 | NFR-12 | debug build, `adb logcat -s StrictMode` while doing section 8 and one cold start | no StrictMode disk or network violation from Liftoff frames on the main thread other than the first prefs read in `MainActivity.onCreate` (known, recorded) | |
 | NFR-13 | TalkBack on, every home style (Grid, List, Psp, Dsi), Continuous and Paged, Orbit, Filmstrip and Flat search; swipe through the whole screen | each item announces a name, order follows the intended order (Orbit: best match first), every action reachable | |
-| NFR-14 | Settings > Accessibility > Remove animations (or the three animation scales to 0), then open: palette, drawer (all styles), Ground Control, Launchpad, notifications hub, page home, XMB, Orbit | no spring, slide or loop; only fades and snaps; the Launchpad still slides briefly and linearly (known gap) | |
+| NFR-14 | Settings > Accessibility > Remove animations (or the three animation scales to 0), then open: palette, drawer (all styles), Ground Control, Comms, notifications hub, page home, XMB, Orbit | no spring, slide or loop; only fades and snaps; the Comms still slides briefly and linearly (known gap) | |
 | NFR-15 | each background kind (black, wallpaper bright and dark, solid, gradient, texture, live scenes, Horizon, a bright photo): look at clock and labels; run an accessibility contrast check (Accessibility Scanner) on home, palette, settings | primary text 4.5:1; live scenes and Horizon are the unsampled cases to look at first | |
 | NFR-17 | Ground Control > Backup > Crash reports: use Lab > "Crash on purpose", then on the recovery screen share the report (Email / share sheet), Discard | the share sheet is the only exit; no network traffic from Liftoff (check with a packet capture or `dumpsys netstats`) | |
 | NFR-19 | section 9, three-button and gesture navigation, on a notch device | every step in section 9 passes | |
 
-## Launchpad groups (wave 10 groups)
+## Comms groups (wave 10 groups)
 
-- [ ] STR-13: Ground Control > Launchpad > Groups: create "Work" (Normal) and "Family" (Priority, pick a colour). Open Launchpad: the section titles are Family, Work, Everything else; the selected one is large and dark, the others small and grey.
+- [ ] STR-13: Ground Control > Comms > Groups: create "Work" (Normal) and "Family" (Priority, pick a colour). Open Comms: the section titles are Family, Work, Everything else; the selected one is large and dark, the others small and grey.
 - [ ] STR-13: from a chat row open the menu (long press, then swipe right and More) > Move to group... > pick the person scope > Work. The same person's chats from a second messaging app (same name, or "Name (WhatsApp)") land in Work too.
 - [ ] STR-13: with the contacts grant off, the rule editor says contact conditions never match; turn the grant on from Groups settings (explanation first, CFG-07) and the "in my contacts" and "starred" conditions start to match; turn it off again and nothing crashes.
 - [ ] STR-13: set My last name, add the rule "sender last name is my last name" to Family: a message from someone with that surname shows in Family, in front of other sections, even if its app is on a digest.
@@ -128,7 +128,7 @@ Run `tools/device_nfr.sh` on the mid-range reference device for the rows marked 
 - [ ] STR-13, INP-01..03: with a keyboard only, reach a group title with the arrow keys, select it with Enter; in the manager, Move up and Move down reorder groups and rules; with a mouse, right-click a row opens the same menu.
 - [ ] STR-13, NFR-13: TalkBack reads each group title with its priority, each manager button with the group's name (for example "Move Work up"), and the rule summary and "matches N current notifications" line change as a live region while editing.
 - [ ] STR-13, CFG-04: delete a group, then Ground Control > Backup > restore the newest snapshot: the group, its assignments and rules are back. Export the setup, import on a second install: groups, links and rules arrive; cloud backup and device transfer do not carry them (bmgr restore leaves them empty).
-- [ ] STR-13: with 100+ real notifications from many apps, Launchpad opens and scrolls without a stall and the section order matches the manager.
+- [ ] STR-13: with 100+ real notifications from many apps, Comms opens and scrolls without a stall and the section order matches the manager.
 - [ ] HOM-22: without usage access, launch four apps from Liftoff, set the landing to Recent apps (Ground Control > Home, the quick sheet or Ctrl+Shift+L): they appear newest first; relaunching one moves it to the front; the empty state explains how to include apps opened elsewhere.
 - [ ] HOM-22: grant usage access (Settings > Special app access), open an app from the system's own app list, return to Liftoff: the app joins the Recent landing without restarting. Revoke the grant: it stays out of new sightings and nothing crashes. No work-profile app opened inside the work profile appears from usage events (UsageStatsManager reports the calling profile); work apps launched from Liftoff do.
 - [ ] HOM-22: "Remove from recents" removes one app, "Clear recents" empties the list, launching an app again brings it back. Restart the phone: removals persist. Export the setup and inspect it: no recents or removals in the file; bmgr restore leaves the removals empty.
@@ -136,15 +136,15 @@ Run `tools/device_nfr.sh` on the mid-range reference device for the rows marked 
 - [ ] HOM-22: switch the landing four times from Ground Control > Home, the quick sheet (long press the wallpaper) and Ctrl+Shift+L: each shows its surface with a short cross-fade (an instant swap with animations off); switching back to Selected apps shows the same pages, folders and widgets.
 - [ ] HOM-22: Recent apps in each home style (grid, list, XMB, DSi), portrait and landscape, light and dark, right to left: newest first, no pages, long press shows the app menu with Remove from recents and Clear recents; with no history the one-line empty state shows and "Allow usage access" opens the explanation then the system screen.
 - [ ] HOM-22, HOM-05: All apps landing: A to Z, the alphabet index jumps in the grid and DSi styles and the list rail still scrubs, type-to-filter and the Work and Personal tabs work, hidden apps stay out; a hardware keyboard reaches the filter field.
-- [ ] HOM-22, INP-16, INP-17: Minimal shows only the wallpaper and four faint dots (no clock, strip, dock, rail, page dots); the edge swipe still opens Launchpad, a long press opens the quick sheet, and TalkBack reads the four hotspots as buttons in reading order; "Show corner dots" off hides the dots and the hotspots still work.
+- [ ] HOM-22, INP-16, INP-17: Minimal shows only the wallpaper and four faint dots (no clock, strip, dock, rail, page dots); the edge swipe still opens Comms, a long press opens the quick sheet, and TalkBack reads the four hotspots as buttons in reading order; "Show corner dots" off hides the dots and the hotspots still work.
 - [ ] HOM-01, HOM-22: on a fresh install the hint shows "Long press to add apps" and "Or show recent apps"; tapping the second switches to Recent apps with the empty state, and the quick sheet's "Edit home pages" returns to the empty page in edit mode.
 
 ## Cross-cutting audit (wave 13)
 
-- [ ] NFR-13: TalkBack on, Ground Control > Launchpad > Groups: type your last name into the field. TalkBack reads the typed text back, not only the field name (the field carries a content description; if it hides the typed text on a device, report it).
-- [ ] NFR-13: Launchpad roomy list: the "+N more" line and each title in the strip at the top are announced as a button and a tab and can be hit with a thumb without touching the neighbour (48 dp targets, wave 13).
+- [ ] NFR-13: TalkBack on, Ground Control > Comms > Groups: type your last name into the field. TalkBack reads the typed text back, not only the field name (the field carries a content description; if it hides the typed text on a device, report it).
+- [ ] NFR-13: Comms roomy list: the "+N more" line and each title in the strip at the top are announced as a button and a tab and can be hit with a thumb without touching the neighbour (48 dp targets, wave 13).
 - [ ] NFR-13: edit card, page carousel: Add page, Move up, Move down and Delete page are announced with the page number and can be hit reliably. Known gap, not changed in wave 13: the add carousel's tab labels (Apps, Widgets, Folders, Shortcuts) and the Personal and Work chips are smaller than 48 dp because the add band is a fixed 132 to 136 dp high; judge whether they are usable and decide on a taller band.
-- [ ] NFR-13, font scale 200 percent: Launchpad (roomy list, groups manager, rule editor), the edit card, the landing switcher in the quick sheet and the Recent apps landing. Text wraps or ellipsizes, nothing is cut off, every button stays reachable by scrolling.
+- [ ] NFR-13, font scale 200 percent: Comms (roomy list, groups manager, rule editor), the edit card, the landing switcher in the quick sheet and the Recent apps landing. Text wraps or ellipsizes, nothing is cut off, every button stays reachable by scrolling.
 - [ ] NFR-17: with the groups set up (people, rules, last name), trigger "Copy report" in Capabilities and share a crash report from Ground Control; neither contains a name, a sender or a notification text.
 - [ ] CFG-01, CFG-03: export the setup, edit the file by hand to add an unknown field inside one group, one person and one rule and an unknown condition kind in a rule, import it, export again: the unknown fields are still there, and the rule with the unknown condition shows as off.
 ## Radar background and signal view (wave 14 signalFx)
@@ -176,12 +176,12 @@ Nothing here has been confirmed on a device. Compare every item with the owner's
 - [ ] NFR-13: with TalkBack on, the home and Radar announce the signal once ("Signal: good, Wi-Fi") and the background is not focusable.
 ## Recents panel (wave 15, STR-14)
 
-- [ ] STR-14: from the home, drag in from the right edge: the home shrinks into the same rounded card as Launchpad, pushed to the LEFT, following the finger; a short drag springs back, a long one or a fling settles open in about 0.45 s. A thin sliver of the card stays at the left edge; tap it, drag it back, press Back or Esc: home returns. Compare the card, scrim and sliver with Launchpad on the other side.
+- [ ] STR-14: from the home, drag in from the right edge: the home shrinks into the same rounded card as Comms, pushed to the LEFT, following the finger; a short drag springs back, a long one or a fling settles open in about 0.45 s. A thin sliver of the card stays at the left edge; tap it, drag it back, press Back or Esc: home returns. Compare the card, scrim and sliver with Comms on the other side.
 - [ ] STR-14, INP-08: the edge swipe does not fight the system back gesture on a gesture-navigation device (the right edge back gesture of the system may win in the first few dp; the 28 dp zone and the handle are the fallback). The slim handle on the right edge opens the panel with a tap; the corner and gesture action "Open recents" and Ctrl+R open it.
 - [ ] STR-14: launch three apps from Liftoff, go home, open the panel: they are listed newest first, one row each, with "Recent" and how long ago; the one line under the title says Android does not tell a launcher which apps are still running. Relaunch one: it moves to the top.
 - [ ] STR-14: grant usage access, open an app from a notification and from the system share sheet, leave it, return to Liftoff and open the panel: the apps appear ordered by when you left them; without the grant only apps opened from Liftoff appear and the empty state offers "Allow usage access".
 - [ ] STR-14: long press, right-click (mouse) and the Menu key on a row open the app menu with "Remove from recents"; the app disappears and returns after you use it again. "Clear all" empties the list. Tap a row: the app opens.
-- [ ] STR-14, RTL: switch to Arabic: the card goes to the RIGHT, the sliver and handle are on the right, the swipe comes from the LEFT edge; Launchpad is then on the left edge.
+- [ ] STR-14, RTL: switch to Arabic: the card goes to the RIGHT, the sliver and handle are on the right, the swipe comes from the LEFT edge; Comms is then on the left edge.
 - [ ] STR-14: Ground Control > Home > Right side: Recents panel, Dock rail, Off. With Dock rail and the dock turned on, the right-edge swipe reveals the dock rail; with the dock off nothing is turned on by it. With Off there is no handle and no swipe.
 - [ ] STR-14, NFR-14: Remove animations on: the card snaps and the panel cross-fades. Font size 200 percent and display size large: rows and the header wrap, nothing overlaps the sliver, Clear all is reachable.
 - [ ] STR-14, NFR-13: TalkBack reads each row as "Name, Recent, N min ago", the sliver as "Home card. Return to home", the handle as "Open recents". With a keyboard, Tab and arrows reach each row and Clear all; Enter opens, Menu opens the menu, Esc returns.
@@ -205,15 +205,15 @@ Nothing here has been confirmed on a device. Compare with the owner's screenshot
 
 Nothing here has been confirmed on a device. Owner bug report on build 48: "The glance needs to have launchpad on the left. Why is that missing?" Decisions: `docs/decisions/glanceEdges.md`. Robolectric renders: `feature-grid/build/screenshots/glance_handles_*.png`.
 
-- [ ] STR-01, HOM-23, NFR-20: gesture navigation phone, Glance home: drag in from the PHYSICAL left edge. Record what happens: the system back gesture zone (about 24 to 30 dp) can take the first dp and cancel the stream; the Glance edge zone is 48 dp so a swipe that starts a little further in (where the handle is) should open Launchpad. NFR-20 forbids `systemGestureExclusion`, so the launcher never claims the zone. Note the dp at which the swipe starts to work, per device.
-- [ ] STR-01, HOM-23: the handle tap is the reliable path: tap the slim bar on the left edge (48 dp wide, 160 dp tall, centred): Launchpad opens. Same with three-button navigation.
+- [ ] STR-01, HOM-23, NFR-20: gesture navigation phone, Glance home: drag in from the PHYSICAL left edge. Record what happens: the system back gesture zone (about 24 to 30 dp) can take the first dp and cancel the stream; the Glance edge zone is 48 dp so a swipe that starts a little further in (where the handle is) should open Comms. NFR-20 forbids `systemGestureExclusion`, so the launcher never claims the zone. Note the dp at which the swipe starts to work, per device.
+- [ ] STR-01, HOM-23: the handle tap is the reliable path: tap the slim bar on the left edge (48 dp wide, 160 dp tall, centred): Comms opens. Same with three-button navigation.
 - [ ] HOM-23: the left and right handles are barely there: visible at low alpha after a touch, almost invisible after about 4 seconds, back on any touch; with Remove animations on they change instantly. Pure black surface still reads calm next to the owner's references.
-- [ ] STR-09, STR-13, HOM-23: with notification access on and an unread notification, a small dot shows above the left handle (the group colour and a star for a Priority group); tap it opens Launchpad; nothing waiting, no dot.
-- [ ] HOM-23: tap the list glyph at the bottom centre (Launchpad) and the right-hand dot: Launchpad and the recents panel open; the home glyph does nothing; each target is 48 dp (TalkBack: "Open Launchpad", "Open recents", "Glance home").
+- [ ] STR-09, STR-13, HOM-23: with notification access on and an unread notification, a small dot shows above the left handle (the group colour and a star for a Priority group); tap it opens Comms; nothing waiting, no dot.
+- [ ] HOM-23: tap the list glyph at the bottom centre (Comms) and the right-hand dot: Comms and the recents panel open; the home glyph does nothing; each target is 48 dp (TalkBack: "Open Comms", "Open recents", "Glance home").
 - [ ] STR-14, HOM-23: drag in from the right edge, and tap the right handle: recents opens. Right side set to Dock rail or Off: no right handle.
-- [ ] STR-01: Launchpad set to Off in Ground Control: no left handle, dot or indicator glyph; the edge swipe does nothing; nothing looks dead. Rail setting on: the rail shows on Glance as on the other landings.
-- [ ] STR-01, STR-14, RTL: Arabic: the Launchpad handle and swipe are on the RIGHT edge, recents on the LEFT; the indicator mirrors.
-- [ ] HOM-23, NFR-13: TalkBack: swipe to the handles (focusable buttons labelled "Open Launchpad" and "Open recents"), double tap opens; with a keyboard Tab reaches the indicator buttons.
+- [ ] STR-01: Comms set to Off in Ground Control: no left handle, dot or indicator glyph; the edge swipe does nothing; nothing looks dead. Rail setting on: the rail shows on Glance as on the other landings.
+- [ ] STR-01, STR-14, RTL: Arabic: the Comms handle and swipe are on the RIGHT edge, recents on the LEFT; the indicator mirrors.
+- [ ] HOM-23, NFR-13: TalkBack: swipe to the handles (focusable buttons labelled "Open Comms" and "Open recents"), double tap opens; with a keyboard Tab reaches the indicator buttons.
 
 ## Radar search cleanup, query line at the top, Orbit tiers (wave 18, radarSearch)
 
@@ -275,7 +275,7 @@ For each surface: tap its row, leave Settings within 3 seconds, use the surface 
 - [ ] Glance: swipe between the clock and the edges, open and close the quick sheet.
 - [ ] Drawer scroll: open the drawer and fling the list up and down for the 10 seconds.
 - [ ] Radar: open and type: open Radar, type a few words, clear, type again.
-- [ ] Launchpad: open and close: open and close Launchpad repeatedly.
+- [ ] Comms: open and close: open and close Comms repeatedly.
 - [ ] Page swipe: swipe through the home pages back and forth.
 Run each on a release build with animations on, not with the debugger attached. The measure is the platform's own `FrameMetrics` total duration; it is not the same number as `gfxinfo` or `FrameTimingMetric`, so quote which one you used.
 
@@ -285,7 +285,7 @@ Swipe Liftoff away from recents, open it from the launcher or the home button, t
 ### Checklist (Pass, Fail or Skip, plus a note; kept on the phone)
 - [ ] TalkBack order: TalkBack on, swipe through home, the drawer and Radar; order follows the screen, every control is named (NFR-13).
 - [ ] Gesture navigation: edge swipe against the back gesture: with gesture navigation on, swipe from the left and right edges; note which edge opens a Liftoff panel and which goes Back (NFR-20, STR-01).
-- [ ] Animations removed: Remove animations on; Radar, Launchpad and page turns do not slide or loop (NFR-14).
+- [ ] Animations removed: Remove animations on; Radar, Comms and page turns do not slide or loop (NFR-14).
 - [ ] Font size 200 percent: largest font (Developer options font scale 2.0); no cut-off text on home, Radar, Settings (NFR-13).
 - [ ] Display size large: no overlap on the grid, the dock or Radar (NFR-13).
 - [ ] Radar black buttons in daylight, dark and light: field, buttons and results readable at full brightness in both themes (docs/decisions/radarGlass.md).

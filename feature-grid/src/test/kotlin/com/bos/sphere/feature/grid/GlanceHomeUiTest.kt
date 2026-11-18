@@ -299,7 +299,7 @@ class GlanceHomeUiTest {
         val lp = tag("glance.indicator.launchpad"); val rt = tag("glance.indicator.right.Recents")
         lp.assertIsDisplayed(); rt.assertIsDisplayed()
         for (n in listOf(lp, rt)) { val b = n.fetchSemanticsNode().boundsInRoot; assertTrue("48 dp target", b.width >= 48f * 2f - 1f && b.height >= 48f * 2f - 1f) }
-        assertEquals(1, rule.onAllNodesWithContentDescription("Open Launchpad").fetchSemanticsNodes().size)
+        assertEquals(1, rule.onAllNodesWithContentDescription("Open Comms").fetchSemanticsNodes().size)
         assertEquals(1, rule.onAllNodesWithContentDescription("Open recents").fetchSemanticsNodes().size)
         rule.onNodeWithContentDescription("Glance home").assertHasNoClickAction()
         lp.performClick(); rt.performClick()
@@ -307,7 +307,7 @@ class GlanceHomeUiTest {
         assertTrue("both are focus nodes", LauncherInput.focus.nodes().map { it.id }.containsAll(listOf("glance.indicator.launchpad", "glance.indicator.right.Recents")))
         Snapshot.withMutableSnapshot { on.value = false }
         rule.waitForIdle()
-        assertFalse(visible("Open Launchpad")); assertFalse(visible("Open recents")); assertFalse(visible("Glance home"))
+        assertFalse(visible("Open Comms")); assertFalse(visible("Open recents")); assertFalse(visible("Glance home"))
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -320,7 +320,7 @@ class GlanceHomeUiTest {
                 onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(), onOpenRight = { opened += "right" },
             )
         }
-        assertFalse("Launchpad off: no Launchpad glyph", visible("Open Launchpad"))
+        assertFalse("Comms off: no Comms glyph", visible("Open Comms"))
         rule.onNodeWithContentDescription("Show the dock").performClick()
         assertEquals(listOf("right"), opened)
     }
@@ -336,7 +336,7 @@ class GlanceHomeUiTest {
                 )
                 val tint = if (dark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black
                 val red = com.bos.sphere.core.design.rememberMotionPrefs().reduced
-                GlanceEdgeHandle("Open Launchpad", "glance.handle.left", rightEdge = rtl, wake = { wake.intValue }, reduced = red, tint = tint, onOpen = { taps += "left" },
+                GlanceEdgeHandle("Open Comms", "glance.handle.left", rightEdge = rtl, wake = { wake.intValue }, reduced = red, tint = tint, onOpen = { taps += "left" },
                     modifier = Modifier.align(androidx.compose.ui.BiasAbsoluteAlignment(if (rtl) 1f else -1f, 0f)))
                 GlanceEdgeHandle("Open recents", "recents.handle", rightEdge = !rtl, wake = { wake.intValue }, reduced = red, tint = tint, onOpen = { taps += "right" },
                     modifier = Modifier.align(androidx.compose.ui.BiasAbsoluteAlignment(if (rtl) -1f else 1f, 0f)))
@@ -348,7 +348,7 @@ class GlanceHomeUiTest {
     fun HOM_23_theQuietHandlesAre48By160FocusableLabelledAndTapOpen() {
         val taps = ArrayList<String>(); val wake = androidx.compose.runtime.mutableIntStateOf(0)
         handles(false, wake, taps)
-        for ((t, d) in listOf("glance.handle.left" to "Open Launchpad", "recents.handle" to "Open recents")) {
+        for ((t, d) in listOf("glance.handle.left" to "Open Comms", "recents.handle" to "Open recents")) {
             val b = tag(t).fetchSemanticsNode().boundsInRoot
             assertEquals("$t is 48 dp wide", 48f * 2f, b.width, 1f)
             assertEquals("$t is 160 dp tall", 160f * 2f, b.height, 1f)

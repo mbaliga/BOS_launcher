@@ -63,7 +63,7 @@ class StateGapsAuditTest {
         assertTrue(svc.contains("limiter.decide(reason, System.currentTimeMillis())"))
         assertTrue("the first snapshot of each burst is pinned in the store", svc.contains("pin = d.burstStart"))
         val kinds = Repo.mainSources().flatMap { f -> Regex("""DestructiveEdits\.before\("([^"]+)"\)""").findAll(f.readText()).map { it.groupValues[1] }.toList() }.toSet()
-        assertTrue("Launchpad rule removal is hooked: $kinds", "remove Launchpad rule" in kinds)
+        assertTrue("Comms rule removal is hooked: $kinds", "remove Comms rule" in kinds)
         assertTrue(kinds.size >= 6)
     }
 

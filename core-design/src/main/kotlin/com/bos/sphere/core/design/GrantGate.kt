@@ -75,9 +75,9 @@ object GrantGateLogic {
     fun copy(kind: GrantKind): GrantCopy = when (kind) {
         GrantKind.Notifications -> GrantCopy(
             "Show notifications here",
-            "Reads the title, text and actions of your notifications, and which media is playing, so Launchpad and the media strip can show them.",
+            "Reads the title, text and actions of your notifications, and which media is playing, so Comms and the media strip can show them.",
             STAYS_ON_DEVICE, "Allow notification access",
-            "Notification access is still off, so Launchpad and the media strip stay empty.",
+            "Notification access is still off, so Comms and the media strip stay empty.",
         )
         GrantKind.UsageAccess -> GrantCopy(
             "Show recent apps",

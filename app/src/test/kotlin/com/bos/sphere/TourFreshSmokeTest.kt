@@ -167,9 +167,9 @@ class TourFreshSmokeTest : TourBase() {
         key(KeyEvent.KEYCODE_COMMA, ctrl = true); check("ground control", Surface.Settings)
         stores.prefs.update { it.copy(leftPage = LeftPage.Off) }; settle(); check("launchpad off while Ground Control is open", Surface.Settings)
         back(); check("closed", Surface.Home)
-        assertFalse("Launchpad Off: no handle", tagShown("glance.handle.left")); swipeFromLeft(); assertFalse("and no swipe", launchpadShown()); check("off", Surface.Home)
+        assertFalse("Comms Off: no handle", tagShown("glance.handle.left")); swipeFromLeft(); assertFalse("and no swipe", launchpadShown()); check("off", Surface.Home)
         stores.prefs.update { it.copy(leftPage = LeftPage.Launchpad) }; settle()
-        assertTrue("Launchpad back On: the handle is back", tagShown("glance.handle.left")); swipeFromLeft(); check("on again", Surface.Launchpad); back()
+        assertTrue("Comms back On: the handle is back", tagShown("glance.handle.left")); swipeFromLeft(); check("on again", Surface.Launchpad); back()
         // the background pair and the hotspot count change under the open home without a crash
         for (pair in listOf(com.bos.sphere.core.data.BgItem.None to com.bos.sphere.core.data.BgItem.None, com.bos.sphere.core.data.BackgroundChoice.DEFAULT.let { it.slot1 to it.slot2 })) {
             stores.prefs.update { it.copy(backgroundSlot1 = pair.first, backgroundSlot2 = pair.second) }; settle(); check("background $pair", Surface.Home)
@@ -201,7 +201,7 @@ class TourFreshSmokeTest : TourBase() {
         for ((name, opener) in listOf<Pair<String, () -> Unit>>(
             "radar" to { key(KeyEvent.KEYCODE_SLASH, ctrl = true) }, "drawer" to { key(KeyEvent.KEYCODE_D, ctrl = true) }, "ground control" to { key(KeyEvent.KEYCODE_COMMA, ctrl = true) })) {
             opener(); val shown = open(); assertFalse("$name opened", shown.contains(Surface.Home))
-            tapAt(0.02f, 0.5f); check("$name, left edge tapped"); assertFalse("$name: Launchpad opened by an edge tap", launchpadShown())
+            tapAt(0.02f, 0.5f); check("$name, left edge tapped"); assertFalse("$name: Comms opened by an edge tap", launchpadShown())
             // Wave 25 (dead touch): Radar takes a tap on empty space itself and closes; that one tap must not also open Launchpad, and Home behind it is then live,
             // so a second edge tap is a real edge tap on Home and is not part of this check.
             if (name == "radar") { assertFalse("radar: the edge tap closes Radar without opening Recents", recentsShown()); assertEquals("radar closed by the empty-space tap", setOf(Surface.Home), open().toSet()); continue }

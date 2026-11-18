@@ -310,7 +310,7 @@ class InputTouchPathsUiTest {
         }
         rule.waitForIdle()
         LauncherInput.focus.request("w4.a"); rule.waitForIdle()
-        assertTrue("with Launchpad closed an arrow moves along the home", LauncherInput.focus.move(com.bos.sphere.core.input.FocusDir.Right))
+        assertTrue("with Comms closed an arrow moves along the home", LauncherInput.focus.move(com.bos.sphere.core.input.FocusDir.Right))
         LauncherInput.focus.request("w4.a"); rule.waitForIdle()
         rule.runOnUiThread { open = true }
         rule.waitForIdle()

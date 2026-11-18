@@ -40,6 +40,6 @@ class GlanceWaitingDotTest {
         rule.setContent { WaitingIndicatorView(count = 2, headline = null, onOpen = {}, priorityCount = 1, accent = Color(0xFFE53935), quiet = true) }
         rule.onNodeWithTag("glance.waiting").assertIsDisplayed()
         val d = rule.onNodeWithTag("glance.waiting").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].firstOrNull()
-        assertEquals("2 waiting, 1 priority. Launchpad", d)
+        assertEquals("2 waiting, 1 priority. Comms", d)
     }
 }

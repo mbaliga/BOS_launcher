@@ -497,7 +497,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
 
     // --- Launchpad ---------------------------------------------------------------------------
     out += SettingCategory(
-        "Launchpad",
+        "Comms",
         Glyphs.Bell,
         buildList {
             val leftPick: (com.bos.sphere.core.data.LeftPage) -> Unit = { v ->
@@ -521,7 +521,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             }
             add(
                 SettingItem.Choice(
-                    x("Launchpad theme"), Glyphs.Moon, com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { x(it.label) },
+                    x("Comms theme"), Glyphs.Moon, com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { x(it.label) },
                     hint = x("Dark suits the rest of the launcher; Light is the classic hub look."),
                     preview = {
                         VisualChoice(com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { v -> upd { it.copy(launchpadTheme = v) } }, { x(it.label) }, columns = 3, previewHeight = 96.dp) { t ->
@@ -532,7 +532,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })
             add(
-                SettingItem.Pane(x("Launchpad gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {
+                SettingItem.Pane(x("Comms gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {
                     val bound by com.bos.sphere.core.data.LaunchpadSettings.gestures.collectAsState()
                     com.bos.sphere.core.data.LaunchpadGesture.entries.forEach { g ->
                         Sub(g.label)
@@ -793,7 +793,7 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     out += SettingCategory(x("Gestures"), Glyphs.Pinch, items("Gestures", "Motion"))
     out += SettingCategory(x("App drawer"), Glyphs.Widget, cat("Apps")?.items.orEmpty())
     cat("Radar")?.let { out += it }
-    cat("Launchpad")?.let { out += it }
+    cat("Comms")?.let { out += it }
     out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
     cat("Backup")?.let { out += it }
     cat("Desktop & dock")?.let { out += it }
@@ -843,5 +843,5 @@ internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherP
             hint = x("A quiet ambience behind the clock that follows the weather. It needs Weather in the content."),
         ) { v -> upd { it.copy(glanceWeatherIntensity = v) } },
     )
-    add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("A small row at the bottom: Launchpad, home and the right-hand panel")) { v -> upd { it.copy(glanceIndicator = v) } })
+    add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("A small row at the bottom: Comms, home and the right-hand panel")) { v -> upd { it.copy(glanceIndicator = v) } })
 }

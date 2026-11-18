@@ -661,7 +661,7 @@ fun LaunchpadContent(
             // Beside the home card the host draws the backdrop (it must not fade with the content); alone, the content draws its own.
             .then(if (endInset > 0.dp) Modifier else Modifier.background(Brush.verticalGradient(listOf(LocalLp.current.bg, androidx.compose.ui.graphics.lerp(LocalLp.current.bg, LocalLp.current.surface, 0.55f)))))
             .testTag("lp.root")
-            .semantics { paneTitle = L10n.tr("Launchpad") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
+            .semantics { paneTitle = L10n.tr("Comms") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
             .then(if (hub == null) Modifier else Modifier.hubKeys( // outside focusable(): the keys work whether the root or a row has focus
                 onView = { d -> HubLogic.step(hub.views, hub.view, d)?.let(hub::select) },
@@ -856,13 +856,13 @@ private fun LaunchpadHeader(
         ) {
             Box(
                 Modifier.size(48.dp).clip(CircleShape)
-                    .semantics { contentDescription = L10n.tr("Notification menu") }
-                    .clickable(onClickLabel = L10n.tr("Notification menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
+                    .semantics { contentDescription = L10n.tr("Comms menu") }
+                    .clickable(onClickLabel = L10n.tr("Comms menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
                 Alignment.Center,
             ) { HamburgerIcon(ink) }
             Spacer(Modifier.width(8.dp))
             Text(
-                filterLabel ?: L10n.tr("Launchpad"), color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                filterLabel ?: L10n.tr("Comms"), color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("lp.title"),
             )
             // Wave 25: the slot the view switcher (history, files, usage, timeline) drops into.
@@ -870,7 +870,7 @@ private fun LaunchpadHeader(
             Text(
                 L10n.tr("Home"), color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(end = 4.dp).heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)) // wave 23: 48 dp, a button
-                    .clickable(onClickLabel = L10n.tr("Close Launchpad"), role = androidx.compose.ui.semantics.Role.Button, onClick = onClose).padding(horizontal = 14.dp, vertical = 14.dp),
+                    .clickable(onClickLabel = L10n.tr("Close Comms"), role = androidx.compose.ui.semantics.Role.Button, onClick = onClose).padding(horizontal = 14.dp, vertical = 14.dp),
             )
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
@@ -936,7 +936,7 @@ fun LaunchpadRail(
             .width(44.dp)
             .clip(androidx.compose.foundation.shape.AbsoluteRoundedCornerShape(topRight = 22.dp, bottomRight = 22.dp))
             .background(Color(0xB30B0D14))
-            .semantics(mergeDescendants = true) { contentDescription = L10n.tr("%d unread. Launchpad", total) }
+            .semantics(mergeDescendants = true) { contentDescription = L10n.tr("%d unread. Comms", total) }
             .clickable(onClick = onOpen, onClickLabel = L10n.tr("Open"))
             .pointerInput(Unit) {
                 var total = 0f

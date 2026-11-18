@@ -114,7 +114,7 @@ fun WaitingIndicatorView(
     quiet: Boolean = false,
 ) {
     if (count <= 0) return
-    val desc = if (priorityCount > 0) L10n.tr("%d waiting, %d priority. Launchpad", count, priorityCount) else L10n.tr("%d waiting. Launchpad", count)
+    val desc = if (priorityCount > 0) L10n.tr("%d waiting, %d priority. Comms", count, priorityCount) else L10n.tr("%d waiting. Comms", count)
     if (quiet) {
         val dot = if (priorityCount > 0 && accent != null) lpAccentFill(accent) else Color(0xFF3FA7E8)
         androidx.compose.foundation.layout.Box(

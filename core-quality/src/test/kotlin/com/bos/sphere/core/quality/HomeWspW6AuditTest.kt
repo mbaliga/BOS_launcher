@@ -17,7 +17,7 @@ class HomeWspW6AuditTest {
         val callers = Repo.mainSources().filter { it.readText().contains(".startMainActivity(") }.map { it.name }.toSet()
         assertEquals("startMainActivity outside the launch layer: $callers", emptySet<String>(), callers - allowed)
         val screen = text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt")
-        assertTrue("the Launchpad's fallback goes through the launcher", !screen.contains("getLaunchIntentForPackage(pkg)"))
+        assertTrue("the Comms fallback goes through the launcher", !screen.contains("getLaunchIntentForPackage(pkg)"))
         assertTrue(screen.contains("runner.launchHook ="))
     }
 

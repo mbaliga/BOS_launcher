@@ -68,7 +68,7 @@ class W13CrossAuditTest {
         val carousel = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/PageCarousel.kt")
         assertTrue("carousel buttons keep a 48 dp target around the small pill", carousel.contains("defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)"))
         val rows = text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/LaunchpadRows.kt")
-        assertFalse("Launchpad action pills and sheet lines are announced as buttons", Regex("""\.clickable\(onClick = onClick\)""").containsMatchIn(rows))
+        assertFalse("Comms action pills and sheet lines are announced as buttons", Regex("""\.clickable\(onClick = onClick\)""").containsMatchIn(rows))
         val kit = text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/GroupUiKit.kt")
         assertEquals("both group controls are at least 48 dp high", 2, Regex("""heightIn\(min = 48\.dp\)""").findAll(kit).count())
     }

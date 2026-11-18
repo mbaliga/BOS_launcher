@@ -122,7 +122,7 @@ class GlanceEdgesSmokeTest {
     @Test fun STR_01_theGlanceEdgeZoneIsWideEnoughToStartWhereTheHandleIs() {
         startFresh()
         rule.onRoot().performTouchInput { down(Offset(40f * 2f, height * 0.5f)); moveBy(Offset(60f, 0f)); moveBy(Offset(200f, 0f)); moveBy(Offset(300f, 0f)); up() }; settle()
-        assertTrue("a swipe that starts 40 dp in (beyond the old 28 dp zone) opens Launchpad on Glance", launchpadShown())
+        assertTrue("a swipe that starts 40 dp in (beyond the old 28 dp zone) opens Comms on Glance", launchpadShown())
     }
     @Test fun STR_01_aSwipeStartingBeyondTheEdgeZoneDoesNotOpenLaunchpad() {
         startFresh()
@@ -155,7 +155,7 @@ class GlanceEdgesSmokeTest {
     @Test fun HOM_22_withGlanceOffThePagesKeepTheirOwnHandles() {
         AppSmokeHarness.seedApps("Alpha"); AppSmokeHarness.configure(); scenario = AppSmokeHarness.launch(); rule.waitForIdle(); settle()
         assertFalse(tagShown("glance.handle.left")); assertTrue(tagShown("recents.handle"))
-        assertTrue(rule.onAllNodesWithContentDescription("Launchpad").fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithContentDescription("Comms").fetchSemanticsNodes().isNotEmpty())
     }
     @Test fun HOM_23_theHandlesWorkAfterTheControlsPopOutToo() {
         startFresh(); MediaNow.publishForTest(track); settle()
@@ -172,9 +172,9 @@ class GlanceEdgesSmokeTest {
     fun STR_14_landscapeTheRightEdgeSwipeOpensRecentsOnGlance() { startFresh(); swipeFromRight(); assertTrue(recentsShown()) }
 
     @Test @Config(qualifiers = "ar-ldrtl-w360dp-h720dp-xhdpi")
-    fun STR_01_rightToLeftOrderLaunchpadOpensFromThePhysicalRightEdgeAndRecentsFromTheLeft() {
+    fun STR_01_rightToLeftOrderCommsOpensFromThePhysicalRightEdgeAndRecentsFromTheLeft() {
         startFresh { it.copy(homeOrder = com.bos.sphere.core.data.HomeOrder.RightToLeft) }
-        swipeFromRight(); assertTrue("RTL: Launchpad from the right edge", launchpadShown())
+        swipeFromRight(); assertTrue("RTL: Comms from the right edge", launchpadShown())
     }
     @Test @Config(qualifiers = "ar-ldrtl-w360dp-h720dp-xhdpi")
     fun STR_14_rightToLeftOrderRecentsOpensFromThePhysicalLeftEdge() { startFresh { it.copy(homeOrder = com.bos.sphere.core.data.HomeOrder.RightToLeft) }; swipeFromLeft(); assertTrue(recentsShown()) }

@@ -94,7 +94,7 @@ enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right(
 enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
 
 /** What sits one swipe to the left of the first home page. */
-enum class LeftPage(val label: String) { Off("Off"), Launchpad("Launchpad"), Widget("A widget") }
+enum class LeftPage(val label: String) { Off("Off"), Launchpad("Comms"), Widget("A widget") }
 
 /** The backdrop behind Settings. */
 /** The clock as one line ("23:02   18°C") or time over a second line. */
@@ -476,7 +476,7 @@ enum class CornerActionId(val label: String, val internal: Boolean = false) {
     DoNotDisturb("Do not disturb"),
     SystemSettings("Settings"),
     /** HOM-22: opens Launchpad (the left card); the default top-right hotspot of the Minimal landing. */
-    OpenLaunchpad("Launchpad", internal = true),
+    OpenLaunchpad("Comms", internal = true),
     /** STR-14: opens the Recents panel (the right-hand card); assignable to a corner or a gesture. */
     OpenRecents("Open recents", internal = true),
 }

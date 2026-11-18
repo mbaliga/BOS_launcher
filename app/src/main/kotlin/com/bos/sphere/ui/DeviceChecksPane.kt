@@ -61,7 +61,7 @@ internal fun surfaceLabel(s: ProbeSurface): String = when (s) {
     ProbeSurface.Glance -> L10n.tr("Glance")
     ProbeSurface.DrawerScroll -> L10n.tr("Drawer scroll")
     ProbeSurface.RadarTyping -> L10n.tr("Radar: open and type")
-    ProbeSurface.LaunchpadOpenClose -> L10n.tr("Launchpad: open and close")
+    ProbeSurface.LaunchpadOpenClose -> L10n.tr("Comms: open and close")
     ProbeSurface.PageSwipe -> L10n.tr("Page swipe")
 }
 
@@ -82,7 +82,7 @@ internal fun checkTitle(c: DeviceCheck): String = when (c) {
 internal fun checkInstruction(c: DeviceCheck): String = when (c) {
     DeviceCheck.TalkBack -> L10n.tr("Turn TalkBack on, then swipe through home, the drawer and Radar. The order should follow what you see and every control should have a name.")
     DeviceCheck.GestureNav -> L10n.tr("With gesture navigation on, swipe in from the left and right edges of home. Note which edge opens a Liftoff panel and which one goes Back.")
-    DeviceCheck.NoAnimations -> L10n.tr("Turn on Remove animations in Accessibility, then open Radar, open Launchpad and turn pages. Nothing should slide or loop.")
+    DeviceCheck.NoAnimations -> L10n.tr("Turn on Remove animations in Accessibility, then open Radar, open Comms and turn pages. Nothing should slide or loop.")
     DeviceCheck.Font200 -> L10n.tr("Set the font to its largest size (Developer options font scale for 200 percent). Look at home, Radar and Settings for cut-off text.")
     DeviceCheck.DisplaySize -> L10n.tr("Set Display size to Large. Look at the home grid, the dock and Radar for overlap or controls that no longer fit.")
     DeviceCheck.GlassLook -> L10n.tr("Open Radar in daylight at full brightness, in the dark theme and in the light theme. Can you read the field, the buttons and the results?")

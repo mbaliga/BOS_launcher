@@ -14,7 +14,7 @@ object PinnableActions {
     val all: List<Def> = listOf(
         Def("OpenSettings", "Open launcher settings", actionId = CornerActionId.LauncherSettings),
         Def("OpenDrawer", "Open all apps", actionId = CornerActionId.AllApps),
-        Def("OpenLaunchpad", "Open Launchpad", actionId = CornerActionId.Notifications),
+        Def("OpenLaunchpad", "Open Comms", actionId = CornerActionId.Notifications),
         Def("NextWorkspace", "Switch to next workspace", run = RunTarget(RunKind.Workspace, WorkspaceRefs.NEXT)),
         Def("PreviousWorkspace", "Switch to previous workspace", run = RunTarget(RunKind.Workspace, WorkspaceRefs.PREVIOUS)),
     )

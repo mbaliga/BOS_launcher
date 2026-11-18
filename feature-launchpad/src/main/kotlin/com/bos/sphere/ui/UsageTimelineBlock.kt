@@ -140,7 +140,7 @@ private fun NoAccessLine(tone: VizTone) {
 @Composable
 private fun UsageReady(week: UsageWeek, tone: VizTone, labelOf: (String) -> String) {
     var selected by rememberSaveable { mutableIntStateOf(week.columns.lastIndex) }
-    var table by remember { mutableStateOf(false) }
+    var table by rememberSaveable { mutableStateOf(false) }
     val sel = selected.coerceIn(0, week.columns.lastIndex)
     val parts = week.parts(sel)
     val summary = UsageTexts.summary(week, sel, labelOf)

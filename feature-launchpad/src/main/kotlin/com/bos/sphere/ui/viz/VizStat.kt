@@ -1,7 +1,10 @@
 package com.bos.sphere.ui.viz
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,11 +22,10 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun VizStat(caption: String, figure: String, tone: VizTone, modifier: Modifier = Modifier, figureSp: Int = 24) {
-    Row(
-        modifier.semantics(mergeDescendants = true) { contentDescription = "$caption, $figure" },
-        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom,
-    ) {
-        Text(caption, color = tone.ink.copy(alpha = 0.72f), fontSize = 13.sp, maxLines = 1, modifier = Modifier.padding(bottom = 4.dp))
-        Text(figure, color = tone.ink, fontSize = figureSp.sp, fontWeight = FontWeight.Light, maxLines = 1, letterSpacing = (-0.01).sp)
-    }
+    val semantic = modifier.semantics(mergeDescendants = true) { contentDescription = "$caption, $figure" }
+    val cap: @Composable (Modifier) -> Unit = { m -> Text(caption, color = tone.ink.copy(alpha = 0.72f), fontSize = 13.sp, maxLines = 1, modifier = m) }
+    val fig: @Composable () -> Unit = { Text(figure, color = tone.ink, fontSize = figureSp.sp, fontWeight = FontWeight.Light, maxLines = 1, letterSpacing = (-0.01).sp, modifier = Modifier.testTag("viz.stat.figure")) }
+    // Large text: the caption stacks over the figure, as in the toolkit's own `stat`, instead of sharing a line that no longer fits.
+    if (LocalDensity.current.fontScale > 1.3f) Column(semantic) { cap(Modifier); fig() }
+    else Row(semantic, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) { cap(Modifier.padding(bottom = 4.dp)); fig() }
 }

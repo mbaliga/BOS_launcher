@@ -17,6 +17,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -60,14 +62,19 @@ fun VizSteps(
     val n = columns.size.coerceAtLeast(1)
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current.density
-    BoxWithConstraints(modifier.fillMaxWidth().height(height)) {
+    // Large text: the figure above and the names below are sp, so their rows grow with the font scale (up to 2x) and the plot keeps its height.
+    val fs = LocalDensity.current.fontScale.coerceIn(1f, 2f)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val full = height + (VizStepsGeometry.HEAD + VizStepsGeometry.FOOT).dp * (fs - 1f)
+    BoxWithConstraints(modifier.fillMaxWidth().height(full)) {
         val cell = maxOf(minCell, maxWidth / n)
-        Box(Modifier.requiredWidth(cell * n).height(height)) {
+        Box(Modifier.requiredWidth(cell * n).height(full)) {
             Canvas(Modifier.fillMaxWidth().fillMaxHeight()) {
-                val g = VizStepsGeometry.of(size.width / this.density, size.height / this.density, n)
+                val g = VizStepsGeometry.of(size.width / this.density, size.height / this.density, n, fs)
                 val max = columns.maxOfOrNull { VizFormat.safe(it.value) } ?: 0.0
                 columns.forEachIndexed { i, c ->
-                    val left = g.left(i) * this.density; val w = g.barW * this.density
+                    // Right to left the week runs from the right edge, as the tap targets below do.
+                    val left = g.left(if (rtl) n - 1 - i else i) * this.density; val w = g.barW * this.density
                     val bh = VizFormat.barHeight(c.value, max, g.plot) * this.density
                     val base = g.baseline * this.density
                     val sel = i == selected
@@ -106,10 +113,10 @@ fun VizSteps(
 val STEPS_HEIGHT: Dp = 54.dp
 
 /** The steps geometry in dp, pure so tests can read it: seven cells, the bars centred in them, one baseline. */
-class VizStepsGeometry private constructor(val width: Float, val height: Float, val n: Int) {
+class VizStepsGeometry private constructor(val width: Float, val height: Float, val n: Int, val fontScale: Float = 1f) {
     /** Space above the tallest column for the selected column's figure, and below the baseline for the names. */
-    val head = HEAD
-    val foot = FOOT
+    val head = HEAD * fontScale
+    val foot = FOOT * fontScale
     val plot: Float get() = (height - head - foot).coerceAtLeast(0f)
     val baseline: Float get() = head + plot
     val cell: Float get() = if (n <= 0) 0f else width / n
@@ -122,6 +129,6 @@ class VizStepsGeometry private constructor(val width: Float, val height: Float, 
         const val FOOT = 14f
         const val RADIUS = 9f
         const val MIN_GAP = 6f
-        fun of(width: Float, height: Float, n: Int) = VizStepsGeometry(if (width.isFinite()) width.coerceAtLeast(0f) else 0f, if (height.isFinite()) height.coerceAtLeast(0f) else 0f, n)
+        fun of(width: Float, height: Float, n: Int, fontScale: Float = 1f) = VizStepsGeometry(if (width.isFinite()) width.coerceAtLeast(0f) else 0f, if (height.isFinite()) height.coerceAtLeast(0f) else 0f, n, if (fontScale.isFinite()) fontScale.coerceIn(1f, 2f) else 1f)
     }
 }

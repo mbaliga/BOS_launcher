@@ -43,6 +43,9 @@ class UsageWeek(val days: List<DayTime>, val columns: List<WeekColumn>, val week
     fun total(index: Int): Long = columns.getOrNull(index)?.totalMs ?: 0L
 }
 
+/** The language the app shows its own text in (the in-app choice, else the device's): day names must agree with every other string of the block. */
+internal fun appLocale(): Locale = Locale.forLanguageTag(L10n.effectiveLanguage())
+
 object UsageShaping {
     const val DAYS = 7
     const val TOP = 4
@@ -87,7 +90,7 @@ object UsageShaping {
     }
 
     /** The week for [days] (oldest first; the last is today). */
-    fun week(days: List<DayTime>, zone: ZoneId, today: LocalDate, locale: Locale = Locale.getDefault()): UsageWeek {
+    fun week(days: List<DayTime>, zone: ZoneId, today: LocalDate, locale: Locale = appLocale()): UsageWeek {
         val columns = days.map { d ->
             val date = Instant.ofEpochMilli(d.dayStartMs).atZone(zone).toLocalDate()
             WeekColumn(d.dayStartMs, date, total(d), date.dayOfWeek.getDisplayName(TextStyle.NARROW, locale).take(2).uppercase(locale), date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale), date == today)
@@ -112,7 +115,7 @@ object UsageFormat {
         return when {
             min < 1 -> "0"
             min < 60 -> L10n.tr("%d min", min)
-            else -> L10n.tr("%s h", String.format(Locale.getDefault(), "%.1f", min / 60.0))
+            else -> L10n.tr("%s h", String.format(appLocale(), "%.1f", min / 60.0))
         }
     }
 }

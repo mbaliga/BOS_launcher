@@ -31,3 +31,26 @@ Owner: combine Usage with Timeline as a small visualization above it, drawn with
 ## Full run
 
 `./gradlew testDebugUnitTest assembleRelease --offline --continue -q --max-workers=2`: release assembled. Failures that remain and are not from this stream: `PackageRemovedW26SmokeTest` (known order-dependent flake) and `RepoHygieneAuditTest.CFG_01_everyTestNamedInTheCoverageTableExists` (docs/TEST_COVERAGE.md still names three PAL_20 radar tests that the base commit removed; run `tools/spec_coverage.py`).
+
+## Adversarial review findings (second pass)
+
+Each fixed finding has a test that failed first (`UsageReviewW28Test`, feature-launchpad).
+
+| # | Finding | Status | Test |
+|---|---|---|---|
+| 1 | Day names, initials and the "2.1 h" figure used `Locale.getDefault()`, so with an in-app language different from the device's the block mixed languages. They now follow `L10n.effectiveLanguage()`. | fixed | `USG_30_dayNamesAndInitialsFollowTheAppLanguageNotTheDeviceLocale` |
+| 2 | RTL: the steps canvas always drew left to right while the tap targets mirrored, so a tap on a column selected another day. The canvas now runs the week from the right edge. | fixed | `USG_31_inARightToLeftLayout...Columns` |
+| 3 | RTL: the stack pill and its labels were drawn left to right while the focus nodes mirrored (TalkBack focus outline on the wrong part). Pill and labels are mirrored. | fixed | `USG_32_inARightToLeftLayout...StackParts` |
+| 4 | Font scale 2.0: the steps' figure row (17 dp) and name row (14 dp) were fixed dp holding sp text, so the figure and day initials were clipped. Both rows scale with the font scale (capped at 2). | fixed | `USG_33_atFontScaleTwo...` |
+| 5 | Font scale 2.0: the stack's 15 dp label row clipped the share labels. It scales the same way. | fixed | `USG_33_atFontScaleTwo...` |
+| 6 | Font scale 2.0 on a narrow block: the stat header (caption and figure on one line, `maxLines = 1`) ran off the edge. Above 1.3x the caption stacks over the figure, as the toolkit's own `stat` does. | fixed | `USG_34_theStatHeaderWraps...` |
+| 7 | The "Show as table" state was lost on rotation while the selected day survived. It is saved with it. | fixed | `USG_35_theTableViewSurvivesARotation...` |
+| 8 | Dead code: the removed panel's strings ("Usage access is off...", "Open usage access settings") stayed in nine L10n tables, translated and unused. Removed (18 lines). | fixed | `USG_36_theTranslationsOfTheRemovedUsagePanelAreGone` |
+
+Found and not changed:
+
+- The block is about 165 dp high with a legend that wraps to two rows (brief: about 120 to 150); `USG_10` allows up to 185 dp. Kept: five keys do not fit one row at 360 dp.
+- "Allow usage access" is plain text without an underline or accent, so it reads as a caption; the 48 dp target and button role are right. Needs the owner's call on the look.
+- While loading, the block is 1 dp high and the list jumps down when the week arrives (the first read per process only; the repo caches afterwards).
+- Landscape and tablet widths give very wide columns (87 dp); this is the toolkit's own `steps` geometry (`bw = (w - gaps) / n`), so it was kept.
+- Unread screenshots now read: dark missing-access (clean, one line with the action), light empty landscape (one quiet line, hugs the top edge of the block).

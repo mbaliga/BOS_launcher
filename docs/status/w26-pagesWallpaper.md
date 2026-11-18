@@ -9,3 +9,5 @@
 | NFR-14 | ok | no new infinite animation; live preview still under reduced motion |
 
 Old tests changed: none removed. Device-only: look and feel of the gradient/solid on a phone, crossfade between different wallpapers.
+
+Old tests changed (wave 26): NfrWiringTest.NFR_15_homeDrawsTheScrimBehindTheTextLayer and RadarSignalLabWiringTest.PAL_24_theBackgroundPane... asserted the old source layout (scrim drawn in HomeScreen, one BackgroundPane call); they now assert the HomeSurfaceBackground seam and the Glance and Pages pane calls. The quick sheet Background button now opens Home screen (where the wallpaper rows are).

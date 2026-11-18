@@ -231,6 +231,8 @@ data class LauncherPrefs(
     val uiSounds: Boolean = true,
     val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
+    /** W26 (arcDrawer): how the quarter-ring section switcher draws its wedges: icon only, or icon with a short label. */
+    val switcherStyle: SwitcherStyle = SwitcherStyle.Expanded,
 
     // --- home landing (HOM-22)
     /** What the home shows: the user's pages, the recent apps, every app, or only the wallpaper and the four hotspots. */
@@ -510,6 +512,9 @@ enum class DrawerStyle(val label: String) {
 }
 
 /** How the wheel drawer groups apps into spokes. */
+/** W26: Compact shows only each section's icon; Expanded adds a small label (the shipped default). */
+enum class SwitcherStyle(val label: String) { Compact("Compact"), Expanded("Expanded") }
+
 enum class WheelGrouping(val label: String) { Letter("A–Z"), Category("Category"), Recent("Recent") }
 
 /** Defaults match the reference layout (portrait natural orientation). */

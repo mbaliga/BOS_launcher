@@ -393,6 +393,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             // Open-the-drawer settings first, then what lives on the home screen.
             add(SettingItem.Choice(x("All apps opens as"), Glyphs.Apps, DrawerStyle.entries, p.drawerStyle, { x(it.label) }, hint = x("The wheel fans out around the corner you open it from.")) { v -> upd { it.copy(drawerStyle = v) } })
             add(SettingItem.Choice(x("Wheel groups"), Glyphs.Dial, WheelGrouping.entries, p.wheelGrouping, { x(it.label) }, hint = x("How the wheel groups apps into spokes.")) { g -> upd { it.copy(wheelGrouping = g) } })
+            add(SettingItem.Choice(x("Switcher: Compact or Expanded"), Glyphs.Dial, com.bos.sphere.core.data.SwitcherStyle.entries, p.switcherStyle, { x(it.label) }, hint = x("Compact shows only each section's icon; Expanded adds a small number or label.")) { v -> upd { it.copy(switcherStyle = v) } })
             add(SettingItem.Choice(x("View switcher shows"), Glyphs.Apps, com.bos.sphere.core.data.SwitchStyle.entries, p.drawerViewSwitch, { x(it.label) }) { v -> upd { it.copy(drawerViewSwitch = v) } })
             add(
                 SettingItem.Choice(

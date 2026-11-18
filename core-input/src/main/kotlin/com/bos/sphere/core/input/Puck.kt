@@ -30,7 +30,7 @@ sealed interface PuckEffect {
 data class PuckKey(val keyCode: Int, val shift: Boolean = false, val ch: Char? = null)
 
 /**
- * The puck's keyboard contract. Left/Right (and the scroll wheel) rotate, a typed letter jumps to the
+ * The puck's keyboard contract. Left/Right (and the scroll wheel) step round the looped sections, a typed letter jumps to the
  * group starting with it, Tab cycles A-Z, Category and Recent, Up/Down walk the apps of the focused
  * group, Enter launches, Esc closes.
  */
@@ -56,8 +56,9 @@ object PuckKeys {
         Keys.ENTER, Keys.DPAD_CENTER, Keys.NUMPAD_ENTER, Keys.ESCAPE, Keys.BACK, Keys.SLASH) || Keys.isLetter(keyCode) || (ch != null && (ch.isLetterOrDigit()))
 
     private fun step(s: PuckState, d: Int): PuckEffect? {
-        val i = (s.focused + d).coerceIn(0, max(0, s.labels.lastIndex))
-        return if (s.labels.isEmpty() || i == s.focused) null else PuckEffect.FocusGroup(i)
+        // W26: the sections form a ring, so stepping past the last continues into the first (and back); one section stays.
+        if (s.labels.size <= 1) return null
+        return PuckEffect.FocusGroup(Math.floorMod(s.focused + d, s.labels.size))
     }
 
     /** The group a typed letter lands on: the first label starting with it, else the next one after it alphabetically. */

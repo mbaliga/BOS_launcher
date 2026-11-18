@@ -81,6 +81,8 @@ class DockActions(
     val onPin: (DockItem) -> Unit = {},
     val onEnableUsage: () -> Unit = {},
     val onOpenPanel: () -> Unit = {},
+    /** W26: a tap on the Home glyph goes to the home's first page (nothing when already there). It never opens the panel: that is the long-press menu's job. */
+    val onGoHome: () -> Unit = {},
     val onSwitchWorkspace: (delta: Int) -> Unit = {},
     val onToggleExpanded: () -> Unit = {},
     val onLeave: () -> Unit = {},
@@ -250,8 +252,9 @@ private fun SectionDivider(horizontal: Boolean) {
 }
 
 /**
- * The home button: a house glyph instead of the workspace name's pill. Tap opens the workspace panel; a horizontal swipe switches
- * workspace (WSP-07 gesture route); TalkBack gets the same two switches as actions. The name is only its description.
+ * The home button: a house glyph instead of the workspace name's pill. W26: a tap goes home (it never opens the panel; the panel is behind the
+ * long-press menu and Ground Control). A horizontal swipe past the touch slop and 40 px switches workspace (WSP-07 gesture route); a tap cannot
+ * reach that. TalkBack gets the same two switches as actions. The name is only its description.
  */
 @Composable
 private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.FocusBridge?) {
@@ -263,7 +266,7 @@ private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.
                 detectHorizontalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total > 40f) actions.onSwitchWorkspace(-1) else if (total < -40f) actions.onSwitchWorkspace(1) }) { _, d -> total += d }
             }
             .graphNode("dock.workspaces", bridge)
-            .clickable(onClickLabel = L10n.tr("Workspaces"), onClick = actions.onOpenPanel)
+            .clickable(onClickLabel = L10n.tr("Home"), onClick = actions.onGoHome)
             .semantics {
                 role = Role.Button
                 contentDescription = L10n.tr("Workspace %s", name)

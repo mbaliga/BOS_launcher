@@ -886,10 +886,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val dockState by com.bos.sphere.feature.dock.WorkspaceRepository.get(context).state.collectAsState()
     val dockTier = remember(cfg.screenWidthDp) { com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs()) }
     // HOM-19: the rail sits above the bottom clock and page dots, and the app area gives up what the rail reaches past the band.
+    val dockOn = (dockState.dock.isEnabled(dockTier) || HomeChromeRules.forcesDock(landing, com.bos.sphere.core.data.ChromeSettings.of(prefs))) && HomeChromeRules.shows(landing, ChromeElement.Dock, com.bos.sphere.core.data.ChromeSettings.of(prefs))
+    val pageDotsAtBottom = prefs.pagingFor(isLandscape) != com.bos.sphere.core.data.PagingAxis.Vertical && pages.size > 1
     val bottomPlan = com.bos.sphere.feature.dock.HomeBottomStack.plan(
-        enabled = dockState.dock.isEnabled(dockTier), edge = dockState.dock.edgeFor(isLandscape),
+        // W26: an empty dock (nothing pinned, nothing recent) is not drawn and reserves nothing.
+        enabled = com.bos.sphere.feature.dock.DockVisibility.shown(dockOn, com.bos.sphere.feature.dock.DockPresence.hasItems),
+        edge = dockState.dock.edgeFor(isLandscape),
         collapsed = dockState.dock.mode == com.bos.sphere.feature.dock.DockMode.Collapsed, bandDp = frame.value,
-        lowerStackDp = com.bos.sphere.feature.grid.bottomStackDp(prefs, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()),
+        lowerStackDp = com.bos.sphere.feature.dock.HomeBottomStack.lowerStackDp(
+            stackDp = com.bos.sphere.feature.grid.bottomStackDp(prefs, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()),
+            glance = landing == HomeLanding.Glance, glanceIndicator = prefs.glanceIndicator,
+            pageDotsAtBottom = pageDotsAtBottom, clockAtBottom = prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Bottom,
+        ),
         shelfShown = com.bos.sphere.feature.dock.GroupShelfModel.visible(dockState.groups, dockState.dock.groupShelf).isNotEmpty(),
     )
     val dockReserve = bottomPlan.reserve
@@ -1096,7 +1104,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 } else {
                     Background()
                     Box(
-                        Modifier.fillMaxSize().padding(start = dockReserve.start.dp, end = dockReserve.end.dp, bottom = bottomClear + dockReserve.bottom.dp).leftSwipe(
+                        Modifier.fillMaxSize().padding(bottom = bottomClear).leftSwipe(
                             enabled = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !leftOpen,
                             atFirstPage = { gridState.pager.currentPage == 0 && !gridState.pager.isScrollInProgress },
                             onOpen = { leftOpen = true },
@@ -1107,6 +1115,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             appsByKey = appsByKey,
                             prefs = prefs,
                             isLandscape = isLandscape,
+                            reserveStart = dockReserve.start.dp, reserveEnd = dockReserve.end.dp, reserveBottom = dockReserve.bottom.dp, // W26: only the app area gives up the dock's room; the dots stay in the band
                             state = gridState,
                             suggestion = suggestion,
                             gesturesBound = gestures.keys,
@@ -1211,6 +1220,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             unavailableApps = homeItems.unavailableKeys,
             bottomPlan = bottomPlan,
             alwaysShown = HomeChromeRules.forcesDock(landing, chromeSettings),
+            onGoHome = { scope.launch { gridState.goToPage(prefs.homePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))) } }, // W26: the Home glyph goes home; the dock panel is the long-press menu's
         )
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).

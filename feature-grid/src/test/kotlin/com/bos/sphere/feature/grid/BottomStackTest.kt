@@ -97,4 +97,58 @@ class BottomStackTest {
         assertTrue(bottom > top)
         assertTrue(bottom <= HomeFrame.band(360f, 640f) + 0.5f)
     }
+
+    // ---- W26: the dock above the position indicator (page dots or the Glance indicator), at least 8 dp clear.
+
+    /** The indicator's box in window dp, as the home draws it: Glance row 4 to 52 dp up, 160 dp wide; page dots row 26 to 46 dp up (or in the clock band). */
+    private fun indicatorRect(w: Int, h: Int, glance: Boolean, clockBottom: Boolean): R =
+        if (glance) R(w / 2f - 80f, h - HomeBottomStack.GLANCE_INDICATOR_TOP_DP, w / 2f + 80f, h - 4f)
+        else if (clockBottom) R(w / 2f - 80f, h - 17f, w / 2f + 80f, h - 1f)
+        else R(w / 2f - 80f, h - HomeBottomStack.PAGE_DOTS_TOP_DP, w / 2f + 80f, h - 26f)
+
+    @Test
+    fun HOM_19_W26_theDockSitsAboveThePositionIndicatorWithAtLeastEightDpClearAtEverySize() {
+        assertTrue(HomeBottomStack.GAP_DP >= 8f)
+        for ((w, h) in sizes) for (edge in DockEdge.entries) for (collapsed in listOf(false, true))
+            for (surface in listOf("glance", "dotsClockTop", "dotsClockBottom", "dotsAtStart", "none")) {
+                val glance = surface == "glance"
+                val clockBottom = surface == "dotsClockBottom"
+                val dotsAtBottom = surface.startsWith("dotsClock")
+                val p = prefs(if (clockBottom) ClockPosition.Bottom else ClockPosition.Top, true)
+                val stack = bottomStackDp(p, w.toFloat(), h.toFloat())
+                val lower = HomeBottomStack.lowerStackDp(stack, glance, glanceIndicator = true, pageDotsAtBottom = dotsAtBottom, clockAtBottom = clockBottom)
+                val plan = HomeBottomStack.plan(true, edge, collapsed, HomeFrame.band(w.toFloat(), h.toFloat()), lower)
+                val label = "$w x $h $edge collapsed=$collapsed $surface"
+                val rail = when (edge) {
+                    DockEdge.Bottom -> R(76f, h - plan.railTopDp, w - 76f, h - plan.railBottomDp)
+                    DockEdge.Left -> R(DockFootprint.SIDE_MARGIN_DP, 76f, DockFootprint.thicknessDp(edge, collapsed), h - 76f)
+                    DockEdge.Right -> R(w - DockFootprint.thicknessDp(edge, collapsed), 76f, w - DockFootprint.SIDE_MARGIN_DP, h - 76f)
+                }
+                if (glance || dotsAtBottom) {
+                    val ind = indicatorRect(w, h, glance, clockBottom)
+                    assertFalse("rail on the indicator: $label", rail.hits(ind))
+                    if (edge == DockEdge.Bottom) assertTrue("gap under 8 dp: $label", ind.t - rail.b >= 0f && (h - plan.railBottomDp) <= ind.t - 8f + 0.01f)
+                    else assertFalse("side rail reaches the indicator row: $label", rail.b > ind.t - 8f && rail.l < ind.r && ind.l < rail.r)
+                }
+                // Hotspots sit in the four corners (a 76 dp square): no rail reaches one.
+                for (c in listOf(R(0f, 0f, 76f, 76f), R(w - 76f, 0f, w.toFloat(), 76f), R(0f, h - 76f, 76f, h.toFloat()), R(w - 76f, h - 76f, w.toFloat(), h.toFloat())))
+                    assertFalse("rail in a hotspot corner: $label", rail.hits(c))
+            }
+    }
+
+    @Test
+    fun HOM_19_W26_theLowerStackCountsTheGlanceIndicatorAndTheHigherPageDots() {
+        assertEquals(HomeBottomStack.GLANCE_INDICATOR_TOP_DP, HomeBottomStack.lowerStackDp(18f, glance = true, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = false), 0f)
+        assertEquals(0f, HomeBottomStack.lowerStackDp(18f, glance = true, glanceIndicator = false, pageDotsAtBottom = true, clockAtBottom = false), 0f)
+        assertEquals(HomeBottomStack.PAGE_DOTS_TOP_DP, HomeBottomStack.lowerStackDp(18f, glance = false, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = false), 0f)
+        assertEquals(50f, HomeBottomStack.lowerStackDp(50f, glance = false, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = true), 0f)
+        assertEquals(0f, HomeBottomStack.lowerStackDp(0f, glance = false, glanceIndicator = true, pageDotsAtBottom = false, clockAtBottom = false), 0f)
+    }
+
+    @Test
+    fun HOM_19_W26_withNoDockNothingIsReservedAndTheBottomStackIsJustTheIndicator() {
+        val none = HomeBottomStack.plan(false, DockEdge.Bottom, false, 54f, HomeBottomStack.GLANCE_INDICATOR_TOP_DP)
+        assertFalse(none.reserve.any)
+        assertEquals(0f, none.railTopDp, 0f)
+    }
 }

@@ -230,6 +230,10 @@ fun GridHome(
     /** HOM-12: edit mode. Items are grabbed at once (no long press), and apps and shortcuts carry a remove handle. */
     editMode: Boolean = false,
     onRemoveItem: (String) -> Unit = {},
+    /** W26: what the dock rail takes from the app area beyond the frame band. Only the app area gives it up: the page dots, clock and corner icons stay in the band (the old container padding lifted them into the rail). */
+    reserveStart: Dp = 0.dp,
+    reserveEnd: Dp = 0.dp,
+    reserveBottom: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
     val ex by rememberUpdatedState(extras)
@@ -270,9 +274,9 @@ fun GridHome(
     // The same frame as the scrolling homes: about 15% of the short side on every side, in either orientation.
     val frameDp = with(density) { HomeFrame.band(fullSize.width.toFloat(), fullSize.height.toFloat()).toDp() }
     val padTopDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
-    val padBottomDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
-    val padStartDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
-    val padEndDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padBottomDp = frameDp + reserveBottom // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padStartDp = frameDp + reserveStart // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padEndDp = frameDp + reserveEnd // the apps area never depends on the clock, dots or corner icons: they live in the margin band
     val insetLeft = with(density) { safeInsets.getLeft(this, dir).toDp() }
     val insetRight = with(density) { safeInsets.getRight(this, dir).toDp() }
     val insetTop = with(density) { safeInsets.getTop(this).toDp() }

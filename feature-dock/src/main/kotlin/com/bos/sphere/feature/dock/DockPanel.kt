@@ -83,6 +83,7 @@ fun DockPanel(
     var newWorkspace by remember { mutableStateOf("") }
     var scheduleFor by remember { mutableStateOf<Pair<RunTarget, String>?>(null) }
     var pickingScheduleApp by remember { mutableStateOf(false) }
+    var addingPins by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         DockDialogInput() // INP-20: controller window hook and the shared focus layer
@@ -101,6 +102,8 @@ fun DockPanel(
             Chips(DockMode.entries.map { it.label }, DockMode.entries.indexOf(state.dock.mode)) { i -> manager.setDock { it.copy(mode = DockMode.entries[i]) } }
             Chips(DockEdge.entries.map { it.label }, DockEdge.entries.indexOf(state.dock.edge)) { i -> manager.setDock { it.copy(edge = DockEdge.entries[i]) } }
             Hint(L10n.tr("In portrait the dock is always at the bottom. In landscape it can also sit on a side."))
+            // W26: an empty dock is hidden, so this is also the way to the first pin from Ground Control.
+            Btn("Add apps to the dock") { addingPins = true }
 
             Heading("Workspaces")
             state.workspaces.forEach { w ->
@@ -179,6 +182,12 @@ fun DockPanel(
     scheduleFor?.let { (t, label) ->
         ScheduleDialog(label, now(), onDismiss = { scheduleFor = null }, onPick = { at -> onSchedule(t, label, at); scheduleFor = null })
     }
+    if (addingPins) AppPicker(L10n.tr("Add apps to the dock"), apps, state.active.dockPins.filter { it.kind == ItemKind.App }.map { it.id }.toSet(), max = Int.MAX_VALUE, min = 0,
+        onDone = { picked ->
+            val keep = state.active.dockPins.filter { it.kind != ItemKind.App || it.id in picked }
+            manager.setPins(picked.fold(keep) { acc, k -> DockPins.add(acc, DockItemRef.app(k)) }); addingPins = false
+        },
+        onDismiss = { addingPins = false })
     if (pickingScheduleApp) AppPicker(
         L10n.tr("Which app?"), apps, emptySet(), max = 1, min = 1,
         onDone = { picked -> pickingScheduleApp = false; apps.firstOrNull { it.key in picked }?.let { scheduleFor = RunTarget(RunKind.App, it.key) to it.label } },

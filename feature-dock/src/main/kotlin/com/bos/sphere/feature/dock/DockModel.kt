@@ -1,5 +1,8 @@
 package com.bos.sphere.feature.dock
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.bos.sphere.core.capabilities.Tier
 import com.bos.sphere.core.input.LauncherCommand
 
@@ -173,6 +176,23 @@ data class DockContent(
 ) {
     /** Items that number shortcuts 1 to 9 launch, in the order the rail shows them. */
     val numbered: List<DockItem> get() = (pinned + recent).take(9)
+
+    /** W26: the rail has something to show (a pinned item, or a recent one while the Recent section is on); the usage-access button alone does not count. */
+    val hasItems: Boolean get() = DockVisibility.hasItems(pinned.size, if (showRecentSection) recent.size else 0)
+}
+
+/** W26: the dock is hidden entirely (no rail, no lone Home glyph, no reserved space) while nothing is pinned and nothing is recent. */
+object DockVisibility {
+    fun hasItems(pinned: Int, recentShown: Int): Boolean = pinned > 0 || recentShown > 0
+
+    /** Whether the host draws a rail and reserves room for it: the dock is on for this surface and has something to show. */
+    fun shown(dockOn: Boolean, hasItems: Boolean): Boolean = dockOn && hasItems
+}
+
+/** W26: what the phone home's dock last said it holds, so the bottom stack plan can leave out an empty dock. Written by [DockHost]. */
+object DockPresence {
+    var hasItems: Boolean by mutableStateOf(false)
+        internal set
 }
 
 object DockText {

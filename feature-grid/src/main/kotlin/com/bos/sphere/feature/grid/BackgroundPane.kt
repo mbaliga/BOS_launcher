@@ -39,31 +39,83 @@ import com.bos.sphere.core.data.BgItem
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.RadarIntensity
 import com.bos.sphere.core.data.SignalForce
+import com.bos.sphere.core.data.GradientSpec
+import com.bos.sphere.core.data.Wallpaper
+import com.bos.sphere.core.data.WallpaperKind
+import com.bos.sphere.core.data.WallpaperSurface
+import com.bos.sphere.core.data.rawWallpaper
+import com.bos.sphere.core.data.wallpaper
+import com.bos.sphere.core.data.withWallpaper
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.rememberMotionPrefs
 import com.bos.sphere.core.signals.SignalState
 
 /**
- * HOM-16, PAL-24, CFG-17 (wave 15): Ground Control > Background. Two slot pickers (slot 1: any of the nine items or None; slot 2:
- * any other item or None; at most one living wallpaper, with the reason shown on the options the rule disables), a live
- * thumbnail on every option drawn at the preview signal level, a "Preview signal" control that only changes what the pane shows
- * (the saved Lab override is separate), and the Intensity.
+ * HOM-16, PAL-24, CFG-17 (wave 15, wave 26): Ground Control > Home > Glance wallpaper / Pages wallpaper. [surface] picks which
+ * of the two wallpapers the pane edits. A wallpaper is exactly one of three kinds: a solid colour (the shared [ColorPicker]), a
+ * two-stop linear gradient (two colours, an angle, a preview) or a live wallpaper (two slot pickers: at most one living
+ * wallpaper plus an effect, with a live thumbnail on every option, a "Preview signal" control that only changes what the pane shows,
+ * and the Intensity). While the pages share the Glance wallpaper, the Pages pane only says so and shows it.
  */
 @Composable
-fun BackgroundPane(prefs: LauncherPrefs, update: ((LauncherPrefs) -> LauncherPrefs) -> Unit) {
-    var previewForce by remember { mutableStateOf(SignalForce.Good) }
-    val choice = BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2)
+fun BackgroundPane(prefs: LauncherPrefs, surface: WallpaperSurface = WallpaperSurface.Glance, update: ((LauncherPrefs) -> LauncherPrefs) -> Unit) {
+    val shared = surface == WallpaperSurface.Pages && prefs.pagesSameAsGlance
+    val wp = prefs.wallpaper(surface)
+    fun edit(f: (Wallpaper) -> Wallpaper) = update { it.withWallpaper(surface, f(it.rawWallpaper(surface))) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        BackgroundPreview(choice, previewForce, prefs.radarIntensity)
-        Text(L10n.tr("Preview signal"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
-        ChipRow(SignalForce.entries.toList(), previewForce, { L10n.tr(it.label) }) { previewForce = it }
-        Text(L10n.tr("Each item glows differently with the signal. With no signal it falls to a dim resting state and thin lines close in from the screen edges."), color = HyleColors.InkDim, fontSize = 11.sp)
-        SlotPicker(1, choice, previewForce, prefs.radarIntensity) { item -> update { it.copy(backgroundSlot1 = BackgroundChoice(it.backgroundSlot1, it.backgroundSlot2).with(1, item).slot1) } }
-        SlotPicker(2, choice, previewForce, prefs.radarIntensity) { item -> update { it.copy(backgroundSlot2 = BackgroundChoice(it.backgroundSlot1, it.backgroundSlot2).with(2, item).slot2) } }
-        Text(L10n.tr("At most one living wallpaper, plus an effect. Two effects work too, and so does one item alone."), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
-        Text(L10n.tr("Intensity"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
-        ChipRow(RadarIntensity.entries.toList(), prefs.radarIntensity, { L10n.tr(it.label) }) { v -> update { it.copy(radarIntensity = v) } }
+        WallpaperPreview(wp, prefs.radarIntensity)
+        if (shared) {
+            Text(L10n.tr("The pages and the scroll show the Glance wallpaper. Turn off \"Pages use the same wallpaper as Glance\" to give them their own."), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            return@Column
+        }
+        Text(L10n.tr("Wallpaper type"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+        ChipRow(WallpaperKind.entries.toList(), wp.kind, { L10n.tr(it.label) }) { k -> edit { it.copy(kind = k) } }
+        when (wp.kind) {
+            WallpaperKind.Solid -> Box(Modifier.padding(top = 10.dp)) { ColorPicker(wp.solid, { c -> edit { it.copy(solid = c) } }) }
+            WallpaperKind.Gradient -> GradientEditor(wp.gradient) { g -> edit { it.copy(gradient = g) } }
+            WallpaperKind.Live -> LiveWallpaperEditor(wp.live, prefs.radarIntensity, { c -> edit { it.copy(live = c) } }, { v -> update { it.copy(radarIntensity = v) } })
+        }
+    }
+}
+
+/** Gradient: the two stops (edit one at a time with the shared colour picker), the angle, linear only. */
+@Composable
+private fun GradientEditor(g: GradientSpec, onChange: (GradientSpec) -> Unit) {
+    var stop by remember { mutableStateOf(0) }
+    Text(L10n.tr("Colour"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+    ChipRow(listOf(0, 1), stop, { L10n.tr(if (it == 0) "From" else "To") }) { stop = it }
+    Box(Modifier.padding(top = 8.dp)) {
+        androidx.compose.runtime.key(stop) {
+            ColorPicker(if (stop == 0) g.from else g.to, { c -> onChange(if (stop == 0) g.copy(from = c) else g.copy(to = c)) })
+        }
+    }
+    Text(L10n.tr("Angle"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+    ChipRow(GRADIENT_ANGLES, GRADIENT_ANGLES.minByOrNull { Math.abs(it - g.angle) } ?: 90, { "$it\u00B0" }) { a -> onChange(g.copy(angle = a)) }
+}
+
+internal val GRADIENT_ANGLES: List<Int> = listOf(0, 45, 90, 135, 180, 225, 270, 315)
+
+/** The live wallpaper choices: the signal controls and the two slots (the pickers that must always be reachable). */
+@Composable
+private fun LiveWallpaperEditor(choice: BackgroundChoice, intensity: RadarIntensity, onChoice: (BackgroundChoice) -> Unit, onIntensity: (RadarIntensity) -> Unit) {
+    var previewForce by remember { mutableStateOf(SignalForce.Good) }
+    Text(L10n.tr("Preview signal"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+    ChipRow(SignalForce.entries.toList(), previewForce, { L10n.tr(it.label) }) { previewForce = it }
+    Text(L10n.tr("Each item glows differently with the signal. With no signal it falls to a dim resting state and thin lines close in from the screen edges."), color = HyleColors.InkDim, fontSize = 11.sp)
+    SlotPicker(1, choice, previewForce, intensity) { item -> onChoice(choice.with(1, item)) }
+    SlotPicker(2, choice, previewForce, intensity) { item -> onChoice(choice.with(2, item)) }
+    Text(L10n.tr("At most one living wallpaper, plus an effect. Two effects work too, and so does one item alone."), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+    Text(L10n.tr("Intensity"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
+    ChipRow(RadarIntensity.entries.toList(), intensity, { L10n.tr(it.label) }, onIntensity)
+}
+
+/** The strip at the top of the pane: the wallpaper as it will be drawn (live ones animate unless reduced motion is on, then one still frame). */
+@Composable
+internal fun WallpaperPreview(w: Wallpaper, intensity: RadarIntensity, modifier: Modifier = Modifier) {
+    when (w.kind) {
+        WallpaperKind.Live -> BackgroundPreview(w.live, SignalForce.Good, intensity, modifier)
+        else -> Box(modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black).semantics { contentDescription = L10n.tr("Preview") }) { FlatWallpaper(w) }
     }
 }
 

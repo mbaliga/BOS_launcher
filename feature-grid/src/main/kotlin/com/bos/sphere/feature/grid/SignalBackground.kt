@@ -311,14 +311,14 @@ fun isDarkSurface(): Boolean = com.bos.sphere.core.design.HyleTheme.variant != c
  * activity is started), runs one shared clock only while the screen is on and the window focused (and never under reduced
  * motion), and announces the signal level to TalkBack once, politely, as a 1 dp live region. Place it as the bottom layer of a
  * `Box`; [dark] defaults to the current theme (the light theme draws the quiet light variant); it fills the box, has no touch handling and no other semantics. [dark] false draws the quiet light variant;
- * [baseFill] paints the black (or light) base too. [animate] false draws one static frame (thumbnails, Settings backdrop).
+ * [choice] is the live wallpaper to draw (the Glance's by default; the pages pass theirs, see [HomeSurfaceBackground]). [baseFill] paints the black (or light) base too. [animate] false draws one static frame (thumbnails, Settings backdrop).
  */
 @Composable
-fun SignalBackground(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = isDarkSurface(), baseFill: Boolean = false, animate: Boolean = true, announce: Boolean = true) {
+fun SignalBackground(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = isDarkSurface(), baseFill: Boolean = false, animate: Boolean = true, announce: Boolean = true, choice: BackgroundChoice = BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2)) {
     val reduced = rememberMotionPrefs().reduced || !animate
     val active = rememberRadarActive()
     val clock = rememberRadarClock(active && animate, reduced)
-    val cfg = remember(prefs.backgroundSlot1, prefs.backgroundSlot2, prefs.radarIntensity, dark, baseFill) { BackgroundConfig.from(prefs, dark, baseFill) }
+    val cfg = remember(choice, prefs.radarIntensity, dark, baseFill) { BackgroundConfig(choice, prefs.radarIntensity, dark, baseFill) }
     val shows = cfg.choice.items.isNotEmpty()
     val signal = rememberRadarSignal(prefs.radarSignalForce, shows)
     SignalBackgroundCanvas(cfg, signal, clock, reduced, modifier)

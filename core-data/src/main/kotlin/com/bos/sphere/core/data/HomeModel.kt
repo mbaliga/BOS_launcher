@@ -259,6 +259,21 @@ data class LauncherPrefs(
     // --- background (wave 15): two signal-driven slots, see BackgroundChoice
     val backgroundSlot1: BgItem = BackgroundChoice.DEFAULT.slot1,
     val backgroundSlot2: BgItem = BackgroundChoice.DEFAULT.slot2,
+    // --- wallpaper per surface (wave 26): the slots above are the Glance's live wallpaper; see Wallpaper.kt
+    val glanceWallpaperKind: WallpaperKind = WallpaperKind.Live,
+    val glanceSolid: Long = Wallpaper.DEFAULT_SOLID,
+    val glanceGradFrom: Long = GradientSpec.DEFAULT_FROM,
+    val glanceGradTo: Long = GradientSpec.DEFAULT_TO,
+    val glanceGradAngle: Int = GradientSpec.DEFAULT_ANGLE,
+    /** The pages (paginated or scroll) use the Glance wallpaper; when off they use the pages* values below. */
+    val pagesSameAsGlance: Boolean = true,
+    val pagesWallpaperKind: WallpaperKind = WallpaperKind.Live,
+    val pagesSolid: Long = Wallpaper.DEFAULT_SOLID,
+    val pagesGradFrom: Long = GradientSpec.DEFAULT_FROM,
+    val pagesGradTo: Long = GradientSpec.DEFAULT_TO,
+    val pagesGradAngle: Int = GradientSpec.DEFAULT_ANGLE,
+    val pagesSlot1: BgItem = BackgroundChoice.DEFAULT.slot1,
+    val pagesSlot2: BgItem = BackgroundChoice.DEFAULT.slot2,
 
     // --- search
     val webEngine: WebEngine = WebEngine.DuckDuckGo,

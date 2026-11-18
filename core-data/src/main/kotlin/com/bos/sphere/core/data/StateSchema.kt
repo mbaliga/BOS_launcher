@@ -11,6 +11,8 @@ import org.json.JSONObject
  * as a [JSONObject] so fields this build does not know (written by a newer build, or by another work
  * stream) survive a round trip untouched.
  *
+ * Wave 26: the wallpaper per surface keys (wpGlance*, wpPages*) live in launcher_prefs, which is exported and backed up like the rest; no version bump (additive).
+ *
  * Schema history (every version listed here has a fixture under `core-data/src/test/resources` and a
  * migration step in [StateMigrations]):
  *  - 1: first export format. Flat `prefs` map at the top, `layoutPages` as an embedded JSON string,

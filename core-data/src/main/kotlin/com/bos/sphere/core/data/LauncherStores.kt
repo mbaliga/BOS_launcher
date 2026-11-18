@@ -60,6 +60,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
                 indicatorSpeed = it.indicatorSpeed.coerceIn(0f, 1f),
                 recentsLimit = HomeRecents.clampLimit(it.recentsLimit),
             ).let { p -> BackgroundChoice.normalised(p.backgroundSlot1, p.backgroundSlot2).let { c -> p.copy(backgroundSlot1 = c.slot1, backgroundSlot2 = c.slot2) } }
+            .let { p -> p.withWallpaper(WallpaperSurface.Glance, p.rawWallpaper(WallpaperSurface.Glance)).let { q -> q.withWallpaper(WallpaperSurface.Pages, q.rawWallpaper(WallpaperSurface.Pages)) } }
         }
         if (next == _prefs.value) return
         _prefs.value = next
@@ -93,6 +94,11 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("searchLayout", next.searchLayout.name).putInt("homePage", next.homePage).putString("pageTransition", next.pageTransition.name)
             .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
             .putString("bgSlot1", next.backgroundSlot1.id).putString("bgSlot2", next.backgroundSlot2.id)
+            .putString("wpGlanceKind", next.glanceWallpaperKind.id).putLong("wpGlanceSolid", next.glanceSolid)
+            .putLong("wpGlanceFrom", next.glanceGradFrom).putLong("wpGlanceTo", next.glanceGradTo).putInt("wpGlanceAngle", next.glanceGradAngle)
+            .putBoolean("wpPagesSame", next.pagesSameAsGlance).putString("wpPagesKind", next.pagesWallpaperKind.id).putLong("wpPagesSolid", next.pagesSolid)
+            .putLong("wpPagesFrom", next.pagesGradFrom).putLong("wpPagesTo", next.pagesGradTo).putInt("wpPagesAngle", next.pagesGradAngle)
+            .putString("wpPagesSlot1", next.pagesSlot1.id).putString("wpPagesSlot2", next.pagesSlot2.id)
             .putString("radarIntensity", next.radarIntensity.name).putString("radarSignalForce", next.radarSignalForce.name)
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
@@ -149,7 +155,20 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         val d = LauncherPrefs()
         // Wave 15: any stored choice of the old background gallery is ignored; no stored slots means the default pair.
         val bg = BackgroundChoice.fromStored(sp.getString("bgSlot1", null), sp.getString("bgSlot2", null))
+        val pagesBg = BackgroundChoice.fromStored(sp.getString("wpPagesSlot1", null), sp.getString("wpPagesSlot2", null))
         return LauncherPrefs(
+            glanceWallpaperKind = WallpaperKind.forId(sp.getString("wpGlanceKind", null)) ?: d.glanceWallpaperKind,
+            glanceSolid = sp.getLong("wpGlanceSolid", d.glanceSolid) or GradientSpec.OPAQUE,
+            glanceGradFrom = sp.getLong("wpGlanceFrom", d.glanceGradFrom) or GradientSpec.OPAQUE,
+            glanceGradTo = sp.getLong("wpGlanceTo", d.glanceGradTo) or GradientSpec.OPAQUE,
+            glanceGradAngle = GradientSpec(angle = sp.getInt("wpGlanceAngle", d.glanceGradAngle)).normalised().angle,
+            pagesSameAsGlance = sp.getBoolean("wpPagesSame", d.pagesSameAsGlance),
+            pagesWallpaperKind = WallpaperKind.forId(sp.getString("wpPagesKind", null)) ?: d.pagesWallpaperKind,
+            pagesSolid = sp.getLong("wpPagesSolid", d.pagesSolid) or GradientSpec.OPAQUE,
+            pagesGradFrom = sp.getLong("wpPagesFrom", d.pagesGradFrom) or GradientSpec.OPAQUE,
+            pagesGradTo = sp.getLong("wpPagesTo", d.pagesGradTo) or GradientSpec.OPAQUE,
+            pagesGradAngle = GradientSpec(angle = sp.getInt("wpPagesAngle", d.pagesGradAngle)).normalised().angle,
+            pagesSlot1 = pagesBg.slot1, pagesSlot2 = pagesBg.slot2,
             homeStyle = enumOr(sp.getString("style", null), d.homeStyle),
             homeScroll = enumOr(sp.getString("homeScroll", null), d.homeScroll),
             drawerRailVisible = sp.getBoolean("drawerRailVisible", d.drawerRailVisible),

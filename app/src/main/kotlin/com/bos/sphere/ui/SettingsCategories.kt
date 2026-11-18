@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bos.sphere.core.data.WallpaperSurface
+import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.AppsOnHome
 import com.bos.sphere.core.data.ClockFormat
@@ -269,6 +271,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     hint = x("What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing"),
                 ) { v -> upd { it.copy(rightSide = v) } },
             )
+            addAll(wallpaperSettings(p) { f -> upd(f) }) // HOM-16 (wave 26): Glance and Pages wallpaper, always listed
             if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Recents) {
                 add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })
                 add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Uses usage access when it is allowed; otherwise only apps opened from Liftoff are listed")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })
@@ -622,7 +625,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             if (p.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Wallpaper) {
                 add(SettingItem.Slider(x("Backdrop dimming"), Glyphs.Moon, p.settingsDim, 0.2f..0.95f, pct(p.settingsDim)) { v -> upd { it.copy(settingsDim = v) } })
             }
-            add(SettingItem.Pane(x("Background"), Glyphs.Image, p.backgroundSummary()) { com.bos.sphere.feature.grid.BackgroundPane(p, m.updatePrefs) }) // HOM-16
         },
     )
 
@@ -791,10 +793,16 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     return out
 }
 
-/** The summary line of the Background row: the two slots, "Spire + Breathing dots". */
-private fun com.bos.sphere.core.data.LauncherPrefs.backgroundSummary(): String =
-    com.bos.sphere.core.data.BackgroundChoice(backgroundSlot1, backgroundSlot2).items.joinToString(" + ") { com.bos.sphere.core.design.L10n.tr(it.label) }.ifEmpty { com.bos.sphere.core.design.L10n.tr("None") }
-
+/**
+ * HOM-16 (wave 26): the wallpaper rows of the Home screen category. They are listed in every state (Glance on or off, signal
+ * permitted or not, pages present or not): the live wallpaper choices live inside each pane, under the "Live wallpaper" type.
+ */
+internal fun wallpaperSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): List<SettingItem> = buildList {
+    val tr = { s: String -> com.bos.sphere.core.design.L10n.tr(s) }
+    add(SettingItem.Pane(x("Glance wallpaper"), Glyphs.Image, com.bos.sphere.feature.grid.wallpaperSummary(p.wallpaper(WallpaperSurface.Glance), tr)) { com.bos.sphere.feature.grid.BackgroundPane(p, WallpaperSurface.Glance, upd) })
+    add(SettingItem.Toggle(x("Pages use the same wallpaper as Glance"), Glyphs.Image, p.pagesSameAsGlance, x("Applies to the pages and the scroll alike")) { v -> upd { it.copy(pagesSameAsGlance = v) } })
+    if (!p.pagesSameAsGlance) add(SettingItem.Pane(x("Pages wallpaper"), Glyphs.Image, com.bos.sphere.feature.grid.wallpaperSummary(p.wallpaper(WallpaperSurface.Pages), tr)) { com.bos.sphere.feature.grid.BackgroundPane(p, WallpaperSurface.Pages, upd) })
+}
 
 /** HOM-23: the Glance settings rows (content presets and free toggles, hotspot presets and corners, controls timeout, weather strength, indicator). */
 internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): List<SettingItem> = buildList {

@@ -138,8 +138,13 @@ sealed interface SettingItem {
     }
 
     /** − value + for small whole numbers. */
-    data class Stepper(override val title: String, override val glyph: ImageVector, val count: Int, val range: IntRange, val hint: String? = null, val onChange: (Int) -> Unit) : SettingItem {
-        override val value: String get() = count.toString()
+    data class Stepper(
+        override val title: String, override val glyph: ImageVector, val count: Int, val range: IntRange, val hint: String? = null,
+        /** Wave 28: the size of one step (the Comms size moves in 5s) and the text shown for the value ("100%"); by default one and the number. */
+        val step: Int = 1, val valueText: String? = null,
+        val onChange: (Int) -> Unit,
+    ) : SettingItem {
+        override val value: String get() = valueText ?: count.toString()
     }
 
     /** Runs on tap (opens a dialog, adds a page …). */

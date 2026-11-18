@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.paddingFromBaseline
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -139,7 +140,7 @@ internal fun SectionHeader(
             .clickable(onClick = onToggle),
     ) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 32.dp).padding(start = RoomyList.H_PAD_DP.dp, end = RoomyList.H_PAD_DP.dp, top = 6.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth().heightIn(min = 32.dp).padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (accent != null) Box(Modifier.padding(end = 8.dp).size(10.dp).background(accent, CircleShape))
@@ -149,22 +150,22 @@ internal fun SectionHeader(
             }
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                title, color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                title, color = LocalLp.current.dim, fontSize = CommsStyle.HEADING_SP.sp, fontWeight = FontWeight.Medium,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
             )
             val sub = listOf(sec.subtitle, extra).filter { it.isNotEmpty() }.joinToString(" · ")
             if (sub.isNotEmpty()) {
                 Text(
-                    "  $sub", color = LocalLp.current.dim, fontSize = 12.sp, maxLines = 1,
+                    "  $sub", color = LocalLp.current.dim, fontSize = CommsStyle.NOTE_SP.sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                 )
             }
             if (badge.isNotEmpty()) Text("  $badge", color = LocalLp.current.dim, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
-            Text("${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp)
+            Text("${sec.items.size}", color = LocalLp.current.dim, fontSize = CommsStyle.NOTE_SP.sp)
             if (collapsed) { Spacer(Modifier.width(6.dp)); Chevron(LocalLp.current.dim, down = false, size = 14) }
         }
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
+        CommsRowLine()
     }
 }
 
@@ -173,8 +174,8 @@ internal fun SectionHeader(
 internal fun HeldDigestLine(count: Int, timeText: String) {
     Text(
         L10n.tr("%d held for the digest at %s", count, timeText),
-        color = LocalLp.current.dim, fontSize = 12.sp,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = RoomyList.H_PAD_DP.dp, vertical = 8.dp),
+        color = LocalLp.current.dim, fontSize = CommsStyle.NOTE_SP.sp,
+        modifier = Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 8.dp, bottom = 8.dp),
     )
 }
 
@@ -301,48 +302,30 @@ internal fun NotificationRow(
                 .heightIn(min = RoomyList.ROW_MIN_DP.dp)
                 .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
         ) {
-            // Wave 27 (the owner's Comms mock-up): no stripe. A 56 dp rounded app icon, the headline (a message's text; else the title) in 24 sp,
+            // Wave 27 (the owner's Comms mock-up), wave 28 (measured): no stripe. A 38 dp rounded app icon, the headline (a message's text; else the title) in 17 sp,
             // a grey second line (the sender; else the text) with the time right-aligned on it.
-            Row(
-                Modifier.weight(1f).fillMaxHeight().padding(horizontal = CommsStyle.H_PAD_DP.dp, vertical = CommsStyle.ROW_V_PAD_DP.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-            AppIcon(n.packageName, n.appLabel.ifBlank { n.title }, CommsStyle.ICON_DP, Modifier.testTag("lp.badge.${n.key}"))
-            Spacer(Modifier.width(CommsStyle.TEXT_GAP_DP.dp))
             val messaging = n.isMessaging && n.summary.isNotEmpty()
             val headline = if (messaging) n.summary else n.title.ifBlank { n.summary }
             val second = if (messaging) n.title else if (n.title.isNotBlank()) n.summary.ifBlank { n.appLabel } else n.appLabel
-            Column(Modifier.weight(1f)) {
-                Text(
-                    headline, color = if (unread && !silent) LocalLp.current.ink else LocalLp.current.ink2, fontSize = CommsStyle.TITLE_SP.sp, fontWeight = FontWeight.Normal,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("lp.title.${n.key}"),
-                )
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        second, color = LocalLp.current.dim, fontSize = CommsStyle.SUB_SP.sp, fontWeight = FontWeight.Normal,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("lp.preview.${n.key}"),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    if (pinned || important) Box(Modifier.padding(end = 6.dp, bottom = 5.dp).size(6.dp).background(BlueLight, CircleShape))
-                    Text(
-                        formatStamp(n.timestamp, now, is24, zone), color = LocalLp.current.dim, fontSize = CommsStyle.TIME_SP.sp,
-                        maxLines = 1, modifier = Modifier.testTag("lp.time.${n.key}"),
-                    )
+            CommsRowContent(
+                pkg = n.packageName, appLabel = n.appLabel.ifBlank { n.title }, iconTag = "lp.badge.${n.key}",
+                headline = headline, headlineColor = if (unread && !silent) LocalLp.current.ink else LocalLp.current.ink2, titleTag = "lp.title.${n.key}",
+                second = second, previewTag = "lp.preview.${n.key}", stamp = formatStamp(n.timestamp, now, is24, zone), timeTag = "lp.time.${n.key}",
+                dot = pinned || important, modifier = Modifier.weight(1f).fillMaxHeight(),
+            ) {
+                if (showButtons) {
+                    // Buttons for both gestures, shown on hover and on focus (STR-03 equivalents).
+                    Spacer(Modifier.width(10.dp))
+                    if (canSwipeLeft) RowButton(primaryLabel, handlers.onPrimary)
+                    RowButton(L10n.tr("Actions"), handlers.onMenu)
                 }
-            }
-            if (showButtons) {
-                // Buttons for both gestures, shown on hover and on focus (STR-03 equivalents).
-                Spacer(Modifier.width(10.dp))
-                if (canSwipeLeft) RowButton(primaryLabel, handlers.onPrimary)
-                RowButton(L10n.tr("Actions"), handlers.onMenu)
-            }
             }
         }
       }
         // Wave 25 (STR-02): no chips on a resting row; a long press opens them in place, with "Actions" for the full menu.
         if (actionsOpen && (plain.isNotEmpty() || reply != null)) {
             Row(
-                Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = 16.dp, bottom = 8.dp),
+                Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (reply != null) ActionChip(reply.label.ifBlank { L10n.tr("Reply") }, true) { handlers.onCommand(RowCommand.Reply) }
@@ -350,14 +333,14 @@ internal fun NotificationRow(
                 ActionChip(L10n.tr("Actions"), false) { handlers.onMenu() }
             }
         } else if (actionsOpen) {
-            Row(Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = 16.dp, bottom = 8.dp)) {
+            Row(Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp, bottom = 8.dp)) {
                 ActionChip(L10n.tr("Actions"), false) { handlers.onMenu() }
             }
         }
         if (replyOpen && reply != null) {
             ReplyRow(reply, hint = reply.reply?.hint, onSend = { text -> handlers.onSendReply(reply, text) })
         }
-        Box(Modifier.padding(horizontal = CommsStyle.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line).testTag("lp.rowLine.${n.key}"))
+        CommsRowLine(Modifier.testTag("lp.rowLine.${n.key}"))
     }
 }
 
@@ -396,7 +379,7 @@ internal fun ReplyRow(action: HubAction, hint: String?, onSend: (String) -> Unit
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Row(
-        Modifier.fillMaxWidth().padding(start = HubStyle.TEXT_START_DP.dp, end = 16.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(LocalLp.current.surface).padding(horizontal = 14.dp, vertical = 9.dp)) {
@@ -494,5 +477,59 @@ private fun SheetLine(label: String, expandable: Boolean, expanded: Boolean, onC
     ) {
         Text(label, color = LocalLp.current.ink2, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         if (expandable) { Spacer(Modifier.width(8.dp)); Chevron(LocalLp.current.dim, down = !expanded, size = 14) }
+    }
+}
+
+
+/** The inset hairline under a Comms row: from the left margin to the right margin, one dp. */
+@Composable
+internal fun CommsRowLine(modifier: Modifier = Modifier) =
+    Box(Modifier.padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp).then(modifier).fillMaxWidth().height(CommsStyle.HAIR_DP.dp).background(LocalLp.current.line))
+
+/**
+ * One Comms row's content, shared by the live list and the history views, at the mock-up's measures: the icon 16 dp below the row's top, the headline's
+ * baseline 33.2 dp and the second line's 52.7 dp below it, the time's 50.9 dp, text 16 dp after the icon. With [expanded] (an opened history row) the
+ * headline may take several lines and the second line follows it.
+ */
+@Composable
+internal fun CommsRowContent(
+    pkg: String, appLabel: String, iconTag: String,
+    headline: String, headlineColor: Color, titleTag: String,
+    second: String, previewTag: String, stamp: String, timeTag: String,
+    modifier: Modifier = Modifier, dot: Boolean = false, expanded: Boolean = false,
+    trailing: @Composable () -> Unit = {},
+) {
+    val lp = LocalLp.current
+    Row(modifier.padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp)) {
+        AppIcon(pkg, appLabel, CommsStyle.ICON_DP, Modifier.padding(top = CommsStyle.ICON_TOP_DP.dp).testTag(iconTag))
+        Spacer(Modifier.width(CommsStyle.TEXT_GAP_DP.dp))
+        val titleText: @Composable (Modifier) -> Unit = { m ->
+            Text(
+                headline, color = headlineColor, fontSize = CommsStyle.TITLE_ROW_SP.sp, fontWeight = FontWeight.Normal,
+                maxLines = if (expanded) 12 else 1, overflow = TextOverflow.Ellipsis, modifier = m.testTag(titleTag),
+            )
+        }
+        val subLine: @Composable (Boolean) -> Unit = { baselineAligned ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = if (baselineAligned) Alignment.Top else Alignment.Bottom) {
+                Text(
+                    second, color = lp.dim, fontSize = CommsStyle.SUB_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).then(if (baselineAligned) Modifier.paddingFromBaseline(top = CommsStyle.SUB_BASELINE_DP.dp) else Modifier).testTag(previewTag),
+                )
+                Spacer(Modifier.width(8.dp))
+                if (dot) Box(Modifier.padding(end = 6.dp, top = (CommsStyle.TIME_BASELINE_DP - 8f).dp).size(6.dp).background(BlueLight, CircleShape))
+                Text(
+                    stamp, color = lp.dim, fontSize = CommsStyle.TIME_SP.sp, maxLines = 1,
+                    modifier = (if (baselineAligned) Modifier.paddingFromBaseline(top = CommsStyle.TIME_BASELINE_DP.dp) else Modifier).testTag(timeTag),
+                )
+            }
+        }
+        if (expanded) Column(Modifier.weight(1f).heightIn(min = (CommsStyle.ROW_DP - CommsStyle.HAIR_DP).dp)) {
+            titleText(Modifier.paddingFromBaseline(top = CommsStyle.TITLE_BASELINE_DP.dp).padding(end = CommsStyle.TITLE_END_DP.dp))
+            Box(Modifier.padding(top = 2.dp, bottom = 10.dp)) { subLine(false) }
+        } else Box(Modifier.weight(1f).heightIn(min = (CommsStyle.ROW_DP - CommsStyle.HAIR_DP).dp)) {
+            titleText(Modifier.paddingFromBaseline(top = CommsStyle.TITLE_BASELINE_DP.dp).padding(end = CommsStyle.TITLE_END_DP.dp))
+            subLine(true)
+        }
+        trailing()
     }
 }

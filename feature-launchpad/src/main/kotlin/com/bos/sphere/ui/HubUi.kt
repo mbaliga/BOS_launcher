@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -58,40 +59,42 @@ import java.util.Locale
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 /**
  * Wave 27: the tab row of the owner's Comms mock-up: ALL UNREAD FILES USAGE TIMELINE in capitals with letter spacing, the selected one in the full ink
- * colour and the others grey (no underline, no options button: Options live in the Comms menu). 48 dp high; it scrolls when the labels do not fit.
+ * colour and the others grey (no underline, no options button: Options live in the Comms menu). Wave 28: 17 sp labels 19 dp apart, 35 dp high; it scrolls when the labels do not fit.
  */
 @Composable
 fun HubSwitcher(state: HubState, modifier: Modifier = Modifier) {
     val lp = LocalLp.current
+    // The row is 35 dp high and the label sits centred on it; each tab is a 48 dp target centred on the row (it overlaps the rows above and below, which are transparent there).
     Row(
-        modifier.fillMaxWidth().height(CommsStyle.TAB_H_DP.dp).horizontalScroll(rememberScrollState()).testTag("hub.switcher"),
+        modifier.fillMaxWidth().padding(top = CommsStyle.TABS_GAP_DP.dp).height(CommsStyle.TAB_H_DP.dp).horizontalScroll(rememberScrollState()).testTag("hub.switcher"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(Modifier.width((CommsStyle.H_PAD_DP - 9).dp))
-        state.tabs.forEach { v ->
+        Spacer(Modifier.width((CommsStyle.H_PAD_DP - CommsStyle.TAB_PAD_DP).dp))
+        state.tabs.forEachIndexed { i, v ->
             val sel = v == state.view
             val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
             LaunchedEffect(sel) { if (sel) bring.bringIntoView() } // a view picked by a swipe or a link scrolls into sight
             Box(
-                Modifier.height(CommsStyle.TAB_H_DP.dp).widthIn(min = 48.dp).bringIntoViewRequester(bring).clickable { state.select(v) }
+                Modifier.requiredHeight(maxOf(48.dp, commsTarget())).widthIn(min = (CommsStyle.TAB_SLOTS_DP.getOrNull(i) ?: 0f).dp).bringIntoViewRequester(bring).clickable { state.select(v) }
                     .semantics { role = Role.Tab; selected = sel; contentDescription = L10n.tr(v.label) }.testTag("hub.view.${v.id}"),
-                Alignment.Center,
+                Alignment.CenterStart,
             ) {
                 Text(
-                    L10n.tr(v.label).uppercase(), color = if (sel) lp.ink else lp.dim, fontSize = CommsStyle.TAB_SP.sp, fontWeight = FontWeight.Normal,
-                    letterSpacing = 1.sp, maxLines = 1, modifier = Modifier.padding(horizontal = 9.dp),
+                    L10n.tr(v.label).uppercase(), color = if (sel) lp.ink else lp.tabDim, fontSize = CommsStyle.TAB_SP.sp, fontWeight = FontWeight.Normal,
+                    maxLines = 1, modifier = Modifier.padding(horizontal = CommsStyle.TAB_PAD_DP.dp),
                 )
             }
         }
+        Spacer(Modifier.width((CommsStyle.END_PAD_DP - CommsStyle.TAB_PAD_DP).coerceAtLeast(0f).dp))
     }
 }
 
 @Composable
 private fun HubChip(text: String, selected: Boolean, tag: String, onClick: () -> Unit) {
     val lp = LocalLp.current
-    Box(Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).clickable(onClick = onClick).semantics { role = Role.Button; this.selected = selected }.testTag(tag), Alignment.Center) { // wave 26: 48 dp both ways, so a short label ("Day") has no narrow, shared hit area
+    Box(Modifier.heightIn(min = commsTarget()).widthIn(min = commsTarget()).clickable(onClick = onClick).semantics { role = Role.Button; this.selected = selected }.testTag(tag), Alignment.Center) { // wave 26: 48 dp both ways, so a short label ("Day") has no narrow, shared hit area
         Text(
-            text, color = if (selected) Color.White else lp.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            text, color = if (selected) Color.White else lp.ink2, fontSize = CommsStyle.CHIP_SP.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(if (selected) BlueDark else lp.ink.copy(alpha = 0.07f)).padding(horizontal = 10.dp, vertical = 4.dp).widthIn(max = 180.dp),
         )
     }
@@ -134,8 +137,8 @@ fun HubBody(
 ) {
     val lp = LocalLp.current
     Column(modifier.fillMaxWidth().fillMaxHeight().testTag("hub.body")) {
-        if (!hasAccess && state.view.history) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("hub.noAccess"), verticalAlignment = Alignment.CenterVertically) {
-            Text(L10n.tr("Notification access is off, so new notifications are not recorded."), color = lp.dim, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        if (!hasAccess && state.view.history) Row(Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp).testTag("hub.noAccess"), verticalAlignment = Alignment.CenterVertically) {
+            Text(L10n.tr("Notification access is off, so new notifications are not recorded."), color = lp.dim, fontSize = CommsStyle.NOTE_SP.sp, modifier = Modifier.weight(1f))
             HubChip(L10n.tr("Turn on"), true, "hub.grant", onRequestAccess)
         }
         if (!state.view.history) { Box(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding().testTag("hub.panel.${state.view.id}")) { panelBody(state.view) }; return@Column }
@@ -153,7 +156,7 @@ fun HubBody(
                             state.view == HubView.Read -> "Nothing read yet"
                             else -> "No notifications in history yet"
                         }),
-                        color = lp.dim, fontSize = 16.sp, modifier = Modifier.testTag("hub.empty"),
+                        color = lp.dim, fontSize = CommsStyle.EMPTY_SP.sp, modifier = Modifier.testTag("hub.empty"),
                     )
                 }
             } else {
@@ -171,16 +174,16 @@ fun HubBody(
                                 HubGrouping.Flat -> ""
                             }
                             Row(
-                                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp).testTag("hub.header.$key"),
+                                Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 14.dp, bottom = 4.dp).testTag("hub.header.$key"),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(title, color = lp.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                if (state.grouping != HubGrouping.Day) Text("${list.size}", color = lp.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp).testTag("hub.headerCount.$key"))
+                                Text(title, color = lp.dim, fontSize = CommsStyle.HEADING_SP.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                if (state.grouping != HubGrouping.Day) Text("${list.size}", color = lp.dim, fontSize = CommsStyle.NOTE_SP.sp, modifier = Modifier.padding(start = 8.dp).testTag("hub.headerCount.$key"))
                             }
                         }
                         items(list, key = { it.id }) { e ->
                             HubRow(
-                                e, state.density, stampOf(e.timeMillis, now, is24, zone), open = expanded == e.id, live = e.key in liveKeys,
+                                e, stampOf(e.timeMillis, now, is24, zone), open = expanded == e.id, live = e.key in liveKeys,
                                 onTap = { state.store?.setRead(listOf(e.id), true); expanded = if (expanded == e.id) null else e.id },
                                 onOpen = { onOpen(e) }, onMore = { onMore(e) },
                                 onToggleRead = { state.store?.setRead(listOf(e.id), !e.read) },
@@ -197,10 +200,10 @@ fun HubBody(
                         .background(Color(0xE6202228), RoundedCornerShape(50)).padding(start = 18.dp).testTag("hub.undoBar"),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(u.message, color = Color.White, fontSize = 13.sp)
+                    Text(u.message, color = Color.White, fontSize = CommsStyle.CHIP_SP.sp)
                     Text(
-                        L10n.tr("Undo"), color = Color(0xFF9DB7FF), fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.heightIn(min = 48.dp).clickable { state.store?.setRead(u.ids, false); state.undo = null }
+                        L10n.tr("Undo"), color = Color(0xFF9DB7FF), fontSize = CommsStyle.BODY_SP.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.heightIn(min = commsTarget()).clickable { state.store?.setRead(u.ids, false); state.undo = null }
                             .semantics { role = Role.Button }.padding(horizontal = 16.dp).padding(top = 14.dp).testTag("hub.undo"),
                     )
                 }
@@ -210,48 +213,33 @@ fun HubBody(
 }
 
 /**
- * Wave 27: a history row in the Comms row style, the same as the live list: a 56 dp app icon, the headline (a message's text, else its title) in 24 sp,
- * a grey second line (the sender, else the text) and the time right-aligned on that line, a thin inset hairline below, no stripe. Compact density
- * drops the second line and shrinks the icon; Expanded lets the headline use three lines. Tapping marks the row read and opens its buttons.
+ * Wave 27: a history row in the Comms row style, the same as the live list (wave 28: [CommsRowContent], measured off the mock-up): a 38 dp app icon, the
+ * headline (a message's text, else its title) in 17 sp, a grey second line (the sender, else the text) and the time right-aligned on that line, a thin
+ * inset hairline below, no stripe. Tapping marks the row read and opens its buttons and lets the headline use more lines.
  */
 @Composable
 private fun HubRow(
-    e: HistoryEntry, density: HubDensity, stamp: String, open: Boolean, live: Boolean,
+    e: HistoryEntry, stamp: String, open: Boolean, live: Boolean,
     onTap: () -> Unit, onOpen: () -> Unit, onMore: () -> Unit, onToggleRead: () -> Unit, onDelete: () -> Unit,
 ) {
     val lp = LocalLp.current
     val unread = !e.read
     // The stored entry does not say whether it was a message (the sender falls back to the title), so history always reads text first, then who.
     val headline = e.text.lineSequence().firstOrNull().orEmpty().ifBlank { e.title.ifBlank { e.appLabel } }
-    val second = e.who
-    val iconDp = if (density == HubDensity.Compact) 40 else CommsStyle.ICON_DP
     Column(Modifier.fillMaxWidth().testTag("hub.row.${e.id}")) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = if (density == HubDensity.Compact) 56.dp else CommsStyle.ROW_MIN_DP.dp).hubTap(onTap).semantics(mergeDescendants = true) {
+        CommsRowContent(
+            pkg = e.packageName, appLabel = e.appLabel.ifBlank { e.who }, iconTag = "hub.badge.${e.id}",
+            headline = headline, headlineColor = if (unread) lp.ink else lp.ink2, titleTag = "hub.title.${e.id}",
+            second = e.who, previewTag = "hub.who.${e.id}", stamp = stamp, timeTag = "hub.time.${e.id}", expanded = open,
+            modifier = Modifier.fillMaxWidth().hubTap(onTap).semantics(mergeDescendants = true) {
                 role = Role.Button
                 stateDescription = L10n.tr(if (unread) "Unread" else "Read")
-            }.padding(horizontal = CommsStyle.H_PAD_DP.dp, vertical = if (density == HubDensity.Compact) 8.dp else CommsStyle.ROW_V_PAD_DP.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppIcon(e.packageName, e.appLabel.ifBlank { e.who }, iconDp, Modifier.testTag("hub.badge.${e.id}"))
-            Spacer(Modifier.width(CommsStyle.TEXT_GAP_DP.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    headline, color = if (unread) lp.ink else lp.ink2, fontSize = if (density == HubDensity.Compact) 18.sp else CommsStyle.TITLE_SP.sp,
-                    maxLines = if (open) 12 else if (density == HubDensity.Expanded) 3 else 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("hub.title.${e.id}"),
-                )
-                if (density != HubDensity.Compact || open) Row(verticalAlignment = Alignment.Bottom) {
-                    Text(second, color = lp.dim, fontSize = CommsStyle.SUB_SP.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stamp, color = lp.dim, fontSize = CommsStyle.TIME_SP.sp, maxLines = 1, modifier = Modifier.testTag("hub.time.${e.id}"))
-                } else Text(stamp, color = lp.dim, fontSize = CommsStyle.TIME_SP.sp, maxLines = 1, modifier = Modifier.align(Alignment.End).testTag("hub.time.${e.id}"))
-            }
-        }
+            },
+        )
         if (open) Text(
             (e.appLabel.ifBlank { e.packageName }) + (if (e.conversation.isNotBlank() && e.conversation != e.who) " · " + e.conversation else "") + (if (e.dismissed) " · " + L10n.tr("Cleared from the shade") else ""),
-            color = lp.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = HubStyle.TEXT_START_DP.dp, end = 16.dp),
+            color = lp.dim, fontSize = CommsStyle.NOTE_SP.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp),
         )
         if (open) Row(Modifier.fillMaxWidth().padding(start = HubStyle.TEXT_START_DP.dp - 10.dp).horizontalScroll(rememberScrollState()).testTag("hub.rowActions.${e.id}"), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             HubChip(L10n.tr("Open"), false, "hub.open.${e.id}", onOpen)
@@ -259,6 +247,6 @@ private fun HubRow(
             if (live) HubChip(L10n.tr("More options"), false, "hub.more.${e.id}", onMore)
             HubChip(L10n.tr("Delete from history"), false, "hub.delete.${e.id}", onDelete)
         }
-        Box(Modifier.padding(horizontal = CommsStyle.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(lp.line))
+        CommsRowLine()
     }
 }

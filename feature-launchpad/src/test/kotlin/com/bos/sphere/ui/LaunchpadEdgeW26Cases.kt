@@ -70,12 +70,12 @@ abstract class LaunchpadEdgeW26Cases(private val orientation: String) : Launchpa
         if (!rtl) {
             assertEquals("row right edge is the card's left edge", cardEdge, row.right.value, 1f)
             assertEquals("section band right edge", cardEdge, head.right.value, 1f)
-            assertEquals("time is 20 dp inside the row", row.right.value - 20f, time.right.value, 1.5f)
+            assertEquals("time is 18 dp inside the row (wave 28)", row.right.value - CommsStyle.END_PAD_DP, time.right.value, 1.5f)
             assertTrue("switcher row stays inside the content", sys.right.value <= cardEdge + 0.5f)
         } else {
             assertEquals("row left edge is the card's right edge", cardEdge, row.left.value, 1f)
             assertEquals("section band left edge", cardEdge, head.left.value, 1f)
-            assertTrue("time inside the row (${time.left.value} .. ${time.right.value}, row ${row.left.value}..${row.right.value})", time.right.value <= row.right.value - 19.5f && time.left.value >= row.left.value + 20f)
+            assertTrue("time inside the row (${time.left.value} .. ${time.right.value}, row ${row.left.value}..${row.right.value})", time.right.value <= row.right.value - 31f && time.left.value >= row.left.value + 17f)
             assertTrue("switcher row stays inside the content", sys.left.value >= cardEdge - 0.5f)
         }
     }

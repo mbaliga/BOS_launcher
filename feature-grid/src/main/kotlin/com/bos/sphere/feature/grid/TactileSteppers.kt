@@ -28,7 +28,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -69,15 +71,25 @@ internal fun TactileStepper(
     onIncrease: () -> Unit,
     label: String,
     modifier: Modifier = Modifier,
+    /** Wave 28: (current, range, step) for a stepper that is also a progress range to TalkBack (the Comms size); [onProgress] sets it. */
+    progress: Triple<Float, ClosedFloatingPointRange<Float>, Int>? = null,
+    onProgress: ((Float) -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(16.dp)
     Row(
         modifier
-            .height(44.dp)
+            .height(48.dp)
             .clip(shape)
             .background(TactileTokens.groove)
             .border(1.dp, TactileTokens.rimLight.copy(alpha = 0.25f), shape)
-            .semantics { contentDescription = "$label $value"; stateDescription = value },
+            .semantics {
+                contentDescription = "$label $value"; stateDescription = value
+                if (progress != null) {
+                    val steps = ((progress.second.endInclusive - progress.second.start) / progress.third).toInt() - 1
+                    progressBarRangeInfo = androidx.compose.ui.semantics.ProgressBarRangeInfo(progress.first, progress.second, steps.coerceAtLeast(0))
+                    if (onProgress != null) setProgress { v -> onProgress(v); true }
+                }
+            },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StepKey("−", canDecrease, "Decrease $label", onDecrease)
@@ -95,7 +107,7 @@ internal fun TactileStepper(
 private fun StepKey(glyph: String, enabled: Boolean, description: String, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(44.dp)
+            .size(48.dp)
             .padding(4.dp)
             .shadow(if (enabled) 2.dp else 0.dp, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))

@@ -14,6 +14,8 @@ import org.json.JSONObject
  * Wave 26: the wallpaper per surface keys (wpGlance*, wpPages*) live in launcher_prefs, which is exported and backed up like the rest; no version bump (additive).
  * Wave 27: the launcher haptic strength lives in its own exported pref file "launcher_haptics" (PrefFilesSource.ALLOWED), see [LauncherHapticSettings]; additive, no version bump.
  *
+ * Wave 28: the Comms content scale (75 to 125 percent) lives in its own exported pref file "comms_scale" (PrefFilesSource.ALLOWED), see [CommsScaleSettings]; additive, no version bump.
+ *
  * Schema history (every version listed here has a fixture under `core-data/src/test/resources` and a
  * migration step in [StateMigrations]):
  *  - 1: first export format. Flat `prefs` map at the top, `layoutPages` as an embedded JSON string,

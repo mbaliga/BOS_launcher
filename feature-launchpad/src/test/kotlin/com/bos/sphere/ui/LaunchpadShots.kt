@@ -22,6 +22,10 @@ import java.time.ZoneOffset
 /** Shared fixtures and capture for the Launchpad screenshot tests (STR-07). */
 abstract class LaunchpadShots {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    /** Wave 28: the Comms size is a process-wide setting; every test starts from the default. */
+    @org.junit.Before fun resetCommsScale() { com.bos.sphere.core.data.CommsScaleSettings.resetForTest() }
+    @org.junit.After fun resetCommsScaleAfter() { com.bos.sphere.core.data.CommsScaleSettings.resetForTest() }
+
     protected val outDir = File(System.getProperty("user.dir"), "build/screenshots").apply { mkdirs() }
 
     protected val zone = ZoneOffset.UTC

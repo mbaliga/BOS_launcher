@@ -530,11 +530,21 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     },
                 ) { v -> upd { it.copy(launchpadTheme = v) } },
             )
+            // Wave 28: the size of the Comms content, 75 to 125 percent in 5s (also an Options row of the Comms menu and the pinch on the list).
+            add(
+                SettingItem.Stepper(
+                    x("Comms size"), Glyphs.Pinch, com.bos.sphere.core.data.CommsScaleSettings.percent.value,
+                    com.bos.sphere.core.data.CommsScale.MIN..com.bos.sphere.core.data.CommsScale.MAX,
+                    hint = x("Text, icons and rows of Comms and its menu, from 75 to 125 percent. Pinching the list changes it too."),
+                    step = com.bos.sphere.core.data.CommsScale.STEP, valueText = "${com.bos.sphere.core.data.CommsScaleSettings.percent.value}%",
+                ) { v -> com.bos.sphere.core.data.CommsScaleSettings.set(v) },
+            )
             add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })
             add(
                 SettingItem.Pane(x("Comms gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {
                     val bound by com.bos.sphere.core.data.LaunchpadSettings.gestures.collectAsState()
-                    com.bos.sphere.core.data.LaunchpadGesture.entries.forEach { g ->
+                    // Wave 28: a pinch sets the Comms size now, so the two pinch bindings are not offered (the stored values stay, unused).
+                    com.bos.sphere.core.data.LaunchpadGesture.entries.filter { it != com.bos.sphere.core.data.LaunchpadGesture.PinchIn && it != com.bos.sphere.core.data.LaunchpadGesture.PinchOut }.forEach { g ->
                         Sub(g.label)
                         Text(L10n.tr(g.hint), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(bottom = 2.dp))
                         Chips(com.bos.sphere.core.data.LaunchpadGestures.allowed(g), bound[g] ?: com.bos.sphere.core.data.LaunchpadAction.None, { it.label }) { a ->

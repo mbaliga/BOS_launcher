@@ -305,13 +305,13 @@ class LaunchpadGroupsEndToEndW24Test {
         assertTrue("the tapped row is marked read", "c" in LaunchpadSettings.readKeys.value)
     }
 
-    @Test fun STR_02_groupedRowsAreRoomyAt72dpOrMore() {
+    @Test fun STR_02_groupedRowsAre70dpOrMore() {
         GroupsSettings.restore(GroupsConfig(groups = listOf(LaunchpadGroup("w", "Work")), assignments = listOf(GroupAssignment(AssignKind.App, AssignTargets.app("demo.wa"), "w"))))
         launch()
         rule.waitUntil(10_000) { sectionOf("c") == "group:w" }
         val density = rule.activity.resources.displayMetrics.density
         rule.onAllNodes(hasTestTagPrefix("lp.row."), useUnmergedTree = true).fetchSemanticsNodes().forEach { n ->
-            assertTrue("${tagOf(n)} is ${n.boundsInRoot.height / density} dp", n.boundsInRoot.height / density >= 72f - 0.5f)
+            assertTrue("${tagOf(n)} is ${n.boundsInRoot.height / density} dp", n.boundsInRoot.height / density >= 70f - 0.5f)
         }
     }
 

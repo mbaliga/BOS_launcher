@@ -94,7 +94,7 @@ object GroundControlNav {
             if (next != item.amount) { item.onChange(next); true } else false
         }
         is SettingItem.Stepper -> {
-            val next = (item.count + delta).coerceIn(item.range.first, item.range.last)
+            val next = (item.count + delta * item.step).coerceIn(item.range.first, item.range.last)
             if (next != item.count) { item.onChange(next); true } else false
         }
         is SettingItem.Choice<*> -> {

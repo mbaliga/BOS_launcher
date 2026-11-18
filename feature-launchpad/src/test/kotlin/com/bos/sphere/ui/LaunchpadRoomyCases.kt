@@ -67,14 +67,14 @@ abstract class LaunchpadRoomyCases(private val orientation: String) : LaunchpadS
         scrollTo("And the second part"); rule.onNodeWithText("And the second part").assertIsDisplayed()
     }
 
-    // Updated for wave 27 (the owner's Comms mock-up): a 56 dp rounded icon, rows of about 80 dp, 20 dp margins and no gap between rows (an inset divider instead).
-    @Test fun STR_02_row_isAtLeast78dpTall_withA56dpIcon() {
+    // Updated for wave 28 (the mock-ups, measured): a 38 dp rounded icon, rows of 70 dp (69 and a hairline), 32 dp left margin and no gap between rows (an inset divider instead).
+    @Test fun STR_02_row_is70dpTall_withA38dpIcon() {
         render("height", dark = false)
         scrollTo("Your code is 4411")
         val h = rule.onNodeWithTag("lp.row.s1", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertTrue("row height ${h.bottom - h.top} is under 78 dp", (h.bottom - h.top) >= 78.dp)
-        assertEquals(56, RoomyList.ICON_DP); assertEquals(80, RoomyList.ROW_MIN_DP)
-        assertEquals(20, RoomyList.H_PAD_DP); assertEquals(12, RoomyList.V_PAD_DP); assertEquals(0, RoomyList.ROW_GAP_DP)
+        assertTrue("row height ${h.bottom - h.top} is under 69 dp", (h.bottom - h.top) >= 69.dp)
+        assertEquals(38f, RoomyList.ICON_DP, 0f); assertEquals(69f, RoomyList.ROW_MIN_DP, 0f)
+        assertEquals(32f, RoomyList.H_PAD_DP, 0f); assertEquals(0, RoomyList.ROW_GAP_DP)
     }
 
     @Test fun STR_02_conversation_showsLatestWithMoreThatExpandsInPlace() {

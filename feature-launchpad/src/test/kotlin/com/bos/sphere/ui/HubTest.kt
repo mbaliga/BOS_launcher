@@ -35,6 +35,8 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.pinch
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.bos.sphere.core.data.CommsScale
+import com.bos.sphere.core.data.CommsScaleSettings
 import com.bos.sphere.core.data.GroupMode
 import com.bos.sphere.core.data.HubNotification
 import com.bos.sphere.core.data.LaunchpadPrefs
@@ -78,7 +80,10 @@ class HubTest {
         n("e1", "demo.mail", "Mail", "Invoice", "Payment received", at(5, 9, 30)),
     )
 
+    @org.junit.After fun resetScaleAfter() { CommsScaleSettings.resetForTest() }
+
     @Before fun setUp() {
+        CommsScaleSettings.resetForTest()
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         ctx.getSharedPreferences("launchpad_hub", 0).edit().clear().commit()
         store = NotificationHistoryStore(File(java.nio.file.Files.createTempDirectory("hub").toFile(), "usage/h.log"), Executor { it.run() })
@@ -94,9 +99,9 @@ class HubTest {
             CompositionLocalProvider(LocalLp provides LpDark) {
                 Column(
                     Modifier.fillMaxSize().background(LpDark.bg).testTag("host")
-                        .hubKeys(onView = { d -> HubLogic.step(s.views, s.view, d)?.let(s::select) }, onDensity = { l -> (if (l) s.density.looser else s.density.denser)?.let(s::chooseDensity) }, onMarkRead = { s.markVisibleRead(now, zone) })
+                        .hubKeys(onView = { d -> HubLogic.step(s.views, s.view, d)?.let(s::select) }, onScale = { b -> CommsScaleSettings.set(CommsScale.step(CommsScaleSettings.percent.value, if (b) +1 else -1)) }, onMarkRead = { s.markVisibleRead(now, zone) })
                         .focusable()
-                        .hubGestures(onPinch = { s.pinch(it) }, onSwipe = { sw -> s.swipe(sw) { s.markVisibleRead(now, zone) } }),
+                        .hubGestures(currentScale = { CommsScaleSettings.percent.value }, onScale = { CommsScaleSettings.set(it) }, onSwipe = { sw -> s.swipe(sw) { s.markVisibleRead(now, zone) } }),
                 ) {
                     HubSwitcher(s)
                     HubBody(s, now, zone, true, liveKeys = setOf("m1"), onOpen = { opened += it.key }, onMore = {}, modifier = Modifier.weight(1f), panelBody = { v -> Text("panel ${v.id}", color = LpDark.ink, modifier = Modifier.testTag("panel.${v.id}")) })
@@ -126,9 +131,9 @@ class HubTest {
 
     // ---- b: the switcher ----
 
-    @Test fun HUB_10_theSwitcherIs48dpHighShowsTheFiveTabsAndSwitchesOnATap() {
+    @Test fun HUB_10_theSwitcherIs35dpHighShowsTheFiveTabsAndSwitchesOnATap() {
         host()
-        rule.onNodeWithTag("hub.switcher").assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("hub.switcher").assertHeightIsAtLeast(34.5.dp) // wave 28: the mock-up's 35 dp tab row; the tap target grows to 48 dp of real screen
         HubView.entries.filter { it != HubView.Read }.forEach { rule.onNodeWithTag("hub.view.${it.id}").assertExists() }
         rule.onNodeWithTag("hub.view.read").assertDoesNotExist() // wave 27: the mock-up's tabs are ALL UNREAD FILES USAGE TIMELINE
         rule.onNodeWithTag("hub.view.all").assertIsSelected()
@@ -251,33 +256,37 @@ class HubTest {
         assertTrue(HubLogic.query(all, HubView.Files, HubFilters(), now, zone).isEmpty())
     }
 
-    // ---- density and pinch ----
+    // ---- Comms size and pinch (wave 28: replaces the three-level density pinch and its grouping tail) ----
 
-    @Test fun HUB_14_pinchOutMakesRowsLooserPinchInDenserAndTheChoiceIsPersisted() {
+    @Test fun HUB_14_pinchOutMakesTheCommsSizeBiggerPinchInSmallerInDetentsOf5() {
         host()
-        assertEquals(HubDensity.Comfortable, state.density)
-        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
+        assertEquals(100, CommsScaleSettings.percent.value)
+        // spread 200 px to 220 px: 10 percent bigger, one pinch, two detents
+        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-100f, 0f), center + Offset(-110f, 0f), center + Offset(100f, 0f), center + Offset(110f, 0f)) }
         rule.waitForIdle()
-        assertEquals(HubDensity.Expanded, state.density)
-        assertEquals(HubDensity.Expanded, newState(true).density)
+        assertEquals(110, CommsScaleSettings.percent.value)
         rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-200f, 0f), center + Offset(-40f, 0f), center + Offset(200f, 0f), center + Offset(40f, 0f)) }
         rule.waitForIdle()
-        assertEquals(HubDensity.Comfortable, state.density)
+        assertEquals("far in: the smallest detent", 75, CommsScaleSettings.percent.value)
+        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-300f, 0f), center + Offset(40f, 0f), center + Offset(300f, 0f)) }
+        rule.waitForIdle()
+        assertEquals("far out: the biggest detent", 125, CommsScaleSettings.percent.value)
     }
 
-    @Test fun HUB_14_atTheEndOfTheDensityScaleAFurtherPinchChangesTheGroupingGranularity() {
-        assertEquals(HubDensity.Expanded to HubGrouping.Sender, HubLogic.pinch(HubDensity.Expanded, HubGrouping.Day, true))
-        assertEquals(HubDensity.Expanded to HubGrouping.Sender, HubLogic.pinch(HubDensity.Expanded, HubGrouping.Sender, true))
-        assertEquals(HubDensity.Compact to HubGrouping.App, HubLogic.pinch(HubDensity.Compact, HubGrouping.Day, false))
-        assertEquals(HubDensity.Compact to HubGrouping.Day, HubLogic.pinch(HubDensity.Comfortable, HubGrouping.Day, false).let { HubDensity.Compact to HubGrouping.Day })
+    @Test fun HUB_14_aTinyChangeOfTheFingerSpreadIsNotAPinch() {
+        host()
+        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-100f, 0f), center + Offset(-103f, 0f), center + Offset(100f, 0f), center + Offset(103f, 0f)) }
+        rule.waitForIdle()
+        assertEquals(100, CommsScaleSettings.percent.value)
+    }
+
+    @Test fun HUB_14_theGroupingIsChosenInTheMenuAndPersistedNoPinchChangesIt() {
         assertEquals("wave 27: the default is a flat list, no bands", HubGrouping.Flat, state.grouping)
-        host(); rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseDensity(HubDensity.Expanded); state.chooseGrouping(HubGrouping.Day) } }; rule.waitForIdle()
+        host(); rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseGrouping(HubGrouping.Day) } }; rule.waitForIdle()
         rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
         rule.waitForIdle()
-        assertEquals(HubGrouping.Sender, state.grouping)
-        // Wave 26: Mum has a single row here, so there is no header that would repeat it (was: a "Mum" header above the "Mum" row).
-        rule.onAllNodesWithTag("hub.header.s:Mum").assertCountEquals(0)
-        assertEquals(HubGrouping.Sender, newState(true).grouping)
+        assertEquals("the pinch left the grouping alone", HubGrouping.Day, state.grouping)
+        assertEquals(HubGrouping.Day, newState(true).grouping)
     }
 
     // Wave 26 (launchpadPolish, owner item 2): an app or sender header only for two or more rows, with the count; day bands always.
@@ -358,7 +367,7 @@ class HubTest {
         rule.onNodeWithTag("hub.list").performTouchInput { swipeLeft() }; rule.waitForIdle()
         assertEquals(HubView.All, state.view)                                // one finger never switches views
         assertEquals(emptyList<String>(), rows().filter { it.read }.map { it.key })
-        assertEquals(HubDensity.Comfortable, state.density)
+        assertEquals(100, CommsScaleSettings.percent.value)
     }
 
     // ---- non-gesture equivalents ----
@@ -386,7 +395,7 @@ class HubTest {
         assertEquals(1, asked)
     }
 
-    @Test fun HUB_16_theHardwareKeyboardSwitchesViewsChangesDensityAndMarksRead() {
+    @Test fun HUB_16_theHardwareKeyboardSwitchesViewsChangesTheCommsSizeAndMarksRead() {
         host()
         rule.onNodeWithTag("host").requestFocus()
         rule.onNodeWithTag("host").performKeyInput { keyDown(Key.CtrlLeft); pressKey(Key.DirectionRight); keyUp(Key.CtrlLeft) }
@@ -395,7 +404,7 @@ class HubTest {
         rule.onNodeWithTag("host").performKeyInput { keyDown(Key.CtrlLeft); pressKey(Key.DirectionLeft); keyUp(Key.CtrlLeft) }
         rule.onNodeWithTag("host").performKeyInput { keyDown(Key.CtrlLeft); pressKey(Key.Minus); keyUp(Key.CtrlLeft) }
         rule.waitForIdle()
-        assertEquals(HubView.All, state.view); assertEquals(HubDensity.Compact, state.density)
+        assertEquals(HubView.All, state.view); assertEquals(95, CommsScaleSettings.percent.value)
         rule.onNodeWithTag("host").performKeyInput { keyDown(Key.CtrlLeft); keyDown(Key.ShiftLeft); pressKey(Key.M); keyUp(Key.ShiftLeft); keyUp(Key.CtrlLeft) }
         rule.waitForIdle()
         assertTrue(rows().all { it.read })
@@ -419,10 +428,10 @@ class HubTest {
         rule.waitForIdle()
         rule.onNodeWithTag("hub.switcher").assertExists()
         rule.onNodeWithTag("lp.root").assertExists()
-        // The old one-finger-pair pinch (collapse all / show unread) is replaced by the hub's: pinch out changes the density.
+        // Wave 28: a pinch on the screen sets the Comms size (the old pinch actions and the density pinch are gone).
         rule.onNodeWithTag("lp.root").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
         rule.waitForIdle()
-        assertEquals(HubDensity.Expanded, s.density)
+        assertEquals(125, CommsScaleSettings.percent.value)
         // Clear all empties the shade; the history keeps every entry, flagged as cleared.
         store.observe(emptyList())
         rule.waitForIdle()
@@ -467,10 +476,10 @@ class HubTest {
         rule.waitForIdle()
         rule.onNodeWithTag("lp.row.m1").assertExists()                             // the live list with its own rows and groups
         rule.onNodeWithTag("hub.list").assertDoesNotExist()
-        // The old pinch actions still apply there; the hub's density does not change.
+        // Wave 28: the pinch sets the Comms size on the live list too.
         rule.onNodeWithTag("lp.root").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
         rule.waitForIdle()
-        assertEquals(HubDensity.Comfortable, live.density)
+        assertEquals(125, CommsScaleSettings.percent.value)
         rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
         rule.onNodeWithTag(rowTag("m1")).assertExists()                            // persistent history
         rule.onNodeWithTag("hub.view.all").performClick(); rule.waitForIdle()
@@ -483,7 +492,7 @@ class HubTest {
         host()
         rule.mainClock.autoAdvance = false
         shoot("hub-all")
-        rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseDensity(HubDensity.Expanded) } }; rule.onNodeWithTag(rowTag("m1")).performClick(); rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag(rowTag("m1")).performClick(); rule.mainClock.advanceTimeByFrame()
         shoot("hub-expanded")
     }
 

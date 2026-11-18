@@ -42,10 +42,9 @@ import kotlinx.coroutines.launch
 
 /** STR-02: the measures of the roomy, fully expanded notification list, and which conversations fold behind "+N more". */
 internal object RoomyList {
-    const val ROW_MIN_DP = CommsStyle.ROW_MIN_DP
+    /** Wave 28: the row is 70 dp including its hairline (the content above it is 69 dp), all from [CommsStyle]. */
+    const val ROW_MIN_DP = CommsStyle.ROW_DP - CommsStyle.HAIR_DP
     const val H_PAD_DP = CommsStyle.H_PAD_DP
-    const val V_PAD_DP = CommsStyle.ROW_V_PAD_DP
-    /** Wave 27: the app icon is the Comms mock-up's 56 dp rounded square; the rows are flat with an inset divider and no gap. */
     const val ICON_DP = CommsStyle.ICON_DP
     const val ROW_GAP_DP = 0
     /** Extra air above a new conversation or section, drawn with a hairline. */
@@ -88,7 +87,7 @@ internal object LaunchpadOpen {
 internal fun MoreLine(hidden: Int, expanded: Boolean, id: String, onClick: () -> Unit) {
     Text(
         if (expanded) L10n.tr("Show fewer") else L10n.tr("+%d more", hidden),
-        color = BlueLight, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+        color = BlueLight, fontSize = CommsStyle.CHIP_SP.sp, fontWeight = FontWeight.Medium,
         modifier = Modifier.padding(start = HubStyle.TEXT_START_DP.dp)
             .heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) // NFR-13: 48 dp target, announced as a button
             .padding(horizontal = 12.dp, vertical = 14.dp).testTag("lp.more.$id"),

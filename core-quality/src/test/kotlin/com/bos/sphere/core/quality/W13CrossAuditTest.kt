@@ -41,7 +41,7 @@ class W13CrossAuditTest {
     @Test fun NFR_18_everyPreferenceFileTheSourcesOpenIsClassified() {
         // The user's own setup (exported through the file as a section or settings; theming is appearance only), or device-local and excluded from backup and transfer, or audited as holding no personal content.
         val exported = setOf("launcher_prefs", "home_layout", "hidden_apps", "shortcuts", "launchpad_rules", "home_state", "home_tags", "home_icons", "home_badges",
-            "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", "theming", "launcher_haptics")
+            "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", "theming", "launcher_haptics", "comms_scale")
         val excluded = setOf("launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "palette", "liftoff_spikes", "desktop_surface",
             "liftoff_misc", "device_bound", "launchpad_groups", "device_checks")
         val benign = setOf("grant_history") // when each permission was asked for, nothing about contacts or messages

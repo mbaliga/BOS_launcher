@@ -1,8 +1,5 @@
 package com.bos.sphere
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.LauncherPrefs
@@ -19,11 +16,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** HOM-01, HOM-22 (wave 28): the Pages setting in Ground Control, Home screen: one row with exactly Off, Paginated, Continuous; no Add page in Continuous. */
+/** HOM-01, HOM-22 (wave 28): the Pages setting in Ground Control, Home screen: one row with exactly Off, Paginated, Continuous; Add page only in Paginated. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w411dp-h1600dp-xhdpi")
 class HomeUnifyRowsTest {
-    private var prefs by mutableStateOf(LauncherPrefs())
+    private var prefs = LauncherPrefs() // a plain field: no snapshot state is written outside a Compose host
 
     private fun items(p: LauncherPrefs) = buildSettingsCategories(
         SettingsModel(
@@ -46,9 +43,12 @@ class HomeUnifyRowsTest {
         assertTrue("the old Scroll or Paginated row is gone", items(prefs).none { it.title == "Pages after Glance" })
     }
 
-    @Test fun HOM_01_w28_addPageIsOfferedForOffAndPaginatedButNotForTheOneContinuousSurface() {
-        for (m in listOf(HomePages.Off, HomePages.Paginated)) assertNotNull("Add page with $m", items(LauncherPrefs(homePages = m)).firstOrNull { it.title == "Add page" })
-        assertFalse(items(LauncherPrefs(homePages = HomePages.Continuous)).any { it.title == "Add page" })
-        assertNotNull(items(LauncherPrefs(homePages = HomePages.Continuous)).firstOrNull { it.title == "Edit home pages" })
+    @Test fun HOM_01_w28_addPageIsOfferedOnlyForPaginatedAndEditHomeForEveryValue() {
+        assertNotNull("Add page with Paginated", items(LauncherPrefs(homePages = HomePages.Paginated)).firstOrNull { it.title == "Add page" })
+        for (m in listOf(HomePages.Off, HomePages.Continuous)) assertFalse("no Add page with $m: the Pages setting is the switch", items(LauncherPrefs(homePages = m)).any { it.title == "Add page" })
+        for (m in HomePages.entries) {
+            assertNotNull("Edit home with $m", items(LauncherPrefs(homePages = m)).firstOrNull { it.title == "Edit home" })
+            assertFalse(items(LauncherPrefs(homePages = m)).any { it.title == "Edit home pages" })
+        }
     }
 }

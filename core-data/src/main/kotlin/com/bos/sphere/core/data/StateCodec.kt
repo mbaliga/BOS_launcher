@@ -77,7 +77,11 @@ object SettingsCodec {
             .put("prefs", map)
     }
 
-    fun decode(settings: JSONObject?): Decoded {
+    /**
+     * [layoutHasPages]: the file's home layout holds pages the user built. A file from before wave 28 has no `homePages`; with nothing chosen it then
+     * imports as Paginated so the pages that come with it are not hidden (the same rule the install's own migration applies).
+     */
+    fun decode(settings: JSONObject?, layoutHasPages: Boolean = false): Decoded {
         val src = settings?.optJSONObject("prefs") ?: JSONObject()
         val raw = LinkedHashMap<String, Any?>()
         src.keys().forEach { k ->
@@ -96,6 +100,10 @@ object SettingsCodec {
         val safe = read.copy(
             onboardingDone = true,
             leftWidgetId = d.leftWidgetId,
+            homePages = HomeModelMigration.pagesMode(
+                src.optString("homePages", "").ifEmpty { null }, src.optString("homeScroll", "").ifEmpty { null },
+                if (src.has("pagesModeChosen")) src.optBoolean("pagesModeChosen", false) else null, layoutHasPages,
+            ),
         )
         return Decoded(safe, unknown)
     }
@@ -178,14 +186,13 @@ object StateCodec {
     fun decode(doc: StateDocument): Decoded {
         val mig = StateMigrations.toCurrent(doc)
         val j = mig.doc.json
-        val settings = SettingsCodec.decode(j.optJSONObject(StateSchema.K_SETTINGS))
-
         val lay = j.optJSONObject(StateSchema.K_LAYOUT)
         val layout = HomeLayout(
             pages = HomeLayoutMath.normalizeIds(HomeLayoutCodec.decode(lay?.optJSONArray("pages")?.toString()?.let(WidgetIdSplit::sanitize))), // NFR-18: older files may hold ids
             removed = lay?.optJSONArray("removed")?.let { a -> WidgetIdSplit.sanitize(List(a.length()) { a.getString(it) }.toSet()) } ?: emptySet(),
             seeded = lay?.optBoolean("seeded", false) ?: false,
         )
+        val settings = SettingsCodec.decode(j.optJSONObject(StateSchema.K_SETTINGS), HomeModelMigration.hasBuiltPages(layout.pages))
 
         val sc = j.optJSONObject(StateSchema.K_SHORTCUTS)
         val corners = LinkedHashMap(DefaultCorners)

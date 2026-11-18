@@ -161,8 +161,8 @@ fun HomeQuickSheet(
                 }
             }
 
-            if (page == null && prefs.homePages != com.bos.sphere.core.data.HomePages.Continuous) {
-                // Wave 26: "Add page" also works from Glance (page is null there). Wave 28: not in Continuous (one scroll surface, no pages); with Pages Off it turns Paginated on.
+            if (page == null && prefs.homePages == com.bos.sphere.core.data.HomePages.Paginated) {
+                // Wave 26: "Add page" also works from Glance (page is null there). Wave 28: only in Paginated (the Pages setting is the one switch that turns pages on; Continuous is one scroll surface).
                 Spacer(Modifier.height(10.dp))
                 BigButton(Modifier.fillMaxWidth().testTag("quick.addpage"), Glyphs.Plus, L10n.tr("Add page"), onAddPage)
             }

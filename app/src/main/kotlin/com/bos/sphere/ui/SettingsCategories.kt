@@ -116,7 +116,7 @@ class SettingsModel(
     val copyText: (String) -> Unit = {},
     /** CFG-17: the Lab spikes, each with its last result. */
     val lab: List<LabEntry> = emptyList(),
-    /** Wave 26: "Add page" (after Glance; asks Scroll or Paginated the first time) and "Edit home pages". */
+    /** Wave 26: "Add page" (wave 28: Paginated only, never asks anything) and "Edit home" (turns Pages on first when it is Off). */
     val addHomePage: () -> Unit = {},
     val editHomePages: () -> Unit = {},
 )
@@ -266,8 +266,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     x("On: home is the calm, empty screen and your pages come after it. Off: home shows the first page or the scroll."),
                 ) { v -> upd { it.copy(glanceEnabled = v) } },
             )
-            if (p.homePages != com.bos.sphere.core.data.HomePages.Continuous) add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("Adds a page after the last one and turns Pages on (Paginated)")) { m.addHomePage() })
-            add(SettingItem.Action(x("Edit home pages"), Glyphs.Apps, x("Add icons, widgets and folders to the pages")) { m.editHomePages() })
+            if (p.homePages == com.bos.sphere.core.data.HomePages.Paginated) add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("Adds a page after the last one")) { m.addHomePage() })
+            add(SettingItem.Action(x("Edit home"), Glyphs.Apps, x("Add icons, widgets and folders to the pages")) { m.editHomePages() })
             add(
                 SettingItem.Choice(
                     x("Order"), Glyphs.Swipe, com.bos.sphere.core.data.HomeOrder.entries, p.homeOrder, { x(it.label) },

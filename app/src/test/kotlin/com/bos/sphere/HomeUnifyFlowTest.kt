@@ -175,8 +175,8 @@ class HomeUnifyFlowTest : TourBase() {
         pressHome(); assertFalse("with Glance off Home shows the first page", glanceShown())
     }
 
-    @Test fun HOM_01_w28_groundControlAddPageTurnsPagedOnAndNeverAsksScrollOrPaginated() {
-        start()
+    @Test fun HOM_01_w28_groundControlAddPageAddsAPageWhenPaginatedAndNeverAsksScrollOrPaginated() {
+        start(edit = { it.copy(homePages = HomePages.Paginated) })
         key(android.view.KeyEvent.KEYCODE_COMMA, ctrl = true); check("ground control", Surface.Settings)
         rule.onNodeWithText("Home screen", useUnmergedTree = true).performClick(); settle()
         rule.onNodeWithText("Add page", useUnmergedTree = true).performClick(); settle()

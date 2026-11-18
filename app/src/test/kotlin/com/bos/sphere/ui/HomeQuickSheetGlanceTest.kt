@@ -82,15 +82,15 @@ class HomeQuickSheetGlanceTest {
         assertEquals(HomeOrder.LeftToRight, seen.prefs.homeOrder)
     }
 
-    @Test fun HOM_01_w28_fromGlanceTheSheetHasAddPageAndEditHomeAndContinuousHasNoAddPage() {
-        val seen = Seen(); sheet(LauncherPrefs(), seen)
+    @Test fun HOM_01_w28_fromGlanceTheSheetHasAddPageWhenPaginatedAndEditHome() {
+        val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Paginated), seen)
         rule.onNodeWithTag("quick.addpage").performScrollTo().assertExists().performClick()
         assertEquals(1, seen.add)
         rule.onNodeWithText("Edit home").performScrollTo().performClick()
         assertEquals(1, seen.edit)
     }
 
-    @Test fun HOM_01_w28_inContinuousThereIsOneScrollSurfaceSoTheSheetOffersNoAddPage() {
+    @Test fun HOM_01_w28_withPagesOffOrContinuousTheSheetOffersNoAddPageBecauseThePagesChipsAreTheSwitch() {
         val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Continuous), seen)
         rule.onNodeWithTag("quick.addpage").assertDoesNotExist()
         rule.onNodeWithText("Edit home").performScrollTo().assertExists()

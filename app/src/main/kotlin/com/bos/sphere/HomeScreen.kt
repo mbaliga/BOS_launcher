@@ -316,7 +316,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     // "One page" shows only the first page; the rest of the apps stay in the drawer.
     // Wave 28: Pages Off shows the first page only (Glance off: that page is home); the other pages stay stored and come back when Pages is turned on.
-    val pages = remember(allPages, prefs.pageMode, prefs.homePages) { if (prefs.pageMode == PageMode.Single || prefs.homePages == com.bos.sphere.core.data.HomePages.Off) allPages.take(1) else allPages }
+    val pages = remember(allPages, prefs.pageMode, prefs.homePages) { allPages.take(if (prefs.pageMode == PageMode.Single) 1 else com.bos.sphere.core.data.HomeDeck.visiblePages(prefs.homePages, allPages.size)) } // wave 28: one rule, HomeDeck.visiblePages
     // Stored keys that can't be drawn right now (hidden apps, a paused work profile, pages hidden by
     // "one page"): every save keeps them.
     val preserve = remember(layout, apps, allPages, pages, extrasState) {
@@ -1256,7 +1256,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 )
             }
             // HOM-01: an empty home says how to fill it; the hint opens edit mode with the add carousel focused.
-            if (prefs.homeStyle == HomeStyle.Grid && prefs.homePages != com.bos.sphere.core.data.HomePages.Continuous && !homeEdit.active && !leftActive &&
+            if (prefs.homeStyle == HomeStyle.Grid && !homeEdit.active && !leftActive && // wave 28: the empty Continuous scroll says how to start too
                 HomeShownRules.showsEmptyHomeHint(landing, com.bos.sphere.core.data.FreshHome.isEmpty(pages))
             ) {
                 com.bos.sphere.feature.grid.EmptyHomeHint(

@@ -1393,6 +1393,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             apps = apps,
             grouping = prefs.wheelGrouping,
             onGroupingChange = { g -> stores.prefs.update { it.copy(wheelGrouping = g) } },
+            switcherStyle = prefs.switcherStyle,
             recentKeys = remember(history) { history.asReversed().map { it.key }.distinct() },
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },

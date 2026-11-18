@@ -37,7 +37,7 @@ class W4MotionAuditTest {
     @Test fun NFR_14_oneShotAnimationsAreGatedOrOnTheAuditedAllowList() {
         val allowed = mapOf(
             // press feedback and chip colour changes: under 200 ms, tied to a touch, no travel
-            "WheelDrawer.kt" to 2, "Complications.kt" to 4, "Tactile.kt" to 2,
+            "WheelDrawer.kt" to 1, "Complications.kt" to 4, "Tactile.kt" to 2,
             // the item glide to a new slot (edit mode) and the page-dot pill: short position/size springs
             "GridHome.kt" to 3,
             // the edit card (HOM-12): one progress value read inside graphicsLayer; under reduced motion the card jumps and only the carousel cross-fades (160 ms)

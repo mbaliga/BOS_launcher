@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.platform.testTag
 import android.content.Intent
 import com.bos.sphere.core.design.predictiveBackLayer
@@ -19,6 +20,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -263,6 +269,9 @@ internal fun SearchScreen(
     val micFocus = remember { FocusRequester() }
     var micStripNow by remember { mutableStateOf(0.dp) }
     var barFocused by remember { mutableStateOf(false) }
+    // Wave 29 (radarFull): the Orbit is its own layer over the whole display area; where the category wheel sits comes from the layout of the region under the field.
+    var orbitGeo by remember { mutableStateOf<OrbitGeo?>(null) }
+    var rootCoords by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     var micFocused by remember { mutableStateOf(false) }
     var field by remember { mutableStateOf(TextFieldValue(initialQuery, TextRange(initialQuery.length))) }
     var userCat by remember { mutableStateOf(initialCategory) }
@@ -501,9 +510,26 @@ internal fun SearchScreen(
     // blank part of a list) is never swallowed: with nothing typed it closes Radar, with a query it puts the keyboard away. Children take their own taps first.
     val emptyTap = { if (query.isEmpty()) onDismiss() else { keyboard?.hide(); Unit } }
     val emptyTapNow by androidx.compose.runtime.rememberUpdatedState(emptyTap)
-    Box(Modifier.fillMaxSize().radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey).pointerInput(Unit) { detectTapGestures { emptyTapNow() } }) {
+    Box(Modifier.fillMaxSize().onGloballyPositioned { rootCoords = it }.radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey).pointerInput(Unit) { detectTapGestures { emptyTapNow() } }) {
         SearchBackdrop(Modifier.fillMaxSize())
         SignalBackground(prefs, Modifier.fillMaxSize(), dark = true) // Radar is black in every theme; HOM-16, PAL-24: the two background items, the same on every surface
+        // Wave 29 (radarFull, owner: the rings and icons are cropped and part of them cannot be touched): the Orbit's drawing and touch layer is the whole display area, edge to
+        // edge and from the top of the screen to the top of the keyboard (the bottom edge when it is down). The field, the buttons, the mic, the strip circles and the wheel are
+        // drawn above it and each takes only its own bounds; the only clip is the true screen or keyboard edge (docs/decisions/radarFull.md).
+        val geo = orbitGeo
+        if (!flatMode && layout == SearchLayout.Orbit && geo != null) {
+            Box(Modifier.fillMaxSize().imePadding()) {
+                Orbit(
+                    tiles = if (orbitTyped) ringTiles else data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
+                    actions = tileActions, centreFromBottom = geo.centre, wheel = geo.wheel,
+                    modifier = Modifier.fillMaxSize().semantics { isTraversalGroup = true; traversalIndex = 1f },
+                    onVisibleCount = { orbitVisible = it },
+                    emptyHint = if (data.blank && (selected == null || selected == SearchCategory.Apps) && data.tiles(selected).isEmpty()) L10n.tr("Rings fill up as you use Radar") else null,
+                    tierNames = if (orbitTyped) RadarRings.queryTierNames else RadarRings.tierNames,
+                    region = geo.region, reserveBottom = if (orbitTyped) RadarStripHeight else 0.dp,
+                )
+            }
+        }
         // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
         // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
@@ -515,18 +541,30 @@ internal fun SearchScreen(
             SideEffect { micStripNow = micStrip } // the action list below sits outside this box and needs the same number
             // Wave 22 (audit): the results are one reading group, so TalkBack reads the field, its buttons, the whole results area and the mic last
             // (the Orbit rings are a group inside it); without the groups the ring indices 1, 2 ... sorted after the mic, which has index 0.
-            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = micStrip).clipToBounds().semantics { isTraversalGroup = true }) {
+            if (flatMode) Box(Modifier.fillMaxSize().semantics { isTraversalGroup = true; traversalIndex = 1f }) {
+                // Typing, or the Flat layout at rest (what you open most): a plain results list under the query line. Wave 29: it fills the area edge to edge and scrolls under the
+                // field and above the mic (its content padding keeps the first and last row clear at rest), so no row is cut by a line.
+                FlatResults(
+                    data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
+                    onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
+                    onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
+                    plain = true, onPreview = onPreview,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = RadarQueryBarHeight + 4.dp, bottom = micStrip + 8.dp),
+                )
+            }
+            // Wave 29: no clip here (it was a straight line across the rings at the field's bottom and the mic's top); the Orbit has its own full-screen layer above, and the lists
+            // scroll under the field and above the mic with their own content padding.
+            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = micStrip).onGloballyPositioned { c ->
+                val root = rootCoords ?: c.findRootCoordinates()
+                if (root.isAttached && c.isAttached) {
+                    val r = androidx.compose.ui.geometry.Rect(root.localPositionOf(c, Offset.Zero), androidx.compose.ui.geometry.Size(c.size.width.toFloat(), c.size.height.toFloat()))
+                    val old = orbitGeo
+                    if (old == null || old.region != r) orbitGeo = OrbitGeo(r, old?.centre ?: 0.dp, old?.wheel ?: WheelSpec.Default)
+                }
+            }.semantics { isTraversalGroup = true; traversalIndex = 1f }) {
                 val emptyHint = if (data.blank && (selected == null || selected == SearchCategory.Apps) && data.tiles(selected).isEmpty()) L10n.tr("Rings fill up as you use Radar") else null
-                if (flatMode) {
-                    // Typing, or the Flat layout at rest (what you open most): a plain results list below the query line.
-                    FlatResults(
-                        data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
-                        onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
-                        onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
-                        plain = true, onPreview = onPreview,
-                        modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
-                    )
-                } else {
+                if (flatMode) Unit else {
                     // Idle browsing: the category wheel with Filmstrip or Orbit results.
                     val expanded = contactRows.firstOrNull { it.hit.id == expandedContact }?.takeIf { selected == SearchCategory.Contacts || selected == null }
                     // The wheel sits in the middle of the free area below the query line; the Orbit's rings are centred on it
@@ -557,13 +595,8 @@ internal fun SearchScreen(
                             }
                         }
                         if (layout == SearchLayout.Orbit) {
-                            Orbit(
-                                tiles = if (orbitTyped) ringTiles else data.tiles(selected), motionRequested = prefs.searchMotion, footnote = data.footnote(selected),
-                                actions = tileActions, centreFromBottom = centre, wheel = wheel,
-                                modifier = Modifier.fillMaxSize().padding(bottom = if (orbitTyped) RadarStripHeight else 0.dp).semantics { isTraversalGroup = true },
-                                onVisibleCount = { orbitVisible = it }, emptyHint = emptyHint,
-                                tierNames = if (orbitTyped) RadarRings.queryTierNames else RadarRings.tierNames,
-                            )
+                            // The rings themselves are the full-screen layer above (wave 29); this box only holds the overlays and says where the wheel's centre is.
+                            SideEffect { val g = orbitGeo; if (g != null && (g.centre != centre || g.wheel != wheel)) orbitGeo = OrbitGeo(g.region, centre, wheel) }
                             if (orbitTyped) ResultStrip(
                                 tiles = stripTiles,
                                 filenames = if (filesAvailable) L10n.tr("Filenames") else null,
@@ -578,7 +611,7 @@ internal fun SearchScreen(
                             Filmstrip(
                                 tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                                 expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
-                                actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max = below).clipToBounds().padding(bottom = 4.dp),
+                                actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max = below).padding(bottom = 4.dp),
                                 emptyHint = emptyHint, fit = StripFit.of(below.value, withRow = data.tiles(selected).any { it is Tile.App && it.shortcuts.isNotEmpty() }),
                             )
                         }
@@ -618,7 +651,7 @@ internal fun SearchScreen(
             }
             // Wave 21 (owner): the mic for voice input sits at the centre of the bottom, above the keyboard and the gesture bar
             // (the inset padding above), 56 dp, in every layout and orientation; space is reserved for it so it never covers a result.
-            if (voiceOn && !micInline) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight).semantics { isTraversalGroup = true }, contentAlignment = Alignment.Center) {
+            if (voiceOn && !micInline) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight).semantics { isTraversalGroup = true; traversalIndex = 2f }, contentAlignment = Alignment.Center) {
                 PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, modifier = Modifier.testTag(RADAR_MIC_TAG).focusRequester(micFocus), onFocusChange = { micFocused = it })
             }
         }
@@ -709,6 +742,9 @@ internal object ContactHabits {
     fun primaryFor(c: android.content.Context, id: Long, channels: List<Channel>): Channel? =
         last(c, id)?.takeIf { it in channels } ?: Channel.Call.takeIf { it in channels } ?: badgeChannel(channels)
 }
+
+/** Wave 29: where the Orbit's rings sit: the free region under the field (in the screen's pixels), the wheel's centre in it (from its top) and the wheel's size. */
+internal data class OrbitGeo(val region: androidx.compose.ui.geometry.Rect, val centre: androidx.compose.ui.unit.Dp, val wheel: WheelSpec)
 
 /** The height of the query line at the top of Radar, below the status bar and cutout. */
 internal val RadarQueryBarHeight = 64.dp

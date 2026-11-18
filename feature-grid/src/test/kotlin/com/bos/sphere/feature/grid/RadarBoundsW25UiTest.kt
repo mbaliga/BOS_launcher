@@ -31,7 +31,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Wave 25 (owner item 5): in the running Radar nothing is drawn partly outside the display area or under the keyboard or the mic, all the recents
+ * Wave 25 (owner item 5; wave 29 narrows it to the still rings, the moving ones are in RadarFullW29UiTest): in the running Radar nothing is drawn partly outside the display area or under the keyboard or the mic, all the recents
  * the region can hold are placed at once, and no touch is swallowed. Windows: 360x640, 411x891, 320x480, 640x360, 891x411, 1280x800, 280x653;
  * font scale 1.0 and 2.0; keyboard closed and 40 percent open (landscape also 60 percent).
  */
@@ -72,7 +72,8 @@ class RadarBoundsW25UiTest {
                 .build()
             androidx.core.view.ViewCompat.dispatchApplyWindowInsets(rule.activity.window.decorView, w)
         }
-        rule.mainClock.advanceTimeBy(500)
+        // wave 29: the Orbit layer follows the region under the field a few frames behind the keyboard (state written from a layout callback needs the looper to run before the next frame)
+        repeat(4) { rule.mainClock.advanceTimeBy(300); rule.runOnIdle { } }
     }
 
     private fun root() = rule.onRoot().fetchSemanticsNode().boundsInRoot
@@ -142,13 +143,6 @@ class RadarBoundsW25UiTest {
     @Test @Config(sdk = [35], qualifiers = "w280dp-h653dp-port-night-xhdpi") fun PAL_18_orbitTilesStayInsideTheDisplayArea_280x653_font2_keyboard0() { assertOrbitInside(2f, 0.0f) }
     @Test @Config(sdk = [35], qualifiers = "w280dp-h653dp-port-night-xhdpi") fun PAL_18_orbitTilesStayInsideTheDisplayArea_280x653_font2_keyboard40() { assertOrbitInside(2f, 0.4f) }
 
-    /** Everything the region can hold is placed at once: all 44 recents on the large windows, a quarter or more on the small ones, never none while there is room for one row. */
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_18_movingRingsStayInsideTheDisplayAreaToo() {
-        open(SearchLayout.Orbit, "", 1f, motion = true)
-        repeat(6) { rule.mainClock.advanceTimeBy(1_500)
-            val r = root()
-            tiles().forEach { t -> assertTrue("a drifting tile $t left the display", t.left >= r.left - 0.5f && t.right <= r.right + 0.5f && t.top >= 0f && t.bottom <= r.bottom + 0.5f) } }
-    }
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-notnight-xhdpi") fun PAL_18_lightThemeRadarIsTheSameBlackOrbit() { assertOrbitInside(1f, 0f, shot = "w25-orbit-light-theme") }
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_18_filmstripPortraitShot() { open(SearchLayout.Filmstrip); shoot("w25-filmstrip-portrait") }
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_18_flatPortraitShot() { open(SearchLayout.Flat, "App0"); shoot("w25-flat-typed-portrait") }

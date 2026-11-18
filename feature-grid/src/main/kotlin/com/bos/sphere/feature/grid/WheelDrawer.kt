@@ -1036,32 +1036,6 @@ private fun WheelIcon(
     )
 }
 
-@Composable
-private fun GroupingChip(
-    label: String,
-    selected: Boolean,
-    rotationDeg: Float,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val bg by animateColorAsState(if (selected) HyleColors.Violet.copy(alpha = 0.22f) else Color.Transparent, label = "chipBg")
-    val edge by animateColorAsState(if (selected) HyleColors.Violet.copy(alpha = 0.75f) else HyleColors.Hairline, label = "chipEdge")
-    val ink by animateColorAsState(if (selected) HyleColors.InkBright else HyleColors.InkDim, label = "chipInk")
-    val shape = RoundedCornerShape(50)
-    Box(
-        modifier = modifier
-            .graphicsLayer { rotationZ = rotationDeg }
-            .clip(shape)
-            .background(bg, shape)
-            .border(1.dp, edge, shape)
-            .clickable(role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 7.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = label, color = ink, fontSize = 10.5.sp, letterSpacing = 0.6.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-    }
-}
-
 /** The hub's search glyph (the Concepts eyedropper analogue): a bare magnifier, no enclosing shape. */
 @Composable
 private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {

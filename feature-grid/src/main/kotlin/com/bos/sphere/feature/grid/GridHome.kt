@@ -1082,24 +1082,6 @@ fun rememberNow(): Date {
     return now
 }
 
-/** "12:01 PM" (or 24-hour), following the system setting. */
-@Composable
-fun HomeClock(onTap: () -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val now = rememberNow()
-    val text = remember(now) { DateFormat.getTimeFormat(context).format(now) }
-    Text(
-        text,
-        color = HyleColors.InkBright,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.3.sp,
-        modifier = modifier
-            .semantics { contentDescription = "Time $text" }
-            .pointerInput(Unit) { detectTapGesturesSimple(onTap) },
-    )
-}
-
 /** HOM-08: a widget tile in its span box on a grid page. */
 @Composable
 private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit, editing: Boolean = false, onRemove: () -> Unit = {}) {

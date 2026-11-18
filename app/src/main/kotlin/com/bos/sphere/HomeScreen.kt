@@ -133,7 +133,6 @@ import com.bos.sphere.core.data.LauncherAppsAppRepository
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.MotionGestureSensors
 import com.bos.sphere.core.data.PageLayout
-import com.bos.sphere.core.data.VoiceInputManager
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.feature.grid.ComplicationCluster
 import com.bos.sphere.feature.grid.ComplicationView
@@ -352,7 +351,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var editFocusAdd by remember { mutableStateOf(false) }
     LaunchedEffect(homeEdit.active) { if (!homeEdit.active) editFocusAdd = false }
     val sounds = remember { UiSounds() }
-    DisposableEffect(Unit) { onDispose { sounds.release(); VoiceInputManager.release() } }
+    DisposableEffect(Unit) { onDispose { sounds.release() } }
     sounds.enabled = prefs.uiSounds
     sounds.volume = prefs.uiSoundVolume
 
@@ -510,7 +509,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var actionAppsRev by remember { mutableIntStateOf(0) }
     val pickAppForRef by rememberUpdatedState({ id: CornerActionId -> pickFor = id })
     val runner = remember {
-        ActionRunner(context, onInternal = { internalRef(it, null) }, onAppLaunched = { stores.history.record(it) }, onPickApp = { pickAppForRef(it) })
+        ActionRunner(context, onInternal = { internalRef(it, null) }, onAppLaunched = { stores.history.record(it) }, onPickApp = { pickAppForRef(it) }, translate = { com.bos.sphere.core.design.L10n.tr(it) })
     }
     runner.launchHook = { key ->
         com.bos.sphere.feature.dock.AppKeys.target(key)?.let { t ->
@@ -641,7 +640,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // The background service shows an ongoing notification; on Android 13+ that needs permission.
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) {
-            android.widget.Toast.makeText(context, "Motion gestures still run; their notification is hidden", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, com.bos.sphere.core.design.L10n.tr("Motion gestures still run; their notification is hidden"), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     LaunchedEffect(prefs.motionEnabled, prefs.motionInBackground) {
@@ -694,11 +693,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             if (weatherSource.hasPermission()) weatherSource.refresh() else locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
         }
     }
+    val weatherWantedNow = androidx.compose.runtime.rememberUpdatedState(weatherWanted) // wave 23 sweep: the observer below lives as long as the owner, so it must read the CURRENT setting
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, e ->
             if (e == Lifecycle.Event.ON_START) {
                 indicator.start()
-                if (weatherWanted) weatherSource.refresh()
+                if (weatherWantedNow.value) weatherSource.refresh()
             }
             if (e == Lifecycle.Event.ON_STOP) indicator.stop()
         }
@@ -746,7 +746,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // WSP-05: a group placed on the page grid runs like the dock's group item.
     homeItems.runGroup = { g -> scope.launch { appLauncher.runGroup(g) } }
-    val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
+    val contactSource = remember { com.bos.sphere.core.data.ContactSource(context) }
     val searchHub = remember {
         val palette = com.bos.sphere.feature.search.palette.PaletteHost.get(context)
         com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)
@@ -1229,7 +1229,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
             if (quietLeft) {
                 com.bos.sphere.feature.grid.GlanceEdgeHandle(
-                    label = L10n.tr("Open Launchpad"), tag = "glance.handle.left", rightEdge = launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = Color.White,
+                    label = L10n.tr("Open Launchpad"), tag = "glance.handle.left", rightEdge = launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = com.bos.sphere.feature.grid.GlanceHandleFade.tint(com.bos.sphere.feature.grid.isDarkSurface()),
                     onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge),
                 )
             } else {
@@ -1256,7 +1256,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             val rightEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) -1f else 1f, 0f)
             if (HomeChromeRules.quiet(landing, ChromeElement.RightHandle)) {
                 com.bos.sphere.feature.grid.GlanceEdgeHandle(
-                    label = L10n.tr("Open recents"), tag = "recents.handle", rightEdge = !launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = Color.White,
+                    label = L10n.tr("Open recents"), tag = "recents.handle", rightEdge = !launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = com.bos.sphere.feature.grid.GlanceHandleFade.tint(com.bos.sphere.feature.grid.isDarkSurface()),
                     onOpen = { openRecents() }, modifier = Modifier.align(rightEdge),
                 )
             } else {

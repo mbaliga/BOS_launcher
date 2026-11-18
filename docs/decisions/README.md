@@ -29,3 +29,4 @@ One line per record, newest wave first. A record explains why a requirement is b
 | [NFR-16.md](NFR-16.md) | earlier | `INTERNET` stays in the manifest for weather: options and costs (still an owner decision) |
 | [CFG-20.md](CFG-20.md) | earlier | Package identity (application ID) |
 | [tourSmoke.md](tourSmoke.md) | 22 | Whole-app tour smoke suite (fresh, busy, recreate, panes, seeded monkey walk), the defects it found, and what Robolectric cannot cover |
+| [auditSweep.md](auditSweep.md) | 23 | Independent sweep of waves 17 to 22: what was found and fixed, what was removed as dead, and the three calls that are decisions (English-only recovery screen, preview inertness, a retired-key marker per wave) |

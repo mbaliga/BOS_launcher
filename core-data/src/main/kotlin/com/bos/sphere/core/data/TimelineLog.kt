@@ -68,13 +68,13 @@ class TimelineLogStore(
     private fun load() {
         val read = runCatching { if (file.exists()) file.readLines().mapNotNull(TimelineLogCodec::decode) else emptyList() }.getOrDefault(emptyList())
         synchronized(lock) {
-            val merged = TimelineLogCodec.merge(seed, read + pending.filter { p -> read.none { it == p } })
+            val merged = TimelineLogCodec.merge(seed, read + pending.filter { p -> read.none { it == p } }, max)
             lines = read.size
             loaded = true
             pending.clear()
             unwritten.clear()
             // What was recorded before the read finished is part of the log: write the merged result once.
-            val rewrite = merged.size != read.size || TimelineLogCodec.needsCompaction(read.size, max, slack)
+            val rewrite = merged != read || TimelineLogCodec.needsCompaction(read.size, max, slack)
             _events.value = merged
             if (rewrite) writeAll(merged)
         }

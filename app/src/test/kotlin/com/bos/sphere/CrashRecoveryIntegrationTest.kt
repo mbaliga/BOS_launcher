@@ -154,6 +154,18 @@ class CrashRecoveryIntegrationTest {
         assertNull(shadowOf(screen).nextStartedActivity)
     }
 
+    /** Wave 23 sweep: Discard in a PREVIEW used to delete the real waiting report (and claim it had) while the preview is meant to be inert. */
+    @Test fun NFR_17_discardInAPreviewNeverDeletesTheRealWaitingReport() {
+        seedCrash()
+        assertNotNull(CrashRecovery.pending(app))
+        val screen = Robolectric.buildActivity(CrashRecoveryActivity::class.java, CrashRecovery.previewIntent(app, "Liftoff")).setup().get()
+        screen.click("Discard this report")
+        org.robolectric.shadows.ShadowLooper.idleMainLooper(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
+        assertNotNull("the real report is still waiting after Discard in a preview", CrashRecovery.pending(app))
+        assertFalse("the preview did not claim a deletion", screen.textsOnScreen().any { it.contains("Report deleted") })
+        assertNull("nothing was launched", shadowOf(screen).nextStartedActivity)
+    }
+
     // ---- the host's own few rules --------------------------------------------------------------------------------
 
     @Test fun CFG_09_theLibrarysPrivateFileNamesTheHostRelyOnStillMatch() {

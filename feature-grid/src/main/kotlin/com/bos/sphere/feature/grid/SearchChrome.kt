@@ -210,29 +210,15 @@ internal fun CategoryWheel(
 }
 
 /**
- * The "SEARCH" label left of the wheel at rest, right-aligned against it; a tap raises the keyboard. Wave 22 (audit): the typed-query
- * branch (a large query with a blinking caret and its own clear button) belonged to the old bottom field layout and was never drawn
- * once the one glass field moved to the top, so it and the caret were removed.
+ * The "SEARCH" label left of the wheel, right-aligned against it; a tap raises the keyboard. Wave 22 (audit): the typed-query
+ * branch (a large query, a blinking caret and a 28 dp clear button) belonged to the old bottom field layout and was never drawn
+ * once the one glass field moved to the top. Wave 23 (sweep): the branch and its two parameters were still in the code, called only with an
+ * empty query, and are now gone for real; the query and its Clear X live in the glass field.
  */
 @Composable
-internal fun QueryDisplay(query: String, onClear: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier, height: Dp = WheelHeight) {
+internal fun QueryDisplay(onTap: () -> Unit, modifier: Modifier = Modifier, height: Dp = WheelHeight) {
     Box(modifier.height(height).clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onTap), contentAlignment = Alignment.CenterEnd) {
-        if (query.isEmpty()) {
-            Text(L10n.tr("SEARCH"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End) {
-                Box(
-                    Modifier.size(28.dp).clip(CircleShape).background(Color(0x33FFFFFF)).clickable(onClick = onClear),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Glyphs.Close, L10n.tr("Clear"), tint = Color.White, modifier = Modifier.size(14.dp)) }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    query, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Light, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End, lineHeight = 32.sp,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-            }
-        }
+        Text(L10n.tr("SEARCH"), color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, letterSpacing = 0.8.sp, maxLines = 1)
     }
 }
 

@@ -26,4 +26,5 @@ dependencies {
     api(project(":core-data"))
 
     testImplementation(libs.junit)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

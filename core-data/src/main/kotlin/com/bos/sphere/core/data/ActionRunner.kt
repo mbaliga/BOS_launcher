@@ -127,6 +127,8 @@ class ActionRunner(
     private val onAppLaunched: (String) -> Unit = {},
     /** Asked when an app-backed action has no chosen app and the system would show its own chooser. Null = let the system do it. */
     private val onPickApp: ((CornerActionId) -> Unit)? = null,
+    /** Wave 23: puts the English words of a toast into the app language (core-data cannot see the string tables); the default leaves them as they are. */
+    private val translate: (String) -> String = { it },
 ) {
     private val ctx = context.applicationContext
 
@@ -216,7 +218,7 @@ class ActionRunner(
     private fun start(intent: Intent, failureFor: CornerActionId?): Boolean {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val ok = runCatching { ctx.startActivity(intent) }.isSuccess
-        if (!ok && failureFor != null) toast("No app for ${failureFor.label}")
+        if (!ok && failureFor != null) toast("No app for %s", translate(failureFor.label))
         return ok
     }
 
@@ -258,7 +260,8 @@ class ActionRunner(
         start(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS), null)
     }
 
-    private fun toast(text: String) {
+    private fun toast(key: String, vararg args: Any?) {
+        val text = translate(key).let { if (args.isEmpty()) it else String.format(it, *args) }
         val show = { Toast.makeText(ctx, text, Toast.LENGTH_SHORT).show() }
         if (Looper.myLooper() == Looper.getMainLooper()) show() else Handler(Looper.getMainLooper()).post(show)
     }

@@ -530,7 +530,7 @@ internal fun SearchScreen(
                         val wheelRow: @Composable () -> Unit = {
                             // "SEARCH" ends just left of the centre line and the wheel starts just right of it.
                             Row(Modifier.fillMaxWidth()) {
-                                QueryDisplay("", onClear = { setQuery("") }, onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp), height = wheel.height)
+                                QueryDisplay(onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp), height = wheel.height)
                                 Box(Modifier.weight(1f)) {
                                     CategoryWheel(
                                         selected = selected, counts = counts,

@@ -150,7 +150,7 @@ internal fun onDeviceSpeechAvailable(context: Context): Boolean =
  * held) works too. Draws nothing when the device has no on-device recogniser. The text goes to [onText] as it comes.
  */
 @Composable
-fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}) {
+fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}, recogniserOverride: OnDeviceRecogniser? = null) {
     val context = LocalContext.current
     val available = remember(context, availableOverride) { availableOverride ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     if (!available) return
@@ -164,7 +164,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
     }
     val ptt = remember(context) {
         PushToTalk(
-            AndroidOnDeviceRecogniser(context),
+            recogniserOverride ?: AndroidOnDeviceRecogniser(context),
             hasPermission = { context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED },
             askPermission = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.Microphone) { permission.launch(Manifest.permission.RECORD_AUDIO) } }, // CFG-07: explanation first
             onText = { latestText(it) },
@@ -172,6 +172,14 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
         )
     }
     DisposableEffect(ptt) { onDispose { ptt.dispose() } }
+    // Wave 23 sweep: a hold that goes on while the app leaves the screen (a tap-toggled listening, or a key held, then the user switches app) must not
+    // keep the microphone open in the background; the screen pausing is the end of listening, as releasing the finger is.
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(owner, ptt) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_PAUSE && ptt.listening) { ptt.release(); listening = false } }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
     val label = L10n.tr("Speak to search")
     // Wave 21: glass (violet-tinted while listening), 56 dp, the same hold-to-talk behaviour.
     Box(

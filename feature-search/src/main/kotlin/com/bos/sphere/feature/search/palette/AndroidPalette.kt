@@ -38,7 +38,6 @@ import kotlinx.coroutines.launch
 /** Strings for rows the engine builds itself, through the app's localiser. */
 fun paletteStrings() = PaletteStrings(
     searchWeb = { L10n.tr("Search the web for “%s”", it) },
-    searchStore = { L10n.tr("Search the app store for “%s”", it) },
     enableContacts = L10n.tr("Allow contacts to search people"),
     enableFiles = L10n.tr("Allow files to search them"),
     calculatorHint = L10n.tr("Press Enter to copy"),

@@ -167,17 +167,6 @@ internal fun StepperSettingRow(item: SettingItem.Stepper, onTick: () -> Unit) {
     )
 }
 
-@Composable
-private fun RoundStep(text: String, enabled: Boolean, description: String, onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(36.dp)
-            .clickable(enabled = enabled, onClick = onClick)
-            .semantics { contentDescription = description },
-    ) { Text(text, color = if (enabled) HyleColors.InkBright else HyleColors.InkDim.copy(alpha = 0.4f), fontSize = 18.sp) }
-}
-
 /** Up to this many options step in place with the ⌃⌄ arrows; more open a dropdown menu. */
 internal const val INLINE_CHOICE_MAX = 6
 

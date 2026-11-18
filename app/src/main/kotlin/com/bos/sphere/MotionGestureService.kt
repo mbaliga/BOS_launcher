@@ -47,6 +47,7 @@ class MotionGestureService : Service() {
             this,
             onInternal = { id -> openHome(id) },
             onAppLaunched = { stores.history.record(it) },
+            translate = { com.bos.sphere.core.design.L10n.tr(it) },
         )
         Torch.init(this)
         sensors = MotionGestureSensors(this) { gesture ->
@@ -54,7 +55,7 @@ class MotionGestureService : Service() {
             val opensUi = item is CornerItem.App || (item is CornerItem.Action && item.id.opensUi())
             // Android only lets a background service open UI for the default home app.
             if (opensUi && !isDefaultHome()) {
-                Toast.makeText(this, "Set Liftoff as your home app to open things with motion gestures", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, com.bos.sphere.core.design.L10n.tr("Set Liftoff as your home app to open things with motion gestures"), Toast.LENGTH_SHORT).show()
             } else {
                 runner.run(item)
             }

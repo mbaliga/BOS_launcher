@@ -102,16 +102,6 @@ class WebFallback(
         return PaletteResult("web:fallback", "web", PaletteScope.Web, strings.searchWeb(q), url, -1.0, listOf(ResultAction(ResultActionId.SearchWeb)), mapOf("url" to url), pinnedLast = true, learn = false)
     }
 
-    /** PAL-15: a row offering to search the installed app store. */
-    fun storeRow(query: String): PaletteResult? {
-        val q = query.trim()
-        if (q.isEmpty()) return null
-        return PaletteResult(
-            "store:lookup", "store", PaletteScope.Apps, strings.searchStore(q), null, 0.05, listOf(ResultAction(ResultActionId.SearchStore)),
-            mapOf("market" to "market://search?q=${encode(q)}&c=apps", "url" to "https://play.google.com/store/search?q=${encode(q)}&c=apps"), learn = false,
-        )
-    }
-
     companion object {
         /** Percent-encoding written out so the engine package needs no networking class at all. */
         fun encode(s: String): String {

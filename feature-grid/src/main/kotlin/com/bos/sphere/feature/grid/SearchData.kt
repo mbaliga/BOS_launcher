@@ -194,6 +194,22 @@ internal class SearchData(
 internal class SuggItem(val label: String, val insertion: String?, val scope: SearchCategory?, val accent: Boolean = false)
 internal class SuggGroup(val header: String, val items: List<SuggItem>)
 
+/**
+ * The refinement chips come from the search model with English labels; this puts the words around the user's text into the app language
+ * ("Package contains “x”", "Kind: Games", "Used: today", "x I used yesterday"). What the user typed or the device names (a category) stays as is.
+ */
+internal fun localizeChip(label: String): String {
+    fun quoted(prefix: String) = label.removePrefix(prefix).removeSuffix("”")
+    return when {
+        label.startsWith("Name contains “") && label.endsWith("”") -> L10n.tr("Name contains “%s”", quoted("Name contains “"))
+        label.startsWith("Package contains “") && label.endsWith("”") -> L10n.tr("Package contains “%s”", quoted("Package contains “"))
+        label.startsWith("Kind: ") -> L10n.tr("Kind: %s", label.removePrefix("Kind: "))
+        label.startsWith("Used: ") || label.startsWith("Is: ") || label.startsWith("Launches ") -> L10n.tr(label)
+        label.endsWith(" I used yesterday") -> L10n.tr("%s I used yesterday", label.removeSuffix(" I used yesterday"))
+        else -> label
+    }
+}
+
 /** Header + rows like the macOS suggestion menu: Filenames, Content, Kinds, Contacts, Web. */
 internal fun buildSuggestionGroups(
     query: String,
@@ -208,12 +224,12 @@ internal fun buildSuggestionGroups(
     if (q.isEmpty()) return emptyList()
     val chips = suggest(query, appCategories)
     val kinds = chips.filter { it.kind == SuggestionKind.Key || it.kind == SuggestionKind.Value }
-        .map { SuggItem(it.label, it.insertion, null, accent = true) }
-    // "Name contains" is already offered once under Filenames: don't repeat it per category.
-    val nameLabel = L10n.tr("Name contains “%s”", q)
+        .map { SuggItem(localizeChip(it.label), it.insertion, null, accent = true) }
+    // "Name contains" is already offered once under Filenames: don't repeat it per category. The model's labels are English: the
+    // test is on that English, never on the translated words (a translated phone showed the chip twice), and each shown label is translated.
     val appText = chips.filter { it.kind == SuggestionKind.Text || it.kind == SuggestionKind.Natural }
-        .filter { it.label != nameLabel && !it.label.startsWith(L10n.tr("Name contains")) }
-        .map { SuggItem(it.label, it.insertion, null) }
+        .filter { !it.label.startsWith("Name contains") }
+        .map { SuggItem(localizeChip(it.label), it.insertion, null) }
     val all = buildList {
         if (filesAvailable) add(SuggGroup(L10n.tr("Filenames"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Files))))
         if (deepAvailable) add(SuggGroup(L10n.tr("Content"), listOf(SuggItem(L10n.tr("Contains “%s”", q), null, SearchCategory.Files))))

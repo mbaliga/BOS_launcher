@@ -593,6 +593,12 @@ class CrashRecoveryActivity : Activity() {
     }
 
     private fun discard() {
+        // Wave 23 sweep: a preview shows SAMPLE content and must stay inert: it must neither delete a real waiting report nor say it did.
+        if (preview) {
+            showToast("Preview only: nothing was deleted")
+            paneMain.postDelayed({ continueToApp() }, 650)
+            return
+        }
         CrashRecovery.clear(this)
         showToast("Report deleted from device")
         paneMain.postDelayed({ continueToApp() }, 650)

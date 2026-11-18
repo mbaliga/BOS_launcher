@@ -52,15 +52,11 @@ class WorkspaceTest {
         assertTrue(queued.isNotEmpty())
     }
 
-    @Test fun WSP_07_nextAndPreviousWrapAndPaletteProviderSwitches() {
+    @Test fun WSP_07_nextAndPreviousWrap() {
         val m = manager(); val b = m.create("B"); m.create("C")
         m.next(); assertEquals(b, m.current.activeId)
         m.previous(); assertEquals(DockWorkspaceState.DEFAULT_ID, m.current.activeId)
         m.previous(); assertEquals("C", m.current.active.name)
-        val p = WorkspacePaletteProvider({ m.current }, { m.switchTo(it) }, {})
-        val hit = p.results("B").single()
-        assertEquals("Switch to B", hit.title); hit.run()
-        assertEquals("B", m.current.active.name)
     }
 
     @Test fun WSP_12_aSwitchMadeWhileNoHomeIsComposedKeepsTheLiveHomeForTheWorkspaceThatWasLeft() {
@@ -182,14 +178,6 @@ class WorkspaceTest {
         m.setPins(listOf(DockItemRef.group("g1")))
         m.saveGroup(group.copy(name = "Dev2")); assertEquals(1, m.current.groups.size); assertEquals("Dev2", m.current.groups.single().name)
         m.deleteGroup("g1"); assertTrue(m.current.groups.isEmpty()); assertTrue(m.current.active.dockPins.isEmpty())
-    }
-
-    @Test fun WSP_05_groupIsAPaletteResultAndRunsFromIt() {
-        var ran: AppGroup? = null
-        val p = GroupPaletteProvider({ listOf(group) }, { ran = it })
-        assertTrue(p.results("").isEmpty())
-        val hit = p.results("de").single(); assertEquals("Dev", hit.title); hit.run()
-        assertEquals(group, ran)
     }
 
     @Test fun WSP_09_sessionsAreSavedAndDeleted() {

@@ -791,11 +791,6 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     return out
 }
 
-@Composable
-private fun ChipRowItem(label: String, selected: Boolean, onClick: () -> Unit) {
-    com.bos.sphere.feature.grid.ActionRow(label = label, selected = selected, onClick = onClick)
-}
-
 /** The summary line of the Background row: the two slots, "Spire + Breathing dots". */
 private fun com.bos.sphere.core.data.LauncherPrefs.backgroundSummary(): String =
     com.bos.sphere.core.data.BackgroundChoice(backgroundSlot1, backgroundSlot2).items.joinToString(" + ") { com.bos.sphere.core.design.L10n.tr(it.label) }.ifEmpty { com.bos.sphere.core.design.L10n.tr("None") }

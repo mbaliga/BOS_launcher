@@ -31,3 +31,5 @@ Each has a test that failed before the fix (screen cases in CommsReadScreenCases
 6. Dismissing a live row (swipe, menu) looked like a no-op now that the row stays as history. It says "Cleared from the shade". Test: dismissingALiveRowSaysItWasClearedFromTheShadeAndTheRowStays.
 
 Not changed: the merge runs on the main thread when the feed or the history changes (a sort of up to 5000 small entries, no I/O); a pinch landing on an end stop gives no haptic.
+
+Verification of the second pass: feature-launchpad, core-design, core-data, core-quality unit tests green; app tests green except the known order-dependent PackageRemovedW26SmokeTest flake. The full `assembleRelease` could not be completed on the shared machine (the Gradle daemon was repeatedly stopped or killed by other streams); only Kotlin in feature-launchpad (compiled by its tests) and one comment in the app changed in this pass.

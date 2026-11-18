@@ -56,7 +56,7 @@ class DockIconsOnlyW25Test {
     private fun content(recent: Boolean = false, enable: Boolean = false) = DockContent(
         pinned = listOf("Alpha", "Bravo", "Charlie").mapIndexed { i, l -> DockItem(DockItemRef.app("k$i"), l) },
         recent = if (recent) listOf(DockItem(DockItemRef.app("r0"), "Recent one")) else emptyList(),
-        showEnableRow = enable, showRecentSection = recent, media = null, collapsed = false,
+        showEnableRow = enable, showRecentSection = recent, collapsed = false,
     )
 
     @Composable private fun Rail(c: DockContent, actions: DockActions, edge: DockEdge = DockEdge.Bottom) {

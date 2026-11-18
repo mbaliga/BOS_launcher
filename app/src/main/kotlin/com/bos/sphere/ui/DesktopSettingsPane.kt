@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +30,12 @@ import kotlinx.coroutines.launch
 fun desktopCategory(): SettingCategory = SettingCategory(
     L10n.tr("Desktop & dock"),
     Glyphs.Apps,
-    listOf(SettingItem.Pane(L10n.tr("Dock and external display"), Glyphs.Apps, L10n.tr("Offer, disconnect, per-display profiles")) { DesktopPane() }),
+    listOf(
+        SettingItem.Pane(L10n.tr("Dock and external display"), Glyphs.Apps, L10n.tr("Offer, disconnect, per-display profiles")) { DesktopPane() },
+        // Wave 24 review: a Pane is indexed by its title only, so with the dock off a search for workspaces or groups (Ground Control
+        // or Radar, CFG-14) found nothing; this row names them and opens the same dock panel entry.
+        SettingItem.Pane(L10n.tr("Workspaces, groups and sessions"), Glyphs.Apps, L10n.tr("Dock panel")) { DockPanelEntry() },
+    ),
 )
 
 /** What the offer and disconnect rows say, kept apart so a test can read them without a screen. */
@@ -92,8 +96,10 @@ internal fun DockPanelEntry() {
     val context = LocalContext.current
     val view = androidx.compose.ui.platform.LocalView.current
     var open by remember { mutableStateOf(false) }
-    // Kept outside the open branch: a group run or session restore started from the panel must outlive the panel closing (it closes itself first).
-    val scope = rememberCoroutineScope()
+    // A group run or session restore started from the panel must outlive the panel and Ground Control closing (a Home press closes
+    // Ground Control mid-run; the runs space launches 350 ms apart and post their notices at the end). A composition scope was cancelled
+    // with Ground Control (wave 24 review), so this is unbound, like the palette providers' scope; each run ends on its own.
+    val scope = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate) }
     Text(L10n.tr("Dock panel"), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
     ActionRow(label = L10n.tr("Workspaces, groups and dock settings"), selected = false) { open = true }
     Text(L10n.tr("Opens the same panel as the dock's own button. It works with the dock off."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))

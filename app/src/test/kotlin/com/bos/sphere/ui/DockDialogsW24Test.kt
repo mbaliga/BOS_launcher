@@ -85,8 +85,9 @@ class DockDialogsW24Test {
 
     private fun idle(ms: Long = 1500) = repeat(3) { ShadowLooper.idleMainLooper(ms / 3, TimeUnit.MILLISECONDS) }
 
-    private fun show(content: @Composable () -> Unit) {
-        scenario.onActivity { a -> a.setContentView(ComposeView(a).apply { setContent { DockInputWiring.Install(); content() } }) }
+    /** [withHook] false composes no dock and no hook, so a test sees only what the content installs itself (the Ground Control row). */
+    private fun show(withHook: Boolean = true, content: @Composable () -> Unit) {
+        scenario.onActivity { a -> a.setContentView(ComposeView(a).apply { setContent { if (withHook) DockInputWiring.Install(); content() } }) }
         idle()
     }
 
@@ -214,8 +215,10 @@ class DockDialogsW24Test {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         val m = com.bos.sphere.feature.dock.WorkspaceRepository.get(context)
         m.setDock { it.copy(enabled = false) }
-        show { androidx.compose.foundation.layout.Column { DesktopPane() } }
+        show(withHook = false) { androidx.compose.foundation.layout.Column { DesktopPane() } }
         assertTrue("nothing is open yet", showing().isEmpty())
+        assertTrue("no hook before the panel opens (wave 24 review: the row must install it itself)", DockInput.bridge == null)
+        assertTrue("no dialog hook before the panel opens, so the layer below can only come from the row", DockInput.dialogHook !== DockInputWiring.dialogHook)
         var home: View? = null
         scenario.onActivity { home = it.window.decorView }
         click(nodes(home!!), "Workspaces, groups and dock settings")

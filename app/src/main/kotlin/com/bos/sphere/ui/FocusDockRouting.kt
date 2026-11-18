@@ -20,14 +20,17 @@ internal object FocusDockRouting {
     /** Why the home would show no rail after its overlays close. */
     enum class NoDock(val message: String) {
         Off("The dock is off. Turn it on in Ground Control, Desktop & dock."),
-        Landing("This home landing shows no dock. On Glance, set Ground Control, Home, Right side to Dock rail."),
+        Landing("This home landing shows no dock. On Glance, set Ground Control, Home screen, Right side to Dock rail."),
+        /** Wave 24 review: the rail steps aside while the home is being edited (DockLayer's visible flag), so "focus" found nothing. */
+        Editing("Finish editing the home first: the dock steps aside while you edit."),
     }
 
     /** Null when a rail shows on the home once nothing covers it (the same rules `DockLayer` and `DockHost` apply). */
-    fun noDock(landing: HomeLanding, chrome: ChromeSettings, dockEnabled: Boolean): NoDock? = when {
-        HomeChromeRules.forcesDock(landing, chrome) -> null
+    fun noDock(landing: HomeLanding, chrome: ChromeSettings, dockEnabled: Boolean, editing: Boolean = false): NoDock? = when {
+        HomeChromeRules.forcesDock(landing, chrome) -> if (editing) NoDock.Editing else null
         !HomeChromeRules.shows(landing, ChromeElement.Dock, chrome) -> NoDock.Landing
         !dockEnabled -> NoDock.Off
+        editing -> NoDock.Editing
         else -> null
     }
 

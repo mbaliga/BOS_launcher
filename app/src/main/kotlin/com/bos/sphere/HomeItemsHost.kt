@@ -228,7 +228,8 @@ class HomeItems internal constructor(
     /** One tile per panel: a second tap on "add" for the same panel does nothing (the key is the target). */
     fun addPanel(tab: com.bos.sphere.core.catalog.PanelTab) {
         val uri = com.bos.sphere.core.catalog.HomePanelLinks.uri(tab)
-        if (extrasState.items.containsKey(ItemKeys.link(uri))) return
+        // Second pass (wave 24): the tile is already on the pages; on a landing without pages show it instead of doing nothing.
+        if (extrasState.items.containsKey(ItemKeys.link(uri))) { onPlaced(); return }
         addLink(uri, L10n.tr(tab.title), isFile = false)
     }
 

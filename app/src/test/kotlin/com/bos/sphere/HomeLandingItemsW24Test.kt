@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import com.bos.sphere.core.catalog.HomeEdit
 import com.bos.sphere.core.catalog.HomeExtrasStore
 import com.bos.sphere.core.catalog.HomePanelLinks
@@ -193,5 +195,35 @@ class HomeLandingItemsW24Test : TourBase() {
         assertEquals("the portrait arrangement is the one that was seeded", listOf(clockKey, stackKey), pageKeys())
         assertEquals(listOf(weatherKey, notesKey), WidgetStacks.stackAt(extras.state.value, stackKey)?.keys)
         check("Selected after the rotation", TourBase.Surface.Home)
+    }
+
+    @Test fun HOM_02_onGlanceAddToHomeInTheDrawersAppMenuSwitchesToSelectedAppsWhereTheAppIsShown() {
+        startOnGlance {
+            // Delta is installed but not on the pages, so its menu offers "Add to home".
+            stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = emptyList(), id = 1L)), seeded = true))
+        }
+        val delta = AppSmokeHarness.appKey("Delta")
+        assertFalse(delta in pageKeys())
+        key(android.view.KeyEvent.KEYCODE_D, ctrl = true); check("drawer", TourBase.Surface.Drawer)
+        rule.onAllNodesWithText("Delta", useUnmergedTree = true).onFirst().performTouchInput { longClick() }; settle()
+        rule.onNodeWithText("Add to home", useUnmergedTree = true).performClick(); settle()
+        assertTrue("the app is placed on a page", delta in pageKeys())
+        // Before the second pass the app went onto the hidden Selected apps pages and Glance stayed the landing.
+        assertEquals("placing from a landing without pages shows the landing that has them", HomeLanding.Selected, landing())
+    }
+
+    @Test fun HOM_15_onGlanceAFilesTileThatIsAlreadyOnThePagesIsShownWhenItIsAddedAgain() {
+        val key = ItemKeys.link(HomePanelLinks.uri(PanelTab.Files))
+        startOnGlance {
+            val s = HomeEdit.add(HomeState(pages = listOf(HomePage(keys = emptyList(), id = 1L))), ItemDef(key, ItemKind.Link, "Files", HomePanelLinks.uri(PanelTab.Files)), 0, { 20 })
+            stores.layout.replace(HomeLayout(pages = s.pages, seeded = true)); extras.set(s)
+        }
+        openQuickSheet()
+        rule.onNodeWithText("Widgets, folders and icons").performScrollTo().performClick(); settle()
+        rule.onNodeWithText("Files panel").performClick(); settle()
+        assertEquals("still one tile", 1, pageKeys().count { it == key })
+        // Before the second pass the second tap returned early: nothing placed, nothing switched, nothing on screen changed.
+        assertEquals("the existing tile is shown", HomeLanding.Selected, landing())
+        assertTrue(descShown("Files"))
     }
 }

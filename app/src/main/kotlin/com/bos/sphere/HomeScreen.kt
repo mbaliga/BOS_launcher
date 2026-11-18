@@ -1536,7 +1536,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 isOnHome = if (prefs.isPaged) pages.any { app.key in it.keys } else null,
                 onToggleHome = {
                     if (pages.any { app.key in it.keys }) stores.layout.removeFromHome(app.key, pages, preserve)
-                    else stores.layout.addToHome(app.key, pages, gridState.currentPage, capacityOf, preserve)
+                    else { stores.layout.addToHome(app.key, pages, gridState.currentPage, capacityOf, preserve); homeItems.onPlaced() } // wave 24: Glance shows the pages it was placed on
                     menuApp = null
                 },
             )

@@ -71,14 +71,26 @@ private fun deliveryLabel(d: DeliveryMode?) = when (d) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LaunchpadGroupsPane(modifier: Modifier = Modifier) {
+fun LaunchpadGroupsPane(modifier: Modifier = Modifier) = LaunchpadGroupsPane(modifier, feed = null, colors = null)
+
+/** The Groups manager with an explicit feed and colours (wave 24: opened from inside Launchpad). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun LaunchpadGroupsPane(
+    modifier: Modifier = Modifier,
+    /** Wave 24: the feed to pick people from and preview rules on (Launchpad passes what it shows); null reads the live feed. */
+    feed: List<com.bos.sphere.core.data.HubNotification>?,
+    /** Wave 24: Launchpad's own colours when opened from inside Launchpad; null is the Ground Control look. */
+    colors: GColors?,
+) {
     val ctx = LocalContext.current
     remember(ctx) { GroupsSettings.init(ctx); true }
     val cfg by GroupsSettings.config.collectAsStateWithLifecycle()
-    val feed by NotificationProvider.notifications.collectAsStateWithLifecycle(remember { NotificationProvider.snapshot })
+    val liveFeed by NotificationProvider.notifications.collectAsStateWithLifecycle(remember { NotificationProvider.snapshot })
+    val feed = feed ?: liveFeed
     val contacts = rememberContactDirectory()
     val granted = rememberGranted(GrantKind.Contacts)
-    val c = hyleGColors()
+    val c = colors ?: hyleGColors()
     val apps by produceState(emptyList<Pair<String, String>>()) {
         value = withContext(Dispatchers.IO) {
             runCatching {
@@ -100,7 +112,13 @@ fun LaunchpadGroupsPane(modifier: Modifier = Modifier) {
         )
         if (cfg.groups.isEmpty()) Text(L10n.tr("No groups yet"), color = c.dim, fontSize = 13.sp)
         val ordered = cfg.groups.sortedBy { it.order }
-        ordered.forEachIndexed { i, g -> GroupCard(c, g, i, ordered.size) }
+        ordered.forEachIndexed { i, g -> GroupCard(c, g, i, ordered.size, cfg, feed, contacts) }
+        // Wave 24: Priority groups break through system Do Not Disturb in Liftoff's own indicator (read only, never changed).
+        GChip(
+            c, L10n.tr("Priority groups break through Do Not Disturb"), cfg.priorityBreaksDnd, tag = "grp.dnd",
+            description = L10n.tr("Priority groups break through Do Not Disturb") + ": " + (if (cfg.priorityBreaksDnd) L10n.tr("On") else L10n.tr("Off")),
+        ) { GroupsSettings.setPriorityBreaksDnd(!cfg.priorityBreaksDnd) }
+        Text(L10n.tr("While Do Not Disturb is on, only Priority groups light Liftoff's edge indicator. Launchpad still lists everything. Do Not Disturb itself is not changed."), color = c.dim, fontSize = 12.sp)
 
         Column(Modifier.fillMaxWidth().background(c.surface, RoundedCornerShape(14.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GField(c, newName, { newName = it }, L10n.tr("New group name"), tag = "grp.pane.newName")
@@ -176,7 +194,10 @@ fun LaunchpadGroupsPane(modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GroupCard(c: GColors, g: LaunchpadGroup, index: Int, count: Int) {
+private fun GroupCard(
+    c: GColors, g: LaunchpadGroup, index: Int, count: Int,
+    cfg: com.bos.sphere.core.data.GroupsConfig, feed: List<com.bos.sphere.core.data.HubNotification>, contacts: com.bos.sphere.core.data.ContactDirectory,
+) {
     var renaming by remember(g.id) { mutableStateOf(false) }
     var name by remember(g.id, g.name) { mutableStateOf(g.name) }
     var confirm by remember(g.id) { mutableStateOf(false) }
@@ -222,6 +243,7 @@ private fun GroupCard(c: GColors, g: LaunchpadGroup, index: Int, count: Int) {
             if (index < count - 1) GChip(c, L10n.tr("Move down"), description = L10n.tr("Move %s down", g.name), tag = "grp.card.${g.id}.down") { GroupsSettings.moveGroup(g.id, 1) }
             GChip(c, L10n.tr("Delete"), description = L10n.tr("Delete %s", g.name), tag = "grp.card.${g.id}.delete") { confirm = true }
         }
+        GroupPeoplePicker(c, g, cfg, feed, contacts) // wave 24: pick a person, members
         if (confirm) {
             Text(L10n.tr("Delete %s? Its assignments and rules go with it. A snapshot is saved first.", g.name), color = c.ink2, fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

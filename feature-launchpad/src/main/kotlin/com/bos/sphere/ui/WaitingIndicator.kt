@@ -61,13 +61,14 @@ fun LaunchpadWaitingIndicator(onOpen: () -> Unit, modifier: Modifier = Modifier,
     remember(ctx) { com.bos.sphere.core.data.GroupsSettings.init(ctx); true }
     val groups by com.bos.sphere.core.data.GroupsSettings.config.collectAsStateWithLifecycle()
     val contacts = rememberContactDirectory()
+    val dnd = rememberDndOn() // wave 24: while Do Not Disturb is on only Priority groups count (Liftoff's own indicator)
     val plain = remember(items, rules, policies, snoozed, read, now, groups) {
         if (groups.groups.isEmpty()) WaitingLogic.waiting(items, rules, policies, read, snoozed, now, ZoneId.systemDefault()) else null
     }
-    val grouped by androidx.compose.runtime.produceState<Pair<List<HubNotification>, com.bos.sphere.core.data.PriorityWaiting>?>(null, items, rules, policies, snoozed, read, now, groups, contacts) {
+    val grouped by androidx.compose.runtime.produceState<Pair<List<HubNotification>, com.bos.sphere.core.data.PriorityWaiting>?>(null, items, rules, policies, snoozed, read, now, groups, contacts, dnd) {
         value = if (groups.groups.isEmpty()) null else withContext(kotlinx.coroutines.Dispatchers.Default) {
             val r = com.bos.sphere.core.data.GroupResolver(groups, contacts)
-            val w = com.bos.sphere.core.data.GroupWaiting.waiting(items, rules, policies, read, snoozed, now, ZoneId.systemDefault(), r)
+            val w = com.bos.sphere.core.data.GroupWaiting.waiting(items, rules, policies, read, snoozed, now, ZoneId.systemDefault(), r, dndOn = dnd)
             w to com.bos.sphere.core.data.GroupWaiting.priority(w, r)
         }
     }

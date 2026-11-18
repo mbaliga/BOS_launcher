@@ -14,7 +14,7 @@ import org.json.JSONObject
  */
 object GroupsJson {
     const val VERSION = 1
-    private val KNOWN = setOf("v", "groups", "people", "assignments", "rules", "myLastName")
+    private val KNOWN = setOf("v", "groups", "people", "assignments", "rules", "myLastName", "priorityBreaksDnd")
 
     /**
      * CFG-03: a reserved key inside [GroupsConfig.extra]. It is never written to the file under this name: [ENTRIES] holds the
@@ -85,6 +85,7 @@ object GroupsJson {
             }
         })
         if (c.myLastName.isNotBlank()) o.put("myLastName", c.myLastName)
+        if (!c.priorityBreaksDnd) o.put("priorityBreaksDnd", false) // written only when changed, so older documents read the same
         return o
     }
 
@@ -145,7 +146,7 @@ object GroupsJson {
                 GroupRule(rid, conds, gid, r.optBoolean("enabled", true) && unreadable.isEmpty(), r.optString("name"))
             }.distinctBy { it.id }.take(GroupsConfig.MAX_RULES)
             if (entries.length() > 0) extra.put(ENTRIES, entries)
-            GroupsConfig(groups, people, assignments, rules, o.optString("myLastName").trim(), extra.toString())
+            GroupsConfig(groups, people, assignments, rules, o.optString("myLastName").trim(), o.optBoolean("priorityBreaksDnd", true), extra.toString())
         }.getOrDefault(GroupsConfig())
     }
 
@@ -239,4 +240,12 @@ object GroupsSettings {
     }
 
     fun setMyLastName(name: String) = edit { GroupsEdit.setMyLastName(it, name) }
+    fun setPriorityBreaksDnd(on: Boolean) = edit { GroupsEdit.setPriorityBreaksDnd(it, on) }
+
+    /**
+     * Forgets the in-memory copy so the next [init] reads the stored file again: what a process restart does. Used by the
+     * end-to-end tests that check a manual group survives a restart; harmless anywhere else (the file is the truth).
+     */
+    @Synchronized
+    fun forgetInMemoryCopy() { sp = null; _config.value = GroupsConfig() }
 }

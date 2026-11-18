@@ -121,10 +121,14 @@ object GroupWaiting {
     fun waiting(
         items: List<HubNotification>, rules: List<Rule>, policies: List<AppPolicy>, readKeys: Set<String>,
         snoozedUntil: Map<String, Long>, now: Long, zone: ZoneId, grouping: GroupResolver?,
+        /** Wave 24: system Do Not Disturb is on; with [GroupDnd.breaksThrough] only Priority group items count. */
+        dndOn: Boolean = false,
     ): List<HubNotification> {
         if (grouping == null || grouping.config.groups.isEmpty()) return WaitingLogic.waiting(items, rules, policies, readKeys, snoozedUntil, now, zone)
+        val onlyPriority = GroupDnd.breaksThrough(grouping.config, dndOn)
         return LaunchpadLogic.visible(items, rules, now).filter { n ->
             val g = grouping.resolve(n).group
+            if (onlyPriority && g?.priority != GroupPriority.Priority) return@filter false
             val pol = listOfNotNull(GroupLogic.effectivePolicy(n.packageName, g, policies))
             g?.priority != GroupPriority.Quiet && !n.isOngoing && n.key !in readKeys &&
                 (g?.priority == GroupPriority.Priority || !LaunchpadLogic.isSilent(n, rules)) &&

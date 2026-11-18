@@ -52,7 +52,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -204,7 +203,7 @@ internal fun ArcDrawerContent(
         val m = remember(anchor, w, h, density, actions.size) { ArcMetrics(anchor, w, h, density, actions.size) }
         val context = LocalContext.current.applicationContext
         val scope = rememberCoroutineScope()
-        val haptics = LocalHapticFeedback.current
+        val haptics = rememberLauncherHaptics()
         val motion = com.bos.sphere.core.design.rememberMotionPrefs()
 
         val categories by produceState(initialValue = WheelCategoryCache.cachedFor(apps.map { it.packageName }), apps, grouping) {

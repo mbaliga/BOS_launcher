@@ -61,7 +61,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -250,7 +249,7 @@ fun GridHome(
     // exactly where touches land. Text inside still shapes right-to-left.
     val rtl = prefs.homeOrder.rtl // wave 26: the home order (not the app language) mirrors the pages and the cells
     val density = LocalDensity.current
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLauncherHaptics()
     val scope = rememberCoroutineScope()
 
     // The pager fills the whole screen so pages slide edge to edge; each page insets its own

@@ -81,7 +81,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
@@ -213,7 +212,7 @@ private fun SettingsSpaceContent(
     sounds: UiSounds?,
     onClose: () -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLauncherHaptics()
     var cat by remember { mutableIntStateOf(initialCategory.coerceIn(0, (categories.size - 1).coerceAtLeast(0))) }
     var paneOpen by remember { mutableIntStateOf(-1) } // index (in the displayed list) of the item whose page is open
     var searching by remember { mutableStateOf(false) }

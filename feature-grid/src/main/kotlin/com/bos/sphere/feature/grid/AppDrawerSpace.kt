@@ -63,7 +63,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -320,7 +319,7 @@ private fun DrawerContent(
             val sizesNow by rememberUpdatedState(sizes)
 
             var scrub by remember { mutableStateOf<ScrubState?>(null) }
-            val haptic = LocalHapticFeedback.current
+            val haptic = rememberLauncherHaptics()
             val onScrub: (Float, Boolean) -> Unit = { f, leftSide ->
                 val t = DrawerOrdering.railTarget(f, sizesNow)
                 if (t != null) {

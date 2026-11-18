@@ -237,18 +237,21 @@ class RadarGlassW22Test {
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
     fun NFR_13_theQueryLineTheResultsAndTheMicAreSeparateTraversalGroupsReadTopToBottom() {
         open(SearchLayout.Orbit)
-        val groups = rule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.IsTraversalGroup), useUnmergedTree = true).fetchSemanticsNodes()
-            .filter { it.config[SemanticsProperties.IsTraversalGroup] }.map { it.boundsInRoot }
+        // Wave 29: the Orbit's layer spans the display (the field and the mic are drawn above it), so the reading order is the groups' traversal indices, not their geometry:
+        // the query line 0, the results 1, the mic 2.
+        val nodes = rule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.IsTraversalGroup), useUnmergedTree = true).fetchSemanticsNodes()
+            .filter { it.config[SemanticsProperties.IsTraversalGroup] }
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
         val mic = bounds("Speak to search")
         val field = rule.onNode(androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNode().boundsInRoot
-        val bar = groups.firstOrNull { it.contains(field.center) && it.height < root.height / 4 }
-        val micGroup = groups.firstOrNull { it.contains(mic.center) && it.height < root.height / 4 && it !== bar }
-        val results = groups.firstOrNull { it.height > root.height / 2 }
-        assertTrue("a group holds the query line: $groups", bar != null)
-        assertTrue("a group holds the mic: $groups", micGroup != null)
-        assertTrue("a group holds the results: $groups", results != null)
-        assertTrue("query line group above the results above the mic group", bar!!.bottom <= results!!.top + 1f && results.bottom <= micGroup!!.top + 1f)
+        fun index(n: androidx.compose.ui.semantics.SemanticsNode) = n.config.getOrNull(SemanticsProperties.TraversalIndex) ?: 0f
+        val bar = nodes.firstOrNull { it.boundsInRoot.contains(field.center) && it.boundsInRoot.height < root.height / 4 }
+        val micGroup = nodes.firstOrNull { it.boundsInRoot.contains(mic.center) && it.boundsInRoot.height < root.height / 4 && it !== bar }
+        val results = nodes.filter { it.boundsInRoot.height > root.height / 2 }
+        assertTrue("a group holds the query line", bar != null)
+        assertTrue("a group holds the mic", micGroup != null)
+        assertTrue("a group holds the results", results.isNotEmpty())
+        assertTrue("query line group before the results before the mic group (${index(bar!!)}, ${results.map { index(it) }}, ${index(micGroup!!)})", results.all { index(bar) < index(it) && index(it) < index(micGroup) })
     }
 
     // ---- wave 23: the adaptive mic (strip when the free height is 220 dp or more, in the field row below that)

@@ -127,7 +127,7 @@ class RadarSearchW18UiTest {
 
     // ---- (3) the Orbit rings are tiers of use
 
-    private fun orbitTiles() = rule.onAllNodes(SemanticsMatcher("has traversal index") { it.config.contains(SemanticsProperties.TraversalIndex) }).fetchSemanticsNodes()
+    private fun orbitTiles() = rule.onAllNodes(SemanticsMatcher("has traversal index") { it.config.contains(SemanticsProperties.TraversalIndex) && it.config.getOrNull(SemanticsProperties.TestTag) == RADAR_ORBIT_TILE_TAG }).fetchSemanticsNodes()
         .sortedBy { it.config[SemanticsProperties.TraversalIndex] }
         .map { (it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull().orEmpty()) to (it.config.getOrNull(SemanticsProperties.StateDescription).orEmpty()) }
 

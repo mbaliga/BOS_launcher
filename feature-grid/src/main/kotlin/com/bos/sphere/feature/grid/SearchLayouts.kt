@@ -89,6 +89,7 @@ import kotlin.math.max
 import kotlin.math.cos
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.Dp
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -321,6 +322,14 @@ internal fun Orbit(
     emptyHint: String? = null,
     /** Wave 20: the TalkBack names of the tiers, innermost first (match tiers while a query is typed). */
     tierNames: List<String> = RadarRings.tierNames,
+    /**
+     * Wave 29 (radarFull): the Orbit's layer is the whole display area (the caller gives it the full width and the height down to the keyboard) and
+     * [region] is the part of it the rings were fitted to before (the free area under the field and above the mic), in this layer's pixels; null = the
+     * whole layer. [centreFromBottom] is measured from the region's top. The tiles revolve over the whole layer; only the still layout (reduced motion)
+     * keeps to the region, [reserveBottom] of it left for the result strip.
+     */
+    region: androidx.compose.ui.geometry.Rect? = null,
+    reserveBottom: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     // NFR-14: with system animations off the rings do not creep by themselves (a drag still turns them).
     val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
@@ -353,7 +362,7 @@ internal fun Orbit(
         }
     }
 
-    BoxWithConstraints(modifier.linearTraversal().clipToBounds().pointerInput(Unit) {
+    BoxWithConstraints(modifier.linearTraversal().clipToBounds().testTag(RADAR_ORBIT_TAG).pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
                 val e = awaitPointerEvent(PointerEventPass.Initial)
@@ -372,10 +381,12 @@ internal fun Orbit(
         }
     }) {
         val density = LocalDensity.current
-        val wPx = with(density) { maxWidth.toPx() }
-        val hPx = with(density) { maxHeight.toPx() }
-        val cx = wPx / 2f
-        val cy = with(density) { centreFromBottom.toPx() } // (named for history: this is the centre's distance from the top)
+        val rg = region ?: androidx.compose.ui.geometry.Rect(0f, 0f, with(density) { maxWidth.toPx() }, with(density) { maxHeight.toPx() })
+        val wPx = rg.width
+        val hPx = rg.height - with(density) { reserveBottom.toPx() }
+        val centrePx = with(density) { centreFromBottom.toPx() } // (named for history: this is the centre's distance from the region's top)
+        val cx = rg.left + wPx / 2f
+        val cy = rg.top + centrePx
         val tileSize = 54.dp
         val tilePx = with(density) { tileSize.toPx() }
         val colW = 80.dp
@@ -396,7 +407,8 @@ internal fun Orbit(
         val textLeft = with(density) { 90.dp.toPx() * maxOf(1f, density.fontScale) }
         val textRight = with(density) { 100.dp.toPx() * maxOf(1f, density.fontScale) }
         val textHalfH = with(density) { wheel.halfVisible.toPx() }
-        val placements = remember(wPx, hPx, tiles.size, motion, cy, wheel, density.fontScale) {
+        val placements = remember(wPx, hPx, tiles.size, motion, centrePx, wheel, density.fontScale) {
+            val cx = wPx / 2f; val cy = centrePx // the fitting works in the region's own coordinates
             // Candidate angles per ring, best position first.
             val candidates = ArrayList<List<Double>>()
             val pts = ArrayList<Offset>()
@@ -446,32 +458,38 @@ internal fun Orbit(
             val tierDescription = L10n.tr(tierNames[ring.coerceIn(0, tierNames.lastIndex)])
             Column(
                 Modifier
-                    .width(colW)
-                    // NFR-13: the tiles circle the screen, so geometry means nothing to TalkBack; they read in rank order, best match first.
-                    .semantics(mergeDescendants = true) { traversalIndex = i.toFloat(); contentDescription = tile.caption(); stateDescription = tierDescription }
+                    // Wave 29: the offset comes first so the semantics node (and its test tag) sits where the tile is drawn; with it after the semantics the node reported the pre-offset
+                    // position (the layer's top left), which put TalkBack's focus frame and any test's bounds in the corner.
                     .offset {
                         val sway = dir * travel.floatValue / radii[ring].toDouble()
                         val a = baseAngle + sway
                         val x = cx + radii[ring] * cos(a).toFloat()
                         val y = cy + radii[ring] * sin(a).toFloat()
                         IntOffset((x - colWPx / 2f).roundToInt(), (y - tilePx / 2f).roundToInt())
-                    },
+                    }
+                    .width(colW)
+                    // NFR-13: the tiles circle the screen, so geometry means nothing to TalkBack; they read in rank order, best match first.
+                    .semantics(mergeDescendants = true) { testTag = RADAR_ORBIT_TILE_TAG; traversalIndex = i.toFloat(); contentDescription = tile.caption(); stateDescription = tierDescription },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                androidx.compose.foundation.layout.Box(
-                    Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape).secondaryClick { actions.onSecondary(tile) }.radarDragOut(tile, pointer = false).orbitClick(tile, actions),
-                ) { TileFace(tile, tileSize) }
-                Text(
-                    tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
-                )
+                // Wave 29 (review): the face and its caption are one touch target (a tap on the name under the icon used to fall through and close Radar).
+                Column(
+                    Modifier.secondaryClick { actions.onSecondary(tile) }.radarDragOut(tile, pointer = false).orbitClick(tile, actions),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    androidx.compose.foundation.layout.Box(Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape)) { TileFace(tile, tileSize) }
+                    Text(
+                        tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
                 if (tile is Tile.App) ShortcutCircleRow(tile, colW, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) }, modifier = Modifier.padding(top = 0.dp))
             }
         }
         if (footnote != null) {
             Text(
                 footnote, color = Color.White.copy(alpha = 0.55f), fontSize = (11 * z).sp, maxLines = 1,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = with(density) { rg.top.toDp() } + 4.dp),
             )
         }
         if (emptyHint != null && tiles.isEmpty()) {
@@ -501,7 +519,9 @@ internal fun ResultStrip(
 ) {
     val selectedKey = LocalRadarSelection.current
     androidx.compose.foundation.layout.Row(
-        modifier.fillMaxWidth().heightIn(min = RadarStripHeight).testTag(RADAR_STRIP_TAG).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 2.dp),
+        // Wave 29: the row is as wide as its circles (no full-width bar that would swallow the taps and drags meant for the rings behind it); it scrolls when there are more than fit.
+        // The padding sits outside the scrolling node: a pointer-input node (the scroll) takes the touch even where it ignores it, so its bounds are only the circles.
+        modifier.heightIn(min = RadarStripHeight).padding(horizontal = 16.dp, vertical = 2.dp).testTag(RADAR_STRIP_TAG).horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
@@ -513,6 +533,12 @@ internal fun ResultStrip(
 }
 
 internal const val RADAR_STRIP_TAG = "radarStrip"
+
+/** Wave 29: test tag of the Orbit's layer (its bounds are the whole display area). */
+internal const val RADAR_ORBIT_TAG = "radarOrbit"
+
+/** Wave 29: test tag of one revolving tile (face, caption and shortcuts). */
+internal const val RADAR_ORBIT_TILE_TAG = "orbitTile"
 
 /** The 24 dp glyph of a strip circle: the action's own icon (ActionIcons), the engine glyph for a web row, the settings glyph for a setting. */
 @Composable
@@ -560,6 +586,8 @@ internal fun FlatResults(
     plain: Boolean = false,
     /** Long-press / right-click on a result (the host shows the preview, the same one in all layouts). */
     onPreview: (Tile) -> Unit = {},
+    /** Wave 29: the list's own padding (the room under the field and above the mic): rows scroll through it instead of being cut by a clipped box. */
+    contentPadding: PaddingValues = PaddingValues(bottom = 8.dp),
 ) {
     val rows = remember(data, scope, suggestions) {
         buildList<FRow> {
@@ -610,7 +638,7 @@ internal fun FlatResults(
                 }
             },
         state = listState,
-        contentPadding = PaddingValues(bottom = 8.dp),
+        contentPadding = contentPadding,
     ) {
         itemsIndexed(rows, key = { _, r -> r.key }) { idx, row ->
             val z = LocalResultScale.current

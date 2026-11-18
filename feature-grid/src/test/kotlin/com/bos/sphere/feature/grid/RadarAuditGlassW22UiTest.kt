@@ -148,7 +148,8 @@ class RadarAuditGlassW22UiTest {
         val groups = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("a traversal group") { it.config.getOrNull(sem.IsTraversalGroup) == true }).fetchSemanticsNodes()
         org.junit.Assert.assertTrue("the results area and the rings are reading groups (the mic, index 0, is otherwise read before ring tile 1)", groups.size >= 2)
         val mic = rule.onNodeWithContentDescription("Speak to search").fetchSemanticsNode()
-        org.junit.Assert.assertTrue("the mic is not inside a results group", groups.filter { g -> g.boundsInRoot.height > mic.boundsInRoot.height * 3 }.none { g -> g.boundsInRoot.overlaps(mic.boundsInRoot) })
+        // Wave 29: the Orbit's layer spans the display under the mic, so "inside" is about the tree, not the geometry.
+        org.junit.Assert.assertTrue("the mic is not inside a results group", generateSequence(mic.parent) { it.parent }.none { g -> g.config.getOrNull(sem.IsTraversalGroup) == true && g.boundsInRoot.height > mic.boundsInRoot.height * 3 })
         val ringTiles = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("ring tile") { it.config.contains(sem.TraversalIndex) }).fetchSemanticsNodes()
         org.junit.Assert.assertTrue(ringTiles.isNotEmpty())
         org.junit.Assert.assertTrue("every ring tile sits inside a reading group", ringTiles.all { t -> groups.any { g -> g.boundsInRoot.let { b -> b.left <= t.boundsInRoot.left + 1 && b.right >= t.boundsInRoot.right - 1 && b.top <= t.boundsInRoot.top + 1 && b.bottom >= t.boundsInRoot.bottom - 1 } } })

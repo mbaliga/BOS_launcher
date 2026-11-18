@@ -1,5 +1,8 @@
 # Radar black gradients (wave 25, supersedes the glass below), nothing leaves the display, no dead touch (PAL-18, PAL-20, INP-12, NFR-13, NFR-15)
 
+> **Wave 29 (radarFull): the region rules (the Orbit fitted to, and clipped to, the area between the field and the mic bar; "results area ... clipped to its own bounds"; the mic strip reserved with `clipToBounds`) are superseded by [radarFull.md](radarFull.md).** The Orbit is a full-screen layer, nothing is clipped inside the screen, every visible part of a tile is tappable. The rest of this record stands.
+
+
 **Wave 25 owner request (authoritative, replaces the wave 21/22 glass):** "Radar looks weird - remove the glass effect buttons and keep only black gradients instead.
 Don't let icons exit the display area. I should be able to see all recents at once, not have some outside the screen. There is still a dead touch area. The
 landscape view cuts off above the keyboard."

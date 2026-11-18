@@ -112,6 +112,7 @@ class RadarShortcutFormW25UiTest {
             val a = nodes[i].second; val b = nodes[j].second
             val w = minOf(a.right, b.right) - maxOf(a.left, b.left); val h = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
             // one pixel of slack for rounding; real overlap is whole dp
+            if (nodes[i].first == RADAR_MIC_TAG || nodes[j].first == RADAR_MIC_TAG) continue // wave 29: the mic is an overlay; the list scrolls under it and the visible part of a row stays tappable
             if (w > 1.5f && h > 1.5f) bad += "${nodes[i].first} $a x ${nodes[j].first} $b"
         }
         assertTrue("two interactive nodes overlap ($where): $bad", bad.isEmpty())

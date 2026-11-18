@@ -1,5 +1,8 @@
 # Radar shortcuts, quicklinks and actions: one form (wave 25)
 
+> **Wave 29 (radarFull): the region rules (the strip and the rings living in a clipped results region) are superseded by [radarFull.md](radarFull.md).** The Orbit is a full-screen layer, nothing is clipped inside the screen, every visible part of a tile is tappable. The rest of this record stands.
+
+
 Owner (build 53, query "fylz" in Orbit): "Some shortcuts/quicklinks appear as circles floating around the radar circles, others as pills below the icon. Looks weird and
 feels clunky." The screenshot showed two or three pill chips stacked and overlapping under the app tile, "Deep results" as a stand-alone tile on the rings and the web
 searches as pills along the bottom.

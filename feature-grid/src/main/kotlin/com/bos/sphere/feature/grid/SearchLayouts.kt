@@ -301,7 +301,7 @@ private fun StripTileView(tile: Tile, actions: TileActions, fit: StripFit) {
 /**
  * Results floating on concentric elliptical rings (like the old AirDrop screen): the best match
  * nearest the top of the innermost ring, then 5 / 9 / 13 / 17 outward. Wave 25: the rings are fitted to the
- * region and nothing leaves it ([OrbitFit]); positions come from layout offsets so only layout (not composition)
+ * region (wave 26: back to circles that may leave the screen); positions come from layout offsets so only layout (not composition)
  * runs per frame.
  */
 @Composable
@@ -322,7 +322,7 @@ internal fun Orbit(
     /** Wave 20: the TalkBack names of the tiers, innermost first (match tiers while a query is typed). */
     tierNames: List<String> = RadarRings.tierNames,
 ) {
-    // NFR-14: with system animations off the tiles do not drift by themselves.
+    // NFR-14: with system animations off the rings do not creep by themselves (a drag still turns them).
     val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
     val z = LocalResultScale.current
     val selectedKey = LocalRadarSelection.current
@@ -359,78 +359,112 @@ internal fun Orbit(
                 if (e.changes.any { it.pressed }) actions.onTouch()
             }
         }
+    }.pointerInput(Unit) {
+        detectHorizontalDragGestures(
+            onDragStart = { dragging[0] = true },
+            onDragEnd = { dragging[0] = false },
+            onDragCancel = { dragging[0] = false },
+        ) { change, dx ->
+            change.consume()
+            travel.floatValue += dx
+            extra[0] = OrbitMotion.flingSpeed(extra[0], dx, OrbitFeel.current)
+        }
     }) {
         val density = LocalDensity.current
-        val wDp = maxWidth.value
-        val hDp = maxHeight.value
-        val cyDp = centreFromBottom.value // (named for history: this is the centre's distance from the top)
-        val fs = maxOf(1f, density.fontScale)
-        // Wave 25 (owner: "Don't let icons exit the display area. I should be able to see all recents at once"): the rings are ellipses fitted to this
-        // region ([OrbitFit]); icons shrink before anything is dropped and no tile box lies even partly outside. The rings no longer revolve
-        // through the whole screen (that is what carried icons off it); with motion on each tile drifts a few dp around its place.
-        // Wave 25 (shortcutForm): a tile with shortcuts carries a row of circles under its caption; every box reserves that row (width and height), so no two boxes overlap.
-        val rowW = tiles.maxOfOrNull { (it as? Tile.App)?.shortcuts?.size?.let(ShortcutForm::smallRowWidth) ?: 0f } ?: 0f
-        val rowH = if (rowW > 0f) ShortcutForm.SLOT_DP else 0f
-        val fit = remember(wDp, hDp, cyDp, tiles.size, wheel, fs, z, rowW) {
-            OrbitFit.fit(wDp, hDp, cyDp, 90f * fs, 100f * fs, wheel.halfVisible.value, tiles.size, fs, z, rowW, rowH)
+        val wPx = with(density) { maxWidth.toPx() }
+        val hPx = with(density) { maxHeight.toPx() }
+        val cx = wPx / 2f
+        val cy = with(density) { centreFromBottom.toPx() } // (named for history: this is the centre's distance from the top)
+        val tileSize = 54.dp
+        val tilePx = with(density) { tileSize.toPx() }
+        val colW = 80.dp
+        val colWPx = with(density) { colW.toPx() }
+        // Keep tiles clear of the system's edge-swipe zones, which swallow touches along both sides.
+        val edgeGuard = with(density) { 28.dp.toPx() }
+        val margin = colWPx / 2f + edgeGuard
+        // Ring gaps stay wider than a tile (face + caption) so rings revolving past each other never touch.
+        // Wave 18: the rings are tiers (RadarRings): the first holds what you open most, then outward. The innermost
+        // ring starts clear of the category wheel at the centre.
+        val gap = with(density) { 92.dp.toPx() }
+        val radii = FloatArray(RadarRings.MAX_RINGS) { with(density) { 140.dp.toPx() } + it * gap }
+
+        // The rings are centred on the category wheel in the middle of the free area below the query line and run all the
+        // way round. Within a ring the best result sits straight above the centre and the rest alternate outward.
+        val boxW = colWPx + with(density) { 8.dp.toPx() }
+        val boxH = tilePx + with(density) { 26.dp.toPx() }
+        val textLeft = with(density) { 90.dp.toPx() * maxOf(1f, density.fontScale) }
+        val textRight = with(density) { 100.dp.toPx() * maxOf(1f, density.fontScale) }
+        val textHalfH = with(density) { wheel.halfVisible.toPx() }
+        val placements = remember(wPx, hPx, tiles.size, motion, cy, wheel, density.fontScale) {
+            // Candidate angles per ring, best position first.
+            val candidates = ArrayList<List<Double>>()
+            val pts = ArrayList<Offset>()
+            for (r in radii.indices) {
+                val even = RadarRings.evenAngles(RadarRings.capacity(r), r)
+                    .sortedBy { Math.abs(Math.atan2(sin(it + PI / 2), cos(it + PI / 2))) }
+                if (motion) { candidates += even; continue } // Moving: every slot stays, the tiles revolve through the whole screen like planets.
+                // Still: keep only slots that are on screen, clear of the wheel text and of each other.
+                val kept = ArrayList<Double>()
+                for (ang in even) {
+                    val pt = Offset(cx + radii[r] * cos(ang).toFloat(), cy + radii[r] * sin(ang).toFloat())
+                    val onScreen = pt.x in margin..(wPx - margin) && pt.y in (tilePx * 0.6f)..(hPx - tilePx * 1.1f)
+                    val onText = (pt.x + tilePx / 2f) > cx - textLeft && (pt.x - tilePx / 2f) < cx + textRight && abs(pt.y - cy) < textHalfH + tilePx * 0.6f
+                    if (onScreen && !onText && pts.none { abs(it.x - pt.x) < boxW && abs(it.y - pt.y) < boxH }) { kept += ang; pts += pt }
+                }
+                candidates += kept
+            }
+            val rings = RadarRings.assign(tiles.size, RadarRings.limits(candidates.map { it.size }))
+            val used = IntArray(radii.size)
+            // A ring that is not full spreads its few tiles evenly when moving; when still they take the best positions.
+            val perRing = IntArray(radii.size).also { c -> rings.forEach { c[it]++ } }
+            rings.map { r ->
+                val k = used[r]++
+                r to (if (motion) RadarRings.evenAngles(perRing[r], r)[k] else candidates[r][k])
+            }
         }
-        val shown = tiles.take(fit.slots.size)
+
+        val shown = tiles.take(placements.size)
         androidx.compose.runtime.SideEffect { onVisibleCount(shown.size) }
         Canvas(Modifier.fillMaxSize()) {
             // Each ring is a faint tier guide; the inner tiers are a little brighter.
-            if (fit.guides) fit.rings.forEachIndexed { r, e ->
-                drawOval(Color.White.copy(alpha = 0.16f - 0.035f * r), topLeft = Offset((e[0] - e[2]) * density.density, (e[1] - e[3]) * density.density), size = androidx.compose.ui.geometry.Size(2 * e[2] * density.density, 2 * e[3] * density.density), style = Stroke(width = 1.dp.toPx()))
-            }
+            for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.16f - 0.035f * r), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
         }
-        // TalkBack: one quiet heading per tier that has results (the rank bands 5, 9, 13, 17), placed at the ellipse of the tier's best tile.
-        val tiersAll = RadarRings.assign(shown.size, RadarRings.capacities)
-        tiersAll.distinct().forEach { t ->
-            val r = fit.slots[tiersAll.indexOf(t)].ring
+        // TalkBack: one quiet heading per ring that has results, named for its tier.
+        placements.map { it.first }.distinct().forEach { r ->
             androidx.compose.foundation.layout.Box(
                 Modifier
-                    .offset { IntOffset((wDp / 2f * density.density).roundToInt(), ((fit.rings[r][1] - fit.rings[r][3]) * density.density).roundToInt()) }
+                    .offset { IntOffset(cx.roundToInt(), (cy - radii[r]).roundToInt()) }
                     .size(1.dp)
-                    .semantics { heading(); contentDescription = L10n.tr(tierNames[t.coerceIn(0, tierNames.lastIndex)]) },
+                    .semantics { heading(); contentDescription = L10n.tr(tierNames[r.coerceIn(0, tierNames.lastIndex)]) },
             )
         }
-        val wPx = wDp * density.density
-        val hPx = hDp * density.density
-        val boxHPx = fit.boxH * density.density
 
-        // The tier (Most used, Often used ...) follows the rank (5, 9, 13, 17 best results), not which ellipse a slot sits on: a ring the wheel crowds may hold fewer tiles.
-        val tierOf = RadarRings.assign(shown.size, RadarRings.capacities)
         shown.forEachIndexed { i, tile ->
-            val slot = fit.slots[i]
-            val ring = tierOf.getOrElse(i) { slot.ring }
+            val (ring, baseAngle) = placements[i]
+            val dir = if (ring % 2 == 1) -1.0 else 1.0
             val tierDescription = L10n.tr(tierNames[ring.coerceIn(0, tierNames.lastIndex)])
             Column(
                 Modifier
-                    // The tile is placed first (outermost), so its semantics and its touch area are where it is drawn, not at the origin.
-                    .layout { measurable, constraints ->
-                        val p = measurable.measure(constraints)
-                        layout(p.width, p.height) {
-                            // The tile's own measured box is kept inside the region whatever it holds (a caption, the nested shortcut pills).
-                            val bob = if (motion) with(density) { OrbitFit.BOB.dp.toPx() } else 0f
-                            val ph = travel.floatValue / 120f + i * 1.7f
-                            val x = (slot.x * density.density + bob * cos(ph) - p.width / 2f).coerceIn(0f, (wPx - p.width).coerceAtLeast(0f))
-                            val y = (slot.y * density.density - boxHPx / 2f + bob * sin(ph)).coerceIn(0f, (hPx - p.height).coerceAtLeast(0f))
-                            p.place(x.roundToInt(), y.roundToInt())
-                        }
-                    }
-                    .width(fit.boxW.dp)
-                    // NFR-13: geometry means little to TalkBack; the tiles read in rank order, best match first.
+                    .width(colW)
+                    // NFR-13: the tiles circle the screen, so geometry means nothing to TalkBack; they read in rank order, best match first.
                     .semantics(mergeDescendants = true) { traversalIndex = i.toFloat(); contentDescription = tile.caption(); stateDescription = tierDescription }
-                    .testTag("orbitTile"),
+                    .offset {
+                        val sway = dir * travel.floatValue / radii[ring].toDouble()
+                        val a = baseAngle + sway
+                        val x = cx + radii[ring] * cos(a).toFloat()
+                        val y = cy + radii[ring] * sin(a).toFloat()
+                        IntOffset((x - colWPx / 2f).roundToInt(), (y - tilePx / 2f).roundToInt())
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 androidx.compose.foundation.layout.Box(
                     Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape).secondaryClick { actions.onSecondary(tile) }.radarDragOut(tile, pointer = false).orbitClick(tile, actions),
-                ) { TileFace(tile, fit.icon.dp) }
+                ) { TileFace(tile, tileSize) }
                 Text(
                     tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
                 )
-                if (tile is Tile.App) ShortcutCircleRow(tile, fit.boxW.dp, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) }, modifier = Modifier.padding(top = 0.dp))
+                if (tile is Tile.App) ShortcutCircleRow(tile, colW, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) }, modifier = Modifier.padding(top = 0.dp))
             }
         }
         if (footnote != null) {
@@ -442,7 +476,7 @@ internal fun Orbit(
         if (emptyHint != null && tiles.isEmpty()) {
             Text(
                 emptyHint, color = Color.White.copy(alpha = 0.6f), fontSize = (13 * z).sp, textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.TopCenter).offset { IntOffset(0, (cyDp * density.density + with(density) { (wheel.height / 2 + 14.dp).toPx() }).roundToInt()) }.padding(horizontal = 32.dp),
+                modifier = Modifier.align(Alignment.TopCenter).offset { IntOffset(0, (cy + with(density) { (wheel.height / 2 + 14.dp).toPx() }).roundToInt()) }.padding(horizontal = 32.dp),
             )
         }
     }

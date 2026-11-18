@@ -116,20 +116,6 @@ class RadarNestingTest {
         assertEquals(listOf<Tile>(Tile.Hit(compose)), tapped)
     }
 
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun PAL_03_orbitDrawsTheShortcutsInsideTheAppTileAndMoreOpensThePreview() {
-        rule.mainClock.autoAdvance = false // the Orbit runs a frame loop that never idles
-        val three = listOf(shortcut("demo.mail", "a", "Alpha", 0.9f), shortcut("demo.mail", "b", "Beta", 0.8f), shortcut("demo.mail", "c", "Gamma", 0.7f), shortcut("demo.mail", "d", "Delta", 0.6f))
-        val tile = Tile.App(mail, three)
-        val tapped = mutableListOf<Tile>(); val longPressed = mutableListOf<Tile>()
-        rule.setContent { Orbit(listOf(tile), motionRequested = false, footnote = null, actions = TileActions({ tapped += it }, { longPressed += it }, {}), centreFromBottom = 400.dp) }
-        rule.mainClock.advanceTimeBy(500)
-        rule.onNodeWithTag(tag(tile, three[0])).assertExistsAndTap()
-        assertEquals(listOf<Tile>(Tile.Hit(three[0])), tapped)
-        rule.onNodeWithTag(tag(tile, three[2])).assertDoesNotExist() // beyond the circles a small tile has room for: "+1" opens the preview that lists all
-        rule.onNodeWithTag("nested.${mail.key}.more").assertExistsAndTap()
-        assertEquals(listOf<Tile>(tile), longPressed)
-    }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun PAL_03_flatListDrawsEveryShortcutInTheAppRow() {

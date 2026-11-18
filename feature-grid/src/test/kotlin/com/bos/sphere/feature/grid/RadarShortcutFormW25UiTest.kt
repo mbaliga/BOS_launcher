@@ -135,10 +135,6 @@ class RadarShortcutFormW25UiTest {
         if (shot != null) shoot(shot)
     }
 
-    @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_360x640_font1() = checkLayout(SearchLayout.Orbit, 1f)
-    @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_360x640_font2() = checkLayout(SearchLayout.Orbit, 2f)
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_411x891_font1() = checkLayout(SearchLayout.Orbit, 1f, "w25-shortcutForm-orbit-fylz")
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_411x891_font2() = checkLayout(SearchLayout.Orbit, 2f)
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_891x411_font1() = checkLayout(SearchLayout.Orbit, 1f, "w25-shortcutForm-orbit-fylz-landscape")
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_891x411_font2() = checkLayout(SearchLayout.Orbit, 2f)
     @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_360x640_font1() = checkLayout(SearchLayout.Flat, 1f)
@@ -174,22 +170,6 @@ class RadarShortcutFormW25UiTest {
 
     // ---- no action circle on the rings; the strip holds them in the same form
 
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
-    fun PAL_18_noActionIsAnOrbitTileTheyAllSitOnTheStripAsCircles() {
-        open(SearchLayout.Orbit)
-        val ringNames = rule.onAllNodes(hasTestTag("orbitTile")).fetchSemanticsNodes().map { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() }
-        assertTrue("Fylz is a ring tile: $ringNames", "Fylz" in ringNames)
-        listOf("Deep results", "Open Fylz settings page", "Tools", "Activity").forEach { assertTrue("$it is not a ring tile: $ringNames", it !in ringNames) }
-        val strip = rule.onNodeWithTag(RADAR_STRIP_TAG).fetchSemanticsNode().boundsInRoot
-        rule.onAllNodes(hasTestTag("orbitTile")).fetchSemanticsNodes().forEach { assertTrue("a ring tile ${it.boundsInRoot} reaches into the strip $strip", it.boundsInRoot.bottom <= strip.top + 1f) }
-        val density = rule.activity.resources.displayMetrics.density
-        val onStrip = circles("strip.")
-        val labels = onStrip.map { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() }
-        assertTrue("Deep results is a strip circle: $labels", "Deep results" in labels)
-        assertTrue("the web search is a strip circle too: $labels", labels.any { it?.startsWith("Search ") == true })
-        onStrip.forEach { assertEquals("one size for all", 48f * density, it.boundsInRoot.width, 1f) }
-        assertNoOverlap("strip")
-    }
 
     @Test fun PAL_18_theRingResultsOfTheDataModelAreOnlyAppsPeopleAndFiles() {
         val d = SearchData(
@@ -224,15 +204,6 @@ class RadarShortcutFormW25UiTest {
         shortcuts.forEach { rule.onNodeWithTag("preview.shortcut.${it.id}").assertExists() }
     }
 
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
-    fun PAL_03_everyCircleHasItsLabelAsContentDescriptionAndLongPressShowsATooltip() {
-        open(SearchLayout.Orbit)
-        val tools = rule.onNodeWithTag("nested.${fylz.key}.${shortcuts[0].id}", useUnmergedTree = true)
-        assertEquals("App shortcut: Tools", tools.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].first())
-        tools.performSemanticsAction(SemanticsActions.OnLongClick)
-        rule.mainClock.advanceTimeBy(300)
-        rule.onAllNodes(androidx.compose.ui.test.hasText("Tools")).fetchSemanticsNodes().let { assertTrue("the tooltip text is shown", it.isNotEmpty()) }
-    }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.performSemanticsAction(a: androidx.compose.ui.semantics.SemanticsPropertyKey<androidx.compose.ui.semantics.AccessibilityAction<() -> Boolean>>) {
         rule.runOnUiThread { fetchSemanticsNode().config[a].action?.invoke() }

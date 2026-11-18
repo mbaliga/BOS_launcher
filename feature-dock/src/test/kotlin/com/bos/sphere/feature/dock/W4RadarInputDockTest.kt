@@ -196,15 +196,17 @@ class W4RadarInputDockTest {
         rule.onNodeWithText("3").assertExists()
     }
 
-    @Test fun INP_07_theWorkspaceChipSwitchesWorkspaceBySwipeAndOpensThePanelOnTap() {
-        val steps = mutableListOf<Int>(); var panels = 0
-        rule.setContent { Rail(content("Alpha"), DockActions(onSwitchWorkspace = { steps += it }, onOpenPanel = { panels++ }), null) }
+    @Test fun INP_07_theWorkspaceChipSwitchesWorkspaceBySwipeAndGoesHomeOnTap() {
+        // W26: a tap on the Home glyph goes home and never opens the panel (it was: the tap opened the panel).
+        val steps = mutableListOf<Int>(); var panels = 0; var homes = 0
+        rule.setContent { Rail(content("Alpha"), DockActions(onSwitchWorkspace = { steps += it }, onOpenPanel = { panels++ }, onGoHome = { homes++ }), null) }
         rule.waitForIdle()
         rule.onNodeWithContentDescription("Workspace Home").performTouchInput { swipeLeft() }
         rule.onNodeWithContentDescription("Workspace Home").performTouchInput { swipeRight() }
         rule.onNodeWithContentDescription("Workspace Home").performClick()
         assertEquals(listOf(1, -1), steps)
-        assertEquals(1, panels)
+        assertEquals(0, panels)
+        assertEquals(1, homes)
     }
 
     @Test fun INP_07_theCollapsedBandExpandsOnTapSoFocusDockHasATouchPath() {

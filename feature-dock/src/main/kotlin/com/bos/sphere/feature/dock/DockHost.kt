@@ -126,6 +126,8 @@ fun DockHost(
     refreshKey: Int,
     onLaunchApp: (AppEntry) -> Unit,
     onOpenPanel: () -> Unit,
+    /** W26: a tap on the Home glyph. */
+    onGoHome: () -> Unit = {},
     modifier: (DockEdge) -> Modifier,
     displayId: Int = 0,
     inputIsKeyboard: Boolean = false,
@@ -203,6 +205,9 @@ fun DockHost(
             else -> onLaunchOther(item.ref)
         }
     }
+    // W26: nothing pinned and nothing recent: no rail at all (not even the Home glyph), and the phone home's stack plan leaves the room out.
+    if (!forceEnabled) androidx.compose.runtime.SideEffect { DockPresence.hasItems = content.hasItems }
+    if (!DockVisibility.shown(true, content.hasItems)) return
     controller.launchNth = { n -> content.numbered.getOrNull(n)?.let { launchItem(it); true } ?: false }
     DisposableEffect(controller) { controller.railShown = true; onDispose { controller.railShown = false; controller.releaseRail() } }
     // A "focus dock" that arrived while an overlay hid the rail is honoured once the rail is back (INP-05); the counter is relative to this entry.
@@ -214,7 +219,7 @@ fun DockHost(
     var replacing by remember { mutableStateOf<DockItem?>(null) }
     var adding by remember { mutableStateOf(false) }
     val edgeNow = edgeOverride ?: state.dock.edgeFor(landscape)
-    val actions = remember(content, state.active.dockPins, landscape, edgeOverride, forceEnabled, alwaysShown) {
+    val actions = remember(content, state.active.dockPins, landscape, edgeOverride, forceEnabled, alwaysShown, onGoHome) {
         DockActions(
             onLaunch = { item, _ -> launchItem(item) },
             onReorder = { from, to -> instance.reorder(from, to) },
@@ -222,6 +227,7 @@ fun DockHost(
             onPin = { instance.pin(it.ref) },
             onEnableUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(usage.settingsIntent()) } } },
             onOpenPanel = onOpenPanel,
+            onGoHome = onGoHome,
             onSwitchWorkspace = { d -> if (d > 0) manager.next() else manager.previous() },
             onToggleExpanded = { expanded = !expanded; instance.expanded = expanded },
             onLeave = { expanded = false; instance.expanded = false },

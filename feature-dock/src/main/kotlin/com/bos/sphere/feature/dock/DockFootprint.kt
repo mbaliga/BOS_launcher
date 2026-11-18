@@ -42,8 +42,26 @@ object DockFootprint {
  * shelf) rides on the rail's top. The app area gives up whatever the rail's top reaches beyond the frame band.
  */
 object HomeBottomStack {
-    /** Air between the lower stack and the rail, and between the rail and what sits above it. */
-    const val GAP_DP = 4f
+    /**
+     * Air between the lower stack (clock, page dots, Glance indicator) and the rail, and between the rail and what sits above it.
+     * W26 rule: the dock sits ABOVE the position indicator with at least this much clear space.
+     */
+    const val GAP_DP = 8f
+    /** W26: how far up from the (inset) bottom edge the page-dot row reaches when no bottom clock shares the band (26 dp padding, a row of at most 20 dp). */
+    const val PAGE_DOTS_TOP_DP = 46f
+    /** W26: how far up the Glance indicator reaches (4 dp padding and its 48 dp buttons). */
+    const val GLANCE_INDICATOR_TOP_DP = 52f
+
+    /**
+     * W26: the height of everything the home draws at the bottom edge that a bottom rail must clear.
+     * [stackDp] is the clock-and-dots height the clock fit reports (the dots assumed on the band's bottom edge);
+     * the Glance indicator and the page dots (which sit higher when no bottom clock is there) are added on top of it as maxima, never summed.
+     */
+    fun lowerStackDp(stackDp: Float, glance: Boolean, glanceIndicator: Boolean, pageDotsAtBottom: Boolean, clockAtBottom: Boolean): Float = when {
+        glance -> if (glanceIndicator) GLANCE_INDICATOR_TOP_DP else 0f
+        pageDotsAtBottom && !clockAtBottom -> maxOf(stackDp, PAGE_DOTS_TOP_DP)
+        else -> stackDp
+    }
     /** Where the media strip sits with no rail (it clears the clock and dots in the band). */
     const val MEDIA_DEFAULT_DP = 66f
     const val SHELF_OFF_DP = 8f

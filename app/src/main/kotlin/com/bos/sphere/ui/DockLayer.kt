@@ -125,6 +125,8 @@ fun BoxScope.DockLayer(
     bottomPlan: com.bos.sphere.feature.dock.HomeBottomStack.Plan? = null,
     /** W20 (HOM-23): Glance with Right side = Dock rail shows the rail even while the dock setting is off (the dot says "Show the dock"). */
     alwaysShown: Boolean = false,
+    /** W26: a tap on the dock's Home glyph (the first page; never the dock panel). */
+    onGoHome: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val stores = remember { LauncherStores.get(context) }
@@ -186,7 +188,7 @@ fun BoxScope.DockLayer(
         alwaysShown = alwaysShown,
         unavailableApps = unavailableApps,
         apps = apps, launcher = launcher, controller = controller, refreshKey = homeSignal,
-        onLaunchApp = onLaunch, onOpenPanel = { panelOpen = true }, inputIsKeyboard = keyboardMode,
+        onLaunchApp = onLaunch, onOpenPanel = { panelOpen = true }, onGoHome = onGoHome, inputIsKeyboard = keyboardMode,
         onRunGroup = { g -> scope.launch { launcher.runGroup(g) } },
         labelOfOther = { ref ->
             if (ref.kind == ItemKind.Shortcut && ref.id == DESKTOP_PIN_ID) L10n.tr("Desktop")

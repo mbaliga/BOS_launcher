@@ -114,6 +114,19 @@ internal object AppSmokeHarness {
         }
     }
 
+    /**
+     * Wave 26: what the system does after an uninstall is confirmed: the package leaves the launcher-apps inventory and the `onPackageRemoved`
+     * callback fires (the fake callback of the brief: Robolectric's shadow posts it to the callback the repository registered).
+     */
+    fun removeApp(label: String) {
+        val pkg = packageOf(label)
+        val shadow = Shadows.shadowOf(app.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps)
+        val f = Class.forName("org.robolectric.shadows.ShadowLauncherApps").getDeclaredField("activityList").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST") val list = f.get(null) as com.google.common.collect.Multimap<UserHandle, LauncherActivityInfo>
+        list.values().removeAll { it.applicationInfo.packageName == pkg }
+        shadow.notifyPackageRemoved(pkg)
+    }
+
     /** Past onboarding, with the given preference edits; the stores are the ones the activity will read. */
     fun configure(edit: (com.bos.sphere.core.data.LauncherPrefs) -> com.bos.sphere.core.data.LauncherPrefs = { it }) {
         // Wave 16 (HOM-23): the default landing is now Glance; the existing smoke tests exercise the Selected apps home, so they start on it

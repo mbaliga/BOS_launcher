@@ -11,6 +11,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -135,8 +138,11 @@ private fun PanelTab(text: String, selected: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Text(
         text, color = if (selected) HyleColors.InkBright else HyleColors.Ink, fontSize = 13.sp,
-        modifier = Modifier.background(if (selected) HyleColors.Violet.copy(alpha = 0.3f) else Color(0x12FFFFFF), shape)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
+        // Wave 26 (audit): a 48 dp touch row, a radio role and the selected state (it was a bare clickable text, 31 dp high, announced as nothing).
+        modifier = Modifier.heightIn(min = 48.dp)
+            .selectable(selected = selected, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = onClick)
+            .wrapContentHeight(androidx.compose.ui.Alignment.CenterVertically)
+            .background(if (selected) HyleColors.Violet.copy(alpha = 0.3f) else Color(0x12FFFFFF), shape).padding(horizontal = 14.dp, vertical = 8.dp),
     )
 }
 
@@ -188,7 +194,7 @@ private fun FilesPanel(prefs: HomePanelPrefs) {
             }
         }
         item {
-            Text(L10n.tr("Choose a folder"), color = HyleColors.Violet, fontSize = 13.sp, modifier = Modifier.clickable { pick.launch(null) }.padding(vertical = 8.dp))
+            Text(L10n.tr("Choose a folder"), color = HyleColors.Violet, fontSize = 13.sp, modifier = Modifier.heightIn(min = 48.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { pick.launch(null) }.wrapContentHeight(androidx.compose.ui.Alignment.CenterVertically))
             Text(L10n.tr("Recent files"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
         }
         items(FilesView.filter(files, only)) { f ->

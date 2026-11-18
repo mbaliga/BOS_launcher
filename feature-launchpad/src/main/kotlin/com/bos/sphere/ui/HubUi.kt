@@ -90,7 +90,7 @@ fun HubSwitcher(state: HubState, modifier: Modifier = Modifier) {
 @Composable
 private fun HubChip(text: String, selected: Boolean, tag: String, onClick: () -> Unit) {
     val lp = LocalLp.current
-    Box(Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).semantics { role = Role.Button; this.selected = selected }.testTag(tag), Alignment.Center) {
+    Box(Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp).clickable(onClick = onClick).semantics { role = Role.Button; this.selected = selected }.testTag(tag), Alignment.Center) { // wave 26: 48 dp both ways, so a short label ("Day") has no narrow, shared hit area
         Text(
             text, color = if (selected) Color.White else lp.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(if (selected) BlueDark else lp.ink.copy(alpha = 0.07f)).padding(horizontal = 10.dp, vertical = 4.dp).widthIn(max = 180.dp),

@@ -487,7 +487,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             // Wave 24: the same route as Ctrl+H, so what hides the rail closes first (the drawer, Radar...) and, with no rail to come, a toast says why.
             com.bos.sphere.core.data.RightSide.DockRail -> { focusDockFromHome(com.bos.sphere.core.input.LauncherCommand.FocusDock); true }
             com.bos.sphere.core.data.RightSide.Off -> {
-                android.widget.Toast.makeText(context, L10n.tr("The right side is off. Turn it on in Ground Control, Home, Right side."), android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(context, L10n.tr("The right side is off. Turn it on in Ground Control, Home screen, Right side."), android.widget.Toast.LENGTH_SHORT).show()
                 false
             }
         }

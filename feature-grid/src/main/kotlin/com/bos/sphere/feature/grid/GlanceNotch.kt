@@ -25,8 +25,6 @@ object GlanceNotch {
     const val ICON_DP = 22f
     /** The icon centre sits this far below the top of the controls row (cutout bottom). */
     const val ICON_TOP_DP = 13f
-    /** Gap between the notch bottom and the title line's slot (the line has its own 8 dp padding: about 11 dp to the text). */
-    const val LINE_GAP_DP = 3f
     /** W25: the title is pushed down by exactly the notch body while the controls are in, so it never touches the notch. */
     const val TITLE_PUSH_DP = BODY_HEIGHT_DP
     /** The title line's gap under the status area when the controls are away. */

@@ -98,9 +98,6 @@ private val WheelRow = 34.dp
 /** The wheel at its roomiest: five rows. */
 internal val WheelHeight = WheelRow * 5
 
-/** How far above and below the middle of the wheel its labels are still bright enough to be in the way of a tile. */
-internal val WheelRowHalfVisible = WheelRow * 1.6f
-
 /**
  * Wave 22: the wheel sized to the room it really has. [rows] is odd (the selected label sits in the middle row) and [row] grows with the
  * font scale so two labels never overlap; [height] is the wheel's own box, which is the only place a label is drawn.
@@ -199,9 +196,13 @@ internal fun CategoryWheel(
                         onTouchNow(); if (cat != selected) { onTickNow(); onSelectNow(cat) }
                     },
             ) {
+                // Wave 26 (audit): a big font scale made the longest label wider than its half of the screen and cut it (EVERYTHIN); the label shrinks in steps until it fits.
+                var shrink by remember(cat) { mutableStateOf(1f) }
                 Text(
-                    (cat?.label ?: L10n.tr("Everything")).uppercase(), color = Color.White, fontSize = 16.sp, letterSpacing = 0.8.sp,
-                    fontWeight = if (cat == selected) FontWeight.Medium else FontWeight.Normal, maxLines = 1,
+                    (cat?.label ?: L10n.tr("Everything")).uppercase(), color = Color.White, fontSize = (16f * shrink).sp, letterSpacing = 0.8.sp,
+                    fontWeight = if (cat == selected) FontWeight.Medium else FontWeight.Normal, maxLines = 1, softWrap = false,
+                    onTextLayout = { if (it.didOverflowWidth && shrink > 0.45f) shrink *= 0.92f },
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (n > 0 && cat != selected) {
                     Text(

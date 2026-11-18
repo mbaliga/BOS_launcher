@@ -119,6 +119,8 @@ class SettingsModel(
     /** Wave 26: "Add page" (wave 28: Paginated only, never asks anything) and "Edit home" (turns Pages on first when it is Off). */
     val addHomePage: () -> Unit = {},
     val editHomePages: () -> Unit = {},
+    /** Wave 29: bring Comms up (on a hub view and/or with the Groups and rules manager open), closing settings; the app wires it to the Comms surface. */
+    val openComms: (com.bos.sphere.ui.HubView?, Boolean) -> Unit = { v, g -> com.bos.sphere.ui.LaunchpadHubNav.openComms(v, g) },
 )
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
@@ -536,7 +538,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     },
                 ) { v -> upd { it.copy(launchpadTheme = v) } },
             )
-            // Wave 28: the size of the Comms content, 75 to 125 percent in 5s (also an Options row of the Comms menu and the pinch on the list).
+            // Wave 28: the size of the Comms content, 75 to 125 percent in 5s (wave 29: the only place with the stepper, the Comms menu has no Options; the pinch on the list changes it too).
             add(
                 SettingItem.Stepper(
                     x("Comms size"), Glyphs.Pinch, com.bos.sphere.core.data.CommsScaleSettings.percent.value,
@@ -545,6 +547,16 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     step = com.bos.sphere.core.data.CommsScale.STEP, valueText = "${com.bos.sphere.core.data.CommsScaleSettings.percent.value}%",
                 ) { v -> com.bos.sphere.core.data.CommsScaleSettings.set(v) },
             )
+            // Wave 29: the options that used to be in the Comms menu panel. The same stores as before (CommsOptions), read live by the hub when Comms opens.
+            val comms = com.bos.sphere.ui.CommsOptions
+            add(
+                SettingItem.Choice(
+                    x("Default view"), Glyphs.Bell, com.bos.sphere.ui.HubView.entries, comms.defaultView.value, { x(it.label) },
+                    hint = x("What Comms shows first when it opens."),
+                ) { v -> comms.setDefaultView(v) },
+            )
+            add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })
+            add(SettingItem.Action(x("Groups and rules"), Glyphs.Message, x("Open"), navigates = true) { m.openComms(null, true) })
             add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })
             add(
                 SettingItem.Pane(x("Comms gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {
@@ -562,6 +574,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             add(SettingItem.Pane(x("Grouping & rules"), Glyphs.Message, x("Per app, sender, conversation")) { com.bos.sphere.ui.LaunchpadRulesPane() })
             add(SettingItem.Pane(x("Access Liftoff asks for"), Glyphs.Gear, x("Turn on or review what Liftoff may read")) { com.bos.sphere.ui.AccessPane() })
+            add(SettingItem.Action(x("Mark all as read"), Glyphs.Bell, confirm = "Mark every notification, in the list and in the history, as read?", confirmLabel = "Mark all as read") { comms.markAllRead() })
+            add(SettingItem.Action(x("Clear all notifications"), Glyphs.Close, confirm = "Clear all notifications from the list? The history stays.", confirmLabel = "Clear all") { comms.clearAll() })
+            add(SettingItem.Action(x("Delete history"), Glyphs.Close, confirm = "Delete all notification history? Notifications in the shade stay.", confirmLabel = "Delete history") { comms.deleteHistory() })
         },
     )
 

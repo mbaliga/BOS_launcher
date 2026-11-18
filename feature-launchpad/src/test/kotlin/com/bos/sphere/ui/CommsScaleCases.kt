@@ -81,38 +81,6 @@ abstract class CommsScaleCases(orientation: String) : CommsLayoutCases(orientati
         for (p in listOf(75, 100, 125)) assertEquals("minimum touch target at $p percent", 48f * dpx(), seen[p]!!, 1f)
     }
 
-    @Test fun CMS_13_theMenuStepperTargetsAreAtLeast48dpAt75PercentAndStepTheSetting() {
-        render()
-        CommsScaleSettings.set(75); rule.waitForIdle()
-        openMenu()
-        rule.onNodeWithTag("lp.menu.list").performScrollToNode(hasTestTag("lp.menu.scale")); rule.waitForIdle()
-        val min = 48f * dpx() - 1f
-        for (t in listOf("lp.menu.scale.down", "lp.menu.scale.up")) { val b = boundsPx(t); assertTrue("$t is ${b.width}x${b.height} px", b.width >= min && b.height >= min) }
-        rule.onNodeWithTag("lp.menu.scale.down").assertIsNotEnabled()
-        rule.onNodeWithTag("lp.menu.scale.up").performClick(); rule.waitForIdle()
-        assertEquals(80, CommsScaleSettings.percent.value)
-        rule.onNodeWithTag("lp.menu.scale.down").performClick(); rule.waitForIdle()
-        assertEquals(75, CommsScaleSettings.percent.value)
-    }
-
-    @Test fun CMS_14_theStepperIsAProgressRangeForTalkBackAndTakesLeftAndRightKeys() {
-        render()
-        openMenu()
-        rule.onNodeWithTag("lp.menu.list").performScrollToNode(hasTestTag("lp.menu.scale")); rule.waitForIdle()
-        val info = rule.onNodeWithTag("lp.menu.scale").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ProgressBarRangeInfo)!!
-        assertEquals(100f, info.current, 0f); assertEquals(75f..125f, info.range)
-        rule.onNodeWithTag("lp.menu.scale").performSemanticsAction(SemanticsActions.SetProgress) { it(115f) }; rule.waitForIdle()
-        assertEquals(115, CommsScaleSettings.percent.value)
-        rule.onNodeWithTag("lp.menu.scale").performSemanticsAction(SemanticsActions.SetProgress) { it(500f) }; rule.waitForIdle()
-        assertEquals("clamped", 125, CommsScaleSettings.percent.value)
-        rule.onNodeWithTag("lp.menu.scale").requestFocus()
-        rule.onNodeWithTag("lp.menu.scale").performKeyInput { pressKey(Key.DirectionLeft) }; rule.waitForIdle()
-        assertEquals(120, CommsScaleSettings.percent.value)
-        rule.onNodeWithTag("lp.menu.scale").performKeyInput { pressKey(Key.DirectionRight) }; rule.waitForIdle()
-        assertEquals(125, CommsScaleSettings.percent.value)
-        assertEquals("125 percent", rule.onNodeWithTag("lp.menu.scale").fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
-    }
-
     @Test fun CMS_15_theContentStaysLeftOfTheHomeCardAndLongTitlesEllipsizeAtEverySize() {
         val long = feed(4).map { if (it.key == "k0") it.copy(title = "A very long headline that has to be cut at the right margin " + "xyz ".repeat(20), summary = "") else it }
         render(long)

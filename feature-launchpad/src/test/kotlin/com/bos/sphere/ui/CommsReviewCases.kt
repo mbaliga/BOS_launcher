@@ -39,14 +39,6 @@ class CommsReviewTest : CommsLayoutCases("portrait") {
         shoot("comms-portrait-font2-scale125")
     }
 
-    @Test fun REV_02_inRtlTheLeftKeyMakesTheSizeBiggerBecauseThePlusKeyIsOnTheLeft() {
-        render(rtl = true); openMenu()
-        rule.onNodeWithTag("lp.menu.list").performScrollToNode(hasTestTag("lp.menu.scale")); rule.waitForIdle()
-        rule.onNodeWithTag("lp.menu.scale").requestFocus()
-        rule.onNodeWithTag("lp.menu.scale").performKeyInput { pressKey(Key.DirectionLeft) }; rule.waitForIdle()
-        assertEquals(105, CommsScaleSettings.percent.value)
-    }
-
     @Test fun REV_03_aSizeChosenBeforeTheFileIsOpenedIsKeptAndWritten() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         ctx.getSharedPreferences(CommsScaleSettings.FILE, 0).edit().clear().commit()

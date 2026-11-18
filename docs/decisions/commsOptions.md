@@ -1,0 +1,12 @@
+# Comms options in Ground Control (wave 29)
+
+Owner: "Move the comms options into liftoff settings."
+
+- The Comms menu panel is the owner's mock-up again: GROUP BY grid and SHOW list, nothing below. The Options section (Comms size stepper, default view, Read history, mark visible as read, delete history with its inline confirmation, Groups and rules, Clear all) is gone, with `MenuActions` parameters it needed (hub, canClear, onClearAll, onGroups, onMarkRead, onScale) and the menu's own `CommsScaleStepper` (one stepper, in Ground Control).
+- Ground Control, category Comms, now holds: Comms size (the existing stepper row), Default view (All, Unread, Read, Files, Timeline), Read history (opens Comms on the Read view), Groups and rules (opens Comms with the manager open), and three action rows with a confirmation sheet each: Mark all as read (every live notification and every history entry), Clear all notifications (the live list only, what the menu's Clear all did), Delete history (the stored history; the shade stays).
+- There is no "keep read history" switch in the product (history is always kept, only Delete history clears it), so the equivalent is the Read history row.
+- One source of truth, no new keys: `launchpad_hub` (default view), `comms_scale`, the history store, the notification feed. `CommsOptions` (feature-launchpad) is the thin set of operations over them and mirrors the default view into a flow so the row shows the live value; the hub reads the pref when Comms opens.
+- Opening Comms from settings: `LaunchpadHubNav.openComms(view, groupsManager)` sets the pending view or manager request and raises `openSignal`; `HomeScreen` closes settings and opens the Comms surface (left page or standalone hub); the hub selects the view and the Groups overlay opens from `LaunchpadHubNav.groups`.
+- Destructive rows: `SettingItem.Action` got `confirm` and `confirmLabel`; Ground Control shows its glass sheet (Cancel / confirm) for touch, keyboard and controller activation alike.
+- Settings search finds each row because the index is built from the live rows. The old "Options row" mentions (pinch hint) are unchanged in meaning: the pinch still sets the size, now documented as living in Ground Control only.
+- `ChoiceSettingRow` only uses the one-slab segment control when the labels total at most 24 characters; five long labels (the default view) step with the arrows instead of being cut.

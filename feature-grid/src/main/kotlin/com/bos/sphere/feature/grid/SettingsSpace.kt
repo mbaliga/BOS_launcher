@@ -81,6 +81,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
@@ -150,7 +151,9 @@ sealed interface SettingItem {
     }
 
     /** Runs on tap (opens a dialog, adds a page …). */
-    data class Action(override val title: String, override val glyph: ImageVector, override val value: String = "", val navigates: Boolean = false, val onClick: () -> Unit) : SettingItem
+    data class Action(override val title: String, override val glyph: ImageVector, override val value: String = "", val navigates: Boolean = false,
+        /** Wave 29: a destructive action asks first: this text in a confirmation sheet whose confirm button is [confirmLabel]. */
+        val confirm: String? = null, val confirmLabel: String = "Confirm", val onClick: () -> Unit) : SettingItem
 
     /** Opens a full-screen page with its own controls; the row shows the current value and a chevron. */
     class Pane(
@@ -221,6 +224,7 @@ private fun SettingsSpaceContent(
 ) {
     val haptics = rememberLauncherHaptics()
     var cat by remember { mutableIntStateOf(initialCategory.coerceIn(0, (categories.size - 1).coerceAtLeast(0))) }
+    var confirming by remember { mutableStateOf<SettingItem.Action?>(null) } // wave 29: the destructive action waiting for its confirmation
     var paneOpen by remember { mutableIntStateOf(-1) } // index (in the displayed list) of the item whose page is open
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -290,7 +294,7 @@ private fun SettingsSpaceContent(
             is GEffect.Adjust -> list.getOrNull(e.item)?.item?.let { if (GroundControlNav.adjust(it, e.delta)) { sounds?.play(UiSound.Tick); tick() } else sounds?.play(UiSound.Nope) }
             is GEffect.Activate -> list.getOrNull(e.item)?.item?.let { item ->
                 when (item) {
-                    is SettingItem.Action -> { sounds?.play(UiSound.Select); item.onClick() }
+                    is SettingItem.Action -> { sounds?.play(UiSound.Select); if (item.confirm != null) confirming = item else item.onClick() }
                     else -> if (item.detail() != null) openDetail(e.item)
                 }
             }
@@ -425,7 +429,7 @@ private fun SettingsSpaceContent(
                                     @Suppress("UNCHECKED_CAST")
                                     ChoiceSettingRow(it as SettingItem.Choice<Any?>, { sounds?.play(UiSound.Tick); tick() }, { openDetail(i) })
                                 }
-                                is SettingItem.Action -> NavigationSettingRow(it, chevron = it.navigates, highlighted = false, onClick = { sounds?.play(UiSound.Select); it.onClick() })
+                                is SettingItem.Action -> NavigationSettingRow(it, chevron = it.navigates, highlighted = false, onClick = { sounds?.play(UiSound.Select); if (it.confirm != null) confirming = it else it.onClick() })
                                 is SettingItem.Pane -> NavigationSettingRow(it, chevron = true, highlighted = i == paneOpen, onClick = { openDetail(i) })
                             }
                         }
@@ -440,6 +444,17 @@ private fun SettingsSpaceContent(
                         modifier = Modifier.padding(start = 22.dp, top = 24.dp),
                     )
                 }
+            }
+        }
+
+        confirming?.let { a ->
+            GlassDialog(title = com.bos.sphere.core.design.L10n.tr(a.title), onDismiss = { confirming = null }, footer = {
+                Row(Modifier.padding(16.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                    TextButtonPill(com.bos.sphere.core.design.L10n.tr("Cancel"), onClick = { confirming = null })
+                    TextButtonPill(com.bos.sphere.core.design.L10n.tr(a.confirmLabel), primary = true, onClick = { confirming = null; a.onClick() })
+                }
+            }) {
+                Text(com.bos.sphere.core.design.L10n.tr(a.confirm ?: ""), color = HyleColors.Ink, fontSize = 16.sp, modifier = Modifier.padding(22.dp).testTag("gc.confirm.text"))
             }
         }
 

@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.GroupMode
@@ -304,16 +305,20 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         assertEquals("the app filter follows into history views", "com.whatsapp", hub.filters(HubView.Unread).app)
     }
 
-    @Test fun STR_01_w27_optionsMovedIntoThePanelAndTheThreeDotsButtonIsGone() {
+    // Wave 29: replaces STR_01_w27_optionsMovedIntoThePanel...: the Options moved to Ground Control, the menu is GROUP BY and SHOW only.
+    @Test fun STR_01_w29_menuHasNoOptionsSectionAndNoOptionRowsAtAnyScale() {
         render(feed(4))
         assertEquals("no ... button on the tab row", 0, rule.onAllNodesWithTag("hub.options").fetchSemanticsNodes().size)
         openMenu()
-        for (t in listOf("lp.menu.opt.default", "lp.menu.opt.read", "lp.menu.opt.markRead", "lp.menu.opt.delete")) {
-            if (rule.onAllNodesWithTag(t).fetchSemanticsNodes().isEmpty()) rule.onNodeWithTag("lp.menu.list").performScrollToNode(androidx.compose.ui.test.hasTestTag(t))
-            rule.onNodeWithTag(t).assertExists()
+        rule.onNodeWithTag("lp.menu.label.groupBy", useUnmergedTree = true).assertExists()
+        for (pct in listOf(75, 100, 125)) {
+            com.bos.sphere.core.data.CommsScaleSettings.set(pct); rule.waitForIdle()
+            for (t in listOf("lp.menu.opt.default", "lp.menu.opt.read", "lp.menu.opt.markRead", "lp.menu.opt.delete", "lp.menu.opt.scale", "lp.menu.groups", "lp.menu.clear", "lp.menu.label.options")) {
+                runCatching { rule.onNodeWithTag("lp.menu.list").performScrollToIndex(4) }
+                assertEquals("$t is gone at $pct percent", 0, rule.onAllNodesWithTag(t, useUnmergedTree = true).fetchSemanticsNodes().size)
+            }
+            com.bos.sphere.core.data.CommsScaleSettings.set(com.bos.sphere.core.data.CommsScale.DEFAULT)
         }
-        rule.onNodeWithTag("lp.menu.opt.read").performClick(); rule.waitForIdle()
-        assertEquals("Read history is reachable from the menu", HubView.Read, hub.view)
     }
 
     private fun scrollMenuTo(tag: String) { rule.onNodeWithTag("lp.menu.list").performScrollToNode(androidx.compose.ui.test.hasTestTag(tag)); rule.waitForIdle() }
@@ -329,29 +334,6 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         assertEquals(HubGrouping.App, hub.grouping)
         assertFalse(menuRef!!.open)
         rule.onAllNodesWithTag("hub.header.a:com.whatsapp").fetchSemanticsNodes().let { assertTrue("app header for the app group", it.isEmpty() || it.size == 1) }
-    }
-
-    @Test fun STR_01_w27_markVisibleReadAndDeleteHistoryAreMenuRowsAndDeleteNeedsAConfirmation() {
-        render(feed(4))
-        rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
-        openMenu()
-        scrollMenuTo("lp.menu.opt.markRead"); rule.onNodeWithTag("lp.menu.opt.markRead").performClick(); rule.waitForIdle(); rule.mainClock.advanceTimeBy(1000); rule.waitForIdle()
-        assertTrue("marking read through the menu reads the visible history", hub.store!!.entries.value.all { it.read })
-        assertFalse(menuRef!!.open)
-        openMenu()
-        scrollMenuTo("lp.menu.opt.delete"); rule.onNodeWithTag("lp.menu.opt.delete").performClick(); rule.waitForIdle()
-        assertEquals("nothing deleted by the first tap", 4, hub.store!!.entries.value.size)
-        scrollMenuTo("hub.deleteConfirm"); rule.onNodeWithTag("hub.deleteConfirm").assertExists()
-        scrollMenuTo("lp.menu.opt.deleteCancel"); rule.onNodeWithTag("lp.menu.opt.deleteCancel").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("lp.menu.opt.delete").performClick(); rule.waitForIdle()
-        // The scrim's centre is under the panel; tap its far edge, the part of the list that still shows.
-        rule.onNodeWithTag("lp.menu.scrim").performTouchInput { click(androidx.compose.ui.geometry.Offset(width - 10f, height / 2f)) }; rule.waitForIdle(); rule.mainClock.advanceTimeBy(1000); rule.waitForIdle()
-        assertFalse(menuRef!!.open)
-        openMenu(); scrollMenuTo("lp.menu.opt.delete")
-        rule.onNodeWithTag("hub.deleteConfirm").assertDoesNotExist()
-        rule.onNodeWithTag("lp.menu.opt.delete").performClick(); rule.waitForIdle()
-        scrollMenuTo("lp.menu.opt.deleteYes"); rule.onNodeWithTag("lp.menu.opt.deleteYes").performClick(); rule.waitForIdle()
-        assertTrue(hub.store!!.entries.value.isEmpty())
     }
 
     @Test fun STR_01_w27_theListShiftsRightBehindThePanelAndTheHomeCardLeaves() {

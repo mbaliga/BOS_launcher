@@ -193,7 +193,7 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
         }
         return
     }
-    if (!dropdown && item.options.size >= 2 && item.options.all { item.label(it).length <= 11 }) {
+    if (!dropdown && item.options.size >= 2 && item.options.all { item.label(it).length <= 11 } && item.options.sumOf { item.label(it).length } <= 24) { // wave 29: five long labels do not fit one slab (Timeline was cut), they step with the arrows
         Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
             TactileLabel(item.title, Modifier.padding(start = LocalRailInset.current + 4.dp, bottom = 10.dp))
             SegmentSlab(item.options.map { item.label(it) }, index, { i -> if (i != index) { onTick(); item.onSelect(item.options[i]) } })

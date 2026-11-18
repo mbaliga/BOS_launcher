@@ -140,8 +140,8 @@ class LaunchpadGroupsEndToEndW24Test {
     private fun sectionOf(key: String) = column().firstOrNull { key in it.second }?.first
 
     private fun openGroups() {
-        rule.onNodeWithTag("lp.menu").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("lp.menu.groups").performClick(); rule.waitForIdle()
+        // Wave 29: the manager is opened from Ground Control's "Groups and rules" row, through the Comms nav request.
+        LaunchpadHubNav.openComms(groupsManager = true); rule.waitForIdle()
         rule.onNodeWithTag("lp.groups").assertExists()
     }
 

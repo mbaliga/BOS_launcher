@@ -23,7 +23,7 @@ class RadarSignalLabWiringTest {
     /** Wave 15: the Radar-only pane became the one Background pane (HOM-16), which Radar shares with the home. */
     @Test fun PAL_24_theBackgroundPaneReplacesTheRadarOnlyPaneAndHoldsTheLabSignalControls() {
         val cats = text("app/src/main/kotlin/com/bos/sphere/ui/SettingsCategories.kt")
-        assertTrue(cats.contains("BackgroundPane(p, m.updatePrefs)"))
+        assertTrue(cats.contains("BackgroundPane(p, WallpaperSurface.Glance, upd)") && cats.contains("BackgroundPane(p, WallpaperSurface.Pages, upd)"))
         assertTrue(!cats.contains("RadarBackgroundPane"))
         assertTrue(text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/BackgroundPane.kt").contains("Preview signal"))
     }

@@ -860,13 +860,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
     }
     @Composable
-    fun Background(baseFill: Boolean = true) {
-        // HOM-16 (wave 15): the two signal-driven slots; the same composable is behind every surface.
-        com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), baseFill = baseFill)
-        // NFR-15: keeps clock and labels at WCAG AA over whatever the background draws behind them.
-        com.bos.sphere.feature.grid.HomeScrim(
-            com.bos.sphere.feature.grid.rememberHomeScrim(com.bos.sphere.core.data.BackgroundChoice(prefs.backgroundSlot1, prefs.backgroundSlot2), prefs.radarIntensity, com.bos.sphere.feature.grid.isDarkSurface()),
-        )
+    fun Background(baseFill: Boolean = true, surface: com.bos.sphere.core.data.WallpaperSurface = com.bos.sphere.core.data.WallpaperSurface.Pages) {
+        // HOM-16 (wave 26): one seam per surface; solid, gradient or the two signal-driven slots, and the NFR-15 scrim over it.
+        com.bos.sphere.feature.grid.HomeSurfaceBackground(surface, prefs, Modifier.fillMaxSize(), baseFill = baseFill)
         IndicatorLayer(
             reading = reading,
             effects = prefs.indicatorEffects,
@@ -1079,7 +1075,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             gestures = homeGestureSpec,
                             onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true },
                             onOpenRight = { openRecents() },
-                            underlay = { Background(baseFill = false) },
+                            underlay = { Background(baseFill = false, surface = com.bos.sphere.core.data.WallpaperSurface.Glance) },
                         )
                     }
                 }
@@ -1621,7 +1617,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 // HOM-22: "Edit home pages" on another landing switches to Selected apps first, then enters edit mode.
                 onEdit = { quickOpen = false; editFocusAdd = false; if (landing != HomeLandingRules.editHomePagesLanding) stores.prefs.update { it.copy(homeLanding = HomeLandingRules.editHomePagesLanding) }; homeEdit.enter() },
                 onPanels = { quickOpen = false; panelsOpen = true },
-                onWallpaper = { quickOpen = false; openSettings(categories.indexOfFirst { it.title == L10n.tr("Look") }.coerceAtLeast(0)) },
+                onWallpaper = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) }, // HOM-16 (wave 26): the wallpaper rows are in Home screen
                 onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
                 onDismiss = { quickOpen = false },
                 onHomeItems = { quickOpen = false; homeItems.openSheet() },

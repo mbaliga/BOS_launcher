@@ -469,7 +469,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     fun openRecents(): Boolean {
         return when (prefs.rightSide) {
             com.bos.sphere.core.data.RightSide.RecentsPanel -> { leftOpen = false; rightOpen = true; true }
-            com.bos.sphere.core.data.RightSide.DockRail -> { dockController.handle(com.bos.sphere.core.input.LauncherCommand.FocusDock); true }
+            com.bos.sphere.core.data.RightSide.DockRail -> {
+                // Wave 24: the dock stays optional; with it off (and a landing that does not force the rail) say so instead of nothing.
+                val why = com.bos.sphere.ui.FocusDockRouting.noDock(
+                    landing, com.bos.sphere.core.data.ChromeSettings.of(prefs),
+                    com.bos.sphere.feature.dock.WorkspaceRepository.get(context).current.dock.isEnabled(com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs())),
+                )
+                if (why != null) android.widget.Toast.makeText(context, L10n.tr(why.message), android.widget.Toast.LENGTH_SHORT).show()
+                else dockController.handle(com.bos.sphere.core.input.LauncherCommand.FocusDock)
+                true
+            }
             com.bos.sphere.core.data.RightSide.Off -> {
                 android.widget.Toast.makeText(context, L10n.tr("The right side is off. Turn it on in Ground Control, Home, Right side."), android.widget.Toast.LENGTH_SHORT).show()
                 false
@@ -564,6 +573,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     c, overlayOpen = searchOpen || drawerOpen || wheelOpen || leftOpen || settingsOpen,
                     closeOverlays = { searchOpen = false; drawerOpen = false; wheelOpen = false; leftOpen = false; settingsOpen = false },
                     dock = dockController::handle,
+                    // Wave 24: with no rail to come (dock off, or a landing without one) the overlay stays and a toast says why.
+                    noDock = com.bos.sphere.ui.FocusDockRouting.noDock(
+                        landing, com.bos.sphere.core.data.ChromeSettings.of(prefs),
+                        com.bos.sphere.feature.dock.WorkspaceRepository.get(context).current.dock.isEnabled(com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs())),
+                    ),
+                    onNoDock = { why -> android.widget.Toast.makeText(context, L10n.tr(why.message), android.widget.Toast.LENGTH_SHORT).show() },
                 )
                 else -> dockController.handle(c)
             }

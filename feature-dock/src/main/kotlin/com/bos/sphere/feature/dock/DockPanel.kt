@@ -32,7 +32,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -285,6 +287,10 @@ fun Chips(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
 private fun Field(value: String, onChange: (String) -> Unit, hint: String, modifier: Modifier) {
     Box(modifier.clip(RoundedCornerShape(12.dp)).background(HyleColors.Hairline).padding(horizontal = 12.dp, vertical = 10.dp)) {
         if (value.isEmpty()) Text(hint, color = HyleColors.InkDim, fontSize = 14.sp)
-        BasicTextField(value, onChange, singleLine = true, textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 14.sp), cursorBrush = SolidColor(HyleColors.Violet), modifier = Modifier.fillMaxWidth())
+        // The caret starts after any text already there (the session dialog opens with the group's name), so a keyboard or controller
+        // user who focuses the field and types adds to the end instead of the start (INP-20, wave 24).
+        var edited by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+        val shown = if (edited.text == value) edited else TextFieldValue(value, TextRange(value.length))
+        BasicTextField(shown, { edited = it; if (it.text != value) onChange(it.text) }, singleLine = true, textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 14.sp), cursorBrush = SolidColor(HyleColors.Violet), modifier = Modifier.fillMaxWidth())
     }
 }

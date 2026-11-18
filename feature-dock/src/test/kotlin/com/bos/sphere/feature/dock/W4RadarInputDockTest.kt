@@ -236,9 +236,11 @@ class W4RadarInputDockTest {
     }
 
     /**
-     * The group editor, the session dialog and the panel hold text fields, whose blinking cursor keeps a headless Compose clock from ever
-     * idling, so they cannot be rendered here. Every dialog window of the module is instead audited in source: each `Dialog(` call is
-     * followed at once by the hook call, so a new dialog cannot ship without it.
+     * The group editor, the session dialog and the panel hold text fields; under the Compose test rule a text field inside a dialog window
+     * never lets the rule idle (wave 24 found the cause: the rule's Robolectric idling keeps forcing a layout of the dialog's root, and each
+     * measure republishes the field's layout result; it is not the cursor). They are rendered without the rule in the app module's
+     * `DockDialogsW24Test`. Every dialog window of the module is also audited in source: each `Dialog(` call is followed at once by the
+     * hook call, so a new dialog cannot ship without it.
      */
     @Test fun INP_20_everyDialogWindowInTheDockModuleStartsWithTheDialogHook() {
         val dir = java.io.File(System.getProperty("user.dir"), "src/main/kotlin/com/bos/sphere/feature/dock")

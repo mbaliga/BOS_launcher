@@ -60,6 +60,13 @@ internal sealed interface Tile {
     data class Setting(val entry: SettingEntry) : Tile { override val key get() = "set:${entry.id}" }
 }
 
+/** Wave 25: an action, a web hand-off or a setting: results that are not an app, a person or a file, so they sit on the strip, never on the rings. */
+internal fun isStripTile(t: Tile): Boolean = when (t) {
+    is Tile.Web, is Tile.Setting -> true
+    is Tile.Hit -> t.hit.category == SearchCategory.Actions || t.hit.category == SearchCategory.Web
+    is Tile.App, is Tile.Person, is Tile.Allow -> false
+}
+
 /** The key Radar learns selections under (PaletteHost.learn), so a tile finds its use in [SearchData.habit]. */
 internal fun Tile.habitKey(): String = when (this) {
     is Tile.App -> RadarHabits.appKey(app)
@@ -143,15 +150,22 @@ internal class SearchData(
         return out
     }
 
-    /** Wave 20: the typed Orbit's ring results: [tiles] without the web hand-off rows, which sit on the result strip instead. */
-    fun ringTiles(cat: SearchCategory?): List<Tile> = tiles(cat).filter { it !is Tile.Web }
+    /**
+     * Wave 25 (shortcutForm): the typed Orbit's ring results: [tiles] without what belongs on the strip ([isStripTile]), so the rings hold only apps, people and files.
+     */
+    fun ringTiles(cat: SearchCategory?): List<Tile> = tiles(cat).filter { !isStripTile(it) }
 
-    /** Wave 20: the web hand-off rows ("Search <engine> for ...", the page of a URL, the Play Store row) for the compact strip: the URL's own row, then the engine, then the app store. */
+    /**
+     * Wave 25: the typed Orbit's strip: the web hand-off rows ("Search <engine> for ...", the page of a URL, the Play Store row), then every action that is not tied
+     * to an app (an inline answer, a launcher command, a settings page, a shortcut whose app did not match). The web rows come first, the URL's own row before the
+     * engine, then the app store, because those are the taps people want.
+     */
     fun stripTiles(): List<Tile> {
         if (blank) return emptyList()
         val rows = tilesFor(SearchCategory.Web).filterIsInstance<Tile.Web>()
-        // The browser hand-off is the first pill (it is the tap people want, and the strip scrolls); the app store comes after it.
-        return rows.sortedBy { when (it.row) { is WebRow.Open -> 0; is WebRow.Search -> 1; is WebRow.PlayStore -> 2 } }
+        val web = rows.sortedBy { when (it.row) { is WebRow.Open -> 0; is WebRow.Search -> 1; is WebRow.PlayStore -> 2 } }
+        val webHits = tilesFor(SearchCategory.Web).filterIsInstance<Tile.Hit>()
+        return web + webHits + tilesFor(SearchCategory.Actions)
     }
 
     private fun tilesFor(cat: SearchCategory): List<Tile> = when (cat) {

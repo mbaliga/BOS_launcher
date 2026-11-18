@@ -140,7 +140,7 @@ class RadarAuditGlassW22UiTest {
         val sem = androidx.compose.ui.semantics.SemanticsProperties
         val rootBounds = rule.onRoot().fetchSemanticsNode().boundsInRoot
         val pills = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("a strip pill") { n ->
-            n.config.getOrNull(sem.Role) == androidx.compose.ui.semantics.Role.Button && n.config.getOrNull(sem.Text)?.joinToString { it.text }.orEmpty().contains("bra", ignoreCase = true) &&
+            n.config.getOrNull(sem.Role) == androidx.compose.ui.semantics.Role.Button && n.config.getOrNull(sem.ContentDescription)?.joinToString().orEmpty().contains("bra", ignoreCase = true) && // wave 25: a strip circle names itself by its description
                 n.boundsInRoot.top > rootBounds.height * 0.6f
         }).fetchSemanticsNodes()
         org.junit.Assert.assertTrue("a typed query has web hand-off pills", pills.isNotEmpty())

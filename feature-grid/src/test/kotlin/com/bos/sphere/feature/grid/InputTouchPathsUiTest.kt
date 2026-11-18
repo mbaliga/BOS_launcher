@@ -220,7 +220,7 @@ class InputTouchPathsUiTest {
         rule.setContent {
             Box(Modifier.fillMaxSize()) {
                 WheelDrawer(
-                    visible = true, anchor = Corner.BottomRight, apps = apps,
+                    visible = true, anchor = Corner.BottomRight, apps = apps, grouping = WheelGrouping.Letter, onGroupingChange = {}, recentKeys = emptyList(),
                     onLaunch = { launched += it.label }, onLongPressApp = {}, onSearch = { searched++ }, onDismiss = { dismissed++ }, modifier = Modifier.fillMaxSize(),
                 )
             }

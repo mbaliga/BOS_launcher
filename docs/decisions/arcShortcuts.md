@@ -1,5 +1,7 @@
 # App drawer: alphabet wheel, app fan and up to four shortcuts (wave 28)
 
+> Superseded in wave 29 by [drawerRevert.md](drawerRevert.md): the code described here is removed and the pre-wave-26 wheel disc is back.
+
 Source: the owner's screenshot of the expanded app drawer (bottom-left corner of a Glance home) and text: the drawer, when expanded, is a looped alphabet wheel; up to four shortcuts can be put in there, or none; the shortcuts are either always open (tapping the four squares opens the wheel) or open only with the wheel; with shortcuts off, the four squares just open the wheel. The apps are plain app icons, not circles (the grey discs in the screenshot are placeholders).
 
 ## Decisions

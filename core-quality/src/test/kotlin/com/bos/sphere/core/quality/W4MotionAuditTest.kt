@@ -37,7 +37,7 @@ class W4MotionAuditTest {
     @Test fun NFR_14_oneShotAnimationsAreGatedOrOnTheAuditedAllowList() {
         val allowed = mapOf(
             // press feedback and chip colour changes: under 200 ms, tied to a touch, no travel
-            "WheelDrawer.kt" to 1, "Complications.kt" to 4, "Tactile.kt" to 2,
+            "WheelDrawer.kt" to 2, "Complications.kt" to 4, "Tactile.kt" to 2,
             // the item glide to a new slot (edit mode) and the page-dot pill: short position/size springs
             // wave 28: plus the one page indicator's quiet fade (it moved here from GlanceHome): one alpha read in graphicsLayer, a 600 ms tween that is 0 ms under reduced motion
             "GridHome.kt" to 4,

@@ -106,8 +106,12 @@ abstract class CommsReadScreenCases(private val orientation: String) : Launchpad
 
     @Test fun STR_02_w29_clearAllOnlyEmptiesTheShadeAndNeverTheHistory() {
         render()
-        openMenu()
-        rule.onNodeWithTag("lp.menu.list").performScrollToNode(hasTestTag("lp.menu.clear")); rule.onNodeWithTag("lp.menu.clear").performClick(); rule.waitForIdle()
+        // Wave 29: Clear all moved from the Comms menu to the Liftoff settings (CommsOptions.clearAll); it empties the shade and never the history.
+        val before = CommsOptions.clearer
+        try {
+            CommsOptions.clearer = { cleared++; liveItems = emptyList(); store.observe(emptyList()) }
+            CommsOptions.clearAll(); rule.waitForIdle()
+        } finally { CommsOptions.clearer = before }
         assertEquals(1, cleared)
         assertEquals(5, store.entries.value.size)
         assertTrue(present("m1") && present("e1"))

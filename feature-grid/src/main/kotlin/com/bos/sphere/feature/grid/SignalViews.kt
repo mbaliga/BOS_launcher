@@ -22,7 +22,7 @@ import com.bos.sphere.core.signals.SignalState
  * paints, buffers), and the painter draws one frame from a [SignalState], the eased level and the shared clock without
  * allocating. The registry is [SignalViews.views], one entry per [BgItem]; the living wallpapers are in LivingWallpapers.kt.
  */
-internal class RadarGeometry(val w: Float, val h: Float, val density: Float, val glass: Boolean = false) {
+internal class RadarGeometry(val w: Float, val h: Float, val density: Float) {
     val portrait: Boolean get() = h > w
 }
 

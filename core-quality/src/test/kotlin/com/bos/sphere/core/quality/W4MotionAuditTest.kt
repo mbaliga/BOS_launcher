@@ -164,9 +164,9 @@ class W4MotionAuditTest {
             }
         }
         // Audited: scrolling drags (the lists have their own scroll semantics), scrim taps closed by Back, the orbit tile click
-        // (tiles are named by OrbitA11yTest), the empty-home long press (Settings is also in the app menu), edge-swipe handles.
+        // (tiles are named by OrbitA11yTest), Radar's wheel blank-space tap (wave 25: the labels carry the names; the tap only puts the cursor in the field), the empty-home long press (Settings is also in the app menu), edge-swipe handles.
         val audited = mapOf(
-            "ContinuousHome.kt" to 1, "XmbHome.kt" to 2, "ListHome.kt" to 1, "WidgetStackView.kt" to 1, "SearchChrome.kt" to 1, "SettingsSpace.kt" to 2,
+            "ContinuousHome.kt" to 1, "XmbHome.kt" to 2, "ListHome.kt" to 1, "WidgetStackView.kt" to 1, "SearchChrome.kt" to 2, "SettingsSpace.kt" to 2,
             "SearchLayouts.kt" to 2, "Corners.kt" to 1, "WidgetHosting.kt" to 1, "HomeScreen.kt" to 4,
             // the colour square and hue bar have semantics on the Canvas; their drag handlers sit further than the scan window
             "ColorPicker.kt" to 3, "Tactile.kt" to 1,

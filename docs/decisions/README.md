@@ -6,7 +6,7 @@ One line per record, newest wave first. A record explains why a requirement is b
 | --- | --- | --- |
 | [homeLandingPlacement.md](homeLandingPlacement.md) | 24 | Placing a home item from Glance, Recents or All apps switches to Selected apps; a workspace switch ends edit mode (HOM-02, HOM-07, HOM-12, HOM-15) |
 | [orbitTyping.md](orbitTyping.md) | 20 | Radar keeps the Orbit while typing: best match in the innermost ring, tiers named by match, web rows and Filenames in a compact strip (PAL-18, PAL-12) |
-| [radarGlass.md](radarGlass.md) | 21 | Radar glass: mic at the bottom centre, glass field and buttons with a measured legibility shade, the Clear X inside the field; one reusable `glass()` (PAL-18, INP-12, NFR-15) |
+| [radarGlass.md](radarGlass.md) | 25 (21, 22) | **Wave 25 supersedes the glass:** black gradients only on the field, Clear X, Close and mic; rings fitted so nothing leaves the display and all recents show at once; no dead touch; landscape uses the free height above the keyboard (PAL-18, PAL-20, INP-12, NFR-13, NFR-15). Waves 21/22 glass kept as history |
 | [startupCrashes.md](startupCrashes.md) | 18 | Startup crashes from old persisted state: tolerant preference reads, the crash-counting loop guard (CFG-09, NFR-12) |
 | [radarSearchCleanup.md](radarSearchCleanup.md) | 18 | Radar loses the typed prefix and the `!bang` syntax; what was removed and how to restore it (PAL-13, PAL-19) |
 | [radarSearch.md](radarSearch.md) | 18 | Radar's query field at the top only; Orbit rings tiered by use frequency (PAL-18, INP-12) |

@@ -1,4 +1,63 @@
-# Radar glass, mic at the bottom centre, X inside the field (wave 21; PAL-18, PAL-20, INP-12, NFR-13, NFR-15, NFR-05)
+# Radar black gradients (wave 25, supersedes the glass below), nothing leaves the display, no dead touch (PAL-18, PAL-20, INP-12, NFR-13, NFR-15)
+
+**Wave 25 owner request (authoritative, replaces the wave 21/22 glass):** "Radar looks weird - remove the glass effect buttons and keep only black gradients instead.
+Don't let icons exit the display area. I should be able to see all recents at once, not have some outside the screen. There is still a dead touch area. The
+landscape view cuts off above the keyboard."
+
+Everything from "Radar glass, mic at the bottom centre" down is **history**: the glass look, its measured shade and the Spire lift are gone. What the owner
+decided in waves 21 and 22 about *placement* stays: the mic is 56 dp at the bottom centre (inline in the field row when the free height is under 220 dp), the
+Clear X is inside the field, Close is outside the field while the query is empty and not in Flat, every target is 48 dp, labelled, with a focus ring.
+
+## 1. Black gradients instead of glass
+
+`Glass.kt` is now `BlackSpec`, `Modifier.blackSurface(shape, pressed)`, `BlackButton` and `BlackField`. A surface is black at 96 percent at its top and 70 percent at
+its bottom (one vertical gradient, built once per size by `drawWithCache`), solid black while pressed or listening; no blur, no translucent white fill or rim, no sheen,
+no inner glow, no grey. The mic shows "listening" with a 2 dp violet ring on solid black. Text and icons are white. **Contrast holds by construction**: the least opaque
+pixel is 70 percent black, so even over pure white it is a dark grey and white on it is above 4.5:1 (hint text at 80 percent white too);
+`RadarBlackW25Test` computes it, so nothing is measured from the background any more.
+
+Removed (code and what tested only it): `Modifier.glass`, `GlassLayers`, `GlassSpec` (fills, sheen, shade maths), `GlassButton`, `GlassField`, `GlassShade`/`GlassShades`/
+`rememberGlassShades` (the measured shade), `BackgroundConfig.glass` with `RadarGeometry.glass`, the Spire's lift and tip floor (`GLASS_TOP_DP`) and `SignalBackground(glass =)`; the
+Flat scope pill lost its nested glass fill (it keeps its 48 dp target). Tests removed: `RadarGlassContrastW21Test` (the measured-shade contrast over every background pair),
+`RadarGlassFrameCostW22Test` (allocation of the glass draw path; its "no RenderEffect or blur anywhere in Radar" check lives on in `RadarBlackW25Test`). The behavioural
+tests in `RadarGlassW21UiTest`, `RadarGlassW22Test` and `RadarAuditGlassW22UiTest` (focus, TalkBack, 48 dp, bounds, RTL) are kept.
+
+## 2. Nothing leaves the display; all recents at once
+
+`OrbitFit` (`RadarFit.kt`, pure) fits the rings to the Orbit's own region (below the field, above the mic bar and the keyboard). Each ring is an ellipse scaled to the
+region (inner ellipses at 40, 60, 80, 100 percent) with up to 5, 9, 13, 17 tiles (the ring capacities are unchanged); a tile is placed only where its whole box (icon and
+caption) lies inside the region, clear of the wheel and its "SEARCH" caption and of every other box. If the rings cannot hold every result at the current icon size, a tight
+staggered fill of the same region is tried at that size (no guide lines are drawn then); if that cannot either, the icon shrinks 2 dp and the loop repeats, down to a **32 dp
+floor**; only below that are the lowest-ranked results left out (the wheel keeps its room first: at most half the region plus 8 dp, so the rings keep the other half). Moving
+rings no longer revolve through the screen (that carried icons off it): with motion on each tile drifts at most 3 dp around its place (reduced motion: still). A last clamp in
+the tile's layout keeps its measured box inside the region whatever it holds (a caption, nested shortcut pills). The Filmstrip (`StripFit`) shrinks its tile (76 to 32 dp)
+and drops the footnote, the caption and the nested pills before anything would hang below the free height; its row and the Flat list still scroll sideways and up
+and down by design (their edge items are cut by the scroll, not by the layout).
+Numbers (`RadarFitW25Test`, 44 recents wanted, font scale 1, keyboard closed): 411x891 and 1280x800 place all 44, 891x411 all 44, 360x640 38, 640x360 32, 320x480 20, 280x653 24;
+with the keyboard 40 percent open 1280x800 still places 44, 891x411 40, 411x891 32, 640x360 26. When the region is too small to hold one tile row beside the wheel (320x480 with
+the keyboard 60 percent open, big text) the Orbit places none and the wheel keeps the area; that is the honest limit, not hidden.
+
+## 3. No dead touch
+
+Found and fixed: (a) nothing took a tap on empty space (between tiles, the strip beside the mic, the blank part of a list), (b) the wheel's blank space between its labels
+swallowed taps, (c) the field's padding around its text line did nothing. Now: the Radar root takes any tap no child took: with nothing typed it **closes Radar**, with a
+query it puts the soft keyboard away (the documented empty-space action); a tap on the wheel's blank space or anywhere on the field puts the cursor in the field; only the mic
+itself (56 dp) is active in the bottom bar. `RadarBoundsW25UiTest` injects taps on a grid across the screen (Orbit, Filmstrip, Flat; portrait and landscape; keyboard
+open and closed) and asserts every point hits a control, a result or the empty-space action. Orbit tiles are also placed outermost in their modifier chain now, so
+their semantics and touch area are where they are drawn.
+
+## 4. Landscape
+
+With the keyboard open in landscape the region is the whole free height above the keyboard (the mic goes inline in the field row from wave 23), the wheel takes at most
+half of it and the rings are fitted to the rest: no label is cut and no blank band is left (`PAL_18_landscapeUsesTheWholeFreeHeightAboveTheKeyboard`).
+
+## To undo
+
+The glass is in git history (wave 22). Restoring it means `Glass.kt` from that commit and the `shades` plumbing in `SearchOverlay`; the Spire lift is `BackgroundConfig.glass`.
+
+---
+
+# (History) Radar glass, mic at the bottom centre, X inside the field (wave 21; PAL-18, PAL-20, INP-12, NFR-13, NFR-15, NFR-05)
 
 Owner request (authoritative): "For the Radar, keep the mic icon for voice input in the centre at the bottom. Don't make the field and
 button that kind of grey. Make it glass. Put the X inside the field."

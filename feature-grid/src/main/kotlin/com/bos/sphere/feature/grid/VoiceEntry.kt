@@ -166,7 +166,7 @@ object VoiceStates {
  * held) works too. Draws nothing when the device has no on-device recogniser. The text goes to [onText] as it comes.
  */
 @Composable
-fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}, size: androidx.compose.ui.unit.Dp = GlassSpec.BigButton, recogniserOverride: OnDeviceRecogniser? = null) {
+fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, onFocusChange: (Boolean) -> Unit = {}, size: androidx.compose.ui.unit.Dp = BlackSpec.BigButton, recogniserOverride: OnDeviceRecogniser? = null) {
     val context = LocalContext.current
     val available = remember(context, availableOverride) { availableOverride ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     if (!available) return
@@ -208,12 +208,13 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
     val label = L10n.tr("Speak to search")
-    // Wave 21: glass (violet-tinted while listening), 56 dp, the same hold-to-talk behaviour.
+    // Wave 21: 56 dp, the same hold-to-talk behaviour. Wave 25: a black gradient disc (solid black while listening), no glass.
     Box(
         modifier
             .size(size)
-            .glass(CircleShape, tint = if (listening) Color(0xFFB9A8FF) else Color.White, pressed = listening, shade = shade)
+            .blackSurface(CircleShape, pressed = listening)
             .clip(CircleShape)
+            .then(if (listening) Modifier.border(2.dp, Color(0xFFB9A8FF), CircleShape) else Modifier) // wave 25: listening is a solid violet ring on solid black
             .then(if (focused) Modifier.border(2.dp, Color.White, CircleShape) else Modifier) // a visible keyboard focus (second audit)
             .pointerInput(ptt) {
                 awaitEachGesture {
@@ -238,6 +239,6 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
                 onClick(label = label) { ptt.toggle(); listening = ptt.listening; true } },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Glyphs.Mic, null, tint = GlassSpec.content(true), modifier = Modifier.size(24.dp))
+        Icon(Glyphs.Mic, null, tint = BlackSpec.Content, modifier = Modifier.size(24.dp))
     }
 }

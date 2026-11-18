@@ -203,6 +203,9 @@ class TourFreshSmokeTest : TourBase() {
             "radar" to { key(KeyEvent.KEYCODE_SLASH, ctrl = true) }, "drawer" to { key(KeyEvent.KEYCODE_D, ctrl = true) }, "ground control" to { key(KeyEvent.KEYCODE_COMMA, ctrl = true) })) {
             opener(); val shown = open(); assertFalse("$name opened", shown.contains(Surface.Home))
             tapAt(0.02f, 0.5f); check("$name, left edge tapped"); assertFalse("$name: Launchpad opened by an edge tap", launchpadShown())
+            // Wave 25 (dead touch): Radar takes a tap on empty space itself and closes; that one tap must not also open Launchpad, and Home behind it is then live,
+            // so a second edge tap is a real edge tap on Home and is not part of this check.
+            if (name == "radar") { assertFalse("radar: the edge tap closes Radar without opening Recents", recentsShown()); assertEquals("radar closed by the empty-space tap", setOf(Surface.Home), open().toSet()); continue }
             tapAt(0.98f, 0.5f); check("$name, right edge tapped"); assertFalse("$name: Recents opened by an edge tap", recentsShown())
             assertEquals("$name stays open", shown, open())
             back(); key(ESC); check("$name closed", Surface.Home)

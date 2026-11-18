@@ -238,7 +238,16 @@ Nothing here has been confirmed on a device. Decisions: `docs/decisions/crashRec
 - [ ] PAL-09 (wave 20): open apps a few times, open Radar in Orbit (rings filled), Ground Control > Search history > "Forget what Radar learned", open Radar again: the rings are empty ("Rings fill up as you use Radar") and fill again with new use.
 - [ ] INP-12, NFR-13 (wave 20): Radar's clear (x) and close buttons in the query line are easy to hit with a thumb (48 dp targets); with a hardware keyboard typing starts at once with no tap; the field stays below the camera cutout in both orientations.
 
-## Radar glass, mic at the bottom centre, X in the field (wave 21, radarGlass)
+## Radar black gradients, nothing off screen, no dead touch (wave 25, radarFix)
+
+Nothing here is device-confirmed; Robolectric covered bounds, touch grids and screenshots only.
+
+- [ ] PAL-18: Radar in Orbit, Filmstrip and Flat: the field, the Clear X, Close and the mic are black with a faint top-to-bottom fade; no blur, white rim, glow or grey fill; text stays white and readable over every wallpaper pair, in daylight.
+- [ ] PAL-18, PAL-20: Orbit with the keyboard closed and open, portrait and landscape: every icon and its label is whole on screen, none under the keyboard or the mic; all your recents (up to 44) show at once, smaller on a small screen; nothing scrolls.
+- [ ] PAL-18: tap empty space (between icons, beside the mic, below a short list): Radar closes (or the keyboard goes away when something is typed); the mic only reacts on the mic itself.
+- [ ] NFR-13: largest font size, landscape with the keyboard open: no label cut, the free height above the keyboard is used.
+
+## (Superseded by wave 25) Radar glass, mic at the bottom centre, X in the field (wave 21, radarGlass)
 
 - [ ] PAL-18: open Radar over each living wallpaper in turn (Beam, Spire, Halo, Laser, Shaft) with Breathing dots, then with Glow lines, Radar sweep and Bottom glow: the field, the Close circle and the mic look like glass (a faint white veil, a bright hairline at the top-left fading to the bottom-right, a short sheen at the top), the wallpaper shows through, nothing is flat grey. Compare with the owner's screenshot of build 49.
 - [ ] NFR-15: in the same checks the placeholder "Search", typed text, the X, the scope pill and the mic stay easy to read at No signal and at Excellent (Lab > Radar signal); over Beam the mic may look darker than the field (the measured shade), never washed out.
@@ -248,7 +257,7 @@ Nothing here has been confirmed on a device. Decisions: `docs/decisions/crashRec
 - [ ] PAL-18: Flat layout: the scope menu is a small glass pill at the left end of the field and opens the scope list downward.
 - [ ] NFR-05: scroll and rotate Radar over a living wallpaper for a minute with the glass on: no jank beyond the budget (the glass is drawn from cached brushes, nothing is blurred).
 
-## Radar clearer glass and landscape layout (wave 22, glassFix)
+## (Superseded by wave 25) Radar clearer glass and landscape layout (wave 22, glassFix)
 
 - [ ] NFR-15, PAL-18: Radar over the default pair (Spire + Breathing dots) at No signal and at Excellent: the field, Close and the mic are clear glass (the background shows through them, no smoky dark patch); the Spire's tip stops below the field and its glow sits above the mic. Home behind Radar is unchanged. Placeholder, typed text, X and mic icon stay easy to read in daylight.
 - [ ] NFR-15: over Beam, Shaft and Laser (the pairs that still keep a shade under a piece of glass) the text and icons are readable and the shade does not look like a grey patch.
@@ -279,7 +288,7 @@ Swipe Liftoff away from recents, open it from the launcher or the home button, t
 - [ ] Animations removed: Remove animations on; Radar, Launchpad and page turns do not slide or loop (NFR-14).
 - [ ] Font size 200 percent: largest font (Developer options font scale 2.0); no cut-off text on home, Radar, Settings (NFR-13).
 - [ ] Display size large: no overlap on the grid, the dock or Radar (NFR-13).
-- [ ] Radar glass in daylight, dark and light: field, buttons and results readable at full brightness in both themes (docs/decisions/radarGlass.md).
+- [ ] Radar black buttons in daylight, dark and light: field, buttons and results readable at full brightness in both themes (docs/decisions/radarGlass.md).
 - [ ] Real crash path: Lab "Crash on purpose" (tap twice); the recovery screen shows on the next start; Continue opens Liftoff normally (NFR-09, CFG-09).
 - [ ] Speech engine: Radar microphone, speak a query; note whether an engine answered and whether it works offline (SPK-07, INP-13).
 - [ ] Work profile badge: with a work profile, its apps carry the badge in the drawer and Radar (HOM-06).

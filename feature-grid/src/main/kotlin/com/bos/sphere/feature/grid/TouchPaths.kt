@@ -60,7 +60,7 @@ object TouchPaths {
         ))
         put(LauncherCommand.OpenPuck, listOf(grid("INP_07_the_all_apps_corner_opens_the_puck_for_the_wheel_style_and_the_puck_is_operable_by_touch")))
         put(LauncherCommand.ShortcutSheet, listOf(grid("INP_07_the_keyboard_shortcuts_row_in_home_settings_opens_the_shortcut_sheet")))
-        for (c in listOf(LauncherCommand.NextWorkspace, LauncherCommand.PreviousWorkspace)) put(c, listOf(dock("INP_07_theWorkspaceChipSwitchesWorkspaceBySwipeAndOpensThePanelOnTap")))
+        for (c in listOf(LauncherCommand.NextWorkspace, LauncherCommand.PreviousWorkspace)) put(c, listOf(dock("INP_07_theWorkspaceChipSwitchesWorkspaceBySwipeAndGoesHomeOnTap")))
         put(LauncherCommand.FocusDock, listOf(dock("INP_07_theCollapsedBandExpandsOnTapSoFocusDockHasATouchPath"), dock("INP_07_tappingADockItemLaunchesItAndItsNumberIsItsPosition")))
         for (c in LauncherCommand.entries.filter { it.name.startsWith("Dock") && it.name.length == 5 }) put(c, listOf(dock("INP_07_tappingADockItemLaunchesItAndItsNumberIsItsPosition")))
         for (c in listOf(LauncherCommand.CornerTopLeft, LauncherCommand.CornerTopRight, LauncherCommand.CornerBottomLeft, LauncherCommand.CornerBottomRight)) put(c, listOf(grid("INP_07_tapping_each_corner_runs_what_it_holds")))

@@ -191,7 +191,7 @@ internal class SearchData(
 
 // ---- refinement suggestions (macOS Spotlight menu) ----
 
-internal class SuggItem(val label: String, val insertion: String?, val scope: SearchCategory?, val accent: Boolean = false)
+internal class SuggItem(val label: String, val insertion: String?, val scope: SearchCategory?, val accent: Boolean = false, val icon: ActionKind = ActionKind.RefineApps)
 internal class SuggGroup(val header: String, val items: List<SuggItem>)
 
 /**
@@ -224,7 +224,7 @@ internal fun buildSuggestionGroups(
     if (q.isEmpty()) return emptyList()
     val chips = suggest(query, appCategories)
     val kinds = chips.filter { it.kind == SuggestionKind.Key || it.kind == SuggestionKind.Value }
-        .map { SuggItem(localizeChip(it.label), it.insertion, null, accent = true) }
+        .map { SuggItem(localizeChip(it.label), it.insertion, null, accent = true, icon = ActionKind.FilterKind) }
     // "Name contains" is already offered once under Filenames: don't repeat it per category. The model's labels are English: the
     // test is on that English, never on the translated words (a translated phone showed the chip twice), and each shown label is translated.
     val appText = chips.filter { it.kind == SuggestionKind.Text || it.kind == SuggestionKind.Natural }
@@ -232,8 +232,8 @@ internal fun buildSuggestionGroups(
         .filter { !filesAvailable || !it.label.startsWith("Name contains") }
         .map { SuggItem(localizeChip(it.label), it.insertion, null) }
     val all = buildList {
-        if (filesAvailable) add(SuggGroup(L10n.tr("Filenames"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Files))))
-        if (deepAvailable) add(SuggGroup(L10n.tr("Content"), listOf(SuggItem(L10n.tr("Contains “%s”", q), null, SearchCategory.Files))))
+        if (filesAvailable) add(SuggGroup(L10n.tr("Filenames"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Files, icon = ActionKind.FilterFiles))))
+        if (deepAvailable) add(SuggGroup(L10n.tr("Content"), listOf(SuggItem(L10n.tr("Contains “%s”", q), null, SearchCategory.Files, icon = ActionKind.FilterContent))))
         if (appHits && kinds.isNotEmpty()) add(SuggGroup(L10n.tr("Kinds"), kinds))
         if (appHits && appText.isNotEmpty()) add(SuggGroup(L10n.tr("Refine apps"), appText))
     }

@@ -35,3 +35,4 @@ One line per record, newest wave first. A record explains why a requirement is b
 | [launchpadRules.md](launchpadRules.md) | 24 | Launchpad groups: the manager inside Launchpad, the people picker and members, Priority breaks through Do Not Disturb in Liftoff (STR-13) |
 | [auditSweep.md](auditSweep.md) | 23 | Independent sweep of waves 17 to 22: what was found and fixed, what was removed as dead, and the three calls that are decisions (English-only recovery screen, preview inertness, a retired-key marker per wave) |
 | [dockOptional.md](dockOptional.md) | 24 | The dock stays optional: dock panel from Ground Control, "Focus the dock" with no rail to come, survey of every dock feature with the dock off |
+| [actionIcons.md](actionIcons.md) | 25 | Radar suggestion, action and shortcut rows and pills get leading icons: the shortcut's own, else a built-in glyph per action kind, else the app icon (owner item 6) |

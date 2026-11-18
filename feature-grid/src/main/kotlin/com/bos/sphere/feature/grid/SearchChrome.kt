@@ -348,7 +348,7 @@ private fun scopeGlyph(c: SearchCategory?): ImageVector = when (c) {
 
 // ---------------------------------------------------------------- tile faces
 
-internal fun hitGlyph(hit: SearchHit): ImageVector = hit.actionId?.let { Glyphs.forAction(it) } ?: when (hit.kind) {
+internal fun hitGlyph(hit: SearchHit): ImageVector = hit.actionId?.let { Glyphs.forAction(it) } ?: ActionIcons.kind(hit)?.glyph ?: when (hit.kind) {
     HitKind.Action -> Glyphs.Bolt
     HitKind.Document -> DocGlyph
     HitKind.Image -> Glyphs.Image
@@ -387,8 +387,11 @@ internal fun HitFace(hit: SearchHit, size: Dp, modifier: Modifier = Modifier, ra
         val b = bmp
         if (b != null) {
             Image(b, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } else if (NestedShortcuts.isAppShortcut(hit)) {
+            // Wave 25 (owner item 6): an app shortcut shows its own icon (else its app's), at a larger size than a glyph.
+            HitLeadingIcon(hit, size * 0.62f, HyleColors.VioletSoft)
         } else {
-            Icon(hitGlyph(hit), null, tint = if (hit.actionId != null) HyleColors.VioletSoft else Color(0xFFE7E9F0), modifier = Modifier.size(size * 0.46f))
+            Icon(hitGlyph(hit), null, tint = if (hit.actionId != null || hit.kind == HitKind.Action) HyleColors.VioletSoft else Color(0xFFE7E9F0), modifier = Modifier.size(size * 0.46f))
         }
         sourceBadge(hit.sourcePackage)?.let { s ->
             Text(

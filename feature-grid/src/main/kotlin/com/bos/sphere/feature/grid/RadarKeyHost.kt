@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -113,15 +115,22 @@ internal fun RadarActionList(entries: List<ResultMenuEntry>, index: Int, onPick:
             .padding(vertical = 6.dp),
     ) {
         entries.forEachIndexed { i, e ->
-            Text(
-                L10n.tr(e.label), color = Color.White, fontSize = 16.sp, fontWeight = if (i == index) FontWeight.SemiBold else FontWeight.Normal,
-                modifier = Modifier
+            Row(
+                Modifier
                     .fillMaxWidth()
                     .background(if (i == index) Color(0x44B9A8FF) else Color.Transparent)
                     .clickable { onPick(i) }
                     .semantics { contentDescription = e.label; selected = i == index }
                     .padding(horizontal = 18.dp, vertical = 10.dp),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Wave 25: every entry has a leading icon (the shortcut's own, else a built-in glyph); the text already names it, so no description.
+                if (e.shortcut != null) HitLeadingIcon(e.shortcut, 20.dp, Color.White) else KindIcon(ActionIcons.kind(e), 20.dp, Color.White)
+                Text(
+                    L10n.tr(e.label), color = Color.White, fontSize = 16.sp, fontWeight = if (i == index) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.padding(start = 12.dp).weight(1f),
+                )
+            }
         }
     }
 }

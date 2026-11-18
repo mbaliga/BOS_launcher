@@ -6,6 +6,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -17,8 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -71,15 +76,21 @@ internal object NestedShortcuts {
     }
 }
 
-/** One nested shortcut: a small pill that runs it. */
+/** One nested shortcut: a small pill that runs it, with its own icon (16 dp) in front; the "+N" pill has none. */
 @Composable
-internal fun ShortcutPill(title: String, tag: String, scale: Float, modifier: Modifier = Modifier, describe: String = L10n.tr("App shortcut: %s", title), onClick: () -> Unit) {
-    Text(
-        title, color = Color.White, fontSize = (11 * scale).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-        modifier = modifier.testTag(tag).clip(RoundedCornerShape(9.dp)).background(Color(0x33FFFFFF)).clickable(onClick = onClick)
-            .semantics { contentDescription = describe }
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-    )
+internal fun ShortcutPill(
+    title: String, tag: String, scale: Float, modifier: Modifier = Modifier, describe: String = L10n.tr("App shortcut: %s", title),
+    hit: SearchHit? = null, app: AppEntry? = null, onClick: () -> Unit,
+) {
+    Row(
+        modifier.testTag(tag).clip(RoundedCornerShape(9.dp)).background(Color(0x33FFFFFF)).clickable(onClick = onClick)
+            .clearAndSetSemantics { contentDescription = describe; role = Role.Button; onClick { onClick(); true } }
+            .padding(start = if (hit != null) 4.dp else 8.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hit != null) { HitLeadingIcon(hit, 16.dp, Color.White, app = app); Spacer(Modifier.width(4.dp)) }
+        Text(title, color = Color.White, fontSize = (11 * scale).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+    }
 }
 
 /**
@@ -98,7 +109,7 @@ internal fun NestedShortcutPills(
     if (tile.shortcuts.isEmpty()) return
     val z = LocalResultScale.current
     Column(modifier.widthIn(max = width).padding(top = 3.dp), verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        tile.shortcuts.take(shown).forEach { h -> ShortcutPill(h.title, "nested.${tile.app.key}.${h.id}", z) { onRun(h) } }
+        tile.shortcuts.take(shown).forEach { h -> ShortcutPill(h.title, "nested.${tile.app.key}.${h.id}", z, hit = h, app = tile.app) { onRun(h) } }
         val more = tile.shortcuts.size - shown
         if (more > 0) ShortcutPill("+$more", "nested.${tile.app.key}.more", z, describe = "+$more", onClick = onMore)
     }
@@ -110,6 +121,6 @@ internal fun NestedShortcutRow(tile: Tile.App, onRun: (SearchHit) -> Unit, modif
     if (tile.shortcuts.isEmpty()) return
     val z = LocalResultScale.current
     Row(modifier.horizontalScroll(rememberScrollState()).padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        tile.shortcuts.forEach { h -> ShortcutPill(h.title, "nested.${tile.app.key}.${h.id}", z) { onRun(h) } }
+        tile.shortcuts.forEach { h -> ShortcutPill(h.title, "nested.${tile.app.key}.${h.id}", z, hit = h, app = tile.app) { onRun(h) } }
     }
 }

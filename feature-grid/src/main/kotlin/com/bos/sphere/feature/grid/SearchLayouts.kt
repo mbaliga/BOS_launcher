@@ -601,10 +601,16 @@ internal fun FlatResults(
                 )
                 is FRow.Note -> Text(row.text, color = Color(0x80FFFFFF), fontSize = (15 * z).sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 is FRow.Sugg -> {
-                    Text(
-                        row.item.label, color = if (row.item.accent) HyleColors.VioletSoft else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { onPickSuggestion(row.item) }.padding(horizontal = 16.dp, vertical = 9.dp),
-                    )
+                    Row(
+                        Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { onPickSuggestion(row.item) }.padding(horizontal = 16.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        KindIcon(row.item.icon, 20.dp, if (row.item.accent) HyleColors.VioletSoft else Color.White)
+                        Text(
+                            row.item.label, color = if (row.item.accent) HyleColors.VioletSoft else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
                     if (rows.getOrNull(idx + 1) is FRow.Sugg) Divider()
                 }
                 is FRow.Item -> {

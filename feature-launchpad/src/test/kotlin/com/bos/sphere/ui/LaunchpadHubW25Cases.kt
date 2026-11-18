@@ -17,6 +17,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -263,10 +264,13 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
     }
 
     // ---- the view switcher slot ----------------------------------------------------------------------------------------------------
+    // Owner: the list looks like the BlackBerry Hub, whose views are ONE flat tab row directly under the title bar, across the full width.
     @Test fun STR_02_topBarHasASlotForTheViewSwitcher() {
-        render(hub(3), false, switcher = { Text("VIEWS", Modifier.testTag("slot.views")) })
+        render(hub(3), false, switcher = { Text("VIEWS", Modifier.fillMaxWidth().testTag("slot.views")) })
         val slot = rule.onNodeWithTag("slot.views").assertIsDisplayed().getUnclippedBoundsInRoot()
         val menu = rule.onNodeWithTag("lp.menu").getUnclippedBoundsInRoot()
-        assertTrue("the switcher sits in the top bar, right of the menu button", slot.left.value > menu.right.value && slot.top.value < 64f)
+        assertTrue("the switcher row sits directly below the title bar (menu bottom=${menu.bottom.value}, slot top=${slot.top.value})", slot.top.value >= menu.bottom.value && slot.top.value - menu.bottom.value <= 12f)
+        assertEquals("the switcher row starts at the left edge", 0f, slot.left.value, 1f)
+        assertEquals("the switcher row spans the width", winW(), slot.right.value - slot.left.value, 1f)
     }
 }

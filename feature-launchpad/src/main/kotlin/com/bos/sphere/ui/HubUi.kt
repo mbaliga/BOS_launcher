@@ -92,8 +92,8 @@ private fun HubChip(text: String, selected: Boolean, tag: String, onClick: () ->
     val lp = LocalLp.current
     Box(Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).semantics { role = Role.Button; this.selected = selected }.testTag(tag), Alignment.Center) {
         Text(
-            text, color = if (selected) Color.White else lp.ink2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 2.dp).clip(RoundedCornerShape(50)).background(if (selected) BlueDark else lp.ink.copy(alpha = 0.08f)).padding(horizontal = 14.dp, vertical = 7.dp).widthIn(max = 180.dp),
+            text, color = if (selected) Color.White else lp.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(if (selected) BlueDark else lp.ink.copy(alpha = 0.07f)).padding(horizontal = 10.dp, vertical = 4.dp).widthIn(max = 180.dp),
         )
     }
 }
@@ -136,8 +136,8 @@ internal fun HubFilterRow(state: HubState, entries: List<HistoryEntry>) {
     val f = state.filters()
     val lp = LocalLp.current
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp).testTag("hub.filters"),
-        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp).testTag("hub.filters"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
     ) {
         HubChip(L10n.tr("Today"), f.range == HubRange.Today, "hub.f.today") { state.setFilters(f.copy(range = if (f.range == HubRange.Today) HubRange.Any else HubRange.Today)) }
         HubChip(L10n.tr("7 days"), f.range == HubRange.Week, "hub.f.week") { state.setFilters(f.copy(range = if (f.range == HubRange.Week) HubRange.Any else HubRange.Week)) }

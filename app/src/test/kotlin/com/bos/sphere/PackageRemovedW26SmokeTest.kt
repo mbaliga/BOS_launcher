@@ -58,7 +58,7 @@ class PackageRemovedW26SmokeTest : TourBase() {
 
         // the dock keeps the pin for the HOM-10 grace period but marks it unavailable (dimmed, not launchable): the app's own label is gone from the rail
         key(KeyEvent.KEYCODE_H, ctrl = true)
-        assertTrue("the dock does not mark the removed app as unavailable", descShown("App unavailable", substring = true) || textShown("App unavailable"))
+        waitFor("the dock marks the removed app as unavailable", 8000) { descShown("App unavailable", substring = true) || textShown("App unavailable") }
         assertFalse("the dock still offers the removed app by its name", descShown("Alpha", substring = true))
     }
 }

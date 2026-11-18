@@ -71,7 +71,7 @@ internal fun checkTitle(c: DeviceCheck): String = when (c) {
     DeviceCheck.NoAnimations -> L10n.tr("Animations removed")
     DeviceCheck.Font200 -> L10n.tr("Font size 200 percent")
     DeviceCheck.DisplaySize -> L10n.tr("Display size large")
-    DeviceCheck.GlassLook -> L10n.tr("Radar glass in daylight, dark and light")
+    DeviceCheck.GlassLook -> L10n.tr("Radar black buttons in daylight, dark and light")
     DeviceCheck.RealCrash -> L10n.tr("Real crash path")
     DeviceCheck.Speech -> L10n.tr("Speech engine")
     DeviceCheck.WorkBadge -> L10n.tr("Work profile badge")

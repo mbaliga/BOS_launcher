@@ -12,6 +12,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -144,6 +145,8 @@ internal fun CategoryWheel(
     onTouch: () -> Unit,
     modifier: Modifier = Modifier,
     spec: WheelSpec = WheelSpec.Default,
+    /** Wave 25: a tap on the wheel's blank space between its labels is not swallowed; the host puts the cursor in the field. */
+    onBlankTap: () -> Unit = {},
 ) {
     val cats: List<SearchCategory?> = listOf(null) + SearchCategory.entries
     fun idx(c: SearchCategory?) = cats.indexOf(c).toFloat()
@@ -154,6 +157,7 @@ internal fun CategoryWheel(
     val onSelectNow by rememberUpdatedState(onSelect)
     val onTickNow by rememberUpdatedState(onTick)
     val onTouchNow by rememberUpdatedState(onTouch)
+    val onBlankTapNow by rememberUpdatedState(onBlankTap)
     LaunchedEffect(selected) {
         if (!dragging) { raw[0] = idx(selected); pos.animateTo(idx(selected), spring(stiffness = 380f)) }
     }
@@ -161,6 +165,7 @@ internal fun CategoryWheel(
     Box(
         modifier
             .height(spec.height)
+            .pointerInput(Unit) { detectTapGestures { onBlankTapNow() } }
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragStart = { dragging = true; onTouchNow() },
@@ -239,15 +244,15 @@ internal fun ScopeToken(
     fanDown: Boolean = false,
     /** False draws only the glyph and the mark, so a narrow query line keeps its room (the scope is still named for TalkBack). */
     showLabel: Boolean = true,
-    /** Wave 21: the plain token wears a glass pill (it sits inside the glass field) and keeps a 48 dp touch target. */
-    glass: Boolean = false,
+    /** Wave 21: the plain token sits inside the field and keeps a 48 dp touch target (wave 25: on black, in white). */
+    onField: Boolean = false,
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         if (plain) {
             // The query line: "Everything 🌐 ⇅". Tapping fans the scopes out (downward from the top line), right-aligned (macOS-style).
             val dim = Color(0xB3FFFFFF)
-            val ink = if (glass) GlassSpec.content(true) else dim
+            val ink = if (onField) BlackSpec.Content else dim
             val tokenContent: @Composable () -> Unit = {
                 if (showLabel) Text(scopeLabel(shown, webLabel), color = ink, fontSize = 16.sp, maxLines = 1)
                 Icon(scopeGlyph(shown), if (showLabel) null else scopeLabel(shown, webLabel), tint = ink, modifier = Modifier.padding(start = if (showLabel) 8.dp else 0.dp).size(20.dp))
@@ -256,14 +261,14 @@ internal fun ScopeToken(
                     Icon(Glyphs.Down, null, tint = ink, modifier = Modifier.size(10.dp).offset(y = (-2).dp))
                 }
             }
-            if (glass) {
-                // Wave 21: a quiet glass pill inside the glass field; the clickable area is the full 48 dp height (NFR-13).
+            if (onField) {
+                // Wave 21: inside the field; the clickable area is the full 48 dp height (NFR-13). Wave 25: no pill fill, the field is black.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.alpha(if (open) 0f else 1f).heightIn(min = GlassSpec.Target).clip(RoundedCornerShape(24.dp)).clickable { open = true }
+                    modifier = Modifier.alpha(if (open) 0f else 1f).heightIn(min = BlackSpec.Target).clip(RoundedCornerShape(24.dp)).clickable { open = true }
                         .semantics { role = androidx.compose.ui.semantics.Role.Button },
                 ) {
-                    Row(Modifier.glass(RoundedCornerShape(50), strength = GlassSpec.NESTED_STRENGTH).padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { tokenContent() }
+                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { tokenContent() }
                 }
             } else Row(
                 verticalAlignment = Alignment.CenterVertically,

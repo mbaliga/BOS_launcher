@@ -90,7 +90,7 @@ enum class DeviceCheck(val id: String, val english: String, val closes: String) 
     NoAnimations("noanim", "Animations removed", "NFR-14"),
     Font200("font200", "Font size 200 percent", "NFR-13"),
     DisplaySize("dispsize", "Display size large", "NFR-13"),
-    GlassLook("glass", "Radar glass in daylight, dark and light", "docs/decisions/radarGlass.md"),
+    GlassLook("glass", "Radar black buttons in daylight, dark and light", "docs/decisions/radarGlass.md"),
     RealCrash("crash", "Real crash path", "NFR-09, CFG-09"),
     Speech("speech", "Speech engine", "SPK-07, INP-13"),
     WorkBadge("workbadge", "Work profile badge", "HOM-06"),

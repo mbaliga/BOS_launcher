@@ -38,3 +38,4 @@ One line per record, newest wave first. A record explains why a requirement is b
 | [actionIcons.md](actionIcons.md) | 25 | Radar suggestion, action and shortcut rows and pills get leading icons: the shortcut's own, else a built-in glyph per action kind, else the app icon (owner item 6) |
 | [uninstall.md](uninstall.md) | 25 | Uninstall did nothing: ACTION_DELETE needs REQUEST_DELETE_PACKAGES on API 28+; one shared AppUninstall helper with a test seam, profile-aware, no entry for system apps |
 | [dockIcons.md](dockIcons.md) | 25 | The dock shows only icons; the "i" and "..." buttons and the text pills are gone and their options sit behind a long press (icon: its options, dock: the dock's options), with the menu key and TalkBack actions |
+| [musicNotch.md](musicNotch.md) | 25 | Music controls only in the Glance notch (no strip, nothing in the dock), the flush merging notch shape, the pushed-down marquee title |

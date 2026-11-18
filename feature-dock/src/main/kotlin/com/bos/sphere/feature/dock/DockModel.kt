@@ -1,7 +1,6 @@
 package com.bos.sphere.feature.dock
 
 import com.bos.sphere.core.capabilities.Tier
-import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.input.LauncherCommand
 
 /** A pinned thing, by kind and id. The folder and shortcut kinds are defined by the home stream; the dock only carries the reference. */
@@ -170,7 +169,6 @@ data class DockContent(
     /** True when usage access is missing: the Recent section is replaced by one enable row (DCK-06). */
     val showEnableRow: Boolean,
     val showRecentSection: Boolean,
-    val media: MediaInfo?,
     val collapsed: Boolean,
 ) {
     /** Items that number shortcuts 1 to 9 launch, in the order the rail shows them. */
@@ -198,7 +196,6 @@ object DockContentBuilder {
         usageGranted: Boolean,
         mode: DockMode,
         sessionUsed: Set<String>,
-        media: MediaInfo?,
         recentLimit: Int = 6,
         spanOf: (DockItemRef) -> Int = { 1 },
     ): DockContent {
@@ -216,7 +213,7 @@ object DockContentBuilder {
             pinned = pinned, recent = recent,
             showEnableRow = showRecent && !usageGranted,
             showRecentSection = showRecent && usageGranted,
-            media = media, collapsed = mode == DockMode.Collapsed,
+            collapsed = mode == DockMode.Collapsed,
         )
     }
 }

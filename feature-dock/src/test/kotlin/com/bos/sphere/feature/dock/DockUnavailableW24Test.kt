@@ -33,7 +33,7 @@ class DockUnavailableW24Test {
         DockContentBuilder.build(
             pins = listOf(DockItemRef.app("a"), DockItemRef.app("gone"), DockItemRef.app("c"), DockItemRef.app("removed")),
             labelOf = { ref -> DockUnavailable.appLabel(ref.id, { installed[it] }, unavailable, "App unavailable") },
-            recentApps = emptyList(), recentLabelOf = { null }, usageGranted = false, mode = DockMode.PinnedPlusRecent, sessionUsed = emptySet(), media = null,
+            recentApps = emptyList(), recentLabelOf = { null }, usageGranted = false, mode = DockMode.PinnedPlusRecent, sessionUsed = emptySet(),
         ),
     ) { it in installed }
 

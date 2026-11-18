@@ -145,7 +145,7 @@ class W4RadarInputDockTest {
     }
 
     private fun content(vararg labels: String) = DockContent(
-        pinned = labels.mapIndexed { i, l -> DockItem(DockItemRef.app("k$i"), l) }, recent = emptyList(), showEnableRow = false, showRecentSection = false, media = null, collapsed = false,
+        pinned = labels.mapIndexed { i, l -> DockItem(DockItemRef.app("k$i"), l) }, recent = emptyList(), showEnableRow = false, showRecentSection = false, collapsed = false,
     )
 
     @Composable private fun Rail(c: DockContent, actions: DockActions, bridge: DockInput.FocusBridge?) {

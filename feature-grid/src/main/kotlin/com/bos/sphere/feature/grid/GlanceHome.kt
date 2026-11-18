@@ -13,7 +13,15 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -201,16 +209,19 @@ fun GlanceSurface(
         )
         val density = androidx.compose.ui.platform.LocalDensity.current
         val cutoutTop = with(density) { WindowInsets.displayCutout.getTop(density).toDp() }
-        val safeTop = with(density) { WindowInsets.safeDrawing.getTop(density).toDp() }
-        val notchHeight = GlanceNotch.heightDp(cutoutTop.value).dp
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             GlanceCentre(prefs, weather, items, w, h, ink, inkDim, onClockTap, Modifier.align(Alignment.Center))
             // Music at the top: a stable slot (its height is reserved), the line only while something plays. W22: the line always sits below
             // the notch's bottom edge (the notch hangs over the top of the screen), so it never moves and the notch never covers it.
-            val lineTop = maxOf(14.dp, notchHeight - safeTop + GlanceNotch.LINE_GAP_DP.dp)
-            Box(Modifier.align(Alignment.TopCenter).padding(top = lineTop).height(40.dp)) {
+            // W25: the title keeps its own place (fixed padding under the status area) while the controls are away; when they come in it is pushed down
+            // by the notch body (spring, snap with reduced motion) and moves back when they leave, so it is never behind or touching the notch.
+            val push by animateDpAsState(
+                if (playing && pop.visible) GlanceNotch.TITLE_PUSH_DP.dp else 0.dp,
+                if (reduced) snap() else spring(dampingRatio = 0.8f, stiffness = 420f), label = "glanceTitlePush",
+            )
+            Box(Modifier.align(Alignment.TopCenter).padding(top = GlanceNotch.TITLE_TOP_DP.dp).offset { IntOffset(0, push.roundToPx()) }.height(40.dp).testTag("glance.title.slot")) {
                 if (playing && media != null) {
-                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapSurface() })
+                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapSurface() }, maxWidth = (w - 2 * GlanceNotch.TITLE_SIDE_DP).coerceIn(120f, 280f).dp, edge = if (dark) Color.Black else Color(0xFFF3F3F6))
                 }
             }
         }
@@ -297,15 +308,29 @@ private fun GlanceCentre(
     }
 }
 
+/**
+ * The song title (W25): one line, centred when it fits; when it is wider than its slot it scrolls as a marquee with both edges faded.
+ * With reduced motion it does not scroll: it shows the beginning with an ellipsis. The text carries the test tag "glance.title.marquee"
+ * or "glance.title.static" (fits, or reduced motion) so the state is observable.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit) {
-    var overflow by remember(media.title, media.artist) { mutableStateOf(false) }
+private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit, maxWidth: Dp = 280.dp, edge: Color = Color.Black) {
     val line = GlanceText.nowPlayingLine(media.title, media.artist)
+    val display = GlanceText.nowPlayingDisplay(media.title, media.artist)
     val spoken = L10n.tr("Now playing: %s", line)
     val showLabel = L10n.tr("Show playback controls")
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val style = androidx.compose.ui.text.TextStyle(color = tint, fontSize = 14.sp)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    // The text's room: the slot minus the 16 dp note glyph, its 8 dp gap and the 12 dp padding on each side.
+    val room = with(density) { (maxWidth - 16.dp - 8.dp - 24.dp).roundToPx() }
+    val natural = remember(display, density.fontScale) { measurer.measure(display, style, softWrap = false, maxLines = 1).size.width }
+    val overflow = natural > room
+    val scrolling = marquee && overflow
+    val fade = with(density) { 14.dp.toPx() }
     Row(
-        Modifier.widthIn(max = 280.dp)
+        Modifier.widthIn(max = maxWidth)
             .launcherItem("glance.nowplaying", focusable = true, onActivate = onActivate, ringRadiusDp = 16f)
             .clickable(onClickLabel = showLabel, role = Role.Button, onClick = onActivate)
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -314,10 +339,21 @@ private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onAc
     ) {
         Icon(Glyphs.Music, null, tint = tint, modifier = Modifier.size(16.dp))
         Text(
-            GlanceText.nowPlayingDisplay(media.title, media.artist), color = tint, fontSize = 14.sp, maxLines = 1, softWrap = false,
-            overflow = if (marquee && overflow) TextOverflow.Clip else TextOverflow.Ellipsis,
-            onTextLayout = { overflow = it.hasVisualOverflow },
-            modifier = if (marquee && overflow) Modifier.basicMarquee(iterations = 3) else Modifier,
+            display, color = tint, fontSize = 14.sp, maxLines = 1, softWrap = false,
+            overflow = if (scrolling) TextOverflow.Clip else TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false).testTag(if (scrolling) "glance.title.marquee" else "glance.title.static")
+                .then(
+                    if (scrolling) Modifier
+                        .drawWithContent {
+                            drawContent()
+                            // Both edges fade into the surface colour (no blend mode, no offscreen layer).
+                            val f = fade.coerceAtMost(size.width / 2f)
+                            drawRect(Brush.horizontalGradient(listOf(edge, Color.Transparent), 0f, f), size = androidx.compose.ui.geometry.Size(f, size.height))
+                            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, edge), size.width - f, size.width), topLeft = Offset(size.width - f, 0f), size = androidx.compose.ui.geometry.Size(f, size.height))
+                        }
+                        .basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1200, repeatDelayMillis = 1200, spacing = MarqueeSpacing(32.dp))
+                    else Modifier,
+                ),
         )
     }
 }
@@ -358,10 +394,15 @@ internal fun ControlsNotch(
             // Wave 23: the box, the drawn shape and the 48 dp targets are the same height, so a tap outside the black falls through to the home card.
             .width(GlanceNotch.widthDp(areaWidthDp).dp).height(cutoutTop + GlanceNotch.TARGET_DP.dp)
             .drawBehind {
-                val path = NotchShape.path(size.width, height.toPx(), GlanceNotch.FLARE_DP.dp.toPx(), GlanceNotch.CORNER_DP.dp.toPx())
+                val path = NotchShape.path(size.width, height.toPx(), GlanceNotch.FLARE_DP.dp.toPx(), GlanceNotch.CORNER_DP.dp.toPx(), GlanceNotch.SHOULDER_DP.dp.toPx())
                 drawPath(path, Color.Black)
-                // The one allowed extra: a hairline lighter edge so the black tab still reads on a black surface.
-                drawPath(path, Color.White.copy(alpha = 0.16f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
+                // The one allowed extra: a hairline lighter edge so the black tab still reads on a black surface. W25: it fades out toward the top
+                // edge (zero alpha at y = 0 and along the shoulders' start), so there is no line along the top and the notch melts into the status area.
+                val fadeEnd = GlanceNotch.SHOULDER_DP.dp.toPx() * 1.4f
+                drawPath(
+                    path, Brush.verticalGradient(0f to Color.Transparent, 0.35f * fadeEnd / size.height to Color.Transparent, fadeEnd / size.height to Color.White.copy(alpha = 0.16f), 1f to Color.White.copy(alpha = 0.16f)),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
+                )
             }
             .pointerInput(Unit) { awaitEachGesture {
                 // A finger on the notch (even one a button consumed) holds the timer; lifting it restarts the timer.

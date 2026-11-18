@@ -690,7 +690,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val indicatorTarget = IndicatorColors.argb(reading, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, prefs.indicatorInvert)
     val indicatorColor by androidx.compose.animation.animateColorAsState(Color(indicatorTarget.toInt()), com.bos.sphere.core.design.rememberMotionPrefs().gate(androidx.compose.animation.core.tween(800)), label = "indicator")
 
-    val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(prefs.mediaControls || (landing == HomeLanding.Glance && com.bos.sphere.core.data.GlanceItem.NowPlaying in prefs.glanceContent)) // STR-06, HOM-23: one media source for the strip and the Glance music line
+    val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo((landing == HomeLanding.Glance && com.bos.sphere.core.data.GlanceItem.NowPlaying in prefs.glanceContent)) // STR-06, HOM-23: W25: the media controls and title live only in the Glance notch, no strip and nothing in the dock
 
     // ---- weather (opt-in; needs approximate location)
     val weatherSource = remember { WeatherSource(context) }
@@ -1186,24 +1186,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             LaunchpadCardOverlay(recentsGeometry, rightReveal, onReturn = { rightOpen = false }, slideDp = rightSlideDp)
         }
 
-        // Media controls: a track + prev / play / next strip while something is playing.
-        androidx.compose.animation.AnimatedVisibility(
-            visible = mediaInfo != null && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && HomeChromeRules.shows(landing, ChromeElement.MediaStrip, chromeSettings.copy(mediaControls = true)),
-            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
-            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
-            modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
-        ) {
-            mediaInfo?.let { mi ->
-                com.bos.sphere.feature.grid.MediaStrip(
-                    info = mi,
-                    onPrev = { com.bos.sphere.core.data.MediaNow.previous() },
-                    onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() },
-                    onNext = { com.bos.sphere.core.data.MediaNow.next() },
-                    onOpen = { com.bos.sphere.core.data.MediaNow.openPlayer(context) },
-                )
-            }
-        }
-
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
@@ -1217,7 +1199,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
-            visible = HomeChromeRules.shows(landing, ChromeElement.MediaStrip, chromeSettings) && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen,
+            visible = landing == HomeLanding.Glance && com.bos.sphere.core.data.GlanceItem.NowPlaying in prefs.glanceContent && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen,
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         )
 

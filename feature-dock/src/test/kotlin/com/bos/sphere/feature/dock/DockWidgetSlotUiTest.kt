@@ -35,7 +35,7 @@ class DockWidgetSlotUiTest {
     private val widgetRef = DockItemRef(ItemKind.Widget, "widget:5")
     private val content = DockContent(
         pinned = listOf(DockItem(DockItemRef.app("a"), "A"), DockItem(widgetRef, "W", span = 2), DockItem(DockItemRef.app("c"), "C")),
-        recent = emptyList(), showEnableRow = false, showRecentSection = false, media = null, collapsed = false,
+        recent = emptyList(), showEnableRow = false, showRecentSection = false, collapsed = false,
     )
 
     private class Seen { var reorders = mutableListOf<Pair<Int, Int>>(); var bodyDrags = 0; var bodyDown = 0 }

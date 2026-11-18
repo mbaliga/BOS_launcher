@@ -90,7 +90,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
             .putFloat("spacingV", next.spacingV).putFloat("gridBias", next.gridBias).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
             .putFloat("gridInsetBottom", next.gridInsetBottom).putFloat("labelScale", next.labelScale)
-            .putString("searchLayout", next.searchLayout.name).putInt("homePage", next.homePage).putString("pageTransition", next.pageTransition.name).putBoolean("mediaControls", next.mediaControls)
+            .putString("searchLayout", next.searchLayout.name).putInt("homePage", next.homePage).putString("pageTransition", next.pageTransition.name)
             .putBoolean("searchMotion", next.searchMotion).putBoolean("searchFiles", next.searchFiles)
             .putString("bgSlot1", next.backgroundSlot1.id).putString("bgSlot2", next.backgroundSlot2.id)
             .putString("radarIntensity", next.radarIntensity.name).putString("radarSignalForce", next.radarSignalForce.name)
@@ -202,7 +202,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             searchLayout = runCatching { SearchLayout.valueOf(sp.getString("searchLayout", null) ?: "") }.getOrDefault(d.searchLayout),
             homePage = sp.getInt("homePage", d.homePage).coerceAtLeast(0),
             pageTransition = enumOr(sp.getString("pageTransition", null), d.pageTransition),
-            mediaControls = sp.getBoolean("mediaControls", d.mediaControls),
             searchMotion = sp.getBoolean("searchMotion", d.searchMotion),
             radarIntensity = enumOr(sp.getString("radarIntensity", null), d.radarIntensity),
             radarSignalForce = enumOr(sp.getString("radarSignalForce", null), d.radarSignalForce),

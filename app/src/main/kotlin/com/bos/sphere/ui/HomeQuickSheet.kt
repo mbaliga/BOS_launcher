@@ -106,7 +106,7 @@ fun HomeQuickSheet(
             val batteryOn = StripItem.Battery in prefs.strip
             val rows = ContextMenus.forHomeSheet(
                 HomeSheetContext(
-                    timeOn = timeOn, weatherOn = prefs.clockShowWeather, batteryOn = batteryOn, mediaOn = prefs.mediaControls,
+                    timeOn = timeOn, weatherOn = prefs.clockShowWeather, batteryOn = batteryOn,
                     page = page, pageCount = pageCount, alignTop = prefs.gridBias <= 0.05f, alignBottom = prefs.gridBias >= 0.95f,
                     isHomePage = page != null && prefs.homePage == page,
                     transitions = PageTransition.entries.map { it.label to (prefs.pageTransition == it) },
@@ -114,14 +114,13 @@ fun HomeQuickSheet(
                 ),
             )
             fun glyphOf(k: SheetToggle) = when (k) {
-                SheetToggle.Time -> Glyphs.Clock; SheetToggle.Weather -> Glyphs.Sun; SheetToggle.Battery -> Glyphs.Battery; SheetToggle.Media -> Glyphs.Music
+                SheetToggle.Time -> Glyphs.Clock; SheetToggle.Weather -> Glyphs.Sun; SheetToggle.Battery -> Glyphs.Battery
                 SheetToggle.AlignTop -> Glyphs.Up; SheetToggle.AlignBottom -> Glyphs.Down; SheetToggle.MakeHome -> Glyphs.Home
             }
             fun flip(k: SheetToggle) = when (k) {
                 SheetToggle.Time -> update { it.copy(clockPosition = if (timeOn) ClockPosition.Hidden else ClockPosition.Top) }
                 SheetToggle.Weather -> update { it.copy(clockShowWeather = !it.clockShowWeather) }
                 SheetToggle.Battery -> update { it.copy(strip = if (batteryOn) it.strip - StripItem.Battery else it.strip + (StripItem.Battery to StripZone.Right)) }
-                SheetToggle.Media -> update { it.copy(mediaControls = !it.mediaControls) }
                 SheetToggle.AlignTop -> update { it.copy(gridBias = 0f) }
                 SheetToggle.AlignBottom -> update { it.copy(gridBias = 1f) }
                 SheetToggle.MakeHome -> update { it.copy(homePage = page ?: it.homePage) }
@@ -173,7 +172,7 @@ fun HomeQuickSheet(
     }
 }
 
-private val SWITCHES = setOf(SheetToggle.Time, SheetToggle.Weather, SheetToggle.Battery, SheetToggle.Media)
+private val SWITCHES = setOf(SheetToggle.Time, SheetToggle.Weather, SheetToggle.Battery)
 
 @Composable
 private fun Heading(text: String) {

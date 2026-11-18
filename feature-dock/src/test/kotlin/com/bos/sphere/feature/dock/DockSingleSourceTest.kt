@@ -75,7 +75,7 @@ class DockSingleSourceTest {
         val ref = HomeItemPins.refOf("widget:3")!!
         val content = DockContentBuilder.build(
             pins = listOf(DockItemRef.app("a"), ref), labelOf = { "x" }, recentApps = emptyList(), recentLabelOf = { null },
-            usageGranted = false, mode = DockMode.PinnedPlusRecent, sessionUsed = emptySet(), media = null,
+            usageGranted = false, mode = DockMode.PinnedPlusRecent, sessionUsed = emptySet(),
             spanOf = { 3 },
         )
         assertEquals(1, content.pinned[0].span)

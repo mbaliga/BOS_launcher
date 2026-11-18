@@ -44,11 +44,11 @@ class HomeLayoutW3DockTest {
         val content = DockContentBuilder.build(
             pins = pins,
             labelOf = { r -> when (r.kind) { ItemKind.App -> "App A"; else -> HomeItemPins.homeKeyOf(r)?.let { if (it == "folder:f1") "Games" else "Site" } } },
-            recentApps = emptyList(), recentLabelOf = { null }, usageGranted = true, mode = DockMode.PinnedPlusRecent, sessionUsed = emptySet(), media = null,
+            recentApps = emptyList(), recentLabelOf = { null }, usageGranted = true, mode = DockMode.PinnedPlusRecent, sessionUsed = emptySet(),
         )
         assertEquals(listOf("App A", "Games", "Site"), content.pinned.map { it.label })
         // A folder deleted from home has no label: it is skipped, its pin kept in storage.
-        val gone = DockContentBuilder.build(pins, { r -> if (r.kind == ItemKind.App) "App A" else null }, emptyList(), { null }, true, DockMode.PinnedPlusRecent, emptySet(), null)
+        val gone = DockContentBuilder.build(pins, { r -> if (r.kind == ItemKind.App) "App A" else null }, emptyList(), { null }, true, DockMode.PinnedPlusRecent, emptySet())
         assertEquals(listOf("App A"), gone.pinned.map { it.label })
     }
 

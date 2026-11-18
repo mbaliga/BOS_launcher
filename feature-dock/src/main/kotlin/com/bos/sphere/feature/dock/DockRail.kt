@@ -70,7 +70,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 
@@ -85,10 +84,6 @@ class DockActions(
     val onSwitchWorkspace: (delta: Int) -> Unit = {},
     val onToggleExpanded: () -> Unit = {},
     val onLeave: () -> Unit = {},
-    val onMediaPrev: () -> Unit = {},
-    val onMediaPlayPause: () -> Unit = {},
-    val onMediaNext: () -> Unit = {},
-    val onMediaOpen: () -> Unit = {},
     /** W25: the options that used to sit behind "i" and "...", now behind a long press. */
     val onAppInfo: (DockItem) -> Unit = {},
     val onReplace: (DockItem) -> Unit = {},
@@ -100,7 +95,7 @@ class DockActions(
 )
 
 /**
- * The dock rail (DCK-01 to DCK-08): pinned items, a Recent section or an enable row, a compact media control, and a workspace chip.
+ * The dock rail (DCK-01 to DCK-08): pinned items, a Recent section or an enable row, and a workspace chip.
  * Horizontal at the bottom edge, vertical on a side edge. [icon] draws an item's icon so this module needs no app list.
  */
 @Composable
@@ -205,7 +200,6 @@ fun DockRail(
                 }
             }
             if (content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge)
-            content.media?.let { MediaItem(it, horizontal, actions) }
         }
     }
     if (menuFor == MENU_DOCK) DockMenuPopup(menuPress, DockMenuModel.TAG_DOCK_MENU, dockEntries) { menuFor = MENU_NONE }
@@ -400,41 +394,6 @@ private fun DockSlot(
         if (showNumbers && index < 9) Text("${index + 1}", color = HyleColors.OnAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.TopStart).padding(2.dp).clip(CircleShape).background(HyleColors.Violet).padding(horizontal = 5.dp))
     }
-}
-
-/** Compact transport: previous, play or pause, next, drawn as shapes so it does not depend on a font (DCK-08). */
-@Composable
-private fun MediaItem(info: MediaInfo, horizontal: Boolean, actions: DockActions) {
-    val shape = RoundedCornerShape(16.dp)
-    val body: @Composable () -> Unit = {
-        TransportButton(Transport.Prev, info.canPrev, L10n.tr("Previous track"), actions.onMediaPrev)
-        TransportButton(if (info.playing) Transport.Pause else Transport.Play, true, if (info.playing) L10n.tr("Pause") else L10n.tr("Play"), actions.onMediaPlayPause)
-        TransportButton(Transport.Next, info.canNext, L10n.tr("Next track"), actions.onMediaNext)
-    }
-    val m = Modifier.clip(shape).background(HyleColors.Violet.copy(alpha = 0.16f)).clickable(onClickLabel = info.title, onClick = actions.onMediaOpen)
-        .padding(4.dp).semantics { contentDescription = L10n.tr("Now playing: %s", info.title) }
-    if (horizontal) Row(m, verticalAlignment = Alignment.CenterVertically) { body() } else Column(m, horizontalAlignment = Alignment.CenterHorizontally) { body() }
-}
-
-private enum class Transport { Prev, Play, Pause, Next }
-
-@Composable
-private fun TransportButton(kind: Transport, enabled: Boolean, description: String, onClick: () -> Unit) {
-    val tint = if (enabled) HyleColors.InkBright else HyleColors.InkDim.copy(alpha = 0.4f)
-    Box(
-        Modifier.size(36.dp).clickable(enabled = enabled, onClickLabel = description, onClick = onClick).semantics { role = Role.Button; contentDescription = description }
-            .drawBehind {
-                val w = size.width; val h = size.height; val s = w * 0.28f
-                val cx = w / 2; val cy = h / 2
-                fun tri(dir: Float, x: Float) = Path().apply { moveTo(x + dir * s, cy); lineTo(x - dir * s * 0.8f, cy - s); lineTo(x - dir * s * 0.8f, cy + s); close() }
-                when (kind) {
-                    Transport.Play -> drawPath(tri(1f, cx), tint)
-                    Transport.Pause -> { drawRect(tint, Offset(cx - s * 0.9f, cy - s), androidx.compose.ui.geometry.Size(s * 0.6f, s * 2)); drawRect(tint, Offset(cx + s * 0.3f, cy - s), androidx.compose.ui.geometry.Size(s * 0.6f, s * 2)) }
-                    Transport.Next -> { drawPath(tri(1f, cx - s * 0.2f), tint); drawRect(tint, Offset(cx + s * 0.7f, cy - s), androidx.compose.ui.geometry.Size(s * 0.35f, s * 2)) }
-                    Transport.Prev -> { drawPath(tri(-1f, cx + s * 0.2f), tint); drawRect(tint, Offset(cx - s * 1.05f, cy - s), androidx.compose.ui.geometry.Size(s * 0.35f, s * 2)) }
-                }
-            },
-    )
 }
 
 /** HOM-02: height of the reorder grip over a widget slot, and its test tag. */

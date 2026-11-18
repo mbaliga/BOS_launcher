@@ -43,7 +43,6 @@ import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.input.KeyChord
 import com.bos.sphere.core.input.LauncherCommand
 import com.bos.sphere.core.input.ShortcutRegistry
-import com.bos.sphere.core.signals.MediaSignals
 import com.bos.sphere.core.signals.UsageRecents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -179,20 +178,18 @@ fun DockHost(
             sinceStart = usage.recents(limit = 50, windowMs = SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime())
         }
     }
-    DisposableEffect(Unit) { MediaSignals.start(context); onDispose { MediaSignals.stop() } }
-    val media by MediaSignals.info.collectAsState()
 
     val byKey = remember(apps) { apps.associateBy { it.key } }
     val keyByPackage = remember(apps) { apps.groupBy { it.packageName }.mapValues { it.value.first().key } }
     val sessionUsed = remember(sinceStart, apps, resumes, refreshKey) { SessionUse.all() + sinceStart.mapNotNull { keyByPackage[it] } }
-    val content = remember(state.active.dockPins, state.groups, apps, recents, granted, state.dock.mode, sessionUsed, media, unavailableApps) {
+    val content = remember(state.active.dockPins, state.groups, apps, recents, granted, state.dock.mode, sessionUsed, unavailableApps) {
         DockContentBuilder.build(
             spanOf = spanOfOther,
             pins = state.active.dockPins,
             labelOf = { ref -> when (ref.kind) { ItemKind.App -> DockUnavailable.appLabel(ref.id, { byKey[it]?.label }, unavailableApps, com.bos.sphere.core.design.L10n.tr("App unavailable")); ItemKind.Group -> state.groups.firstOrNull { it.id == ref.id }?.name; else -> labelOfOther(ref) } },
             recentApps = recents.mapNotNull { keyByPackage[it] },
             recentLabelOf = { byKey[it]?.label },
-            usageGranted = granted, mode = state.dock.mode, sessionUsed = sessionUsed, media = media,
+            usageGranted = granted, mode = state.dock.mode, sessionUsed = sessionUsed,
         ).let { c -> DockUnavailable.mark(c) { id -> byKey[id] != null } }
     }
     // The band's expanded state is recorded on this display's own instance, so two displays never share it (DCK-07).
@@ -228,8 +225,6 @@ fun DockHost(
             onSwitchWorkspace = { d -> if (d > 0) manager.next() else manager.previous() },
             onToggleExpanded = { expanded = !expanded; instance.expanded = expanded },
             onLeave = { expanded = false; instance.expanded = false },
-            onMediaPrev = MediaSignals::previous, onMediaPlayPause = MediaSignals::playPause, onMediaNext = MediaSignals::next,
-            onMediaOpen = { MediaSignals.open(context) },
             onAppInfo = { item -> if (item.ref.kind == ItemKind.App) byKey[item.ref.id]?.let { runCatching { context.startActivity(DockAppOptions.infoIntent(it.packageName)) } } },
             onReplace = { replacing = it },
             onAddApps = { adding = true },

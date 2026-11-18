@@ -287,8 +287,6 @@ data class LauncherPrefs(
     /** The page the Home button returns to. */
     val homePage: Int = 0,
     val pageTransition: PageTransition = PageTransition.Slide,
-    /** A track + prev / play / next strip on the home while something is playing. */
-    val mediaControls: Boolean = false,
     /** Filmstrip / orbit keep drifting slowly; off = still until you move them. */
     val searchMotion: Boolean = true,
     val searchFiles: Boolean = true,

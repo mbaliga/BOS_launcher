@@ -21,7 +21,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import com.bos.sphere.core.data.MediaInfo
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -66,17 +65,6 @@ class FontScaleTest {
         val big = (b2.bottom - b2.top).value
         assertTrue("height at 200% ($big) should exceed 100% ($normal)", big > normal)
         rule.onNodeWithText(longLabel).assertIsDisplayed()
-    }
-
-    @Test fun NFR_14_mediaStripRendersAtTwoHundredPercent() {
-        rule.setContent {
-            AtScale(2f) {
-                MediaStrip(MediaInfo("A Really Long Track Title That Must Be Cut Off", "An Artist", "demo", playing = true, canPrev = true, canNext = true), {}, {}, {}, {})
-            }
-        }
-        rule.onNodeWithTag("root").assertWidthIsEqualTo(411.dp)
-        val b = rule.onNodeWithTag("root").getUnclippedBoundsInRoot()
-        assertTrue((b.bottom - b.top).value >= 52f)
     }
 
     @Test fun NFR_14_stepperAndActionRowShowTheirLabelsAtTwoHundredPercent() {

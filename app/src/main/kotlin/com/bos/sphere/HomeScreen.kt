@@ -906,7 +906,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         collapsed = dockState.dock.mode == com.bos.sphere.feature.dock.DockMode.Collapsed, bandDp = frame.value,
         lowerStackDp = com.bos.sphere.feature.dock.HomeBottomStack.lowerStackDp(
             stackDp = com.bos.sphere.feature.grid.bottomStackDp(prefs, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()),
-            glance = landing == HomeLanding.Glance, glanceIndicator = prefs.glanceIndicator,
+            glance = landing == HomeShown.Glance, glanceIndicator = prefs.glanceIndicator,
             pageDotsAtBottom = pageDotsAtBottom, clockAtBottom = prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Bottom,
         ),
         shelfShown = com.bos.sphere.feature.dock.GroupShelfModel.visible(dockState.groups, dockState.dock.groupShelf).isNotEmpty(),

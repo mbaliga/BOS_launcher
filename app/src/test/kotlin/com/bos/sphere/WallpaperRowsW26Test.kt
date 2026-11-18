@@ -14,7 +14,6 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.bos.sphere.core.data.BgItem
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.HomeScroll
 import com.bos.sphere.core.data.HomeStyle
@@ -67,8 +66,8 @@ class WallpaperRowsW26Test {
     private fun homeItems(p: LauncherPrefs, pages: Int) = buildSettingsCategories(model(p, pages)).first { it.title == "Home screen" }.items
 
     private val states = buildList {
-        for (landing in listOf(HomeLanding.Glance, HomeLanding.Recents)) for (signal in listOf(SignalForce.Live, SignalForce.NoSignal)) for (same in listOf(true, false)) for (pages in listOf(0, 1, 3)) {
-            add(Triple(LauncherPrefs(homeLanding = landing, radarSignalForce = signal, pagesSameAsGlance = same, homeStyle = HomeStyle.Grid, homeScroll = if (pages == 3) HomeScroll.Continuous else HomeScroll.Paged), pages, "$landing/$signal/same=$same/pages=$pages"))
+        for (glance in listOf(true, false)) for (signal in listOf(SignalForce.Live, SignalForce.NoSignal)) for (same in listOf(true, false)) for (pages in listOf(0, 1, 3)) {
+            add(Triple(LauncherPrefs(glanceEnabled = glance, radarSignalForce = signal, pagesSameAsGlance = same, homeStyle = HomeStyle.Grid, homeScroll = if (pages == 3) HomeScroll.Continuous else HomeScroll.Paged), pages, "$glance/$signal/same=$same/pages=$pages"))
         }
     }
 

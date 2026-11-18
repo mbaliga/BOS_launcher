@@ -86,7 +86,11 @@ class HomeEditState internal constructor(private val layoutStore: HomeLayoutStor
     fun undo() { write(layoutStore.layout.value.pages, session?.undo()); rev++ }
     fun redo() { write(layoutStore.layout.value.pages, session?.redo()); rev++ }
     /** HOM-12: the rail's pin list changed (a move to the dock, a pin, an unpin, a reorder). */
-    internal fun observePins(view: DockPinsView) { if (session?.observePins(view) == true) rev++ }
+    internal fun observePins(view: DockPinsView) {
+        // HOM-12 (wave 24): a workspace switch replaces the whole arrangement; it is not an edit, so the session ends (see EditWorkspaceSwitch).
+        if (com.bos.sphere.core.catalog.EditWorkspaceSwitch.endsEdit(session?.active == true, session?.currentPins?.workspaceId, view.workspaceId)) { exit(); return }
+        if (session?.observePins(view) == true) rev++
+    }
     internal fun observe(layout: com.bos.sphere.core.data.HomeLayout) {
         if (session != null) hooks?.observed(layout.pages)
         if (session?.observe(layout) == true) rev++

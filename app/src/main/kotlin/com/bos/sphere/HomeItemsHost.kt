@@ -146,6 +146,9 @@ class HomeItems internal constructor(
 
     fun openSheet() { sheetOpen = true }
 
+    /** Wave 24: called after an item was placed on the pages (set by the home screen: a landing without pages switches to Selected apps). */
+    internal var onPlaced: () -> Unit = {}
+
     /** HOM-10: folder members and dock pins whose app is missing right now (kept for the grace period, drawn as unavailable). */
     var unavailableKeys by mutableStateOf<Set<String>>(emptySet())
         private set
@@ -191,12 +194,14 @@ class HomeItems internal constructor(
         val d = context.resources.displayMetrics.density
         val span = WidgetSizing.spanFor((info.minWidth / d).toInt(), (info.minHeight / d).toInt(), 80f)
         edit { HomeEdit.add(it, ItemDef(ItemKeys.widget(id), ItemKind.Widget, label, info.provider.flattenToString()), page(), capacityOf, span) }
+        onPlaced()
     }
 
     fun addFolderWith(keys: List<String>, name: String = L10n.tr("Folder")) {
         if (keys.isEmpty()) return
         val id = newId()
         edit { HomeEdit.createFolder(it, keys, id, name, capacityOf) }
+        onPlaced()
     }
 
     /** WSP-05: set by the home screen; runs a saved group the way the dock does. */
@@ -205,6 +210,7 @@ class HomeItems internal constructor(
 
     fun addGroup(id: String, name: String) {
         edit { HomeEdit.add(it, ItemDef(ItemKeys.group(id), ItemKind.Group, name, id), page(), capacityOf) }
+        onPlaced()
     }
 
     /** WSP-05: group tiles follow the saved groups (a deleted group loses its tile, a renamed one renames it). */
@@ -216,6 +222,7 @@ class HomeItems internal constructor(
     fun addLink(uri: String, label: String, isFile: Boolean) {
         val def = ItemDef(ItemKeys.link(uri), ItemKind.Link, label, uri, isFile)
         edit { HomeEdit.add(it, def, page(), capacityOf) }
+        onPlaced()
     }
 
     /** One tile per panel: a second tap on "add" for the same panel does nothing (the key is the target). */
@@ -229,6 +236,7 @@ class HomeItems internal constructor(
     fun addDropped(defs: List<ItemDef>) {
         if (defs.isEmpty()) return
         edit { s -> defs.fold(s) { acc, def -> HomeEdit.add(acc, def, page(), capacityOf) } }
+        onPlaced()
     }
 
     /** INP-11: links and files dropped on a folder tile are defined on the home (without taking a page cell of their own) and filed into that folder. */
@@ -252,6 +260,7 @@ class HomeItems internal constructor(
     fun addShortcut(app: AppEntry, s: PinnableShortcut) {
         val def = ItemDef(ItemKeys.shortcut(app.packageName, s.id, app.user.hashCode()), ItemKind.Shortcut, s.label, s.id)
         edit { HomeEdit.add(it, def, page(), capacityOf) }
+        onPlaced()
     }
 
     // ---- shortcuts

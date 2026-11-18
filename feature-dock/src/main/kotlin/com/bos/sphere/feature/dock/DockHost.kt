@@ -188,16 +188,17 @@ fun DockHost(
         DockContentBuilder.build(
             spanOf = spanOfOther,
             pins = state.active.dockPins,
-            labelOf = { ref -> when (ref.kind) { ItemKind.App -> byKey[ref.id]?.label ?: if (ref.id in unavailableApps) com.bos.sphere.core.design.L10n.tr("App unavailable") else null; ItemKind.Group -> state.groups.firstOrNull { it.id == ref.id }?.name; else -> labelOfOther(ref) } },
+            labelOf = { ref -> when (ref.kind) { ItemKind.App -> DockUnavailable.appLabel(ref.id, { byKey[it]?.label }, unavailableApps, com.bos.sphere.core.design.L10n.tr("App unavailable")); ItemKind.Group -> state.groups.firstOrNull { it.id == ref.id }?.name; else -> labelOfOther(ref) } },
             recentApps = recents.mapNotNull { keyByPackage[it] },
             recentLabelOf = { byKey[it]?.label },
             usageGranted = granted, mode = state.dock.mode, sessionUsed = sessionUsed, media = media,
-        ).let { c -> c.copy(pinned = c.pinned.map { if (it.ref.kind == ItemKind.App && byKey[it.ref.id] == null) it.copy(unavailable = true) else it }) }
+        ).let { c -> DockUnavailable.mark(c) { id -> byKey[id] != null } }
     }
     // The band's expanded state is recorded on this display's own instance, so two displays never share it (DCK-07).
     var expanded by remember(instance) { mutableStateOf(instance.expanded) }
 
     fun launchItem(item: DockItem) {
+        if (!DockUnavailable.launchable(item)) return // HOM-10: an unavailable pin has nothing to launch
         when (item.ref.kind) {
             ItemKind.App -> byKey[item.ref.id]?.let { SessionUse.mark(it.key); onLaunchApp(it) }
             ItemKind.Group -> state.groups.firstOrNull { it.id == item.ref.id }?.let(onRunGroup)

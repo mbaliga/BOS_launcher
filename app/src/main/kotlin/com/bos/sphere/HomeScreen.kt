@@ -605,7 +605,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     )
     androidx.compose.runtime.SideEffect { homeEdit.hooks = homeItems }
     com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
-        if (appsByKey[key] != null && pages.none { key in it.keys }) stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)
+        if (appsByKey[key] != null && pages.none { key in it.keys }) { stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve); homeItems.onPlaced() }
     }, onItems = { defs -> homeItems.addDropped(defs) }, onTouchDrag = { menuApp = null })
     // HOM-10: folder members and dock pins of packages that are gone are unavailable first, then removed after the grace period.
     LaunchedEffect(allApps) { if (allApps.isNotEmpty()) homeItems.reconcileMembers(allApps.mapTo(HashSet()) { it.key }) }
@@ -746,6 +746,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // WSP-05: a group placed on the page grid runs like the dock's group item.
     homeItems.runGroup = { g -> scope.launch { appLauncher.runGroup(g) } }
+    // Wave 24: an item placed from Glance, Recents or All apps lands on pages; show the landing that draws them.
+    homeItems.onPlaced = { com.bos.sphere.core.data.HomePlacementLanding.after(stores.prefs.prefs.value.homeLanding)?.let { l -> stores.prefs.update { it.copy(homeLanding = l) } } }
     val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
     val searchHub = remember {
         val palette = com.bos.sphere.feature.search.palette.PaletteHost.get(context)

@@ -91,7 +91,12 @@ internal fun rememberDndOn(): Boolean {
  * behind regroups live as the groups change.
  */
 @Composable
-internal fun LaunchpadGroupsOverlay(open: Boolean, feed: List<HubNotification>, onClose: () -> Unit) {
+internal fun LaunchpadGroupsOverlay(
+    open: Boolean, feed: List<HubNotification>,
+    /** Wave 24 review: beside the home card the manager keeps clear of the card's return zone, like the column behind it. */
+    endInset: androidx.compose.ui.unit.Dp = 0.dp,
+    onClose: () -> Unit,
+) {
     if (!open) return
     BackHandler(enabled = open, onBack = onClose)
     val req = remember { FocusRequester() }
@@ -102,7 +107,8 @@ internal fun LaunchpadGroupsOverlay(open: Boolean, feed: List<HubNotification>, 
             .pointerInput(Unit) { detectTapGestures { } }
             .onPreviewKeyEvent { if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) { onClose(); true } else false }
             .focusRequester(req).focusable()
-            .statusBarsPadding().navigationBarsPadding(),
+            .statusBarsPadding().navigationBarsPadding()
+            .padding(end = if (endInset > 0.dp) endInset + 8.dp else 0.dp),
     ) {
         Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(L10n.tr("Groups and rules"), color = c.ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
@@ -159,7 +165,8 @@ internal fun GroupPeoplePicker(c: GColors, g: LaunchpadGroup, cfg: GroupsConfig,
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         others.forEachIndexed { j, o ->
                             GChip(c, o.senders.first(), description = L10n.tr("%s is the same person as %s", m.label, o.senders.first()), tag = "grp.card.${g.id}.member.$i.link.$j") {
-                                o.senders.forEach { s -> GroupsSettings.linkSenders(m.label, s, o.contactKey) }
+                                // Review fix: linked through the person's id and kept in this group (not "first assignment wins").
+                                GroupsSettings.edit { GroupPeople.linkInto(it, m.target, o, g.id) }
                                 linkingFor = null
                             }
                         }

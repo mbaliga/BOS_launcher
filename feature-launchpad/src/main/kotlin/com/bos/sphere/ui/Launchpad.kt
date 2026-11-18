@@ -736,7 +736,7 @@ fun LaunchpadContent(
             )
         }
     }
-    LaunchpadGroupsOverlay(groupsOpen, items) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
+    LaunchpadGroupsOverlay(groupsOpen, items, endInset = endInset) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
     groupFor?.let { n ->
         GroupAssignSheet(
             n, groups, contacts, items,

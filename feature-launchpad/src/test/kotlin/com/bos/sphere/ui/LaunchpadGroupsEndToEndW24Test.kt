@@ -298,6 +298,10 @@ class LaunchpadGroupsEndToEndW24Test {
         assertEquals(1, sent.size)
         assertEquals(feed.first { it.key == "c" }.contentIntent, sent.single().first)
         assertNotNull("Android 14+: the sender's background-activity-start opt-in travels with it", sent.single().second)
+        // Review: not just any bundle; the same opt-in options PendingIntentLauncher builds, and not an empty one.
+        val keys = sent.single().second!!.keySet()
+        assertTrue("the options bundle is not empty", keys.isNotEmpty())
+        assertEquals(PendingIntentLauncher.options()!!.keySet(), keys)
         assertTrue("the tapped row is marked read", "c" in LaunchpadSettings.readKeys.value)
     }
 

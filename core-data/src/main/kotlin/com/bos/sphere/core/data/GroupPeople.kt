@@ -85,6 +85,21 @@ object GroupPeople {
         return GroupsEdit.assign(next, AssignKind.Person, personId, groupId)
     }
 
+    /**
+     * Wave 24 review: "Link another name" on a person who is a member of [groupId]: every sender name of [other] becomes an alias
+     * of that stored person (found by id, not by its label), and the person stays in [groupId], the group the link was made
+     * from, even when [other] already had its own assignment elsewhere (a plain merge keeps whichever assignment came first).
+     */
+    fun linkInto(c: GroupsConfig, personId: String, other: PersonCandidate, groupId: String): GroupsConfig {
+        val p = c.person(personId) ?: return c
+        if (c.group(groupId) == null || other.identity == personId) return c
+        var next = c
+        val names = other.senders.ifEmpty { listOf(other.name) }
+        names.forEach { s -> next = GroupsEdit.linkSenders(next, p.name, s, p.contactKey ?: other.contactKey) }
+        if (next.person(personId) == null) return c
+        return GroupsEdit.assign(next, AssignKind.Person, personId, groupId)
+    }
+
     /** A typed name (someone with nothing in the feed right now): a stored person with that name, put in [groupId]. */
     fun addNameToGroup(c: GroupsConfig, name: String, groupId: String, id: String = "p:" + UUID.randomUUID()): GroupsConfig {
         if (PersonNames.key(name).isEmpty() || c.group(groupId) == null) return c

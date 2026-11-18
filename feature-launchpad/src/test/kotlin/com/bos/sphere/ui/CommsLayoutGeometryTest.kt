@@ -59,8 +59,9 @@ class CommsLayoutGeometryTest : CommsLayoutCases("geo") {
 
     @Test fun CML_03_tabsAndTheirHairlineLandOnTheMockUp() {
         val b = screen()
-        val left = listOf(70, 174, 358, 489, 644); val ranges = listOf(60 to 150, 160 to 330, 340 to 470, 475 to 625, 630 to 830)
-        for (i in 0 until 5) MockDiff.ink(b, ranges[i].first, 270, ranges[i].second, 325, pageBg, 25)!!.let {
+        // Wave 28: the USAGE tab is gone (Usage lives in Timeline), so TIMELINE takes the fourth place, where the mock-up's USAGE started.
+        val left = listOf(70, 174, 358, 489); val ranges = listOf(60 to 150, 160 to 330, 340 to 470, 475 to 830)
+        for (i in 0 until 4) MockDiff.ink(b, ranges[i].first, 270, ranges[i].second, 325, pageBg, 25)!!.let {
             near("tab $i left", left[i], it[0]); near("tab $i cap top", 286, it[1]); near("tab $i baseline", 312, it[3])
         }
         val rows = MockDiff.lineRows(b, 100, 700, 320, 350, pageBg)

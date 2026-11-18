@@ -256,3 +256,34 @@ Nothing here has been confirmed on a device. Decisions: `docs/decisions/crashRec
 - [ ] NFR-13, PAL-18: Settings > Display > Font size at the largest: the wheel labels do not overlap each other, the mic is still centred and whole.
 - [ ] PAL-18: Flat with an empty query has no Close button, only the scope pill and the placeholder; Esc and Back close Radar.
 - [ ] NFR-05: with the glass on, a minute of scrolling and rotating Radar over Spire, Beam and Halo stays within 1 percent janky frames (`gfxinfo`).
+
+## Device checks page (wave 23, deviceKit)
+
+Settings (Ground Control) > Lab > **Device checks**. The Lab is listed in debug builds and, during alpha, in release builds (docs/decisions/CFG-17.md). The page measures and records; **Copy report** puts one plain-text block on the clipboard (nothing is sent anywhere) for you to paste back. A number or a Pass here is evidence for the owner to weigh, never a spec row closed by the app. No code claim of NFR-05, NFR-06, NFR-12, NFR-13, NFR-14, INP-12, CFG-17 or SPK-01 is changed by this page; the rows stay as written in docs/SPEC_STATUS.md until a pasted report is reviewed.
+
+### Frame timing (NFR-05)
+For each surface: tap its row, leave Settings within 3 seconds, use the surface for 10 seconds (the page shows a countdown when you come back), read the result. It shows frames, p50, p95 and p99 total frame duration, the share of frames over the display's refresh interval (the "janky" figure; the NFR-05 budget is at most 1 percent) and the slowest frame. The last run per surface is kept on the phone. A run is discarded if Liftoff stops (screen off, another app in front) so a partial run is never shown.
+- [ ] Glance: swipe between the clock and the edges, open and close the quick sheet.
+- [ ] Drawer scroll: open the drawer and fling the list up and down for the 10 seconds.
+- [ ] Radar: open and type: open Radar, type a few words, clear, type again.
+- [ ] Launchpad: open and close: open and close Launchpad repeatedly.
+- [ ] Page swipe: swipe through the home pages back and forth.
+Run each on a release build with animations on, not with the debugger attached. The measure is the platform's own `FrameMetrics` total duration; it is not the same number as `gfxinfo` or `FrameTimingMetric`, so quote which one you used.
+
+### Cold start (NFR-12)
+Swipe Liftoff away from recents, open it from the launcher or the home button, then open the page. "This start" is the time from process start (`Process.getStartElapsedRealtime`) to the first drawn home frame. If something other than opening the app started the process earlier (boot, a widget, a broadcast), the number includes that wait. The process start reason (`ApplicationStartInfo`) needs API 35 and the minimum is 31, so it is not read.
+
+### Checklist (Pass, Fail or Skip, plus a note; kept on the phone)
+- [ ] TalkBack order: TalkBack on, swipe through home, the drawer and Radar; order follows the screen, every control is named (NFR-13).
+- [ ] Gesture navigation: edge swipe against the back gesture: with gesture navigation on, swipe from the left and right edges; note which edge opens a Liftoff panel and which goes Back (NFR-20, STR-01).
+- [ ] Animations removed: Remove animations on; Radar, Launchpad and page turns do not slide or loop (NFR-14).
+- [ ] Font size 200 percent: largest font (Developer options font scale 2.0); no cut-off text on home, Radar, Settings (NFR-13).
+- [ ] Display size large: no overlap on the grid, the dock or Radar (NFR-13).
+- [ ] Radar glass in daylight, dark and light: field, buttons and results readable at full brightness in both themes (docs/decisions/radarGlass.md).
+- [ ] Real crash path: Lab "Crash on purpose" (tap twice); the recovery screen shows on the next start; Continue opens Liftoff normally (NFR-09, CFG-09).
+- [ ] Speech engine: Radar microphone, speak a query; note whether an engine answered and whether it works offline (SPK-07, INP-13).
+- [ ] Work profile badge: with a work profile, its apps carry the badge in the drawer and Radar (HOM-06).
+- [ ] Notification tap opens the app: tap a notification Liftoff shows; the posting app opens (HOM-09).
+- [ ] External display: connect one; note whether Liftoff became its home or a desktop surface was offered (SPK-01, EXT-02).
+
+INP-12 (keyboard focus when the drawer opens) and NFR-06 (180 MB PSS with 10 widgets, `tools/measure_pss.sh`) have no probe on this page: INP-12 is the "INP-12, NFR-13" keyboard line in the Radar section above (and the drawer type-to-filter focus), NFR-06 stays a `tools/` measurement.

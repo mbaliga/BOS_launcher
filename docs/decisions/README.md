@@ -4,6 +4,7 @@ One line per record, newest wave first. A record explains why a requirement is b
 
 | Record | Wave | What it decides |
 | --- | --- | --- |
+| [launchpadHub.md](launchpadHub.md) | 25 | Launchpad menu is a left side panel above the notifications (home card slides out), hub-style flat rows with a stripe, floating compose button (STR-01, STR-02) |
 | [homeLandingPlacement.md](homeLandingPlacement.md) | 24 | Placing a home item from Glance, Recents or All apps switches to Selected apps; a workspace switch ends edit mode (HOM-02, HOM-07, HOM-12, HOM-15) |
 | [orbitTyping.md](orbitTyping.md) | 20 | Radar keeps the Orbit while typing: best match in the innermost ring, tiers named by match, web rows and Filenames in a compact strip (PAL-18, PAL-12) |
 | [radarGlass.md](radarGlass.md) | 21 | Radar glass: mic at the bottom centre, glass field and buttons with a measured legibility shade, the Clear X inside the field; one reusable `glass()` (PAL-18, INP-12, NFR-15) |

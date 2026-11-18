@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.down
 import androidx.compose.ui.test.moveBy
@@ -254,6 +255,9 @@ class LaunchpadInteractionTest {
             )
         }
         rule.waitForIdle()
+        // Wave 25: a resting row shows no chips; a long press opens them in place.
+        assertTrue(rule.onAllNodesWithText("Mark read").fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithTag("lp.focus.a1").performTouchInput { longClick() }; rule.waitForIdle()
         rule.onNodeWithText("Mark read").performClick(); rule.waitForIdle()
         assertEquals(listOf("Mark read"), ran)
         rule.onNodeWithText("Reply").performClick(); rule.waitForIdle()

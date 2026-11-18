@@ -1,0 +1,21 @@
+# Launchpad as a hub: side panel menu, flat rows, floating compose (wave 25)
+
+Owner items 1 and 2 (visual and interaction part). Requirement rows: STR-01, STR-02 (STR-03, STR-13 untouched in behaviour).
+
+## Decisions
+
+- **The three-bars menu is a left side panel, not a pop-up.** `LaunchpadMenuLayer` (feature-launchpad, `LaunchpadMenuPanel.kt`) sits above the notifications layer: a scrim over the list, a panel at most 320 dp wide on the physical left (right in right-to-left layouts). The old `DropdownMenu` and its `MenuLabel` are removed; no alternative is left.
+- **One progress drives four things.** `LaunchpadMenuState.progress` (0..1) moves the panel in from the left, shifts the notification list right by the panel width, fades the scrim, and (read by the host) slides the floating home card fully out of view to the right. It settles with the home card's own 450 ms ease-out (`LaunchpadCardGeometry.SETTLE_MS`, the same cubic-bezier) so the two motions read as one language. The maths is in `LaunchpadMenuMotion` (pure, JVM-tested): at full progress `cardBounds + cardTranslation` has its left edge at or beyond the window width in every size, and mirrored in RTL.
+- **Reduced motion: fade only.** Nothing travels: the panel and the home card cross-fade; the card is moved away only once it is fully transparent (so it cannot catch touches).
+- **Back, Esc, scrim, close button, a swipe left on the list** all close the panel first; the next Back leaves Launchpad. A `BackHandler` registered after the panel's predictive handler takes the press while the menu is open (the predictive handler is untouched, so the NFR-19 audit keeps its exact shape).
+- **The same options, as real rows.** Group by (six modes), Show (All and one row per app with its count), Groups and rules, Clear all: 48 dp rows, a check mark and `selected` semantics on the current choice. Picking a grouping or a filter closes the panel.
+- **Host wiring.** `LaunchpadPanel(menu = ..., onCompose = ...)`. HomeScreen owns the `LaunchpadMenuState` and applies `Modifier.launchpadMenuAside` to the home card layer and to the card's return overlay.
+- **Hub rows.** Flat rows, min 72 dp, a 4 dp stripe on the leading edge (full row height), a 32 dp app badge, title bold when unread (normal when read) with the time right-aligned on the same line, a one-line preview in the lighter tone, a 0.5 dp divider. No gaps between rows. Day sections read "Thu 20 Aug 2015" (`HubStyle.dayHeader`); other sections keep their titles. The jump strip at the top lost its pills (flat text tabs, the current one underlined).
+- **Stripe colour** is `HubStyle.stripeFor(package)`: a small table of known brand colours, else one of ten hues picked by the package hash. It is stable per app. The icon's dominant colour is NOT used (it would need decoding every icon on the list path); `NotificationRow(stripeColor = ...)` takes any colour so the hub data stream can pass its own.
+- **Action chips only on expand.** A resting row has no chips; a long press (or the secondary button) opens Reply, the notification's own actions and "Actions" (the full sheet) under the row. The hover/focus buttons and the TalkBack custom actions are unchanged.
+- **Floating compose button.** 56 dp, blue, a pencil, 16 dp from the right edge and above the navigation bar, labelled "Compose". There was no docked compose strip in the Launchpad code to remove (the only docked strip-like control was the header menu). Launchpad has no composer of its own and no search entry in its list, so the button asks the host: HomeScreen closes Launchpad and opens Radar on the People scope (`SearchOverlay(initialCategory = Contacts)`), where a contact's message channels are one tap away. `SearchOverlay` gained an `initialCategory` parameter and its first empty query no longer clears the opening scope.
+- **Hooks for the history/files/usage/timeline work (stream hubData).** `viewSwitcher: @Composable () -> Unit = {}` on `LaunchpadPanel` and `LaunchpadContent` draws in the top bar between the title and "Home". `NotificationRow` already takes `unread` and now `stripeColor`.
+
+## How to undo
+
+Restore `LaunchpadHeader` and `MenuLabel` from wave 24 and delete `LaunchpadMenuPanel.kt`; the row changes are in `LaunchpadRows.kt` (`NotificationRow`, `SectionHeader`) and `RoomyList` constants.

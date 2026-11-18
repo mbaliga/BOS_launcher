@@ -152,6 +152,8 @@ fun SearchOverlay(
     settingsSource: SettingsResultSource? = null,
     /** PAL-01: text already typed when Radar opens (type-to-search from home). */
     initialQuery: String = "",
+    /** Wave 25: the scope Radar opens on (Launchpad's compose button opens it on People); null = all. */
+    initialCategory: SearchCategory? = null,
     /** PAL-03: a launcher command a result asked for (a core-input LauncherCommand name, and a workspace index if any). */
     onRunCommand: (String, Int?) -> Unit = { _, _ -> },
     /** PAL-08: run a shared menu action (display, beside, dock) straight from the Radar list; false = the host cannot, so the app sheet opens. */
@@ -171,7 +173,7 @@ fun SearchOverlay(
             onRequestContactsPermission = onRequestContactsPermission, onDismiss = onDismiss,
             hub = hub, onOpenHit = onOpenHit, onRunAction = onRunAction,
             onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
-            initialQuery = initialQuery, onRunCommand = onRunCommand,
+            initialQuery = initialQuery, initialCategory = initialCategory, onRunCommand = onRunCommand,
             onRunAppAction = onRunAppAction, adjacentSupported = adjacentSupported, onAppActionChoices = onAppActionChoices,
             launchHistory = launchHistory,
         )
@@ -288,10 +290,12 @@ internal fun SearchScreen(
         runCatching { focus.requestFocus(); keyboard?.show() }
     }
     DisposableEffect(Unit) { onDispose { runCatching { keyboard?.hide() } } }
+    var firstQuery by remember { mutableStateOf(true) } // wave 25: the scope Radar was opened on (initialCategory) survives the first, empty query
     LaunchedEffect(trimmed) {
         touched = false
         expandedContact = null
-        if (trimmed.isEmpty()) userCat = null // an explicit choice sticks until the query is cleared
+        if (trimmed.isEmpty() && !firstQuery) userCat = null // an explicit choice sticks until the query is cleared
+        firstQuery = false
     }
 
     // ---- results

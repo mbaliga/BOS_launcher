@@ -4,7 +4,6 @@ import android.view.KeyEvent
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.MediaNow

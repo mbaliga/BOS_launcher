@@ -89,13 +89,14 @@ class W13AuditStateTest {
         assertEquals(parts.launchpadGroups!!.copy(extra = decoded.extra), decoded)
     }
 
-    @Test fun CFG_01_theLandingSettingsRoundTripAndAnOlderSettingsFileKeepsTheDefaults() {
-        val prefs = LauncherPrefs(homeLanding = HomeLanding.AllApps, recentsLimit = 30)
+    @Test fun CFG_01_theHomeSettingsRoundTripAndAnOlderSettingsFileKeepsTheDefaults() {
+        val prefs = LauncherPrefs(glanceEnabled = false, homeOrder = HomeOrder.RightToLeft, recentsLimit = 30)
         val back = SettingsCodec.decode(SettingsCodec.encode(prefs)).prefs
-        assertEquals(HomeLanding.AllApps, back.homeLanding)
+        assertEquals(HomeOrder.RightToLeft, back.homeOrder); assertEquals(false, back.glanceEnabled)
         assertEquals(30, back.recentsLimit)
         val old = SettingsCodec.decode(JSONObject().put("format", StateSchema.SETTINGS_FORMAT).put("version", 1)).prefs
-        assertEquals(HomeLanding.Glance, old.homeLanding) // wave 16: the default landing is Glance
+        assertEquals(true, old.glanceEnabled) // wave 26: Glance is on by default
+        assertEquals(HomeOrder.LeftToRight, old.homeOrder)
     }
 
     @Test fun HOM_01_anImportedEmptyHomeOrAnyOtherSavedHomeIsNeverTakenForAFreshInstall() {

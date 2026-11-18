@@ -1,7 +1,7 @@
 package com.bos.sphere.ui
 
 import com.bos.sphere.core.data.ChromeSettings
-import com.bos.sphere.core.data.HomeLanding
+import com.bos.sphere.core.data.HomeShown
 import com.bos.sphere.core.data.RightSide
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.grid.SettingsIndex
@@ -21,10 +21,10 @@ class DockDeskReviewW24RulesTest {
 
     @Test fun INP_05_whileTheHomeIsEditedFocusDockSaysWhyInsteadOfNothing() {
         val c = ChromeSettings()
-        assertEquals(FocusDockRouting.NoDock.Editing, FocusDockRouting.noDock(HomeLanding.Selected, c, dockEnabled = true, editing = true))
-        assertEquals(FocusDockRouting.NoDock.Editing, FocusDockRouting.noDock(HomeLanding.Glance, c.copy(rightSide = RightSide.DockRail), dockEnabled = false, editing = true))
-        assertEquals("the dock being off is the reason to fix first", FocusDockRouting.NoDock.Off, FocusDockRouting.noDock(HomeLanding.Selected, c, dockEnabled = false, editing = true))
-        assertNull(FocusDockRouting.noDock(HomeLanding.Selected, c, dockEnabled = true, editing = false))
+        assertEquals(FocusDockRouting.NoDock.Editing, FocusDockRouting.noDock(HomeShown.Pages, c, dockEnabled = true, editing = true))
+        assertEquals(FocusDockRouting.NoDock.Editing, FocusDockRouting.noDock(HomeShown.Glance, c.copy(rightSide = RightSide.DockRail), dockEnabled = false, editing = true))
+        assertEquals("the dock being off is the reason to fix first", FocusDockRouting.NoDock.Off, FocusDockRouting.noDock(HomeShown.Pages, c, dockEnabled = false, editing = true))
+        assertNull(FocusDockRouting.noDock(HomeShown.Pages, c, dockEnabled = true, editing = false))
     }
 
     @Test fun CFG_14_settingsSearchFindsTheDockPanelByWorkspacesAndGroups() {

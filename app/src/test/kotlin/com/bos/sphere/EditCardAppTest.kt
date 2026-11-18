@@ -53,7 +53,7 @@ class EditCardAppTest {
         val stores = LauncherStores.get(AppSmokeHarness.app)
         settle()
         // Onboarding is not what is under test: finish it so the home is what the person sees.
-        stores.prefs.update { it.copy(onboardingDone = true, homeLanding = com.bos.sphere.core.data.HomeLanding.Selected) } // wave 16: the default landing is Glance; these tests are about the Selected apps home
+        stores.prefs.update { it.copy(onboardingDone = true, glanceEnabled = false) } // wave 26: Glance off, so home is the first page; these tests are about the pages
         settle()
         return stores
     }
@@ -141,13 +141,14 @@ class EditCardAppTest {
         rule.onNodeWithContentDescription("Add to home: Camera").assertIsDisplayed() // back in the carousel
     }
 
-    @Test fun HOM_22_leavingSelectedAppsEndsAnOpenEditSession() {
+    @Test fun HOM_22_theHomeButtonToGlanceEndsAnOpenEditSession() {
         val stores = startFresh()
+        stores.prefs.update { it.copy(glanceEnabled = true) }; settle() // Glance on: home still shows the pages until the Home button is pressed
         rule.onNodeWithText("Long press to add apps").performClick(); settle()
         rule.onNodeWithContentDescription("Page carousel").assertIsDisplayed()
-        stores.prefs.update { it.copy(homeLanding = com.bos.sphere.core.data.HomeLanding.Minimal) }; settle()
-        assertTrue("edit mode ended with the landing switch", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
-        stores.prefs.update { it.copy(homeLanding = com.bos.sphere.core.data.HomeLanding.Selected) }; settle()
+        scenario!!.onActivity { androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)) }; settle()
+        assertTrue("edit mode ended when home went back to Glance", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
+        settle()
         assertTrue("and does not come back by itself", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
     }
 }

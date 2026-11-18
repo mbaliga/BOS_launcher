@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -124,6 +125,7 @@ internal fun ToggleSettingRow(item: SettingItem.Toggle, onToggle: (Boolean) -> U
             role = Role.Switch
             contentDescription = "${item.title}, ${item.value}"
             stateDescription = item.value
+            toggleableState = androidx.compose.ui.state.ToggleableState(item.checked) // wave 26: a Switch exposes its state (the first visible Home row is now one)
         },
         trailing = {
             TactileToggle(item.checked)

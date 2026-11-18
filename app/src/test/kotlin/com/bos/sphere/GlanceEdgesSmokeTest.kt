@@ -70,7 +70,7 @@ class GlanceEdgesSmokeTest {
 
     @Test fun STR_01_aFreshStateIsOnGlanceWithTheLeftPageOnLaunchpad() {
         startFresh()
-        assertEquals(com.bos.sphere.core.data.HomeLanding.Glance, LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.homeLanding)
+        assertTrue(LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled); assertTrue(tagShown("glance.deckdots"))
         assertEquals(LeftPage.Launchpad, LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.leftPage)
     }
     @Test fun STR_01_aTouchSwipeFromTheLeftEdgeOpensLaunchpadOnGlance() { startFresh(); swipeFromLeft(); assertTrue(launchpadShown()) }
@@ -152,7 +152,7 @@ class GlanceEdgesSmokeTest {
         assertTrue(tagShown("glance.handle.left")); assertFalse("no pill when the rail setting is on", tagShown("glance.waiting"))
         rule.onNodeWithTag("glance.handle.left", useUnmergedTree = true).performClick(); settle(); assertTrue(launchpadShown())
     }
-    @Test fun HOM_22_theOtherLandingsKeepTheirOwnHandles() {
+    @Test fun HOM_22_withGlanceOffThePagesKeepTheirOwnHandles() {
         AppSmokeHarness.seedApps("Alpha"); AppSmokeHarness.configure(); scenario = AppSmokeHarness.launch(); rule.waitForIdle(); settle()
         assertFalse(tagShown("glance.handle.left")); assertTrue(tagShown("recents.handle"))
         assertTrue(rule.onAllNodesWithContentDescription("Launchpad").fetchSemanticsNodes().isNotEmpty())
@@ -172,15 +172,15 @@ class GlanceEdgesSmokeTest {
     fun STR_14_landscapeTheRightEdgeSwipeOpensRecentsOnGlance() { startFresh(); swipeFromRight(); assertTrue(recentsShown()) }
 
     @Test @Config(qualifiers = "ar-ldrtl-w360dp-h720dp-xhdpi")
-    fun STR_01_rightToLeftLaunchpadOpensFromThePhysicalRightEdgeAndRecentsFromTheLeft() {
-        startFresh();
+    fun STR_01_rightToLeftOrderLaunchpadOpensFromThePhysicalRightEdgeAndRecentsFromTheLeft() {
+        startFresh { it.copy(homeOrder = com.bos.sphere.core.data.HomeOrder.RightToLeft) }
         swipeFromRight(); assertTrue("RTL: Launchpad from the right edge", launchpadShown())
     }
     @Test @Config(qualifiers = "ar-ldrtl-w360dp-h720dp-xhdpi")
-    fun STR_14_rightToLeftRecentsOpensFromThePhysicalLeftEdge() { startFresh(); swipeFromLeft(); assertTrue(recentsShown()) }
+    fun STR_14_rightToLeftOrderRecentsOpensFromThePhysicalLeftEdge() { startFresh { it.copy(homeOrder = com.bos.sphere.core.data.HomeOrder.RightToLeft) }; swipeFromLeft(); assertTrue(recentsShown()) }
     @Test @Config(qualifiers = "ar-ldrtl-w360dp-h720dp-xhdpi")
-    fun STR_01_rightToLeftTheLaunchpadHandleSitsOnTheRightEdge() {
-        startFresh()
+    fun STR_01_rightToLeftOrderTheLaunchpadHandleSitsOnTheRightEdge() {
+        startFresh { it.copy(homeOrder = com.bos.sphere.core.data.HomeOrder.RightToLeft) }
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
         assertEquals(root.right, rule.onNodeWithTag("glance.handle.left", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.right, 2f)
         assertEquals(0f, rule.onNodeWithTag("recents.handle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left, 2f)

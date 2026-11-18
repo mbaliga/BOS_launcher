@@ -3,7 +3,6 @@ package com.bos.sphere
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.LauncherStores
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,16 +35,16 @@ class ZeroSizeStartSmokeTest {
         scenario?.close(); scenario = null; AppSmokeHarness.resetProcess(); Thread.setDefaultUncaughtExceptionHandler(old)
     }
 
-    @Test fun NFR_09_everyLandingStartsInATinyWindow() {
+    @Test fun NFR_09_glanceOnAndOffStartInATinyWindow() {
         AppSmokeHarness.seedApps("Alpha", "Bravo")
-        for (landing in HomeLanding.entries) {
+        for (landing in listOf(true, false)) {
             AppSmokeHarness.resetProcess()
-            AppSmokeHarness.configure { it.copy(homeLanding = landing) }
+            AppSmokeHarness.configure { it.copy(glanceEnabled = landing) }
             scenario = AppSmokeHarness.launch(); rule.waitForIdle()
             assertTrue("$landing: $uncaught", uncaught.isEmpty())
             scenario!!.close(); scenario = null
             AppSmokeHarness.restartProcess()
         }
-        assertEquals(HomeLanding.entries.last(), LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.homeLanding)
+        assertEquals(false, LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled)
     }
 }

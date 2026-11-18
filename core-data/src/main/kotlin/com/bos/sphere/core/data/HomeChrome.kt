@@ -32,8 +32,8 @@ data class ChromeSettings(
  * Every landing x element is stated here and tested, so a new landing cannot lose an element by accident.
  */
 object HomeChromeRules {
-    fun shows(landing: HomeLanding, element: ChromeElement, s: ChromeSettings = ChromeSettings()): Boolean {
-        val glance = landing == HomeLanding.Glance
+    fun shows(landing: HomeShown, element: ChromeElement, s: ChromeSettings = ChromeSettings()): Boolean {
+        val glance = landing == HomeShown.Glance
         val launchpad = s.leftPage == LeftPage.Launchpad
         return when (element) {
             ChromeElement.LeftHandle -> s.leftPage != LeftPage.Off
@@ -49,14 +49,14 @@ object HomeChromeRules {
      * W20 audit (HOM-23, STR-14): Right side = Dock rail on Glance must actually show the rail, also on a phone where the dock setting is
      * off by default; otherwise the indicator dot "Show the dock" and the edge swipe did nothing. Other landings keep the dock setting.
      */
-    fun forcesDock(landing: HomeLanding, s: ChromeSettings): Boolean = landing == HomeLanding.Glance && s.rightSide == RightSide.DockRail
+    fun forcesDock(landing: HomeShown, s: ChromeSettings): Boolean = landing == HomeShown.Glance && s.rightSide == RightSide.DockRail
 
     /** Handles and the waiting indicator are drawn in their quiet form (low alpha, fading when idle) on Glance only. */
-    fun quiet(landing: HomeLanding, element: ChromeElement): Boolean =
-        landing == HomeLanding.Glance && (element == ChromeElement.LeftHandle || element == ChromeElement.RightHandle || element == ChromeElement.WaitingIndicator)
+    fun quiet(landing: HomeShown, element: ChromeElement): Boolean =
+        landing == HomeShown.Glance && (element == ChromeElement.LeftHandle || element == ChromeElement.RightHandle || element == ChromeElement.WaitingIndicator)
 
     /** The edge zone (dp) in which a drag opens a card: the handle's width on Glance, so the swipe also starts where the handle is. */
-    fun edgeZoneDp(landing: HomeLanding): Float = if (landing == HomeLanding.Glance) GLANCE_EDGE_DP else DEFAULT_EDGE_DP
+    fun edgeZoneDp(landing: HomeShown): Float = if (landing == HomeShown.Glance) GLANCE_EDGE_DP else DEFAULT_EDGE_DP
     const val DEFAULT_EDGE_DP = 28f
     const val GLANCE_EDGE_DP = 48f
     const val HANDLE_WIDTH_DP = 48f

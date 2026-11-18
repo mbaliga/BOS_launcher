@@ -59,6 +59,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -172,7 +173,7 @@ internal sealed interface PageGeometry {
                     Grid(
                         GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else prefs.gridBias, spread = prefs.iconSpacing,
                             spreadY = if (prefs.spacingV >= 0f) prefs.spacingV else prefs.iconSpacing,
-                            insetX = prefs.gridInsetX, insetTop = prefs.gridInsetTop, insetBottom = prefs.gridInsetBottom),
+                            insetX = prefs.gridInsetX, insetTop = prefs.gridInsetTop, insetBottom = prefs.gridInsetBottom, mirror = prefs.homeOrder.rtl),
                         prefs.iconScale,
                         prefs.showLabels,
                     )
@@ -230,6 +231,8 @@ fun GridHome(
     /** HOM-12: edit mode. Items are grabbed at once (no long press), and apps and shortcuts carry a remove handle. */
     editMode: Boolean = false,
     onRemoveItem: (String) -> Unit = {},
+    /** Wave 26: when Glance is on, the page dots count it as the first stop and this returns to it. */
+    onGlance: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val ex by rememberUpdatedState(extras)
@@ -241,7 +244,7 @@ fun GridHome(
     // The whole surface is laid out in physical (LTR) coordinates — geometry, hit-testing and
     // gestures are physical, and corners are pinned to physical corners — so RTL locales draw
     // exactly where touches land. Text inside still shapes right-to-left.
-    val rtl = false
+    val rtl = prefs.homeOrder.rtl // wave 26: the home order (not the app language) mirrors the pages and the cells
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -678,6 +681,7 @@ fun GridHome(
                 if (paging == PagingAxis.Horizontal) {
                     HorizontalPager(
                         state = pagerState,
+                        reverseLayout = rtl,
                         userScrollEnabled = dragKey == null,
                         beyondViewportPageCount = 1,
                         modifier = Modifier.fillMaxSize(),
@@ -737,6 +741,8 @@ fun GridHome(
             vertical = indicatorAtStart,
             onSelect = { scope.launch { pagerState.pageTo(it, stillPaging) } },
             onMenu = { onEmptyLongPress(pagerState.currentPage) },
+            rtl = rtl,
+            onGlance = onGlance,
             homeIndex = prefs.homePage.coerceIn(0, (pageCount - 1).coerceAtLeast(0)),
             modifier = if (indicatorAtStart) {
                 Modifier.align(Alignment.CenterStart).windowInsetsPadding(safe).padding(start = 14.dp)
@@ -935,7 +941,7 @@ fun SettingsTile(size: Dp, modifier: Modifier = Modifier) {
 val LocalLabelScale = androidx.compose.runtime.compositionLocalOf { 1f }
 
 @Composable
-private fun AppLabel(label: String, iconDp: Dp) {
+internal fun AppLabel(label: String, iconDp: Dp) {
     Text(
         label,
         color = HyleColors.Ink,
@@ -1023,9 +1029,20 @@ fun PageIndicator(
     onMenu: (() -> Unit)? = null,
     /** Which page carries the house (the one the Home button returns to). */
     homeIndex: Int = 0,
+    /** Wave 26: right to left order draws the first page's dot at the right (the row is mirrored, whatever the app language is). */
+    rtl: Boolean = false,
+    /** Wave 26: Glance is the first stop of the deck: a leading dot (tag "pages.glancedot") that returns to it. Null: Glance is off, no dot. */
+    onGlance: (() -> Unit)? = null,
 ) {
-    if (count <= 1) return
+    if (count <= 1 && onGlance == null) return
     val content: @Composable () -> Unit = {
+        if (onGlance != null) {
+            Box(
+                Modifier.testTag("pages.glancedot").padding(horizontal = 2.dp).size(24.dp).pointerInput(Unit) { detectTapGesturesSimple { onGlance() } }
+                    .semantics { role = androidx.compose.ui.semantics.Role.Button; contentDescription = com.bos.sphere.core.design.L10n.tr("Glance home, stop %s of %s", 1, count + 1); onClick(com.bos.sphere.core.design.L10n.tr("Glance home")) { onGlance(); true } },
+                contentAlignment = Alignment.Center,
+            ) { Box(Modifier.size(7.dp).background(HyleColors.Ink.copy(alpha = 0.75f), androidx.compose.foundation.shape.CircleShape)) }
+        }
         // ≡ then ⌂ then the dots: the menu opens this page's options, the house is the first page.
         if (onMenu != null) {
             Icon(
@@ -1056,7 +1073,9 @@ fun PageIndicator(
     if (vertical) {
         Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { content() }
     } else {
-        Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) { content() }
+        androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) { content() }
+        }
     }
 }
 
@@ -1093,7 +1112,7 @@ private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere
     val pad = g.base * 0.04f
     val wPx = place.span.cols * g.pitchX - 2 * pad
     val hPx = place.span.rows * g.pitchY - 2 * pad
-    val left = g.cellLeft(slot) + pad
+    val left = g.spanLeft(slot % g.columns, place.span.cols) + pad
     val top = g.cellTop(slot) + pad
     Box(
         Modifier.offset { IntOffset(left.roundToInt(), top.roundToInt()) }

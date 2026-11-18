@@ -26,6 +26,6 @@ HSPLcom/bos/sphere/feature/grid/HomeLegibilityKt**;->**(**)**
 HSPLcom/bos/sphere/feature/grid/BackgroundSamples;->**(**)**
 HSPLcom/bos/sphere/feature/grid/SignalBackgroundKt**;->**(**)**
 # Wave 8 to 12 additions on the first-frame path: the landing host, the landing rules and the groups store read at start.
-HSPLcom/bos/sphere/HomeLandingHostKt**;->**(**)**
-HSPLcom/bos/sphere/core/data/HomeLanding**;->**(**)**
+HSPLcom/bos/sphere/UsageAccessHostKt**;->**(**)**
+HSPLcom/bos/sphere/core/data/HomeShown**;->**(**)**
 HSPLcom/bos/sphere/core/data/GroupsSettings;->**(**)**

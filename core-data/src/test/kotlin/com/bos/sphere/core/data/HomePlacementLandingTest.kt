@@ -4,20 +4,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Wave 24: placing a home item from a landing without pages shows the landing that draws it. */
+/** Wave 24, updated in wave 26: placing a home item while Glance is showing moves to the pages, which draw it. */
 class HomePlacementLandingTest {
-    @Test fun HOM_02_placingAnItemFromALandingWithoutPagesSwitchesToSelectedApps() {
-        for (l in HomeLanding.entries.filter { !HomeLandingRules.hasPages(it) }) {
-            assertEquals("from $l", HomeLanding.Selected, HomePlacementLanding.after(l))
-        }
+    @Test fun HOM_02_placingAnItemFromGlanceSwitchesToThePages() {
+        assertEquals(HomeShown.Pages, HomePlacementLanding.after(HomeShown.Glance))
     }
 
-    @Test fun HOM_02_placingAnItemOnSelectedAppsStaysThere() {
-        assertNull(HomePlacementLanding.after(HomeLanding.Selected))
+    @Test fun HOM_02_placingAnItemOnThePagesStaysThere() {
+        assertNull(HomePlacementLanding.after(HomeShown.Pages))
     }
 
-    @Test fun HOM_02_theTargetIsTheSameLandingEditHomePagesUses() {
-        assertEquals(HomeLandingRules.editHomePagesLanding, HomePlacementLanding.after(HomeLanding.Minimal))
-        assertEquals(true, HomeLandingRules.hasPages(HomePlacementLanding.after(HomeLanding.Recents)!!))
+    @Test fun HOM_02_theTargetIsTheSameSurfaceEditHomePagesUses() {
+        assertEquals(HomeShownRules.editHomePagesSurface, HomePlacementLanding.after(HomeShown.Glance))
+        assertEquals(true, HomeShownRules.hasPages(HomePlacementLanding.after(HomeShown.Glance)!!))
     }
 }

@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -167,6 +168,9 @@ fun GlanceSurface(
     /** Wave 17: the indicator's Launchpad glyph and its right-hand dots are real buttons. */
     onOpenLaunchpad: () -> Unit = {},
     onOpenRight: () -> Unit = {},
+    /** Wave 26: how many stops the deck has after Glance (the pages; the scroll counts as one): the dots count Glance as the first stop, a tap steps forward. 0 draws none. */
+    pageStops: Int = 0,
+    onOpenPages: () -> Unit = {},
     gestures: HomeGestureSpec? = null,
     dark: Boolean = isDarkSurface(),
     underlay: @Composable () -> Unit = {},
@@ -233,6 +237,7 @@ fun GlanceSurface(
         }
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             GlanceHotspotLayer(hotspots, appsByKey, onRun, tint = inkDim)
+            if (pageStops > 0) DeckDots(pageStops + 1, 0, ink, Modifier.align(Alignment.BottomCenter).padding(bottom = if (prefs.glanceIndicator) 34.dp else 4.dp), onOpenPages)
             if (prefs.glanceIndicator) GlanceIndicator(hasLaunchpad, rightDestinations, awakeNonce, reduced, ink, Modifier.align(Alignment.BottomCenter), onOpenLaunchpad, onOpenRight)
         }
     }
@@ -497,4 +502,25 @@ internal fun rememberBatteryPercent(): Int {
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
     return pct
+}
+
+/**
+ * Wave 26: the deck dots on Glance. [stops] counts Glance as the first stop, then one per page (the scroll is one stop); [current] is lit.
+ * Drawn in the layout direction of its parent, which the home sets from the order (so right to left puts the first stop at the right).
+ * A tap on any dot after the first steps forward to the first page: the visible way from Glance to the pages.
+ */
+@Composable
+internal fun DeckDots(stops: Int, current: Int, ink: Color, modifier: Modifier = Modifier, onForward: () -> Unit = {}) {
+    Row(
+        modifier.testTag("glance.deckdots")
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            .clickable(role = Role.Button, onClickLabel = L10n.tr("Next page"), onClick = onForward)
+            .semantics { contentDescription = L10n.tr("Glance home, stop %s of %s", current + 1, stops) },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        for (i in 0 until stops) {
+            val on = i == current
+            Box(Modifier.size(if (on) 8.dp else 6.dp).background(ink.copy(alpha = if (on) 0.9f else 0.4f), CircleShape).testTag("glance.deckdot.$i"))
+        }
+    }
 }

@@ -60,6 +60,12 @@ object VizTextures {
         startX = left, endX = if (right > left) right else left + 1f,
     )
 
+    /** `fade`, direction left (right-to-left bars): solid at the left, 7 percent at the right. */
+    fun fadeBrushLeft(ink: Color, left: Float, right: Float): Brush = Brush.horizontalGradient(
+        0f to ink.copy(alpha = 1f), 0.45f to ink.copy(alpha = 0.5f), 1f to ink.copy(alpha = 0.07f),
+        startX = left, endX = if (right > left) right else left + 1f,
+    )
+
     /** The repeating tile, from the cache. */
     fun tile(kind: VizTexture, ink: Color, scale: Float, density: Float): ImageBitmap {
         require(kind != VizTexture.Solid && kind != VizTexture.Fade) { "$kind has no tile" }

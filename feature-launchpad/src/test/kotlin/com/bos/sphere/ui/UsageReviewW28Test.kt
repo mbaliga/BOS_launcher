@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -21,10 +22,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import com.bos.sphere.core.design.L10n
-import com.bos.sphere.ui.viz.VizKey
-import com.bos.sphere.ui.viz.VizLegend
-import com.bos.sphere.ui.viz.VizPart
-import com.bos.sphere.ui.viz.VizStack
+import com.bos.sphere.ui.viz.VizBar
 import com.bos.sphere.ui.viz.VizStepColumn
 import com.bos.sphere.ui.viz.VizSteps
 import com.bos.sphere.ui.viz.VizTexture
@@ -88,29 +86,29 @@ class UsageReviewW28Test : LaunchpadShots() {
         assertTrue("today's accent column is under its own tap target in RTL ($hits yellow pixels)", hits > 8)
     }
 
-    @Test fun USG_32_inARightToLeftLayoutTheStackPartsAreDrawnWhereTheirFocusNodesAre() {
+    @Test fun USG_32_inARightToLeftLayoutTheBarsStartFromTheRightEdgeTheReadingStart() {
         rule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 Box(Modifier.fillMaxSize().background(tone.ground).padding(horizontal = 20.dp)) {
-                    VizStack(listOf(VizPart(60.0, VizTexture.Solid, "", "a"), VizPart(40.0, VizTexture.Stipple, "", "b")), tone)
+                    Box(Modifier.testTag("bar")) { VizBar(0.5f, VizTexture.Solid, tone) }
                 }
             }
         }
         val d = rule.density.density
-        val b = rule.onNodeWithTag("viz.stack.part.0").getUnclippedBoundsInRoot()
+        val b = rule.onNodeWithTag("bar").getUnclippedBoundsInRoot()
         val bmp = shot()
-        val x = (((b.left.value + b.right.value) / 2f) * d).toInt(); val y0 = (b.top.value * d).toInt()
-        val solid = (2 until (10 * d).toInt()).count { bright(bmp.getPixel(x, y0 + it)) }
-        assertEquals("the solid first part sits under its own node in RTL", (2 until (10 * d).toInt()).count(), solid)
+        val y = (((b.top.value + b.bottom.value) / 2f) * d).toInt()
+        val left = ((b.left.value + 4) * d).toInt(); val right = ((b.right.value - 4) * d).toInt()
+        assertTrue("the bar fills from the right edge", bright(bmp.getPixel(right, y)))
+        assertFalse("and leaves the left end to the track", bright(bmp.getPixel(left, y)))
     }
 
-    @Test fun USG_33_atFontScaleTwoTheStepsAndStackGrowSoTheirTextIsNotClipped() {
+    @Test fun USG_33_atFontScaleTwoTheStepsGrowSoTheirTextIsNotClipped() {
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 2f)) {
                 Box(Modifier.fillMaxSize().background(tone.ground).padding(horizontal = 20.dp)) {
                     androidx.compose.foundation.layout.Column {
                         VizSteps(cols, 6, {}, tone, tagPrefix = "s")
-                        VizStack(listOf(VizPart(60.0, VizTexture.Solid, "60%", "a")), tone, tagPrefix = "k")
                     }
                 }
             }
@@ -118,9 +116,8 @@ class UsageReviewW28Test : LaunchpadShots() {
         fun h(tag: String) = rule.onNodeWithTag(tag).getUnclippedBoundsInRoot().let { it.bottom.value - it.top.value }
         val steps = rule.onAllNodesWithTag("s.col.0").fetchSemanticsNodes().size
         assertEquals(1, steps)
-        val col = h("s.col.0"); val part = h("k.part.0")
-        assertTrue("the steps need room for a 30 sp figure above and 22 sp names below, got $col dp", col >= 54f + 31f)
-        assertTrue("the stack's label row holds 22 sp text, got $part dp", part >= 12f + 28f)
+        val col = h("s.col.0")
+        assertTrue("the steps need room for a 28 sp figure above and 22 sp names below, got $col dp", col >= 60f + 31f)
     }
 
     @Test fun USG_34_theStatHeaderWrapsInsteadOfClippingAtFontScaleTwoOnANarrowBlock() {

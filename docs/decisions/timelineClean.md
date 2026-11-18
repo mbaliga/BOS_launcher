@@ -1,5 +1,7 @@
 # Decision: Timeline usage legend and filter row (wave 29, timelineClean)
 
+> Superseded by [usageSimplify.md](usageSimplify.md): the legend (and the stack it explained) and the whole filter row were removed in the same wave. Kept for history.
+
 Owner (build 58, annotated screenshot): the usage block's legend overlapped the percentage labels under the stack and itself, and the Timeline's filter pills were large, purple and wrapped onto two rows.
 
 ## Legend

@@ -136,6 +136,14 @@ internal object CommsStyle {
     const val TARGET_DP = 48f
     const val EMPTY_SP = 15f
 
+    // ---- the Timeline's usage block (wave 29, usageSimplify): top line, week columns, ranked list; 12 dp between the three ----
+    const val USAGE_GAP_DP = 12f
+    const val USAGE_DAY_SP = 14f
+    const val USAGE_FIGURE_SP = 28f
+    const val USAGE_ROW_DP = 36f
+    const val USAGE_ICON_DP = 20f
+    const val USAGE_BAR_DP = 4f
+
     // ---- the menu panel ----
     const val PANEL_FRACTION = 0.584f
     const val PANEL_MAX_DP = 380f

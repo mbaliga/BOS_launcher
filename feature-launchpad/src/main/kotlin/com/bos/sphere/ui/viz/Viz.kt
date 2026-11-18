@@ -17,13 +17,12 @@ import androidx.compose.ui.graphics.Color
  * | [VizTextures.fadeBrush]                | `fills(...)('fade', dir)`                            | ink at 7 percent, 50 percent at 55 percent, 100 percent; direction up or right |
  * | [VizTone]                              | `ASOC.viz.tones` (`night`) and `tone(o)`             | ink on ground plus an accent for the selected or today mark; light derived |
  * | [VizSteps]                             | `steps` (and its `mount` frame: marks, labels, table) | columns from one baseline, number above, name below; the number only on the selected column |
- * | [VizStack], [VizPart]                  | `stack` and `fold`                                   | one pill split into parts, labelled where the label fits, 2 px gaps, parts individually focusable |
- * | [VizLegend], [VizSwatch]               | `legend` and `swatch`                                | the keys in the same textures; swatch scale 0.62 under 20 px |
+ * | [VizBar], [VizBarGeometry]             | `bars`                                               | the bar of a ranked row: 4 dp, as long as its share of the longest, filled with its texture (wave 29; replaces `stack` and `legend`) |
  * | [VizStat]                              | `stat`                                               | the number itself, caption muted, light weight 300 |
  * | [VizTable]                             | `table()` on every chart                             | the same data as a plain table, for TalkBack and for "Show as table" |
  * | [VizFormat.fold]                       | `fold`                                               | more parts than textures collapse into Other |
  *
- * Not ported: `bars`, `fan`, `line`, `spark`, `halftone`, `meter`, `graph`, `rose`, `gantt` (the launcher does not draw them yet), pointer
+ * Not ported: `fan`, `line`, `spark`, `halftone`, `meter`, `graph`, `rose`, `gantt` (the launcher does not draw them yet), pointer
  * hover (touch has no hover; selection replaces it), animations (the toolkit only transitions opacity .15 s; here nothing animates, which
  * satisfies reduced motion by construction).
  *

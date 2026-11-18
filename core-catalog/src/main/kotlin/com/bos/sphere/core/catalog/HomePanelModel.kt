@@ -36,11 +36,6 @@ enum class UsageRange(val label: String, val days: Int) {
     fun startMs(startOfTodayMs: Long): Long = startOfTodayMs - (days - 1) * 86_400_000L
 }
 
-/** HOM-18: how far back the timeline reads. The timeline log keeps at most [Timeline.LOG_MAX] opens. */
-enum class TimelineDepth(val label: String, val opens: Int) {
-    Short("Last 30 opens", 30), Medium("Last 100 opens", 100), Full("Everything recorded (up to 5000)", Timeline.LOG_MAX);
-}
-
 /** Panel settings. Kept in the existing home state preference file under its own keys. */
 class HomePanelPrefs(context: Context) {
     private val sp = com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, "home_state")
@@ -48,14 +43,6 @@ class HomePanelPrefs(context: Context) {
     var usageRange: UsageRange
         get() = UsageRange.entries.firstOrNull { it.name == sp.getString("panel.usage", null) } ?: UsageRange.Today
         set(v) { sp.edit().putString("panel.usage", v.name).apply() }
-
-    var timelineDepth: TimelineDepth
-        get() = TimelineDepth.entries.firstOrNull { it.name == sp.getString("panel.timeline.depth", null) } ?: TimelineDepth.Medium
-        set(v) { sp.edit().putString("panel.timeline.depth", v.name).apply() }
-
-    var timelineScheduled: Boolean
-        get() = sp.getBoolean("panel.timeline.scheduled", true)
-        set(v) { sp.edit().putBoolean("panel.timeline.scheduled", v).apply() }
 
     var filesPerFolder: Int
         get() = sp.getInt("panel.files.count", 20).coerceIn(5, 50)
@@ -83,7 +70,9 @@ object TimelineView {
             TimelineRow(e, day, i == 0 || day != Timeline.dayLabel(startOfTodayMs, entries[i - 1].timeMs, zone), key, n)
         }
 
-    /** The timeline for the settings: [scheduled] only when asked for, opens cut to the chosen depth. */
-    fun build(history: List<LaunchEvent>, scheduled: List<TimelineEntry>, nowMs: Long, depth: TimelineDepth, withScheduled: Boolean, labelOf: (String) -> String?) =
-        Timeline.build(history, if (withScheduled) scheduled else emptyList(), nowMs, depth.opens, labelOf)
+    /** Wave 29 (usageSimplify): the one behaviour of the Timeline, with no filter: the last [OPENS] opens, scheduled launches included. */
+    const val OPENS = 100
+
+    fun build(history: List<LaunchEvent>, scheduled: List<TimelineEntry>, nowMs: Long, labelOf: (String) -> String?) =
+        Timeline.build(history, scheduled, nowMs, OPENS, labelOf)
 }

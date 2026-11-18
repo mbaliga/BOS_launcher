@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.catalog.FilesView
 import com.bos.sphere.core.catalog.HomePanelPrefs
 import com.bos.sphere.core.catalog.PinnedFolder
-import com.bos.sphere.core.catalog.TimelineDepth
 import com.bos.sphere.core.catalog.TimelineView
 import com.bos.sphere.core.catalog.UsageRange
 import com.bos.sphere.core.catalog.RecentFile
@@ -90,7 +89,7 @@ fun HomePanelsBody(
     val modifier = if (view == com.bos.sphere.ui.HubView.Timeline) Modifier.fillMaxSize() else Modifier.fillMaxSize().background(HyleColors.Surface)
     Box(modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
         when (view) {
-            com.bos.sphere.ui.HubView.Timeline -> TimelinePanel(history, appsByKey, prefs, onLaunch)
+            com.bos.sphere.ui.HubView.Timeline -> TimelinePanel(history, appsByKey, onLaunch)
             else -> FilesPanel(prefs)
         }
     }
@@ -103,8 +102,6 @@ fun HomePanelSettings() {
     val prefs = remember { HomePanelPrefs(context) }
     val source = remember { RecentFilesSource(context) }
     var range by remember { mutableStateOf(prefs.usageRange) }
-    var depth by remember { mutableStateOf(prefs.timelineDepth) }
-    var sched by remember { mutableStateOf(prefs.timelineScheduled) }
     var count by remember { mutableIntStateOf(prefs.filesPerFolder) }
     var rev by remember { mutableIntStateOf(0) }
     var trees by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -112,9 +109,6 @@ fun HomePanelSettings() {
     Column(Modifier.padding(horizontal = 4.dp)) {
         Text(L10n.tr("Usage panel"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
         SettingChips(UsageRange.entries, range, { L10n.tr(it.label) }) { range = it; prefs.usageRange = it }
-        Text(L10n.tr("Timeline panel"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 14.dp))
-        SettingChips(TimelineDepth.entries, depth, { L10n.tr(it.label) }) { depth = it; prefs.timelineDepth = it }
-        SettingChips(listOf(true, false), sched, { if (it) L10n.tr("With scheduled launches") else L10n.tr("Opens only") }) { sched = it; prefs.timelineScheduled = it }
         Text(L10n.tr("Files panel"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 14.dp))
         SettingChips(listOf(10, 20, 50), count, { L10n.tr("%d files", it) }) { count = it; prefs.filesPerFolder = it }
         Text(L10n.tr("Folders the launcher may read"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 14.dp))
@@ -223,17 +217,15 @@ private fun FilesPanel(prefs: HomePanelPrefs) {
 }
 
 @Composable
-private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, AppEntry>, prefs: HomePanelPrefs, onLaunch: (AppEntry) -> Unit) {
+private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, AppEntry>, onLaunch: (AppEntry) -> Unit) {
     val context = LocalContext.current
     val now = System.currentTimeMillis()
     val ink = PanelInk.comms()
-    var depth by remember { mutableStateOf(prefs.timelineDepth) }
-    var withScheduled by remember { mutableStateOf(prefs.timelineScheduled) }
-    val entries = remember(history, appsByKey, depth, withScheduled) {
+    val entries = remember(history, appsByKey) {
         val scheduled = runCatching {
             WorkspaceRepository.get(context).current.schedules.map { TimelineEntry(it.atMillis, "", it.label, scheduled = true, id = it.id) }
         }.getOrDefault(emptyList())
-        TimelineView.build(history, scheduled, now, depth, withScheduled) { appsByKey[it]?.label }
+        TimelineView.build(history, scheduled, now) { appsByKey[it]?.label }
     }
     val startOfToday = remember { Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis }
     val fmt = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
@@ -243,17 +235,6 @@ private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, App
     // Wave 28: the usage block is the first item of the list, so it scrolls away with it and the list opens scrolled to the top.
     LazyColumn(Modifier.testTag("timeline.list")) {
         item { com.bos.sphere.ui.UsageTimelineBlock(usage, labelOf) }
-        item {
-            // Wave 29: one flat scrolling row (range, then kind), not two rows of pills; the same persisted prefs.
-            val depthText = mapOf(TimelineDepth.Short to ("30" to "Last 30 opens"), TimelineDepth.Medium to ("100" to "Last 100 opens"), TimelineDepth.Full to (L10n.tr("All") to "Everything recorded, up to 5000"))
-            com.bos.sphere.ui.CommsFilterRow(
-                listOf(
-                    TimelineDepth.entries.map { d -> com.bos.sphere.ui.FilterOpt(depthText.getValue(d).first, L10n.tr(depthText.getValue(d).second), d == depth, "timeline.filter.range.${d.name}") { depth = d; prefs.timelineDepth = d } },
-                    listOf(true, false).map { s -> com.bos.sphere.ui.FilterOpt(if (s) L10n.tr("Scheduled") else L10n.tr("Opens only"), if (s) L10n.tr("With scheduled launches") else L10n.tr("Opens only"), s == withScheduled, "timeline.filter.kind.${if (s) "scheduled" else "opens"}") { withScheduled = s; prefs.timelineScheduled = s } },
-                ),
-                Modifier.padding(top = 4.dp),
-            )
-        }
         if (entries.isEmpty()) item { Text(L10n.tr("Nothing yet. Opened apps and scheduled launches appear here."), color = ink.ink, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) }
         itemsIndexed(rows) { i, r ->
             val e = r.entry

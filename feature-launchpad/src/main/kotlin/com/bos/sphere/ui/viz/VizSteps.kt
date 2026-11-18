@@ -90,7 +90,7 @@ fun VizSteps(
                     val name = measurer.measure(c.label, TextStyle(fontSize = 11.sp, color = tone.ink.copy(alpha = if (sel) 1f else 0.72f), fontWeight = if (sel) FontWeight.Medium else FontWeight.Normal), maxLines = 1)
                     drawText(name, topLeft = Offset(left + (w - name.size.width) / 2f, base + 3f * this.density))
                     if (sel) {
-                        val num = measurer.measure(c.valueText, TextStyle(fontSize = 15.sp, color = tone.ink, fontWeight = FontWeight.Light), maxLines = 1)
+                        val num = measurer.measure(c.valueText, TextStyle(fontSize = 14.sp, color = tone.ink, fontWeight = FontWeight.Normal), maxLines = 1)
                         val x = (left + (w - num.size.width) / 2f).coerceIn(0f, (size.width - num.size.width).coerceAtLeast(0f))
                         drawText(num, topLeft = Offset(x, (base - bh - num.size.height - 2f * this.density).coerceAtLeast(0f)))
                     }
@@ -110,7 +110,7 @@ fun VizSteps(
     }
 }
 
-val STEPS_HEIGHT: Dp = 54.dp
+val STEPS_HEIGHT: Dp = 60.dp
 
 /** The steps geometry in dp, pure so tests can read it: seven cells, the bars centred in them, one baseline. */
 class VizStepsGeometry private constructor(val width: Float, val height: Float, val n: Int, val fontScale: Float = 1f) {
@@ -120,14 +120,16 @@ class VizStepsGeometry private constructor(val width: Float, val height: Float, 
     val plot: Float get() = (height - head - foot).coerceAtLeast(0f)
     val baseline: Float get() = head + plot
     val cell: Float get() = if (n <= 0) 0f else width / n
-    val gap: Float get() = maxOf(MIN_GAP, cell * 0.18f).coerceAtMost(cell / 2)
-    val barW: Float get() = (cell - gap).coerceAtLeast(1f)
+    /** Wave 29: thin columns, at most [MAX_BAR] wide however wide the 48 dp tap target is, centred in their cell. */
+    val barW: Float get() = (cell - MIN_GAP).coerceIn(1f, MAX_BAR)
+    val gap: Float get() = (cell - barW).coerceAtLeast(0f)
     fun left(i: Int): Float = i * cell + gap / 2
 
     companion object {
         const val HEAD = 17f
         const val FOOT = 14f
-        const val RADIUS = 9f
+        const val RADIUS = 3f
+        const val MAX_BAR = 16f
         const val MIN_GAP = 6f
         fun of(width: Float, height: Float, n: Int, fontScale: Float = 1f) = VizStepsGeometry(if (width.isFinite()) width.coerceAtLeast(0f) else 0f, if (height.isFinite()) height.coerceAtLeast(0f) else 0f, n, if (fontScale.isFinite()) fontScale.coerceIn(1f, 2f) else 1f)
     }

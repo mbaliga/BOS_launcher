@@ -36,10 +36,14 @@ data class WeekColumn(val dayStartMs: Long, val date: LocalDate, val totalMs: Lo
 /** One part of a day's stack. [key] is the package, "" for Other. */
 data class UsagePart(val key: String, val ms: Long, val percent: Int, val texture: VizTexture) { val isOther: Boolean get() = key.isEmpty() }
 
+/** One ranked row of a day's list (wave 29): [share] is [ms] over the longest row of the day, in 0..1 (the longest is 1), the length of its bar. */
+data class UsageRow(val key: String, val ms: Long, val share: Float, val texture: VizTexture) { val isOther: Boolean get() = key.isEmpty() }
+
 /** The shaped week: seven columns oldest first (today last) and the apps ranked over the week (they decide the textures). */
 class UsageWeek(val days: List<DayTime>, val columns: List<WeekColumn>, val weekRank: List<String>) {
     val hasData: Boolean get() = columns.any { it.totalMs > 0 }
     fun parts(index: Int): List<UsagePart> = UsageShaping.parts(days.getOrNull(index), weekRank)
+    fun rows(index: Int): List<UsageRow> = UsageShaping.rows(days.getOrNull(index), weekRank)
     fun total(index: Int): Long = columns.getOrNull(index)?.totalMs ?: 0L
 }
 
@@ -87,6 +91,16 @@ object UsageShaping {
         val tex = textures(weekRank, head.map { it.key })
         val parts = head.map { UsagePart(it.key, it.ms, VizFormat.percent(it.ms, total), tex.getValue(it.key)) }
         return if (rest > 0) parts + UsagePart("", rest, VizFormat.percent(rest, total), OTHER_TEXTURE) else parts
+    }
+
+    /**
+     * Wave 29 (usageSimplify): the ranked list of one day: the [TOP] apps then Other, each with its share of the longest row (the toolkit's `bars`
+     * scale: the longest row is a full bar, so Other, being a sum, can be the full one). Empty for a day with no time.
+     */
+    fun rows(day: DayTime?, weekRank: List<String>): List<UsageRow> {
+        val parts = parts(day, weekRank)
+        val longest = parts.maxOfOrNull { it.ms } ?: return emptyList()
+        return parts.map { UsageRow(it.key, it.ms, (it.ms.toDouble() / longest).toFloat().coerceIn(0f, 1f), it.texture) }
     }
 
     /** The week for [days] (oldest first; the last is today). */

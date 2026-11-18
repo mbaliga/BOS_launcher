@@ -160,17 +160,16 @@ class HomeInfoW3Test {
     }
 
     @Test
-    fun HOM_18_depthCutsOpensAndTheScheduledSwitchRemovesUpcoming() {
+    fun HOM_18_theTimelineIsTheLast100OpensWithScheduledLaunchesAndNoFilter() {
         val now = 10_000_000L
         val opens = (1..200).map { LaunchEvent("a", now - it * 1000L, 9) }
         val sched = listOf(TimelineEntry(now + 5, "a", "A", true, "s"))
-        val short = TimelineView.build(opens, sched, now, TimelineDepth.Short, true) { "A" }
-        assertEquals(1 + 30, short.size)
-        assertTrue(short.first().scheduled)
-        assertEquals(100, TimelineView.build(opens, sched, now, TimelineDepth.Medium, false) { "A" }.size)
-        assertEquals(200, TimelineView.build(opens, emptyList(), now, TimelineDepth.Full, true) { "A" }.size) // all recorded
-        // Wave 4: the timeline reads the larger log (TimelineLogStore), not the 400-entry history.
-        assertEquals(5000, TimelineDepth.Full.opens)
+        val t = TimelineView.build(opens, sched, now) { "A" }
+        assertEquals(1 + 100, t.size)
+        assertEquals(100, TimelineView.OPENS)
+        assertTrue("scheduled launches are always in, soonest first", t.first().scheduled)
+        assertTrue("newest first", t.drop(1).zipWithNext().all { (x, y) -> x.timeMs >= y.timeMs })
+        assertEquals(now - 1000L, t[1].timeMs)
     }
 
     @Test

@@ -2,7 +2,7 @@ package com.bos.sphere.ui
 
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.ui.viz.VizFormat
-import com.bos.sphere.ui.viz.VizStackGeometry
+import com.bos.sphere.ui.viz.VizBarGeometry
 import com.bos.sphere.ui.viz.VizStepsGeometry
 import com.bos.sphere.ui.viz.VizTexture
 import org.junit.After
@@ -44,6 +44,43 @@ class UsageShapingTest {
         assertEquals(64, p[0].percent)
         val one = UsageFixtures.week().parts(1) // five days ago: mail only
         assertEquals(100, one.single().percent)
+    }
+
+    // ---- wave 29: the ranked rows ----
+
+    @Test fun USG_40_rowsAreTheTopFourAppsThenOtherEachWithItsShareOfTheLongest() {
+        val r = UsageFixtures.week().rows(6)
+        assertEquals(listOf("demo.chrome", "demo.chat", "demo.maps", "demo.mail", ""), r.map { it.key })
+        assertEquals(listOf(70L, 45L, 20L, 10L, 9L).map { it * M }, r.map { it.ms })
+        assertEquals("the longest is a full bar", 1f, r[0].share, 0f)
+        assertEquals(45f / 70f, r[1].share, 1e-6f); assertEquals(9f / 70f, r[4].share, 1e-6f)
+        assertEquals(listOf(VizTexture.Solid, VizTexture.Hatch, VizTexture.Dots, VizTexture.Fade, VizTexture.Stipple), r.map { it.texture })
+        assertTrue(r.last().isOther)
+    }
+
+    @Test fun USG_40_otherIsTheFullBarWhenTheRestAddsUpToMoreThanTheTopApp() {
+        val d = day("a" to 10, "b" to 9, "c" to 8, "d" to 7, "e" to 6, "f" to 6, "g" to 6)
+        val r = UsageShaping.rows(d, UsageShaping.weekRank(listOf(d)))
+        assertEquals(5, r.size)
+        assertEquals(18 * M, r.last().ms); assertEquals(1f, r.last().share, 0f); assertEquals(10f / 18f, r[0].share, 1e-6f)
+    }
+
+    @Test fun USG_40_tiesKeepTheirKeyOrderAndShareOne() {
+        val d = day("b" to 10, "a" to 10, "c" to 10)
+        val r = UsageShaping.rows(d, UsageShaping.weekRank(listOf(d)))
+        assertEquals(listOf("a", "b", "c"), r.map { it.key }); assertEquals(listOf(1f, 1f, 1f), r.map { it.share })
+    }
+
+    @Test fun USG_40_fewerThanFiveAppsHaveNoOtherRowAndOneAppIsOneFullRow() {
+        assertEquals(listOf("demo.chat", "demo.chrome", "demo.mail"), UsageFixtures.week().rows(5).map { it.key })
+        val one = UsageFixtures.week().rows(1).single()
+        assertEquals("demo.mail", one.key); assertEquals(1f, one.share, 0f)
+    }
+
+    @Test fun USG_40_aDayWithNoTimeHasNoRowsAndNoNaN() {
+        assertTrue(UsageFixtures.week().rows(3).isEmpty())
+        assertTrue(UsageShaping.rows(null, emptyList()).isEmpty())
+        assertTrue(UsageShaping.rows(day("a" to 0, "b" to -5), listOf("a", "b")).isEmpty())
     }
 
     @Test fun USG_03_tiesBreakByAppKeySoTheOrderNeverFlips() {
@@ -102,8 +139,8 @@ class UsageShapingTest {
         assertEquals(0f, VizFormat.barHeight(Double.NaN, 10.0, 30f)); assertEquals(3f, VizFormat.barHeight(5.0, Double.NaN, 30f)) // a value with no usable maximum is a stub, never NaN
         assertEquals(0f, VizFormat.barHeight(Double.POSITIVE_INFINITY, 10.0, 30f)); assertEquals(0f, VizFormat.barHeight(0.0, 10.0, 30f))
         assertEquals(3f, VizFormat.barHeight(0.001, 10.0, 30f)); assertEquals(30f, VizFormat.barHeight(10.0, 10.0, 30f))
-        assertEquals(listOf(0f, 0f), VizStackGeometry.widths(listOf(Double.NaN, -1.0), 100f))
-        assertEquals(listOf(49f, 49f), VizStackGeometry.widths(listOf(1.0, 1.0), 100f))
+        assertEquals(0f, VizBarGeometry.length(Float.NaN, 100f)); assertEquals(0f, VizBarGeometry.length(-1f, 100f)); assertEquals(0f, VizBarGeometry.length(0.5f, Float.NaN))
+        assertEquals(100f, VizBarGeometry.length(7f, 100f)); assertEquals(3f, VizBarGeometry.length(0.001f, 100f)); assertEquals(50f, VizBarGeometry.length(0.5f, 100f))
         val g = VizStepsGeometry.of(Float.NaN, Float.POSITIVE_INFINITY, 0)
         assertEquals(0f, g.plot); assertEquals(0f, g.cell)
     }

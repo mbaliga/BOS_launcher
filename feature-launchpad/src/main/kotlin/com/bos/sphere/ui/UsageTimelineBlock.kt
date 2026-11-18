@@ -1,6 +1,19 @@
 package com.bos.sphere.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import com.bos.sphere.ui.viz.STEPS_HEIGHT
+import com.bos.sphere.ui.viz.VizBar
+import com.bos.sphere.ui.viz.VizStepsGeometry
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,11 +50,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import com.bos.sphere.core.design.GrantHooks
 import com.bos.sphere.core.design.GrantKind
 import com.bos.sphere.core.design.L10n
-import com.bos.sphere.ui.viz.VizKey
-import com.bos.sphere.ui.viz.VizLegend
-import com.bos.sphere.ui.viz.VizPart
-import com.bos.sphere.ui.viz.VizStack
-import com.bos.sphere.ui.viz.rememberStackLabelFits
 import com.bos.sphere.ui.viz.VizStat
 import com.bos.sphere.ui.viz.VizStepColumn
 import com.bos.sphere.ui.viz.VizSteps
@@ -72,22 +80,34 @@ internal object UsageTexts {
 
     fun columnDescription(index: Int, week: UsageWeek): String = L10n.tr("%s, %s", dayCaption(index, week), UsageFormat.full(week.total(index)))
 
-    fun partDescription(p: UsagePart, labelOf: (String) -> String): String = L10n.tr("%s, %s, %d percent", nameOf(p.key, labelOf), UsageFormat.full(p.ms), p.percent)
+    /** A ranked row, spoken: the app and its time (no percentage: the block shows none). */
+    fun rowDescription(r: UsageRow, labelOf: (String) -> String): String = L10n.tr("%s, %s", nameOf(r.key, labelOf), UsageFormat.full(r.ms))
 
     /** The chart's accessible name: the week, then the selected day with its top apps. */
     fun summary(week: UsageWeek, selected: Int, labelOf: (String) -> String): String {
         val days = week.columns.indices.joinToString("; ") { columnDescription(it, week) }
-        val top = week.parts(selected).joinToString("; ") { partDescription(it, labelOf) }
+        val top = week.rows(selected).joinToString("; ") { rowDescription(it, labelOf) }
         val sel = columnDescription(selected, week)
         return L10n.tr("Screen time, last 7 days. %s. Selected: %s. Top apps: %s.", days, sel, top.ifEmpty { L10n.tr("none") })
     }
 }
 
+/** The last answer, kept for the process so reopening the Timeline shows the block at once instead of a placeholder (no jump). */
+private object UsageUiLast {
+    private class Held(val repo: UsageWeekRepo, val ui: UsageUi)
+    @Volatile private var held: Held? = null
+    fun of(repo: UsageWeekRepo): UsageUi = held?.takeIf { it.repo === repo }?.ui ?: UsageUi.Loading
+    fun keep(repo: UsageWeekRepo, ui: UsageUi) { held = Held(repo, ui) }
+}
+
 /**
- * Wave 28 (usageTimeline, owner): Usage merged into Timeline as a small visualization above it. A header with the day's total (stat), a
- * steps chart of the last seven days (tap a column to select it), and one stack of the selected day by app with its legend, all in the
- * ASOC viz language (`com.bos.sphere.ui.viz`): one ink, textures instead of hues. Without usage access the block offers the existing "Allow
- * usage access" action instead of the chart; with nothing recorded it says so in one quiet line.
+ * Wave 28 (usageTimeline), wave 29 (usageSimplify, owner: "The usage block is a mess and hard to read"): Usage merged into the Timeline as a
+ * small visualization above it, in three parts 12 dp apart and a hairline under them: the selected day and its total (stat), the last seven
+ * days as thin columns (steps; tap one to select it), and the ranked list of that day's apps (the top four and Other: icon, name, time, and a
+ * thin bar as long as the app's share of the day's longest; tap a row to highlight it and dim the others). All in the ASOC viz language
+ * (`com.bos.sphere.ui.viz`): one ink, textures instead of hues, no percentages. Everything sizes with the Comms scale and the font scale and the
+ * block is content-sized (nothing fixed), so nothing clips or overlaps. While the data loads a quiet placeholder of the same parts holds the
+ * height. Without usage access the block offers an "Allow usage access" text button; with nothing recorded it says so in one quiet line.
  *
  * [labelOf] names a package (the app's launcher label); the data comes from [repo], read off the main thread and again when the screen
  * resumes (the user may have just granted the access).
@@ -104,7 +124,7 @@ fun UsageTimelineBlock(
     val tone = remember(lp) { VizTone.of(lp.ink, lp.bg) }
     var resumes by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumes++ }
-    val ui by produceState<UsageUi>(UsageUi.Loading, repo, resumes) {
+    val ui by produceState(UsageUiLast.of(repo), repo, resumes) {
         value = withContext(Dispatchers.IO) {
             if (!repo.granted()) UsageUi.NoAccess
             else {
@@ -112,14 +132,47 @@ fun UsageTimelineBlock(
                 val week = UsageShaping.week(repo.load(t), zone, Instant.ofEpochMilli(t).atZone(zone).toLocalDate())
                 if (week.hasData) UsageUi.Ready(week) else UsageUi.Empty
             }
-        }
+        }.also { UsageUiLast.keep(repo, it) }
     }
-    Column(modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp).testTag("usage.block")) {
+    val gap = CommsStyle.USAGE_GAP_DP.dp
+    Column(modifier.fillMaxWidth().padding(top = 4.dp).testTag("usage.block")) {
         when (val u = ui) {
-            UsageUi.Loading -> Spacer(Modifier.height(1.dp))
+            UsageUi.Loading -> UsagePlaceholder(tone)
             UsageUi.NoAccess -> NoAccessLine(tone)
-            UsageUi.Empty -> Text(L10n.tr("No screen time recorded yet."), color = tone.ink.copy(alpha = 0.72f), fontSize = 13.sp, modifier = Modifier.heightIn(min = 32.dp).testTag("usage.empty"))
+            UsageUi.Empty -> Text(
+                L10n.tr("No screen time recorded yet."), color = tone.ink.copy(alpha = 0.72f), fontSize = CommsStyle.USAGE_DAY_SP.sp,
+                modifier = Modifier.heightIn(min = commsTarget()).wrapContentHeight(Alignment.CenterVertically).testTag("usage.empty"),
+            )
             is UsageUi.Ready -> UsageReady(u.week, tone, labelOf)
+        }
+        Spacer(Modifier.height(gap))
+        Box(Modifier.fillMaxWidth().height(CommsStyle.HAIR_DP.dp).background(lp.line).testTag("usage.hairline"))
+    }
+}
+
+/**
+ * Loading: the three parts as quiet blocks (a short line, seven stubs, five bars) of the heights the finished block has, so the block does not
+ * start at 1 dp and the list below does not jump when the numbers arrive. Nothing animates; a screen reader hears one short phrase.
+ */
+@Composable
+private fun UsagePlaceholder(tone: VizTone) {
+    val quiet = tone.ink.copy(alpha = 0.08f)
+    val gap = CommsStyle.USAGE_GAP_DP.dp
+    val fs = LocalDensity.current.fontScale.coerceIn(1f, 2f)
+    val loading = L10n.tr("Loading screen time")
+    Column(Modifier.fillMaxWidth().testTag("usage.loading").semantics(mergeDescendants = true) { contentDescription = loading }) {
+        Box(Modifier.height((CommsStyle.USAGE_FIGURE_SP * 1.2f).dp * fs).fillMaxWidth(0.4f).padding(vertical = 6.dp).background(quiet, RoundedCornerShape(4.dp)))
+        Spacer(Modifier.height(gap))
+        Row(Modifier.fillMaxWidth().height(STEPS_HEIGHT + (VizStepsGeometry.HEAD + VizStepsGeometry.FOOT).dp * (fs - 1f)), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
+            listOf(0.5f, 0.8f, 0.35f, 0.6f, 1f, 0.45f, 0.7f).forEach { Box(Modifier.width(14.dp).fillMaxHeight(0.2f + 0.3f * it).background(quiet, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))) }
+        }
+        Spacer(Modifier.height(gap))
+        repeat(UsageShaping.TOP + 1) { i ->
+            Row(Modifier.fillMaxWidth().heightIn(min = CommsStyle.USAGE_ROW_DP.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(CommsStyle.USAGE_ICON_DP.dp).background(quiet, RoundedCornerShape(3.dp)))
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.height(CommsStyle.USAGE_BAR_DP.dp).fillMaxWidth(1f - i * 0.17f).background(quiet, RoundedCornerShape(2.dp)))
+            }
         }
     }
 }
@@ -127,13 +180,14 @@ fun UsageTimelineBlock(
 @Composable
 private fun NoAccessLine(tone: VizTone) {
     val ctx = LocalContext.current
-    Row(Modifier.fillMaxWidth().testTag("usage.noAccess"), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(L10n.tr("Screen time"), color = tone.ink.copy(alpha = 0.72f), fontSize = 13.sp)
+    Column(Modifier.fillMaxWidth().testTag("usage.noAccess")) {
+        Text(L10n.tr("Screen time"), color = tone.ink.copy(alpha = 0.72f), fontSize = CommsStyle.USAGE_DAY_SP.sp)
+        // A text button in the accent (today's colour in the chart), 48 dp of real screen high, reading start aligned.
         Text(
-            L10n.tr("Allow usage access"), color = tone.ink, fontSize = 14.sp,
-            modifier = Modifier.heightIn(min = 48.dp).clickable(role = Role.Button) {
+            L10n.tr("Allow usage access"), color = tone.accent, fontSize = CommsStyle.BODY_SP.sp, fontWeight = FontWeight.Medium,
+            modifier = Modifier.heightIn(min = commsTarget()).clickable(role = Role.Button) {
                 GrantHooks.ask(GrantKind.UsageAccess) { GrantSupport.request(ctx, GrantKind.UsageAccess) }
-            }.wrapContentHeight(Alignment.CenterVertically).padding(start = 12.dp).testTag("usage.allow"),
+            }.wrapContentHeight(Alignment.CenterVertically).testTag("usage.allow"),
         )
     }
 }
@@ -143,10 +197,12 @@ private fun UsageReady(week: UsageWeek, tone: VizTone, labelOf: (String) -> Stri
     var selected by rememberSaveable { mutableIntStateOf(week.columns.lastIndex) }
     var table by rememberSaveable { mutableStateOf(false) }
     val sel = selected.coerceIn(0, week.columns.lastIndex)
-    val parts = week.parts(sel)
+    val rows = week.rows(sel)
     val summary = UsageTexts.summary(week, sel, labelOf)
     val show = L10n.tr("Show as table"); val hide = L10n.tr("Show as chart")
-    VizStat(UsageTexts.dayCaption(sel, week), UsageFormat.full(week.total(sel)), tone, Modifier.testTag("usage.stat"))
+    val gap = CommsStyle.USAGE_GAP_DP.dp
+    VizStat(UsageTexts.dayCaption(sel, week), UsageFormat.full(week.total(sel)), tone, Modifier.testTag("usage.stat"), captionSp = CommsStyle.USAGE_DAY_SP.toInt(), figureSp = CommsStyle.USAGE_FIGURE_SP.toInt())
+    Spacer(Modifier.height(gap))
     Box(
         Modifier.fillMaxWidth().testTag("usage.chart").semantics {
             contentDescription = summary
@@ -158,24 +214,41 @@ private fun UsageReady(week: UsageWeek, tone: VizTone, labelOf: (String) -> Stri
             week.columns.indices.map { listOf(UsageTexts.dayCaption(it, week), UsageFormat.full(week.total(it))) }, tone, tagPrefix = "usage.table",
         ) else VizSteps(
             week.columns.mapIndexed { i, c -> VizStepColumn(c.initial, c.totalMs.toDouble(), UsageFormat.compact(c.totalMs), UsageTexts.columnDescription(i, week), accent = c.isToday) },
-            sel, { selected = it }, tone, tagPrefix = "usage.steps", minCell = 36.dp,
+            sel, { selected = it }, tone, tagPrefix = "usage.steps", minCell = commsTarget(),
         )
     }
-    Spacer(Modifier.height(4.dp))
-    // Wave 29: the percentage is printed on the stack parts wide enough for it and in the legend line of the others: one place each, never both.
+    Spacer(Modifier.height(gap))
+    // A pick belongs to the day it was made on: another day starts with nothing highlighted.
     var picked by rememberSaveable(sel) { mutableIntStateOf(-1) }
-    val vparts = parts.map { VizPart(it.ms.toDouble(), it.texture, "${it.percent}%", UsageTexts.partDescription(it, labelOf), it.key) }
-    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val fits = rememberStackLabelFits(vparts, maxWidth)
-        Column(Modifier.fillMaxWidth()) {
-            VizStack(vparts, tone, tagPrefix = "usage.stack", labelFits = fits, highlight = com.bos.sphere.ui.viz.clampPick(picked, parts.size))
-            Spacer(Modifier.height(8.dp))
-            VizLegend(
-                parts.mapIndexed { i, it -> VizKey(it.texture, UsageTexts.nameOf(it.key, labelOf), UsageFormat.full(it.ms), it.key, percent = if (fits.getOrNull(i) == true) null else "${it.percent}%") }, tone,
-                Modifier, tagPrefix = "usage.legend", textSp = CommsStyle.NOTE_SP,
-                selected = com.bos.sphere.ui.viz.clampPick(picked, parts.size), onSelect = { picked = if (picked == it) -1 else it },
-                lead = { k -> if (k.tag.isNotEmpty()) AppIcon(k.tag, k.label, 16) },
-            )
+    val pick = com.bos.sphere.ui.viz.clampPick(picked, rows.size)
+    Column(Modifier.fillMaxWidth().testTag("usage.rows")) {
+        rows.forEachIndexed { i, r -> UsageRowLine(r, i, labelOf, tone, dim = pick >= 0 && pick != i, chosen = pick == i) { picked = if (picked == i) -1 else i } }
+    }
+}
+
+/** One ranked row: icon, name (ellipsizes), time right-aligned in muted ink, and under them the bar. At least 36 dp high, taller when the text is. */
+@Composable
+private fun UsageRowLine(r: UsageRow, i: Int, labelOf: (String) -> String, tone: VizTone, dim: Boolean, chosen: Boolean, onClick: () -> Unit) {
+    val name = UsageTexts.nameOf(r.key, labelOf)
+    val spoken = UsageTexts.rowDescription(r, labelOf)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = CommsStyle.USAGE_ROW_DP.dp).testTag("usage.row.$i")
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = spoken; selected = chosen }
+            .alpha(if (dim) 0.4f else 1f)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Other has no icon of its own: its slot stays so the names line up.
+        Box(Modifier.size(CommsStyle.USAGE_ICON_DP.dp).testTag("usage.row.icon.$i")) { if (!r.isOther) AppIcon(r.key, name, CommsStyle.USAGE_ICON_DP) }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(name, color = tone.ink, fontSize = CommsStyle.NOTE_SP.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("usage.row.name.$i"))
+                Text(UsageFormat.full(r.ms), color = tone.ink.copy(alpha = 0.72f), fontSize = CommsStyle.NOTE_SP.sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 10.dp).testTag("usage.row.value.$i"))
+            }
+            Spacer(Modifier.height(3.dp))
+            VizBar(r.share, r.texture, tone, Modifier.testTag("usage.row.bar.$i"), thickness = CommsStyle.USAGE_BAR_DP.dp)
         }
     }
 }

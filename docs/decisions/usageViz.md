@@ -1,5 +1,7 @@
 # usageViz (wave 28): Usage merged into Timeline as an ASOC viz block
 
+> Superseded in part by [usageSimplify.md](usageSimplify.md) (wave 29): the `stack` of the selected day, the `legend`, the percentages and the stack-label rule below are gone, replaced by a ranked list with a `bars` bar per app. The merge into Timeline, the tabs, the data source, the steps chart, the textures, access and accessibility rules stay.
+
 Owner: "Combine Usage with Timeline. Let usage be a small visualization above timeline. We recently developed a dataviz toolkit, I want you to use that for the visualization."
 
 ## The toolkit

@@ -8,4 +8,4 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w400dp-h800dp-xhdpi", sdk = [35])
-class UsageLegendW29PortraitTest : UsageLegendW29Cases("portrait")
+class UsageSimplifyW29PortraitTest : UsageSimplifyW29Cases("portrait")

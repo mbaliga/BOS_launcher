@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -33,6 +34,8 @@ import java.io.File
 /**
  * Wave 28 (usageTimeline): the usage block above the Timeline: where it sits, what a tap on a column does, the missing-access and empty states,
  * the table view, the accessible names, and screenshots (`build/screenshots/usage-*.png`, dark and light, granted, access missing, empty).
+ * Wave 29 (usageSimplify): the stack and legend became a ranked list of rows; the tests below follow that (the block's layout and overlap rules are
+ * in [UsageSimplifyW29Cases]).
  */
 @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots() {
@@ -70,20 +73,21 @@ abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots
         val block = rule.onNodeWithTag("usage.block").getUnclippedBoundsInRoot(); val row = rule.onNodeWithTag("timeline.row.0").getUnclippedBoundsInRoot()
         assertTrue("block ${block.bottom} above the first row ${row.top}", block.bottom.value <= row.top.value + 0.5f)
         val h = block.bottom.value - block.top.value
-        assertTrue("the block is $h dp high (wave 29: five 24 dp legend lines 8 dp apart under the chart)", h in 230f..300f)
+        assertTrue("the block is $h dp high (wave 29: the day line, the week, five 36 dp rows and a hairline)", h in 250f..320f)
         assertEquals("same horizontal margin as the list", 20f, block.left.value, 0.5f)
         assertEquals("a quiet header line with the total", "Today, 2 h 34 min", desc("usage.stat"))
     }
 
     // ---- the chart ----
 
-    @Test fun USG_11_tappingAColumnSelectsItsDayAndTheStackAndLegendFollow() {
+    @Test fun USG_11_tappingAColumnSelectsItsDayAndTheRowsFollow() {
         granted()
-        assertEquals(5, count("usage.stack.part")); assertEquals(5, count("usage.legend.key"))
+        assertEquals(5, count("usage.row"))
+        assertEquals("Browser, 1 h 10 min", desc("usage.row.0")); assertEquals("Other, 9 min", desc("usage.row.4"))
         rule.onNodeWithTag("usage.steps.col.4").performClick(); rule.waitForIdle()
         assertEquals("Fri, 1 h 50 min", desc("usage.stat"))
-        assertEquals("two apps that day, nothing folded", 2, count("usage.stack.part")); assertEquals(2, count("usage.legend.key"))
-        assertEquals("Browser, 20 min, 18 percent", desc("usage.stack.part.1"))
+        assertEquals("two apps that day, nothing folded", 2, count("usage.row"))
+        assertEquals("Browser, 20 min", desc("usage.row.1"))
         rule.onNodeWithTag("usage.steps.col.5").performClick(); rule.waitForIdle()
         assertEquals("Yesterday, 2 h 5 min", desc("usage.stat"))
     }
@@ -100,7 +104,7 @@ abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots
         var asked: GrantKind? = null
         GrantHooks.interceptor = { k, _ -> asked = k }
         host(UsageFixtures.repo(UsageFixtures.FakeSource(granted = false))); waitFor("usage.noAccess")
-        assertEquals("no axes, no columns, no stack", 0, count("usage.steps.col") + count("usage.stack.part"))
+        assertEquals("no axes, no columns, no rows", 0, count("usage.steps.col") + count("usage.row"))
         rule.onNodeWithTag("usage.allow").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         rule.onNodeWithTag("usage.allow").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.let { assertEquals("Allow usage access", it.joinToString("")) }
         rule.onNodeWithTag("usage.allow").performClick(); rule.waitForIdle()
@@ -110,9 +114,9 @@ abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots
 
     @Test fun USG_13_withNoDataTheBlockIsOneQuietLine() {
         host(UsageFixtures.repo(UsageFixtures.FakeSource(data = emptyMap()))); waitFor("usage.empty")
-        assertEquals(0, count("usage.steps.col") + count("usage.stack.part") + count("usage.legend.key"))
+        assertEquals(0, count("usage.steps.col") + count("usage.row"))
         rule.onNodeWithTag("usage.empty").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.let { assertEquals("No screen time recorded yet.", it.joinToString("")) }
-        assertTrue(rule.onNodeWithTag("usage.block").getUnclippedBoundsInRoot().let { it.bottom.value - it.top.value } < 50f)
+        assertTrue(rule.onNodeWithTag("usage.block").getUnclippedBoundsInRoot().let { it.bottom.value - it.top.value } < 80f)
         capture("empty-dark")
     }
 
@@ -123,7 +127,7 @@ abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots
         val d = desc("usage.chart")!!
         assertTrue(d, d.startsWith("Screen time, last 7 days."))
         assertTrue("every day: $d", listOf("Mon", "Tue", "Wed", "Thu", "Fri").all { it in d } && "Yesterday, 2 h 5 min" in d && "Today, 2 h 34 min" in d)
-        assertTrue("selected day and its top apps: $d", "Selected: Today, 2 h 34 min" in d && "Browser, 1 h 10 min, 45 percent" in d)
+        assertTrue("selected day and its top apps: $d", "Selected: Today, 2 h 34 min" in d && "Browser, 1 h 10 min" in d && "percent" !in d)
         val a = rule.onNodeWithTag("usage.chart").fetchSemanticsNode().config[SemanticsActions.CustomActions]
         assertEquals(listOf("Show as table"), a.map { it.label })
     }
@@ -137,22 +141,20 @@ abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots
         rule.onNodeWithTag("usage.table").assertIsDisplayed()
         assertEquals(7, count("usage.table.row"))
         assertEquals("Today, 2 h 34 min", desc("usage.table.row.6")); assertEquals("Thu, <1 min", desc("usage.table.row.3"))
-        assertEquals("the stack and legend stay", 5, count("usage.stack.part"))
+        assertEquals("the ranked rows stay", 5, count("usage.row"))
         rule.runOnUiThread { act().action() }; rule.waitForIdle()
         assertEquals(7, count("usage.steps.col"))
     }
 
-    @Test fun USG_16_columnsAre48dpWideTapTargetsAndStackPartsAreFocusableWithAppDurationPercent() {
+    @Test fun USG_16_columnsAre48dpWideTapTargetsAndRowsAre48dpHighTargetsWithAppAndDuration() {
         granted()
         (0..6).forEach { i -> val b = rule.onNodeWithTag("usage.steps.col.$i").getUnclippedBoundsInRoot(); assertTrue("column $i is ${b.right.value - b.left.value} dp wide", b.right.value - b.left.value >= 47.5f) }
-        assertEquals("Browser, 1 h 10 min, 45 percent", desc("usage.stack.part.0"))
-        assertEquals("Other, 9 min, 6 percent", desc("usage.stack.part.4"))
-        (0..4).forEach { i -> assertTrue("part $i is focusable", rule.onNodeWithTag("usage.stack.part.$i", useUnmergedTree = true).fetchSemanticsNode().config.contains(SemanticsProperties.Focused)) }
-        assertEquals("Browser, 1 h 10 min", desc("usage.legend.key.0"))
+        assertEquals("Browser, 1 h 10 min", desc("usage.row.0"))
+        (0..4).forEach { rule.onNodeWithTag("usage.row.$it").assertTouchHeightIsEqualTo(48.dp) }
     }
 
     @Test fun USG_17_theBlockAnimatesNothingSoReducedMotionHasNothingToTurnOff() {
-        val src = listOf("UsageTimelineBlock.kt", "viz/VizSteps.kt", "viz/VizStack.kt", "viz/VizLegend.kt", "viz/VizTable.kt", "viz/VizStat.kt", "viz/VizTextures.kt", "viz/Viz.kt")
+        val src = listOf("UsageTimelineBlock.kt", "viz/VizSteps.kt", "viz/VizBars.kt", "viz/VizTable.kt", "viz/VizStat.kt", "viz/VizTextures.kt", "viz/Viz.kt")
         val root = listOf(File("src/main/kotlin/com/bos/sphere/ui"), File("feature-launchpad/src/main/kotlin/com/bos/sphere/ui")).first { it.exists() }
         src.forEach { f ->
             val text = File(root, f).readText()
@@ -161,20 +163,20 @@ abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots
         }
     }
 
-    @Test fun USG_18_identityIsTextureNotHueInTheChartButTheLegendCarriesTheAppIcon() {
+    @Test fun USG_18_identityIsTextureNotHueInTheBarsButTheRowsCarryTheAppIcon() {
         granted()
         val bmp = capture("granted-dark")
         val d = rule.density.density
-        // The pill and the columns: every pixel in them is the warm-white ink (or the accent yellow for today), never a per-app hue.
-        val stack = (0..4).map { rule.onNodeWithTag("usage.stack.part.$it").getUnclippedBoundsInRoot() }
-        val y0 = (stack[0].top.value * d).toInt() + 2; val y1 = ((stack[0].top.value + 11) * d).toInt()
         var coloured = 0; var ink = 0
-        for (y in y0 until y1) for (x in (stack[0].left.value * d).toInt() until (stack[4].right.value * d).toInt()) {
-            val p = bmp.getPixel(x, y); val r = (p shr 16) and 255; val g = (p shr 8) and 255; val b = p and 255
-            if (maxOf(r, g, b) - minOf(r, g, b) > 45) coloured++ else if (r + g + b > 450) ink++
+        for (i in 0..4) {
+            val b = rule.onNodeWithTag("usage.row.bar.$i", useUnmergedTree = true).getUnclippedBoundsInRoot()
+            for (y in (b.top.value * d).toInt() until (b.bottom.value * d).toInt()) for (x in (b.left.value * d).toInt() until (b.right.value * d).toInt()) {
+                val p = bmp.getPixel(x, y); val r = (p shr 16) and 255; val g = (p shr 8) and 255; val bl = p and 255
+                if (maxOf(r, g, bl) - minOf(r, g, bl) > 45) coloured++ else if (r + g + bl > 450) ink++
+            }
         }
-        assertEquals("no hue inside the stack", 0, coloured); assertTrue("the stack is drawn in the ink", ink > 100)
-        assertEquals(listOf(VizTexture.Solid, VizTexture.Hatch, VizTexture.Dots, VizTexture.Fade, VizTexture.Stipple), UsageFixtures.week().parts(6).map { it.texture })
+        assertEquals("no hue inside the bars", 0, coloured); assertTrue("the bars are drawn in the ink", ink > 100)
+        assertEquals(listOf(VizTexture.Solid, VizTexture.Hatch, VizTexture.Dots, VizTexture.Fade, VizTexture.Stipple), UsageFixtures.week().rows(6).map { it.texture })
     }
 
     // ---- screenshots (read by eye; the assertions only prove they were taken and are not blank) ----

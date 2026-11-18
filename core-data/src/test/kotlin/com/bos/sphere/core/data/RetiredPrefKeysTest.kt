@@ -37,6 +37,15 @@ class RetiredPrefKeysTest {
         for (k in keys) assertTrue("$k is dropped when a settings file is imported", k in RetiredPrefKeys.DROPPED_ON_IMPORT)
     }
 
+    @Test fun CFG_03_w29_theTimelineFilterPrefsOfOlderBuildsAreDroppedAndTheHomeUsageRangeStays() {
+        val f = mapOf("home_state" to MapSharedPreferences(mapOf("panel.timeline.depth" to "Short", "panel.timeline.scheduled" to false, "panel.usage" to "Week", "panel.files.count" to 20)))
+        assertEquals(2, RetiredPrefKeys.purge { f[it] })
+        assertFalse(f.getValue("home_state").contains("panel.timeline.depth")); assertFalse(f.getValue("home_state").contains("panel.timeline.scheduled"))
+        assertTrue("the home Usage tile's own range is a different feature and stays", f.getValue("home_state").contains("panel.usage"))
+        assertTrue(f.getValue("home_state").contains("panel.files.count"))
+        assertEquals("an old install that never had them is untouched", 0, RetiredPrefKeys.purge { f[it] })
+    }
+
     @Test fun CFG_03_aSecondPurgeFindsNothingAndAMissingOrBrokenFileIsSkipped() {
         val f = files()
         RetiredPrefKeys.purge { f[it] }

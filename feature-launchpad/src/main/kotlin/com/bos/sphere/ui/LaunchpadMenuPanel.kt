@@ -273,7 +273,7 @@ private fun ScaleOption(actions: MenuActions) {
 private fun ShowRow(label: String, selected: Boolean, tag: String, count: Int, pkg: String?, onClick: () -> Unit) {
     val ink = LocalLp.current
     Row(
-        Modifier.fillMaxWidth().heightIn(min = CommsStyle.SHOW_ROW_DP.dp)
+        Modifier.fillMaxWidth().heightIn(min = CommsStyle.SHOW_ROW_DP.dp).then(if (count == 0 && pkg != null) Modifier.graphicsLayer { alpha = 0.45f } else Modifier) // wave 29: an app with nothing under the active filter stays listed, dimmed
             .semantics(mergeDescendants = true) { this.selected = selected; role = Role.RadioButton }
             .clickable(onClick = onClick).testTag(tag).padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.PANEL_END_PAD_DP.dp),
         verticalAlignment = Alignment.CenterVertically,

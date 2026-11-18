@@ -541,7 +541,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 SettingItem.Stepper(
                     x("Comms size"), Glyphs.Pinch, com.bos.sphere.core.data.CommsScaleSettings.percent.value,
                     com.bos.sphere.core.data.CommsScale.MIN..com.bos.sphere.core.data.CommsScale.MAX,
-                    hint = x("Text, icons and rows of Comms and its menu, from 75 to 125 percent. Pinching the list changes it too."),
+                    hint = x("Text, icons and rows of Comms and its menu, from 75 to 125 percent. Ctrl+Plus and Ctrl+Minus change it too."),
                     step = com.bos.sphere.core.data.CommsScale.STEP, valueText = "${com.bos.sphere.core.data.CommsScaleSettings.percent.value}%",
                 ) { v -> com.bos.sphere.core.data.CommsScaleSettings.set(v) },
             )

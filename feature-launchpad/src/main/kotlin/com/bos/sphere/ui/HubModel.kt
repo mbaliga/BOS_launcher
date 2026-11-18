@@ -149,6 +149,17 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
     /** A half-made "Delete history" confirmation (a row of the Comms menu); the menu drops it when it closes. */
     var confirmDelete by mutableStateOf(false)
     var undo by mutableStateOf<HubUndo?>(null)
+    /** Wave 29: the read filter of the All view (Unread - All - Read); the pinch, the TalkBack actions and the label's tap set it. */
+    var readFilter by mutableStateOf(ReadFilter.All)
+        private set
+    fun chooseReadFilter(f: ReadFilter) { readFilter = f }
+    /** One pinch step (see [CommsRead.step]); true when something changed. */
+    fun pinch(dir: PinchDir): Boolean {
+        val (v, f) = CommsRead.step(view, readFilter, dir) ?: return false
+        if (v in views) { view = v; undo = null }
+        readFilter = f
+        return true
+    }
     private var filterMap by mutableStateOf(emptyMap<HubView, HubFilters>())
 
     /** True when the list on screen is the Launchpad's own live grouped list: the All view of a hub whose [liveAll] is set. */

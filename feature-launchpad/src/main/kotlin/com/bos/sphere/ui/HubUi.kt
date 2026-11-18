@@ -229,7 +229,7 @@ private fun HubRow(
     Column(Modifier.fillMaxWidth().testTag("hub.row.${e.id}")) {
         CommsRowContent(
             pkg = e.packageName, appLabel = e.appLabel.ifBlank { e.who }, iconTag = "hub.badge.${e.id}",
-            headline = headline, headlineColor = if (unread) lp.ink else lp.ink2, titleTag = "hub.title.${e.id}",
+            headline = headline, headlineColor = if (unread) lp.ink else lp.ink2, titleTag = "hub.title.${e.id}", read = !unread,
             second = e.who, previewTag = "hub.who.${e.id}", stamp = stamp, timeTag = "hub.time.${e.id}", expanded = open,
             modifier = Modifier.fillMaxWidth().hubTap(onTap).semantics(mergeDescendants = true) {
                 role = Role.Button

@@ -30,6 +30,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
@@ -132,6 +135,10 @@ import com.bos.sphere.core.data.SphereNotificationListener
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.Dispatchers
@@ -287,6 +294,8 @@ fun LaunchpadPanel(
     viewSwitcher: @Composable () -> Unit = {},
     /** Wave 25 (hubData): renders the Files and Timeline views of the hub; null leaves the hub with the history views only. */
     panelBody: (@Composable (HubView) -> Unit)? = null,
+    /** Wave 29 (commsRead): the launcher's strength-aware haptics (the host's rememberLauncherHaptics()); the read-filter pinch ticks through it. Null: no haptic. */
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback? = null,
 ) {
     rememberLaunchpadInit()
     val dark = when (theme) {
@@ -348,7 +357,7 @@ fun LaunchpadPanel(
         val hub = remember(panelBody != null) { if (panelBody == null) null else HubState(HubPrefs.of(ctx), com.bos.sphere.core.data.NotificationHistory.init(ctx), true, liveAll = true) }
         if (hub != null) LaunchedEffect(hub) { LaunchpadHubNav.requests.collect { v -> if (v != null) { hub.select(v); LaunchpadHubNav.take() } } }
         LaunchpadContent(
-            hub = hub, hubPanelBody = panelBody ?: {}, viewSwitcher = { if (hub != null) HubSwitcher(hub); viewSwitcher() },
+            hub = hub, hubPanelBody = panelBody ?: {}, haptics = haptics, viewSwitcher = { if (hub != null) HubSwitcher(hub); viewSwitcher() },
             items = items, rules = rules, prefs = prefs, readKeys = read, hasAccess = access, now = now,
             gestures = gestures,
             endInset = cardInset,
@@ -458,6 +467,8 @@ fun LaunchpadContent(
     soundSheet: SoundSheetState = rememberSoundSheetState(),
     /** Wave 28: the Comms size in percent (75 to 125); by default the persisted setting, which the Comms size stepper and the pinch change. */
     commsScalePercent: Int = rememberCommsScalePercent(),
+    /** Wave 29 (commsRead): the tick performed on each read-filter step (null: none). */
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback? = null,
 ) {
     val ctx = LocalContext.current
     val rtlLayout = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
@@ -471,11 +482,22 @@ fun LaunchpadContent(
     var menuFor by remember { mutableStateOf<HubNotification?>(null) }
     var menuExpand by remember { mutableStateOf<RowCommand?>(null) }
     var replyFor by remember { mutableStateOf<String?>(null) }
-    var unreadOnly by remember { mutableStateOf(false) }
+    // Wave 29: the read filter (Unread - All - Read) of the All view: the hub's when there is one, else the panel's own.
+    var localReadFilter by remember { mutableStateOf(ReadFilter.All) }
+    val readFilter = hub?.readFilter ?: localReadFilter
+    fun setReadFilter(f: ReadFilter) { if (hub != null) hub.chooseReadFilter(f) else localReadFilter = f }
+    // Wave 29: ALL is the live list plus the persistent history (one row per key, newest first), so a read notification stays.
+    val historyFlow = remember(hub?.store) { hub?.store?.entries ?: MutableStateFlow(emptyList<com.bos.sphere.core.data.HistoryEntry>()) }
+    val history by historyFlow.collectAsState()
+    val merged = remember(items, history, readKeys, hub != null) {
+        if (hub != null && hub.liveAll) CommsRead.merge(items, history, readKeys) else CommsRead.Merged(items, readKeys, emptyMap())
+    }
+    val effRead = merged.readKeys
+    val historyOnly = merged.historyOnly
     var groupFor by remember { mutableStateOf<HubNotification?>(null) }
     var ruleFrom by remember { mutableStateOf<HubNotification?>(null) }
     var groupsOpen by remember { mutableStateOf(false) } // wave 24: the Groups manager inside Launchpad
-    val shown = remember(items, readKeys, unreadOnly) { if (unreadOnly) items.filter { it.key !in readKeys } else items }
+    val shown = remember(merged, readFilter) { CommsRead.filter(merged.items, effRead, readFilter) }
     val toast = remember { mutableStateOf<String?>(null) }
     LaunchedEffect(toast.value) { if (toast.value != null) { delay(1400); toast.value = null } }
     val tracker = remember { InputModeTracker() }
@@ -486,9 +508,9 @@ fun LaunchpadContent(
         val pkg = n?.packageName.orEmpty()
         when (action) {
             com.bos.sphere.core.data.LaunchpadAction.None -> Unit
-            com.bos.sphere.core.data.LaunchpadAction.ShowUnread -> { unreadOnly = true; toast.value = L10n.tr("Unread only") }
-            com.bos.sphere.core.data.LaunchpadAction.ShowAll -> { unreadOnly = false; toast.value = L10n.tr("Showing everything") }
-            com.bos.sphere.core.data.LaunchpadAction.ToggleUnread -> { unreadOnly = !unreadOnly; toast.value = L10n.tr(if (unreadOnly) "Unread only" else "Showing everything") }
+            com.bos.sphere.core.data.LaunchpadAction.ShowUnread -> { setReadFilter(ReadFilter.Unread); toast.value = L10n.tr("Unread only") }
+            com.bos.sphere.core.data.LaunchpadAction.ShowAll -> { setReadFilter(ReadFilter.All); toast.value = L10n.tr("Showing everything") }
+            com.bos.sphere.core.data.LaunchpadAction.ToggleUnread -> { val on = readFilter != ReadFilter.Unread; setReadFilter(if (on) ReadFilter.Unread else ReadFilter.All); toast.value = L10n.tr(if (on) "Unread only" else "Showing everything") }
             com.bos.sphere.core.data.LaunchpadAction.NextGrouping -> {
                 val next = GroupMode.entries[(prefs.defaultMode.ordinal + 1) % GroupMode.entries.size]
                 onSetDefaultMode(next); toast.value = L10n.tr("Grouped: %s", groupModeText(next))
@@ -509,8 +531,8 @@ fun LaunchpadContent(
     }
 
     // Counts for the filter menu reflect what the user can actually see.
-    val visible = remember(items, rules, now) { LaunchpadLogic.visible(items, rules, now) }
-    val counts = remember(visible) { LaunchpadLogic.countsBySource(visible) }
+    val visible = remember(merged, rules, now) { LaunchpadLogic.visible(merged.items, rules, now) }
+    val counts = remember(visible, effRead, readFilter) { CommsRead.counts(visible, effRead, readFilter) }
     val activeFilter = filter?.takeIf { f -> counts.any { it.packageName == f } }
     val digestLabel = L10n.tr("Digest")
     val todayLabel = L10n.tr("Today"); val yesterdayLabel = L10n.tr("Yesterday"); val pinnedLabel = L10n.tr("Pinned"); val flatLabel = L10n.tr("All")
@@ -602,6 +624,12 @@ fun LaunchpadContent(
     }
     /** STR-02: the shared way to open a notification; a failed hand-off keeps Launchpad open and says so. */
     fun open(n: HubNotification) {
+        val h = historyOnly[n.key]
+        if (h != null) { // wave 29: a row whose notification left the shade has no intent: tapping reads it and opens its app
+            hub?.store?.setRead(listOf(h.id), true)
+            if (n.packageName.isNotBlank()) { if (openApp == null) onOpenApp(n.packageName) else if (!openApp(n.packageName)) toast.value = L10n.tr("Couldn't open %s", n.appLabel.ifBlank { n.packageName }) }
+            return
+        }
         if (openItem == null) onOpenItem(n)
         else if (!openItem(n)) toast.value = L10n.tr("Couldn't open %s", n.appLabel.ifBlank { n.title })
     }
@@ -630,6 +658,11 @@ fun LaunchpadContent(
     val keyHandler = remember { { ev: androidx.compose.ui.input.key.KeyEvent -> listKeyNow[0](ev) } }
 
     fun command(cmd: RowCommand, n: HubNotification) {
+        val h = historyOnly[n.key]
+        if (h != null && (cmd == RowCommand.MarkRead || cmd == RowCommand.Dismiss)) { // wave 29: history-only rows mark in, and leave, the history
+            if (cmd == RowCommand.MarkRead) { hub?.store?.setRead(listOf(h.id), true); toast.value = L10n.tr("Marked as read") } else hub?.store?.delete(history.filter { it.key == n.key }.map { it.id })
+            return
+        }
         when (cmd) {
             RowCommand.Open -> open(n)
             RowCommand.Dismiss -> perform(com.bos.sphere.core.data.LaunchpadAction.Dismiss, n, sections)
@@ -646,7 +679,7 @@ fun LaunchpadContent(
     }
 
     // Wave 25: "mark what is visible as read" for the hub: the live list marks its unread rows, a history view uses the store (with undo).
-    val liveNow = androidx.compose.runtime.rememberUpdatedState(items to readKeys)
+    val liveNow = androidx.compose.runtime.rememberUpdatedState(merged.items to effRead)
     val hubMarkRead: () -> Unit = {
         if (hub != null) {
             if (hub.listIsLive) {
@@ -656,6 +689,23 @@ fun LaunchpadContent(
             } else hub.markVisibleRead(System.currentTimeMillis(), zone)
         }
     }
+
+    // Wave 29: the read filter's steps: the pinch and Ctrl+U move one stop, the TalkBack actions and the label's tap choose one.
+    fun tick() { haptics?.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove) }
+    fun stepFilter(d: PinchDir) {
+        val changed = if (hub != null) hub.pinch(d) else localReadFilter.toward(d).let { n -> (n != localReadFilter).also { if (it) localReadFilter = n } }
+        if (changed) tick()
+    }
+    fun chooseFilter(f: ReadFilter) {
+        if (hub != null && hub.view.history && hub.view != HubView.All) hub.select(HubView.All)
+        if (readFilter != f) tick()
+        setReadFilter(f)
+    }
+    val filterActions = listOf(
+        CustomAccessibilityAction(L10n.tr("Show unread only")) { chooseFilter(ReadFilter.Unread); true },
+        CustomAccessibilityAction(L10n.tr("Show read only")) { chooseFilter(ReadFilter.Read); true },
+        CustomAccessibilityAction(L10n.tr("Show all")) { chooseFilter(ReadFilter.All); true },
+    )
 
     // Wave 27: on a history view (Unread, Read) the grid groups that history; on the live list it sets the default grouping of the live list.
     val historyGrouping = hub != null && !hub.listIsLive && hub.view.history
@@ -683,12 +733,17 @@ fun LaunchpadContent(
             // Beside the home card the host draws the backdrop (it must not fade with the content); alone, the content draws its own.
             .then(if (endInset > 0.dp) Modifier else Modifier.background(LocalLp.current.bg))
             .testTag("lp.root")
-            .semantics { paneTitle = L10n.tr("Comms") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
+            .semantics {
+                paneTitle = L10n.tr("Comms")
+                // Wave 29: the pinch's equivalents for TalkBack and switch access.
+                customActions = filterActions
+            } // wave 23 (NFR-13): TalkBack announces the panel when it opens
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
             .hubKeys( // outside focusable(): the keys work whether the root or a row has focus
                 onView = { d -> hub?.step(d)?.let(hub::select) },
                 onScale = { bigger -> CommsScaleSettings.set(CommsScale.step(CommsScaleSettings.percent.value, if (bigger) +1 else -1)) },
                 onMarkRead = { hubMarkRead() },
+                onFilter = { d -> stepFilter(d) },
             )
             .onKeyEvent(keyHandler)
             .focusRequester(rootReq)
@@ -706,9 +761,9 @@ fun LaunchpadContent(
                     onDragEnd = { if (total < -80f) { if (menu.open) menu.open = false else onClose() } },
                 ) { _, dx -> total += dx }
             }
-            // Wave 28: a pinch sets the Comms size (it replaces the density pinch and the pinch actions); a two-finger swipe belongs to the hub.
+            // Wave 29: a pinch steps the read filter Unread - All - Read (it no longer sets the Comms size); a two-finger swipe belongs to the hub.
             .hubGestures(
-                currentScale = { CommsScaleSettings.percent.value }, onScale = { CommsScaleSettings.set(it) },
+                onPinch = { d -> stepFilter(d) },
                 onSwipe = if (hub == null) null else { s -> hub.swipe(s) { hubMarkRead() } },
             )
             .padding(end = endInset),
@@ -727,6 +782,12 @@ fun LaunchpadContent(
             L10n.tr("Do Not Disturb is on. Only Priority groups light the edge indicator."), color = LocalLp.current.dim, fontSize = CommsStyle.NOTE_SP.sp,
             modifier = Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 8.dp, bottom = 6.dp).testTag("lp.dnd"),
         )
+        if (readFilter != ReadFilter.All && !(hub != null && !hub.listIsLive)) Text(
+            L10n.tr(if (readFilter == ReadFilter.Unread) "Unread only" else "Read only"), color = LocalLp.current.dim, fontSize = CommsStyle.NOTE_SP.sp,
+            modifier = Modifier.fillMaxWidth().heightIn(min = commsTarget()).clickable { chooseFilter(ReadFilter.All) }
+                .semantics { role = Role.Button; contentDescription = L10n.tr("Tap to show all") + ": " + L10n.tr(if (readFilter == ReadFilter.Unread) "Unread only" else "Read only") }
+                .wrapContentHeight(Alignment.CenterVertically).padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp).testTag("lp.readFilter"),
+        )
         if (hub != null && !hub.listIsLive) HubBody(
             hub, now, zone, is24, liveKeys = items.mapTo(HashSet()) { it.key }, modifier = Modifier.weight(1f), hasAccess = hasAccess, onRequestAccess = onRequestAccess, panelBody = hubPanelBody,
             onOpen = { e ->
@@ -740,7 +801,7 @@ fun LaunchpadContent(
         ) {
             if (entries.isEmpty()) {
                 if (!loadingGroups) Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text(L10n.tr(if (unreadOnly) "No unread notifications" else "All caught up"), color = LocalLp.current.dim, fontSize = CommsStyle.EMPTY_SP.sp, fontWeight = FontWeight.Light)
+                    Text(L10n.tr(when (readFilter) { ReadFilter.Unread -> "No unread notifications"; ReadFilter.Read -> "Nothing read yet"; ReadFilter.All -> "All caught up" }), color = LocalLp.current.dim, fontSize = CommsStyle.EMPTY_SP.sp, fontWeight = FontWeight.Light)
                 }
             } else Column(Modifier.fillMaxSize()) {
               LazyColumn(
@@ -782,7 +843,7 @@ fun LaunchpadContent(
                             val globalLeft = gestures[com.bos.sphere.core.data.LaunchpadGesture.SwipeItemLeft] ?: com.bos.sphere.core.data.LaunchpadAction.Dismiss
                             val leftAction = DeliveryLogic.primaryFor(n.packageName, policies, globalLeft)
                             NotificationRow(
-                                n = n, unread = n.key !in readKeys, now = now, is24 = is24, zone = zone,
+                                n = n, unread = n.key !in effRead, now = now, is24 = is24, zone = zone,
                                 important = LaunchpadLogic.isImportant(n, rules),
                                 pinned = e.pinned,
                                 silent = n.key in view.silentKeys,
@@ -793,6 +854,8 @@ fun LaunchpadContent(
                                     onCommand = { command(it, n) },
                                     onMenu = { menuFor = n; menuExpand = null },
                                     onToggleActions = { actionsOpenFor = if (n.key in actionsOpenFor) actionsOpenFor - n.key else actionsOpenFor + n.key },
+                                    onToggleRead = { historyOnly[n.key]?.let { h -> hub?.store?.setRead(listOf(h.id), !h.read) } },
+                                    onDeleteFromHistory = { hub?.store?.delete(history.filter { it.key == n.key }.map { it.id }) },
                                     onRunAction = { a ->
                                         if (runAction == null) onRunAction(a) else if (!runAction(a)) toast.value = L10n.tr("Couldn't open %s", a.label.ifBlank { n.appLabel })
                                     },
@@ -806,6 +869,7 @@ fun LaunchpadContent(
                                 onPointer = tracker::onPointer, onKeyOther = keyHandler,
                                 replyOpen = replyFor == n.key,
                                 actionsOpen = n.key in actionsOpenFor,
+                                historyOnly = n.key in historyOnly,
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -845,7 +909,7 @@ fun LaunchpadContent(
     }
     menuFor?.let { n ->
         RowMenuSheet(
-            n = n, unread = n.key !in readKeys, canReply = ReplyLogic.pick(n.actions) != null, now = now, zone = zone,
+            n = n, unread = n.key !in effRead, historyOnly = n.key in historyOnly, canReply = ReplyLogic.pick(n.actions) != null, now = now, zone = zone,
             expand = menuExpand,
             onDismissSheet = { menuFor = null },
             onAddRule = { onAddRule(it); menuFor = null },

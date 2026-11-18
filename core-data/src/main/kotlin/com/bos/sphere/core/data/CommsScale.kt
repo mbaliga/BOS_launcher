@@ -35,15 +35,11 @@ object CommsScale {
 
     /** The multiplier for dp and sp. */
     fun factor(percent: Int): Float = snap(percent) / 100f
-
-    /** The detent a pinch lands on: the percent the pinch started at, times the finger spread ratio. */
-    fun fromPinch(startPercent: Int, ratio: Float): Int =
-        if (ratio.isNaN() || ratio <= 0f) snap(startPercent) else snap((startPercent * ratio).roundToInt())
 }
 
 /**
  * The persisted [CommsScale] percent (file "comms_scale", key "pct", read through [TolerantPrefs]; exported with the other launcher
- * settings, see [PrefFilesSource.ALLOWED]). A process-wide store: the Comms surfaces, the menu panel, Ground Control and the pinch all use it.
+ * settings, see [PrefFilesSource.ALLOWED]). A process-wide store: the Comms surfaces, the menu panel, Ground Control and the Ctrl+Plus and Ctrl+Minus chords use it.
  */
 object CommsScaleSettings {
     const val FILE = "comms_scale"

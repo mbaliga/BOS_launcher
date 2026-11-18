@@ -1036,7 +1036,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onOpenApp = { pkg -> hubStandalone = false; apps.firstOrNull { it.packageName == pkg }?.let(::launch) ?: appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))) },
             modifier = Modifier.fillMaxSize(), theme = prefs.launchpadTheme,
             launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
-            panelBody = hubPanelBody,
+            panelBody = hubPanelBody, haptics = com.bos.sphere.feature.grid.rememberLauncherHaptics(),
         )
         when (prefs.leftPage) {
             com.bos.sphere.core.data.LeftPage.Launchpad -> if (leftActive) com.bos.sphere.ui.LaunchpadPanel(
@@ -1054,7 +1054,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 // STR-02: reports whether the app started, so a failed open keeps Launchpad up with a message.
                 launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
                 menu = lpMenu,
-                panelBody = hubPanelBody,
+                panelBody = hubPanelBody, haptics = com.bos.sphere.feature.grid.rememberLauncherHaptics(),
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit

@@ -104,6 +104,8 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
     }
 
     private fun render(items: List<HubNotification>, dark: Boolean = true, name: String? = null, rtl: Boolean = false, home: Boolean = true) {
+        // Wave 29: ALL is the live list plus the history, so the history holds exactly what this screen shows live.
+        hub = HubState(HubPrefs(null), NotificationHistoryStore(File(java.nio.file.Files.createTempDirectory("comms").toFile(), "usage/h.log"), Executor { it.run() }).also { it.observe(items) }, true, liveAll = true)
         rule.setContent { Stage(items, dark, rtl, home) }
         rule.waitForIdle()
         if (name != null) shoot("comms-$orientation-$name-${if (dark) "dark" else "light"}")

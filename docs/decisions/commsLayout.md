@@ -1,5 +1,7 @@
 # commsLayout (wave 28)
 
+> Wave 29 (commsRead): the pinch no longer sets the Comms size; it filters by read state, see [commsRead.md](commsRead.md).
+
 Owner: "Please observe the spacing and alignment of these mockups and make sure you follow it exactly - it looks rather clunky now. User should be able to configure the scale of the content here from 75% to 125% in detents of 5%. 100% is default."
 
 ## What was wrong

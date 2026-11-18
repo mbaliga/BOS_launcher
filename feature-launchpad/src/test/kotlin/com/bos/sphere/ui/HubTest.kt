@@ -101,7 +101,7 @@ class HubTest {
                     Modifier.fillMaxSize().background(LpDark.bg).testTag("host")
                         .hubKeys(onView = { d -> HubLogic.step(s.views, s.view, d)?.let(s::select) }, onScale = { b -> CommsScaleSettings.set(CommsScale.step(CommsScaleSettings.percent.value, if (b) +1 else -1)) }, onMarkRead = { s.markVisibleRead(now, zone) })
                         .focusable()
-                        .hubGestures(currentScale = { CommsScaleSettings.percent.value }, onScale = { CommsScaleSettings.set(it) }, onSwipe = { sw -> s.swipe(sw) { s.markVisibleRead(now, zone) } }),
+                        .hubGestures(onPinch = { s.pinch(it) }, onSwipe = { sw -> s.swipe(sw) { s.markVisibleRead(now, zone) } }),
                 ) {
                     HubSwitcher(s)
                     HubBody(s, now, zone, true, liveKeys = setOf("m1"), onOpen = { opened += it.key }, onMore = {}, modifier = Modifier.weight(1f), panelBody = { v -> Text("panel ${v.id}", color = LpDark.ink, modifier = Modifier.testTag("panel.${v.id}")) })
@@ -255,27 +255,29 @@ class HubTest {
         assertTrue(HubLogic.query(all, HubView.Files, HubFilters(), now, zone).isEmpty())
     }
 
-    // ---- Comms size and pinch (wave 28: replaces the three-level density pinch and its grouping tail) ----
+    // ---- the pinch filters by read state (wave 29: replaces the wave 28 pinch that set the Comms size) ----
 
-    @Test fun HUB_14_pinchOutMakesTheCommsSizeBiggerPinchInSmallerInDetentsOf5() {
+    private fun pinchOut(fromSpread: Float = 100f, toSpread: Float = 220f) = rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-fromSpread, 0f), center + Offset(-toSpread, 0f), center + Offset(fromSpread, 0f), center + Offset(toSpread, 0f)) }
+    private fun pinchIn(fromSpread: Float = 200f, toSpread: Float = 40f) = pinchOut(fromSpread, toSpread)
+
+    @Test fun HUB_14_pinchInStepsTowardUnreadPinchOutTowardReadOneStopPerGestureAndTheSizeStaysPut() {
         host()
-        assertEquals(100, CommsScaleSettings.percent.value)
-        // spread 200 px to 220 px: 10 percent bigger, one pinch, two detents
-        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-100f, 0f), center + Offset(-110f, 0f), center + Offset(100f, 0f), center + Offset(110f, 0f)) }
-        rule.waitForIdle()
-        assertEquals(110, CommsScaleSettings.percent.value)
-        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-200f, 0f), center + Offset(-40f, 0f), center + Offset(200f, 0f), center + Offset(40f, 0f)) }
-        rule.waitForIdle()
-        assertEquals("far in: the smallest detent", 75, CommsScaleSettings.percent.value)
-        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-300f, 0f), center + Offset(40f, 0f), center + Offset(300f, 0f)) }
-        rule.waitForIdle()
-        assertEquals("far out: the biggest detent", 125, CommsScaleSettings.percent.value)
+        assertEquals(ReadFilter.All, state.readFilter)
+        pinchIn(); rule.waitForIdle()
+        assertEquals(ReadFilter.Unread, state.readFilter)
+        pinchIn(); rule.waitForIdle()
+        assertEquals("already at the end stop", ReadFilter.Unread, state.readFilter)
+        pinchOut(); rule.waitForIdle()
+        assertEquals("one long pinch is one step, not a run through both stops", ReadFilter.All, state.readFilter)
+        pinchOut(100f, 300f); rule.waitForIdle()
+        assertEquals(ReadFilter.Read, state.readFilter)
+        assertEquals("the pinch does not change the Comms size any more", 100, CommsScaleSettings.percent.value)
     }
 
     @Test fun HUB_14_aTinyChangeOfTheFingerSpreadIsNotAPinch() {
         host()
-        rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-100f, 0f), center + Offset(-103f, 0f), center + Offset(100f, 0f), center + Offset(103f, 0f)) }
-        rule.waitForIdle()
+        pinchOut(100f, 103f); rule.waitForIdle()
+        assertEquals(ReadFilter.All, state.readFilter)
         assertEquals(100, CommsScaleSettings.percent.value)
     }
 
@@ -427,10 +429,11 @@ class HubTest {
         rule.waitForIdle()
         rule.onNodeWithTag("hub.switcher").assertExists()
         rule.onNodeWithTag("lp.root").assertExists()
-        // Wave 28: a pinch on the screen sets the Comms size (the old pinch actions and the density pinch are gone).
+        // Wave 29: a pinch on the screen steps the read filter and leaves the Comms size alone.
         rule.onNodeWithTag("lp.root").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
         rule.waitForIdle()
-        assertEquals(125, CommsScaleSettings.percent.value)
+        assertEquals(100, CommsScaleSettings.percent.value)
+        assertEquals(ReadFilter.Read, s.readFilter)
         // Clear all empties the shade; the history keeps every entry, flagged as cleared.
         store.observe(emptyList())
         rule.waitForIdle()
@@ -475,10 +478,13 @@ class HubTest {
         rule.waitForIdle()
         rule.onNodeWithTag("lp.row.m1").assertExists()                             // the live list with its own rows and groups
         rule.onNodeWithTag("hub.list").assertDoesNotExist()
-        // Wave 28: the pinch sets the Comms size on the live list too.
-        rule.onNodeWithTag("lp.root").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
+        // Wave 29: the pinch filters the live list by read state; the Comms size is untouched.
+        rule.onNodeWithTag("lp.root").performTouchInput { pinch(center + Offset(-200f, 0f), center + Offset(-40f, 0f), center + Offset(200f, 0f), center + Offset(40f, 0f)) }
         rule.waitForIdle()
-        assertEquals(125, CommsScaleSettings.percent.value)
+        assertEquals(100, CommsScaleSettings.percent.value)
+        assertEquals(ReadFilter.Unread, live.readFilter)
+        rule.onNodeWithTag("lp.readFilter").performClick(); rule.waitForIdle()
+        assertEquals(ReadFilter.All, live.readFilter)
         rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
         rule.onNodeWithTag(rowTag("m1")).assertExists()                            // persistent history
         rule.onNodeWithTag("hub.view.all").performClick(); rule.waitForIdle()

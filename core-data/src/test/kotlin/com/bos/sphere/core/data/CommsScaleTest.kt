@@ -48,14 +48,4 @@ class CommsScaleTest {
         assertEquals(1.25f, CommsScale.factor(125), 0f)
         assertEquals(1f, CommsScale.factor(101), 0f)
     }
-
-    @Test fun CMS_06_pinchRatioLandsOnADetentRelativeToTheStart() {
-        assertEquals(100, CommsScale.fromPinch(100, 1.0f))
-        assertEquals(110, CommsScale.fromPinch(100, 1.1f))
-        assertEquals(125, CommsScale.fromPinch(100, 3f))
-        assertEquals(75, CommsScale.fromPinch(100, 0.2f))
-        assertEquals(90, CommsScale.fromPinch(120, 0.75f))
-        assertEquals(100, CommsScale.fromPinch(100, Float.NaN))
-        assertEquals(100, CommsScale.fromPinch(100, -1f))
-    }
 }

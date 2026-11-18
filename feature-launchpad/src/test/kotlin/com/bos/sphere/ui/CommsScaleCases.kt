@@ -48,18 +48,16 @@ abstract class CommsScaleCases(orientation: String) : CommsLayoutCases(orientati
         }
     }
 
-    @Test fun CMS_11_pinchOutAndInChangeTheSizeLiveInDetentsOf5AndTheLayoutFollows() {
+    @Test fun CMS_11_pinchNoLongerChangesTheSizeItFiltersByReadStateInstead() {
         render()
         assertEquals(100, CommsScaleSettings.percent.value)
-        val before = rowPitchPx()
         rule.onNodeWithTag("lp.root").performTouchInput { pinch(center + Offset(-100f, 0f), center + Offset(-110f, 0f), center + Offset(100f, 0f), center + Offset(110f, 0f)) }
         rule.waitForIdle()
-        assertEquals("a 10 percent spread is two detents", 110, CommsScaleSettings.percent.value)
-        assertEquals("the rows are 10 percent taller", before * 1.1f, rowPitchPx(), 1.5f)
-        rule.onNodeWithTag("lp.root").performTouchInput { pinch(center + Offset(-300f, 0f), center + Offset(-30f, 0f), center + Offset(300f, 0f), center + Offset(30f, 0f)) }
-        rule.waitForIdle()
-        assertEquals("far together: the smallest", 75, CommsScaleSettings.percent.value)
-        assertEquals(before * 0.75f, rowPitchPx(), 1.5f)
+        assertEquals("wave 29: a pinch is the read filter, not the size", 100, CommsScaleSettings.percent.value)
+        rule.onNodeWithTag("lp.readFilter").assertExists() // pinched apart: Read only (every row of this fixture is unread, so none shows)
+        rule.onNodeWithTag("lp.readFilter").performClick(); rule.waitForIdle()
+        rule.onNodeWithTag("lp.readFilter").assertDoesNotExist()
+        assertEquals(100, CommsScaleSettings.percent.value)
     }
 
     @Test fun CMS_12_touchTargetsStayAtLeast48dpAt75Percent() {

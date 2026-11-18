@@ -1,5 +1,7 @@
 # Wave 25 hubData: persistent history and views in the Launchpad (owner item 2, data and navigation part)
 
+> Wave 29 (commsRead): the All view is no longer live only, it is the live list merged with the history, and the pinch filters by read state; see [commsRead.md](commsRead.md).
+
 ## What the owner asked
 Persistent history with read/unread views; Files, Usage and Timeline rolled into the Launchpad; a default view; quick filters; pinch and two-finger gestures. The row look is the `launchpadHub` stream's work; this stream builds the data, the views, the switcher and the gestures and adds them to the Launchpad with a small edit.
 

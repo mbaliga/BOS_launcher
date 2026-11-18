@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,6 +99,9 @@ internal class RowHandlers(
     val onSendReply: (HubAction, String) -> Unit,
     /** Wave 25: a long press (or the secondary button) opens the row's action chips in place; the full menu is behind the chips' "More". */
     val onToggleActions: () -> Unit = onMenu,
+    /** Wave 29: the buttons of a row that is only in the history (its notification left the shade). */
+    val onToggleRead: () -> Unit = {},
+    val onDeleteFromHistory: () -> Unit = {},
 )
 
 internal fun menuContextFor(n: HubNotification, replyAvailable: Boolean, unread: Boolean) = RowMenuContext(
@@ -212,6 +216,8 @@ internal fun NotificationRow(
     modifier: Modifier = Modifier,
     /** Wave 25: the action chips (Reply and the notification's own actions) show only when the row is expanded. */
     actionsOpen: Boolean = false,
+    /** Wave 29 (commsRead): the notification is no longer in the shade, only in the history: it has no actions of its own, no swipe-to-dismiss, and offers read/unread and delete from history. */
+    historyOnly: Boolean = false,
 ) {
     var dx by remember { mutableFloatStateOf(0f) }
     var base by remember { mutableFloatStateOf(0f) } // 0, or the palette's width while it is held open
@@ -224,21 +230,25 @@ internal fun NotificationRow(
     val reply = remember(n.actions) { ReplyLogic.pick(n.actions) }
     val plain = remember(n.actions) { ReplyLogic.plain(n.actions).take(3) }
     val ctx = menuContextFor(n, reply != null, unread)
-    val cells = LaunchpadRowMenus.paletteCells(ctx) + RowCommand.MakeRule
+    val cells = (LaunchpadRowMenus.paletteCells(ctx) + RowCommand.MakeRule).filter { !(historyOnly && it == RowCommand.Snooze) }
     val colors = mapOf(
         RowCommand.Snooze to Color(0xFF7A5C00), RowCommand.MarkRead to Color(0xFF0B7BB8), RowCommand.MuteApp to Color(0xFF3B4A5A),
         RowCommand.Open to Color(0xFF0A6296), RowCommand.MakeRule to Color(0xFF55486F),
     )
     val cellPx = minOf(with(density) { 72.dp.toPx() }, widthPx * 0.9f / cells.size)
     val paletteW = cellPx * cells.size
-    val canSwipeLeft = leftAction != LaunchpadAction.None
+    val canSwipeLeft = leftAction != LaunchpadAction.None && !historyOnly
     // With no primary action there is nothing behind a left slide, so the row does not move that way.
     val offsetPx = (base + dx).coerceIn(if (canSwipeLeft) -widthPx else 0f, paletteW * 1.1f)
     val showButtons = hovered || focused
     val primaryLabel = L10n.tr(leftAction.label)
     val a11yActions = buildList {
-        add(CustomAccessibilityAction(primaryLabel) { handlers.onPrimary(); true })
+        if (!historyOnly) add(CustomAccessibilityAction(primaryLabel) { handlers.onPrimary(); true })
         add(CustomAccessibilityAction(L10n.tr("Actions")) { handlers.onMenu(); true })
+        if (historyOnly) {
+            add(CustomAccessibilityAction(L10n.tr(if (unread) "Mark as read" else "Mark as unread")) { handlers.onToggleRead(); true })
+            add(CustomAccessibilityAction(L10n.tr("Delete from history")) { handlers.onDeleteFromHistory(); true })
+        }
     }
 
     Column(modifier.testTag("lp.row.${n.key}")) {
@@ -309,7 +319,7 @@ internal fun NotificationRow(
             val second = if (messaging) n.title else if (n.title.isNotBlank()) n.summary.ifBlank { n.appLabel } else n.appLabel
             CommsRowContent(
                 pkg = n.packageName, appLabel = n.appLabel.ifBlank { n.title }, iconTag = "lp.badge.${n.key}",
-                headline = headline, headlineColor = if (unread && !silent) LocalLp.current.ink else LocalLp.current.ink2, titleTag = "lp.title.${n.key}",
+                headline = headline, headlineColor = if (unread && !silent) LocalLp.current.ink else LocalLp.current.ink2, titleTag = "lp.title.${n.key}", read = !unread,
                 second = second, previewTag = "lp.preview.${n.key}", stamp = formatStamp(n.timestamp, now, is24, zone), timeTag = "lp.time.${n.key}",
                 dot = pinned || important, modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
@@ -323,7 +333,17 @@ internal fun NotificationRow(
         }
       }
         // Wave 25 (STR-02): no chips on a resting row; a long press opens them in place, with "Actions" for the full menu.
-        if (actionsOpen && (plain.isNotEmpty() || reply != null)) {
+        if (actionsOpen && historyOnly) {
+            Row(
+                Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp, bottom = 8.dp).then(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState())),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ActionChip(L10n.tr("Open"), true, Modifier.testTag("lp.chip.open.${n.key}")) { handlers.onOpen() }
+                ActionChip(L10n.tr(if (unread) "Mark as read" else "Mark as unread"), false, Modifier.testTag("lp.chip.toggleRead.${n.key}")) { handlers.onToggleRead() }
+                ActionChip(L10n.tr("Delete from history"), false, Modifier.testTag("lp.chip.delete.${n.key}")) { handlers.onDeleteFromHistory() }
+                ActionChip(L10n.tr("Actions"), false, Modifier.testTag("lp.chip.actions.${n.key}")) { handlers.onMenu() }
+            }
+        } else if (actionsOpen && (plain.isNotEmpty() || reply != null)) {
             Row(
                 Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
@@ -363,10 +383,10 @@ private fun RowButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ActionChip(label: String, accent: Boolean, onClick: () -> Unit) {
+private fun ActionChip(label: String, accent: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Text(
         label, color = if (accent) Color.White else LocalLp.current.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(16.dp))
+        modifier = modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(16.dp))
             .background(if (accent) BlueDark else LocalLp.current.surface)
             .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
     )
@@ -412,6 +432,7 @@ internal fun RowMenuSheet(
     now: Long,
     zone: ZoneId,
     expand: RowCommand? = null,
+    historyOnly: Boolean = false,
     onDismissSheet: () -> Unit,
     onAddRule: (Rule) -> Unit,
     onCommand: (RowCommand) -> Unit,
@@ -421,7 +442,9 @@ internal fun RowMenuSheet(
     val sender = LaunchpadLogic.senderOf(n).takeIf { it.isNotBlank() }
     val pkg = n.packageName
     var open by remember { mutableStateOf(expand) }
-    val entries = LaunchpadRowMenus.onLongPress(menuContextFor(n, canReply, unread))
+    // Wave 29: a history-only row cannot be snoozed or replied to; Dismiss there means "delete from history" (the shade has nothing to dismiss).
+    val entries = LaunchpadRowMenus.onLongPress(menuContextFor(n, canReply, unread).let { if (historyOnly) it.copy(canDismiss = true) else it })
+        .filter { !(historyOnly && (it == RowCommand.Snooze || it == RowCommand.Reply)) }
     val rules = buildList<Pair<String, () -> Unit>> {
         if (pkg.isNotBlank()) {
             add(L10n.tr("Hide this app") to { onAddRule(Rule.create(RuleAction.Hide, packageName = pkg)) })
@@ -497,6 +520,8 @@ internal fun CommsRowContent(
     headline: String, headlineColor: Color, titleTag: String,
     second: String, previewTag: String, stamp: String, timeTag: String,
     modifier: Modifier = Modifier, dot: Boolean = false, expanded: Boolean = false,
+    /** Wave 29: a read row is quieter: its second line is dimmer still (the headline colour is the caller's). */
+    read: Boolean = false,
     trailing: @Composable () -> Unit = {},
 ) {
     val lp = LocalLp.current
@@ -514,7 +539,7 @@ internal fun CommsRowContent(
         val subLine: @Composable (Boolean) -> Unit = { baselineAligned ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = if (baselineAligned) Alignment.Top else Alignment.Bottom) {
                 Text(
-                    second, color = lp.dim, fontSize = CommsStyle.SUB_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    second, color = if (read) lp.dim.copy(alpha = lp.dim.alpha * 0.75f) else lp.dim, fontSize = CommsStyle.SUB_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).then(if (baselineAligned) Modifier.paddingFromBaseline(top = CommsStyle.SUB_BASELINE_DP.dp) else Modifier).testTag(previewTag),
                 )
                 Spacer(Modifier.width(8.dp))

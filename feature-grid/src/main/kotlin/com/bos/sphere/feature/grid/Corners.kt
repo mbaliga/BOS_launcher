@@ -59,7 +59,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
@@ -225,7 +224,7 @@ fun CornerLayer(
     var hovered by remember { mutableIntStateOf(-1) }
     val progress = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLauncherHaptics()
     val density = LocalDensity.current
 
     fun close() {
@@ -438,7 +437,7 @@ private fun CornerSlotView(
     val align = corner.absoluteAlignment()
     val bubble = style == CornerStyle.Quarter
     val round = style == CornerStyle.Bubble
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLauncherHaptics()
 
     Box(Modifier.fillMaxSize()) {
         if (bubble && slot !is CornerSlot.ComplicationCluster) {

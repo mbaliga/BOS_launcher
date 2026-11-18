@@ -437,6 +437,8 @@ fun LaunchpadContent(
     viewSwitcher: @Composable () -> Unit = {},
     hub: HubState? = null,
     hubPanelBody: @Composable (HubView) -> Unit = {},
+    /** Wave 27: the Sound and Vibration sheet; the header's sound hook calls [SoundSheetState.show], the system row's sound button does too. */
+    soundSheet: SoundSheetState = rememberSoundSheetState(),
 ) {
     val ctx = LocalContext.current
     val rtlLayout = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
@@ -701,7 +703,7 @@ fun LaunchpadContent(
         )
         viewSwitcher()
         if (hub != null && hub.optionsOpen) HubOptions(hub) { hubMarkRead() }
-        if (systemState != null && hasAccess) SystemStateRow(systemState, is24, onOpenSystemPanel)
+        if (systemState != null && hasAccess) SystemStateRow(systemState, is24, onOpenPanel = { if (it == SystemTileKind.Sound) soundSheet.show() else onOpenSystemPanel(it) })
         if (hasAccess && com.bos.sphere.core.data.GroupDnd.breaksThrough(groups, dndOn)) Text(
             L10n.tr("Do Not Disturb is on. Only Priority groups light the edge indicator."), color = LocalLp.current.dim, fontSize = 13.sp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = RoomyList.H_PAD_DP.dp, vertical = 6.dp).testTag("lp.dnd"),
@@ -811,6 +813,7 @@ fun LaunchpadContent(
     }
     // The manager is a screen of buttons, so it stays clear of the card's 48 dp return zone (the list behind runs to the card's edge).
     LaunchpadGroupsOverlay(groupsOpen, items, endInset = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
+    if (soundSheet.open) SoundVibrationSheet(onDismiss = { soundSheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp))
     groupFor?.let { n ->
         GroupAssignSheet(
             n, groups, contacts, items,

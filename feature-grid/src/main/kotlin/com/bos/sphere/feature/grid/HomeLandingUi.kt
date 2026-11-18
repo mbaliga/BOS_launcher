@@ -45,7 +45,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -246,7 +245,7 @@ fun RecentsListHome(
     gestures: HomeGestureSpec? = null,
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        val haptic = LocalHapticFeedback.current
+        val haptic = rememberLauncherHaptics()
         val icon = (46f * iconScale / 0.8f).coerceIn(32f, 60f).dp
         val state = androidx.compose.foundation.lazy.rememberLazyListState()
         Box(modifier.fillMaxSize().homeGestures(gestures) { pos -> state.layoutInfo.visibleItemsInfo.none { pos.y >= it.offset && pos.y < it.offset + it.size } }) {
@@ -298,7 +297,7 @@ fun RecentsEmptyState(usageAccessOn: Boolean, onGrantUsage: () -> Unit, modifier
 @Composable
 fun BoxScope.LetterIndexRail(letters: List<Char>, onJump: (Char) -> Unit, modifier: Modifier = Modifier, topPad: androidx.compose.ui.unit.Dp = 0.dp, bottomPad: androidx.compose.ui.unit.Dp = 0.dp) {
     if (letters.size < 2) return
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberLauncherHaptics()
     var active by remember { mutableStateOf<Char?>(null) }
     val latest = androidx.compose.runtime.rememberUpdatedState(onJump)
     Column(

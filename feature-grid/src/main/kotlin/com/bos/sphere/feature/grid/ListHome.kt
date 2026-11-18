@@ -34,7 +34,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -93,7 +92,7 @@ fun ListHome(
         val firstIndexOf = remember(rows) { letters.associateWith { l -> rows.indexOfFirst { it is LRow.Head && it.letter == l } } }
         val state = rememberLazyListState()
         val scope = rememberCoroutineScope()
-        val haptic = LocalHapticFeedback.current
+        val haptic = rememberLauncherHaptics()
         var scrubLetter by remember { mutableStateOf<Char?>(null) }
         val icon = (46f * iconScale / 0.8f).coerceIn(32f, 60f).dp
         val density = LocalDensity.current

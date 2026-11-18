@@ -81,7 +81,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.SearchCategory
 import com.bos.sphere.core.data.SearchHit
@@ -254,7 +253,7 @@ internal fun SearchScreen(
     var aliasFor by remember { mutableStateOf<AppEntry?>(null) }
     val otherDisplays = remember { otherDisplaysOverride ?: runCatching { com.bos.sphere.core.capabilities.CapabilityEvaluator.externalDisplays(com.bos.sphere.core.capabilities.CapabilityRegistry(context).snapshot()).count { it.canHostTasks == true } }.getOrDefault(0) }
     val selectedHitHolder = remember { arrayOfNulls<String>(1) }
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberLauncherHaptics()
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
     // Wave 22 (audit): a hardware keyboard or d-pad reaches the Clear/Close button and the mic (Shift+Tab or Up from the field; Tab or Down

@@ -61,7 +61,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -182,7 +181,7 @@ private fun ContinuousImpl(
 ) {
     val rows = remember(apps, extras, extraKeys, topLevel) { HomeInterleave.merge(apps, { it.key }, if (extras == null) emptyList() else extraKeys, topLevel) }
     val density = LocalDensity.current
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLauncherHaptics()
     val latestLaunch by rememberUpdatedState(onLaunch)
     val latestLong by rememberUpdatedState(onLongPress)
     val latestSounds by rememberUpdatedState(sounds)

@@ -24,7 +24,8 @@ class MotionGestureSensors(
     private val gyro: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
     private val detector = MotionGestureDetector { gesture ->
-        runCatching { vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK)) }
+        // Wave 27: the launcher's own haptic strength (Sound and Vibration sheet) applies here too.
+        if (HapticPolicy.resolve(LauncherHapticSettings.strength.value, HapticKind.Tick) != null) runCatching { vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK)) }
         onGesture(gesture)
     }
 

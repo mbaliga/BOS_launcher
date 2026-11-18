@@ -46,7 +46,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -256,7 +255,7 @@ private fun XmbHomeImpl(
     topLevel: List<String>,
 ) {
     val density = LocalDensity.current
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLauncherHaptics()
     val scope = rememberCoroutineScope()
     val latestCategoryOf by rememberUpdatedState(categoryOf)
     val cats = remember(apps, recent, extras, extraKeys, topLevel) {

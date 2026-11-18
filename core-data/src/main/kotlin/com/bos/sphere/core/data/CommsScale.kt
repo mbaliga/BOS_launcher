@@ -39,8 +39,6 @@ object CommsScale {
     /** The detent a pinch lands on: the percent the pinch started at, times the finger spread ratio. */
     fun fromPinch(startPercent: Int, ratio: Float): Int =
         if (ratio.isNaN() || ratio <= 0f) snap(startPercent) else snap((startPercent * ratio).roundToInt())
-
-    fun index(percent: Int): Int = steps.indexOf(snap(percent))
 }
 
 /**
@@ -53,6 +51,8 @@ object CommsScaleSettings {
     private val _percent = MutableStateFlow(CommsScale.DEFAULT)
     val percent: StateFlow<Int> = _percent.asStateFlow()
     @Volatile private var sp: SharedPreferences? = null
+    /** A size chosen before the file was opened: kept and written when [init] opens it. */
+    @Volatile private var pending: Int? = null
 
     /** Opens the file once (idempotent); later calls keep the first context's file. */
     fun init(context: Context) {
@@ -61,16 +61,19 @@ object CommsScaleSettings {
             if (sp != null) return
             val p = TolerantPrefs.of(context.applicationContext, FILE)
             sp = p
-            _percent.value = CommsScale.parse(runCatching { p.all[KEY]?.toString() }.getOrNull())
+            val chosen = pending
+            if (chosen != null) { pending = null; _percent.value = chosen; p.edit().putInt(KEY, chosen).apply() }
+            else _percent.value = CommsScale.parse(runCatching { p.all[KEY]?.toString() }.getOrNull())
         }
     }
 
     fun set(next: Int) {
         val v = CommsScale.snap(next)
         _percent.value = v
-        sp?.edit()?.putInt(KEY, v)?.apply()
+        val file = sp
+        if (file == null) pending = v else file.edit().putInt(KEY, v).apply()
     }
 
     /** Tests: drop the file binding and go back to the default. */
-    fun resetForTest() { sp = null; _percent.value = CommsScale.DEFAULT }
+    fun resetForTest() { sp = null; pending = null; _percent.value = CommsScale.DEFAULT }
 }

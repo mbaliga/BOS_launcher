@@ -165,7 +165,7 @@ internal fun StepperSettingRow(item: SettingItem.Stepper, onTick: () -> Unit) {
                 item.value, item.count > item.range.first, item.count < item.range.last,
                 { onTick(); item.onChange((item.count - item.step).coerceAtLeast(item.range.first)) }, { onTick(); item.onChange((item.count + item.step).coerceAtMost(item.range.last)) }, item.title,
                 progress = Triple(item.count.toFloat(), item.range.first.toFloat()..item.range.last.toFloat(), item.step),
-                onProgress = { v -> item.onChange(((v - item.range.first) / item.step).let { Math.floor(it + 0.5).toInt() } * item.step + item.range.first) },
+                onProgress = { v -> item.onChange(item.fromProgress(v)) },
             )
         },
     )

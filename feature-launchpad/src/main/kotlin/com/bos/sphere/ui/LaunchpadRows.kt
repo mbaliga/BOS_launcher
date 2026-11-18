@@ -500,6 +500,8 @@ internal fun CommsRowContent(
     trailing: @Composable () -> Unit = {},
 ) {
     val lp = LocalLp.current
+    // With big system fonts the mock-up's baselines (headline and second line 19.5 dp apart) would overlap: stack the lines instead.
+    val stacked = expanded || LocalDensity.current.fontScale > 1.3f
     Row(modifier.padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp)) {
         AppIcon(pkg, appLabel, CommsStyle.ICON_DP, Modifier.padding(top = CommsStyle.ICON_TOP_DP.dp).testTag(iconTag))
         Spacer(Modifier.width(CommsStyle.TEXT_GAP_DP.dp))
@@ -523,7 +525,7 @@ internal fun CommsRowContent(
                 )
             }
         }
-        if (expanded) Column(Modifier.weight(1f).heightIn(min = (CommsStyle.ROW_DP - CommsStyle.HAIR_DP).dp)) {
+        if (stacked) Column(Modifier.weight(1f).heightIn(min = (CommsStyle.ROW_DP - CommsStyle.HAIR_DP).dp)) {
             titleText(Modifier.paddingFromBaseline(top = CommsStyle.TITLE_BASELINE_DP.dp).padding(end = CommsStyle.TITLE_END_DP.dp))
             Box(Modifier.padding(top = 2.dp, bottom = 10.dp)) { subLine(false) }
         } else Box(Modifier.weight(1f).heightIn(min = (CommsStyle.ROW_DP - CommsStyle.HAIR_DP).dp)) {

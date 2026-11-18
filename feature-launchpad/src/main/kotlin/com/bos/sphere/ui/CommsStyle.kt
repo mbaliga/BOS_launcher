@@ -131,7 +131,6 @@ internal object CommsStyle {
     /** Section and sub headings, notices and the like. */
     const val HEADING_SP = 12f
     const val NOTE_SP = 12f
-    const val HEAD_ROW_DP = 36f
     const val CHIP_SP = 12f
     const val BODY_SP = 15f
     const val TARGET_DP = 48f
@@ -170,9 +169,6 @@ internal object CommsStyle {
     val DarkTabDim = Color(0xFF43464E)
     val DarkGlyphDim = Color(0xFF4D4D4D)
     val DarkCount = Color(0xFF343434)
-
-    /** Dp at scale [factor] (for tests and for code outside a [CommsScaleHost]). */
-    fun scaled(dp: Float, factor: Float): Float = dp * factor
 }
 
 /** The scale factor of the enclosing [CommsScaleHost] (1 outside one). */

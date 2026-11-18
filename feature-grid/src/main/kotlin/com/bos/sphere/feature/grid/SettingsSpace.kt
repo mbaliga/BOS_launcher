@@ -145,6 +145,8 @@ sealed interface SettingItem {
         val onChange: (Int) -> Unit,
     ) : SettingItem {
         override val value: String get() = valueText ?: count.toString()
+        /** The value a screen reader's set-progress asks for: snapped to [step] from the range start and kept inside the range. */
+        fun fromProgress(v: Float): Int = (Math.floor(((v - range.first) / step).toDouble() + 0.5).toInt() * step + range.first).coerceIn(range.first, range.last)
     }
 
     /** Runs on tap (opens a dialog, adds a page …). */

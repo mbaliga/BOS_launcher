@@ -54,13 +54,15 @@ internal fun CommsScaleStepper(percent: Int, onChange: (Int) -> Unit, modifier: 
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(8.dp)
     val label = L10n.tr("Comms size")
+    // In a right-to-left layout the minus key is on the right, so Left is the bigger direction.
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     Row(
         modifier.fillMaxWidth().heightIn(min = target)
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) false
                 else when (e.key) {
-                    Key.DirectionLeft -> { onChange(CommsScale.step(p, -1)); true }
-                    Key.DirectionRight -> { onChange(CommsScale.step(p, +1)); true }
+                    Key.DirectionLeft -> { onChange(CommsScale.step(p, if (rtl) +1 else -1)); true }
+                    Key.DirectionRight -> { onChange(CommsScale.step(p, if (rtl) -1 else +1)); true }
                     else -> false
                 }
             }

@@ -6,7 +6,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.test.core.app.ActivityScenario
 import com.bos.sphere.core.data.ChromeSettings
-import com.bos.sphere.core.data.HomeLanding
+import com.bos.sphere.core.data.HomeShown
 import com.bos.sphere.core.data.RightSide
 import com.bos.sphere.core.input.LauncherCommand
 import com.bos.sphere.feature.dock.DockItemRef
@@ -63,10 +63,10 @@ class DockOptionalW24SmokeTest {
 
     @Test fun INP_05_noDockIsOffOnlyWhenTheLandingWouldDrawARailAndTheSettingIsOff() {
         val c = ChromeSettings()
-        assertNull(FocusDockRouting.noDock(HomeLanding.Selected, c, dockEnabled = true))
-        assertEquals(FocusDockRouting.NoDock.Off, FocusDockRouting.noDock(HomeLanding.Selected, c, dockEnabled = false))
-        assertEquals(FocusDockRouting.NoDock.Landing, FocusDockRouting.noDock(HomeLanding.Glance, c, dockEnabled = true))
-        assertNull("Glance with the dock rail on its right side always shows the rail", FocusDockRouting.noDock(HomeLanding.Glance, c.copy(rightSide = RightSide.DockRail), dockEnabled = false))
+        assertNull(FocusDockRouting.noDock(HomeShown.Pages, c, dockEnabled = true))
+        assertEquals(FocusDockRouting.NoDock.Off, FocusDockRouting.noDock(HomeShown.Pages, c, dockEnabled = false))
+        assertEquals(FocusDockRouting.NoDock.Landing, FocusDockRouting.noDock(HomeShown.Glance, c, dockEnabled = true))
+        assertNull("Glance with the dock rail on its right side always shows the rail", FocusDockRouting.noDock(HomeShown.Glance, c.copy(rightSide = RightSide.DockRail), dockEnabled = false))
     }
 
     @Test fun INP_05_withNoDockToComeFocusDockClosesNothingAndReportsWhy() {

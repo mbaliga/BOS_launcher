@@ -129,9 +129,9 @@ internal object AppSmokeHarness {
 
     /** Past onboarding, with the given preference edits; the stores are the ones the activity will read. */
     fun configure(edit: (com.bos.sphere.core.data.LauncherPrefs) -> com.bos.sphere.core.data.LauncherPrefs = { it }) {
-        // Wave 16 (HOM-23): the default landing is now Glance; the existing smoke tests exercise the Selected apps home, so they start on it
-        // (an explicit choice, kept by the landing migration). Glance has its own tests, which use configureFresh().
-        LauncherStores.get(app).prefs.update { edit(it.copy(onboardingDone = true, homeLanding = com.bos.sphere.core.data.HomeLanding.Selected)) }
+        // Wave 26: Glance is on by default; the existing smoke tests exercise the pages (the Selected apps home of the old landing), so they start
+        // with Glance off, where home shows the first page. Glance has its own tests, which use configureFresh().
+        LauncherStores.get(app).prefs.update { edit(it.copy(onboardingDone = true, glanceEnabled = false)) }
     }
 
     /** HOM-23: past onboarding and nothing else touched: the default landing (Glance) as a fresh install shows it. */

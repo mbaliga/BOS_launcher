@@ -177,22 +177,22 @@ object GlanceWeather {
     fun strength(i: RadarIntensity) = if (i == RadarIntensity.Subtle) 0.55f else 1f
 }
 
-/** Where the landing choice comes from (HOM-22, wave 16): the default is Glance for everyone who never chose. */
-object LandingMigration {
-    /**
-     * [storedLanding] is the old plain pref and [chosenFlag] the new "explicitly chosen" marker. Wave 12 wrote the landing on every
-     * save, so a stored Selected apps cannot be told from a default save: it is treated as never chosen. Recents and All apps were
-     * never defaults, so they are kept; Minimal becomes Glance. With the marker the stored value is the user's choice.
-     */
-    fun resolve(storedLanding: String?, chosenFlag: Boolean): HomeLanding {
-        val stored = HomeLanding.parseOrNull(storedLanding)
-        return when {
-            chosenFlag -> stored ?: HomeLanding.Glance
-            stored == HomeLanding.Recents || stored == HomeLanding.AllApps -> stored
-            else -> HomeLanding.Glance
-        }
-    }
+/**
+ * Wave 26: the one-time reading of the removed home-landing setting. Every old landing value (Glance, "Minimal", Recents, AllApps, Selected,
+ * missing or unknown) maps to Glance ON: the user's pages, folders and widgets are never touched (they live in the layout, not in the landing),
+ * so a user who had Selected apps keeps those pages as the pages after Glance. The old keys are removed on the next save.
+ * The old "Continuous" scroll setting becomes the Scroll mode (and counts as a choice); the old paged layout becomes Paginated.
+ */
+object HomeModelMigration {
+    data class Result(val glanceEnabled: Boolean, val pagesModeChosen: Boolean, val pagesMode: HomeScroll)
 
-    /** The marker is written when the value is not the default, or was written before (so an explicit Glance sticks after a Selected). */
-    fun markerOnSave(landing: HomeLanding, markerBefore: Boolean) = markerBefore || landing != HomeLanding.Glance
+    val RETIRED_KEYS = listOf("homeLanding", "landingChosen")
+
+    fun resolve(storedLanding: String?, storedGlanceEnabled: Boolean?, storedPagesChosen: Boolean?, storedHomeScroll: String?): Result {
+        val mode = HomeScroll.entries.firstOrNull { it.name == storedHomeScroll } ?: HomeScroll.Paged
+        // Whatever the old landing was, Glance is on: the old value only decides nothing now. A stored new value always wins.
+        val glance = storedGlanceEnabled ?: true
+        val chosen = storedPagesChosen ?: (mode == HomeScroll.Continuous)
+        return Result(glance, chosen, mode)
+    }
 }

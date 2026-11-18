@@ -28,81 +28,74 @@ class HomeLandingTest {
     private val a = app("a"); private val b = app("b"); private val c = app("c"); private val w = app("w", work = true)
     private val all = listOf(a, b, c, w)
 
-    // ---- the setting
+    // ---- the settings (wave 26: Glance on / off, the pages mode, the order; the landing selector is gone)
 
-    // Wave 16 (HOM-23, owner request): the default landing is now Glance, so the next four tests assert that instead of Selected apps.
-    @Test fun HOM_22_aFreshInstallLandsOnGlanceAndTheLandingIsPersistedByName() {
-        assertEquals(HomeLanding.Glance, LauncherPrefs().homeLanding)
+    @Test fun HOM_22_aFreshInstallHasGlanceOnLeftToRightAndNoModeChosenYetAndEachSettingIsPersisted() {
+        val d = LauncherPrefs()
+        assertTrue(d.glanceEnabled); assertEquals(HomeOrder.LeftToRight, d.homeOrder); assertFalse(d.pagesModeChosen)
         val sp = MapSharedPreferences()
         val store = LauncherPrefsStore(sp)
-        store.update { it.copy(homeLanding = HomeLanding.Recents) }
-        assertEquals("Recents", sp.getString("homeLanding", null))
-        assertEquals(HomeLanding.Recents, LauncherPrefsStore(sp).prefs.value.homeLanding)
-        store.update { it.copy(homeLanding = HomeLanding.Glance) } // the stored name of Glance stays "Minimal" for older readers
-        assertEquals("Minimal", sp.getString("homeLanding", null))
+        store.update { it.copy(glanceEnabled = false, homeOrder = HomeOrder.RightToLeft, pagesModeChosen = true, homeScroll = HomeScroll.Continuous) }
+        val back = LauncherPrefsStore(sp).prefs.value
+        assertFalse(back.glanceEnabled); assertEquals(HomeOrder.RightToLeft, back.homeOrder); assertTrue(back.pagesModeChosen); assertEquals(HomeScroll.Continuous, back.homeScroll)
+        assertEquals("RightToLeft", sp.getString("homeOrder", null))
     }
 
-    @Test fun HOM_22_anUnknownStoredLandingFallsBackToTheDefaultAndTheLimitIsClamped() {
-        val sp = MapSharedPreferences(mapOf("homeLanding" to "Hologram", "recentsLimit" to 500))
+    @Test fun HOM_22_anUnknownStoredOrderFallsBackToLeftToRightAndTheRecentsLimitIsClamped() {
+        val sp = MapSharedPreferences(mapOf("homeOrder" to "Sideways", "recentsLimit" to 500))
         val p = LauncherPrefsStore(sp).prefs.value
-        assertEquals(HomeLanding.Glance, p.homeLanding)
+        assertEquals(HomeOrder.LeftToRight, p.homeOrder)
         assertEquals(HomeRecents.MAX_LIMIT, p.recentsLimit)
         assertEquals(HomeRecents.MIN_LIMIT, LauncherPrefsStore(MapSharedPreferences()).apply { update { it.copy(recentsLimit = 1) } }.prefs.value.recentsLimit)
-        assertEquals(HomeLanding.Selected, HomeLanding.parse(null))
     }
 
-    @Test fun HOM_22_cyclingVisitsTheFourLandingsInOrderAndWraps() {
-        var l = HomeLanding.Selected
-        val seen = List(5) { l.also { l = l.next() } }
-        assertEquals(listOf(HomeLanding.Selected, HomeLanding.Recents, HomeLanding.AllApps, HomeLanding.Minimal, HomeLanding.Selected), seen)
-    }
-
-    @Test fun HOM_22_switchingTheLandingChangesNothingElseInThePrefs() {
-        val before = LauncherPrefs(homeStyle = HomeStyle.Psp, homeScroll = HomeScroll.Continuous, hotCornersOn = false)
-        for (l in HomeLanding.entries) {
-            val after = before.copy(homeLanding = l)
-            assertEquals(before.homeStyle, after.homeStyle); assertEquals(before.homeScroll, after.homeScroll); assertEquals(before.hotCornersOn, after.hotCornersOn)
+    @Test fun HOM_22_everyOldLandingValueMigratesToGlanceOnAndTheRetiredKeysAreDeletedOnTheNextSave() {
+        for (old in listOf("Selected", "Recents", "AllApps", "Minimal", "Glance", "Hologram")) {
+            val sp = MapSharedPreferences(mapOf("homeLanding" to old, "landingChosen" to true))
+            val store = LauncherPrefsStore(sp)
+            assertTrue("old landing $old", store.prefs.value.glanceEnabled)
+            store.update { it.copy(recentsLimit = 12) }
+            assertEquals(null, sp.getString("homeLanding", null)); assertFalse(sp.contains("landingChosen"))
+            assertTrue(LauncherPrefsStore(sp).prefs.value.glanceEnabled)
         }
+        // A stored new value always wins over the old landing.
+        assertFalse(LauncherPrefsStore(MapSharedPreferences(mapOf("homeLanding" to "Recents", "glanceEnabled" to false))).prefs.value.glanceEnabled)
     }
 
-    @Test fun HOM_22_theLandingIsAnExportedPlainPrefAndRoundTripsThroughTheSettingsDocument() {
-        val doc = SettingsCodec.encode(LauncherPrefs(homeLanding = HomeLanding.Recents, recentsLimit = 40, recentsUseUsageAccess = false))
+    @Test fun HOM_22_theOldContinuousScrollBecomesTheScrollModeAndCountsAsAChoice() {
+        val r = HomeModelMigration.resolve("Selected", null, null, "Continuous")
+        assertTrue(r.pagesModeChosen); assertEquals(HomeScroll.Continuous, r.pagesMode)
+        val p = HomeModelMigration.resolve("Selected", null, null, "Paged")
+        assertFalse(p.pagesModeChosen); assertEquals(HomeScroll.Paged, p.pagesMode)
+        assertEquals("Paginated", HomeScroll.Paged.label); assertEquals("Scroll", HomeScroll.Continuous.label)
+    }
+
+    @Test fun HOM_22_theHomeSettingsAreExportedAndAnOlderFileImportsAsTheDefaults() {
+        val doc = SettingsCodec.encode(LauncherPrefs(glanceEnabled = false, homeOrder = HomeOrder.RightToLeft, pagesModeChosen = true, recentsLimit = 40, recentsUseUsageAccess = false))
         val prefs = doc.getJSONObject("prefs")
-        assertEquals("Recents", prefs.getString("homeLanding"))
+        assertEquals("RightToLeft", prefs.getString("homeOrder")); assertFalse(prefs.getBoolean("glanceEnabled")); assertTrue(prefs.getBoolean("pagesModeChosen"))
         val back = SettingsCodec.decode(doc).prefs
-        assertEquals(HomeLanding.Recents, back.homeLanding)
-        assertEquals(40, back.recentsLimit)
-        assertFalse(back.recentsUseUsageAccess)
+        assertFalse(back.glanceEnabled); assertEquals(HomeOrder.RightToLeft, back.homeOrder); assertTrue(back.pagesModeChosen)
+        assertEquals(40, back.recentsLimit); assertFalse(back.recentsUseUsageAccess)
+        val old = SettingsCodec.encode(LauncherPrefs()); old.getJSONObject("prefs").remove("homeOrder"); old.getJSONObject("prefs").remove("glanceEnabled")
+        assertEquals(HomeOrder.LeftToRight, SettingsCodec.decode(old).prefs.homeOrder); assertTrue(SettingsCodec.decode(old).prefs.glanceEnabled)
     }
 
-    @Test fun HOM_22_anOlderSettingsFileWithoutTheLandingImportsAsTheDefaultGlance() {
-        val doc = SettingsCodec.encode(LauncherPrefs())
-        doc.getJSONObject("prefs").remove("homeLanding")
-        assertEquals(HomeLanding.Glance, SettingsCodec.decode(doc).prefs.homeLanding)
-    }
+    // ---- rules per surface
 
-    // ---- rules per landing
-
-    @Test fun HOM_22_editModeBelongsToSelectedAppsAndOtherLandingsLongPressToTheQuickSheet() {
-        for (l in HomeLanding.entries) {
-            val sel = l == HomeLanding.Selected
-            assertEquals(sel, HomeLandingRules.allowsEditMode(l))
-            assertEquals(if (sel) HomeLandingRules.LongPress.EditHome else HomeLandingRules.LongPress.QuickSheet, HomeLandingRules.longPress(l))
-            assertEquals(sel, HomeLandingRules.hasPages(l))
+    @Test fun HOM_22_editModeBelongsToThePagesAndGlanceLongPressesToTheQuickSheet() {
+        for (l in HomeShown.entries) {
+            val pages = l == HomeShown.Pages
+            assertEquals(pages, HomeShownRules.allowsEditMode(l))
+            assertEquals(if (pages) HomeShownRules.LongPress.EditHome else HomeShownRules.LongPress.QuickSheet, HomeShownRules.longPress(l))
+            assertEquals(pages, HomeShownRules.hasPages(l))
+            assertEquals(pages, HomeShownRules.usesHomeStyle(l))
         }
-        assertEquals(HomeLanding.Selected, HomeLandingRules.editHomePagesLanding)
-    }
-
-    @Test fun HOM_22_minimalDrawsNoChromeAndOnlyAllAppsHasTheIndexAndFilter() {
-        // Wave 17: showsChrome was removed (it hid the Launchpad handle on Glance); the per-element table is tested in HomeChromeRulesTest.
-        assertFalse(HomeLandingRules.usesHomeStyle(HomeLanding.Minimal))
-        assertTrue(HomeLandingRules.isHotspotOnly(HomeLanding.Minimal))
-        for (l in listOf(HomeLanding.Selected, HomeLanding.Recents, HomeLanding.AllApps)) { assertTrue(HomeLandingRules.usesHomeStyle(l)) }
-        assertEquals(listOf(HomeLanding.AllApps), HomeLanding.entries.filter { HomeLandingRules.hasAlphabetIndex(it) && HomeLandingRules.hasTypeToFilter(it) && HomeLandingRules.hasProfileTabs(it) })
-        assertEquals(listOf(HomeLanding.Recents), HomeLanding.entries.filter { HomeLandingRules.hasRecentsMenu(it) })
-        assertTrue(HomeLandingRules.showsEmptyHomeHint(HomeLanding.Selected, true))
-        assertFalse(HomeLandingRules.showsEmptyHomeHint(HomeLanding.Recents, true))
-        assertFalse(HomeLandingRules.showsEmptyHomeHint(HomeLanding.Selected, false))
+        assertEquals(HomeShown.Pages, HomeShownRules.editHomePagesSurface)
+        assertTrue(HomeShownRules.isHotspotOnly(HomeShown.Glance))
+        assertTrue(HomeShownRules.showsEmptyHomeHint(HomeShown.Pages, true))
+        assertFalse(HomeShownRules.showsEmptyHomeHint(HomeShown.Glance, true))
+        assertFalse(HomeShownRules.showsEmptyHomeHint(HomeShown.Pages, false))
     }
 
     // ---- Minimal hotspots
@@ -128,10 +121,9 @@ class HomeLandingTest {
         assertEquals(setOf(Corner.TopLeft, Corner.TopRight, Corner.BottomLeft, Corner.BottomRight), MinimalHotspots.defaults.keys)
     }
 
-    @Test fun HOM_22_INP_07_theCycleActionIsAnInternalCornerActionSoItCanBeAssignedToACornerOrGesture() {
-        assertTrue(CornerActionId.CycleLanding.internal)
+    @Test fun HOM_22_INP_07_theLandingCycleActionIsGoneAndOpenLaunchpadStaysInternal() {
         assertTrue(CornerActionId.OpenLaunchpad.internal)
-        assertEquals("Cycle home landing", CornerActionId.CycleLanding.label)
+        assertTrue(CornerActionId.entries.none { it.label == "Cycle home landing" })
     }
 
     // ---- recents rules

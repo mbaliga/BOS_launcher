@@ -20,10 +20,17 @@ data class GridGeometry(
     val pitchY: Float,
     val originX: Float,
     val originY: Float,
+    /** Wave 26 (HomeOrder.RightToLeft): the columns run right to left, so column 0 is the right-most one. Physical coordinates, whatever the app language is. */
+    val mirror: Boolean = false,
 ) {
+    private fun colOf(index: Int): Int = (index % columns).let { if (mirror) columns - 1 - it else it }
+
+    /** The left edge of a block [cols] columns wide whose first column (logical) is [col]. */
+    fun spanLeft(col: Int, cols: Int): Float = originX + (if (mirror) columns - col - cols else col) * pitchX
+
     val capacity: Int get() = columns * rows
 
-    fun cellLeft(index: Int): Float = originX + (index % columns) * pitchX
+    fun cellLeft(index: Int): Float = originX + colOf(index) * pitchX
     fun cellTop(index: Int): Float = originY + (index / columns) * pitchY
     fun centreX(index: Int): Float = cellLeft(index) + pitchX / 2f
     fun centreY(index: Int): Float = cellTop(index) + pitchY / 2f
@@ -32,14 +39,14 @@ data class GridGeometry(
     fun cellAt(x: Float, y: Float): Int {
         val c = floor((x - originX) / pitchX).toInt()
         val r = floor((y - originY) / pitchY).toInt()
-        return if (c in 0 until columns && r in 0 until rows) r * columns + c else -1
+        return if (c in 0 until columns && r in 0 until rows) r * columns + (if (mirror) columns - 1 - c else c) else -1
     }
 
     /** Nearest cell to (x, y), clamped into the block (for drop targets). */
     fun nearestCell(x: Float, y: Float): Int {
         val c = floor((x - originX) / pitchX).toInt().coerceIn(0, columns - 1)
         val r = floor((y - originY) / pitchY).toInt().coerceIn(0, rows - 1)
-        return r * columns + c
+        return r * columns + (if (mirror) columns - 1 - c else c)
     }
 
     companion object {
@@ -49,7 +56,7 @@ data class GridGeometry(
          */
         fun compute(
             width: Float, height: Float, columns: Int, rows: Int, verticalBias: Float, spread: Float = 0f,
-            spreadY: Float = spread, insetX: Float = 0f, insetTop: Float = 0f, insetBottom: Float = 0f,
+            spreadY: Float = spread, insetX: Float = 0f, insetTop: Float = 0f, insetBottom: Float = 0f, mirror: Boolean = false,
         ): GridGeometry {
             val cols = columns.coerceAtLeast(1)
             val rws = rows.coerceAtLeast(1)
@@ -66,7 +73,7 @@ data class GridGeometry(
             val originX = ix + (aw - px * cols) / 2f
             // The block's vertical slack shrinks as it spreads; the bias fades with it.
             val originY = it + (ah - py * rws) * verticalBias.coerceIn(0f, 1f)
-            return GridGeometry(cols, rws, base, px, py, originX, originY)
+            return GridGeometry(cols, rws, base, px, py, originX, originY, mirror)
         }
     }
 }

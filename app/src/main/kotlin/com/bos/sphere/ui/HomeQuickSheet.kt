@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,22 +68,22 @@ fun HomeQuickSheet(
     onDismiss: () -> Unit,
     /** Widgets, folders, links, icon pack and hidden apps (HOM-02 to HOM-07). */
     onHomeItems: (() -> Unit)? = null,
-    /** HOM-22: the home landing and how to change it (a four-way segmented control at the top). */
-    landing: com.bos.sphere.core.data.HomeLanding = com.bos.sphere.core.data.HomeLanding.Selected,
-    onLanding: ((com.bos.sphere.core.data.HomeLanding) -> Unit)? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = HyleColors.Surface) {
         // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
         Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
             Text(L10n.tr("Home"), color = HyleColors.InkBright, fontSize = 20.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(bottom = 12.dp))
-            if (onLanding != null) {
-                Heading(L10n.tr("Home landing"))
-                com.bos.sphere.feature.grid.LandingSegmented(landing, onLanding)
-                Text(com.bos.sphere.feature.grid.HomeLandingCopy.description(landing), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
+            // Wave 26: there is no landing selector. The home is Glance (the calm screen) followed by the pages; the user can switch Glance off right here,
+            // and then home shows the first page or the scroll at once (the same setting as Ground Control, Home).
+            Tile(Modifier.fillMaxWidth().testTag("quick.glance"), Glyphs.Home, L10n.tr("Calm home screen (Glance)"), prefs.glanceEnabled) { update { it.copy(glanceEnabled = !it.glanceEnabled) } }
+            Heading(L10n.tr("Pages after Glance"))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                for (m in com.bos.sphere.core.data.HomeScroll.entries) Chip(null, L10n.tr(m.label), prefs.homeScroll == m) { update { it.copy(homeScroll = m, pagesModeChosen = true) } }
+                for (o in com.bos.sphere.core.data.HomeOrder.entries) Chip(null, L10n.tr(o.label), prefs.homeOrder == o) { update { it.copy(homeOrder = o) } }
             }
 
-            if (landing == com.bos.sphere.core.data.HomeLanding.Glance) {
-                // HOM-23: the Glance quick settings: content, hotspots and the background (Landing is above, Edit home pages below).
+            if (prefs.glanceEnabled) {
+                // HOM-23: the Glance quick settings: content, hotspots and the background (Edit home pages below).
                 Heading(L10n.tr("Glance content"))
                 val cur = com.bos.sphere.core.data.GlanceContent.presetOf(prefs.glanceContent)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
@@ -156,9 +157,14 @@ fun HomeQuickSheet(
                 }
             }
 
+            if (page == null) {
+                // Wave 26: "Add page" also works from Glance (page is null there): it goes to the pages and opens the add-page flow.
+                Spacer(Modifier.height(10.dp))
+                BigButton(Modifier.fillMaxWidth().testTag("quick.addpage"), Glyphs.Plus, L10n.tr("Add page"), onAddPage)
+            }
             Spacer(Modifier.height(18.dp))
             val actions = rows.filterIsInstance<AppMenuEntry.Sheet>().map { it.action }
-            if (HomeSheetAction.EditHome in actions) { BigButton(Modifier.fillMaxWidth(), Glyphs.Apps, if (landing == com.bos.sphere.core.data.HomeLanding.Selected) HomeSheetAction.EditHome.label else "Edit home pages") { onEdit?.invoke() }; Spacer(Modifier.height(10.dp)) }
+            if (HomeSheetAction.EditHome in actions) { BigButton(Modifier.fillMaxWidth().testTag("quick.edit"), Glyphs.Apps, L10n.tr("Edit home pages")) { onEdit?.invoke() }; Spacer(Modifier.height(10.dp)) }
             if (HomeSheetAction.Panels in actions) { BigButton(Modifier.fillMaxWidth(), Glyphs.Clock, HomeSheetAction.Panels.label) { onPanels?.invoke() }; Spacer(Modifier.height(10.dp)) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 BigButton(Modifier.weight(1f), Glyphs.Image, HomeSheetAction.Wallpaper.label, onWallpaper)

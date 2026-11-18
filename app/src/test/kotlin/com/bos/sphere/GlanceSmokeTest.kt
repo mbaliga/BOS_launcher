@@ -16,10 +16,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import com.bos.sphere.core.data.GlanceHotspots
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.HotspotPreset
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.MediaInfo
@@ -64,6 +64,7 @@ class GlanceSmokeTest {
     }
 
     private fun settle(ms: Long = 1500) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Snapshot.sendApplyNotifications(); rule.mainClock.advanceTimeBy(ms); org.robolectric.shadows.ShadowLooper.idleMainLooper(); rule.mainClock.advanceTimeBy(ms) }
+    private fun longPressEmpty() { rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * 0.3f)) }; settle(300) }
     private fun graphIds() = LauncherInput.focus.nodes().map { it.id }
     private fun hotspotCount() = graphIds().count { it.startsWith("minimal.corner.") }
     private fun controlsShown() = rule.onAllNodesWithContentDescription("Next").fetchSemanticsNodes().isNotEmpty()
@@ -71,7 +72,7 @@ class GlanceSmokeTest {
 
     @Test fun HOM_23_aFreshStateLandsOnTheGlanceHomeWithTheClockAndFourHotspotsAndNoHint() {
         startFresh(); settle()
-        assertEquals(HomeLanding.Glance, LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.homeLanding)
+        assertTrue(LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled)
         rule.onNodeWithTag("glance.time", useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithTag("glance.date", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(4, hotspotCount())
@@ -112,8 +113,10 @@ class GlanceSmokeTest {
         assertTrue(rule.onAllNodesWithTag("recents.panel").fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithTag("lp.card").fetchSemanticsNodes().isNotEmpty())
     }
 
-    @Test fun HOM_23_theLandingChoiceInTheQuickSheetKeepsGlanceTheDefaultForNewState() {
+    @Test fun HOM_23_glanceIsOnForNewStateAndTheQuickSheetCanSwitchItOff() {
         startFresh(); settle()
-        assertTrue("an explicit choice is stored only when it is not the default", !LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.homeLanding.equals(HomeLanding.Selected))
+        assertTrue(LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled)
+        longPressEmpty(); rule.onNodeWithTag("quick.glance", useUnmergedTree = true).performClick(); settle()
+        assertFalse("the quick sheet's Glance switch turns it off", LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled)
     }
 }

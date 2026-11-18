@@ -137,13 +137,15 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("cornersPerOri", next.cornersPerOrientation)
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name).putString("switcherStyle", next.switcherStyle.name)
-            .putString("homeLanding", next.homeLanding.name).putBoolean("landingChosen", LandingMigration.markerOnSave(next.homeLanding, sp.getBoolean("landingChosen", false)))
+            .putBoolean("glanceEnabled", next.glanceEnabled).putString("homeOrder", next.homeOrder.name).putBoolean("pagesModeChosen", next.pagesModeChosen)
             .putString("glanceContent", GlanceContent.encode(next.glanceContent)).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
             .putInt("glanceControlsSec", next.glanceControlsSeconds).putString("glanceWeather", next.glanceWeatherIntensity.name).putBoolean("glanceIndicator", next.glanceIndicator)
             .putInt("recentsLimit", next.recentsLimit)
             .putBoolean("recentsUsage", next.recentsUseUsageAccess)
             .putString("rightSide", next.rightSide.name)
             .apply()
+        // Wave 26: the removed home-landing keys are deleted once (HomeModelMigration read them).
+        if (HomeModelMigration.RETIRED_KEYS.any { sp.contains(it) }) sp.edit().also { e -> HomeModelMigration.RETIRED_KEYS.forEach { e.remove(it) } }.apply()
         // Wave 15: the keys of the removed background gallery are deleted once, so nothing of it lingers.
         if (RetiredBackgroundKeys.KEYS.any { it != "bgPicture" && sp.contains(it) }) {
             sp.edit().also { e -> RetiredBackgroundKeys.KEYS.forEach { e.remove(it) } }.apply()
@@ -156,6 +158,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         // Wave 15: any stored choice of the old background gallery is ignored; no stored slots means the default pair.
         val bg = BackgroundChoice.fromStored(sp.getString("bgSlot1", null), sp.getString("bgSlot2", null))
         val pagesBg = BackgroundChoice.fromStored(sp.getString("wpPagesSlot1", null), sp.getString("wpPagesSlot2", null))
+        val migrated = HomeModelMigration.resolve(
+            sp.getString("homeLanding", null), if (sp.contains("glanceEnabled")) sp.getBoolean("glanceEnabled", true) else null,
+            if (sp.contains("pagesModeChosen")) sp.getBoolean("pagesModeChosen", false) else null, sp.getString("homeScroll", null),
+        )
         return LauncherPrefs(
             glanceWallpaperKind = WallpaperKind.forId(sp.getString("wpGlanceKind", null)) ?: d.glanceWallpaperKind,
             glanceSolid = sp.getLong("wpGlanceSolid", d.glanceSolid) or GradientSpec.OPAQUE,
@@ -275,7 +281,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             hotCornerDwellMs = sp.getInt("hotCornerDwell", d.hotCornerDwellMs).coerceIn(0, 1000),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
             switcherStyle = enumOr(sp.getString("switcherStyle", null), d.switcherStyle),
-            homeLanding = LandingMigration.resolve(sp.getString("homeLanding", null), sp.getBoolean("landingChosen", false)),
+            glanceEnabled = migrated.glanceEnabled, homeOrder = HomeOrder.parse(sp.getString("homeOrder", null)), pagesModeChosen = migrated.pagesModeChosen,
             glanceContent = GlanceContent.decode(sp.getString("glanceContent", null)),
             glanceHotspots = GlanceHotspots.decode(sp.getString("glanceHotspots", null)),
             glanceControlsSeconds = GlanceControls.clampSeconds(sp.getInt("glanceControlsSec", d.glanceControlsSeconds)),

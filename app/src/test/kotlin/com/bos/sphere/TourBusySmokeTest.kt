@@ -8,7 +8,6 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.feature.grid.LauncherInput
 import org.junit.Assert.assertEquals
@@ -31,9 +30,9 @@ class TourBusySmokeTest : TourBase() {
     private val stores get() = LauncherStores.get(AppSmokeHarness.app)
 
     private var workAppAdded = false
-    private fun startBusy(landing: HomeLanding? = null) {
+    private fun startBusy(glanceOff: Boolean = false) {
         TourSeed.apps(); workAppAdded = runCatching { TourSeed.workApp() }.isSuccess
-        AppSmokeHarness.configureFresh { if (landing != null) it.copy(homeLanding = landing) else it }
+        AppSmokeHarness.configureFresh { if (glanceOff) it.copy(glanceEnabled = false) else it }
         TourSeed.history("Alpha", "Bravo", "Tour 007", "Tour 250", "Camera")
         TourSeed.recordSends()
         TourSeed.notifications("Alpha" to "Hello from Alpha", "Bravo" to "Ping from Bravo", "Alpha" to "Second from Alpha")
@@ -114,9 +113,9 @@ class TourBusySmokeTest : TourBase() {
     }
     private fun drawerHas(pkg: String) = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.app.$pkg") }
 
-    @Test fun CFG_09_busyTourGroundControlWalksEveryCategoryAndTheLandingsRenderOnABusyState() {
-        startBusy(HomeLanding.Selected)
-        for (l in listOf(HomeLanding.Recents, HomeLanding.AllApps, HomeLanding.Selected, HomeLanding.Glance)) { stores.prefs.update { it.copy(homeLanding = l) }; settle(); check("busy landing $l", Surface.Home); rotateAndCheck("busy landing $l") }
+    @Test fun CFG_09_busyTourGroundControlWalksEveryCategoryAndGlanceOnAndOffRenderOnABusyState() {
+        startBusy(glanceOff = true)
+        for (on in listOf(false, true, false)) { stores.prefs.update { it.copy(glanceEnabled = on) }; pressHome(); check("busy glance $on", Surface.Home); rotateAndCheck("busy glance $on") }
         key(KeyEvent.KEYCODE_COMMA, ctrl = true); check("ground control", Surface.Settings)
         repeat(30) { key(KeyEvent.KEYCODE_DPAD_RIGHT); if (it % 6 == 0) check("category $it", Surface.Settings) }
         rotateAndCheck("ground control deep")

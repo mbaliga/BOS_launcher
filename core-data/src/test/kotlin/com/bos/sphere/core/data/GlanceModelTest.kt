@@ -169,38 +169,6 @@ class GlanceModelTest {
         assertTrue(GlanceWeather.strength(RadarIntensity.Subtle) < GlanceWeather.strength(RadarIntensity.Normal))
     }
 
-    // ---- the landing default and its migration
-    @Test fun HOM_22_theDefaultLandingIsGlance() { assertEquals(HomeLanding.Glance, LauncherPrefs().homeLanding); assertEquals("Glance", HomeLanding.Glance.label) }
-
-    @Test fun HOM_22_migrationKeepsExplicitChoicesAndMovesTheOldDefaultToGlance() {
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve(null, false))
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve("Selected", false))   // the old default cannot be told from a choice
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve("Minimal", false))
-        assertEquals(HomeLanding.Recents, LandingMigration.resolve("Recents", false))
-        assertEquals(HomeLanding.AllApps, LandingMigration.resolve("AllApps", false))
-        assertEquals(HomeLanding.Selected, LandingMigration.resolve("Selected", true))  // an explicit pick sticks
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve("Hologram", true))
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve("Glance", true))
-        assertTrue(LandingMigration.markerOnSave(HomeLanding.Selected, false)); assertFalse(LandingMigration.markerOnSave(HomeLanding.Glance, false)); assertTrue(LandingMigration.markerOnSave(HomeLanding.Glance, true))
-    }
-
-    @Test fun HOM_22_theLandingChoiceSticksThroughTheStore() {
-        val sp = MapSharedPreferences()
-        val store = LauncherPrefsStore(sp)
-        assertEquals(HomeLanding.Glance, store.prefs.value.homeLanding)
-        store.update { it.copy(clockSize = 70f) }
-        assertEquals(HomeLanding.Glance, LauncherPrefsStore(sp).prefs.value.homeLanding)
-        store.update { it.copy(homeLanding = HomeLanding.Selected) }
-        assertEquals(HomeLanding.Selected, LauncherPrefsStore(sp).prefs.value.homeLanding)
-        store.update { it.copy(homeLanding = HomeLanding.Glance) }
-        assertEquals(HomeLanding.Glance, LauncherPrefsStore(sp).prefs.value.homeLanding)
-    }
-
-    @Test fun HOM_22_anOldInstallWithTheDefaultSelectedLandsOnGlanceAndRecentsIsKept() {
-        assertEquals(HomeLanding.Glance, LauncherPrefsStore(MapSharedPreferences(mapOf("homeLanding" to "Selected"))).prefs.value.homeLanding)
-        assertEquals(HomeLanding.Recents, LauncherPrefsStore(MapSharedPreferences(mapOf("homeLanding" to "Recents"))).prefs.value.homeLanding)
-    }
-
     @Test fun HOM_23_theGlanceSettingsArePersistedPlainPrefs() {
         val sp = MapSharedPreferences()
         LauncherPrefsStore(sp).update { it.copy(glanceContent = setOf(GlanceItem.Date, GlanceItem.Weather), glanceHotspots = setOf(Corner.BottomLeft), glanceControlsSeconds = 9, glanceWeatherIntensity = RadarIntensity.Normal, glanceIndicator = false) }

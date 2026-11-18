@@ -21,7 +21,7 @@ import com.bos.sphere.core.catalog.ItemKind
 import com.bos.sphere.core.catalog.PanelTab
 import com.bos.sphere.core.catalog.WidgetSpan
 import com.bos.sphere.core.catalog.WidgetStacks
-import com.bos.sphere.core.data.HomeLanding
+import com.bos.sphere.core.data.HomeShown
 import com.bos.sphere.core.data.HomeLayout
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.LauncherStores
@@ -46,7 +46,7 @@ import org.robolectric.annotation.GraphicsMode
 class HomeLandingItemsW24Test : TourBase() {
     private val stores get() = LauncherStores.get(AppSmokeHarness.app)
     private val extras get() = HomeExtrasStore.get(AppSmokeHarness.app)
-    private fun landing() = stores.prefs.prefs.value.homeLanding
+    private fun landing() = if (glanceShown()) HomeShown.Glance else HomeShown.Pages
     private fun pageKeys() = stores.layout.layout.value.pages.flatMap { it.keys }
 
     private val clockKey = ItemKeys.widget(41)
@@ -79,7 +79,7 @@ class HomeLandingItemsW24Test : TourBase() {
         AppSmokeHarness.configureFresh()
         seed()
         launch()
-        assertEquals(HomeLanding.Glance, landing())
+        assertEquals(HomeShown.Glance, landing())
     }
 
     private fun openQuickSheet() {
@@ -91,7 +91,7 @@ class HomeLandingItemsW24Test : TourBase() {
         startOnGlance()
         openQuickSheet()
         rule.onNodeWithText("Edit home pages").performScrollTo().performClick(); settle()
-        assertEquals("Edit home pages moves to the landing that has pages", HomeLanding.Selected, landing())
+        assertEquals("Edit home pages moves to the landing that has pages", HomeShown.Pages, landing())
         assertTrue("the edit card with its page carousel is up", editShown())
         check("edit from Glance", TourBase.Surface.Edit)
         back(); assertFalse("Back leaves edit mode", editShown())
@@ -105,7 +105,7 @@ class HomeLandingItemsW24Test : TourBase() {
         val key = ItemKeys.link(HomePanelLinks.uri(PanelTab.Files))
         assertTrue("the tile is placed on a page", key in pageKeys())
         // Before wave 24 the tile went onto the Selected apps pages while Glance stayed up: placed, but nowhere to be seen.
-        assertEquals("placing an item from a landing without pages shows the landing that has them", HomeLanding.Selected, landing())
+        assertEquals("placing an item from a landing without pages shows the landing that has them", HomeShown.Pages, landing())
         assertTrue("the Files tile is drawn", descShown("Files"))
         check("files tile placed", TourBase.Surface.Home)
     }
@@ -115,8 +115,8 @@ class HomeLandingItemsW24Test : TourBase() {
         // on Glance nothing of the pages is drawn, and nothing is lost either
         assertFalse(descShown("Remove from home", substring = true))
         assertEquals(listOf(clockKey, stackKey), pageKeys())
-        stores.prefs.update { it.copy(homeLanding = HomeLanding.Selected) }; settle()
-        stores.prefs.update { it.copy(homeLanding = HomeLanding.Glance) }; settle()
+        stores.prefs.update { it.copy(glanceEnabled = false) }; settle()
+        stores.prefs.update { it.copy(glanceEnabled = true) }; pressHome()
         assertEquals("a landing round trip keeps the widget and the stack", listOf(clockKey, stackKey), pageKeys())
         assertEquals(setOf(clockKey, weatherKey, notesKey, stackKey), extras.state.value.items.keys)
 
@@ -186,13 +186,13 @@ class HomeLandingItemsW24Test : TourBase() {
         waitFor("the timeline lists the seeded opens") { textShown("Bravo") && textShown("Alpha") }
         rule.onNodeWithText("Usage", useUnmergedTree = true).performScrollTo().performClick(); settle() // HOM-17: without usage access it explains how to grant it, and does not crash
         check("panels on Glance")
-        closeSheet(); assertEquals("the landing is untouched by looking at the panels", HomeLanding.Glance, landing())
+        closeSheet(); assertEquals("the landing is untouched by looking at the panels", HomeShown.Glance, landing())
     }
 
     @Test fun HOM_11_rotatingOnGlanceKeepsTheWidgetsAndTheStackOfTheSelectedAppsPages() {
         startOnGlance(::seedWidgets)
         rotateAndCheck("Glance with widgets on the pages")
-        stores.prefs.update { it.copy(homeLanding = HomeLanding.Selected) }; settle()
+        stores.prefs.update { it.copy(glanceEnabled = false) }; settle()
         assertEquals("the portrait arrangement is the one that was seeded", listOf(clockKey, stackKey), pageKeys())
         assertEquals(listOf(weatherKey, notesKey), WidgetStacks.stackAt(extras.state.value, stackKey)?.keys)
         check("Selected after the rotation", TourBase.Surface.Home)
@@ -210,7 +210,7 @@ class HomeLandingItemsW24Test : TourBase() {
         rule.onNodeWithText("Add to home", useUnmergedTree = true).performClick(); settle()
         assertTrue("the app is placed on a page", delta in pageKeys())
         // Before the second pass the app went onto the hidden Selected apps pages and Glance stayed the landing.
-        assertEquals("placing from a landing without pages shows the landing that has them", HomeLanding.Selected, landing())
+        assertEquals("placing from a landing without pages shows the landing that has them", HomeShown.Pages, landing())
     }
 
     @Test fun HOM_15_onGlanceAFilesTileThatIsAlreadyOnThePagesIsShownWhenItIsAddedAgain() {
@@ -224,7 +224,7 @@ class HomeLandingItemsW24Test : TourBase() {
         rule.onNodeWithText("Files panel").performClick(); settle()
         assertEquals("still one tile", 1, pageKeys().count { it == key })
         // Before the second pass the second tap returned early: nothing placed, nothing switched, nothing on screen changed.
-        assertEquals("the existing tile is shown", HomeLanding.Selected, landing())
+        assertEquals("the existing tile is shown", HomeShown.Pages, landing())
         assertTrue(descShown("Files"))
     }
 }

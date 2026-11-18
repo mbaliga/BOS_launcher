@@ -116,6 +116,9 @@ class SettingsModel(
     val copyText: (String) -> Unit = {},
     /** CFG-17: the Lab spikes, each with its last result. */
     val lab: List<LabEntry> = emptyList(),
+    /** Wave 26: "Add page" (after Glance; asks Scroll or Paginated the first time) and "Edit home pages". */
+    val addHomePage: () -> Unit = {},
+    val editHomePages: () -> Unit = {},
 )
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
@@ -256,13 +259,20 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Home"),
         Glyphs.Apps,
         buildList {
-            // HOM-22: what the home shows. Switching changes nothing that is saved (pages, folders, widgets, hidden apps).
+            // Wave 26: no landing selector. The home is Glance (the calm screen) followed by the pages the user builds; Glance can be switched off.
+            add(
+                SettingItem.Toggle(
+                    x("Calm home screen (Glance)"), Glyphs.Home, p.glanceEnabled,
+                    x("On: home is the calm, empty screen and your pages come after it. Off: home shows the first page or the scroll."),
+                ) { v -> upd { it.copy(glanceEnabled = v) } },
+            )
+            add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("After Glance; you choose Scroll or Paginated the first time")) { m.addHomePage() })
+            add(SettingItem.Action(x("Edit home pages"), Glyphs.Apps, x("Add icons, widgets and folders to the pages")) { m.editHomePages() })
             add(
                 SettingItem.Choice(
-                    x("Home landing"), Glyphs.Home, com.bos.sphere.core.data.HomeLanding.entries, p.homeLanding, { x(it.label) },
-                    hint = com.bos.sphere.feature.grid.HomeLandingCopy.description(p.homeLanding),
-                    preview = { com.bos.sphere.feature.grid.LandingChoiceList(p.homeLanding, { l -> upd { it.copy(homeLanding = l) } }) },
-                ) { l -> upd { it.copy(homeLanding = l) } },
+                    x("Order"), Glyphs.Swipe, com.bos.sphere.core.data.HomeOrder.entries, p.homeOrder, { x(it.label) },
+                    hint = x("Right to left puts the Launchpad on the right edge, the Recents panel on the left, and fills columns and pages from the right."),
+                ) { v -> upd { it.copy(homeOrder = v) } },
             )
             // STR-14: what a swipe from the right edge does. The dock stays optional: "Dock rail" only reveals it, it never turns it on.
             add(
@@ -272,11 +282,11 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 ) { v -> upd { it.copy(rightSide = v) } },
             )
             addAll(wallpaperSettings(p) { f -> upd(f) }) // HOM-16 (wave 26): Glance and Pages wallpaper, always listed
-            if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Recents) {
+            run {
                 add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })
                 add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Uses usage access when it is allowed; otherwise only apps opened from Liftoff are listed")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })
             }
-            if (p.homeLanding == com.bos.sphere.core.data.HomeLanding.Glance) addAll(glanceSettings(p) { f -> upd(f) })
+            if (p.glanceEnabled) addAll(glanceSettings(p) { f -> upd(f) })
             add(
                 SettingItem.Choice(
                     x("Style"), Glyphs.Apps, HomeStyle.entries, p.homeStyle, { x(homeStyleName(it)) },
@@ -295,17 +305,16 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             if (p.homeStyle == HomeStyle.Grid) add(
                 SettingItem.Choice(
-                    x("Scrolling"), Glyphs.Swipe, com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { x(it.label) },
-                    hint = x("Pages: swipe between screens. Continuous: one long scroll of every app."),
+                    x("Pages after Glance"), Glyphs.Swipe, com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { x(it.label) },
+                    hint = x("Paginated: traditional pages with dots. Scroll: one continuous screen that scrolls sideways, filled column by column."),
                     preview = {
-                        VisualChoice(com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { v -> upd { it.copy(homeScroll = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { v ->
+                        VisualChoice(com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { v -> upd { it.copy(homeScroll = v, pagesModeChosen = true) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { v ->
                             GlyphPreview(if (v == com.bos.sphere.core.data.HomeScroll.Paged) Glyphs.Swipe else Glyphs.Down, x(v.label))
                         }
                     },
-                ) { v -> upd { it.copy(homeScroll = v) } },
+                ) { v -> upd { it.copy(homeScroll = v, pagesModeChosen = true) } },
             )
-            if (continuous) add(SettingItem.Stepper(x("Icons across"), Glyphs.Apps, p.continuousColumns, 2..8) { v -> upd { it.copy(continuousColumns = v) } })
-            if (continuous || p.homeStyle == HomeStyle.Dsi) add(
+            if (p.homeStyle == HomeStyle.Dsi) add(
                 SettingItem.Choice(
                     x("Scroll direction"), Glyphs.Swipe, com.bos.sphere.core.data.ScrollAxis.entries, p.scrollAxis, { x(it.label) },
                     hint = x("\"Long side\" keeps scrolling along the phone's longer edge however you hold it. Swipes across the other way are free for gestures."),

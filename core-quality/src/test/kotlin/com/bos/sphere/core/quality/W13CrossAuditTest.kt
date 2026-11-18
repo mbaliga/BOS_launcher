@@ -29,7 +29,7 @@ class W13CrossAuditTest {
         // A crash report holds the stack trace and the exception message; a message built from a name, a sender or a title would leak it.
         val personal = listOf(
             "GroupsStore", "GroupResolver", "LaunchpadGroups", "GroupedView", "PersonNames", "ContactsDirectoryLoader", "HomeRecents",
-            "PendingIntentLauncher", "HomeLanding",
+            "PendingIntentLauncher", "HomeShown",
         ).map { "core-data/src/main/kotlin/com/bos/sphere/core/data/$it.kt" } + listOf(
             "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/GroupAssignSheet.kt", "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/GroupRuleEditor.kt",
             "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/LaunchpadGroupsPane.kt", "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/GroupTexts.kt",
@@ -81,9 +81,9 @@ class W13CrossAuditTest {
         for (f in listOf("launchpad_rules", "launchpad_groups")) assertTrue("$f must be in PrefsWarmup.FILES", warm.contains("\"$f\""))
     }
 
-    @Test fun CFG_10_theLandingSwitcherUsesTheThemeTokensNotAFixedWhiteOverlay() {
+    @Test fun CFG_10_theGlanceHotspotLayerUsesTheThemeTokensNotAFixedWhiteOverlay() {
         // A 7 percent white overlay is invisible on the light theme; the unselected card must follow the ink tokens.
-        for (f in listOf("HomeLandingUi", "HomeLandingScreens", "PageCarousel", "AddCarousel", "EditCardHost"))
+        for (f in listOf("GlanceHotspotLayer", "PageCarousel", "AddCarousel", "EditCardHost"))
             assertFalse("$f has a fixed white overlay", text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/$f.kt").contains("Color(0x12FFFFFF)"))
     }
 }

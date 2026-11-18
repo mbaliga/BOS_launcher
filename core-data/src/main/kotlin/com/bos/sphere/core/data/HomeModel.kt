@@ -17,7 +17,8 @@ enum class ScrollAxis(val label: String) {
     Long("Along the long side"), Short("Along the short side"), Vertical("Top to bottom"), Horizontal("Left to right"),
 }
 
-enum class HomeScroll(val label: String) { Paged("Pages"), Continuous("Continuous") }
+/** Wave 26: how the SUCCESSIVE pages (the ones after Glance) are arranged: [Paged] = paginated pages, [Continuous] = the horizontal column-by-column scroll. */
+enum class HomeScroll(val label: String) { Paged("Paginated"), Continuous("Scroll") }
 
 /** Corner look: a bare glyph, or a quarter-circle bubble hugging the screen corner. */
 /** Holo = bare glyphs; Quarter = Sony-style quarter discs in the corners; Bubble = round floating bubbles. */
@@ -236,7 +237,12 @@ data class LauncherPrefs(
 
     // --- home landing (HOM-22)
     /** What the home shows: the user's pages, the recent apps, every app, or only the wallpaper and the four hotspots. */
-    val homeLanding: HomeLanding = HomeLanding.Glance,
+    /** Wave 26: the Glance is the first surface of the home; off = the first page (or the scroll) is what home shows. */
+    val glanceEnabled: Boolean = true,
+    /** Wave 26: Left to right (default) or Right to left: the Launchpad edge, the column / page order and the hotspot roles. */
+    val homeOrder: HomeOrder = HomeOrder.LeftToRight,
+    /** Wave 26: false until the user has chosen Scroll or Paginated for the pages (the add-page flow asks once; Ground Control can change it). */
+    val pagesModeChosen: Boolean = false,
     /** HOM-23: which items the Glance home shows (time, date, weather, now playing, battery); default Time + Date + music. */
     val glanceContent: Set<GlanceItem> = GlanceContent.DEFAULT,
     /** HOM-23: which hotspots are on, by physical corner (default all four). */
@@ -471,8 +477,6 @@ enum class CornerActionId(val label: String, val internal: Boolean = false) {
     SystemSettings("Settings"),
     /** HOM-22: opens Launchpad (the left card); the default top-right hotspot of the Minimal landing. */
     OpenLaunchpad("Launchpad", internal = true),
-    /** HOM-22: steps the home landing; assignable to a corner or a gesture. */
-    CycleLanding("Cycle home landing", internal = true),
     /** STR-14: opens the Recents panel (the right-hand card); assignable to a corner or a gesture. */
     OpenRecents("Open recents", internal = true),
 }

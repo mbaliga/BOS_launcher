@@ -5,7 +5,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.bos.sphere.core.data.CrashLoopGuard
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.OpenSurface
 import com.bos.sphere.core.data.OpenSurfaceStore

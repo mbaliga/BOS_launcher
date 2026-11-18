@@ -8,7 +8,6 @@ import androidx.compose.ui.test.performTextInput
 import com.bos.sphere.feature.grid.LauncherInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.MediaNow
@@ -45,7 +44,7 @@ class TourFreshSmokeTest : TourBase() {
 
     @Test fun HOM_23_tourStartOnGlanceThenTheControlsPopInAndOutAndTheQuickSheetOpens() {
         startFresh(); MediaNow.publishForTest(track); settle()
-        assertEquals(HomeLanding.Glance, stores.prefs.prefs.value.homeLanding)
+        assertTrue(stores.prefs.prefs.value.glanceEnabled); assertTrue(glanceShown())
         check("start", Surface.Home); assertFalse(controlsShown())
         tapAt(0.5f, 0.72f); assertTrue("a tap pops the controls in", controlsShown()); check("controls in", Surface.Home)
         rotateAndCheck("controls in, rotated")
@@ -57,16 +56,16 @@ class TourFreshSmokeTest : TourBase() {
         closeSheet(); settle(); assertFalse("Back closes the quick sheet", quickSheetShown()); check("quick sheet closed", Surface.Home)
     }
 
-    @Test fun HOM_22_tourLandingsGlanceToRecentsToAllAppsToSelectedAndBackToGlance() {
+    @Test fun HOM_22_tourGlanceOffAndOnAndTheHomeButtonReturnsToWhatHomeStartsOn() {
         startFresh()
-        for (l in listOf(HomeLanding.Recents, HomeLanding.AllApps, HomeLanding.Selected, HomeLanding.Glance)) {
-            stores.prefs.update { it.copy(homeLanding = l) }; settle()
-            check("landing $l", Surface.Home)
-            rotateAndCheck("landing $l")
-            key(KeyEvent.KEYCODE_L, ctrl = true, shift = true); check("cycle from $l")
-            stores.prefs.update { it.copy(homeLanding = l) }; settle()
+        for (on in listOf(false, true, false, true)) {
+            stores.prefs.update { it.copy(glanceEnabled = on) }; pressHome()
+            check("glance $on", Surface.Home)
+            assertEquals("Glance $on: home shows " + (if (on) "Glance" else "the first page"), on, glanceShown())
+            rotateAndCheck("glance $on")
+            key(KeyEvent.KEYCODE_L, ctrl = true, shift = true); check("the removed cycle shortcut does nothing, glance $on")
+            assertEquals(on, stores.prefs.prefs.value.glanceEnabled)
         }
-        assertEquals(HomeLanding.Glance, stores.prefs.prefs.value.homeLanding)
     }
 
     @Test fun STR_01_tourLaunchpadOpensFiveWaysAndClosesBySliverBackAndEscape() {

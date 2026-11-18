@@ -78,26 +78,10 @@ class GlanceAuditW20Test {
     // ---- the Dock rail setting on Glance
     @Test fun HOM_23_theDockRailSettingForcesTheDockOnGlanceOnly() {
         val dockRail = ChromeSettings(rightSide = RightSide.DockRail)
-        assertTrue(HomeChromeRules.forcesDock(HomeLanding.Glance, dockRail))
-        assertTrue(HomeChromeRules.shows(HomeLanding.Glance, ChromeElement.Dock, dockRail))
-        for (l in HomeLanding.entries.filter { it != HomeLanding.Glance }) assertFalse("$l keeps the dock setting", HomeChromeRules.forcesDock(l, dockRail))
-        for (r in RightSide.entries.filter { it != RightSide.DockRail }) assertFalse(HomeChromeRules.forcesDock(HomeLanding.Glance, ChromeSettings(rightSide = r)))
-    }
-
-    // ---- the landing default and its marker
-    @Test fun HOM_22_aStoredSelectedWithoutTheMarkerBecomesGlanceButAnyExplicitChoiceSticksAcrossSaves() {
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve("Selected", false))
-        // the user picks Selected: the marker is written, and every later save keeps it
-        var marker = LandingMigration.markerOnSave(HomeLanding.Selected, false)
-        assertTrue(marker)
-        assertEquals(HomeLanding.Selected, LandingMigration.resolve("Selected", marker))
-        // then Glance again: explicit, still sticks as Glance, and a later Selected is read as chosen
-        marker = LandingMigration.markerOnSave(HomeLanding.Glance, marker)
-        assertTrue(marker)
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve("Minimal", marker))
-        // a damaged value with the marker falls back to Glance, never to Selected
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve("???", true))
-        assertEquals(HomeLanding.Glance, LandingMigration.resolve(null, true))
+        assertTrue(HomeChromeRules.forcesDock(HomeShown.Glance, dockRail))
+        assertTrue(HomeChromeRules.shows(HomeShown.Glance, ChromeElement.Dock, dockRail))
+        for (l in HomeShown.entries.filter { it != HomeShown.Glance }) assertFalse("$l keeps the dock setting", HomeChromeRules.forcesDock(l, dockRail))
+        for (r in RightSide.entries.filter { it != RightSide.DockRail }) assertFalse(HomeChromeRules.forcesDock(HomeShown.Glance, ChromeSettings(rightSide = r)))
     }
 
     // ---- the two slots

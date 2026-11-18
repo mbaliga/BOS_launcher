@@ -8,7 +8,7 @@ import org.junit.Test
 class HomeLandingW12AuditTest {
     private fun text(path: String) = Repo.file(path).readText()
     private val recents = "core-data/src/main/kotlin/com/bos/sphere/core/data/HomeRecents.kt"
-    private val landing = "core-data/src/main/kotlin/com/bos/sphere/core/data/HomeLanding.kt"
+    private val landing = "core-data/src/main/kotlin/com/bos/sphere/core/data/HomeShown.kt"
     private val usage = "core-signals/src/main/kotlin/com/bos/sphere/core/signals/Recents.kt"
 
     @Test fun HOM_22_noHiddenRecentTasksApiOrReflectionAnywhereInTheRecentsCode() {
@@ -42,11 +42,12 @@ class HomeLandingW12AuditTest {
         assertFalse(exporter.contains("RecentsState") || exporter.contains("recents-state"))
     }
 
-    @Test fun HOM_22_theLandingIsAPlainExportedPrefInLauncherPrefsNotADeviceBoundKey() {
+    @Test fun HOM_22_theHomeSettingsArePlainExportedPrefsInLauncherPrefsNotDeviceBoundKeysAndTheLandingKeyIsRetired() {
         val stores = text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt")
-        assertTrue(stores.contains("putString(\"homeLanding\""))
+        for (k in listOf("glanceEnabled", "homeOrder", "pagesModeChosen")) assertTrue(k, stores.contains("put") && stores.contains("\"$k\""))
+        assertFalse("the landing is not written any more", stores.contains("putString(\"homeLanding\""))
         val schema = text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateSchema.kt")
-        assertFalse(schema.substringAfter("DEVICE_BOUND_PREF_KEYS").substringBefore("\n").contains("homeLanding"))
+        for (k in listOf("glanceEnabled", "homeOrder", "pagesModeChosen")) assertFalse(schema.substringAfter("DEVICE_BOUND_PREF_KEYS").substringBefore("\n").contains(k))
     }
 
     @Test fun HOM_22_noNewAnimationOrNetworkInTheLandingLogic() {

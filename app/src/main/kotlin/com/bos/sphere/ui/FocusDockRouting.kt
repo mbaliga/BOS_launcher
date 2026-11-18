@@ -3,7 +3,7 @@ package com.bos.sphere.ui
 import com.bos.sphere.core.data.ChromeElement
 import com.bos.sphere.core.data.ChromeSettings
 import com.bos.sphere.core.data.HomeChromeRules
-import com.bos.sphere.core.data.HomeLanding
+import com.bos.sphere.core.data.HomeShown
 import com.bos.sphere.core.input.LauncherCommand
 
 /**
@@ -26,7 +26,7 @@ internal object FocusDockRouting {
     }
 
     /** Null when a rail shows on the home once nothing covers it (the same rules `DockLayer` and `DockHost` apply). */
-    fun noDock(landing: HomeLanding, chrome: ChromeSettings, dockEnabled: Boolean, editing: Boolean = false): NoDock? = when {
+    fun noDock(landing: HomeShown, chrome: ChromeSettings, dockEnabled: Boolean, editing: Boolean = false): NoDock? = when {
         HomeChromeRules.forcesDock(landing, chrome) -> if (editing) NoDock.Editing else null
         !HomeChromeRules.shows(landing, ChromeElement.Dock, chrome) -> NoDock.Landing
         !dockEnabled -> NoDock.Off

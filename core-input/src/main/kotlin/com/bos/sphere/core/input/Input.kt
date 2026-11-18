@@ -40,8 +40,6 @@ enum class LauncherCommand(val label: String) {
     Dock1("Dock item 1"), Dock2("Dock item 2"), Dock3("Dock item 3"), Dock4("Dock item 4"), Dock5("Dock item 5"),
     Dock6("Dock item 6"), Dock7("Dock item 7"), Dock8("Dock item 8"), Dock9("Dock item 9"),
     CornerTopLeft("Top-left corner"), CornerTopRight("Top-right corner"), CornerBottomLeft("Bottom-left corner"), CornerBottomRight("Bottom-right corner"),
-    /** HOM-22: step the home landing (Selected apps, Recent apps, All apps, Minimal). */
-    CycleLanding("Cycle home landing"),
     /** STR-14: open the Recents panel (the right-hand card). */
     OpenRecents("Open recents"),
     Dismiss("Dismiss"),
@@ -140,7 +138,6 @@ object DefaultShortcuts {
         add(ShortcutDef(LauncherCommand.CornerTopRight, KeyChord(K_W, ctrl = true, shift = true)))
         add(ShortcutDef(LauncherCommand.CornerBottomLeft, KeyChord(K_A, ctrl = true, shift = true)))
         add(ShortcutDef(LauncherCommand.CornerBottomRight, KeyChord(K_S, ctrl = true, shift = true)))
-        add(ShortcutDef(LauncherCommand.CycleLanding, KeyChord(K_L, ctrl = true, shift = true)))
         add(ShortcutDef(LauncherCommand.OpenRecents, KeyChord(K_R, ctrl = true)))
         add(ShortcutDef(LauncherCommand.Dismiss, KeyChord(K_ESC)))
     }

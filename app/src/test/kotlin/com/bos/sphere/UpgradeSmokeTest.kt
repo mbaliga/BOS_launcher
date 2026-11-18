@@ -6,7 +6,6 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import com.bos.sphere.core.data.BackgroundChoice
 import com.bos.sphere.core.data.CrashLoopGuard
-import com.bos.sphere.core.data.HomeLanding
 import com.bos.sphere.core.data.HomeStyle
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.StateService
@@ -124,7 +123,7 @@ class UpgradeSmokeTest {
         }
         val sc = startAndSurvive()
         val p = prefsNow()
-        assertEquals("the old landing is not set, so the default Glance (wave 16 migration)", HomeLanding.Glance, p.homeLanding)
+        assertTrue("no old landing stored: Glance is on (wave 26)", p.glanceEnabled)
         assertEquals("the removed gallery is dropped for the default pair", BackgroundChoice.DEFAULT, BackgroundChoice(p.backgroundSlot1, p.backgroundSlot2))
         assertTrue(app.getSharedPreferences("launcher_prefs", Context.MODE_PRIVATE).all.keys.none { it == "bgKind" } || true)
         sc.close(); scenario = null
@@ -141,14 +140,13 @@ class UpgradeSmokeTest {
         }
     }
 
-    @Test fun HOM_22_build40_everyOldStoredLandingNameStartsAndSelectedWithoutTheMarkerIsTheNewDefault() {
-        for ((stored, expected) in listOf(
-            "Selected" to HomeLanding.Glance, "Recents" to HomeLanding.Recents, "AllApps" to HomeLanding.AllApps,
-            "Minimal" to HomeLanding.Glance, "Glance" to HomeLanding.Glance, "Gone" to HomeLanding.Glance, "" to HomeLanding.Glance,
-        )) {
+    @Test fun HOM_22_build40_everyOldStoredLandingNameStartsWithGlanceOnAndTheHomeSettingsDefault() {
+        for (stored in listOf("Selected", "Recents", "AllApps", "Minimal", "Glance", "Gone", "")) {
             AppSmokeHarness.resetProcess()
             prefs("launcher_prefs") { clear(); putBoolean("onboardingDone", true); putString("homeLanding", stored) }
-            assertEquals("stored \"$stored\"", expected, LauncherStores.get(app).prefs.prefs.value.homeLanding)
+            val p = LauncherStores.get(app).prefs.prefs.value
+            assertTrue("stored \"$stored\": Glance on", p.glanceEnabled)
+            assertEquals(com.bos.sphere.core.data.HomeOrder.LeftToRight, p.homeOrder)
         }
         prefs("launcher_prefs") { clear(); putBoolean("onboardingDone", true); putString("homeLanding", "Selected") }
         AppSmokeHarness.resetProcess()
@@ -235,16 +233,11 @@ class UpgradeSmokeTest {
         startAndSurvive()
     }
 
-    @Test fun HOM_23_builds47to49_theLandingMarkerAbsentOrPresentKeepsTheUsersChoice() {
-        data class Case(val stored: String?, val marker: Boolean?, val expected: HomeLanding)
-        for (c in listOf(
-            Case("Selected", true, HomeLanding.Selected), Case("Selected", null, HomeLanding.Glance), Case("Selected", false, HomeLanding.Glance),
-            Case("Minimal", true, HomeLanding.Glance), Case("Glance", true, HomeLanding.Glance), Case("Recents", null, HomeLanding.Recents),
-            Case("AllApps", false, HomeLanding.AllApps), Case(null, true, HomeLanding.Glance), Case("Bogus", true, HomeLanding.Glance),
-        )) {
+    @Test fun HOM_23_builds47to49_theLandingMarkerAbsentOrPresentAlwaysMigratesToGlanceOnAndKeepsThePages() {
+        for ((stored, marker) in listOf("Selected" to true, "Selected" to null, "Selected" to false, "Minimal" to true, "Glance" to true, "Recents" to null, "AllApps" to false, null to true, "Bogus" to true)) {
             AppSmokeHarness.resetProcess()
-            prefs("launcher_prefs") { clear(); putBoolean("onboardingDone", true); c.stored?.let { putString("homeLanding", it) }; c.marker?.let { putBoolean("landingChosen", it) } }
-            assertEquals("$c", c.expected, LauncherStores.get(app).prefs.prefs.value.homeLanding)
+            prefs("launcher_prefs") { clear(); putBoolean("onboardingDone", true); stored?.let { putString("homeLanding", it) }; marker?.let { putBoolean("landingChosen", it) } }
+            assertTrue("$stored/$marker", LauncherStores.get(app).prefs.prefs.value.glanceEnabled)
         }
         prefs("launcher_prefs") { clear(); putBoolean("onboardingDone", true); putString("homeLanding", "Selected"); putBoolean("landingChosen", true) }
         AppSmokeHarness.resetProcess()
@@ -342,7 +335,7 @@ class UpgradeSmokeTest {
         AppSmokeHarness.resetProcess()
         prefs("launcher_prefs") { clear() }
         importThenStart(text)
-        assertEquals(HomeLanding.Recents, prefsNow().homeLanding)
+        assertTrue("the old Recents landing imports as Glance on", prefsNow().glanceEnabled)
     }
 
     @Test fun CFG_03_exportsWithRemovedEnumNamesAndDamagedSectionsImportOrFailCleanlyAndNeverCrashTheStart() {

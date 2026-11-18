@@ -63,7 +63,9 @@ abstract class TourBase {
     protected fun radarShown() = descShown("Speak to search")
     protected fun drawerShown() = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.") }
     protected fun settingsShown() = descShown("Close settings")
-    protected fun quickSheetShown() = textShown("HOME LANDING")
+    protected fun quickSheetShown() = tagShown("quick.glance")
+    /** Wave 26: Glance is the surface on screen (its deck dots are drawn only there); otherwise the pages are. */
+    protected fun glanceShown() = tagShown("glance.deckdots")
     protected fun editShown() = descShown("Page carousel")
     protected fun controlsShown() = descShown("Next")
 
@@ -97,6 +99,8 @@ abstract class TourBase {
 
     // ---- input
     protected fun key(code: Int, ctrl: Boolean = false, shift: Boolean = false): Boolean { val h = AppSmokeHarness.press(sc, code, ctrl = ctrl, shift = shift); settle(400); return h }
+    /** The Home button (a new MAIN/HOME intent): home returns to what it starts on, Glance when it is on. */
+    protected fun pressHome() { sc.onActivity { androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(it, android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)) }; settle() }
     protected fun back() { AppSmokeHarness.back(sc); settle() }
     protected fun swipeFromLeft(y: Float = 0.5f) { rule.onRoot().performTouchInput { down(Offset(6f, height * y)); moveBy(Offset(60f, 0f)); moveBy(Offset(200f, 0f)); moveBy(Offset(300f, 0f)); up() }; settle() }
     protected fun swipeFromRight(y: Float = 0.5f) { rule.onRoot().performTouchInput { down(Offset(width - 6f, height * y)); moveBy(Offset(-60f, 0f)); moveBy(Offset(-200f, 0f)); moveBy(Offset(-300f, 0f)); up() }; settle() }

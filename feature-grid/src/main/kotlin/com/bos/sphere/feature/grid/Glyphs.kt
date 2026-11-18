@@ -278,7 +278,6 @@ object Glyphs {
         CornerActionId.DoNotDisturb -> Moon
         CornerActionId.SystemSettings -> Gear
         CornerActionId.OpenLaunchpad -> Bell
-        CornerActionId.CycleLanding -> Home
         CornerActionId.OpenRecents -> Apps
     }
 

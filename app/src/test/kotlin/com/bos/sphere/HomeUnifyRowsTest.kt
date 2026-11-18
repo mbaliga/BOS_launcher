@@ -1,0 +1,54 @@
+package com.bos.sphere
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.bos.sphere.core.data.HomePage
+import com.bos.sphere.core.data.HomePages
+import com.bos.sphere.core.data.LauncherPrefs
+import com.bos.sphere.feature.grid.SettingItem
+import com.bos.sphere.ui.SettingsModel
+import com.bos.sphere.ui.SystemLinks
+import com.bos.sphere.ui.buildSettingsCategories
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+/** HOM-01, HOM-22 (wave 28): the Pages setting in Ground Control, Home screen: one row with exactly Off, Paginated, Continuous; no Add page in Continuous. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], qualifiers = "w411dp-h1600dp-xhdpi")
+class HomeUnifyRowsTest {
+    private var prefs by mutableStateOf(LauncherPrefs())
+
+    private fun items(p: LauncherPrefs) = buildSettingsCategories(
+        SettingsModel(
+            prefs = p, updatePrefs = { f -> prefs = f(prefs) }, pageIndex = 0, pages = listOf(HomePage(keys = emptyList(), id = 1L)),
+            setPageLayout = { _, _ -> }, addPageAfter = {}, deletePage = {}, setClockTile = { _, _ -> }, corners = emptyMap(), gestures = emptyMap(), setGesture = { _, _ -> },
+            requestHealth = {}, about = listOf("Version" to "test"), healthAvailable = false, appsByKey = emptyMap(), isLandscape = false, chosenApp = { null },
+            pickLeftWidget = {}, leftWidgetLabel = null, pickAppFor = {}, motionAvailable = false, editCorner = {}, editGesture = {},
+            system = SystemLinks({}, {}, {}, {}), lab = emptyList(),
+        ),
+    ).first { it.title == "Home screen" }.items
+
+    @Test fun HOM_01_w28_groundControlHasOnePagesRowWithExactlyOffPaginatedContinuousAndItWritesThePref() {
+        prefs = LauncherPrefs()
+        @Suppress("UNCHECKED_CAST")
+        val row = items(prefs).filter { it.title == "Pages" }.also { assertEquals("one Pages row", 1, it.size) }.single() as SettingItem.Choice<HomePages>
+        assertEquals(listOf("Off", "Paginated", "Continuous"), row.options.map { row.label(it) })
+        assertEquals(HomePages.Off, row.selected)
+        row.onSelect(HomePages.Continuous); assertEquals(HomePages.Continuous, prefs.homePages)
+        row.onSelect(HomePages.Paginated); assertEquals(HomePages.Paginated, prefs.homePages)
+        assertTrue("the old Scroll or Paginated row is gone", items(prefs).none { it.title == "Pages after Glance" })
+    }
+
+    @Test fun HOM_01_w28_addPageIsOfferedForOffAndPaginatedButNotForTheOneContinuousSurface() {
+        for (m in listOf(HomePages.Off, HomePages.Paginated)) assertNotNull("Add page with $m", items(LauncherPrefs(homePages = m)).firstOrNull { it.title == "Add page" })
+        assertFalse(items(LauncherPrefs(homePages = HomePages.Continuous)).any { it.title == "Add page" })
+        assertNotNull(items(LauncherPrefs(homePages = HomePages.Continuous)).firstOrNull { it.title == "Edit home pages" })
+    }
+}

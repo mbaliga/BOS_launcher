@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -71,6 +72,7 @@ class HomeLandingItemsW24Test : TourBase() {
         s = WidgetStacks.create(s, weatherKey, notesKey, "s1")
         assertEquals(listOf(clockKey, stackKey), s.pages.single().keys)
         stores.layout.replace(HomeLayout(pages = s.pages, seeded = true))
+        stores.prefs.update { it.copy(homePages = com.bos.sphere.core.data.HomePages.Paginated) } // wave 28: the widgets are on pages, so Pages is on
         extras.set(s)
     }
 
@@ -90,7 +92,7 @@ class HomeLandingItemsW24Test : TourBase() {
     @Test fun HOM_12_onGlanceEditHomePagesInTheQuickSheetOpensTheEditCardOnSelectedApps() {
         startOnGlance()
         openQuickSheet()
-        rule.onNodeWithText("Edit home pages").performScrollTo().performClick(); settle()
+        rule.onNodeWithText("Edit home").performScrollTo().performClick(); settle()
         assertEquals("Edit home pages moves to the landing that has pages", HomeShown.Pages, landing())
         assertTrue("the edit card with its page carousel is up", editShown())
         check("edit from Glance", TourBase.Surface.Edit)
@@ -121,7 +123,7 @@ class HomeLandingItemsW24Test : TourBase() {
         assertEquals(setOf(clockKey, weatherKey, notesKey, stackKey), extras.state.value.items.keys)
 
         openQuickSheet()
-        rule.onNodeWithText("Edit home pages").performScrollTo().performClick(); settle()
+        rule.onNodeWithText("Edit home").performScrollTo().performClick(); settle()
         assertTrue(editShown())
         // HOM-12 / HOM-14: the widget and the stack each carry one remove handle in edit mode (the stack is named after its first member)
         assertTrue(descShown("Remove from home: Clock"))
@@ -148,7 +150,7 @@ class HomeLandingItemsW24Test : TourBase() {
         val wm = com.bos.sphere.feature.dock.WorkspaceRepository.get(AppSmokeHarness.app)
         val other = wm.create("Travel"); settle()
         openQuickSheet()
-        rule.onNodeWithText("Edit home pages").performScrollTo().performClick(); settle()
+        rule.onNodeWithText("Edit home").performScrollTo().performClick(); settle()
         assertTrue(editShown())
         rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).performClick(); settle()
         assertEquals(listOf(stackKey), pageKeys())

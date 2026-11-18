@@ -62,27 +62,53 @@ enum class HomeOrder(val label: String) {
 }
 
 /**
- * The home deck: [Glance] first when it is on, then the pages. Pure navigation, so "forward from Glance goes to page 1" and "with Glance off the
- * first page is what home shows" are each stated and tested once.
+ * Wave 28 (homeUnify): the home is ONE horizontal pager. Its stops are [Glance when it is on] then [the pages stop(s)]: with Pages Paginated
+ * the stops after Glance are the pages themselves (one per page, nested in the same pager), with Continuous one scroll surface, with Pages Off none
+ * (unless Glance is also off: then the first page is the only stop). Pure navigation, so each rule is stated and tested once.
  */
 object HomeDeck {
-    /** What home shows on start and on the Home button. */
+    /** What home shows on start and on the Home button: stop 0, which is Glance when it is on, else the first page. */
     fun startSurface(glanceOn: Boolean): HomeShown = if (glanceOn) HomeShown.Glance else HomeShown.Pages
 
-    /** The surface after a forward swipe from [from]: Glance goes to the pages; the pages stay (the pager itself moves between its pages). */
-    fun forward(from: HomeShown): HomeShown = HomeShown.Pages
+    /** Whether a pages stop exists in the outer pager: Pages is on, or Glance is off (then the first page IS home). */
+    fun hasPagesStop(glanceOn: Boolean, mode: HomePages): Boolean = mode != HomePages.Off || !glanceOn
 
-    /** The surface after a backward swipe at the first page: Glance when it is on, else none (the Launchpad edge takes it). */
-    fun backwardFromFirstPage(glanceOn: Boolean): HomeShown? = if (glanceOn) HomeShown.Glance else null
+    /** How many stops the outer pager has. */
+    fun outerCount(glanceOn: Boolean, mode: HomePages): Int = (if (glanceOn) 1 else 0) + (if (hasPagesStop(glanceOn, mode)) 1 else 0)
 
-    /** Turning Glance off while it is showing moves to the pages. */
-    fun afterGlanceSetting(glanceOn: Boolean, shown: HomeShown): HomeShown = if (!glanceOn && shown == HomeShown.Glance) HomeShown.Pages else shown
+    /** The outer pager index of the pages stop, or null when there is none. */
+    fun pagesIndex(glanceOn: Boolean, mode: HomePages): Int? = if (hasPagesStop(glanceOn, mode)) (if (glanceOn) 1 else 0) else null
+
+    /** The surface the outer pager shows at [index]. */
+    fun surfaceAt(glanceOn: Boolean, index: Int): HomeShown = if (glanceOn && index == 0) HomeShown.Glance else HomeShown.Pages
+
+    /** How many pages are drawn: all of them, but with Pages Off (and Glance off) only the first. They are stored, never dropped. */
+    fun visiblePages(mode: HomePages, total: Int): Int = if (mode == HomePages.Off) minOf(1, total) else total
+
+    /**
+     * The number of dots ONE page indicator draws: Glance (when on) is the first, then one per page when Paginated, one for the scroll when
+     * Continuous, the first page alone when Pages is Off and Glance is off.
+     */
+    fun stops(glanceOn: Boolean, mode: HomePages, pageCount: Int): Int =
+        (if (glanceOn) 1 else 0) + when (mode) {
+            HomePages.Off -> if (glanceOn) 0 else 1
+            HomePages.Continuous -> 1
+            HomePages.Paginated -> pageCount.coerceAtLeast(1)
+        }
+
+    /** The dot lit for outer pager [outerIndex] and inner page [pageIndex]. */
+    fun lit(glanceOn: Boolean, outerIndex: Int, pageIndex: Int, mode: HomePages): Int =
+        if (glanceOn && outerIndex == 0) 0 else (if (glanceOn) 1 else 0) + (if (mode == HomePages.Paginated) pageIndex else 0)
+
+    /** Where a tap on dot [dot] goes: the outer stop and the inner page (null for Glance and for the scroll). */
+    fun target(glanceOn: Boolean, mode: HomePages, dot: Int): Pair<Int, Int?> =
+        if (glanceOn && dot == 0) 0 to null else (if (glanceOn) 1 else 0) to (if (mode == HomePages.Paginated) dot - (if (glanceOn) 1 else 0) else null)
 
     /** The result of "Add page": the new page list and the index of the page that was added (the one to show). */
     data class Added(val pages: List<HomePage>, val index: Int)
 
     /**
-     * "Add page" (quick sheet, Ground Control, the add card). From Glance ([afterIndex] null) the page goes after the last one; when the
+     * "Add page" (the edit card, the quick sheet). From Glance ([afterIndex] null) the page goes after the last one; when the
      * home has no page yet, or only the one untouched blank page a fresh install starts with, that blank page IS page 1 (it is shown, no
      * second blank page is stacked on it). From a page ([afterIndex] set) the new blank page goes right after it.
      */
@@ -92,7 +118,4 @@ object HomeDeck {
         afterIndex == null -> Added(HomeLayoutMath.insertPage(pages, pages.size - 1), pages.size)
         else -> Added(HomeLayoutMath.insertPage(pages, afterIndex), (afterIndex + 1).coerceIn(0, pages.size))
     }
-
-    /** The number of stops a page indicator counts: Glance (when on) is the first stop, then one per page (the scroll counts as one stop). */
-    fun stops(glanceOn: Boolean, pageCount: Int, scroll: Boolean): Int = (if (glanceOn) 1 else 0) + (if (scroll) 1 else pageCount.coerceAtLeast(1))
 }

@@ -53,7 +53,7 @@ class EditCardAppTest {
         val stores = LauncherStores.get(AppSmokeHarness.app)
         settle()
         // Onboarding is not what is under test: finish it so the home is what the person sees.
-        stores.prefs.update { it.copy(onboardingDone = true, glanceEnabled = false) } // wave 26: Glance off, so home is the first page; these tests are about the pages
+        stores.prefs.update { it.copy(onboardingDone = true, glanceEnabled = false, homePages = com.bos.sphere.core.data.HomePages.Paginated) } // wave 28: Pages Paginated; wave 26: Glance off, so home is the first page; these tests are about the pages
         settle()
         return stores
     }

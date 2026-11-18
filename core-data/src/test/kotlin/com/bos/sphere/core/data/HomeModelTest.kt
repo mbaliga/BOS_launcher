@@ -302,9 +302,9 @@ class NetworkStatusMathTest {
         val dsiLandscape = LauncherPrefs(homeStyle = HomeStyle.Dsi, scrollAxis = ScrollAxis.Long).surface(landscape = true)
         assertEquals(SurfaceScroll.Horizontal, dsiLandscape.scroll)
         assertTrue(HomeGesture.SwipeUp.usableOn(dsiLandscape) && !HomeGesture.SwipeLeft.usableOn(dsiLandscape))
-        val continuous = LauncherPrefs(homeScroll = HomeScroll.Continuous, scrollAxis = ScrollAxis.Horizontal).surface(landscape = false)
+        val continuous = LauncherPrefs(homePages = HomePages.Continuous, scrollAxis = ScrollAxis.Horizontal).surface(landscape = false)
         assertEquals(HomeSurface(SurfaceScroll.Horizontal, paged = false, hasDensity = true), continuous)
-        assertTrue(!LauncherPrefs(homeScroll = HomeScroll.Continuous).isPaged && LauncherPrefs().isPaged)
+        assertTrue(!LauncherPrefs(homePages = HomePages.Continuous).isPaged && LauncherPrefs().isPaged)
     }
 
     @Test

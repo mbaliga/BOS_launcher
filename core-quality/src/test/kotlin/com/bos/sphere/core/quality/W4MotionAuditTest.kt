@@ -39,12 +39,12 @@ class W4MotionAuditTest {
             // press feedback and chip colour changes: under 200 ms, tied to a touch, no travel
             "WheelDrawer.kt" to 1, "Complications.kt" to 4, "Tactile.kt" to 2,
             // the item glide to a new slot (edit mode) and the page-dot pill: short position/size springs
-            "GridHome.kt" to 3,
+            // wave 28: plus the one page indicator's quiet fade (it moved here from GlanceHome): one alpha read in graphicsLayer, a 600 ms tween that is 0 ms under reduced motion
+            "GridHome.kt" to 4,
             // the edit card (HOM-12): one progress value read inside graphicsLayer; under reduced motion the card jumps and only the carousel cross-fades (160 ms)
             "EditCardGeometry.kt" to 1,
-            // the Glance surface indicator's fade (HOM-23): one alpha read in graphicsLayer, a 600 ms tween that is 0 ms under reduced motion
-            // W25: plus the song title's push-down under the notch: a spring of about 250 ms on one offset, snap() under reduced motion
-            "GlanceHome.kt" to 2,
+            // W25: the song title's push-down under the notch: a spring of about 250 ms on one offset, snap() under reduced motion (wave 28: the indicator fade moved to GridHome's PageIndicator)
+            "GlanceHome.kt" to 1,
             "GlanceEdges.kt" to 1, // wave 17: the quiet edge handle fade, tween 0 when reduced (the caller passes rememberMotionPrefs().reduced)
             // press spring already snaps under reduced motion (`still`)
         )

@@ -373,7 +373,7 @@ class AppSmokeTest {
         start()
         assertTrue("Glance off: the first page shows the seeded apps", showsLabel("Camera"))
         setGlance(true)
-        assertTrue("Glance on: the calm home shows", rule.onAllNodesWithTag("glance.deckdots", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue("Glance on: the calm home shows", rule.onAllNodesWithTag("glance.surface", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         assertFalse("no page icons on Glance", showsLabel("Delta"))
         setGlance(false)
         assertTrue("the original page grid is back, nothing was lost", showsLabel("Camera"))

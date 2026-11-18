@@ -32,12 +32,12 @@ class HomeLandingTest {
 
     @Test fun HOM_22_aFreshInstallHasGlanceOnLeftToRightAndNoModeChosenYetAndEachSettingIsPersisted() {
         val d = LauncherPrefs()
-        assertTrue(d.glanceEnabled); assertEquals(HomeOrder.LeftToRight, d.homeOrder); assertFalse(d.pagesModeChosen)
+        assertTrue(d.glanceEnabled); assertEquals(HomeOrder.LeftToRight, d.homeOrder); assertEquals(HomePages.Off, d.homePages)
         val sp = MapSharedPreferences()
         val store = LauncherPrefsStore(sp)
-        store.update { it.copy(glanceEnabled = false, homeOrder = HomeOrder.RightToLeft, pagesModeChosen = true, homeScroll = HomeScroll.Continuous) }
+        store.update { it.copy(glanceEnabled = false, homeOrder = HomeOrder.RightToLeft, homePages = HomePages.Continuous) }
         val back = LauncherPrefsStore(sp).prefs.value
-        assertFalse(back.glanceEnabled); assertEquals(HomeOrder.RightToLeft, back.homeOrder); assertTrue(back.pagesModeChosen); assertEquals(HomeScroll.Continuous, back.homeScroll)
+        assertFalse(back.glanceEnabled); assertEquals(HomeOrder.RightToLeft, back.homeOrder); assertEquals(HomePages.Continuous, back.homePages)
         assertEquals("RightToLeft", sp.getString("homeOrder", null))
     }
 
@@ -62,20 +62,53 @@ class HomeLandingTest {
         assertFalse(LauncherPrefsStore(MapSharedPreferences(mapOf("homeLanding" to "Recents", "glanceEnabled" to false))).prefs.value.glanceEnabled)
     }
 
-    @Test fun HOM_22_theOldContinuousScrollBecomesTheScrollModeAndCountsAsAChoice() {
-        val r = HomeModelMigration.resolve("Selected", null, null, "Continuous")
-        assertTrue(r.pagesModeChosen); assertEquals(HomeScroll.Continuous, r.pagesMode)
-        val p = HomeModelMigration.resolve("Selected", null, null, "Paged")
-        assertFalse(p.pagesModeChosen); assertEquals(HomeScroll.Paged, p.pagesMode)
-        assertEquals("Paginated", HomeScroll.Paged.label); assertEquals("Scroll", HomeScroll.Continuous.label)
+    @Test fun HOM_22_thePagesSettingHasExactlyThreeValuesOffPaginatedContinuous() {
+        assertEquals(listOf("Off", "Paginated", "Continuous"), HomePages.entries.map { it.label })
+    }
+
+    @Test fun HOM_22_theOldScrollOrPaginatedChoiceMigratesToThePagesSettingAndAnExistingHomeNeverLosesItsPages() {
+        // chose (or had) Scroll -> Continuous; chose Paginated -> Paginated
+        assertEquals(HomePages.Continuous, HomeModelMigration.pagesMode(null, "Continuous", null, false))
+        assertEquals(HomePages.Continuous, HomeModelMigration.pagesMode(null, "Continuous", true, true))
+        assertEquals(HomePages.Paginated, HomeModelMigration.pagesMode(null, "Paged", true, false))
+        // nothing chosen: Off with no pages, Paginated when the home already has built pages
+        assertEquals(HomePages.Off, HomeModelMigration.pagesMode(null, null, null, false))
+        assertEquals(HomePages.Off, HomeModelMigration.pagesMode(null, "Paged", false, false))
+        assertEquals(HomePages.Paginated, HomeModelMigration.pagesMode(null, "Paged", false, true))
+        // a stored new value always wins
+        assertEquals(HomePages.Off, HomeModelMigration.pagesMode("Off", "Continuous", true, true))
+        assertEquals(HomePages.Continuous, HomeModelMigration.pagesMode("Continuous", null, null, false))
+        assertEquals(HomePages.Paginated, HomeModelMigration.pagesMode("Nonsense", null, true, false))
+        // what counts as built pages
+        assertFalse(HomeModelMigration.hasBuiltPages(emptyList())); assertFalse(HomeModelMigration.hasBuiltPages(listOf(HomePage(id = 1L))))
+        assertTrue(HomeModelMigration.hasBuiltPages(listOf(HomePage(id = 1L), HomePage(id = 2L)))); assertTrue(HomeModelMigration.hasBuiltPages(listOf(HomePage(keys = listOf("x"), id = 1L))))
+    }
+
+    @Test fun HOM_22_anOldInstallIsMigratedThroughTheStoreAndTheRetiredKeysAreGoneAfterTheNextSave() {
+        // old Scroll
+        val sp = MapSharedPreferences(mapOf("homeScroll" to "Continuous", "pagesModeChosen" to true))
+        val store = LauncherPrefsStore(sp)
+        assertEquals(HomePages.Continuous, store.prefs.value.homePages)
+        store.migratePages(emptyList())
+        assertEquals("Continuous", sp.getString("homePages", null)); assertFalse(sp.contains("homeScroll")); assertFalse(sp.contains("pagesModeChosen"))
+        assertEquals(HomePages.Continuous, LauncherPrefsStore(sp).prefs.value.homePages)
+        // never chosen, but the home has pages with apps: Paginated, nothing hidden
+        val sp2 = MapSharedPreferences(mapOf("homeScroll" to "Paged"))
+        val s2 = LauncherPrefsStore(sp2)
+        s2.migratePages(listOf(HomePage(keys = listOf("a"), id = 1L)))
+        assertEquals(HomePages.Paginated, s2.prefs.value.homePages)
+        // never chosen and no pages: Off; an already migrated install is left alone
+        val s3 = LauncherPrefsStore(MapSharedPreferences()); s3.migratePages(emptyList()); assertEquals(HomePages.Off, s3.prefs.value.homePages)
+        val sp4 = MapSharedPreferences(mapOf("homePages" to "Off")); LauncherPrefsStore(sp4).migratePages(listOf(HomePage(keys = listOf("a"), id = 1L)))
+        assertEquals("Off", sp4.getString("homePages", null))
     }
 
     @Test fun HOM_22_theHomeSettingsAreExportedAndAnOlderFileImportsAsTheDefaults() {
-        val doc = SettingsCodec.encode(LauncherPrefs(glanceEnabled = false, homeOrder = HomeOrder.RightToLeft, pagesModeChosen = true, recentsLimit = 40, recentsUseUsageAccess = false))
+        val doc = SettingsCodec.encode(LauncherPrefs(glanceEnabled = false, homeOrder = HomeOrder.RightToLeft, homePages = HomePages.Paginated, recentsLimit = 40, recentsUseUsageAccess = false))
         val prefs = doc.getJSONObject("prefs")
-        assertEquals("RightToLeft", prefs.getString("homeOrder")); assertFalse(prefs.getBoolean("glanceEnabled")); assertTrue(prefs.getBoolean("pagesModeChosen"))
+        assertEquals("RightToLeft", prefs.getString("homeOrder")); assertFalse(prefs.getBoolean("glanceEnabled")); assertEquals("Paginated", prefs.getString("homePages"))
         val back = SettingsCodec.decode(doc).prefs
-        assertFalse(back.glanceEnabled); assertEquals(HomeOrder.RightToLeft, back.homeOrder); assertTrue(back.pagesModeChosen)
+        assertFalse(back.glanceEnabled); assertEquals(HomeOrder.RightToLeft, back.homeOrder); assertEquals(HomePages.Paginated, back.homePages)
         assertEquals(40, back.recentsLimit); assertFalse(back.recentsUseUsageAccess)
         val old = SettingsCodec.encode(LauncherPrefs()); old.getJSONObject("prefs").remove("homeOrder"); old.getJSONObject("prefs").remove("glanceEnabled")
         assertEquals(HomeOrder.LeftToRight, SettingsCodec.decode(old).prefs.homeOrder); assertTrue(SettingsCodec.decode(old).prefs.glanceEnabled)

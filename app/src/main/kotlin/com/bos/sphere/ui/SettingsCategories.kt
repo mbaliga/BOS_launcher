@@ -266,7 +266,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     x("On: home is the calm, empty screen and your pages come after it. Off: home shows the first page or the scroll."),
                 ) { v -> upd { it.copy(glanceEnabled = v) } },
             )
-            add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("After Glance; you choose Scroll or Paginated the first time")) { m.addHomePage() })
+            if (p.homePages != com.bos.sphere.core.data.HomePages.Continuous) add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("Adds a page after the last one and turns Pages on (Paginated)")) { m.addHomePage() })
             add(SettingItem.Action(x("Edit home pages"), Glyphs.Apps, x("Add icons, widgets and folders to the pages")) { m.editHomePages() })
             add(
                 SettingItem.Choice(
@@ -303,16 +303,16 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     },
                 ) { s -> upd { it.copy(homeStyle = s) } },
             )
-            if (p.homeStyle == HomeStyle.Grid) add(
+            add(
                 SettingItem.Choice(
-                    x("Pages after Glance"), Glyphs.Swipe, com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { x(it.label) },
-                    hint = x("Paginated: traditional pages with dots. Scroll: one continuous screen that scrolls sideways, filled column by column."),
+                    x("Pages"), Glyphs.Swipe, com.bos.sphere.core.data.HomePages.entries, p.homePages, { x(it.label) },
+                    hint = x("Off: home is the calm screen only. Paginated: regular pages after it, swiped like any home. Continuous: one sideways scroll after it, filled column by column."),
                     preview = {
-                        VisualChoice(com.bos.sphere.core.data.HomeScroll.entries, p.homeScroll, { v -> upd { it.copy(homeScroll = v, pagesModeChosen = true) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { v ->
-                            GlyphPreview(if (v == com.bos.sphere.core.data.HomeScroll.Paged) Glyphs.Swipe else Glyphs.Down, x(v.label))
+                        VisualChoice(com.bos.sphere.core.data.HomePages.entries, p.homePages, { v -> upd { it.copy(homePages = v) } }, { x(it.label) }, columns = 3, previewHeight = 110.dp) { v ->
+                            GlyphPreview(when (v) { com.bos.sphere.core.data.HomePages.Off -> Glyphs.Home; com.bos.sphere.core.data.HomePages.Paginated -> Glyphs.Swipe; else -> Glyphs.Down }, x(v.label))
                         }
                     },
-                ) { v -> upd { it.copy(homeScroll = v, pagesModeChosen = true) } },
+                ) { v -> upd { it.copy(homePages = v) } },
             )
             if (p.homeStyle == HomeStyle.Dsi) add(
                 SettingItem.Choice(

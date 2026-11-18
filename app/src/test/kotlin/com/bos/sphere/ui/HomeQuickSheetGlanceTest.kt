@@ -17,7 +17,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.bos.sphere.core.data.HomeOrder
-import com.bos.sphere.core.data.HomeScroll
+import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.LauncherPrefs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -65,25 +65,35 @@ class HomeQuickSheetGlanceTest {
         assertTrue(seen.prefs.glanceEnabled)
     }
 
-    @Test fun HOM_01_theQuickSheetChoosesScrollOrPaginatedAndTheOrder() {
+    @Test fun HOM_01_w28_theQuickSheetHasThreePagesChipsOffPaginatedContinuousNextToTheGlanceTileAndTheOrder() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
-        rule.onNodeWithText("PAGES AFTER GLANCE").assertExists()
-        rule.onNodeWithText("Scroll").performClick()
-        assertEquals(HomeScroll.Continuous, seen.prefs.homeScroll); assertTrue("the choice counts as made", seen.prefs.pagesModeChosen)
-        rule.onNodeWithText("Paginated").performClick()
-        assertEquals(HomeScroll.Paged, seen.prefs.homeScroll)
+        rule.onNodeWithText("PAGES").assertExists()
+        for (m in HomePages.entries) rule.onNodeWithTag("quick.pages.${m.name}").assertExists()
+        assertEquals("exactly three Pages chips", 3, rule.onAllNodes(androidx.compose.ui.test.hasTestTag("quick.pages.Off") or androidx.compose.ui.test.hasTestTag("quick.pages.Paginated") or androidx.compose.ui.test.hasTestTag("quick.pages.Continuous")).fetchSemanticsNodes().size)
+        rule.onNodeWithTag("quick.pages.Continuous").performClick()
+        assertEquals(HomePages.Continuous, seen.prefs.homePages)
+        rule.onNodeWithTag("quick.pages.Paginated").performClick()
+        assertEquals(HomePages.Paginated, seen.prefs.homePages)
+        rule.onNodeWithTag("quick.pages.Off").performClick()
+        assertEquals(HomePages.Off, seen.prefs.homePages)
         rule.onNodeWithText("Right to left").performClick()
         assertEquals(HomeOrder.RightToLeft, seen.prefs.homeOrder)
         rule.onNodeWithText("Left to right").performClick()
         assertEquals(HomeOrder.LeftToRight, seen.prefs.homeOrder)
     }
 
-    @Test fun HOM_01_fromGlanceTheSheetHasAClearAddPageActionAndEditHomePages() {
+    @Test fun HOM_01_w28_fromGlanceTheSheetHasAddPageAndEditHomeAndContinuousHasNoAddPage() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
         rule.onNodeWithTag("quick.addpage").performScrollTo().assertExists().performClick()
         assertEquals(1, seen.add)
-        rule.onNodeWithText("Edit home pages").performScrollTo().performClick()
+        rule.onNodeWithText("Edit home").performScrollTo().performClick()
         assertEquals(1, seen.edit)
+    }
+
+    @Test fun HOM_01_w28_inContinuousThereIsOneScrollSurfaceSoTheSheetOffersNoAddPage() {
+        val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Continuous), seen)
+        rule.onNodeWithTag("quick.addpage").assertDoesNotExist()
+        rule.onNodeWithText("Edit home").performScrollTo().assertExists()
     }
 
     @Test fun HOM_23_theGlanceQuickSheetOffersContentHotspotsBackgroundAndEditHomePages() {
@@ -91,7 +101,7 @@ class HomeQuickSheetGlanceTest {
         rule.onNodeWithText("GLANCE CONTENT").assertIsDisplayed()
         rule.onNodeWithText("HOTSPOTS").performScrollTo().assertExists()
         rule.onNodeWithText("Background").performScrollTo().assertExists()
-        rule.onNodeWithText("Edit home pages").performScrollTo().assertExists()
+        rule.onNodeWithText("Edit home").performScrollTo().assertExists()
         rule.onNodeWithText("Date + Weather").performClick()
         assertEquals(setOf(com.bos.sphere.core.data.GlanceItem.Date, com.bos.sphere.core.data.GlanceItem.Weather, com.bos.sphere.core.data.GlanceItem.NowPlaying), seen.prefs.glanceContent)
         rule.onNodeWithText("Two (bottom)").performScrollTo().performClick()

@@ -15,7 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.bos.sphere.core.data.BgItem
 import com.bos.sphere.core.data.HomePage
-import com.bos.sphere.core.data.HomeScroll
+import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.HomeStyle
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.SignalForce
@@ -67,7 +67,7 @@ class WallpaperRowsW26Test {
 
     private val states = buildList {
         for (glance in listOf(true, false)) for (signal in listOf(SignalForce.Live, SignalForce.NoSignal)) for (same in listOf(true, false)) for (pages in listOf(0, 1, 3)) {
-            add(Triple(LauncherPrefs(glanceEnabled = glance, radarSignalForce = signal, pagesSameAsGlance = same, homeStyle = HomeStyle.Grid, homeScroll = if (pages == 3) HomeScroll.Continuous else HomeScroll.Paged), pages, "$glance/$signal/same=$same/pages=$pages"))
+            add(Triple(LauncherPrefs(glanceEnabled = glance, radarSignalForce = signal, pagesSameAsGlance = same, homeStyle = HomeStyle.Grid, homePages = if (pages == 3) HomePages.Continuous else HomePages.Paginated), pages, "$glance/$signal/same=$same/pages=$pages"))
         }
     }
 

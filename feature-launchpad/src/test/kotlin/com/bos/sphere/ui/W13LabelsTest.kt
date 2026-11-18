@@ -1,7 +1,7 @@
 package com.bos.sphere.ui
 
 import com.bos.sphere.core.data.HomeOrder
-import com.bos.sphere.core.data.HomeScroll
+import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.RowCommand
 import com.bos.sphere.core.design.L10n
 import org.junit.Assert.assertTrue
@@ -18,7 +18,7 @@ class W13LabelsTest {
     }
 
     @Test fun CFG_19_everyHomeOrderAndPagesModeLabelIsTranslated() {
-        val labels = HomeOrder.entries.map { it.label } + HomeScroll.entries.map { it.label }
+        val labels = HomeOrder.entries.map { it.label } + HomePages.entries.map { it.label }
         assertTrue(missing(labels).toString(), missing(labels).isEmpty())
     }
 }

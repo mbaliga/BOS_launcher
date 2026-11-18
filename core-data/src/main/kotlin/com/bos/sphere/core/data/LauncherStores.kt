@@ -22,6 +22,7 @@ class LauncherStores private constructor(context: Context) {
 
     val prefs = LauncherPrefsStore(TolerantPrefs.of(app, "launcher_prefs"), deviceBound)
     val layout = HomeLayoutStore(TolerantPrefs.of(app, "home_layout"), deviceBound)
+    init { prefs.migratePages(layout.layout.value.pages) } // wave 28: the Pages setting from the old Scroll / Paginated choice, once the layout is known
     val shortcuts = ShortcutStore(TolerantPrefs.of(app, "shortcuts"), deviceBound)
     val history = LaunchHistoryStore(TolerantPrefs.of(app, "launch_history"))
     /** HOM-18: the larger, file-backed log the timeline reads; fed by every [history] record. */
@@ -45,6 +46,18 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
     private val _prefs = MutableStateFlow(run { DeviceBound.migratePrefs(sp, device); read() })
     val prefs: StateFlow<LauncherPrefs> = _prefs.asStateFlow()
 
+    /**
+     * Wave 28: settles the Pages setting of an install that has no stored `homePages` yet (it came from the old Scroll / Paginated choice): with nothing chosen,
+     * a home that already has built pages becomes Paginated so no page is ever hidden by the update. Runs once at start, when the layout is known.
+     */
+    fun migratePages(pages: List<HomePage>) {
+        if (sp.contains("homePages")) return
+        val mode = HomeModelMigration.pagesMode(null, sp.getString("homeScroll", null), if (sp.contains("pagesModeChosen")) sp.getBoolean("pagesModeChosen", false) else null, HomeModelMigration.hasBuiltPages(pages))
+        forceWrite = true
+        update { it.copy(homePages = mode) }
+    }
+    private var forceWrite = false
+
     fun update(transform: (LauncherPrefs) -> LauncherPrefs) {
         val next = transform(_prefs.value).let {
             it.copy(
@@ -62,10 +75,11 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             ).let { p -> BackgroundChoice.normalised(p.backgroundSlot1, p.backgroundSlot2).let { c -> p.copy(backgroundSlot1 = c.slot1, backgroundSlot2 = c.slot2) } }
             .let { p -> p.withWallpaper(WallpaperSurface.Glance, p.rawWallpaper(WallpaperSurface.Glance)).let { q -> q.withWallpaper(WallpaperSurface.Pages, q.rawWallpaper(WallpaperSurface.Pages)) } }
         }
-        if (next == _prefs.value) return
+        if (next == _prefs.value && !forceWrite) return
+        forceWrite = false
         _prefs.value = next
         sp.edit()
-            .putString("style", next.homeStyle.name).putString("homeScroll", next.homeScroll.name).putBoolean("drawerRailVisible", next.drawerRailVisible).putString("drawerViewSwitch", next.drawerViewSwitch.name).putString("scrollAxis", next.scrollAxis.name).putInt("contCols", next.continuousColumns)
+            .putString("style", next.homeStyle.name).putString("homePages", next.homePages.name).putBoolean("drawerRailVisible", next.drawerRailVisible).putString("drawerViewSwitch", next.drawerViewSwitch.name).putString("scrollAxis", next.scrollAxis.name).putInt("contCols", next.continuousColumns)
             .putInt("pCols", next.portraitGrid.columns).putInt("pRows", next.portraitGrid.rows)
             .putInt("lCols", next.landscapeGrid.columns).putInt("lRows", next.landscapeGrid.rows)
             .putFloat("iconScale", next.iconScale)
@@ -137,7 +151,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("cornersPerOri", next.cornersPerOrientation)
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name).putString("switcherStyle", next.switcherStyle.name)
-            .putBoolean("glanceEnabled", next.glanceEnabled).putString("homeOrder", next.homeOrder.name).putBoolean("pagesModeChosen", next.pagesModeChosen)
+            .putBoolean("glanceEnabled", next.glanceEnabled).putString("homeOrder", next.homeOrder.name)
             .putString("glanceContent", GlanceContent.encode(next.glanceContent)).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
             .putInt("glanceControlsSec", next.glanceControlsSeconds).putString("glanceWeather", next.glanceWeatherIntensity.name).putBoolean("glanceIndicator", next.glanceIndicator)
             .putInt("recentsLimit", next.recentsLimit)
@@ -158,9 +172,10 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         // Wave 15: any stored choice of the old background gallery is ignored; no stored slots means the default pair.
         val bg = BackgroundChoice.fromStored(sp.getString("bgSlot1", null), sp.getString("bgSlot2", null))
         val pagesBg = BackgroundChoice.fromStored(sp.getString("wpPagesSlot1", null), sp.getString("wpPagesSlot2", null))
-        val migrated = HomeModelMigration.resolve(
-            sp.getString("homeLanding", null), if (sp.contains("glanceEnabled")) sp.getBoolean("glanceEnabled", true) else null,
-            if (sp.contains("pagesModeChosen")) sp.getBoolean("pagesModeChosen", false) else null, sp.getString("homeScroll", null),
+        val migrated = HomeModelMigration.resolve(sp.getString("homeLanding", null), if (sp.contains("glanceEnabled")) sp.getBoolean("glanceEnabled", true) else null)
+        // Wave 28: the Pages setting; the old Scroll / Paginated choice is read only when no homePages is stored (LauncherStores.migratePages settles the unchosen case with the layout).
+        val pagesMode = HomeModelMigration.pagesMode(
+            sp.getString("homePages", null), sp.getString("homeScroll", null), if (sp.contains("pagesModeChosen")) sp.getBoolean("pagesModeChosen", false) else null, hasPages = false,
         )
         return LauncherPrefs(
             glanceWallpaperKind = WallpaperKind.forId(sp.getString("wpGlanceKind", null)) ?: d.glanceWallpaperKind,
@@ -176,7 +191,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             pagesGradAngle = GradientSpec(angle = sp.getInt("wpPagesAngle", d.pagesGradAngle)).normalised().angle,
             pagesSlot1 = pagesBg.slot1, pagesSlot2 = pagesBg.slot2,
             homeStyle = enumOr(sp.getString("style", null), d.homeStyle),
-            homeScroll = enumOr(sp.getString("homeScroll", null), d.homeScroll),
+            homePages = pagesMode,
             drawerRailVisible = sp.getBoolean("drawerRailVisible", d.drawerRailVisible),
             drawerViewSwitch = enumOr(sp.getString("drawerViewSwitch", null), d.drawerViewSwitch),
             scrollAxis = enumOr(sp.getString("scrollAxis", null), d.scrollAxis),
@@ -281,7 +296,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             hotCornerDwellMs = sp.getInt("hotCornerDwell", d.hotCornerDwellMs).coerceIn(0, 1000),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
             switcherStyle = enumOr(sp.getString("switcherStyle", null), d.switcherStyle),
-            glanceEnabled = migrated.glanceEnabled, homeOrder = HomeOrder.parse(sp.getString("homeOrder", null)), pagesModeChosen = migrated.pagesModeChosen,
+            glanceEnabled = migrated.glanceEnabled, homeOrder = HomeOrder.parse(sp.getString("homeOrder", null)),
             glanceContent = GlanceContent.decode(sp.getString("glanceContent", null)),
             glanceHotspots = GlanceHotspots.decode(sp.getString("glanceHotspots", null)),
             glanceControlsSeconds = GlanceControls.clampSeconds(sp.getInt("glanceControlsSec", d.glanceControlsSeconds)),

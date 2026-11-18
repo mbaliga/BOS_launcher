@@ -102,7 +102,7 @@ class StateStoreTest {
         val parts = Build31Bridge.fromPrefFiles(files)
         // What build 31 showed:
         assertEquals(HomeStyle.Psp, parts.prefs.homeStyle)
-        assertEquals(HomeScroll.Continuous, parts.prefs.homeScroll)
+        assertEquals(HomePages.Continuous, parts.prefs.homePages)
         assertEquals(0.62f, parts.prefs.iconScale, 0f)
         assertEquals(mapOf(StripItem.Time to StripZone.Left, StripItem.Battery to StripZone.Right), parts.prefs.strip)
         // Wave 15: build 31 stored a "show wallpaper" switch; the old background gallery is gone, so it maps to the default pair.

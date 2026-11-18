@@ -76,9 +76,13 @@ fun HomeQuickSheet(
             // Wave 26: there is no landing selector. The home is Glance (the calm screen) followed by the pages; the user can switch Glance off right here,
             // and then home shows the first page or the scroll at once (the same setting as Ground Control, Home).
             Tile(Modifier.fillMaxWidth().testTag("quick.glance"), Glyphs.Home, L10n.tr("Calm home screen (Glance)"), prefs.glanceEnabled) { update { it.copy(glanceEnabled = !it.glanceEnabled) } }
-            Heading(L10n.tr("Pages after Glance"))
+            // Wave 28: the Pages setting, exactly three values, and the order.
+            Heading(L10n.tr("Pages"))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                for (m in com.bos.sphere.core.data.HomeScroll.entries) Chip(null, L10n.tr(m.label), prefs.homeScroll == m) { update { it.copy(homeScroll = m, pagesModeChosen = true) } }
+                for (m in com.bos.sphere.core.data.HomePages.entries) Chip(null, L10n.tr(m.label), prefs.homePages == m, tag = "quick.pages.${m.name}") { update { it.copy(homePages = m) } }
+            }
+            Heading(L10n.tr("Order"))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 for (o in com.bos.sphere.core.data.HomeOrder.entries) Chip(null, L10n.tr(o.label), prefs.homeOrder == o) { update { it.copy(homeOrder = o) } }
             }
 
@@ -157,14 +161,14 @@ fun HomeQuickSheet(
                 }
             }
 
-            if (page == null) {
-                // Wave 26: "Add page" also works from Glance (page is null there): it goes to the pages and opens the add-page flow.
+            if (page == null && prefs.homePages != com.bos.sphere.core.data.HomePages.Continuous) {
+                // Wave 26: "Add page" also works from Glance (page is null there). Wave 28: not in Continuous (one scroll surface, no pages); with Pages Off it turns Paginated on.
                 Spacer(Modifier.height(10.dp))
                 BigButton(Modifier.fillMaxWidth().testTag("quick.addpage"), Glyphs.Plus, L10n.tr("Add page"), onAddPage)
             }
             Spacer(Modifier.height(18.dp))
             val actions = rows.filterIsInstance<AppMenuEntry.Sheet>().map { it.action }
-            if (HomeSheetAction.EditHome in actions) { BigButton(Modifier.fillMaxWidth().testTag("quick.edit"), Glyphs.Apps, L10n.tr("Edit home pages")) { onEdit?.invoke() }; Spacer(Modifier.height(10.dp)) }
+            if (HomeSheetAction.EditHome in actions) { BigButton(Modifier.fillMaxWidth().testTag("quick.edit"), Glyphs.Apps, L10n.tr("Edit home")) { onEdit?.invoke() }; Spacer(Modifier.height(10.dp)) }
             if (HomeSheetAction.Panels in actions) { BigButton(Modifier.fillMaxWidth(), Glyphs.Clock, HomeSheetAction.Panels.label) { onPanels?.invoke() }; Spacer(Modifier.height(10.dp)) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 BigButton(Modifier.weight(1f), Glyphs.Image, HomeSheetAction.Wallpaper.label, onWallpaper)
@@ -204,11 +208,11 @@ private fun Tile(modifier: Modifier, glyph: ImageVector, label: String, on: Bool
 }
 
 @Composable
-private fun Chip(glyph: ImageVector?, label: String, selected: Boolean, danger: Boolean = false, onClick: () -> Unit) {
+private fun Chip(glyph: ImageVector?, label: String, selected: Boolean, danger: Boolean = false, tag: String? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     val tint = if (danger) Color(0xFFFF7A7A) else if (selected) HyleColors.InkBright else HyleColors.Ink
     Row(
-        Modifier.clip(shape)
+        Modifier.then(if (tag != null) Modifier.testTag(tag) else Modifier).clip(shape)
             .background(if (selected) HyleColors.Violet.copy(alpha = 0.25f) else Color(0x12FFFFFF))
             .border(1.dp, if (selected) HyleColors.Violet else HyleColors.Hairline, shape)
             .clickable(onClick = onClick)

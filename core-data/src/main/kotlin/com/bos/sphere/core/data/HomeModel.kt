@@ -17,8 +17,11 @@ enum class ScrollAxis(val label: String) {
     Long("Along the long side"), Short("Along the short side"), Vertical("Top to bottom"), Horizontal("Left to right"),
 }
 
-/** Wave 26: how the SUCCESSIVE pages (the ones after Glance) are arranged: [Paged] = paginated pages, [Continuous] = the horizontal column-by-column scroll. */
-enum class HomeScroll(val label: String) { Paged("Paginated"), Continuous("Scroll") }
+/**
+ * Wave 28 (homeUnify): the "Pages" setting, exactly three values. [Off] = no extra pages (home is Glance only; with Glance also off, home is the one first page),
+ * [Paginated] = regular pages in the pager after Glance, [Continuous] = after Glance the horizontal column-by-column scroll surface, as the rest of the same pager.
+ */
+enum class HomePages(val label: String) { Off("Off"), Paginated("Paginated"), Continuous("Continuous") }
 
 /** Corner look: a bare glyph, or a quarter-circle bubble hugging the screen corner. */
 /** Holo = bare glyphs; Quarter = Sony-style quarter discs in the corners; Bubble = round floating bubbles. */
@@ -199,7 +202,7 @@ enum class UiLanguage(val code: String, val label: String) {
 
 data class LauncherPrefs(
     val homeStyle: HomeStyle = HomeStyle.Grid,
-    val homeScroll: HomeScroll = HomeScroll.Paged,
+    val homePages: HomePages = HomePages.Off,
     /** Show the A–Z letters of the drawer's quick-scrub strip (it still works when hidden). */
     val drawerRailVisible: Boolean = true,
     /** Grid / List / Details switcher in the app drawer. */
@@ -241,8 +244,6 @@ data class LauncherPrefs(
     val glanceEnabled: Boolean = true,
     /** Wave 26: Left to right (default) or Right to left: the Launchpad edge, the column / page order and the hotspot roles. */
     val homeOrder: HomeOrder = HomeOrder.LeftToRight,
-    /** Wave 26: false until the user has chosen Scroll or Paginated for the pages (the add-page flow asks once; Ground Control can change it). */
-    val pagesModeChosen: Boolean = false,
     /** HOM-23: which items the Glance home shows (time, date, weather, now playing, battery); default Time + Date + music. */
     val glanceContent: Set<GlanceItem> = GlanceContent.DEFAULT,
     /** HOM-23: which hotspots are on, by physical corner (default all four). */
@@ -612,7 +613,7 @@ data class HomeSurface(
 )
 
 /** True when the home is the paged grid (pages, per-page layouts, page dots, drag-to-rearrange). */
-val LauncherPrefs.isPaged: Boolean get() = homeStyle == HomeStyle.Grid && homeScroll == HomeScroll.Paged
+val LauncherPrefs.isPaged: Boolean get() = homeStyle == HomeStyle.Grid && homePages != HomePages.Continuous
 
 /** Whether the Continuous / DSi homes scroll sideways in this orientation. */
 fun LauncherPrefs.scrollsHorizontally(landscape: Boolean): Boolean = when (scrollAxis) {

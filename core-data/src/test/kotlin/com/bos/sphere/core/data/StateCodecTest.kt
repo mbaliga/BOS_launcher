@@ -53,6 +53,7 @@ class StateCodecTest {
         v is GridSpec -> listOf(GridSpec(v.columns + 1, v.rows + 1), GridSpec(v.columns - 1, v.rows - 1))
         v is Map<*, *> -> listOf(emptyMap<Any, Any>(), mapOf(StripItem.entries.first() to StripZone.entries.last()))
         v is Set<*> -> listOf(emptySet<Any>(), IndicatorEffect.entries.toSet())
+        v is List<*> -> listOf(listOf("a/M#0", "b/M#0"))
         else -> error("no test variant for ${type.name}")
     }
 

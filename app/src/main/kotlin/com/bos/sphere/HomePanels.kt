@@ -15,6 +15,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -63,36 +64,25 @@ import java.util.Calendar
 import java.util.Date
 
 /**
- * HOM-15, HOM-17 and HOM-18: a home panel with three tabs. Files lists recent files from folders
- * the user granted and the pinned (granted) folders; Usage splits today's screen time by app;
- * Timeline lists scheduled launches and app opens in time order.
+ * HOM-15, HOM-17 and HOM-18, wave 25 (hubData): the Files, Usage and Timeline panels. They are views of the Launchpad hub now (one place,
+ * no sheet of their own); the hub renders this for its Files, Usage and Timeline views. Files lists recent files from folders the user
+ * granted and the pinned (granted) folders; Usage splits today's screen time by app; Timeline lists scheduled launches and app opens.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomePanelsSheet(
+fun HomePanelsBody(
+    tab: com.bos.sphere.core.catalog.PanelTab,
     history: List<LaunchEvent>,
     appsByKey: Map<String, AppEntry>,
-    onDismiss: () -> Unit,
-    initialTab: Int = 0,
     onLaunch: (AppEntry) -> Unit = {},
 ) {
-    var tab by remember { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
     val ctx = LocalContext.current
     val prefs = remember { HomePanelPrefs(ctx) }
-    // A tall sheet (most of the screen) so the timeline reads as a view of its own.
-    val tall = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.62f).dp
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = HyleColors.Surface, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                com.bos.sphere.core.catalog.PanelTab.entries.forEachIndexed { i, t -> PanelTab(L10n.tr(t.title), tab == i) { tab = i } }
-            }
-            Box(Modifier.padding(top = 12.dp).height(tall)) {
-                when (tab) {
-                    0 -> FilesPanel(prefs)
-                    1 -> UsagePanel(appsByKey, prefs, onLaunch)
-                    else -> TimelinePanel(history, appsByKey, prefs, onLaunch)
-                }
-            }
+    // The panels are drawn with the dark panel palette, so they sit on its own surface whichever Launchpad theme is on.
+    Box(Modifier.fillMaxSize().background(HyleColors.Surface).padding(horizontal = 18.dp, vertical = 12.dp)) {
+        when (tab) {
+            com.bos.sphere.core.catalog.PanelTab.Files -> FilesPanel(prefs)
+            com.bos.sphere.core.catalog.PanelTab.Usage -> UsagePanel(appsByKey, prefs, onLaunch)
+            com.bos.sphere.core.catalog.PanelTab.Timeline -> TimelinePanel(history, appsByKey, prefs, onLaunch)
         }
     }
 }

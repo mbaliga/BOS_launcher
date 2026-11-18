@@ -270,6 +270,8 @@ fun LaunchpadPanel(
      * sent; unlike [onOpenApp] it must not close anything, so a failure leaves Launchpad open with a message. Null: [onOpenApp] is trusted.
      */
     launchApp: ((packageName: String) -> Boolean)? = null,
+    /** Wave 25 (hubData): renders the Files, Usage and Timeline views of the hub; null leaves the hub with the history views only. */
+    panelBody: (@Composable (HubView) -> Unit)? = null,
 ) {
     rememberLaunchpadInit()
     val dark = when (theme) {
@@ -324,7 +326,11 @@ fun LaunchpadPanel(
             LaunchpadSettings.pruneToFeed(items.map { it.key }.toSet(), System.currentTimeMillis())
         }
 
+        // The hub is on when the host supplies the Files, Usage and Timeline views (the app does); a bare panel keeps the live grouped list.
+        val hub = remember(panelBody != null) { if (panelBody == null) null else HubState(HubPrefs.of(ctx), com.bos.sphere.core.data.NotificationHistory.init(ctx), true, liveAll = true) }
+        if (hub != null) LaunchedEffect(hub) { LaunchpadHubNav.requests.collect { v -> if (v != null) { hub.select(v); LaunchpadHubNav.take() } } }
         LaunchpadContent(
+            hub = hub, hubPanelBody = panelBody ?: {}, viewSwitcher = { if (hub != null) HubSwitcher(hub) },
             items = items, rules = rules, prefs = prefs, readKeys = read, hasAccess = access, now = now,
             gestures = gestures,
             endInset = cardInset,
@@ -421,6 +427,11 @@ fun LaunchpadContent(
     zone: ZoneId = remember { ZoneId.systemDefault() },
     /** Wave 24: system Do Not Disturb is on (read only); with a Priority group the column says Priority still breaks through. */
     dndOn: Boolean = false,
+    /** The slot in the top bar for the view switcher (wave 25). */
+    viewSwitcher: @Composable () -> Unit = {},
+    /** Wave 25 (hubData): the hub state; null keeps the grouped live list exactly as before. */
+    hub: HubState? = null,
+    hubPanelBody: @Composable (HubView) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val is24 = remember(ctx) { DateFormat.is24HourFormat(ctx) }
@@ -605,6 +616,18 @@ fun LaunchpadContent(
         }
     }
 
+    // Wave 25: "mark what is visible as read" for the hub: the live list marks its unread rows, a history view uses the store (with undo).
+    val liveNow = androidx.compose.runtime.rememberUpdatedState(items to readKeys)
+    val hubMarkRead: () -> Unit = {
+        if (hub != null) {
+            if (hub.listIsLive) {
+                val unread = liveNow.value.first.filter { it.key !in liveNow.value.second }
+                unread.forEach { LaunchpadSettings.markRead(it.key) }
+                if (unread.isNotEmpty()) toast.value = L10n.tr("Marked %d as read", unread.size)
+            } else hub.markVisibleRead(System.currentTimeMillis(), zone)
+        }
+    }
+
     Column(
         modifier
             .fillMaxSize()
@@ -613,6 +636,11 @@ fun LaunchpadContent(
             .testTag("lp.root")
             .semantics { paneTitle = L10n.tr("Launchpad") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
+            .then(if (hub == null) Modifier else Modifier.hubKeys( // outside focusable(): the keys work whether the root or a row has focus
+                onView = { d -> HubLogic.step(hub.views, hub.view, d)?.let(hub::select) },
+                onDensity = { looser -> (if (looser) hub.density.looser else hub.density.denser)?.let(hub::chooseDensity) },
+                onMarkRead = { hubMarkRead() },
+            ))
             .onKeyEvent(keyHandler)
             .focusRequester(rootReq)
             .focusable()
@@ -629,8 +657,9 @@ fun LaunchpadContent(
                     onDragEnd = { if (total < -80f) onClose() },
                 ) { _, dx -> total += dx }
             }
+            .then(if (hub == null) Modifier else Modifier.hubGestures(onPinch = { hub.pinch(it) }, onSwipe = { s -> hub.swipe(s) { hubMarkRead() } }))
             .lpPinch { zoomIn ->
-                perform(
+                if (hub == null || hub.listIsLive) perform(
                     gestures[if (zoomIn) com.bos.sphere.core.data.LaunchpadGesture.PinchOut else com.bos.sphere.core.data.LaunchpadGesture.PinchIn]
                         ?: com.bos.sphere.core.data.LaunchpadAction.None,
                     null, sections,
@@ -644,12 +673,21 @@ fun LaunchpadContent(
             canClear = items.isNotEmpty(), onClose = onClose, onGroups = { groupsOpen = true },
             onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
         )
+        viewSwitcher()
+        if (hub != null && hub.optionsOpen) HubOptions(hub) { hubMarkRead() }
         if (systemState != null && hasAccess) SystemStateRow(systemState, is24, onOpenSystemPanel)
         if (hasAccess && com.bos.sphere.core.data.GroupDnd.breaksThrough(groups, dndOn)) Text(
             L10n.tr("Do Not Disturb is on. Only Priority groups light the edge indicator."), color = LocalLp.current.dim, fontSize = 13.sp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = RoomyList.H_PAD_DP.dp, vertical = 6.dp).testTag("lp.dnd"),
         )
-        GrantGate(
+        if (hub != null && !hub.listIsLive) HubBody(
+            hub, now, zone, is24, liveKeys = items.mapTo(HashSet()) { it.key }, modifier = Modifier.weight(1f), hasAccess = hasAccess, onRequestAccess = onRequestAccess, showOptions = false, panelBody = hubPanelBody,
+            onOpen = { e ->
+                val live = items.firstOrNull { it.key == e.key }
+                if (live != null) open(live) else if (openApp == null) onOpenApp(e.packageName) else if (!openApp(e.packageName)) toast.value = L10n.tr("Couldn't open %s", e.appLabel.ifBlank { e.packageName })
+            },
+            onMore = { e -> items.firstOrNull { it.key == e.key }?.let { menuFor = it; menuExpand = null } },
+        ) else GrantGate(
             kind = GrantKind.Notifications, granted = hasAccess, askedBefore = askedBefore, onEnable = onRequestAccess,
             colors = GrantColors(LocalLp.current.bg, LocalLp.current.surface, LocalLp.current.ink, LocalLp.current.dim, BlueLight, Color.White),
         ) {

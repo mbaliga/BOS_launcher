@@ -13,7 +13,7 @@ class HubStringsW26Test {
     @After fun reset() { L10n.setLanguage("en") }
 
     private val keys: List<String> =
-        HubView.entries.map { it.label } + HubDensity.entries.map { it.label } + HubGrouping.entries.map { it.label } + HubRange.entries.filter { it != HubRange.Any }.map { it.label } +
+        HubView.entries.map { it.label } + HubGrouping.entries.map { it.label } + HubRange.entries.filter { it != HubRange.Any }.map { it.label } +
             listOf(
                 "Nothing matches these filters", "No unread notifications", "Nothing read yet", "No notifications in history yet",
                 "Unread", "Read", "Cleared from the shade", "Marked %d as read", "Mark as unread", "Mark as read", "More options", "Delete from history",

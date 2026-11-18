@@ -129,20 +129,20 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
     @Test fun STR_02_w27_screens_rtl() = render(feed(4), true, "rtl", rtl = true)
 
     // ---- header: menu glyph and title, clock left, four glyphs right ----
-    @Test fun STR_02_w27_headerHasTheTitleCommsAt28spTheClockAndFourStatusGlyphsOf48dp() {
+    @Test fun STR_02_w27_headerHasTheTitleCommsAt17spTheClockAndFourStatusGlyphs() {
         render(feed(4), home = false)
         rule.onNodeWithTag("lp.title", useUnmergedTree = true).assertIsDisplayed()
         assertEquals("Comms", rule.onNodeWithTag("lp.title", useUnmergedTree = true).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.joinToString { it.text })
         val menu = b("lp.menu"); val title = b("lp.title", true); val clock = b("lp.clock")
         assertEquals("menu target is 48 dp", 48f, menu.right.value - menu.left.value, 0.5f)
-        assertTrue("the title follows the menu glyph", title.left.value > menu.right.value)
+        assertTrue("the title follows the menu glyph (its text starts 57.7 dp from the edge)", title.left.value > menu.left.value + 20f && title.left.value < menu.right.value + 1f)
         assertTrue("the clock row is under the title row", clock.top.value >= menu.bottom.value - 1f)
-        assertEquals("the clock is on the left, 20 dp from the edge", 20f, clock.left.value, 1f)
+        assertEquals("the clock is on the left, 32 dp from the edge", 32f, clock.left.value, 1f)
         val glyphs = listOf("brightness", "battery", "signal", "wifi").map { b("lp.sys.$it") }
-        glyphs.forEach { assertEquals("each glyph is a 48 dp target", 48f, it.right.value - it.left.value, 0.5f); assertEquals(48f, it.bottom.value - it.top.value, 0.5f) }
+        glyphs.forEach { assertEquals("each glyph is 48 dp high (wave 28: as wide as its ink and the mock-up's gap, the tap target grows to 48 dp)", 48f, it.bottom.value - it.top.value, 0.5f) }
         assertTrue("glyphs are in order left to right", glyphs.zipWithNext().all { (a, c) -> a.right.value <= c.left.value + 0.5f })
         assertTrue("and on the right of the clock", glyphs.first().left.value > clock.right.value)
-        assertEquals("the last glyph's target ends 8 dp from the edge, so the glyph is 20 dp in", winW() - 8f, glyphs.last().right.value, 1f)
+        assertEquals("the last glyph's box ends 12.15 dp from the edge, so its ink ends 18 dp in", winW() - 12.15f, glyphs.last().right.value, 1f)
         assertEquals("on the clock's row", (clock.top.value + clock.bottom.value) / 2, (glyphs[0].top.value + glyphs[0].bottom.value) / 2, 2f)
         // 23:02, 24 hour (the test device uses the default 24 h of the locale: the text is HH:mm).
         val t = rule.onNodeWithTag("lp.clock").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)!!.joinToString()
@@ -167,33 +167,32 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         listOf("ALL", "UNREAD", "FILES", "USAGE", "TIMELINE").forEach { assertTrue("$it tab", rule.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty()) }
         assertEquals("no READ tab", 0, rule.onAllNodesWithTag("hub.view.read").fetchSemanticsNodes().size)
         val tabs = listOf("all", "unread", "files", "usage", "timeline").map { b("hub.view.$it") }
-        tabs.forEach { assertEquals("each tab is 48 dp high", 48f, it.bottom.value - it.top.value, 0.5f) }
+        tabs.forEach { assertEquals("each tab is a 48 dp target centred on the 35 dp row", 48f, it.bottom.value - it.top.value, 0.5f) }
         assertTrue("one row", tabs.all { it.top.value == tabs[0].top.value })
         assertTrue("left to right in order", tabs.zipWithNext().all { (a, c) -> a.right.value <= c.left.value + 0.5f })
-        assertTrue("tabs start at the 20 dp margin (less the tab padding)", tabs[0].left.value in 8f..14f)
-        val clock = b("lp.clock"); assertTrue("the tab row is under the clock row", tabs[0].top.value >= clock.bottom.value - 1f)
-        val line = b("lp.tabsLine"); assertEquals("a hairline under the tabs", tabs[0].bottom.value, line.top.value, 1f)
+        assertTrue("tabs start at the 32 dp margin (less the tab padding)", tabs[0].left.value in 22f..25f)
+        val clock = b("lp.clock"); assertTrue("the tab row is under the clock row (the 48 dp targets overlap the row above by design)", tabs[0].top.value >= clock.bottom.value - 7f)
+        val line = b("lp.tabsLine"); assertEquals("a hairline under the tabs", tabs[0].bottom.value - 6.5f, line.top.value, 1f)
         assertTrue("the hairline is thin", line.bottom.value - line.top.value <= 1f)
         assertEquals(true, rule.onNodeWithTag("hub.view.all").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
     }
 
     // ---- rows ----
-    @Test fun STR_02_w27_rowsAre56dpIconsTitleSenderAndARightAlignedTimeWithAnInsetHairlineAndNoBands() {
+    @Test fun STR_02_w27_rowsAre38dpIconsTitleSenderAndARightAlignedTimeWithAnInsetHairlineAndNoBands() {
         render(feed(4), home = false)
         val w = winW()
         val keys = (0 until 4).map { "k$it" }.filter { rule.onAllNodesWithTag("lp.row.$it", true).fetchSemanticsNodes().isNotEmpty() && b("lp.row.$it", true).bottom.value <= rule.onRoot().getUnclippedBoundsInRoot().bottom.value }
         assertTrue("at least two rows are on screen: $keys", keys.size >= 2)
         for (k in keys) {
             val row = b("lp.row.$k", true); val h = row.bottom.value - row.top.value
-            assertTrue("row $k is $h dp, expected 78..90", h in 78f..90f)
-            val icon = b("lp.badge.$k", true); assertEquals(56f, icon.right.value - icon.left.value, 0.5f); assertEquals(56f, icon.bottom.value - icon.top.value, 0.5f)
-            assertEquals("icon at the 20 dp margin", 20f, icon.left.value, 0.5f)
-            val time = b("lp.time.$k", true); assertEquals("time right-aligned at the margin", w - 20f, time.right.value, 1f)
+            assertTrue("row $k is $h dp, expected 70", h in 69.5f..70.5f)
+            val icon = b("lp.badge.$k", true); assertEquals(38f, icon.right.value - icon.left.value, 0.5f); assertEquals(38f, icon.bottom.value - icon.top.value, 0.5f)
+            assertEquals("icon at the 32 dp margin", 32f, icon.left.value, 0.5f); assertEquals("icon 16 dp below the row top", row.top.value + 16f, icon.top.value, 0.5f)
+            val time = b("lp.time.$k", true); assertEquals("time right-aligned at the margin", w - 18f, time.right.value, 1f)
             val title = b("lp.title.$k", true); val sub = b("lp.preview.$k", true)
-            assertEquals(20f + 56f + 16f, title.left.value, 1f); assertEquals(title.left.value, sub.left.value, 1f)
-            assertTrue("sender under the title", sub.top.value >= title.bottom.value - 1f)
-            val line = b("lp.rowLine.$k", true); assertEquals("hairline inset 20 dp", 20f, line.left.value, 0.5f); assertEquals(w - 20f, line.right.value, 0.5f)
-            assertEquals("icon is vertically centred", (row.top.value + row.bottom.value) / 2, (icon.top.value + icon.bottom.value) / 2, 4f)
+            assertEquals(32f + 38f + 16f, title.left.value, 1f); assertEquals(title.left.value, sub.left.value, 1f)
+            assertTrue("sender under the title", sub.top.value > title.top.value + 10f)
+            val line = b("lp.rowLine.$k", true); assertEquals("hairline inset 32 dp", 32f, line.left.value, 0.5f); assertEquals(w - 18f, line.right.value, 0.5f)
         }
         assertEquals("no stripes", 0, rule.onAllNodesWithTag("lp.stripe.k0", true).fetchSemanticsNodes().size)
         assertEquals("no date bands or group headers in the default view", 0, rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("group") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("lp.group.") == true }).fetchSemanticsNodes().size)
@@ -216,9 +215,9 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         val ids = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("row") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("hub.row.") == true }).fetchSemanticsNodes()
         assertTrue("history rows are shown", ids.isNotEmpty())
         val tag = ids.first().config[SemanticsProperties.TestTag]; val id = tag.removePrefix("hub.row.")
-        val row = b(tag, true); assertTrue("${row.bottom.value - row.top.value}", row.bottom.value - row.top.value in 78f..90f)
-        val icon = b("hub.badge.$id", true); assertEquals(56f, icon.right.value - icon.left.value, 0.5f)
-        assertEquals(winW() - 20f, b("hub.time.$id", true).right.value, 1f)
+        val row = b(tag, true); assertTrue("${row.bottom.value - row.top.value}", row.bottom.value - row.top.value in 69.5f..70.5f)
+        val icon = b("hub.badge.$id", true); assertEquals(38f, icon.right.value - icon.left.value, 0.5f)
+        assertEquals(winW() - 18f, b("hub.time.$id", true).right.value, 1f)
         assertEquals("no filter chips row any more", 0, rule.onAllNodesWithTag("hub.filters").fetchSemanticsNodes().size)
         assertEquals("no date band in the default view", 0, rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("band") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("hub.header.") == true }).fetchSemanticsNodes().size)
     }
@@ -229,7 +228,7 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         openMenu()
         val w = winW()
         val panel = b("lp.menu.panel")
-        assertEquals("58 percent of the window (at most 380 dp)", minOf(380f, w * 0.58f), panel.right.value - panel.left.value, 1.5f)
+        assertEquals("58.4 percent of the window, 240 dp of 411 (at most 380 dp)", minOf(380f, w * 0.584f), panel.right.value - panel.left.value, 1.5f)
         val cells = GroupMode.entries.associateWith { b("lp.menu.mode.${it.name}") }
         assertEquals("six cells", 6, cells.size)
         assertEquals("three columns", 3, cells.values.map { Math.round(it.left.value) }.toSet().size)
@@ -239,14 +238,14 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         assertTrue("reading order: time, app, sender", cells[GroupMode.Time]!!.left.value < cells[GroupMode.App]!!.left.value && cells[GroupMode.App]!!.left.value < cells[GroupMode.Sender]!!.left.value)
         assertTrue("second row: conversation, app and conversation, none", cells[GroupMode.Conversation]!!.left.value < cells[GroupMode.AppConversation]!!.left.value && cells[GroupMode.AppConversation]!!.left.value < cells[GroupMode.Flat]!!.left.value)
         val widths = cells.values.map { it.right.value - it.left.value }; assertTrue("equal cells $widths", widths.max() - widths.min() < 1f)
-        assertTrue("the grid sits inside the panel with the 20 dp margin", cells.values.all { it.left.value >= panel.left.value + 19.5f && it.right.value <= panel.right.value - 19.5f })
+        assertTrue("the grid sits inside the panel with the 32 dp and 19.5 dp margins", cells.values.all { it.left.value >= panel.left.value + 31.5f && it.right.value <= panel.right.value - 19f })
         // Icons only: no label text inside a cell; the names are accessibility descriptions.
         GroupMode.entries.forEach {
             assertEquals(0, rule.onNodeWithTag("lp.menu.mode.${it.name}", useUnmergedTree = true).fetchSemanticsNode().children.count { c -> c.config.getOrNull(SemanticsProperties.Text) != null })
             assertTrue(rule.onNodeWithTag("lp.menu.mode.${it.name}").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)!!.isNotEmpty())
         }
         assertEquals("the default grouping (app and conversation) is the selected cell", true, rule.onNodeWithTag("lp.menu.mode.Flat").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
-        assertTrue("GROUP BY and Show labels", listOf("GROUP BY", "Show").all { rule.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty() })
+        assertTrue("GROUP BY and Show labels", listOf("GROUP BY", "SHOW").all { rule.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty() })
     }
 
     @Test fun STR_01_w27_showRowsHaveAnAppIconAndTheNameAndACountRightAlignedAllCommsFirst() {
@@ -259,13 +258,13 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
             scrollMenuTo(r)
             val rb = b(r)
             if (r == rows[0]) allTop = rb.top.value else assertTrue("All Comms is the first row, the apps follow", rb.top.value > allTop || r != rows[0])
-            assertEquals("counts are right-aligned at the panel's inner edge", panel.right.value - 20f, b("$r.count", true).right.value, 1f)
+            assertEquals("counts are right-aligned at the panel's inner edge", panel.right.value - 19.5f, b("$r.count", true).right.value, 1f)
         }
         scrollMenuTo(rows[0])
         assertEquals("All Comms carries the total", "4", rule.onNodeWithTag("lp.menu.show.all.count", true).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.joinToString { it.text })
         scrollMenuTo(rows[1])
-        val icon = b("lp.menu.show.com.whatsapp.icon", true); assertEquals("24 dp icon", 24f, icon.right.value - icon.left.value, 0.5f)
-        assertEquals("icon at the 20 dp margin", panel.left.value + 20f, icon.left.value, 1f)
+        val icon = b("lp.menu.show.com.whatsapp.icon", true); assertEquals("16.5 dp icon", 16.5f, icon.right.value - icon.left.value, 0.5f)
+        assertEquals("icon at the 32 dp margin", panel.left.value + 32f, icon.left.value, 1f)
         val name = rule.onNodeWithTag("lp.menu.show.com.whatsapp").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.joinToString { it.text }
         assertTrue(name, name.contains("WhatsApp"))
     }
@@ -318,15 +317,12 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
 
     private fun scrollMenuTo(tag: String) { rule.onNodeWithTag("lp.menu.list").performScrollToNode(androidx.compose.ui.test.hasTestTag(tag)); rule.waitForIdle() }
 
-    // Moved here from the hub's inline options panel (HUB_14, HUB_16): density, grouping, mark visible as read and delete history are rows of the Comms menu.
-    @Test fun STR_01_w27_densityAndGroupingOfAHistoryViewAreInTheMenu() {
+    // Moved here from the hub's inline options panel (HUB_14, HUB_16): grouping, mark visible as read and delete history are rows of the Comms menu.
+    // (Wave 28: the density row is gone; the Comms size stepper replaced it, see CommsScaleCases.)
+    @Test fun STR_01_w27_groupingOfAHistoryViewIsInTheMenu() {
         render(feed(4))
         rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
         openMenu()
-        scrollMenuTo("lp.menu.opt.density")
-        rule.onNodeWithTag("lp.menu.opt.density").performClick(); rule.waitForIdle()
-        assertEquals(HubDensity.Expanded, hub.density)
-        assertTrue("the density row keeps the panel open", menuRef!!.open)
         scrollMenuTo("lp.menu.mode.App")
         rule.onNodeWithTag("lp.menu.mode.App").performClick(); rule.waitForIdle(); rule.mainClock.advanceTimeBy(1000); rule.waitForIdle()
         assertEquals(HubGrouping.App, hub.grouping)
@@ -368,10 +364,10 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
     @Test fun STR_02_w27_rtlMirrorsHeaderRowsAndPanel() {
         render(feed(4), rtl = true, home = false)
         val w = winW()
-        val clock = b("lp.clock"); assertEquals("clock on the right", w - 20f, clock.right.value, 1f)
+        val clock = b("lp.clock"); assertEquals("clock on the right", w - 32f, clock.right.value, 1f)
         assertTrue("glyphs on the left", b("lp.sys.wifi").right.value < clock.left.value)
-        val icon = b("lp.badge.k0", true); assertEquals("icon on the right", w - 20f, icon.right.value, 0.5f)
-        val time = b("lp.time.k0", true); assertEquals("time at the left margin", 20f, time.left.value, 1f)
+        val icon = b("lp.badge.k0", true); assertEquals("icon on the right", w - 32f, icon.right.value, 0.5f)
+        val time = b("lp.time.k0", true); assertEquals("time at the left margin", 18f, time.left.value, 1f)
         openMenu()
         val panel = b("lp.menu.panel"); assertEquals("panel from the right", w, panel.right.value, 1f)
     }

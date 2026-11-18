@@ -28,13 +28,6 @@ enum class HubView(val id: String, val label: String, val history: Boolean) {
     }
 }
 
-/** Row density: what a pinch changes first. */
-enum class HubDensity(val label: String) {
-    Compact("Compact"), Comfortable("Comfortable"), Expanded("Expanded");
-    val denser: HubDensity? get() = entries.getOrNull(ordinal - 1)
-    val looser: HubDensity? get() = entries.getOrNull(ordinal + 1)
-}
-
 /**
  * Grouping granularity, coarse to fine: no groups at all (the Comms default: a flat list, no bands), then one group per app, per day, per sender.
  * Wave 27: the Comms menu's GROUP BY grid drives it on the history views ([of] and [toMode]).
@@ -95,14 +88,6 @@ object HubLogic {
     fun step(views: List<HubView>, cur: HubView, delta: Int): HubView? =
         views.getOrNull(views.indexOf(cur) + delta)
 
-    /**
-     * Pinch rules. Fingers apart ([zoomIn]) makes rows looser (Compact, Comfortable, Expanded); once Expanded, a further pinch out makes
-     * the grouping finer (App, Day, Sender). Fingers together does the reverse: denser rows, then coarser grouping.
-     */
-    fun pinch(d: HubDensity, g: HubGrouping, zoomIn: Boolean): Pair<HubDensity, HubGrouping> =
-        if (zoomIn) d.looser?.let { it to g } ?: (d to (g.finer ?: g))
-        else d.denser?.let { it to g } ?: (d to (g.coarser ?: g))
-
     /** Section key and title (title is a function of the entry) for [g]. */
     fun groupKey(e: HistoryEntry, g: HubGrouping, now: Long, zone: ZoneId): String = when (g) {
         HubGrouping.App -> "a:" + e.packageName
@@ -117,14 +102,11 @@ object HubLogic {
     }
 }
 
-/** The persisted hub settings: the default view, the row density and the grouping. */
+/** The persisted hub settings: the default view and the grouping (wave 28: the row density is gone, the Comms size replaces it). */
 class HubPrefs(private val sp: SharedPreferences?) {
     var defaultView: HubView
         get() = HubView.fromId(sp?.getString("defaultView", null)) ?: HubView.All
         set(v) { sp?.edit()?.putString("defaultView", v.id)?.apply() }
-    var density: HubDensity
-        get() = HubDensity.entries.firstOrNull { it.name == sp?.getString("density", null) } ?: HubDensity.Comfortable
-        set(v) { sp?.edit()?.putString("density", v.name)?.apply() }
     var grouping: HubGrouping
         get() = HubGrouping.entries.firstOrNull { it.name == sp?.getString("grouping", null) } ?: HubGrouping.Flat
         set(v) { sp?.edit()?.putString("grouping", v.name)?.apply() }
@@ -144,7 +126,7 @@ object LaunchpadHubNav {
 class HubUndo(val message: String, val ids: List<String>)
 
 /**
- * The hub's state: the view, the quick filters of each view (kept while the user moves between views), density and grouping
+ * The hub's state: the view, the quick filters of each view (kept while the user moves between views) and grouping
  * (persisted), and the undo of the last mark-read. [panels] says whether Files, Usage and Timeline can be shown (the host supplies them).
  * With [liveAll] the All view is the Launchpad's live grouped list (everything in the shade now, with groups, digests and row actions) and
  * Unread and Read are the persistent history; without it All is the history too.
@@ -152,8 +134,6 @@ class HubUndo(val message: String, val ids: List<String>)
 class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val panels: Boolean, val liveAll: Boolean = false) {
     val views: List<HubView> = HubView.entries.filter { panels || it.history }
     var view by mutableStateOf(prefs.defaultView.takeIf { it in views } ?: HubView.All)
-        private set
-    var density by mutableStateOf(prefs.density)
         private set
     var grouping by mutableStateOf(prefs.grouping)
         private set
@@ -188,12 +168,5 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
     }
 
     fun setDefault(v: HubView = view) { defaultView = v; prefs.defaultView = v }
-    fun chooseDensity(d: HubDensity) { density = d; prefs.density = d }
     fun chooseGrouping(g: HubGrouping) { grouping = g; prefs.grouping = g }
-    fun pinch(zoomIn: Boolean) {
-        if (!view.history || listIsLive) return
-        val (d, g) = HubLogic.pinch(density, grouping, zoomIn)
-        if (d != density) chooseDensity(d)
-        if (g != grouping) chooseGrouping(g)
-    }
 }

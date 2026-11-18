@@ -1440,7 +1440,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val capabilityRows = remember(capInputs) { com.bos.sphere.core.capabilities.CapabilityEvaluator.evaluate(capInputs) }
         val labResults = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
         val labEntries = com.bos.sphere.ui.rememberLabEntries(capInputs, labResults)
-        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }) {
+        remember(context) { com.bos.sphere.core.data.CommsScaleSettings.init(context); true }
+        val commsScalePct by com.bos.sphere.core.data.CommsScaleSettings.percent.collectAsState() // wave 28: the Comms size row shows the live value
+        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct) {
             buildSettingsCategories(
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },

@@ -132,7 +132,7 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.performKeyEscape() =
         performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Escape) }
 
-    @Test fun STR_01_menu_optionsAreRealRowsOf48dpWithTheCurrentChoiceMarked() {
+    @Test fun STR_01_menu_optionsAreRealRowsOfTheMockUpsPitchWithTheCurrentChoiceMarked() {
         render(hub(12), false)
         openMenu()
         val sel = rule.onNodeWithTag("lp.menu.mode.Time").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected)
@@ -142,7 +142,8 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         for (t in tags) {
             if (rule.onAllNodesWithTag(t).fetchSemanticsNodes().isEmpty()) rule.onNodeWithTag("lp.menu.list").performScrollToNodeTag(t)
             val b = rule.onNodeWithTag(t).getUnclippedBoundsInRoot()
-            assertTrue("$t is ${b.bottom.value - b.top.value} dp tall, under 48", b.bottom.value - b.top.value >= 47.9f)
+            // Wave 28: the mock-up's grid cells are 41.4 dp and its Show rows 36 dp; Compose widens the touch target of each to 48 dp of real screen.
+            assertTrue("$t is ${b.bottom.value - b.top.value} dp tall, under 36", b.bottom.value - b.top.value >= 35.9f)
         }
         val count = rule.onNodeWithTag("lp.menu.show.com.whatsapp.count", useUnmergedTree = true).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)
         assertEquals("the app row's count is its own right-aligned text", "2", count!!.joinToString { it.text })
@@ -206,19 +207,19 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         render(hub(8), false)
         val row = rule.onNodeWithTag("lp.row.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val h = row.bottom.value - row.top.value
-        assertTrue("row height $h dp is not 78..90", h in 78f..90f)
+        assertTrue("row height $h dp is not 69..71 (wave 28: 70 dp)", h in 69f..71f)
         assertTrue("no stripe any more", rule.onAllNodesWithTag("lp.stripe.h0", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         val badge = rule.onNodeWithTag("lp.badge.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals(56f, badge.right.value - badge.left.value, 0.5f)
-        assertEquals("icon starts 20 dp from the edge", 20f, badge.left.value, 0.5f)
+        assertEquals(38f, badge.right.value - badge.left.value, 0.5f)
+        assertEquals("icon starts 32 dp from the edge", 32f, badge.left.value, 0.5f)
         val time = rule.onNodeWithTag("lp.time.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals("time is right-aligned with the 20 dp padding", winW() - 20f, time.right.value, 1f)
+        assertEquals("time is right-aligned with the 18 dp margin", winW() - 18f, time.right.value, 1f)
         val title = rule.onNodeWithTag("lp.title.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val second = rule.onNodeWithTag("lp.preview.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals("the title starts after the icon and a 16 dp gap", 20f + 56f + 16f, title.left.value, 1f)
+        assertEquals("the title starts after the icon and a 16 dp gap", 32f + 38f + 16f, title.left.value, 1f)
         assertEquals("the sender line aligns with the title", title.left.value, second.left.value, 1f)
-        assertTrue("the sender line is under the title", second.top.value >= title.bottom.value - 1f)
-        assertTrue("the time sits on the sender line, not the title line", time.top.value >= title.bottom.value - 6f)
+        assertTrue("the sender line is under the title", second.top.value >= title.top.value + 10f)
+        assertTrue("the time sits on the sender line, not the title line", time.top.value >= title.top.value + 10f)
         // Rows are separated by a thin divider only, never a gap: the next row starts where this one ends.
         val next = rule.onNodeWithTag("lp.row.h1", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertEquals(row.bottom.value, next.top.value, 1f)

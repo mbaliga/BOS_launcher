@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -109,6 +110,8 @@ import com.bos.sphere.core.design.GrantKind
 import androidx.compose.ui.input.InputMode as ComposeInputMode
 import com.bos.sphere.core.input.InputMode
 import com.bos.sphere.core.input.InputModeTracker
+import com.bos.sphere.core.data.CommsScale
+import com.bos.sphere.core.data.CommsScaleSettings
 import com.bos.sphere.core.data.GroupMode
 import com.bos.sphere.core.data.ContactDirectory
 import com.bos.sphere.core.data.GroupPriority
@@ -143,12 +146,16 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 /** Launchpad palette: dark by default, or the light BB10-hub look. */
-internal class LpColors(val bg: Color, val surface: Color, val ink: Color, val ink2: Color, val dim: Color, val line: Color)
+internal class LpColors(
+    val bg: Color, val surface: Color, val ink: Color, val ink2: Color, val dim: Color, val line: Color,
+    /** Wave 28: unselected tabs, the menu grid's unselected glyphs, the menu counts and the grid's hairlines; the light look uses [dim] and [line]. */
+    val tabDim: Color = dim, val glyphDim: Color = dim, val count: Color = dim, val gridLine: Color = line,
+)
 /** CFG-10: Launchpad's two looks come from the shared design tokens (dark and light variants), not a private palette. */
 internal fun lpColorsFor(variant: com.bos.sphere.core.design.ThemeVariant): LpColors =
     if (variant == com.bos.sphere.core.design.ThemeVariant.Dark)
         // Wave 27: the dark Comms look is the owner's mock-up palette (near-black navy page, #1A1A1A panel); the light look stays on the shared light tokens.
-        LpColors(CommsStyle.DarkBg, CommsStyle.DarkPanel, CommsStyle.DarkInk, CommsStyle.DarkInk2, CommsStyle.DarkDim, CommsStyle.DarkLine)
+        LpColors(CommsStyle.DarkBg, CommsStyle.DarkPanel, CommsStyle.DarkInk, CommsStyle.DarkInk2, CommsStyle.DarkDim, CommsStyle.DarkLine, CommsStyle.DarkTabDim, CommsStyle.DarkGlyphDim, CommsStyle.DarkCount, CommsStyle.DarkGridLine)
     else com.bos.sphere.core.design.HyleColors.tokens(variant).let { LpColors(it.background, it.surface, it.inkBright, it.ink, it.inkDim, it.hairline) }
 internal val LpDark = lpColorsFor(com.bos.sphere.core.design.ThemeVariant.Dark)
 internal val LpLight = lpColorsFor(com.bos.sphere.core.design.ThemeVariant.Light)
@@ -210,9 +217,12 @@ private fun rememberAppIcon(pkg: String): ImageBitmap? {
 }
 
 @Composable
-internal fun AppIcon(pkg: String, label: String, size: Int, modifier: Modifier = Modifier) {
+internal fun AppIcon(pkg: String, label: String, size: Int, modifier: Modifier = Modifier) = AppIcon(pkg, label, size.toFloat(), modifier)
+
+@Composable
+internal fun AppIcon(pkg: String, label: String, size: Float, modifier: Modifier = Modifier) {
     val icon = rememberAppIcon(pkg)
-    val shape = RoundedCornerShape((size * 0.24f).dp)
+    val shape = RoundedCornerShape((size * CommsStyle.ICON_RADIUS_FRACTION).dp)
     // A hairline outline keeps a black icon visible on the dark page and a white one on the light page (the mock-up's music icon has one).
     val outline = Modifier.border(0.75.dp, LocalLp.current.dim.copy(alpha = 0.45f), shape)
     if (icon != null) {
@@ -446,6 +456,8 @@ fun LaunchpadContent(
     hubPanelBody: @Composable (HubView) -> Unit = {},
     /** Wave 27: the Sound and Vibration sheet; the header's sound hook calls [SoundSheetState.show], the system row's sound button does too. */
     soundSheet: SoundSheetState = rememberSoundSheetState(),
+    /** Wave 28: the Comms size in percent (75 to 125); by default the persisted setting, which the Comms size stepper and the pinch change. */
+    commsScalePercent: Int = rememberCommsScalePercent(),
 ) {
     val ctx = LocalContext.current
     val rtlLayout = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
@@ -659,10 +671,11 @@ fun LaunchpadContent(
         onGroups = { menu.open = false; groupsOpen = true },
         onClearAll = { onClearAll(); menu.open = false },
         hub = hub, onMarkRead = { hubMarkRead(); menu.open = false },
+        scalePercent = commsScalePercent, onScale = { CommsScaleSettings.set(it) },
     )
     // Wave 25 (STR-01): the notifications layer shifts away by the panel's width while the menu is open.
     Box(Modifier.fillMaxSize().graphicsLayer {
-        translationX = LaunchpadMenuMotion.listShiftPx(LaunchpadMenuMotion.panelWidthDp(size.width / density) * density, menu.progress, menu.reduced, if (rtlLayout) -1f else 1f)
+        translationX = LaunchpadMenuMotion.listShiftPx((LaunchpadMenuMotion.panelWidthDp(size.width / density) + CommsStyle.PANEL_GAP_DP) * density, menu.progress, menu.reduced, if (rtlLayout) -1f else 1f)
     }) {
     Column(
         modifier
@@ -672,11 +685,11 @@ fun LaunchpadContent(
             .testTag("lp.root")
             .semantics { paneTitle = L10n.tr("Comms") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
-            .then(if (hub == null) Modifier else Modifier.hubKeys( // outside focusable(): the keys work whether the root or a row has focus
-                onView = { d -> hub.step(d)?.let(hub::select) },
-                onDensity = { looser -> (if (looser) hub.density.looser else hub.density.denser)?.let(hub::chooseDensity) },
+            .hubKeys( // outside focusable(): the keys work whether the root or a row has focus
+                onView = { d -> hub?.step(d)?.let(hub::select) },
+                onScale = { bigger -> CommsScaleSettings.set(CommsScale.step(CommsScaleSettings.percent.value, if (bigger) +1 else -1)) },
                 onMarkRead = { hubMarkRead() },
-            ))
+            )
             .onKeyEvent(keyHandler)
             .focusRequester(rootReq)
             .focusable()
@@ -693,16 +706,15 @@ fun LaunchpadContent(
                     onDragEnd = { if (total < -80f) { if (menu.open) menu.open = false else onClose() } },
                 ) { _, dx -> total += dx }
             }
-            .then(if (hub == null) Modifier else Modifier.hubGestures(onPinch = { hub.pinch(it) }, onSwipe = { s -> hub.swipe(s) { hubMarkRead() } }))
-            .lpPinch { zoomIn ->
-                if (hub == null || hub.listIsLive) perform(
-                    gestures[if (zoomIn) com.bos.sphere.core.data.LaunchpadGesture.PinchOut else com.bos.sphere.core.data.LaunchpadGesture.PinchIn]
-                        ?: com.bos.sphere.core.data.LaunchpadAction.None,
-                    null, sections,
-                )
-            }
+            // Wave 28: a pinch sets the Comms size (it replaces the density pinch and the pinch actions); a two-finger swipe belongs to the hub.
+            .hubGestures(
+                currentScale = { CommsScaleSettings.percent.value }, onScale = { CommsScaleSettings.set(it) },
+                onSwipe = if (hub == null) null else { s -> hub.swipe(s) { hubMarkRead() } },
+            )
             .padding(end = endInset),
     ) {
+      CommsScaleHost(commsScalePercent) {
+      Column(Modifier.fillMaxSize()) {
         LaunchpadHeader(
             filterLabel = activeFilter?.let { f -> counts.firstOrNull { it.packageName == f }?.appLabel },
             onMenu = { menu.open = true }, onOpenSound = { onOpenSound(); soundSheet.show() },
@@ -710,10 +722,10 @@ fun LaunchpadContent(
             onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
         )
         viewSwitcher()
-        Box(Modifier.padding(horizontal = CommsStyle.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line).testTag("lp.tabsLine"))
+        Box(Modifier.padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp).fillMaxWidth().height(CommsStyle.HAIR_DP.dp).background(LocalLp.current.line).testTag("lp.tabsLine"))
         if (hasAccess && com.bos.sphere.core.data.GroupDnd.breaksThrough(groups, dndOn)) Text(
-            L10n.tr("Do Not Disturb is on. Only Priority groups light the edge indicator."), color = LocalLp.current.dim, fontSize = 13.sp,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = RoomyList.H_PAD_DP.dp, vertical = 6.dp).testTag("lp.dnd"),
+            L10n.tr("Do Not Disturb is on. Only Priority groups light the edge indicator."), color = LocalLp.current.dim, fontSize = CommsStyle.NOTE_SP.sp,
+            modifier = Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 8.dp, bottom = 6.dp).testTag("lp.dnd"),
         )
         if (hub != null && !hub.listIsLive) HubBody(
             hub, now, zone, is24, liveKeys = items.mapTo(HashSet()) { it.key }, modifier = Modifier.weight(1f), hasAccess = hasAccess, onRequestAccess = onRequestAccess, panelBody = hubPanelBody,
@@ -728,7 +740,7 @@ fun LaunchpadContent(
         ) {
             if (entries.isEmpty()) {
                 if (!loadingGroups) Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text(L10n.tr(if (unreadOnly) "No unread notifications" else "All caught up"), color = LocalLp.current.dim, fontSize = 18.sp, fontWeight = FontWeight.Light)
+                    Text(L10n.tr(if (unreadOnly) "No unread notifications" else "All caught up"), color = LocalLp.current.dim, fontSize = CommsStyle.EMPTY_SP.sp, fontWeight = FontWeight.Light)
                 }
             } else Column(Modifier.fillMaxSize()) {
               LazyColumn(
@@ -755,10 +767,10 @@ fun LaunchpadContent(
                             )
                         }
                         is Entry.Sub -> Column(Modifier.fillMaxWidth().padding(top = RoomyList.GROUP_GAP_DP.dp)) {
-                            Box(Modifier.padding(horizontal = RoomyList.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
+                            Box(Modifier.padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp).fillMaxWidth().height(CommsStyle.HAIR_DP.dp).background(LocalLp.current.line))
                             Text(
-                                e.title, color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth().padding(start = RoomyList.H_PAD_DP.dp, end = RoomyList.H_PAD_DP.dp, top = 10.dp).testTag("lp.sub.${e.id}"),
+                                e.title, color = LocalLp.current.dim, fontSize = CommsStyle.HEADING_SP.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 10.dp).testTag("lp.sub.${e.id}"),
                             )
                         }
                         is Entry.More -> MoreLine(e.hidden, e.expanded, e.id) {
@@ -802,6 +814,8 @@ fun LaunchpadContent(
               }
             }
         }
+      }
+      }
     }
 
     }
@@ -842,7 +856,7 @@ fun LaunchpadContent(
 }
 
 /**
- * Wave 27: the Comms header of the owner's mock-up. First row: the three-line menu glyph and the title (28 sp, the app's name filter while one is on).
+ * Wave 27: the Comms header of the owner's mock-up (wave 28: re-measured, see CommsStyle). First row: the three-line menu glyph and the title (17 sp, the app's name filter while one is on).
  * Second row: the clock (a tap opens the Sound and Vibration popup through [onOpenSound]) and the four status glyphs. The tab row follows in the
  * view-switcher slot. There is no "Home" button: the home card's visible edge, Back and a swipe close the screen.
  */
@@ -859,24 +873,28 @@ private fun LaunchpadHeader(
     onDoubleTap: () -> Unit,
 ) {
     val ink = LocalLp.current.ink
+    // The menu target is 48 dp of real screen at least; the glyph stays where the mock-up has it (32 dp from the edge) and the title keeps its own left edge.
+    val box = maxOf(CommsStyle.HEADER_ROW_DP.dp, commsTarget())
+    val glyph = CommsStyle.MENU_GLYPH_DP.dp
     Column(
         Modifier.fillMaxWidth()
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleTap() }) },
     ) {
         Row(
-            Modifier.fillMaxWidth().statusBarsPadding().height(56.dp).padding(start = 8.dp, end = CommsStyle.H_PAD_DP.dp),
+            Modifier.fillMaxWidth().statusBarsPadding().padding(top = CommsStyle.HEADER_TOP_DP.dp, start = (CommsStyle.H_PAD_DP.dp - (box - glyph) / 2).coerceAtLeast(0.dp), end = CommsStyle.END_PAD_DP.dp)
+                .height(CommsStyle.HEADER_ROW_DP.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                Modifier.size(48.dp).clip(CircleShape)
+                Modifier.requiredSize(box).clip(CircleShape)
                     .semantics { contentDescription = L10n.tr("Comms menu") }
                     .clickable(onClickLabel = L10n.tr("Comms menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
                 Alignment.Center,
             ) { HamburgerIcon(ink) }
-            Spacer(Modifier.width(9.dp))
             Text(
-                filterLabel ?: L10n.tr("Comms"), color = ink, fontSize = CommsStyle.HEADER_TITLE_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1,
-                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("lp.title"),
+                filterLabel ?: L10n.tr("Comms"), color = ink, fontSize = CommsStyle.TITLE_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).offset(x = CommsStyle.TITLE_X_DP.dp - (CommsStyle.H_PAD_DP.dp + glyph / 2 + box / 2), y = CommsStyle.TITLE_DY_DP.dp).testTag("lp.title"),
             )
         }
         CommsClockRow(snapshot, now, is24, zone, onOpenPanel, onOpenSound)
@@ -886,11 +904,11 @@ private fun LaunchpadHeader(
 /** The three-line menu icon of the owner's mock-up. */
 @Composable
 internal fun HamburgerIcon(color: Color) {
-    Canvas(Modifier.size(20.dp)) {
-        val stroke = 2.4.dp.toPx()
+    Canvas(Modifier.size(CommsStyle.MENU_GLYPH_DP.dp)) {
+        val stroke = CommsStyle.MENU_GLYPH_STROKE_DP.dp.toPx()
         for (i in 0..2) {
-            val y = size.height * (0.22f + 0.28f * i)
-            drawLine(color, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            val y = stroke / 2f + (size.height - stroke) * i / 2f
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
         }
     }
 }

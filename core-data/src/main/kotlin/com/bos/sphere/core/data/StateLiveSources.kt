@@ -234,6 +234,6 @@ class PrefFilesSource(
     }
 
     companion object {
-        val ALLOWED = listOf("home_state", "home_tags", "home_icons", "home_badges", "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", LauncherHapticSettings.FILE)
+        val ALLOWED = listOf("home_state", "home_tags", "home_icons", "home_badges", "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", LauncherHapticSettings.FILE, CommsScaleSettings.FILE)
     }
 }

@@ -32,7 +32,7 @@ import java.util.Locale
 
 /** Wave 25 (STR-02): measures and colours of the hub-style list, kept in one place so rows, tests and the hub views agree. */
 internal object HubStyle {
-    /** Wave 27: no stripe and no compose button any more (the Comms mock-ups show neither); the badge is the 56 dp app icon. */
+    /** Wave 27: no stripe and no compose button any more (the Comms mock-ups show neither); the badge is the app icon (38 dp, wave 28). */
     const val BADGE_DP = CommsStyle.ICON_DP
     /** Where the text of a row starts, from the row's leading edge: the padding, the icon and a gap. */
     const val TEXT_START_DP = CommsStyle.H_PAD_DP + BADGE_DP + CommsStyle.TEXT_GAP_DP

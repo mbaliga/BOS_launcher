@@ -64,7 +64,7 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
                         items = items, rules = emptyList(), prefs = LaunchpadPrefs(mode), readKeys = setOf("c1"), hasAccess = hasAccess, now = now,
                         onClose = { returned++ }, onOpenItem = {}, onOpenApp = {}, onDismissItem = {}, onClearAll = {}, onAddRule = {},
                         onSetDefaultMode = {}, onRequestAccess = {}, policies = policies, systemState = system, zone = zone, onOpenSystemPanel = { opened += it },
-                        endInset = (geo.returnZonePx / density).dp,
+                        endInset = (geo.sliverPx / density).dp,
                     )
                 }
                 // A stand-in for the live home: it is composed at full size and only the layer shrinks it.

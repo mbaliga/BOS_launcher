@@ -269,8 +269,30 @@ class HubTest {
         rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
         rule.waitForIdle()
         assertEquals(HubGrouping.Sender, state.grouping)
-        rule.onNodeWithTag("hub.header.s:Mum").assertExists()
+        // Wave 26: Mum has a single row here, so there is no header that would repeat it (was: a "Mum" header above the "Mum" row).
+        rule.onAllNodesWithTag("hub.header.s:Mum").assertCountEquals(0)
         assertEquals(HubGrouping.Sender, newState(true).grouping)
+    }
+
+    // Wave 26 (launchpadPolish, owner item 2): an app or sender header only for two or more rows, with the count; day bands always.
+    @Test fun HUB_26_historyHeadersAreShownOnlyForTwoOrMoreRowsAndCarryTheCount() {
+        store.observe(feed + n("m3", "demo.chat", "Chat", "Mum", "Bring the dessert", at(10, 11, 50)))
+        state = newState(true)
+        host()
+        rule.onNodeWithTag("hub.options").performClick(); rule.waitForIdle()
+        rule.onNodeWithTag("hub.group.Sender").performClick(); rule.waitForIdle()
+        rule.onNodeWithTag("hub.header.s:Mum").assertExists()
+        rule.onNodeWithTag("hub.headerCount.s:Mum", useUnmergedTree = true).assertExists()
+        assertEquals("2", rule.onNodeWithTag("hub.headerCount.s:Mum", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text })
+        for (single in listOf("s:Team", "s:Standup", "s:Invoice")) rule.onAllNodesWithTag("hub.header.$single").assertCountEquals(0)
+        rule.onNodeWithTag("hub.group.App").performClick(); rule.waitForIdle()
+        rule.onNodeWithTag("hub.header.a:demo.chat").assertExists()
+        rule.onAllNodesWithTag("hub.header.a:demo.cal").assertCountEquals(0)
+        rule.onNodeWithTag("hub.group.Day").performClick(); rule.waitForIdle()
+        rule.onAllNodesWithTag("hub.headerCount.d:", useUnmergedTree = true).assertCountEquals(0)
+        assertTrue(HubLogic.showsGroupHeader(HubGrouping.Day, 1))
+        assertFalse(HubLogic.showsGroupHeader(HubGrouping.Sender, 1))
+        assertTrue(HubLogic.showsGroupHeader(HubGrouping.App, 2))
     }
 
     @Test fun HUB_14_densityAndGroupingHaveButtonEquivalentsInOptions() {

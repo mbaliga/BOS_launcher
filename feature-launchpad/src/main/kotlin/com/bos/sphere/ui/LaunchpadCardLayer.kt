@@ -38,9 +38,7 @@ fun Modifier.homeCardLayer(geometry: LaunchpadCardGeometry, fraction: () -> Floa
     if (f > 0.001f) {
         shape = RoundedCornerShape(p.layerCornerDp.dp)
         clip = true
-        shadowElevation = p.shadowDp.dp.toPx() * p.scale
-        ambientShadowColor = Color.Black.copy(alpha = 0.5f)
-        spotShadowColor = Color.Black.copy(alpha = 0.5f)
+        // Wave 26: no drop shadow; it fell over the notification rows beside the card (the scrim and hairline already separate the card).
     }
 }.drawWithContent {
     drawContent()

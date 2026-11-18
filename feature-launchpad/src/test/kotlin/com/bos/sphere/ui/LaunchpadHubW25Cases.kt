@@ -69,7 +69,7 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
                         items = items, rules = emptyList(), prefs = LaunchpadPrefs(mode), readKeys = setOf("h1", "h2"), hasAccess = true, now = now,
                         onClose = {}, onOpenItem = {}, onOpenApp = {}, onDismissItem = {}, onClearAll = {}, onAddRule = {},
                         onSetDefaultMode = {}, onRequestAccess = {}, zone = zone, menu = menu, onCompose = { composed++ }, viewSwitcher = switcher,
-                        endInset = if (home) (geo.returnZonePx / density).dp else 0.dp,
+                        endInset = if (home) (geo.sliverPx / density).dp else 0.dp,
                     )
                 }
                 if (home) Box(

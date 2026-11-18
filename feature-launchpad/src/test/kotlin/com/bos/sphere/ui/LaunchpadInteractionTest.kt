@@ -78,7 +78,8 @@ class LaunchpadInteractionTest {
     // ---- STR-08 ----
 
     @Test fun STR_08_escapeClosesAndArrowsWalkGroupsThenRows() {
-        setLaunchpad(listOf(n("a1"), n("a2", 1000), n("b1", 2000, "demo.b", "App B")))
+        // Wave 26: a one-item group has no header, so App B gets a second item for its header to exist.
+        setLaunchpad(listOf(n("a1"), n("a2", 1000), n("b1", 2000, "demo.b", "App B"), n("b2", 1500, "demo.b", "App B")))
         key(Key.DirectionDown); rule.waitForIdle()
         rule.onNodeWithTag("lp.group.app:demo.a").assertIsFocused()
         key(Key.DirectionDown); rule.waitForIdle()

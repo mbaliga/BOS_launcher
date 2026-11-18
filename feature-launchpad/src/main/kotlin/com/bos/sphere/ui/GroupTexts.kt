@@ -95,5 +95,17 @@ internal object GroupColumn {
         grouped.map { gs -> Section(gs.group?.name ?: fallbackTitle, gs.key, gs.sections.flatMap { it.items }) }
 
     /** The by-app / by-conversation sub-headings inside a group section are shown only when there is more than one. */
+    /**
+     * Wave 26: a header names a group of two or more items. A group of one item (a sender, conversation or app with a single
+     * notification) has no header: the row below already says the same thing. Date bands, the pinned and digest sections,
+     * the flat list and the user's own groups keep theirs (the flat list has none; its key never reaches a header).
+     */
+    fun showsHeader(sectionKey: String, count: Int): Boolean {
+        val k = sectionKey.substringAfter('/')
+        if (k == com.bos.sphere.core.data.LaunchpadLogic.FLAT_KEY) return false
+        val single = k.startsWith("sender:") || k.startsWith("conv:") || k.startsWith("appconv:") || k.startsWith("app:")
+        return !single || count >= 2
+    }
+
     fun showSubHeads(gs: GroupedSection) = gs.sections.size > 1
 }

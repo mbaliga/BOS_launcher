@@ -32,22 +32,23 @@ internal object OrbitFit {
      */
     fun wheelRoom(availDp: Float): Float = availDp * 0.5f + 8f
 
-    fun boxW(icon: Float) = maxOf(icon + 12f, 56f)
+    fun boxW(icon: Float, rowW: Float = 0f) = maxOf(icon + 12f, 56f, rowW)
     /** Icon, a 3 dp gap and one caption line (10 sp at the font scale and the pinch scale). */
-    fun boxH(icon: Float, fontScale: Float, resultScale: Float = 1f) = icon + 3f + 10f * fontScale * resultScale * 1.3f
+    /** Wave 25: [rowH] is the row of shortcut circles under the caption (0 when no tile has shortcuts). */
+    fun boxH(icon: Float, fontScale: Float, resultScale: Float = 1f, rowH: Float = 0f) = icon + 3f + 10f * fontScale * resultScale * 1.3f + rowH
 
     /**
      * [w] x [h] is the region the Orbit may draw in, [cy] the y of the middle of the category wheel; the wheel and its caption keep a box of
      * [keepLeft] + [keepRight] x 2 [keepHalfH] around it clear. [count] results want a place; fewer are placed only when even the smallest
      * icon leaves no room for more.
      */
-    fun fit(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float = 1f): Fit {
+    fun fit(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float = 1f, rowW: Float = 0f, rowH: Float = 0f): Fit {
         var best: Fit? = null
         val want = minOf(count, RadarRings.capacities.sum())
         var icon = MAX_ICON
         while (true) {
             // The elliptical rings first (the Orbit look); when they cannot hold every result at this size, a staggered fill of the same region may.
-            for (f in listOf(place(w, h, cy, keepLeft, keepRight, keepHalfH, count, fontScale, resultScale, icon), packed(w, h, cy, keepLeft, keepRight, keepHalfH, count, fontScale, resultScale, icon))) {
+            for (f in listOf(place(w, h, cy, keepLeft, keepRight, keepHalfH, count, fontScale, resultScale, icon, rowW, rowH), packed(w, h, cy, keepLeft, keepRight, keepHalfH, count, fontScale, resultScale, icon, rowW, rowH))) {
                 if (best == null || f.slots.size > best.slots.size) best = f
                 if (f.slots.size >= want) return f
             }
@@ -61,8 +62,8 @@ internal object OrbitFit {
      * The crowded case: an even grid over the whole region (every cell at least a tile box), minus what the wheel keeps, filled from the middle outward so the
      * best results are still the innermost. The ring ellipses are then the tiers' outlines.
      */
-    private fun packed(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float, icon: Float): Fit {
-        val bw = boxW(icon); val bh = boxH(icon, fontScale, resultScale)
+    private fun packed(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float, icon: Float, rowW: Float, rowH: Float): Fit {
+        val bw = boxW(icon, rowW); val bh = boxH(icon, fontScale, resultScale, rowH)
         val cx = w / 2f
         val left = bw / 2f + EDGE + BOB; val top = bh / 2f + BOB
         val availW = w - 2 * left; val availH = h - 2 * top
@@ -89,8 +90,8 @@ internal object OrbitFit {
         return Fit(icon, bw, bh, slots, rings, cells.size, guides = false) // a tight fill does not sit on ellipses, so no guide lines are drawn
     }
 
-    private fun place(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float, icon: Float): Fit {
-        val bw = boxW(icon); val bh = boxH(icon, fontScale, resultScale)
+    private fun place(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float, icon: Float, rowW: Float, rowH: Float): Fit {
+        val bw = boxW(icon, rowW); val bh = boxH(icon, fontScale, resultScale, rowH)
         val cx = w / 2f
         val padX = bw / 2f + EDGE + BOB
         val padY = bh / 2f + BOB

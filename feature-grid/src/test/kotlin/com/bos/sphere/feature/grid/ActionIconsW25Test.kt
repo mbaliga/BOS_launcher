@@ -113,14 +113,14 @@ class ActionIconsW25Test {
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun PAL_03_aShortcutWithAnIconShowsThatIconInItsPill() {
+    fun PAL_03_aShortcutWithAnIconShowsThatIconInItsCircle() {
         ShortcutIcons.source = ShortcutIconSource { _, _, _, _, _ -> ColorDrawable(AColor.RED) }
         val mail = app("demo.mail", "Mail")
         val h = shortcut("demo.mail", "compose", "Scan and pay")
-        rule.setContent { Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF101018))) { ShortcutPill(h.title, "pill", 1f, hit = h, app = mail) {} } }
+        rule.setContent { Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF101018))) { ActionCircle(h.title, "pill", onClick = {}) { HitLeadingIcon(h, 24.dp, androidx.compose.ui.graphics.Color.White, app = mail) } } }
         rule.waitUntil(5_000) { ShortcutIcons.peek(h) is ImageBitmap }
         rule.waitForIdle()
-        assertTrue("the shortcut's own icon is drawn in the pill", redPixels("pill", "w25-actionIcons-shortcut-own-icon") > 100)
+        assertTrue("the shortcut's own icon is drawn in its circle", redPixels("pill", "w25-actionIcons-shortcut-own-icon") > 100)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -128,7 +128,7 @@ class ActionIconsW25Test {
         ShortcutIcons.source = ShortcutIconSource { _, _, _, _, _ -> null }
         val mail = app("demo.mail", "Mail")
         val h = shortcut("demo.mail", "compose", "Compose")
-        rule.setContent { Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF101018))) { ShortcutPill(h.title, "pill", 1f, hit = h, app = mail) {} } }
+        rule.setContent { Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF101018))) { ActionCircle(h.title, "pill", onClick = {}) { HitLeadingIcon(h, 24.dp, androidx.compose.ui.graphics.Color.White, app = mail) } } }
         rule.waitUntil(5_000) { ShortcutIcons.peek(h) === ShortcutIcons.Miss }
         rule.waitForIdle()
         // Never the shortcut colour; the leading cell is occupied (app icon, or the built-in glyph when the app has none)

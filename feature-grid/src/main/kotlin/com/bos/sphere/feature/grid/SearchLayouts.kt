@@ -127,15 +127,19 @@ private val StripTile = 76.dp
 
 /**
  * Wave 25: what the Filmstrip draws in the height it is given: the tile (76 dp, down to 32 dp), the caption line under it (26 dp), the footnote line
- * (16 dp) and the nested shortcut pills. [of] drops the extras and shrinks the tile before any of it would run past [heightDp].
+ * (16 dp) and, for an app with shortcuts, the row of shortcut circles (48 dp, part of the tile, so the height is reserved). [of] drops the row and the
+ * extras and shrinks the tile before any of it would run past [heightDp].
  */
 internal class StripFit(val tile: Dp, val caption: Boolean, val footnote: Boolean, val pills: Boolean) {
     companion object {
         val Full = StripFit(StripTile, caption = true, footnote = true, pills = true)
-        fun of(heightDp: Float): StripFit {
+        fun of(heightDp: Float, withRow: Boolean = false): StripFit {
             // 4 dp of air under the caption (the caller's bottom padding).
             val room = heightDp - 4f
-            if (room >= 76f + 26f + 16f) return Full
+            val row = ShortcutForm.SLOT_DP
+            if (withRow && room >= 76f + row + 26f + 16f) return Full
+            if (withRow && room >= 76f + row + 26f) return StripFit(StripTile, caption = true, footnote = false, pills = true)
+            if (room >= 76f + 26f + 16f) return StripFit(StripTile, caption = true, footnote = true, pills = false)
             if (room >= 76f + 26f) return StripFit(StripTile, caption = true, footnote = false, pills = false)
             val tile = (room - 26f).coerceIn(32f, 76f)
             if (room - 26f >= 32f) return StripFit(tile.dp, caption = true, footnote = false, pills = false)
@@ -274,7 +278,8 @@ private fun tileCaption(t: Tile, query: String): AnnotatedString {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StripTileView(tile: Tile, actions: TileActions, fit: StripFit) {
-  Column(horizontalAlignment = Alignment.CenterHorizontally) {
+  val rowW = if (tile is Tile.App && fit.pills && tile.shortcuts.isNotEmpty()) maxOf(fit.tile.value, ShortcutForm.smallRowWidth(tile.shortcuts.size)).dp else fit.tile
+  Column(Modifier.width(rowW), horizontalAlignment = Alignment.CenterHorizontally) {
     Box(
         Modifier
             .size(fit.tile)
@@ -285,8 +290,8 @@ private fun StripTileView(tile: Tile, actions: TileActions, fit: StripFit) {
             .semantics(mergeDescendants = true) { contentDescription = tile.caption() }
             .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
     ) { TileFace(tile, fit.tile) }
-    // PAL-03: the app's own shortcuts sit inside its tile (not when the room is short: they would hang below it).
-    if (tile is Tile.App && fit.pills) NestedShortcutPills(tile, NestedShortcuts.SMALL_SHOWN, fit.tile, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) })
+    // PAL-03, wave 25 (shortcutForm): the app's shortcuts are one row of circles under its tile; the row's height is part of the layout (dropped, not overlapped, when the room is short).
+    if (tile is Tile.App && fit.pills) ShortcutCircleRow(tile, rowW, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) })
   }
 }
 
@@ -363,8 +368,11 @@ internal fun Orbit(
         // Wave 25 (owner: "Don't let icons exit the display area. I should be able to see all recents at once"): the rings are ellipses fitted to this
         // region ([OrbitFit]); icons shrink before anything is dropped and no tile box lies even partly outside. The rings no longer revolve
         // through the whole screen (that is what carried icons off it); with motion on each tile drifts a few dp around its place.
-        val fit = remember(wDp, hDp, cyDp, tiles.size, wheel, fs, z) {
-            OrbitFit.fit(wDp, hDp, cyDp, 90f * fs, 100f * fs, wheel.halfVisible.value, tiles.size, fs, z)
+        // Wave 25 (shortcutForm): a tile with shortcuts carries a row of circles under its caption; every box reserves that row (width and height), so no two boxes overlap.
+        val rowW = tiles.maxOfOrNull { (it as? Tile.App)?.shortcuts?.size?.let(ShortcutForm::smallRowWidth) ?: 0f } ?: 0f
+        val rowH = if (rowW > 0f) ShortcutForm.SLOT_DP else 0f
+        val fit = remember(wDp, hDp, cyDp, tiles.size, wheel, fs, z, rowW) {
+            OrbitFit.fit(wDp, hDp, cyDp, 90f * fs, 100f * fs, wheel.halfVisible.value, tiles.size, fs, z, rowW, rowH)
         }
         val shown = tiles.take(fit.slots.size)
         androidx.compose.runtime.SideEffect { onVisibleCount(shown.size) }
@@ -418,7 +426,7 @@ internal fun Orbit(
                     tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
                 )
-                if (tile is Tile.App) NestedShortcutPills(tile, NestedShortcuts.SMALL_SHOWN, fit.boxW.dp, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) })
+                if (tile is Tile.App) ShortcutCircleRow(tile, fit.boxW.dp, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) }, modifier = Modifier.padding(top = 0.dp))
             }
         }
         if (footnote != null) {
@@ -440,10 +448,10 @@ internal fun Orbit(
 internal val RadarStripHeight = 52.dp
 
 /**
- * Wave 20: the compact strip under the typed Orbit rings: the web hand-off rows (and a Filenames refinement when files can be
- * searched) as one scrolling line of pills, so they stay one tap away and the rings keep the screen.
+ * Wave 25 (shortcutForm): the strip under the typed Orbit rings holds everything that is not an app, a person or a file: the web hand-off rows, an inline answer, launcher
+ * commands, settings pages and the Filenames refinement. Each is one [ActionCircle], the same form as an app's shortcuts, one scrolling row, 48 dp high; the label is
+ * the content description and the long-press tooltip.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ResultStrip(
     tiles: List<Tile>,
@@ -452,40 +460,30 @@ internal fun ResultStrip(
     onFilenames: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val z = LocalResultScale.current
     val selectedKey = LocalRadarSelection.current
-    // Wave 22 (audit): every pill is a 48 dp high labelled button (the pill keeps its look inside it), and the strip grows with a big text
-    // size instead of clipping the pill (it used to be a fixed 52 dp high with 6 dp padding, so a 34 dp pill was the target).
     androidx.compose.foundation.layout.Row(
-        modifier.fillMaxWidth().heightIn(min = RadarStripHeight).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 2.dp),
+        modifier.fillMaxWidth().heightIn(min = RadarStripHeight).testTag(RADAR_STRIP_TAG).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         tiles.forEach { t ->
-            Box(
-                Modifier.heightIn(min = 48.dp)
-                    .secondaryClick { actions.onSecondary(t) }
-                    .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(t) }, onLongClick = { actions.onLongPress(t) })
-                    .semantics { role = Role.Button},
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    t.caption(), color = Color.White, fontSize = (13 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 260.dp).radarSelectedRing(selectedKey == t.key, androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x33FFFFFF))
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                )
-            }
+            ActionCircle(t.caption(), "strip.${t.key}", onClick = { actions.onTap(t) }, selected = selectedKey == t.key) { StripGlyph(t) }
         }
-        if (filenames != null) {
-            Box(Modifier.heightIn(min = 48.dp).clickable(onClick = onFilenames).semantics { role = Role.Button }, contentAlignment = Alignment.Center) {
-                Text(
-                    filenames, color = Color(0xCCFFFFFF), fontSize = (13 * z).sp, maxLines = 1,
-                    modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Color(0x1FFFFFFF))
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                )
-            }
-        }
+        if (filenames != null) ActionCircle(filenames, "strip.filenames", onClick = onFilenames) { KindIcon(ActionKind.FilterFiles, ShortcutForm.GLYPH_DP.dp, Color.White) }
+    }
+}
+
+internal const val RADAR_STRIP_TAG = "radarStrip"
+
+/** The 24 dp glyph of a strip circle: the action's own icon (ActionIcons), the engine glyph for a web row, the settings glyph for a setting. */
+@Composable
+private fun StripGlyph(t: Tile) {
+    val d = ShortcutForm.GLYPH_DP.dp
+    when (t) {
+        is Tile.Hit -> HitLeadingIcon(t.hit, d, Color.White)
+        is Tile.Web -> KindIcon(when (t.row) { is WebRow.Open -> ActionKind.OpenInBrowser; is WebRow.Search -> ActionKind.SearchWeb; is WebRow.PlayStore -> ActionKind.RefineApps }, d, Color.White)
+        is Tile.Setting -> KindIcon(ActionKind.OpenSettingsPage, d, Color.White)
+        else -> TileFace(t, d)
     }
 }
 
@@ -650,7 +648,8 @@ private fun FlatTileRow(
             val ctx = androidx.compose.ui.platform.LocalContext.current
             tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
         }
-        else -> Row(
+        else -> Column(Modifier.fillMaxWidth()) {
+        Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
@@ -670,7 +669,6 @@ private fun FlatTileRow(
                     if (tile is Tile.Hit) highlight(tile.hit.title, query, Color(0xFFB9A8FF)) else AnnotatedString(tile.caption()),
                     color = if (tile is Tile.Allow) Color(0x99FFFFFF) else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                if (tile is Tile.App) NestedShortcutRow(tile, onRun = { onTap(Tile.Hit(it)) })
                 if (tile is Tile.Hit) {
                     tile.hit.subtitle?.let { Text(it, color = Color(0x99FFFFFF), fontSize = (12 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     tile.hit.snippet?.let {
@@ -681,6 +679,9 @@ private fun FlatTileRow(
             if (tile is Tile.Hit) sourceBadge(tile.hit.sourcePackage)?.let {
                 Text(it, color = Color(0xCCFFFFFF), fontSize = (10 * z).sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp).background(Color(0x33FFFFFF), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
             }
+        }
+        // Wave 25 (shortcutForm): the app's shortcut circles are a row of their own under the app's row (not inside its tap area), aligned with the name.
+        if (tile is Tile.App) ShortcutCircleRow(tile, 2000.dp, onRun = { onTap(Tile.Hit(it)) }, onMore = { onPreview(tile) }, modifier = Modifier.padding(start = 16.dp + 36.dp * z + 12.dp - 4.dp), start = true)
         }
     }
 }
@@ -719,7 +720,7 @@ internal fun ResultPreview(
                 tile.hit.subtitle?.let { Text(it, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp)) }
                 tile.hit.snippet?.let { Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xE6FFFFFF), fontSize = 16.sp, maxLines = 12, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp)) }
             }
-            if (tile is Tile.App) NestedShortcutRow(tile, onRun = onShortcut, modifier = Modifier.padding(top = 10.dp))
+            if (tile is Tile.App) ShortcutPreviewList(tile, onRun = onShortcut, modifier = Modifier.padding(top = 10.dp))
             if (tile is Tile.Setting) {
                 Text(tile.entry.category, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                 if (tile.entry.description.isNotEmpty()) Text(tile.entry.description, color = Color(0xE6FFFFFF), fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))

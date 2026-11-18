@@ -124,7 +124,7 @@ class OrbitTypingW20UiTest {
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
     fun PAL_18_stripKeepsTheWebRowsOneTapAwayBelowTheRingsPortraitDark() {
         open(SearchLayout.Orbit, "bra")
-        rule.onAllNodesWithText("for “bra”", substring = true).fetchSemanticsNodes().let { assertTrue("web row on the strip", it.isNotEmpty()) }
+        rule.onAllNodesWithContentDescription("for “bra”", substring = true).fetchSemanticsNodes().let { assertTrue("web row on the strip", it.isNotEmpty()) }
         // The engine hand-off is the first pill, the Play Store row after it.
         val strip = SearchData(query = "bra", apps = emptyList(), contacts = emptyList(), askContacts = false,
             web = com.bos.sphere.feature.search.sections("bra", LauncherPrefs().webEngine, emptyList<AppEntry>(), emptyList<ContactRow>(), searchWeb = true, searchContacts = false).web,
@@ -143,7 +143,7 @@ class OrbitTypingW20UiTest {
         open(SearchLayout.Orbit, "a")
         assertTrue(orbitTiles().isNotEmpty())
         assertEquals("Best match", orbitTiles().first().second)
-        assertTrue(rule.onAllNodesWithText("Search Play Store for", substring = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithContentDescription("Search Play Store for", substring = true).fetchSemanticsNodes().isNotEmpty())
         shoot("w20-typed-orbit-landscape-dark")
     }
 

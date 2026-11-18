@@ -545,7 +545,8 @@ internal fun SearchScreen(
                         val wheelRow: @Composable () -> Unit = {
                             // "SEARCH" ends just left of the centre line and the wheel starts just right of it.
                             Row(Modifier.fillMaxWidth()) {
-                                QueryDisplay(onTap = { showKeyboard() }, modifier = Modifier.weight(1f).padding(end = 10.dp), height = wheel.height)
+                                // Wave 25 (shortcutForm): its tap area is only the word and the visible part of the wheel's height, so a result beside it never lies under it.
+                                Box(Modifier.weight(1f).align(Alignment.CenterVertically).padding(end = 10.dp), contentAlignment = Alignment.CenterEnd) { QueryDisplay(onTap = { showKeyboard() }, modifier = Modifier.widthIn(min = 48.dp), height = minOf(wheel.height, wheel.halfVisible * 2)) }
                                 Box(Modifier.weight(1f)) {
                                     CategoryWheel(
                                         selected = selected, counts = counts,
@@ -579,7 +580,7 @@ internal fun SearchScreen(
                                 tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                                 expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
                                 actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max = below).clipToBounds().padding(bottom = 4.dp),
-                                emptyHint = emptyHint, fit = StripFit.of(below.value),
+                                emptyHint = emptyHint, fit = StripFit.of(below.value, withRow = data.tiles(selected).any { it is Tile.App && it.shortcuts.isNotEmpty() }),
                             )
                         }
                     }

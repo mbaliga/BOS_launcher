@@ -283,9 +283,9 @@ fun LaunchpadPanel(
     menu: LaunchpadMenuState = rememberLaunchpadMenu(),
     /** Wave 27: a tap on the header clock; the host opens the Sound and Vibration popup. Nothing else is wired to it here. */
     onOpenSound: () -> Unit = {},
-    /** Wave 25 (STR-02): a slot in the list's top bar for the history, files, usage and timeline view switcher. */
+    /** Wave 25 (STR-02): a slot in the list's top bar for the history, files and timeline view switcher. */
     viewSwitcher: @Composable () -> Unit = {},
-    /** Wave 25 (hubData): renders the Files, Usage and Timeline views of the hub; null leaves the hub with the history views only. */
+    /** Wave 25 (hubData): renders the Files and Timeline views of the hub; null leaves the hub with the history views only. */
     panelBody: (@Composable (HubView) -> Unit)? = null,
 ) {
     rememberLaunchpadInit()
@@ -344,7 +344,7 @@ fun LaunchpadPanel(
             LaunchpadSettings.pruneToFeed(items.map { it.key }.toSet(), System.currentTimeMillis())
         }
 
-        // The hub is on when the host supplies the Files, Usage and Timeline views (the app does); a bare panel keeps the live grouped list.
+        // The hub is on when the host supplies the Files and Timeline views (the app does); a bare panel keeps the live grouped list.
         val hub = remember(panelBody != null) { if (panelBody == null) null else HubState(HubPrefs.of(ctx), com.bos.sphere.core.data.NotificationHistory.init(ctx), true, liveAll = true) }
         if (hub != null) LaunchedEffect(hub) { LaunchpadHubNav.requests.collect { v -> if (v != null) { hub.select(v); LaunchpadHubNav.take() } } }
         LaunchpadContent(
@@ -450,7 +450,7 @@ fun LaunchpadContent(
     menu: LaunchpadMenuState = rememberLaunchpadMenu(),
     /** Wave 27: a tap on the header clock (the Sound and Vibration popup); see [LaunchpadPanel]. */
     onOpenSound: () -> Unit = {},
-    /** Wave 25 (STR-02): the slot for the view switcher (history, files, usage, timeline), in the top bar next to the title. */
+    /** Wave 25 (STR-02): the slot for the view switcher (history, files, timeline), in the top bar next to the title. */
     viewSwitcher: @Composable () -> Unit = {},
     hub: HubState? = null,
     hubPanelBody: @Composable (HubView) -> Unit = {},

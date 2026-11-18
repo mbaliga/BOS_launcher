@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,7 +55,9 @@ import com.bos.sphere.core.catalog.RecentFilesModel
 import com.bos.sphere.core.catalog.RecentFilesSource
 import com.bos.sphere.core.catalog.Timeline
 import com.bos.sphere.core.catalog.TimelineEntry
-import com.bos.sphere.core.catalog.UsageSplit
+import com.bos.sphere.ui.AppTime
+import com.bos.sphere.ui.UsageWeekRepo
+import com.bos.sphere.ui.UsageWeekSource
 import com.bos.sphere.core.catalog.UsageStatsSource
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.LaunchEvent
@@ -67,25 +71,27 @@ import java.util.Calendar
 import java.util.Date
 
 /**
- * HOM-15, HOM-17 and HOM-18, wave 25 (hubData): the Files, Usage and Timeline panels. They are views of the Launchpad hub now (one place,
- * no sheet of their own); the hub renders this for its Files, Usage and Timeline views. Files lists recent files from folders the user
- * granted and the pinned (granted) folders; Usage splits today's screen time by app; Timeline lists scheduled launches and app opens.
+ * HOM-15, HOM-17 and HOM-18, wave 25 (hubData): the Files and Timeline panels. They are views of the Launchpad hub (one place, no sheet of their
+ * own); the hub renders this for its Files and Timeline views. Files lists recent files from folders the user granted and the pinned (granted)
+ * folders; Timeline lists scheduled launches and app opens. Wave 28 (usageTimeline): the Usage view is gone; Timeline carries a small usage
+ * visualization above its list ([UsageTimelineBlock]; the data is the same [UsageStatsSource]).
  */
 @Composable
 fun HomePanelsBody(
-    tab: com.bos.sphere.core.catalog.PanelTab,
+    view: com.bos.sphere.ui.HubView,
     history: List<LaunchEvent>,
     appsByKey: Map<String, AppEntry>,
     onLaunch: (AppEntry) -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val prefs = remember { HomePanelPrefs(ctx) }
-    // The panels are drawn with the dark panel palette, so they sit on its own surface whichever Launchpad theme is on.
-    Box(Modifier.fillMaxSize().background(HyleColors.Surface).padding(horizontal = 18.dp, vertical = 12.dp)) {
-        when (tab) {
-            com.bos.sphere.core.catalog.PanelTab.Files -> FilesPanel(prefs)
-            com.bos.sphere.core.catalog.PanelTab.Usage -> UsagePanel(appsByKey, prefs, onLaunch)
-            com.bos.sphere.core.catalog.PanelTab.Timeline -> TimelinePanel(history, appsByKey, prefs, onLaunch)
+    // Files is drawn with the dark panel palette, so it sits on its own surface whichever Launchpad theme is on. Wave 28: Timeline sits on the Comms
+    // page itself (its usage block is drawn in the page's ink on the page's ground), so it follows the dark and light looks.
+    val modifier = if (view == com.bos.sphere.ui.HubView.Timeline) Modifier.fillMaxSize() else Modifier.fillMaxSize().background(HyleColors.Surface)
+    Box(modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
+        when (view) {
+            com.bos.sphere.ui.HubView.Timeline -> TimelinePanel(history, appsByKey, prefs, onLaunch)
+            else -> FilesPanel(prefs)
         }
     }
 }
@@ -123,10 +129,18 @@ fun HomePanelSettings() {
     }
 }
 
+/** The ink of a panel's text and chips: the dark panel palette by default, the Comms page's own colours for Timeline (wave 28). */
+private class PanelInk(val ink: Color, val bright: Color, val dim: Color, val chip: Color) {
+    companion object {
+        val Dark = PanelInk(HyleColors.Ink, HyleColors.InkBright, HyleColors.InkDim, Color(0x12FFFFFF))
+        @Composable fun comms() = com.bos.sphere.ui.commsPanelColors().let { PanelInk(it.ink2, it.ink, it.dim, it.ink.copy(alpha = 0.07f)) }
+    }
+}
+
 @Composable
-private fun <T> SettingChips(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
+private fun <T> SettingChips(options: List<T>, selected: T, label: (T) -> String, ink: PanelInk = PanelInk.Dark, onSelect: (T) -> Unit) {
     Row(Modifier.padding(top = 6.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { o -> PanelTab(label(o), o == selected) { onSelect(o) } }
+        options.forEach { o -> PanelTab(label(o), o == selected, ink) { onSelect(o) } }
     }
 }
 
@@ -134,24 +148,24 @@ private fun folderName(tree: Uri): String =
     runCatching { Uri.decode(tree.lastPathSegment.orEmpty()).substringAfterLast(':').ifEmpty { tree.toString() } }.getOrDefault(tree.toString())
 
 @Composable
-private fun PanelTab(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun PanelTab(text: String, selected: Boolean, ink: PanelInk = PanelInk.Dark, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Text(
-        text, color = if (selected) HyleColors.InkBright else HyleColors.Ink, fontSize = 13.sp,
+        text, color = if (selected) ink.bright else ink.ink, fontSize = 13.sp,
         // Wave 26 (audit): a 48 dp touch row, a radio role and the selected state (it was a bare clickable text, 31 dp high, announced as nothing).
         modifier = Modifier.heightIn(min = 48.dp)
             .selectable(selected = selected, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = onClick)
             .wrapContentHeight(androidx.compose.ui.Alignment.CenterVertically)
-            .background(if (selected) HyleColors.Violet.copy(alpha = 0.3f) else Color(0x12FFFFFF), shape).padding(horizontal = 14.dp, vertical = 8.dp),
+            .background(if (selected) HyleColors.Violet.copy(alpha = 0.3f) else ink.chip, shape).padding(horizontal = 14.dp, vertical = 8.dp),
     )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Line(title: String, sub: String, onLong: (() -> Unit)? = null, onClick: (() -> Unit)? = null) {
-    Column(Modifier.fillMaxWidth().then(if (onClick != null) Modifier.combinedClickable(onLongClick = onLong, onClick = onClick) else Modifier).padding(vertical = 7.dp)) {
-        Text(title, color = HyleColors.InkBright, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (sub.isNotEmpty()) Text(sub, color = HyleColors.InkDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun Line(title: String, sub: String, onLong: (() -> Unit)? = null, ink: PanelInk = PanelInk.Dark, tag: String? = null, onClick: (() -> Unit)? = null) {
+    Column(Modifier.fillMaxWidth().then(if (tag != null) Modifier.testTag(tag) else Modifier).then(if (onClick != null) Modifier.combinedClickable(onLongClick = onLong, onClick = onClick) else Modifier).padding(vertical = 7.dp)) {
+        Text(title, color = ink.bright, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (sub.isNotEmpty()) Text(sub, color = ink.dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -209,66 +223,10 @@ private fun FilesPanel(prefs: HomePanelPrefs) {
 }
 
 @Composable
-private fun UsagePanel(appsByKey: Map<String, AppEntry>, prefs: HomePanelPrefs, onLaunch: (AppEntry) -> Unit) {
-    val context = LocalContext.current
-    val source = remember { UsageStatsSource(context) }
-    var granted by remember { mutableStateOf(source.granted()) }
-    var slices by remember { mutableStateOf(emptyList<com.bos.sphere.core.catalog.UsageSlice>()) }
-    var range by remember { mutableStateOf(prefs.usageRange) }
-    // Coming back from the system usage-access screen re-checks the grant.
-    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
-    var resumes by remember { mutableIntStateOf(0) }
-    androidx.compose.runtime.DisposableEffect(lifecycle) {
-        val o = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) resumes++ }
-        lifecycle.addObserver(o)
-        onDispose { lifecycle.removeObserver(o) }
-    }
-    LaunchedEffect(resumes, range) {
-        granted = source.granted()
-        if (granted) withContext(Dispatchers.IO) {
-            val midnight = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
-            val start = range.startMs(midnight)
-            slices = UsageSplit.build(source.samples(start, System.currentTimeMillis()))
-        }
-    }
-    val labels = remember(appsByKey) { appsByKey.values.associate { it.packageName to it.label } }
-    val appsByPackage = remember(appsByKey) { appsByKey.values.filter { it.user == android.os.Process.myUserHandle() }.associateBy { it.packageName } }
-    if (!granted) {
-        Column {
-            Text(L10n.tr("Usage access is off. It lets the launcher read how long each app was open today. The numbers stay on this device."), color = HyleColors.Ink, fontSize = 13.sp)
-            Text(L10n.tr("Open usage access settings"), color = HyleColors.Violet, fontSize = 13.sp, modifier = Modifier.clickable {
-                com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { // CFG-07
-                    runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                }
-            }.padding(vertical = 10.dp))
-        }
-        return
-    }
-    val rangeChips: @Composable () -> Unit = { SettingChips(UsageRange.entries, range, { L10n.tr(it.label) }) { range = it; prefs.usageRange = it } }
-    if (slices.isEmpty()) { Column { rangeChips(); Text(L10n.tr("No screen time recorded yet."), color = HyleColors.Ink, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) }; return }
-    Column {
-        rangeChips()
-        Text(L10n.tr(range.label) + ": " + UsageSplit.duration(UsageSplit.totalMs(slices)), color = HyleColors.InkBright, fontSize = 16.sp, modifier = Modifier.padding(vertical = 10.dp))
-        // One proportional bar, then the legend.
-        Row(Modifier.fillMaxWidth().height(14.dp).background(Color(0x12FFFFFF), RoundedCornerShape(7.dp))) {
-            slices.forEachIndexed { i, s -> Box(Modifier.weight(s.share.coerceAtLeast(0.01f)).height(14.dp).background(sliceColor(i))) }
-        }
-        slices.forEachIndexed { i, s ->
-            val app = appsByPackage[s.packageName]
-            Row(Modifier.padding(top = 8.dp).then(if (app != null) Modifier.clickable { onLaunch(app) } else Modifier), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.padding(top = 4.dp).height(10.dp).fillMaxWidth(0.03f).background(sliceColor(i)))
-                Text("${if (s.packageName.isEmpty()) L10n.tr("Other") else labels[s.packageName] ?: s.packageName}  ${UsageSplit.duration(s.ms)}  ${(s.share * 100).toInt()}%", color = HyleColors.Ink, fontSize = 13.sp)
-            }
-        }
-    }
-}
-
-private fun sliceColor(i: Int) = listOf(Color(0xFF7C5CFF), Color(0xFF3FB6A8), Color(0xFFE5A04D), Color(0xFFE5484D), Color(0xFF5B9BF0), Color(0xFF8A90A8))[i % 6]
-
-@Composable
 private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, AppEntry>, prefs: HomePanelPrefs, onLaunch: (AppEntry) -> Unit) {
     val context = LocalContext.current
     val now = System.currentTimeMillis()
+    val ink = PanelInk.comms()
     var depth by remember { mutableStateOf(prefs.timelineDepth) }
     var withScheduled by remember { mutableStateOf(prefs.timelineScheduled) }
     val entries = remember(history, appsByKey, depth, withScheduled) {
@@ -279,19 +237,42 @@ private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, App
     }
     val startOfToday = remember { Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis }
     val fmt = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
-    val chips: @Composable () -> Unit = {
-        SettingChips(TimelineDepth.entries, depth, { L10n.tr(it.label) }) { depth = it; prefs.timelineDepth = it }
-        SettingChips(listOf(true, false), withScheduled, { if (it) L10n.tr("With scheduled launches") else L10n.tr("Opens only") }) { withScheduled = it; prefs.timelineScheduled = it }
-    }
-    if (entries.isEmpty()) { Column { chips(); Text(L10n.tr("Nothing yet. Opened apps and scheduled launches appear here."), color = HyleColors.Ink, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) }; return }
     val rows = remember(entries, startOfToday) { TimelineView.rows(entries, startOfToday, java.util.TimeZone.getDefault()) }
-    LazyColumn {
-        item { chips() }
-        items(rows) { r ->
+    val usage = remember(context) { UsageWeekHost.repo(context) }
+    val labelOf: (String) -> String = remember(appsByKey) { val labels = appsByKey.values.associate { it.packageName to it.label }; { pkg -> labels[pkg] ?: pkg } }
+    // Wave 28: the usage block is the first item of the list, so it scrolls away with it and the list opens scrolled to the top.
+    LazyColumn(Modifier.testTag("timeline.list")) {
+        item { com.bos.sphere.ui.UsageTimelineBlock(usage, labelOf) }
+        item {
+            SettingChips(TimelineDepth.entries, depth, { L10n.tr(it.label) }, ink) { depth = it; prefs.timelineDepth = it }
+            SettingChips(listOf(true, false), withScheduled, { if (it) L10n.tr("With scheduled launches") else L10n.tr("Opens only") }, ink) { withScheduled = it; prefs.timelineScheduled = it }
+        }
+        if (entries.isEmpty()) item { Text(L10n.tr("Nothing yet. Opened apps and scheduled launches appear here."), color = ink.ink, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) }
+        itemsIndexed(rows) { i, r ->
             val e = r.entry
-            if (r.header) Text(if (r.dayArg == null) L10n.tr(r.dayKey) else L10n.tr(r.dayKey, r.dayArg), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
+            if (r.header) Text(if (r.dayArg == null) L10n.tr(r.dayKey) else L10n.tr(r.dayKey, r.dayArg), color = ink.dim, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
             val app = if (e.key.isNotEmpty()) appsByKey[e.key] else null
-            Line((if (e.scheduled) L10n.tr("Scheduled") + ": " else "") + e.label, fmt.format(Date(e.timeMs)), onClick = app?.let { a -> { onLaunch(a) } })
+            Line((if (e.scheduled) L10n.tr("Scheduled") + ": " else "") + e.label, fmt.format(Date(e.timeMs)), ink = ink, tag = "timeline.row.$i", onClick = app?.let { a -> { onLaunch(a) } })
+        }
+    }
+}
+
+/**
+ * Wave 28: the usage statistics source the Timeline's usage block reads: the same [UsageStatsSource] the Usage panel and the Usage tile use.
+ * One repository for the process, so the week it read (and cached) survives the panel closing and opening.
+ */
+internal object UsageWeekHost {
+    @Volatile private var repo: UsageWeekRepo? = null
+    /** Tests supply their own source; null restores the real one. */
+    internal fun setForTest(r: UsageWeekRepo?) { repo = r }
+
+    fun repo(context: android.content.Context): UsageWeekRepo = repo ?: synchronized(this) {
+        repo ?: run {
+            val src = UsageStatsSource(context.applicationContext)
+            UsageWeekRepo(object : UsageWeekSource {
+                override fun granted() = src.granted()
+                override fun samples(fromMs: Long, toMs: Long) = src.samples(fromMs, toMs).map { AppTime(it.packageName, it.foregroundMs) }
+            }).also { repo = it }
         }
     }
 }

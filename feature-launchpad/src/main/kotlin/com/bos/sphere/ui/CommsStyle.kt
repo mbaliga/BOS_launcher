@@ -364,3 +364,9 @@ internal fun GroupModeGlyph(mode: GroupMode, color: Color, glyphDp: Float = Comm
         }
     }
 }
+
+/** Wave 28: the colours of the Comms page for a panel the host draws inside it (the app's Timeline body), so it follows the dark and light looks. */
+class CommsPanelColors(val ink: Color, val ink2: Color, val dim: Color, val line: Color, val bg: Color)
+
+@androidx.compose.runtime.Composable
+fun commsPanelColors(): CommsPanelColors = LocalLp.current.let { CommsPanelColors(it.ink, it.ink2, it.dim, it.line, it.bg) }

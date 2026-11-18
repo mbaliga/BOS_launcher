@@ -35,3 +35,5 @@ Live notifications: a history row whose notification is still in the shade opens
 - History records only while notification access is on and the listener is bound; the hub says so when access is off.
 - History rows have no swipe actions (tap, expand, buttons); the live All list keeps its row swipes.
 - Merge note: the `viewSwitcher` slot parameter of `LaunchpadContent` is declared here too (same name and type as the launchpadHub stream); the merger keeps one and places `HubSwitcher` in the top bar.
+
+Wave 28 (usageTimeline): the Usage view is merged into Timeline (see usageViz.md); the hub has Files and Timeline panels, and `usage` links, search entries and a stored default view open Timeline.

@@ -76,3 +76,12 @@ class DeviceKitTest {
         assertNotNull(DeviceReport.build("v", "d", "a", null, emptyMap(), emptyList()).takeIf { it.contains("not captured") })
     }
 }
+
+/** Wave 23 review: a saved cold start from an earlier process is never reported as this process. */
+class DeviceReportColdStartLabelTest {
+    @org.junit.Test fun theReportSaysWhenTheColdStartIsFromAnEarlierProcess() {
+        fun r(thisProcess: Boolean) = DeviceReport.build("1", "d", "a", 900, emptyMap(), emptyList(), coldStartThisProcess = thisProcess)
+        org.junit.Assert.assertTrue(r(true).contains("this process): 900 ms"))
+        org.junit.Assert.assertTrue(r(false).contains("EARLIER process") && !r(false).contains("this process"))
+    }
+}

@@ -32,6 +32,9 @@ object DeviceProbe {
     /** Wall-clock end of the current phase, for the countdown. */
     var phaseEndsAtMs by mutableStateOf(0L); private set
 
+    /** True when the last run ended without a result (the activity stopped, the window was gone, or Stop was tapped); cleared by the next start. */
+    var lastRunDiscarded by mutableStateOf(false); private set
+
     private var run: Run? = null
 
     /** Starts a run on [activity]'s window for [which]; [onDone] gets the result (null when no frame arrived). Ignored while another run is active. */
@@ -40,6 +43,7 @@ object DeviceProbe {
         val r = Run(activity, which, now, onDone)
         run = r
         surface = which
+        lastRunDiscarded = false
         r.begin()
     }
 
@@ -76,7 +80,8 @@ object DeviceProbe {
             }
             listener = l; window = w
             measuring = true
-            w.addOnFrameMetricsAvailableListener(l, Handler(t.looper))
+            val added = runCatching { w.addOnFrameMetricsAvailableListener(l, Handler(t.looper)) }.isSuccess
+            if (!added) return stop(report = false)
             phase = Phase.Measuring; phaseEndsAtMs = now() + RUN_MS
             main.postDelayed({ stop(report = true) }, RUN_MS)
         }
@@ -91,7 +96,7 @@ object DeviceProbe {
             owner?.lifecycle?.removeObserver(observer)
             val hz = runCatching { activity.display?.refreshRate }.getOrNull() ?: 60f
             val result = if (report) synchronized(stats) { stats.summary(FrameStats.intervalNs(hz), now()) } else null
-            run = null; phase = Phase.Idle; surface = null
+            run = null; phase = Phase.Idle; surface = null; lastRunDiscarded = !report
             if (report) onDone(which, result)
         }
     }

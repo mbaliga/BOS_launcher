@@ -165,11 +165,14 @@ fun ColumnScope.DeviceChecksPane() {
             )
             ActionRow(L10n.tr("Stop"), null, Glyphs.Info) { DeviceProbe.cancel() }
         }
+        if (phase == DeviceProbe.Phase.Idle && DeviceProbe.lastRunDiscarded) {
+            Text(L10n.tr("The last run was stopped before it finished, so it has no result. Run it again."), color = HyleColors.Violet, fontSize = 12.5.sp, modifier = Modifier.padding(vertical = 4.dp))
+        }
         for (s in ProbeSurface.entries) {
             ActionRow(surfaceLabel(s), probes[s]?.let(::probeText) ?: L10n.tr("Not run yet"), Glyphs.Bolt) {
                 val a = context.activity()
                 val st = store
-                if (a != null && st != null) DeviceProbe.start(a, s) { surface, r -> if (r != null) { probes[surface] = r; st.saveProbe(surface, r) } }
+                if (a != null && st != null) DeviceProbe.start(a, s) { surface, r -> if (r != null) { probes[surface] = r; st.saveProbe(surface, r); copied = false } }
             }
         }
 
@@ -185,13 +188,13 @@ fun ColumnScope.DeviceChecksPane() {
                         TextButtonPill(statusLabel(st), primary = entry.status == st) {
                             // Tapping the chosen status again clears it.
                             val next = if (entry.status == st) CheckStatus.Unset else st
-                            checks[c] = entry.copy(status = next); store?.setStatus(c, next)
+                            checks[c] = entry.copy(status = next); store?.setStatus(c, next); copied = false
                         }
                     }
                 }
                 Text(statusLabel(entry.status), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 BasicTextField(
-                    value = entry.note, onValueChange = { v -> val n = v.take(DeviceChecksStore.MAX_NOTE); checks[c] = entry.copy(note = n); store?.setNote(c, n) },
+                    value = entry.note, onValueChange = { v -> val n = v.take(DeviceChecksStore.MAX_NOTE); checks[c] = entry.copy(note = n); store?.setNote(c, n); copied = false },
                     textStyle = TextStyle(color = HyleColors.Ink, fontSize = 12.5.sp), cursorBrush = SolidColor(HyleColors.InkBright),
                     keyboardOptions = KeyboardOptions.Default,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp).border(1.dp, HyleColors.InkDim.copy(alpha = 0.3f), RoundedCornerShape(10.dp)).padding(10.dp),
@@ -208,6 +211,7 @@ fun ColumnScope.DeviceChecksPane() {
                 coldStartMs = coldMs ?: lastColdMs,
                 probes = ProbeSurface.entries.associateWith { probes[it] },
                 checks = DeviceCheck.entries.map { checks[it] ?: CheckEntry(it, CheckStatus.Unset, "") },
+                coldStartThisProcess = coldMs != null,
             )
             runCatching { context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Liftoff device report", report)) }
             copied = true

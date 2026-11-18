@@ -110,7 +110,7 @@ object ColdStartMath {
 object DeviceReport {
     fun build(
         appVersion: String, device: String, android: String, coldStartMs: Long?,
-        probes: Map<ProbeSurface, ProbeResult?>, checks: List<CheckEntry>,
+        probes: Map<ProbeSurface, ProbeResult?>, checks: List<CheckEntry>, coldStartThisProcess: Boolean = true,
     ): String = buildString {
         appendLine("Liftoff device report")
         appendLine("App: $appVersion")
@@ -118,7 +118,7 @@ object DeviceReport {
         appendLine("Android: $android")
         appendLine("Evidence only: no spec row is closed by this report.")
         appendLine()
-        appendLine("Cold start (process start to first home frame, this process): ${coldStartMs?.let { "$it ms" } ?: "not captured"}")
+        appendLine("Cold start (process start to first home frame, ${if (coldStartThisProcess) "this process" else "an EARLIER process, not this one"}): ${coldStartMs?.let { "$it ms" } ?: "not captured"}")
         appendLine()
         appendLine("Frame timing (10 s per surface, last run)")
         for (s in ProbeSurface.entries) appendLine("- ${s.english}: ${probes[s]?.line() ?: "not run"}")

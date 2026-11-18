@@ -17,4 +17,11 @@ Also in this branch
 - `TranslationCoverageTest` and `W13TranslationDeepScanTest` were failing at the wave 22 base for one untranslated literal, "Previous" (the Glance media control, `GlanceHome.kt`, not touched here); its eight translations are in `L10nW23deviceKit.kt` so the build is green. If the stream that owns that file adds the same key elsewhere the duplicate is harmless (tables are merged).
 - `TourRecreateSmokeTest.NFR_11_tourProcessRecreateRestoresTheDrawerWhenTheSettingIsOn` failed once in a full parallel run and passed alone and in the final run; it looks timing-sensitive under load, not related to this stream.
 
+Second review (adversarial) fixes
+- Report said "this process" for a cold start read back from an earlier process; it now says "an EARLIER process" (`DeviceReportColdStartLabelTest`).
+- A probe run stopped by the activity stopping, Stop, or a window that refused the listener ended silently and looked like "not run"; the page now says the last run was stopped and has no result (eight languages), and a refused `addOnFrameMetricsAvailableListener` no longer throws.
+- "Copied to the clipboard" stayed shown after a later result, status or note change; it now clears, so the owner re-copies.
+- The probe lifecycle was pinned only by source scans; `DeviceProbeLifecycleTest` (Robolectric) now checks the lead-in, discard on stop with no report, and that a new run is accepted afterwards. Whether FrameMetrics frames arrive on a real window is still device only.
+- Verified: every spec ID named by a checklist line exists in SPEC_STATUS; backup rules and `StateSchema` both list `device_checks`; Settings is an overlay of MainActivity, so the probe's window is the one Radar, Launchpad and the pages draw in. No row status is raised; all eight stay partial, and no row is closed from a probe.
+
 Residue the owner must do (exact steps in the last section of `docs/device-checklist.md`): run the five 10 s probes, the cold start, the eleven checklist lines, tap Copy report, paste it back.

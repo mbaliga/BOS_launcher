@@ -314,6 +314,15 @@ class RadarGlassW22Test {
         com.bos.sphere.core.design.L10n.setLanguage("en")
     }
 
+    @Test fun NFR_13_thePageIndicatorLabelsAreTranslatedInAllEightLanguages() {
+        for (lang in listOf("es", "fr", "de", "pt", "hi", "zh", "ja", "ar")) {
+            com.bos.sphere.core.design.L10n.setLanguage(lang)
+            for (w in listOf("Page options", "Home page", "Page %s", "Page %s of %s")) assertTrue("$lang translates '$w'", com.bos.sphere.core.design.L10n.tr(w) != w)
+            assertTrue("$lang keeps both numbers", com.bos.sphere.core.design.L10n.tr("Page %s of %s", 2, 3).let { it.contains("2") && it.contains("3") })
+        }
+        com.bos.sphere.core.design.L10n.setLanguage("en")
+    }
+
     // ---- screenshots (read by a person; the numbers above are the assertions)
 
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun shotLandscapeOrbit() { open(SearchLayout.Orbit); shoot("w22-orbit-landscape") }

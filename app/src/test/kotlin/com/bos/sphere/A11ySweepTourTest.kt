@@ -40,11 +40,11 @@ class A11ySweepTourTest : TourBase() {
     private fun density() = AppSmokeHarness.app.resources.displayMetrics.density
 
     /** Audits the open surface in portrait and in landscape; returns the roots of the portrait pass for the heading and pane-title checks. */
-    private fun sweep(surface: String, headings: Boolean = false, pane: Boolean = false) {
+    private fun sweep(surface: String, headings: Boolean = false, pane: String? = null) {
         findings += A11yAudit.audit("$surface/portrait", roots(), density(), A11yExceptions.all)
         small += A11yAudit.smallLayouts("$surface/portrait", roots(), density())
         if (headings) assertTrue("$surface: no heading is marked", A11yAudit.hasHeading(roots()))
-        if (pane) assertTrue("$surface: the panel announces itself with a pane title", A11yAudit.hasPaneTitle(roots()))
+        if (pane != null) assertTrue("$surface: the panel announces itself with the pane title \"$pane\"", A11yAudit.hasPaneTitle(roots(), pane))
         RuntimeEnvironment.setQualifiers("+w720dp-h360dp-land-xhdpi"); rule.waitForIdle(); settle(400)
         findings += A11yAudit.audit("$surface/landscape", roots(), density(), A11yExceptions.all)
         small += A11yAudit.smallLayouts("$surface/landscape", roots(), density())
@@ -56,8 +56,8 @@ class A11ySweepTourTest : TourBase() {
         MediaNow.publishForTest(track); settle()
         tapAt(0.5f, 0.72f); assertTrue(controlsShown()); sweep("glance")
         waitFor("controls out", 12_000) { !controlsShown() }
-        swipeFromLeft(); check("launchpad", Surface.Launchpad); sweep("launchpad", pane = true); back()
-        key(KeyEvent.KEYCODE_R, ctrl = true); check("recents", Surface.Recents); sweep("recents", headings = true, pane = true); back()
+        swipeFromLeft(); check("launchpad", Surface.Launchpad); sweep("launchpad", pane = "Launchpad"); back()
+        key(KeyEvent.KEYCODE_R, ctrl = true); check("recents", Surface.Recents); sweep("recents", headings = true, pane = "Recent apps"); back()
         key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer); sweep("drawer"); back()
         key(KeyEvent.KEYCODE_B); check("radar", Surface.Radar); sweep("radar"); key(KeyEvent.KEYCODE_R); key(KeyEvent.KEYCODE_A); sweep("radar typed"); back()
         key(KeyEvent.KEYCODE_COMMA, ctrl = true); check("ground control", Surface.Settings); sweep("ground control", headings = true)

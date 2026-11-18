@@ -175,6 +175,13 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
     // Wave 23 (NFR-13): the state is announced as a state; the permission is read again whenever the listening state or the grant changes.
     var permitted by remember { mutableStateOf(context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
     LaunchedEffect(listening) { permitted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED }
+    // Allowed in Settings while Radar stays open: read it again when the app comes back, or the mic would keep saying "Unavailable".
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) permitted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     val latestText by rememberUpdatedState(onText)
     // Wave 22 (audit): a refusal (also a permanent one, which returns at once with no dialog) used to be silent; say what to do. Nothing listens
     // after a grant until the next press (INP-13).

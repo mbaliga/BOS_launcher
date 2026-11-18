@@ -77,5 +77,5 @@ object A11yAudit {
     }
 
     fun hasHeading(roots: List<SemanticsNode>) = roots.any { r -> all(r).any { it.config.contains(SemanticsProperties.Heading) } }
-    fun hasPaneTitle(roots: List<SemanticsNode>) = roots.any { r -> all(r).any { it.config.contains(SemanticsProperties.PaneTitle) } }
+    fun hasPaneTitle(roots: List<SemanticsNode>, title: String) = roots.any { r -> all(r).any { it.config.getOrNull(SemanticsProperties.PaneTitle) == title } }
 }

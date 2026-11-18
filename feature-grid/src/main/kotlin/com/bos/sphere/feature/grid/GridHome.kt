@@ -1029,16 +1029,16 @@ fun PageIndicator(
         // ≡ then ⌂ then the dots: the menu opens this page's options, the house is the first page.
         if (onMenu != null) {
             Icon(
-                Glyphs.Menu, contentDescription = "Page options", tint = HyleColors.InkDim,
-                modifier = Modifier.padding(horizontal = 2.dp).size(16.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick("Page options") { onMenu(); true } }.padding(1.dp), // wave 23: TalkBack can activate it
+                Glyphs.Menu, contentDescription = com.bos.sphere.core.design.L10n.tr("Page options"), tint = HyleColors.InkDim,
+                modifier = Modifier.padding(horizontal = 2.dp).size(16.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick(com.bos.sphere.core.design.L10n.tr("Page options")) { onMenu(); true } }.padding(1.dp), // wave 23: TalkBack can activate it
             )
         }
         for (i in 0 until count) {
             val active = i == current
             if (i == homeIndex) {
                 Icon(
-                    Glyphs.Home, contentDescription = "Home page", tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
-                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 16.dp else 14.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick("Home page") { onSelect(i); true } },
+                    Glyphs.Home, contentDescription = com.bos.sphere.core.design.L10n.tr("Home page"), tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 16.dp else 14.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick(com.bos.sphere.core.design.L10n.tr("Home page")) { onSelect(i); true } },
                 )
                 continue
             }
@@ -1048,7 +1048,7 @@ fun PageIndicator(
                     .padding(4.dp)
                     .size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp)
                     .background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp))
-                    .semantics { contentDescription = "Page ${i + 1} of $count"; role = androidx.compose.ui.semantics.Role.Button; selected = active; onClick("Page ${i + 1}") { onSelect(i); true } }
+                    .semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Page %s of %s", i + 1, count); role = androidx.compose.ui.semantics.Role.Button; selected = active; onClick(com.bos.sphere.core.design.L10n.tr("Page %s", i + 1)) { onSelect(i); true } }
                     .pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
             )
         }

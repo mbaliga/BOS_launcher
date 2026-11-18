@@ -504,6 +504,8 @@ internal fun SearchScreen(
             // Wave 23 (PAL-18): with little free height under the field (landscape, keyboard up) the mic rides in the field row, not in its own strip.
             val micInline = voiceOn && RadarMicPlacement.inline(maxHeight - RadarQueryBarHeight)
             val micStrip = if (voiceOn && !micInline) RadarMicBarHeight else 0.dp
+            // The mic is recomposed at a new place when the keyboard opens or closes; a focus flag the old one held would block the key handler for good.
+            LaunchedEffect(micInline) { micFocused = false }
             SideEffect { micStripNow = micStrip } // the action list below sits outside this box and needs the same number
             // Wave 22 (audit): the results are one reading group, so TalkBack reads the field, its buttons, the whole results area and the mic last
             // (the Orbit rings are a group inside it); without the groups the ring indices 1, 2 ... sorted after the mic, which has index 0.

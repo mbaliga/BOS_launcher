@@ -118,7 +118,7 @@ and the like (none).
 - The scope popup list (Flat) is still plain text over the background, as before; it is not part of the top or bottom bar.
 - Keyboard-open placement is tested with faked IME and navigation-bar insets; not seen on a device. In landscape with the keyboard up the results area is a
   few dozen dp: the wheel shows one row and the Filmstrip is clipped or gone; the owner may want the mic hidden then.
-- The mic's listening state is not announced as a state description (needs a string in eight languages).
+- The mic's listening state is not announced as a state description (needs a string in eight languages). Done in wave 23, below.
 
 ## Wave 23: the mic strip is adaptive; the mic announces its state (PAL-18, INP-12, NFR-13)
 

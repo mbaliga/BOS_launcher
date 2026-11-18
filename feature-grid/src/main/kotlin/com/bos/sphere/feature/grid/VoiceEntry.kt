@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +40,10 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -145,21 +149,37 @@ class AndroidOnDeviceRecogniser(private val context: Context) : OnDeviceRecognis
 internal fun onDeviceSpeechAvailable(context: Context): Boolean =
     Build.VERSION.SDK_INT >= 33 && runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
 
+/** Wave 23 (NFR-13): the English state words the mic exposes as its stateDescription (translated at the call). */
+object VoiceStates {
+    const val READY = "Ready"
+    const val LISTENING = "Listening"
+    const val UNAVAILABLE = "Unavailable, microphone permission is off"
+    fun describe(s: VoiceState): String = when (s) {
+        VoiceState.Listening -> LISTENING
+        VoiceState.NeedsPermission, VoiceState.Hidden -> UNAVAILABLE
+        VoiceState.Idle -> READY
+    }
+}
+
 /**
  * A push-to-talk button for the palette (INP-13): hold to talk, release to stop; a tap (TalkBack, keyboard Enter or Space
  * held) works too. Draws nothing when the device has no on-device recogniser. The text goes to [onText] as it comes.
  */
 @Composable
-fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}) {
+fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}, size: androidx.compose.ui.unit.Dp = GlassSpec.BigButton) {
     val context = LocalContext.current
     val available = remember(context, availableOverride) { availableOverride ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     if (!available) return
     var listening by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
+    // Wave 23 (NFR-13): the state is announced as a state; the permission is read again whenever the listening state or the grant changes.
+    var permitted by remember { mutableStateOf(context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
+    LaunchedEffect(listening) { permitted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED }
     val latestText by rememberUpdatedState(onText)
     // Wave 22 (audit): a refusal (also a permanent one, which returns at once with no dialog) used to be silent; say what to do. Nothing listens
     // after a grant until the next press (INP-13).
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permitted = granted
         if (!granted) runCatching { android.widget.Toast.makeText(context, L10n.tr("Microphone is off. Allow it in Settings to speak to search."), android.widget.Toast.LENGTH_LONG).show() }
     }
     val ptt = remember(context) {
@@ -176,7 +196,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
     // Wave 21: glass (violet-tinted while listening), 56 dp, the same hold-to-talk behaviour.
     Box(
         modifier
-            .size(GlassSpec.BigButton)
+            .size(size)
             .glass(CircleShape, tint = if (listening) Color(0xFFB9A8FF) else Color.White, pressed = listening, shade = shade)
             .clip(CircleShape)
             .then(if (focused) Modifier.border(2.dp, Color.White, CircleShape) else Modifier) // a visible keyboard focus (second audit)
@@ -197,7 +217,10 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
             // A key held down when focus moves away never sends its key-up: stop listening then (the finger case ends with the pointer).
             .onFocusChanged { f -> focused = f.hasFocus; onFocusChange(f.hasFocus); if (!f.hasFocus && ptt.listening) { ptt.release(); listening = false } }
             .focusable()
-            .semantics { role = Role.Button; contentDescription = label; onClick(label = label) { ptt.toggle(); listening = ptt.listening; true } },
+            .semantics { role = Role.Button; contentDescription = label
+                stateDescription = L10n.tr(VoiceStates.describe(PushToTalk.state(true, permitted, listening)))
+                liveRegion = LiveRegionMode.Polite // a change is announced after what is being said, never over it
+                onClick(label = label) { ptt.toggle(); listening = ptt.listening; true } },
         contentAlignment = Alignment.Center,
     ) {
         Icon(Glyphs.Mic, null, tint = GlassSpec.content(true), modifier = Modifier.size(24.dp))

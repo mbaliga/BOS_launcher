@@ -130,6 +130,7 @@ import com.bos.sphere.core.data.SphereNotificationListener
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -605,6 +606,7 @@ fun LaunchpadContent(
             // Beside the home card the host draws the backdrop (it must not fade with the content); alone, the content draws its own.
             .then(if (endInset > 0.dp) Modifier else Modifier.background(Brush.verticalGradient(listOf(LocalLp.current.bg, androidx.compose.ui.graphics.lerp(LocalLp.current.bg, LocalLp.current.surface, 0.55f)))))
             .testTag("lp.root")
+            .semantics { paneTitle = L10n.tr("Launchpad") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
             .onKeyEvent(keyHandler)
             .focusRequester(rootReq)
@@ -774,14 +776,14 @@ private fun LaunchpadHeader(
             Box(
                 Modifier.size(48.dp).clip(CircleShape)
                     .semantics { contentDescription = L10n.tr("Notification menu") }
-                    .clickable(onClickLabel = L10n.tr("Notification menu")) { open = true }.testTag("lp.menu"),
+                    .clickable(onClickLabel = L10n.tr("Notification menu"), role = androidx.compose.ui.semantics.Role.Button) { open = true }.testTag("lp.menu"),
                 Alignment.Center,
             ) { HamburgerIcon(ink) }
             Spacer(Modifier.weight(1f))
             Text(
                 L10n.tr("Home"), color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(end = 4.dp).heightIn(min = 40.dp).clip(RoundedCornerShape(20.dp))
-                    .clickable(onClickLabel = L10n.tr("Close Launchpad"), onClick = onClose).padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.padding(end = 4.dp).heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)) // wave 23: 48 dp, a button
+                    .clickable(onClickLabel = L10n.tr("Close Launchpad"), role = androidx.compose.ui.semantics.Role.Button, onClick = onClose).padding(horizontal = 14.dp, vertical = 10.dp),
             )
             if (filter != null) {
                 Text(

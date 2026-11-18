@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -257,6 +258,7 @@ internal fun SearchScreen(
     val inputModeManager = androidx.compose.ui.platform.LocalInputModeManager.current
     val controlFocus = remember { FocusRequester() }
     val micFocus = remember { FocusRequester() }
+    var micStripNow by remember { mutableStateOf(0.dp) }
     var barFocused by remember { mutableStateOf(false) }
     var micFocused by remember { mutableStateOf(false) }
     var field by remember { mutableStateOf(TextFieldValue(initialQuery, TextRange(initialQuery.length))) }
@@ -498,10 +500,14 @@ internal fun SearchScreen(
         SignalBackground(prefs, Modifier.fillMaxSize(), dark = true, glass = true) // Radar is black in every theme; HOM-16, PAL-24: the two background items, the same on every surface
         // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
         // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
+            // Wave 23 (PAL-18): with little free height under the field (landscape, keyboard up) the mic rides in the field row, not in its own strip.
+            val micInline = voiceOn && RadarMicPlacement.inline(maxHeight - RadarQueryBarHeight)
+            val micStrip = if (voiceOn && !micInline) RadarMicBarHeight else 0.dp
+            SideEffect { micStripNow = micStrip } // the action list below sits outside this box and needs the same number
             // Wave 22 (audit): the results are one reading group, so TalkBack reads the field, its buttons, the whole results area and the mic last
             // (the Orbit rings are a group inside it); without the groups the ring indices 1, 2 ... sorted after the mic, which has index 0.
-            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = if (voiceOn) RadarMicBarHeight else 0.dp).clipToBounds().semantics { isTraversalGroup = true }) {
+            Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = micStrip).clipToBounds().semantics { isTraversalGroup = true }) {
                 val emptyHint = if (data.blank && (selected == null || selected == SearchCategory.Apps) && data.tiles(selected).isEmpty()) L10n.tr("Rings fill up as you use Radar") else null
                 if (flatMode) {
                     // Typing, or the Flat layout at rest (what you open most): a plain results list below the query line.
@@ -590,6 +596,7 @@ internal fun SearchScreen(
                         }
                     }
                 }
+                if (micInline) PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, shade = shades.bottom, size = RadarMicPlacement.InlineSize, modifier = Modifier.padding(start = 8.dp).testTag(RADAR_MIC_TAG).focusRequester(micFocus), onFocusChange = { micFocused = it })
                 if (query.isEmpty() && !flatMode) {
                     // Close and Clear are never both visible: Close is outside the field, a glass circle, while there is nothing to clear.
                     // Wave 22: not in Flat. The owner asked only for the X inside the field; Flat is the keyboard and pointer layout, where Esc and Back leave
@@ -601,8 +608,8 @@ internal fun SearchScreen(
             }
             // Wave 21 (owner): the mic for voice input sits at the centre of the bottom, above the keyboard and the gesture bar
             // (the inset padding above), 56 dp, in every layout and orientation; space is reserved for it so it never covers a result.
-            if (voiceOn) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight).semantics { isTraversalGroup = true }, contentAlignment = Alignment.Center) {
-                PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, shade = shades.bottom, modifier = Modifier.focusRequester(micFocus), onFocusChange = { micFocused = it })
+            if (voiceOn && !micInline) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(RadarMicBarHeight).semantics { isTraversalGroup = true }, contentAlignment = Alignment.Center) {
+                PushToTalkButton(onText = { setQuery(it) }, availableOverride = true, shade = shades.bottom, modifier = Modifier.testTag(RADAR_MIC_TAG).focusRequester(micFocus), onFocusChange = { micFocused = it })
             }
         }
         aliasFor?.let { a ->
@@ -613,7 +620,7 @@ internal fun SearchScreen(
             RadarActionList(
                 menuFor(t), navNow.menuIndex,
                 onPick = { i -> nav = navNow.copy(menuOpen = false); menuFor(t).getOrNull(i)?.let { runMenu(t, it) } },
-                modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(end = 16.dp, bottom = 64.dp + (if (voiceOn) RadarMicBarHeight else 0.dp)),
+                modifier = Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(end = 16.dp, bottom = 64.dp + micStripNow),
             )
         }
         previewTile?.let { t ->
@@ -698,6 +705,16 @@ internal val RadarQueryBarHeight = 64.dp
 
 /** Wave 21: the bottom strip that holds the mic (a 56 dp button and 8 dp above and below); reserved only when the mic exists. */
 internal val RadarMicBarHeight = 72.dp
+
+/** Wave 23: test tag of the mic button, wherever it sits. */
+internal const val RADAR_MIC_TAG = "radarMic"
+
+/** Wave 23 (PAL-18): the mic leaves its bottom strip for the field row when the free height under the field is below [INLINE_BELOW]. */
+internal object RadarMicPlacement {
+    val INLINE_BELOW = 220.dp
+    val InlineSize = 48.dp
+    fun inline(freeHeight: androidx.compose.ui.unit.Dp): Boolean = freeHeight < INLINE_BELOW
+}
 
 /** Wave 22: test tag of the category wheel's own box (its labels are drawn only inside it). */
 internal const val RADAR_WHEEL_TAG = "radarWheel"

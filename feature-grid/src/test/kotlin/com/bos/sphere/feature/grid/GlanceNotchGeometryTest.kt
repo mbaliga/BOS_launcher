@@ -22,9 +22,16 @@ class GlanceNotchGeometryTest {
     }
 
     @Test fun HOM_23_theHeightIsTheBodyBelowTheCutoutAndNeverLessThanTheBody() {
-        assertEquals(32f, GlanceNotch.heightDp(0f), 0f)
-        assertEquals(72f, GlanceNotch.heightDp(40f), 0f)
-        assertEquals(32f, GlanceNotch.heightDp(-5f), 0f)
-        assertTrue("the body is short, 28 to 32 dp", GlanceNotch.BODY_HEIGHT_DP in 28f..32f)
+        assertEquals(48f, GlanceNotch.heightDp(0f), 0f)
+        assertEquals(88f, GlanceNotch.heightDp(40f), 0f)
+        assertEquals(48f, GlanceNotch.heightDp(-5f), 0f)
+        assertEquals("wave 23: the drawn body is as tall as the 48 dp targets", GlanceNotch.TARGET_DP, GlanceNotch.BODY_HEIGHT_DP, 0f)
+    }
+}
+
+class GlanceNotchHitAreaW23Test {
+    @Test fun HOM_23_theIconIsCentredInTheTargetAndTheTargetFillsTheBody() {
+        assertEquals((GlanceNotch.TARGET_DP - GlanceNotch.ICON_DP) / 2f, GlanceNotch.ICON_TOP_DP, 0.6f)
+        assertEquals(GlanceNotch.TARGET_DP, GlanceNotch.BODY_HEIGHT_DP, 0f)
     }
 }

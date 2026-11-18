@@ -462,7 +462,7 @@ private fun DrawerHeader(
                         .semantics { this.selected = on; contentDescription = v.label }
                         .clip(RoundedCornerShape(50))
                         .background(if (on) Color(0x26FFFFFF) else Color.Transparent)
-                        .clickable { sounds?.play(UiSound.Tick); onViewChange(v) }
+                        .clickable(role = androidx.compose.ui.semantics.Role.RadioButton) { sounds?.play(UiSound.Tick); onViewChange(v) } // wave 23: a radio in a group of three, with its selected state
                         .defaultMinSize(minWidth = 40.dp, minHeight = 36.dp)
                         .padding(horizontal = if (showText) 12.dp else 10.dp, vertical = 7.dp),
                 ) {
@@ -484,7 +484,7 @@ private fun DrawerHeader(
                 modifier = Modifier
                     .semantics { contentDescription = "Sort by ${sort.label}" }
                     .clip(RoundedCornerShape(50)).background(Color(0x14FFFFFF))
-                    .clickable { sortOpen = true }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button) { sortOpen = true }.padding(horizontal = 12.dp, vertical = 8.dp),
             )
             androidx.compose.material3.DropdownMenu(
                 expanded = sortOpen, onDismissRequest = { sortOpen = false },
@@ -500,7 +500,7 @@ private fun DrawerHeader(
         }
         Icon(
             Glyphs.Close, contentDescription = "Close apps", tint = HyleColors.Ink,
-            modifier = Modifier.padding(start = 2.dp).size(48.dp).clickable { sounds?.play(UiSound.Close); onClose() }.padding(13.dp),
+            modifier = Modifier.padding(start = 2.dp).size(48.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { sounds?.play(UiSound.Close); onClose() }.padding(13.dp),
         )
     }
 }
@@ -548,7 +548,7 @@ internal fun DrawerGrid(
                         .fillMaxWidth()
                         .launcherItem("drawer.${r.app.key}", FocusKind.Item, layer = DRAWER_FOCUS_LAYER, focusable = false, onActivate = { onLaunch(r.app) }, onMenu = { onLongPress(r.app) }, ringRadiusDp = 12f)
                         .appDragSource(r.app.key, onDragStart) // INP-11: a mouse drag carries the app to the home
-                        .combinedClickable(onClick = { onLaunch(r.app) }, onLongClick = { onLongPress(r.app) })
+                        .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { onLaunch(r.app) }, onLongClick = { onLongPress(r.app) })
                         .padding(vertical = 10.dp, horizontal = 2.dp),
                 ) {
                     AppIcon(r.app, 56.dp)
@@ -587,7 +587,7 @@ private fun DrawerList(
                         .fillMaxWidth()
                         .launcherItem("drawer.${r.app.key}", FocusKind.Item, layer = DRAWER_FOCUS_LAYER, focusable = false, onActivate = { onLaunch(r.app) }, onMenu = { onLongPress(r.app) }, ringRadiusDp = 12f)
                         .appDragSource(r.app.key, onDragStart) // INP-11: a mouse drag carries the app to the home
-                        .combinedClickable(onClick = { onLaunch(r.app) }, onLongClick = { onLongPress(r.app) })
+                        .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { onLaunch(r.app) }, onLongClick = { onLongPress(r.app) })
                         .padding(horizontal = 8.dp, vertical = if (details) 8.dp else 6.dp),
                 ) {
                     AppIcon(r.app, if (details) 44.dp else 40.dp)

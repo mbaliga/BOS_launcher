@@ -83,6 +83,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -328,25 +329,26 @@ private fun SettingsSpaceContent(
                         )
                     }
                 } else {
-                    Text(com.bos.sphere.core.design.L10n.tr("GROUND CONTROL"), color = HyleColors.InkBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
+                    Text(com.bos.sphere.core.design.L10n.tr("GROUND CONTROL"), color = HyleColors.InkBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp, modifier = Modifier.weight(1f).semantics { heading() })
                 }
                 Icon(
                     Glyphs.Search,
-                    contentDescription = "Search settings",
+                    contentDescription = com.bos.sphere.core.design.L10n.tr("Search settings"),
                     tint = if (searching) HyleColors.Violet else HyleColors.Ink,
+                    // Wave 23 (NFR-13): a 48 dp button with a role and a click action (it was a 40 dp pointer-only target, nothing for TalkBack to activate).
                     modifier = Modifier
-                        .size(40.dp)
-                        .pointerInput(searching) { detectTapGestures { if (searching) closeSearch() else { searching = true; paneOpen = -1 } } }
-                        .padding(9.dp),
+                        .size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { if (searching) closeSearch() else { searching = true; paneOpen = -1 } }
+                        .padding(12.dp),
                 )
                 Icon(
                     Glyphs.Close,
-                    contentDescription = "Close settings",
+                    contentDescription = com.bos.sphere.core.design.L10n.tr("Close settings"),
                     tint = HyleColors.Ink,
                     modifier = Modifier
-                        .size(40.dp)
-                        .pointerInput(Unit) { detectTapGestures { sounds?.play(UiSound.Close); onClose() } }
-                        .padding(9.dp),
+                        .size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { sounds?.play(UiSound.Close); onClose() }
+                        .padding(12.dp),
                 )
             }
 
@@ -468,7 +470,7 @@ private fun CategoryTabs(categories: List<SettingCategory>, selected: Int, ancho
                     .offset { androidx.compose.ui.unit.IntOffset((anchorX + pitch * (i - pos) - itemW / 2).roundToPx(), 0) }
                     .width(itemW)
                     .alpha((1f - dist * 0.16f).coerceIn(0.2f, 1f))
-                    .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) { onSelect(i) }
+                    .clickable(indication = null, role = androidx.compose.ui.semantics.Role.Tab, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) { onSelect(i) }
                     .drawBehind {
                         // The soft glow behind the lit category (as in the original bar).
                         if (sel) drawCircle(Brush.radialGradient(listOf(HyleColors.Violet.copy(alpha = 0.38f), Color.Transparent), center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f), radius = size.width * 0.5f), radius = size.width * 0.5f, center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f))

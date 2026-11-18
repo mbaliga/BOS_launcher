@@ -14,6 +14,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -84,7 +86,7 @@ fun ClockBlock(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy((size * 0.55f).dp),
             modifier = modifier
-                .semantics { contentDescription = "Time $time ${meridiem.orEmpty()}" }
+                .semantics { contentDescription = "Time $time ${meridiem.orEmpty()}"; role = androidx.compose.ui.semantics.Role.Button; onClick { onTap(); true } } // wave 23: TalkBack can activate it
                 .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
         ) {
             Row(verticalAlignment = Alignment.Bottom) {
@@ -104,7 +106,7 @@ fun ClockBlock(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .semantics { contentDescription = "Time $time ${meridiem.orEmpty()}" }
+            .semantics { contentDescription = "Time $time ${meridiem.orEmpty()}"; role = androidx.compose.ui.semantics.Role.Button; onClick { onTap(); true } } // wave 23: TalkBack can activate it
             .pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) },
     ) {
         Row(verticalAlignment = Alignment.Bottom) {

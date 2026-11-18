@@ -29,3 +29,4 @@ One line per record, newest wave first. A record explains why a requirement is b
 | [NFR-16.md](NFR-16.md) | earlier | `INTERNET` stays in the manifest for weather: options and costs (still an owner decision) |
 | [CFG-20.md](CFG-20.md) | earlier | Package identity (application ID) |
 | [tourSmoke.md](tourSmoke.md) | 22 | Whole-app tour smoke suite (fresh, busy, recreate, panes, seeded monkey walk), the defects it found, and what Robolectric cannot cover |
+| [a11ySweep.md](a11ySweep.md) | 23 | Glance notch hit area (drawn = touchable, 48 dp), the whole-app TalkBack and semantics sweep, its exceptions and limits |

@@ -66,6 +66,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -1028,7 +1030,7 @@ fun PageIndicator(
         if (onMenu != null) {
             Icon(
                 Glyphs.Menu, contentDescription = "Page options", tint = HyleColors.InkDim,
-                modifier = Modifier.padding(horizontal = 2.dp).size(16.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.padding(1.dp),
+                modifier = Modifier.padding(horizontal = 2.dp).size(16.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick("Page options") { onMenu(); true } }.padding(1.dp), // wave 23: TalkBack can activate it
             )
         }
         for (i in 0 until count) {
@@ -1036,7 +1038,7 @@ fun PageIndicator(
             if (i == homeIndex) {
                 Icon(
                     Glyphs.Home, contentDescription = "Home page", tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
-                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 16.dp else 14.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
+                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 16.dp else 14.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick("Home page") { onSelect(i); true } },
                 )
                 continue
             }
@@ -1046,7 +1048,7 @@ fun PageIndicator(
                     .padding(4.dp)
                     .size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp)
                     .background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp))
-                    .semantics { contentDescription = "Page ${i + 1} of $count" }
+                    .semantics { contentDescription = "Page ${i + 1} of $count"; role = androidx.compose.ui.semantics.Role.Button; selected = active; onClick("Page ${i + 1}") { onSelect(i); true } }
                     .pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
             )
         }
@@ -1095,7 +1097,7 @@ fun HomeClock(onTap: () -> Unit, modifier: Modifier = Modifier) {
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.3.sp,
         modifier = modifier
-            .semantics { contentDescription = "Time $text" }
+            .semantics { contentDescription = "Time $text"; role = androidx.compose.ui.semantics.Role.Button; onClick { onTap(); true } }
             .pointerInput(Unit) { detectTapGesturesSimple(onTap) },
     )
 }

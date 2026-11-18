@@ -119,3 +119,24 @@ and the like (none).
 - Keyboard-open placement is tested with faked IME and navigation-bar insets; not seen on a device. In landscape with the keyboard up the results area is a
   few dozen dp: the wheel shows one row and the Filmstrip is clipped or gone; the owner may want the mic hidden then.
 - The mic's listening state is not announced as a state description (needs a string in eight languages).
+
+## Wave 23: the mic strip is adaptive; the mic announces its state (PAL-18, INP-12, NFR-13)
+
+Owner/device report: landscape with the keyboard up, the reserved 72 dp mic strip took too much of the free height and clipped the wheel.
+
+- **Rule.** `RadarMicPlacement.inline(freeHeight)`: the free height is the height of the safe, IME-padded area minus the 64 dp query line. At 220 dp or more
+  the mic stays in its bottom strip, 56 dp, centred (nothing changed). Below 220 dp the strip is not reserved at all and the mic rides in the field row,
+  beside the field before Close (or alone in Flat), 48 dp instead of 56 dp, still a glass circle with the same hold-to-talk behaviour, focus ring and
+  label. The results area gets the whole height under the field. The keyboard-selected result's action list follows the same number.
+- **Why beside and not inside the field.** The Clear X is already inside the field's trailing end; a second target there would put two 48 dp circles in a
+  field that is 216 dp wide on a 640 dp window and make taps ambiguous. Beside it, the row is field, mic, Close (Orbit and Filmstrip, empty query).
+- **Where it changes.** 640 x 360 dp landscape with a keyboard 40 percent high (free about 152 dp): inline. 891 x 411 with a 45 percent keyboard (free about
+  163 dp): inline. 640 x 360 without a keyboard (about 296 dp), every portrait case, a keyboard in portrait: strip, as before. Tested in
+  `RadarGlassW22Test` (`PAL_18_landscape...`, `PAL_18_portrait...`: Orbit at rest and typed, Filmstrip, Flat; font 1.0 and 2.0; keyboard closed and
+  faked open); the region checks of wave 22 now accept the inline position. Screenshots `feature-grid/build/screenshots/w23-*.png` were read.
+- **State, not shouting.** The mic exposes `stateDescription` Ready, Listening, or "Unavailable, microphone permission is off" (eight languages,
+  `L10nW23a11yPolish.kt`) and a polite live region, so TalkBack says the new state after what it is already saying. The name stays "Speak to search".
+  The permission is read when the control appears, when listening changes and when the permission dialog answers. "Unavailable" means the permission is
+  off (a press still asks for it, CFG-07); a device with no on-device recogniser still draws no mic at all (INP-13).
+- Not run on a device: the real keyboard height and insets (Robolectric fakes them), how TalkBack speaks the state, and whether a state change is read
+  too early or too late.

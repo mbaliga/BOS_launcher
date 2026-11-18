@@ -14,14 +14,15 @@ object GlanceNotch {
     const val MIN_WIDTH_DP = 220f
     const val MAX_WIDTH_DP = 320f
     /** The drawn height below the display cutout (the cutout itself is also covered: the shape starts at y = 0). */
-    const val BODY_HEIGHT_DP = 32f
+    /** Wave 23: as tall as the 48 dp targets, so the drawn notch and the touch area are the same (no invisible hit area below it). */
+    const val BODY_HEIGHT_DP = 48f
     /** Concave flare of each top shoulder, and the convex radius of each bottom corner. */
     const val FLARE_DP = 16f
     const val CORNER_DP = 14f
     const val TARGET_DP = 48f
     const val ICON_DP = 22f
     /** The icon centre sits this far below the top of the controls row (cutout bottom). */
-    const val ICON_TOP_DP = 5f
+    const val ICON_TOP_DP = 13f
     /** Gap between the notch bottom and the title line's slot (the line has its own 8 dp padding: about 11 dp to the text). */
     const val LINE_GAP_DP = 3f
 

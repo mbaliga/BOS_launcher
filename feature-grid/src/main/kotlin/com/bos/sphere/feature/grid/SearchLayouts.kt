@@ -259,7 +259,7 @@ private fun StripTileView(tile: Tile, actions: TileActions) {
             .radarDragOut(tile)
             // NFR-13: the strip shows the caption of the centred tile only, so every tile carries its own name.
             .semantics(mergeDescendants = true) { contentDescription = tile.caption() }
-            .combinedClickable(onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
+            .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
     ) { TileFace(tile, StripTile) }
     // PAL-03: the app's own shortcuts sit inside its tile.
     if (tile is Tile.App) NestedShortcutPills(tile, NestedShortcuts.SMALL_SHOWN, StripTile, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) })
@@ -482,7 +482,7 @@ internal fun ResultStrip(
             Box(
                 Modifier.heightIn(min = 48.dp)
                     .secondaryClick { actions.onSecondary(t) }
-                    .combinedClickable(onClick = { actions.onTap(t) }, onLongClick = { actions.onLongPress(t) })
+                    .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(t) }, onLongClick = { actions.onLongPress(t) })
                     .semantics { role = Role.Button},
                 contentAlignment = Alignment.Center,
             ) {
@@ -508,7 +508,7 @@ internal fun ResultStrip(
 
 @OptIn(ExperimentalFoundationApi::class)
 private fun Modifier.orbitClick(tile: Tile, actions: TileActions): Modifier =
-    this.combinedClickable(onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) })
+    this.combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) })
 
 // ---------------------------------------------------------------- flat (macOS) list
 
@@ -603,7 +603,7 @@ internal fun FlatResults(
                 is FRow.Sugg -> {
                     Text(
                         row.item.label, color = if (row.item.accent) HyleColors.VioletSoft else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth().clickable { onPickSuggestion(row.item) }.padding(horizontal = 16.dp, vertical = 9.dp),
+                        modifier = Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { onPickSuggestion(row.item) }.padding(horizontal = 16.dp, vertical = 9.dp),
                     )
                     if (rows.getOrNull(idx + 1) is FRow.Sugg) Divider()
                 }
@@ -653,7 +653,7 @@ private fun FlatTileRow(
         is Tile.Person -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().then(selBg).padding(vertical = 6.dp, horizontal = 16.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f).secondaryClick { onPreview(tile) }.combinedClickable(onClick = { onOpenIntent(ContactActions.openContact(tile.c.hit)) }, onLongClick = { onPreview(tile) }),
+                modifier = Modifier.weight(1f).secondaryClick { onPreview(tile) }.combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { onOpenIntent(ContactActions.openContact(tile.c.hit)) }, onLongClick = { onPreview(tile) }),
             ) {
                 ContactFace(tile.c, 38.dp * z)
                 Text(tile.c.hit.name, color = Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp))
@@ -669,10 +669,11 @@ private fun FlatTileRow(
                 .secondaryClick { onPreview(tile) }
                 .radarDragOut(tile)
                 .combinedClickable(
+                    role = androidx.compose.ui.semantics.Role.Button,
                     onClick = { onTap(tile) },
                     onLongClick = { onPreview(tile) },
                 )
-                .padding(vertical = 7.dp, horizontal = 16.dp),
+                .heightIn(min = 48.dp).padding(vertical = 7.dp, horizontal = 16.dp),
         ) {
             TileFace(tile, if (tile is Tile.Hit && tile.hit.snippet != null) 44.dp * z else 36.dp * z)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
@@ -742,9 +743,9 @@ internal fun ResultPreview(
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
                 if (tile is Tile.App) Text(L10n.tr("Options").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF241F37)).clickable { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
+                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF241F37)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
                 Text(L10n.tr("Open").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
+                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
             }
         }
     }

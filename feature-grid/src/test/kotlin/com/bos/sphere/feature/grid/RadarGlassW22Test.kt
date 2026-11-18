@@ -5,6 +5,7 @@ import android.os.Process
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -124,14 +125,18 @@ class RadarGlassW22Test {
         checkRegions(layout, query, fontScale, keyboard = true)
     }
 
+    private var lastInline = false
+
     private fun checkRegions(layout: SearchLayout, query: String, fontScale: Float, keyboard: Boolean, shot: String? = null) {
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
         val density = rule.activity.resources.displayMetrics.density
         val mic = bounds("Speak to search")
         val field = rule.onNodeWithTag(RADAR_FIELD_TAG).fetchSemanticsNode().boundsInRoot
-        val stripTop = mic.center.y - 36f * density // the reserved 72 dp strip is centred on the mic
+        // Wave 23: with little free height the mic sits in the field row (inline) and no strip is reserved.
+        val inline = mic.center.y < field.bottom
+        val stripTop = if (inline) root.bottom else mic.center.y - 36f * density // the reserved 72 dp strip is centred on the mic
         val where = "$layout q='$query' font=$fontScale keyboard=$keyboard ${root.width / density}x${root.height / density}dp"
-        assertTrue("mic is below the field: $where", mic.top >= field.bottom - 0.5f || keyboard)
+        assertTrue("mic is below the field: $where", mic.top >= field.bottom - 0.5f || keyboard || inline)
         // The wheel's own box and every label drawn inside it (labels outside it are transparent).
         val wheel = rule.onAllNodes(androidx.compose.ui.test.hasTestTag(RADAR_WHEEL_TAG)).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
         val labelNames = listOf("EVERYTHING", "THE WEB", "ACTIONS", "APPS", "CONTACTS", "SEARCH")
@@ -162,8 +167,15 @@ class RadarGlassW22Test {
             }
         }
         // The mic is a whole 56 dp button, centred, whatever the font and the keyboard.
-        assertTrue("mic is 56 dp: $where", mic.width >= 56f * density - 1f && mic.height >= 56f * density - 1f)
-        assertTrue("mic is centred: $where", kotlin.math.abs(mic.center.x - root.center.x) <= 2f)
+        if (inline) {
+            assertTrue("inline mic is 48 dp and inside the window: $where $mic", mic.width >= 48f * density - 1f && mic.height >= 48f * density - 1f && mic.left >= root.left && mic.right <= root.right)
+            assertFalse("inline mic does not sit on the field: $where", mic.overlaps(field))
+            assertTrue("inline mic is in the field row: $where", mic.top >= root.top && mic.bottom <= field.bottom + 8f * density)
+        } else {
+            assertTrue("mic is 56 dp: $where", mic.width >= 56f * density - 1f && mic.height >= 56f * density - 1f)
+            assertTrue("mic is centred: $where", kotlin.math.abs(mic.center.x - root.center.x) <= 2f)
+        }
+        lastInline = inline
         if (shot != null) shoot(shot)
     }
 
@@ -239,6 +251,69 @@ class RadarGlassW22Test {
         assertTrue("query line group above the results above the mic group", bar!!.bottom <= results!!.top + 1f && results.bottom <= micGroup!!.top + 1f)
     }
 
+    // ---- wave 23: the adaptive mic (strip when the free height is 220 dp or more, in the field row below that)
+
+    @Test fun PAL_18_theMicLeavesItsStripForTheFieldRowBelow220dpOfFreeHeight() {
+        assertFalse(RadarMicPlacement.inline(220.dp))
+        assertFalse(RadarMicPlacement.inline(600.dp))
+        assertTrue(RadarMicPlacement.inline(219.dp))
+        assertTrue(RadarMicPlacement.inline(0.dp))
+        assertEquals("inline it may be 48 dp", 48f, RadarMicPlacement.InlineSize.value, 0f)
+    }
+
+    private fun inlineMatrix(layout: SearchLayout, query: String, font: Float, keyboardFraction: Float, expectInline: Boolean) {
+        open(layout, query, font)
+        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        if (keyboardFraction > 0f) fakeInsets((root.height * keyboardFraction).toInt(), 0)
+        checkRegions(layout, query, font, keyboard = keyboardFraction > 0f)
+        assertEquals("$layout q='$query' font=$font keyboard=$keyboardFraction", expectInline, lastInline)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun PAL_18_landscapeSmallNoKeyboardKeepsTheStripFont1() { inlineMatrix(SearchLayout.Orbit, "", 1f, 0f, expectInline = false) }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun PAL_18_landscapeSmallNoKeyboardKeepsTheStripFont2() { inlineMatrix(SearchLayout.Orbit, "", 2f, 0f, expectInline = false) }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun PAL_18_landscapeSmallKeyboardOpenPutsTheMicInTheFieldRowFont1() { inlineMatrix(SearchLayout.Orbit, "", 1f, 0.4f, true) }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun PAL_18_landscapeSmallKeyboardOpenPutsTheMicInTheFieldRowFont2() { inlineMatrix(SearchLayout.Filmstrip, "", 2f, 0.4f, true) }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun PAL_18_landscapeSmallKeyboardOpenFlatTypedFont1() { inlineMatrix(SearchLayout.Flat, "al", 1f, 0.4f, true) }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun PAL_18_landscapeSmallKeyboardOpenFlatTypedFont2() { inlineMatrix(SearchLayout.Flat, "al", 2f, 0.4f, true) }
+    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_18_landscapeLargeKeyboardOpenOrbitTypedFont1() { inlineMatrix(SearchLayout.Orbit, "br", 1f, 0.45f, true) }
+    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_18_landscapeLargeKeyboardOpenOrbitTypedFont2() { inlineMatrix(SearchLayout.Orbit, "br", 2f, 0.45f, true) }
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_18_portraitKeyboardOpenKeepsTheStripBecauseThereIsRoom() { inlineMatrix(SearchLayout.Orbit, "", 1f, 0.4f, false) }
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_18_portraitNoKeyboardKeepsTheStrip() { inlineMatrix(SearchLayout.Flat, "al", 1f, 0f, false) }
+
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi")
+    fun PAL_18_inlineMicStillHasItsStateAndTheResultsGetTheFreedHeight() {
+        org.robolectric.Shadows.shadowOf(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        open(SearchLayout.Flat, "al")
+        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        fakeInsets((root.height * 0.4f).toInt(), 0)
+        val mic = rule.onNodeWithTag(RADAR_MIC_TAG).fetchSemanticsNode()
+        assertEquals("Ready", mic.config[SemanticsProperties.StateDescription])
+        assertEquals("a polite live region, never assertive", androidx.compose.ui.semantics.LiveRegionMode.Polite, mic.config[SemanticsProperties.LiveRegion])
+        // The free area under the field is 360*0.6 - 64 = 152 dp: the list may use all of it (a strip would have taken 72 dp of it).
+        val rows = rule.onAllNodes(SemanticsMatcher("row") { it.config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text == "Alpha" }, useUnmergedTree = true).fetchSemanticsNodes()
+        assertTrue("a result is listed", rows.isNotEmpty())
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
+    fun NFR_13_theMicSaysUnavailableUntilTheMicrophonePermissionIsGranted() {
+        open(SearchLayout.Orbit)
+        assertEquals("Unavailable, microphone permission is off", rule.onNodeWithTag(RADAR_MIC_TAG).fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        assertEquals("the name stays the name; the state is a state", "Speak to search", rule.onNodeWithTag(RADAR_MIC_TAG).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].first())
+    }
+
+    @Test fun NFR_13_eachVoiceStateHasItsOwnWordsAndAllEightLanguagesTranslateThem() {
+        val words = VoiceState.values().map { VoiceStates.describe(it) }.toSet()
+        assertEquals(setOf(VoiceStates.READY, VoiceStates.LISTENING, VoiceStates.UNAVAILABLE), words)
+        assertEquals(VoiceStates.LISTENING, VoiceStates.describe(PushToTalk.state(true, true, true)))
+        assertEquals(VoiceStates.UNAVAILABLE, VoiceStates.describe(PushToTalk.state(true, false, false)))
+        assertEquals(VoiceStates.READY, VoiceStates.describe(PushToTalk.state(true, true, false)))
+        for (lang in listOf("es", "fr", "de", "pt", "hi", "zh", "ja", "ar")) {
+            com.bos.sphere.core.design.L10n.setLanguage(lang)
+            for (w in words) assertTrue("$lang translates '$w'", com.bos.sphere.core.design.L10n.tr(w) != w)
+        }
+        com.bos.sphere.core.design.L10n.setLanguage("en")
+    }
+
     // ---- screenshots (read by a person; the numbers above are the assertions)
 
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun shotLandscapeOrbit() { open(SearchLayout.Orbit); shoot("w22-orbit-landscape") }
@@ -246,6 +321,9 @@ class RadarGlassW22Test {
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun shotLandscapeFlat() { open(SearchLayout.Flat, "al"); shoot("w22-flat-landscape") }
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun shotLandscapeOrbitKeyboard() { open(SearchLayout.Orbit); fakeInsets(330, 0); shoot("w22-orbit-landscape-keyboard") }
     @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun shotSmallLandscapeFilmstripFont2() { open(SearchLayout.Filmstrip, "", 2f); shoot("w22-filmstrip-small-landscape-font2") }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun shotW23SmallLandscapeKeyboardOrbit() { open(SearchLayout.Orbit); fakeInsets(144, 0); shoot("w23-orbit-small-landscape-keyboard") }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun shotW23SmallLandscapeKeyboardFlatFont2() { open(SearchLayout.Flat, "al", 2f); fakeInsets(144, 0); shoot("w23-flat-small-landscape-keyboard-font2") }
+    @Test @Config(sdk = [35], qualifiers = "w640dp-h360dp-land-night-xhdpi") fun shotW23SmallLandscapeKeyboardFilmstrip() { open(SearchLayout.Filmstrip); fakeInsets(144, 0); shoot("w23-filmstrip-small-landscape-keyboard") }
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun shotPortraitOrbitDefaultBackground() { open(SearchLayout.Orbit); shoot("w22-orbit-portrait-default-bg") }
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun shotPortraitFlatEmpty() { open(SearchLayout.Flat, ""); shoot("w22-flat-empty-portrait") }
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun shotPortraitFilmstripFont2() { open(SearchLayout.Filmstrip, "", 2f); shoot("w22-filmstrip-portrait-font2") }

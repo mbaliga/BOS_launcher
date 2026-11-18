@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,7 +85,7 @@ fun RecentsPanel(
     val bg = HyleColors.Background
     Box(
         modifier.fillMaxSize().background(Brush.verticalGradient(listOf(bg, androidx.compose.ui.graphics.lerp(bg, HyleColors.Surface, 0.55f)))).testTag("recents.panel")
-            .semantics { contentDescription = L10n.tr("Recent apps") },
+            .semantics { contentDescription = L10n.tr("Recent apps"); paneTitle = L10n.tr("Recent apps") },
     ) {
         FocusLayer(layer = RECENTS_FOCUS_LAYER) {
             Column(

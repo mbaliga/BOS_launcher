@@ -355,7 +355,7 @@ internal fun ControlsNotch(
             if (reduced) alpha = p.coerceIn(0f, 1f) else translationY = -(1f - p) * height.toPx()
         }
             .testTag("glance.notch")
-            // The box is as tall as the 48 dp targets need; the black shape is drawn only down to the notch's own bottom edge.
+            // Wave 23: the box, the drawn shape and the 48 dp targets are the same height, so a tap outside the black falls through to the home card.
             .width(GlanceNotch.widthDp(areaWidthDp).dp).height(cutoutTop + GlanceNotch.TARGET_DP.dp)
             .drawBehind {
                 val path = NotchShape.path(size.width, height.toPx(), GlanceNotch.FLARE_DP.dp.toPx(), GlanceNotch.CORNER_DP.dp.toPx())
@@ -370,7 +370,7 @@ internal fun ControlsNotch(
                 fingerUp()
             } },
     ) {
-        // The three 48 dp targets, evenly spread over the straight body, starting below the cutout. A target is taller than the 32 dp
+        // The three 48 dp targets, evenly spread over the straight body, starting below the cutout. A target is as tall as the 48 dp
         // body below the cutout; its icon sits in the upper part, the spare height is only touch area (inside this Box's bounds).
         // Transport order is not mirrored in right-to-left (rewind left, forward right, like every player).
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) { Row(

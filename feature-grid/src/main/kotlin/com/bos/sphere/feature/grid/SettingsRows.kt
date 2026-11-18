@@ -92,7 +92,7 @@ internal fun SettingRowFrame(
         modifier
             .fillMaxWidth()
             // Flat, like the original XMB list: no card, just air between rows.
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)
             .padding(horizontal = 4.dp, vertical = 17.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 42.dp)) {
@@ -173,7 +173,7 @@ private fun RoundStep(text: String, enabled: Boolean, description: String, onCli
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(36.dp)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
     ) { Text(text, color = if (enabled) HyleColors.InkBright else HyleColors.InkDim.copy(alpha = 0.4f), fontSize = 18.sp) }
 }
@@ -234,12 +234,12 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
                     } else {
                         Column {
                             Icon(
-                                Glyphs.Up, "Previous ${item.title}", tint = HyleColors.Ink,
-                                modifier = Modifier.clickable { step(-1) }.padding(horizontal = 8.dp, vertical = 3.dp).size(width = 22.dp, height = 18.dp),
+                                Glyphs.Up, com.bos.sphere.core.design.L10n.tr("Previous %s", item.title), tint = HyleColors.Ink,
+                                modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) { step(-1) }.padding(horizontal = 8.dp, vertical = 3.dp).size(width = 22.dp, height = 18.dp),
                             )
                             Icon(
-                                Glyphs.Down, "Next ${item.title}", tint = HyleColors.Ink,
-                                modifier = Modifier.clickable { step(1) }.padding(horizontal = 8.dp, vertical = 3.dp).size(width = 22.dp, height = 18.dp),
+                                Glyphs.Down, com.bos.sphere.core.design.L10n.tr("Next %s", item.title), tint = HyleColors.Ink,
+                                modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) { step(1) }.padding(horizontal = 8.dp, vertical = 3.dp).size(width = 22.dp, height = 18.dp),
                             )
                         }
                     }

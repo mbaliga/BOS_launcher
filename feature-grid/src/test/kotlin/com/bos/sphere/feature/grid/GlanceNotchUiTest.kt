@@ -197,4 +197,19 @@ class GlanceNotchUiTest {
         assertEquals(GlanceNotch.MAX_WIDTH_DP, b.width / density(), 1f)
         shoot("landscape")
     }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_23_theTouchAreaIsExactlyTheDrawnNotchAndEveryTargetLiesInsideIt() {
+        glance()
+        popIn()
+        val d = density()
+        val b = notch().fetchSemanticsNode().boundsInRoot
+        assertEquals("the box ends where the black ends", GlanceNotch.heightDp(0f), b.height / d, 0.5f)
+        for (tag in listOf("glance.prev", "glance.playpause", "glance.next")) {
+            val t = rule.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("glance.notch")), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            assertTrue("$tag is inside the drawn notch", t.top >= b.top - 0.5f && t.bottom <= b.bottom + 0.5f && t.left >= b.left && t.right <= b.right)
+            assertEquals("$tag is 48 dp tall", 48f, t.height / d, 0.5f)
+        }
+        shoot("hit_area")
+    }
 }

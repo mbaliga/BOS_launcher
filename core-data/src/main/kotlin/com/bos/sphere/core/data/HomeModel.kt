@@ -235,12 +235,6 @@ data class LauncherPrefs(
     val uiSounds: Boolean = true,
     val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
-    /** W28 (arcShortcuts): the app drawer shortcuts: off, or up to [ArcShortcuts.MAX] apps next to the four-squares hotspot. */
-    val drawerShortcutsOn: Boolean = false,
-    /** W28: the shortcuts' app keys, in order (never more than [ArcShortcuts.MAX]). */
-    val drawerShortcuts: List<String> = emptyList(),
-    /** W28: whether the shortcuts are always on the home or only appear with the app wheel. */
-    val drawerShortcutsShown: ShortcutsShown = ShortcutsShown.Always,
 
     // --- home landing (HOM-22)
     /** What the home shows: the user's pages, the recent apps, every app, or only the wallpaper and the four hotspots. */
@@ -536,9 +530,6 @@ enum class DrawerStyle(val label: String) {
 }
 
 /** How the wheel drawer groups apps into spokes. */
-/** W28 (arcShortcuts): when the drawer shortcuts are visible. */
-enum class ShortcutsShown(val label: String) { Always("Always"), OnlyWithWheel("Only with the app wheel") }
-
 enum class WheelGrouping(val label: String) { Letter("A–Z"), Category("Category"), Recent("Recent") }
 
 /** Defaults match the reference layout (portrait natural orientation). */

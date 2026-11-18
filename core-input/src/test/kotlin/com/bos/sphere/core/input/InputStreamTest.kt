@@ -188,14 +188,11 @@ class InputStreamTest {
     private val labels = listOf("A", "B", "C", "M", "S", "Z")
     private fun st(focused: Int = 0, item: Int = 0, count: Int = 3, mode: PuckMode = PuckMode.AZ) = PuckState(mode, labels, focused, item, count)
 
-    @Test fun INP_18_left_right_step_round_the_looped_sections() {
+    @Test fun INP_18_left_right_rotate_and_clamp() {
         assertEquals(PuckEffect.FocusGroup(1), PuckKeys.onKey(st(0), PuckKey(Keys.DPAD_RIGHT)))
         assertEquals(PuckEffect.FocusGroup(2), PuckKeys.onKey(st(3), PuckKey(Keys.DPAD_LEFT)))
-        // W26: before the first is the last, after the last is the first.
-        assertEquals(PuckEffect.FocusGroup(5), PuckKeys.onKey(st(0), PuckKey(Keys.DPAD_LEFT)))
-        assertEquals(PuckEffect.FocusGroup(0), PuckKeys.onKey(st(5), PuckKey(Keys.DPAD_RIGHT)))
-        // One section stays where it is.
-        assertNull(PuckKeys.onKey(PuckState(PuckMode.AZ, listOf("A"), 0), PuckKey(Keys.DPAD_RIGHT)))
+        assertNull(PuckKeys.onKey(st(0), PuckKey(Keys.DPAD_LEFT)))
+        assertNull(PuckKeys.onKey(st(5), PuckKey(Keys.DPAD_RIGHT)))
     }
 
     @Test fun INP_18_typing_a_letter_jumps_to_that_group() {

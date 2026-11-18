@@ -1,5 +1,7 @@
 > Superseded in wave 28 by [arcShortcuts.md](arcShortcuts.md): the switcher, its Compact/Expanded setting and the colour-picker fan are gone; only the looping idea survives, as the looped alphabet.
 
+> Also superseded in wave 29 by [drawerRevert.md](drawerRevert.md): the arc drawer code is removed and the pre-wave-26 wheel disc is back.
+
 # Arc drawer: looped sections, compact or expanded switcher, colour-picker fan (wave 26)
 
 Source: owner batch of wave 26, clauses 1 to 3. References are from a drawing app (Concepts): its quick-switcher quarter ring (marked 1) and its expanded colour picker.

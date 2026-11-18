@@ -29,6 +29,14 @@ class RetiredPrefKeysTest {
         assertFalse(f.getValue("crash_loop").contains("rapid")); assertTrue(f.getValue("crash_loop").contains("crashes"))
     }
 
+    @Test fun CFG_03_w29_theArcDrawerPrefsOfBuilds55To58AreDroppedClean() {
+        val keys = listOf("switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown")
+        val f = mapOf("launcher_prefs" to MapSharedPreferences(keys.associateWith { "x" } + mapOf("wheelGrouping" to "Letter")))
+        assertEquals(4, RetiredPrefKeys.purge { f[it] })
+        assertTrue("the wheel groups setting is live again and stays", f.getValue("launcher_prefs").contains("wheelGrouping"))
+        for (k in keys) assertTrue("$k is dropped when a settings file is imported", k in RetiredPrefKeys.DROPPED_ON_IMPORT)
+    }
+
     @Test fun CFG_03_aSecondPurgeFindsNothingAndAMissingOrBrokenFileIsSkipped() {
         val f = files()
         RetiredPrefKeys.purge { f[it] }

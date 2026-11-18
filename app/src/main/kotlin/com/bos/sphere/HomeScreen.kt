@@ -7,6 +7,7 @@ import com.bos.sphere.feature.grid.homeGestures
 import com.bos.sphere.ui.launchpadCloseDrag
 import com.bos.sphere.ui.launchpadEdgeDrag
 import com.bos.sphere.ui.launchpadShortcut
+import com.bos.sphere.ui.launchpadMenuAside
 import android.content.res.Configuration
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -509,6 +510,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val internalRef by rememberUpdatedState(::internal)
     // PAL-01: a printable key on the home opens Radar with that character typed.
     var typedQuery by remember { mutableStateOf("") }
+    var radarScope by remember { mutableStateOf<com.bos.sphere.core.data.SearchCategory?>(null) } // wave 25: the scope Radar opens on (Launchpad's compose button asks for People)
     androidx.compose.runtime.DisposableEffect(Unit) {
         val hook: (android.view.KeyEvent) -> Boolean = { e ->
             val entry = com.bos.sphere.feature.search.palette.TypeToSearch.onKey(
@@ -519,7 +521,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.feature.grid.LauncherInput.typeHook = hook
         onDispose { if (com.bos.sphere.feature.grid.LauncherInput.typeHook === hook) com.bos.sphere.feature.grid.LauncherInput.typeHook = null }
     }
-    LaunchedEffect(searchOpen) { if (!searchOpen) typedQuery = "" }
+    LaunchedEffect(searchOpen) { if (!searchOpen) { typedQuery = ""; radarScope = null } }
     var pickFor by remember { mutableStateOf<CornerActionId?>(null) }
     var actionAppsRev by remember { mutableIntStateOf(0) }
     val pickAppForRef by rememberUpdatedState({ id: CornerActionId -> pickFor = id })
@@ -921,6 +923,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.ui.CardEdge.forLaunchpad(launchpadRtl), launchpadDensity, launchpadMotion.reduced,
     )
     val revealSlideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * launchpadGeometry.dragTravelFraction
+    // Wave 25 (STR-01): Launchpad's menu is a side panel; while it is open the home card slides fully out of view (and back with it).
+    val lpMenu = com.bos.sphere.ui.rememberLaunchpadMenu()
+    LaunchedEffect(leftOpen) { if (!leftOpen) lpMenu.open = false }
     // STR-14: the Recents panel reuses the same geometry, card layer, scrim and settle with the opposite edge (not a fork).
     val rightReveal = com.bos.sphere.ui.rememberLaunchpadReveal(rightOpen) { rightOpen = it }
     val recentsGeometry = com.bos.sphere.ui.LaunchpadCardGeometry(
@@ -987,6 +992,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 cardFraction = { reveal.progress },
                 // STR-02: reports whether the app started, so a failed open keeps Launchpad up with a message.
                 launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
+                menu = lpMenu,
+                // Wave 25 (STR-02): the floating compose button has no composer of its own to open, so it opens Radar on People (reach someone to message).
+                onCompose = { leftOpen = false; radarScope = com.bos.sphere.core.data.SearchCategory.Contacts; wheelOpen = false; drawerOpen = false; searchOpen = true },
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
@@ -1010,7 +1018,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         val slideDp = revealSlideDp
         Box(
-            Modifier.fillMaxSize().editCardLayer { editCard.frame() }.homeCardLayer(launchpadGeometry) { reveal.progress }
+            Modifier.fillMaxSize().launchpadMenuAside(lpMenu, launchpadGeometry.widthPx, launchpadRtl).editCardLayer { editCard.frame() }.homeCardLayer(launchpadGeometry) { reveal.progress }
                 .homeCardLayer(recentsGeometry) { if (recentsEnabled) rightReveal.progress else 0f }
                 // Behind the card the home is inert for accessibility services; the card overlay below is the one control.
                 .then(if (leftOpen || rightOpen) Modifier.clearAndSetSemantics { } else Modifier)
@@ -1179,7 +1187,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         // The card of home still showing: tap it, press Enter on it, or drag it back, to bring the home back.
         if (leftOpen) {
-            LaunchpadCardOverlay(launchpadGeometry, reveal, onReturn = { leftOpen = false }, slideDp = revealSlideDp)
+            LaunchpadCardOverlay(launchpadGeometry, reveal, onReturn = { leftOpen = false }, slideDp = revealSlideDp, modifier = Modifier.launchpadMenuAside(lpMenu, launchpadGeometry.widthPx, launchpadRtl))
         }
         // STR-14: the same slice of the home card on the left while the Recents panel is open.
         if (rightOpen) {
@@ -1344,6 +1352,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             settingsSource = settingsSource,
             initialQuery = typedQuery,
+            initialCategory = radarScope,
             launchHistory = history, // wave 18: which ring an app sits on before anything is typed
             onRunCommand = { name, index ->
                 // PAL-03: "Switch to workspace Work" names a workspace by position; every other command is a launcher command.

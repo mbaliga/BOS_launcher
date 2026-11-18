@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -44,8 +45,9 @@ internal object RoomyList {
     const val ROW_MIN_DP = 72
     const val H_PAD_DP = 16
     const val V_PAD_DP = 12
-    const val ICON_DP = 40
-    const val ROW_GAP_DP = 8
+    /** Wave 25: the app badge is small (the hub's), the rows are flat with a divider and no gap. */
+    const val ICON_DP = 32
+    const val ROW_GAP_DP = 0
     /** Extra air above a new conversation or section, drawn with a hairline. */
     const val GROUP_GAP_DP = 16
 
@@ -87,7 +89,7 @@ internal fun MoreLine(hidden: Int, expanded: Boolean, id: String, onClick: () ->
     Text(
         if (expanded) L10n.tr("Show fewer") else L10n.tr("+%d more", hidden),
         color = BlueLight, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(start = RoomyList.H_PAD_DP.dp + 3.dp + 10.dp + RoomyList.ICON_DP.dp + 12.dp)
+        modifier = Modifier.padding(start = HubStyle.TEXT_START_DP.dp)
             .heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) // NFR-13: 48 dp target, announced as a button
             .padding(horizontal = 12.dp, vertical = 14.dp).testTag("lp.more.$id"),
     )
@@ -125,12 +127,12 @@ internal fun SectionStrip(sections: List<Section>, listState: LazyListState, hea
                     .testTag("lp.strip.${s.key}"),
                 contentAlignment = Alignment.Center,
             ) {
+                // Wave 25: flat text tabs (the hub has no pills); the one in view is bold with a thin blue underline.
                 Text(
-                    s.title, color = if (on) LocalLp.current.bg else LocalLp.current.ink2, fontSize = 13.sp,
-                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.heightIn(min = 40.dp, max = 40.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp))
-                        .background(if (on) LocalLp.current.ink else LocalLp.current.surface)
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    s.title, color = if (on) LocalLp.current.ink else LocalLp.current.dim, fontSize = 13.sp,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.drawBehind { if (on) drawRect(BlueLight, androidx.compose.ui.geometry.Offset(0f, size.height - 2.dp.toPx()), androidx.compose.ui.geometry.Size(size.width, 2.dp.toPx())) }
+                        .padding(horizontal = 6.dp, vertical = 8.dp),
                 )
             }
         }

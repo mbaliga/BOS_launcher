@@ -95,6 +95,8 @@ internal class RowHandlers(
     val onMenu: () -> Unit,
     val onRunAction: (HubAction) -> Unit,
     val onSendReply: (HubAction, String) -> Unit,
+    /** Wave 25: a long press (or the secondary button) opens the row's action chips in place; the full menu is behind the chips' "More". */
+    val onToggleActions: () -> Unit = onMenu,
 )
 
 internal fun menuContextFor(n: HubNotification, replyAvailable: Boolean, unread: Boolean) = RowMenuContext(
@@ -121,9 +123,11 @@ internal fun SectionHeader(
     /** STR-13: a group section's colour dot and priority badge. */
     accent: Color? = null,
     badge: String = "",
+    /** Wave 25: the text shown; a day section passes its date ("Thu 20 Aug 2015"). */
+    title: String = sec.title,
 ) {
     var focused by remember { mutableStateOf(false) }
-    // STR-02: a quiet title above its notifications; every section is open, and a hairline and extra air set it apart from the one above.
+    // Wave 25 (STR-02): the hub's date band: a small quiet title (a day reads "Thu 20 Aug 2015"), left-aligned with the rows' badges, a thin divider below.
     Column(
         modifier.fillMaxWidth()
             .testTag("lp.group.${sec.key}")
@@ -134,12 +138,8 @@ internal fun SectionHeader(
             .then(if (showRing && focused) Modifier.border(2.dp, FocusRing, RoundedCornerShape(10.dp)) else Modifier)
             .clickable(onClick = onToggle),
     ) {
-        if (!first) {
-            Spacer(Modifier.height(RoomyList.GROUP_GAP_DP.dp))
-            Box(Modifier.padding(horizontal = RoomyList.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
-        }
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = RoomyList.H_PAD_DP.dp, end = 8.dp, top = 8.dp, bottom = 2.dp),
+            Modifier.fillMaxWidth().heightIn(min = 32.dp).padding(start = RoomyList.H_PAD_DP.dp, end = RoomyList.H_PAD_DP.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (accent != null) Box(Modifier.padding(end = 8.dp).size(10.dp).background(accent, CircleShape))
@@ -147,8 +147,9 @@ internal fun SectionHeader(
             if (lead != null && sec.key != LaunchpadLogic.FLAT_KEY && !sec.pinned && (sec.key.startsWith("app:") || sec.key.startsWith("appconv:"))) {
                 AppIcon(lead.packageName, sec.subtitle.ifBlank { sec.title }, 20, Modifier.padding(end = 8.dp))
             }
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                sec.title, color = LocalLp.current.dim, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                title, color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
             )
             val sub = listOf(sec.subtitle, extra).filter { it.isNotEmpty() }.joinToString(" · ")
@@ -159,12 +160,11 @@ internal fun SectionHeader(
                 )
             }
             if (badge.isNotEmpty()) Text("  $badge", color = LocalLp.current.dim, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-            Text(
-                "  ${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp,
-                modifier = Modifier.padding(end = 4.dp),
-            )
-            if (collapsed) Chevron(LocalLp.current.dim, down = false, size = 14)
+            }
+            Text("${sec.items.size}", color = LocalLp.current.dim, fontSize = 12.sp)
+            if (collapsed) { Spacer(Modifier.width(6.dp)); Chevron(LocalLp.current.dim, down = false, size = 14) }
         }
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
     }
 }
 
@@ -209,6 +209,10 @@ internal fun NotificationRow(
     onKeyOther: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
     replyOpen: Boolean,
     modifier: Modifier = Modifier,
+    /** Wave 25: the colour of the 4 dp stripe on the leading edge (one per source app). */
+    stripeColor: Color = HubStyle.stripeFor(n.packageName),
+    /** Wave 25: the action chips (Reply and the notification's own actions) show only when the row is expanded. */
+    actionsOpen: Boolean = false,
 ) {
     var dx by remember { mutableFloatStateOf(0f) }
     var base by remember { mutableFloatStateOf(0f) } // 0, or the palette's width while it is held open
@@ -281,7 +285,7 @@ internal fun NotificationRow(
                         onDragCancel = { dx = 0f },
                     ) { _, delta -> dx += delta }
                 }
-                .onSecondaryClick { handlers.onMenu() }
+                .onSecondaryClick { handlers.onToggleActions() }
                 .hoverable(hoverSource)
                 .onKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
@@ -295,59 +299,63 @@ internal fun NotificationRow(
                 .focusRequester(requester)
                 .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() }
                 .then(if (showRing && focused) Modifier.border(2.dp, FocusRing, RoundedCornerShape(6.dp)) else Modifier)
-                .combinedClickable(onClick = { if (base > 0f) base = 0f else handlers.onOpen() }, onLongClick = handlers.onMenu)
+                .combinedClickable(onClick = { if (base > 0f) base = 0f else handlers.onOpen() }, onLongClick = handlers.onToggleActions)
                 .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
                 .heightIn(min = RoomyList.ROW_MIN_DP.dp)
-                .padding(start = RoomyList.H_PAD_DP.dp, end = RoomyList.H_PAD_DP.dp, top = RoomyList.V_PAD_DP.dp, bottom = RoomyList.V_PAD_DP.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
         ) {
-            Box(Modifier.width(3.dp).height(36.dp).background(
-                if (pinned || important) BlueLight else Color.Transparent, RoundedCornerShape(2.dp),
-            ))
-            Spacer(Modifier.width(10.dp))
-            Box {
-                AppIcon(n.packageName, n.appLabel.ifBlank { n.title }, RoomyList.ICON_DP)
-                if (unread && !silent) {
-                    Box(
-                        Modifier.size(10.dp).align(Alignment.TopStart).offset((-3).dp, (-3).dp)
-                            .background(BlueLight, CircleShape),
-                    )
-                }
-            }
+            // Wave 25 (STR-02): the hub's 4 dp stripe, the full height of the row, one colour per source app.
+            Box(Modifier.width(HubStyle.STRIPE_DP.dp).fillMaxHeight().background(stripeColor).testTag("lp.stripe.${n.key}"))
+            Row(
+                Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp, end = RoomyList.H_PAD_DP.dp, top = RoomyList.V_PAD_DP.dp, bottom = RoomyList.V_PAD_DP.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+            AppIcon(n.packageName, n.appLabel.ifBlank { n.title }, RoomyList.ICON_DP, Modifier.testTag("lp.badge.${n.key}"))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    n.title, color = LocalLp.current.ink, fontSize = 17.sp, fontWeight = if (unread) FontWeight.Bold else FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        n.title, color = LocalLp.current.ink, fontSize = 16.sp, fontWeight = weight,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (pinned || important) Box(Modifier.padding(end = 6.dp).size(6.dp).background(BlueLight, CircleShape))
+                    Text(
+                        formatStamp(n.timestamp, now, is24, zone), color = LocalLp.current.dim, fontSize = 12.sp,
+                        fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal, maxLines = 1,
+                        modifier = Modifier.testTag("lp.time.${n.key}"),
+                    )
+                }
                 if (n.summary.isNotEmpty()) {
                     Text(
                         n.summary, color = if (unread && !silent) LocalLp.current.ink2 else LocalLp.current.dim, fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
+                        fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp).testTag("lp.preview.${n.key}"),
                     )
                 }
             }
-            Spacer(Modifier.width(10.dp))
             if (showButtons) {
                 // Buttons for both gestures, shown on hover and on focus (STR-03 equivalents).
+                Spacer(Modifier.width(10.dp))
                 if (canSwipeLeft) RowButton(primaryLabel, handlers.onPrimary)
                 RowButton(L10n.tr("Actions"), handlers.onMenu)
-            } else {
-                Text(
-                    formatStamp(n.timestamp, now, is24, zone), color = LocalLp.current.dim, fontSize = 12.sp,
-                    fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal,
-                )
+            }
             }
         }
       }
-        if (plain.isNotEmpty() || reply != null) {
+        // Wave 25 (STR-02): no chips on a resting row; a long press opens them in place, with "Actions" for the full menu.
+        if (actionsOpen && (plain.isNotEmpty() || reply != null)) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 81.dp, end = 16.dp, bottom = 6.dp),
+                Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = 16.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (reply != null) ActionChip(reply.label.ifBlank { L10n.tr("Reply") }, true) { handlers.onCommand(RowCommand.Reply) }
                 plain.forEach { a -> ActionChip(a.label, false) { handlers.onRunAction(a) } }
+                ActionChip(L10n.tr("Actions"), false) { handlers.onMenu() }
+            }
+        } else if (actionsOpen) {
+            Row(Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = 16.dp, bottom = 8.dp)) {
+                ActionChip(L10n.tr("Actions"), false) { handlers.onMenu() }
             }
         }
         if (replyOpen && reply != null) {
@@ -392,7 +400,7 @@ internal fun ReplyRow(action: HubAction, hint: String?, onSend: (String) -> Unit
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Row(
-        Modifier.fillMaxWidth().padding(start = 81.dp, end = 16.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().padding(start = HubStyle.TEXT_START_DP.dp, end = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(LocalLp.current.surface).padding(horizontal = 14.dp, vertical = 9.dp)) {

@@ -66,13 +66,14 @@ abstract class LaunchpadRoomyCases(private val orientation: String) : LaunchpadS
         scrollTo("And the second part"); rule.onNodeWithText("And the second part").assertIsDisplayed()
     }
 
-    @Test fun STR_02_row_isAtLeast72dpTall_withA40dpIcon() {
+    // Updated for wave 25 (owner item 2): the hub's flat rows have a small 32 dp badge and no gap between rows (a divider instead).
+    @Test fun STR_02_row_isAtLeast72dpTall_withA32dpBadge() {
         render("height", dark = false)
         scrollTo("Your code is 4411")
         val h = rule.onNodeWithTag("lp.row.s1", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertTrue("row height ${h.bottom - h.top} is under 72 dp", (h.bottom - h.top) >= 72.dp)
-        assertEquals(40, RoomyList.ICON_DP); assertEquals(72, RoomyList.ROW_MIN_DP)
-        assertEquals(16, RoomyList.H_PAD_DP); assertEquals(12, RoomyList.V_PAD_DP); assertEquals(8, RoomyList.ROW_GAP_DP)
+        assertEquals(32, RoomyList.ICON_DP); assertEquals(72, RoomyList.ROW_MIN_DP)
+        assertEquals(16, RoomyList.H_PAD_DP); assertEquals(12, RoomyList.V_PAD_DP); assertEquals(0, RoomyList.ROW_GAP_DP)
     }
 
     @Test fun STR_02_conversation_showsLatestWithMoreThatExpandsInPlace() {

@@ -39,8 +39,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -231,15 +229,6 @@ internal fun formatStamp(ts: Long, now: Long, is24: Boolean, zone: ZoneId): Stri
     return if (same) time else DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()).format(d)
 }
 
-private fun groupModeLabel(m: GroupMode) = when (m) {
-    GroupMode.Time -> L10n.tr("Time")
-    GroupMode.App -> L10n.tr("App")
-    GroupMode.Sender -> L10n.tr("Sender")
-    GroupMode.Conversation -> L10n.tr("Conversation")
-    GroupMode.Flat -> L10n.tr("Flat")
-    GroupMode.AppConversation -> L10n.tr("App and conversation")
-}
-
 // ---------------------------------------------------------------------------------------------
 // Panel
 // ---------------------------------------------------------------------------------------------
@@ -270,6 +259,15 @@ fun LaunchpadPanel(
      * sent; unlike [onOpenApp] it must not close anything, so a failure leaves Launchpad open with a message. Null: [onOpenApp] is trusted.
      */
     launchApp: ((packageName: String) -> Boolean)? = null,
+    /**
+     * Wave 25 (STR-01): the state of the menu side panel. The host passes its own so the home card can slide out of view with it
+     * (read [LaunchpadMenuState.progress] and [LaunchpadMenuMotion]); a panel used alone keeps one itself.
+     */
+    menu: LaunchpadMenuState = rememberLaunchpadMenu(),
+    /** Wave 25 (STR-02): the floating compose button. Launchpad has no composer of its own, so the host decides what opens (Liftoff: Radar on People). */
+    onCompose: () -> Unit = {},
+    /** Wave 25 (STR-02): a slot in the list's top bar for the history, files, usage and timeline view switcher. */
+    viewSwitcher: @Composable () -> Unit = {},
 ) {
     rememberLaunchpadInit()
     val dark = when (theme) {
@@ -282,6 +280,8 @@ fun LaunchpadPanel(
     // NFR-19: the handler lives outside the animated content, which stays composed during the exit; it is off from the
     // first frame of the exit and follows the back gesture while open.
     val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
+    // Back closes the menu panel first (registered after the predictive handler, so it takes the press while open); a second Back leaves Launchpad.
+    androidx.activity.compose.BackHandler(enabled = visible && menu.open) { menu.open = false }
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     androidx.compose.runtime.CompositionLocalProvider(LocalLp provides if (dark) LpDark else LpLight) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.predictiveBackLayer(backProgress)) {
@@ -339,6 +339,7 @@ fun LaunchpadPanel(
             runAction = { a -> ReplyLogic.run(a) },
             sendReply = { a, text -> ReplyLogic.send(ctx, a, text) },
             onClose = onDismiss,
+            menu = menu, onCompose = onCompose, viewSwitcher = viewSwitcher,
             onOpenItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss) },
             openItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss).ok },
             openApp = { pkg ->
@@ -421,14 +422,22 @@ fun LaunchpadContent(
     zone: ZoneId = remember { ZoneId.systemDefault() },
     /** Wave 24: system Do Not Disturb is on (read only); with a Priority group the column says Priority still breaks through. */
     dndOn: Boolean = false,
+    /** Wave 25 (STR-01): the menu side panel's state; see [LaunchpadPanel]. */
+    menu: LaunchpadMenuState = rememberLaunchpadMenu(),
+    /** Wave 25 (STR-02): the floating compose button's action. */
+    onCompose: () -> Unit = {},
+    /** Wave 25 (STR-02): the slot for the view switcher (history, files, usage, timeline), in the top bar next to the title. */
+    viewSwitcher: @Composable () -> Unit = {},
 ) {
     val ctx = LocalContext.current
+    val rtlLayout = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val is24 = remember(ctx) { DateFormat.is24HourFormat(ctx) }
     var filter by remember { mutableStateOf<String?>(null) }
     // STR-02: nothing is folded by default. A section folds only when the user asks (arrow left, pinch in); a conversation shows
     // its latest message and "+N more", which the user expands in place.
     var collapsed by remember { mutableStateOf(setOf<String>()) }
     var expandedConvs by remember { mutableStateOf(setOf<String>()) }
+    var actionsOpenFor by remember { mutableStateOf(setOf<String>()) } // wave 25: rows whose action chips are open (long press)
     var menuFor by remember { mutableStateOf<HubNotification?>(null) }
     var menuExpand by remember { mutableStateOf<RowCommand?>(null) }
     var replyFor by remember { mutableStateOf<String?>(null) }
@@ -452,7 +461,7 @@ fun LaunchpadContent(
             com.bos.sphere.core.data.LaunchpadAction.ToggleUnread -> { unreadOnly = !unreadOnly; toast.value = L10n.tr(if (unreadOnly) "Unread only" else "Showing everything") }
             com.bos.sphere.core.data.LaunchpadAction.NextGrouping -> {
                 val next = GroupMode.entries[(prefs.defaultMode.ordinal + 1) % GroupMode.entries.size]
-                onSetDefaultMode(next); toast.value = L10n.tr("Grouped: %s", groupModeLabel(next))
+                onSetDefaultMode(next); toast.value = L10n.tr("Grouped: %s", groupModeText(next))
             }
             com.bos.sphere.core.data.LaunchpadAction.CollapseAll ->
                 collapsed = if (collapsed.size >= sections.size) emptySet() else sections.map { it.key }.toSet()
@@ -568,7 +577,7 @@ fun LaunchpadContent(
     fun listKey(e: androidx.compose.ui.input.key.KeyEvent): Boolean {
         if (e.type != KeyEventType.KeyDown) return false
         return when (val r = RowKeys.map(e.key.nativeKeyCode, e.isShiftPressed)) {
-            RowKeys.Result.Close -> { onClose(); true }
+            RowKeys.Result.Close -> { if (menu.open) menu.open = false else onClose(); true }
             is RowKeys.Result.Move -> { move(r.delta); true }
             RowKeys.Result.First -> { order.firstOrNull()?.let { focus = it; pending = it }; true }
             RowKeys.Result.Last -> { order.lastOrNull()?.let { focus = it; pending = it }; true }
@@ -605,6 +614,17 @@ fun LaunchpadContent(
         }
     }
 
+    val menuActions = MenuActions(
+        mode = prefs.defaultMode, filter = activeFilter, counts = counts, canClear = items.isNotEmpty(),
+        onMode = { onSetDefaultMode(it); menu.open = false },
+        onFilter = { filter = it; menu.open = false },
+        onGroups = { menu.open = false; groupsOpen = true },
+        onClearAll = { onClearAll(); menu.open = false },
+    )
+    // Wave 25 (STR-01): the notifications layer (list and compose button) shifts away by the panel's width while the menu is open.
+    Box(Modifier.fillMaxSize().graphicsLayer {
+        translationX = LaunchpadMenuMotion.listShiftPx(LaunchpadMenuMotion.panelWidthDp(size.width / density) * density, menu.progress, menu.reduced, if (rtlLayout) -1f else 1f)
+    }) {
     Column(
         modifier
             .fillMaxSize()
@@ -626,7 +646,7 @@ fun LaunchpadContent(
                 var total = 0f
                 detectHorizontalDragGestures(
                     onDragStart = { total = 0f },
-                    onDragEnd = { if (total < -80f) onClose() },
+                    onDragEnd = { if (total < -80f) { if (menu.open) menu.open = false else onClose() } },
                 ) { _, dx -> total += dx }
             }
             .lpPinch { zoomIn ->
@@ -639,9 +659,8 @@ fun LaunchpadContent(
             .padding(end = if (endInset > 0.dp) endInset + 8.dp else 0.dp),
     ) {
         LaunchpadHeader(
-            counts = counts, filter = activeFilter, mode = prefs.defaultMode,
-            onFilter = { filter = it }, onMode = onSetDefaultMode, onClearAll = onClearAll,
-            canClear = items.isNotEmpty(), onClose = onClose, onGroups = { groupsOpen = true },
+            filterLabel = activeFilter?.let { f -> counts.firstOrNull { it.packageName == f }?.appLabel },
+            onMenu = { menu.open = true }, onClose = onClose, viewSwitcher = viewSwitcher,
             onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
         )
         if (systemState != null && hasAccess) SystemStateRow(systemState, is24, onOpenSystemPanel)
@@ -672,7 +691,7 @@ fun LaunchpadContent(
                             val target = FocusTarget.Group(sec.key)
                             val grp = view.grouped.firstOrNull { it.key == sec.key }?.group
                             SectionHeader(
-                                sec, e.collapsed, first = e.first, onToggle = { if (e.collapsed) toggleGroup(sec.key, true) },
+                                sec, e.collapsed, title = HubStyle.dayHeader(sec.key, sec.title), first = e.first, onToggle = { if (e.collapsed) toggleGroup(sec.key, true) },
                                 accent = grp?.let { g -> g.colorArgb?.let { Color(it) } ?: if (g.priority == GroupPriority.Priority) BlueLight else null },
                                 badge = grp?.takeIf { it.priority != GroupPriority.Normal }?.let { GroupTexts.priorityLabel(it.priority) }.orEmpty(),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
@@ -708,6 +727,7 @@ fun LaunchpadContent(
                                     onPrimary = { perform(leftAction, n, sections) },
                                     onCommand = { command(it, n) },
                                     onMenu = { menuFor = n; menuExpand = null },
+                                    onToggleActions = { actionsOpenFor = if (n.key in actionsOpenFor) actionsOpenFor - n.key else actionsOpenFor + n.key },
                                     onRunAction = { a ->
                                         if (runAction == null) onRunAction(a) else if (!runAction(a)) toast.value = L10n.tr("Couldn't open %s", a.label.ifBlank { n.appLabel })
                                     },
@@ -720,6 +740,7 @@ fun LaunchpadContent(
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
                                 onPointer = tracker::onPointer, onKeyOther = keyHandler,
                                 replyOpen = replyFor == n.key,
+                                actionsOpen = n.key in actionsOpenFor,
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -729,6 +750,11 @@ fun LaunchpadContent(
             }
         }
     }
+
+    if (hasAccess) ComposeFab(endPadding = if (endInset > 0.dp) endInset + 8.dp else 0.dp, onClick = onCompose)
+    }
+    // The menu panel and its scrim sit above the notifications layer, on the left.
+    Box(Modifier.fillMaxSize()) { LaunchpadMenuLayer(menu, rtlLayout, menuActions) { menu.open = false; runCatching { rootReq.requestFocus() } } }
 
     toast.value?.let { t ->
         Box(Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 24.dp), Alignment.BottomCenter) {
@@ -761,90 +787,47 @@ fun LaunchpadContent(
     }
 }
 
+/**
+ * The top bar: the menu button (opens the side panel), the title, the slot for the view switcher, the active app filter and "Home".
+ * The menu options themselves live in the side panel ([LaunchpadMenuLayer]); there is no pop-up.
+ */
 @Composable
 private fun LaunchpadHeader(
-    counts: List<com.bos.sphere.core.data.SourceCount>,
-    filter: String?,
-    mode: GroupMode,
-    onFilter: (String?) -> Unit,
-    onMode: (GroupMode) -> Unit,
-    onClearAll: () -> Unit,
-    canClear: Boolean,
+    filterLabel: String?,
+    onMenu: () -> Unit,
     onClose: () -> Unit,
     onDoubleTap: () -> Unit,
-    onGroups: () -> Unit = {},
+    viewSwitcher: @Composable () -> Unit = {},
 ) {
-    var open by remember { mutableStateOf(false) }
     val ink = LocalLp.current.ink
-    Box(
+    Column(
         Modifier.fillMaxWidth()
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleTap() }) },
     ) {
         Row(
-            Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(start = 12.dp, end = 4.dp),
+            Modifier.fillMaxWidth().statusBarsPadding().height(56.dp).padding(start = 8.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 Modifier.size(48.dp).clip(CircleShape)
                     .semantics { contentDescription = L10n.tr("Notification menu") }
-                    .clickable(onClickLabel = L10n.tr("Notification menu"), role = androidx.compose.ui.semantics.Role.Button) { open = true }.testTag("lp.menu"),
+                    .clickable(onClickLabel = L10n.tr("Notification menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
                 Alignment.Center,
             ) { HamburgerIcon(ink) }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                filterLabel ?: L10n.tr("Launchpad"), color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("lp.title"),
+            )
+            // Wave 25: the slot the view switcher (history, files, usage, timeline) drops into.
+            viewSwitcher()
             Text(
                 L10n.tr("Home"), color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(end = 4.dp).heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)) // wave 23: 48 dp, a button
-                    .clickable(onClickLabel = L10n.tr("Close Launchpad"), role = androidx.compose.ui.semantics.Role.Button, onClick = onClose).padding(horizontal = 14.dp, vertical = 10.dp),
+                    .clickable(onClickLabel = L10n.tr("Close Launchpad"), role = androidx.compose.ui.semantics.Role.Button, onClick = onClose).padding(horizontal = 14.dp, vertical = 14.dp),
             )
-            if (filter != null) {
-                Text(
-                    counts.firstOrNull { it.packageName == filter }?.appLabel.orEmpty(),
-                    color = LocalLp.current.dim, fontSize = 13.sp, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 4.dp),
-                )
-            }
-            Box {
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    MenuLabel(L10n.tr("Group by"))
-                    GroupMode.entries.forEach { m ->
-                        DropdownMenuItem(
-                            text = { Text((if (m == mode) "✓  " else "     ") + groupModeLabel(m)) },
-                            onClick = { onMode(m); open = false },
-                        )
-                    }
-                    MenuLabel(L10n.tr("Show"))
-                    DropdownMenuItem(
-                        text = {
-                            Text((if (filter == null) "✓  " else "     ") + L10n.tr("All") + "  (${counts.sumOf { it.count }})")
-                        },
-                        onClick = { onFilter(null); open = false },
-                    )
-                    counts.forEach { c ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    (if (filter == c.packageName) "✓  " else "     ") + c.appLabel + "  (${c.count})",
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            onClick = { onFilter(c.packageName); open = false },
-                        )
-                    }
-                    // Wave 24 (STR-13): groups, people and rules two taps away from the notifications they change.
-                    DropdownMenuItem(
-                        text = { Text("     " + L10n.tr("Groups and rules…")) },
-                        onClick = { open = false; onGroups() }, modifier = Modifier.testTag("lp.menu.groups"),
-                    )
-                    if (canClear) {
-                        MenuLabel("")
-                        DropdownMenuItem(
-                            text = { Text(L10n.tr("Clear all")) },
-                            onClick = { onClearAll(); open = false },
-                        )
-                    }
-                }
-            }
         }
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
     }
 }
 
@@ -857,16 +840,6 @@ internal fun HamburgerIcon(color: Color) {
             val y = size.height * (0.22f + 0.28f * i)
             drawLine(color, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
         }
-    }
-}
-
-@Composable
-private fun MenuLabel(text: String) {
-    if (text.isNotEmpty()) {
-        Text(
-            text.uppercase(), color = LocalLp.current.dim, fontSize = 11.sp, fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 2.dp),
-        )
     }
 }
 

@@ -131,7 +131,7 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
         shown("Digest"); scrollTo("Mum"); shown("Mum")
         scrollTo("Bring the dessert"); shown("Bring the dessert")
         assertTrue("an older message is folded behind +N more", rule.onAllNodesWithText("Are you coming on Sunday?").fetchSemanticsNodes().isEmpty())
-        rule.onNodeWithText("+1 more").performClick(); rule.waitForIdle()
+        scrollTo("+1 more"); rule.onNodeWithText("+1 more").performClick(); rule.waitForIdle()
         scrollTo("Are you coming on Sunday?"); shown("Are you coming on Sunday?")
     }
 

@@ -173,14 +173,14 @@ abstract class SoundVibrationSheetCases(private val orientation: String) : Launc
         assertTrue("faded in at its final place", (root.bottom - sheet.bottom).value < 56f)
     }
 
-    @Test fun SND_31_theLaunchpadSystemRowSoundButtonOpensTheSheet() {
+    @Test fun SND_31_theCommsClockOpensTheSheet() {
         rule.setContent { Themed(true) { Body(grouped) } }
         rule.waitForIdle()
         assertFalse(rule.onAllNodesWithTagExists("snd.sheet"))
-        rule.onNodeWithTag("lp.sys.sound").performClick()
+        rule.onNodeWithTag("lp.clock").performClick()
         rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
         tag("snd.sheet").assertIsDisplayed()
-        shoot("sound-vibration-over-launchpad-$orientation")
+        shoot("sound-vibration-over-comms-$orientation")
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeTestRule.onAllNodesWithTagExists(t: String) =

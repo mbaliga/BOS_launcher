@@ -271,7 +271,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Order"), Glyphs.Swipe, com.bos.sphere.core.data.HomeOrder.entries, p.homeOrder, { x(it.label) },
-                    hint = x("Right to left puts the Launchpad on the right edge, the Recents panel on the left, and fills columns and pages from the right."),
+                    hint = x("Right to left puts the Comms on the right edge, the Recents panel on the left, and fills columns and pages from the right."),
                 ) { v -> upd { it.copy(homeOrder = v) } },
             )
             // STR-14: what a swipe from the right edge does. The dock stays optional: "Dock rail" only reveals it, it never turns it on.

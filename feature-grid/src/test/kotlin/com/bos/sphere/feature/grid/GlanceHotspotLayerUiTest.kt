@@ -98,13 +98,13 @@ class GlanceHotspotLayerUiTest {
     fun HOM_22_minimalShowsFourLabelledHotspotButtonsOnTheFocusGraphAndClickRunsThem() {
         val ran = ArrayList<Pair<CornerItem, Corner>>()
         minimal(run = ran)
-        for (d in listOf("Top left hotspot: Radar", "Top right hotspot: Launchpad", "Bottom left hotspot: All apps", "Bottom right hotspot: Home settings")) {
+        for (d in listOf("Top left hotspot: Radar", "Top right hotspot: Comms", "Bottom left hotspot: All apps", "Bottom right hotspot: Home settings")) {
             val n = rule.onAllNodesWithContentDescription(d, substring = true)
             assertEquals("one button for $d", 1, n.fetchSemanticsNodes().size)
         }
         val ids = LauncherInput.focus.nodes().filter { it.id.startsWith("minimal.corner.") }.map { it.id }.toSet()
         assertEquals("four nodes on the focus graph", setOf("minimal.corner.TopLeft", "minimal.corner.TopRight", "minimal.corner.BottomLeft", "minimal.corner.BottomRight"), ids)
-        rule.onNodeWithContentDescription("Top right hotspot: Launchpad", substring = true).performClick()
+        rule.onNodeWithContentDescription("Top right hotspot: Comms", substring = true).performClick()
         assertEquals(listOf(Corner.TopRight), ran.map { it.second })
         assertEquals(CornerItem.Action(CornerActionId.OpenLaunchpad), ran.single().first)
         shoot("minimal_portrait_dark")

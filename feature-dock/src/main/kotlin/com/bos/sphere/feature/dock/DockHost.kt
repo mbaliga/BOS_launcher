@@ -37,6 +37,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.capabilities.CapabilityEvaluator
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.input.KeyChord
@@ -212,7 +213,11 @@ fun DockHost(
     LaunchedEffect(controller) { if (controller.consumePendingFocus()) { androidx.compose.runtime.withFrameNanos { }; controller.focusRequest++ } }
     controller.step = { d -> if (d > 0) manager.next() else manager.previous() }
 
-    val actions = remember(content, state.active.dockPins) {
+    // W25: the pickers behind "Replace with another app" and "Add apps" (the Edit dock dialog); the options themselves are long-press entries.
+    var replacing by remember { mutableStateOf<DockItem?>(null) }
+    var adding by remember { mutableStateOf(false) }
+    val edgeNow = edgeOverride ?: state.dock.edgeFor(landscape)
+    val actions = remember(content, state.active.dockPins, landscape, edgeOverride, forceEnabled, alwaysShown) {
         DockActions(
             onLaunch = { item, _ -> launchItem(item) },
             onReorder = { from, to -> instance.reorder(from, to) },
@@ -225,10 +230,28 @@ fun DockHost(
             onLeave = { expanded = false; instance.expanded = false },
             onMediaPrev = MediaSignals::previous, onMediaPlayPause = MediaSignals::playPause, onMediaNext = MediaSignals::next,
             onMediaOpen = { MediaSignals.open(context) },
+            onAppInfo = { item -> if (item.ref.kind == ItemKind.App) byKey[item.ref.id]?.let { runCatching { context.startActivity(DockAppOptions.infoIntent(it.packageName)) } } },
+            onReplace = { replacing = it },
+            onAddApps = { adding = true },
+            onHide = if (forceEnabled || alwaysShown) null else ({ manager.setDock { it.copy(enabled = false) } }),
+            onSetEdge = if (landscape && edgeOverride == null) ({ e -> manager.setDock { it.copy(edge = e) } }) else null,
         )
     }
-    val edge = edgeOverride ?: state.dock.edgeFor(landscape)
+    val edge = edgeNow
+    val panelApps = remember(apps) { apps.map { PanelApp(it.key, it.label, it.packageName, launcher.targetOf(it)) } }
+    replacing?.let { old ->
+        AppPicker(L10n.tr("Replace with"), panelApps, emptySet(), max = 1, min = 1,
+            onDone = { picked -> picked.firstOrNull()?.let { k -> DockItemRef.app(k).let { new -> manager.setPins(manager.current.active.dockPins.map { if (it == old.ref) new else it }.distinct()) } }; replacing = null },
+            onDismiss = { replacing = null })
+    }
+    if (adding) AppPicker(L10n.tr("Add apps to the dock"), panelApps, state.active.dockPins.filter { it.kind == ItemKind.App }.map { it.id }.toSet(), max = Int.MAX_VALUE, min = 0,
+        onDone = { picked ->
+            val keep = state.active.dockPins.filter { it.kind != ItemKind.App || it.id in picked }
+            manager.setPins(picked.fold(keep) { acc, k -> DockPins.add(acc, DockItemRef.app(k)) }); adding = false
+        },
+        onDismiss = { adding = false })
     DockRail(
+        itemExtras = { item -> DockAppOptions.entries(context, launcher, manager, byKey[item.ref.id].takeIf { item.ref.kind == ItemKind.App }) },
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
         focusRequest = controller.focusRequest - focusBase, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge).railModifier(), widget = widgetOther,
         graphBridge = if (forceEnabled) null else DockInput.bridge, // the desktop surface's rail stays out of the phone home's graph

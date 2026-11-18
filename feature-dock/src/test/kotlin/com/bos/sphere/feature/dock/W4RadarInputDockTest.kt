@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -157,7 +158,7 @@ class W4RadarInputDockTest {
         val bridge = RecordingBridge()
         rule.setContent { Rail(content("Alpha", "Bravo"), DockActions(), bridge) }
         rule.waitForIdle()
-        assertEquals(setOf("dock.app:k0", "dock.app:k1", "dock.workspaces", "dock.button.i", "dock.button...."), bridge.live.keys.toSet())
+        assertEquals(setOf("dock.app:k0", "dock.app:k1", "dock.workspaces"), bridge.live.keys.toSet())
         rule.runOnUiThread { bridge.live.getValue("dock.app:k1").requestFocus() }
         rule.waitForIdle()
         assertTrue(bridge.focus.contains("dock.app:k1" to true))
@@ -255,7 +256,7 @@ class W4RadarInputDockTest {
                 }
             }
         }
-        assertEquals("the six dialog windows of the dock (panel, group editor, app picker, session, schedule, rail help)", 6, dialogs)
+        assertEquals("the seven dialog windows of the dock (panel, group editor, app picker, session, schedule, rail help, edit dock)", 7, dialogs)
     }
 
     @Test fun INP_20_theRailsHelpDialogInstallsTheDialogHook() {
@@ -264,7 +265,10 @@ class W4RadarInputDockTest {
         rule.setContent { Rail(content("Alpha"), DockActions(), null) }
         rule.waitForIdle()
         assertEquals(0, installed)
-        rule.onNodeWithContentDescription("About the dock").performClick()
+        // W25: the "i" button is gone; About is the last entry of the dock's long-press menu.
+        rule.onNodeWithContentDescription("Dock").performTouchInput { longClick(androidx.compose.ui.geometry.Offset(width - 4f, height / 2f)) }
+        rule.waitForIdle()
+        rule.onNodeWithText("About the dock").performClick()
         rule.waitForIdle()
         assertEquals(1, installed)
     }

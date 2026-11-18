@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
@@ -158,20 +160,33 @@ fun UsageTimelineBlock(
 private fun UsagePlaceholder(tone: VizTone) {
     val quiet = tone.ink.copy(alpha = 0.08f)
     val gap = CommsStyle.USAGE_GAP_DP.dp
-    val fs = LocalDensity.current.fontScale.coerceIn(1f, 2f)
+    val density = LocalDensity.current
+    val fs = density.fontScale.coerceIn(1f, 2f)
+    val measurer = rememberTextMeasurer()
+    // The height of a line of text of [sp], measured (not guessed), so each part is as high as the finished one at any text size and Comms size.
+    fun line(sp: Float, weight: FontWeight = FontWeight.Normal) = with(density) { measurer.measure("0", TextStyle(fontSize = sp.sp, fontWeight = weight), maxLines = 1).size.height.toDp() }
+    val big = density.fontScale > 1.3f
+    val figure = line(if (big) minOf(CommsStyle.USAGE_FIGURE_SP, 22f) else CommsStyle.USAGE_FIGURE_SP, FontWeight.Light)
+    val statH = if (big) line(CommsStyle.USAGE_DAY_SP) + figure else figure
+    val rowText = line(CommsStyle.NOTE_SP)
     val loading = L10n.tr("Loading screen time")
     Column(Modifier.fillMaxWidth().testTag("usage.loading").semantics(mergeDescendants = true) { contentDescription = loading }) {
-        Box(Modifier.height((CommsStyle.USAGE_FIGURE_SP * 1.2f).dp * fs).fillMaxWidth(0.4f).padding(vertical = 6.dp).background(quiet, RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth().height(statH).padding(vertical = 6.dp), contentAlignment = Alignment.CenterStart) { Box(Modifier.fillMaxWidth(0.4f).fillMaxHeight().background(quiet, RoundedCornerShape(4.dp))) }
         Spacer(Modifier.height(gap))
         Row(Modifier.fillMaxWidth().height(STEPS_HEIGHT + (VizStepsGeometry.HEAD + VizStepsGeometry.FOOT).dp * (fs - 1f)), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
             listOf(0.5f, 0.8f, 0.35f, 0.6f, 1f, 0.45f, 0.7f).forEach { Box(Modifier.width(14.dp).fillMaxHeight(0.2f + 0.3f * it).background(quiet, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))) }
         }
         Spacer(Modifier.height(gap))
         repeat(UsageShaping.TOP + 1) { i ->
-            Row(Modifier.fillMaxWidth().heightIn(min = CommsStyle.USAGE_ROW_DP.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The same row as a finished one (a line of text height over the bar), so each is as high as a real row.
+            Row(Modifier.fillMaxWidth().heightIn(min = CommsStyle.USAGE_ROW_DP.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(CommsStyle.USAGE_ICON_DP.dp).background(quiet, RoundedCornerShape(3.dp)))
                 Spacer(Modifier.width(10.dp))
-                Box(Modifier.height(CommsStyle.USAGE_BAR_DP.dp).fillMaxWidth(1f - i * 0.17f).background(quiet, RoundedCornerShape(2.dp)))
+                Column(Modifier.weight(1f)) {
+                    Spacer(Modifier.height(rowText))
+                    Spacer(Modifier.height(3.dp))
+                    Box(Modifier.height(CommsStyle.USAGE_BAR_DP.dp).fillMaxWidth(1f - i * 0.17f).background(quiet, RoundedCornerShape(2.dp)))
+                }
             }
         }
     }

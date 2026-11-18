@@ -13,6 +13,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
@@ -80,7 +81,11 @@ fun VizSteps(
                     val sel = i == selected
                     val inkOf = if (c.accent) tone.accent else tone.ink
                     val alpha = if (sel) 1f else if (c.accent) 0.75f else 0.5f
-                    if (bh > 0f) {
+                    if (bh <= 0f) {
+                        // A day with nothing: a 2 dp stub on the baseline, so the column (and its selection) is still there.
+                        val st = 2f * this.density
+                        drawRoundRect(inkOf.copy(alpha = if (sel) 0.9f else 0.35f), Offset(left, base - st), Size(w, st), CornerRadius(st / 2))
+                    } else {
                         val r = minOf(VizStepsGeometry.RADIUS * this.density, w / 2, bh)
                         val p = Path().apply { addRoundRect(RoundRect(left, base - bh, left + w, base, topLeftCornerRadius = CornerRadius(r), topRightCornerRadius = CornerRadius(r))) }
                         val brush = VizTextures.brush(c.texture, inkOf, density = this.density, fadeTop = base - bh, fadeBottom = base)

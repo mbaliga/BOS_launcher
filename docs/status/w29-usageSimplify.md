@@ -22,3 +22,15 @@ Owner: remove the range and kind pills from the Timeline; the usage block was a 
 - Nothing was run on a device; the usage permission flow, real app icons and the real Timeline scroll are JVM-verified only.
 - The block is about 300 dp at 100 percent, not 260: five 36 dp rows are 180 dp by themselves.
 - At Comms 125 percent on a 360 dp phone the seven 48 dp columns can reach about 26 dp into the right margin (not clipped).
+
+## Adversarial review (second pass)
+| Finding | Fix | Test |
+|---|---|---|
+| The placeholder's day line was one fixed-height bar although the finished stat stacks caption over figure at large text, and its rows ignored the text height: the list jumped 42 dp at font 2.0 with Comms 125 | the placeholder measures real line heights (`rememberTextMeasurer`) for the day line (stacked or one line) and each row, with no text nodes | `USG_54_*` (font 2.0, font 2.0 + Comms 125, Comms 75) |
+| A day with no time drew nothing, so its column (and the selection on it) was invisible | a 2 dp rounded stub on the baseline (muted; selected: strong) | `USG_55_*` |
+| Dots and stipple were near-identical on a 4 dp bar (a 5.6 dp dot tile leaves one row of dots) | `VizBarGeometry.scale`: dots at 0.44 so both staggered rows fit the bar | `USG_56_*` (every texture pair differs in mean ink or change count) |
+| Selection of a day and an app after activity recreation was untested | covered (it already held: `rememberSaveable`) | `USG_57_*` |
+| Dead code: `UsagePart.percent` and `VizFormat.percent` left over from the stack and legend | removed | `UsageShapingTest` USG_02 (no `percent` field or helper) |
+| Stale test assertions encoding percentages | rewritten | `UsageShapingTest` |
+
+Not changed, reported: rows are 36 dp high with a full-width tap area (the brief asks for 36 dp rows and a 48 dp target; both cannot hold without five 48 dp rows, about 360 dp); a selected day with no time shows no rows and no line; `CommsReadScreenPortraitTest.STR_02_w29_clearAllOnlyEmptiesTheShadeAndNeverTheHistory` fails on the base commit 6e59ff6 too (not this stream).

@@ -34,16 +34,15 @@ class UsageShapingTest {
         assertEquals(9 * M, p.last().ms)
         assertEquals(VizTexture.Stipple, p.last().texture)
         assertEquals(154 * M, p.sumOf { it.ms })
-        assertTrue(p.sumOf { it.percent } in 99..101)
+        assertTrue("no percentages are computed at all", UsagePart::class.java.declaredFields.none { it.name == "percent" })
     }
 
     @Test fun USG_02_fourAppsOrFewerHaveNoOtherPart() {
         val p = UsageFixtures.week().parts(5) // yesterday: chat 80, browser 30, mail 15
         assertEquals(listOf("demo.chat", "demo.chrome", "demo.mail"), p.map { it.key })
         assertFalse(p.any { it.isOther })
-        assertEquals(64, p[0].percent)
         val one = UsageFixtures.week().parts(1) // five days ago: mail only
-        assertEquals(100, one.single().percent)
+        assertEquals("demo.mail", one.single().key)
     }
 
     // ---- wave 29: the ranked rows ----
@@ -135,7 +134,7 @@ class UsageShapingTest {
         assertEquals(listOf("c"), UsageShaping.parts(bad, listOf("c")).map { it.key })
         assertEquals(0L, UsageShaping.total(DayTime(0, listOf(AppTime("a", -1)))))
         assertFalse(UsageFixtures.week(emptyMap()).hasData)
-        assertEquals(0, VizFormat.percent(5, 0)); assertEquals(0, VizFormat.percent(-5, 10)); assertEquals(50, VizFormat.percent(5, 10))
+        assertTrue("the toolkit's percent helper is gone with the stack and legend", VizFormat::class.java.declaredMethods.none { it.name == "percent" })
         assertEquals(0f, VizFormat.barHeight(Double.NaN, 10.0, 30f)); assertEquals(3f, VizFormat.barHeight(5.0, Double.NaN, 30f)) // a value with no usable maximum is a stub, never NaN
         assertEquals(0f, VizFormat.barHeight(Double.POSITIVE_INFINITY, 10.0, 30f)); assertEquals(0f, VizFormat.barHeight(0.0, 10.0, 30f))
         assertEquals(3f, VizFormat.barHeight(0.001, 10.0, 30f)); assertEquals(30f, VizFormat.barHeight(10.0, 10.0, 30f))

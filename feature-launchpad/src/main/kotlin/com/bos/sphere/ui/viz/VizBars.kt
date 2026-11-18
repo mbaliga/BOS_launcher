@@ -39,7 +39,7 @@ fun VizBar(share: Float, texture: VizTexture, tone: VizTone, modifier: Modifier 
             val p = Path().apply { addRoundRect(RoundRect(left, 0f, left + bw, h, r)) }
             // Small swatch scale (0.62), as the toolkit uses under 20 px: a 4 dp bar holds a whole tile or two.
             val brush = when {
-                texture != VizTexture.Fade -> VizTextures.brush(texture, tone.ink, 0.62f, density)
+                texture != VizTexture.Fade -> VizTextures.brush(texture, tone.ink, VizBarGeometry.scale(texture), density)
                 rtl -> VizTextures.fadeBrushLeft(tone.ink, left, left + bw)
                 else -> VizTextures.fadeBrushRight(tone.ink, left, left + bw)
             }
@@ -52,6 +52,10 @@ val BAR_THICKNESS: Dp = 4.dp
 
 /** The length of a bar in a row [width] wide: 0 for nothing (or a bad share), [minLen] at least for anything above zero, never more than the row. */
 object VizBarGeometry {
+    /** The tile scale of a texture on a 4 dp bar: the swatch scale (0.62), except dots, whose two staggered rows must both fit the bar (a 9 px tile at 0.44 is 4 dp) so they read as dots and not as stipple. */
+    fun scale(texture: VizTexture): Float = if (texture == VizTexture.Dots) 0.44f else 0.62f
+
+
     fun length(share: Float, width: Float, minLen: Float = 3f): Float {
         if (!share.isFinite() || share <= 0f || !width.isFinite() || width <= 0f) return 0f
         return maxOf(minLen, share.coerceAtMost(1f) * width).coerceAtMost(width)

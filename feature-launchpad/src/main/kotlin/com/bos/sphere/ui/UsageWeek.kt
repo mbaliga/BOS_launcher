@@ -1,7 +1,6 @@
 package com.bos.sphere.ui
 
 import com.bos.sphere.core.design.L10n
-import com.bos.sphere.ui.viz.VizFormat
 import com.bos.sphere.ui.viz.VizTexture
 import java.time.Instant
 import java.time.LocalDate
@@ -34,7 +33,7 @@ val OTHER_TEXTURE: VizTexture = VizTexture.Stipple
 data class WeekColumn(val dayStartMs: Long, val date: LocalDate, val totalMs: Long, val initial: String, val dayName: String, val isToday: Boolean)
 
 /** One part of a day's stack. [key] is the package, "" for Other. */
-data class UsagePart(val key: String, val ms: Long, val percent: Int, val texture: VizTexture) { val isOther: Boolean get() = key.isEmpty() }
+data class UsagePart(val key: String, val ms: Long, val texture: VizTexture) { val isOther: Boolean get() = key.isEmpty() }
 
 /** One ranked row of a day's list (wave 29): [share] is [ms] over the longest row of the day, in 0..1 (the longest is 1), the length of its bar. */
 data class UsageRow(val key: String, val ms: Long, val share: Float, val texture: VizTexture) { val isOther: Boolean get() = key.isEmpty() }
@@ -89,8 +88,8 @@ object UsageShaping {
         val head = all.take(TOP)
         val rest = all.drop(TOP).sumOf { it.ms }
         val tex = textures(weekRank, head.map { it.key })
-        val parts = head.map { UsagePart(it.key, it.ms, VizFormat.percent(it.ms, total), tex.getValue(it.key)) }
-        return if (rest > 0) parts + UsagePart("", rest, VizFormat.percent(rest, total), OTHER_TEXTURE) else parts
+        val parts = head.map { UsagePart(it.key, it.ms, tex.getValue(it.key)) }
+        return if (rest > 0) parts + UsagePart("", rest, OTHER_TEXTURE) else parts
     }
 
     /**

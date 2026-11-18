@@ -339,6 +339,76 @@ abstract class UsageSimplifyW29Cases(private val orientation: String) : Launchpa
         assertNoOverlap("table view")
     }
 
+    // ---- review (wave 29, adversarial pass) ----
+
+    /** Where the first list row sits while the numbers load and once they have arrived, at a text and Comms size. */
+    private fun jumpAt(fs: Float, pct: Int): Float {
+        val gate = CountDownLatch(1)
+        val slow = UsageFixtures.repo(object : UsageWeekSource {
+            val inner = UsageFixtures.FakeSource()
+            override fun granted(): Boolean { gate.await(); return true }
+            override fun samples(fromMs: Long, toMs: Long) = inner.samples(fromMs, toMs)
+        })
+        host(fontScale = fs, percent = pct, repo = slow, wait = "usage.loading")
+        val loading = bounds("timeline.row.0").top.value
+        gate.countDown()
+        rule.waitUntil(10_000) { has("usage.stat") }
+        return Math.abs(bounds("timeline.row.0").top.value - loading)
+    }
+    @Test fun USG_54_thePlaceholderHoldsTheHeightAtFont2SoTheListDoesNotJump() { val j = jumpAt(2f, 100); assertTrue("jump $j dp", j <= 24f) }
+    @Test fun USG_54_thePlaceholderHoldsTheHeightAtFont2Comms125SoTheListDoesNotJump() { val j = jumpAt(2f, 125); assertTrue("jump $j dp", j <= 24f) }
+    @Test fun USG_54_thePlaceholderHoldsTheHeightAtComms75SoTheListDoesNotJump() { val j = jumpAt(1f, 75); assertTrue("jump $j dp", j <= 24f) }
+
+    @Test fun USG_55_aDayWithNoTimeStillShowsItsColumnAsAStubOnTheBaselineSoTheSelectedColumnIsAlwaysSeen() {
+        host()
+        rule.onNodeWithTag("usage.steps.col.3").performClick(); rule.waitForIdle()   // the fixture's empty Thursday
+        val bmp = capture("zero-day-selected")
+        val d = rule.density.density; val b = px("usage.steps.col.3")
+        var lit = 0
+        for (y in b.top.toInt() until b.bottom.toInt()) for (x in (b.center.x - 9 * d).toInt() until (b.center.x + 9 * d).toInt()) {
+            val p = bmp.getPixel(x, y); if (((p shr 16) and 255) > 90 && (p and 255) > 90 && Math.abs(((p shr 16) and 255) - 14) > 60) lit++
+        }
+        assertTrue("an empty day draws a stub, got $lit lit px in its column", lit > 20)
+    }
+
+    @Test fun USG_56_everyTextureOfTheBarsIsDistinctAtFourDpEvenDotsFromStipple() {
+        rule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) { Themed(true) {
+                val tone = com.bos.sphere.ui.viz.VizTone.of(LocalLp.current.ink, LocalLp.current.bg)
+                Column(Modifier.width(200.dp).background(LocalLp.current.bg).padding(8.dp)) {
+                    (APP_TEXTURES + OTHER_TEXTURE).forEachIndexed { i, t -> com.bos.sphere.ui.viz.VizBar(1f, t, tone, Modifier.testTag("bar.$i").padding(vertical = 6.dp)) }
+                }
+            } }
+        }
+        rule.waitForIdle()
+        val view = rule.activity.findViewById<android.view.View>(android.R.id.content)
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888); rule.runOnUiThread { view.draw(Canvas(bmp)) }
+        // A texture's signature: its mean ink, and how often the ink changes along the bar's middle line (a stripe, a dot or a gradient differ there).
+        val sig = (0..4).map { i ->
+            val r = unclipped(rule.onNodeWithTag("bar.$i").fetchSemanticsNode()); var sum = 0.0; var n = 0
+            for (y in r.top.toInt() until r.bottom.toInt()) for (x in r.left.toInt() until r.right.toInt()) { val p = bmp.getPixel(x, y); sum += (((p shr 16) and 255) + ((p shr 8) and 255) + (p and 255)) / 3.0 / 255; n++ }
+            var flips = 0
+            for (y in r.top.toInt() until r.bottom.toInt()) { var prev = false
+                for (x in r.left.toInt() until r.right.toInt()) { val p = bmp.getPixel(x, y); val on = (((p shr 16) and 255) + ((p shr 8) and 255) + (p and 255)) / 3.0 / 255 > 0.4; if (on != prev) flips++; prev = on } }
+            sum / n to flips
+        }
+        for (i in sig.indices) for (j in i + 1 until sig.size) {
+            val (mi, fi) = sig[i]; val (mj, fj) = sig[j]
+            assertTrue("textures $i and $j look alike (mean ink $mi vs $mj, changes $fi vs $fj): $sig", Math.abs(mi - mj) > 0.035 || Math.abs(fi - fj) > 40)
+        }
+    }
+
+    @Test fun USG_57_selectionOfADayAndAnAppSurvivesTheActivityBeingRecreated() {
+        val restore = androidx.compose.ui.test.junit4.StateRestorationTester(rule)
+        val repo = UsageFixtures.repo()
+        restore.setContent { Themed(true) { Column(Modifier.fillMaxSize().background(LocalLp.current.bg)) { UsageTimelineBlock(repo, UsageFixtures.labelOf, now = { UsageFixtures.now }, zone = UsageFixtures.zone) } } }
+        rule.waitUntil(10_000) { has("usage.stat") }
+        rule.onNodeWithTag("usage.steps.col.5").performClick(); rule.onNodeWithTag("usage.row.1").performClick(); rule.waitForIdle()
+        restore.emulateSavedInstanceStateRestore(); rule.waitUntil(10_000) { has("usage.stat") }
+        assertEquals("Yesterday, 2 h 5 min", rule.onNodeWithTag("usage.stat").fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString())
+        assertEquals(true, rule.onNodeWithTag("usage.row.1").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
+    }
+
     // ---- screenshots ----
 
     @Test fun USG_53_screenshotDarkGranted() { host(dark = true); capture("granted-dark") }

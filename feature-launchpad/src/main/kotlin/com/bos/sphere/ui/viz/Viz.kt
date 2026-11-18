@@ -82,7 +82,4 @@ object VizFormat {
         if (s <= 0.0 || plot <= 0f) return 0f
         return maxOf(minBar, if (m <= 0.0) 0f else (s / m * plot).toFloat()).coerceAtMost(plot)
     }
-
-    /** Whole percent of [part] in [total]; 0 when the total is not positive. */
-    fun percent(part: Long, total: Long): Int = if (total <= 0L || part <= 0L) 0 else Math.round(part * 100.0 / total).toInt()
 }

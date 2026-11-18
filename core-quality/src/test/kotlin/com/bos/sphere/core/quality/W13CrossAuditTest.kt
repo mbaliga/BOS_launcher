@@ -64,7 +64,7 @@ class W13CrossAuditTest {
         val roomy = text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/LaunchpadRoomy.kt")
         assertFalse("the +N more line and the section chips must not be a 40 dp target", Regex("""heightIn\(min = 40\.dp\)[^\n]*clickable""").containsMatchIn(roomy))
         assertTrue(roomy.contains("clickable(role = androidx.compose.ui.semantics.Role.Button"))
-        assertTrue(roomy.contains("Modifier.heightIn(min = 48.dp)"))
+        assertTrue(roomy.contains(".heightIn(min = 48.dp)")) // wave 27: the jump strip is gone, the +N more line keeps its 48 dp target
         val carousel = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/PageCarousel.kt")
         assertTrue("carousel buttons keep a 48 dp target around the small pill", carousel.contains("defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)"))
         val rows = text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/LaunchpadRows.kt")

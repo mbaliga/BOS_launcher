@@ -118,15 +118,19 @@ class HubTest {
         up(0); up(1)
     }
 
+    /** Wave 27: the Read history has no tab and the filter chips are gone, so tests drive those through the state (the menu panel's rows are covered in CommsDesignCases). */
+    private fun selectView(v: HubView, s: HubState = state) { rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { s.select(v) } }; rule.waitForIdle() }
+    private fun setFilters(f: HubFilters, v: HubView = state.view) { rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.setFilters(f, v) } }; rule.waitForIdle() }
     private fun rows() = store.entries.value
     private fun rowTag(key: String) = "hub.row." + rows().first { it.key == key }.id
 
     // ---- b: the switcher ----
 
-    @Test fun HUB_10_theSwitcherIs48dpHighShowsAllSixViewsAndSwitchesOnATap() {
+    @Test fun HUB_10_theSwitcherIs48dpHighShowsTheFiveTabsAndSwitchesOnATap() {
         host()
         rule.onNodeWithTag("hub.switcher").assertHeightIsAtLeast(48.dp)
-        HubView.entries.forEach { rule.onNodeWithTag("hub.view.${it.id}").assertExists() }
+        HubView.entries.filter { it != HubView.Read }.forEach { rule.onNodeWithTag("hub.view.${it.id}").assertExists() }
+        rule.onNodeWithTag("hub.view.read").assertDoesNotExist() // wave 27: the mock-up's tabs are ALL UNREAD FILES USAGE TIMELINE
         rule.onNodeWithTag("hub.view.all").assertIsSelected()
         rule.onNodeWithTag("hub.view.files").performClick(); rule.waitForIdle()
         rule.onNodeWithTag("panel.files").assertExists()
@@ -141,7 +145,8 @@ class HubTest {
     @Test fun HUB_10_withoutPanelsTheSwitcherOffersOnlyTheHistoryViews() {
         val s = newState(false); host(s)
         rule.onNodeWithTag("hub.view.files").assertDoesNotExist()
-        rule.onNodeWithTag("hub.view.read").assertExists()
+        rule.onNodeWithTag("hub.view.unread").assertExists()
+        assertEquals(listOf(HubView.All, HubView.Unread), s.tabs)
     }
 
     @Test fun HUB_10_aHomePanelLinkLandsOnTheMatchingHubView() {
@@ -162,13 +167,11 @@ class HubTest {
     @Test fun HUB_11_setAsDefaultViewPersistsAndTheHubOpensThereNextTime() {
         host()
         rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("hub.options").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("hub.setDefault").performClick(); rule.waitForIdle()
-        rule.onNodeWithText("Default view: Unread").assertExists()
+        rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.setDefault() } }; rule.waitForIdle()
         assertEquals(HubView.Unread, newState(true).view)                    // a new hub (a new open) starts there
         assertEquals(HubView.Unread, newState(true).defaultView)
         rule.onNodeWithTag("hub.view.files").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("hub.setDefault").performClick(); rule.waitForIdle()
+        rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.setDefault() } }; rule.waitForIdle()
         assertEquals(HubView.Files, newState(true).view)
         assertEquals(HubView.All, newState(false).view)                       // a hub without panels cannot open on Files
     }
@@ -182,7 +185,7 @@ class HubTest {
         rule.onNodeWithTag(rowTag("m1")).performClick(); rule.waitForIdle()
         assertTrue(rows().first { it.key == "m1" }.read)
         rule.onNodeWithTag(rowTag("m1")).assertDoesNotExist()                  // gone from Unread
-        rule.onNodeWithTag("hub.view.read").performClick(); rule.waitForIdle()
+        selectView(HubView.Read)
         rule.onNodeWithTag(rowTag("m1")).assertExists()
         rule.onNodeWithTag(rowTag("m2")).assertDoesNotExist()
     }
@@ -207,33 +210,35 @@ class HubTest {
 
     // ---- quick filters ----
 
-    @Test fun HUB_13_quickFiltersNarrowTheListInOneTapAndAreKeptPerView() {
+    // Wave 27: the chip row is gone from the screen (the mock-up shows none); the filters live on in the state, driven by the menu's Show rows.
+    @Test fun HUB_13_filtersNarrowTheListAndAreKeptPerView() {
         host()
         rule.onNodeWithTag(rowTag("e1")).assertExists()
-        rule.onNodeWithTag("hub.f.today").performClick(); rule.waitForIdle()
+        setFilters(HubFilters(range = HubRange.Today))
         rule.onNodeWithTag(rowTag("e1")).assertDoesNotExist()                  // five days old
-        rule.onNodeWithTag("hub.f.today").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("hub.f.week").performClick(); rule.waitForIdle()
+        setFilters(HubFilters(range = HubRange.Week))
         rule.onNodeWithTag(rowTag("e1")).assertExists()                        // inside 7 days
-        rule.onNodeWithTag("hub.f.app.demo.chat").performScrollTo().performClick(); rule.waitForIdle()
+        setFilters(HubFilters(range = HubRange.Week, app = "demo.chat"))
         rule.onNodeWithTag(rowTag("c1")).assertDoesNotExist(); rule.onNodeWithTag(rowTag("m1")).assertExists()
-        rule.onNodeWithTag("hub.f.sender.Mum").performScrollTo().performClick(); rule.waitForIdle()
+        setFilters(HubFilters(range = HubRange.Week, app = "demo.chat", sender = "Mum"))
         rule.onNodeWithTag(rowTag("m2")).assertDoesNotExist()
         // State is per view: Read has no filter, and All still has its own when the user returns.
-        rule.onNodeWithTag("hub.view.read").performClick(); rule.waitForIdle()
+        selectView(HubView.Read)
         assertFalse(state.filters(HubView.Read).active)
-        rule.onNodeWithTag("hub.view.all").performClick(); rule.waitForIdle()
+        selectView(HubView.All)
         assertEquals(HubFilters(app = "demo.chat", sender = "Mum", range = HubRange.Week), state.filters(HubView.All))
-        rule.onNodeWithTag("hub.f.clear").performScrollTo().performClick(); rule.waitForIdle()
+        assertEquals("no chip row on screen", 0, rule.onAllNodesWithTag("hub.filters").fetchSemanticsNodes().size)
+        state.clearFilters()
+        rule.waitForIdle()
         rule.onNodeWithTag(rowTag("c1")).assertExists()
     }
 
     @Test fun HUB_13_unreadOnlyAndTheEmptyMessageForFilters() {
         store.setRead(listOf(rows().first { it.key == "c1" }.id), true)
         host()
-        rule.onNodeWithTag("hub.f.unread").performClick(); rule.waitForIdle()
+        setFilters(HubFilters(unreadOnly = true))
         rule.onNodeWithTag(rowTag("c1")).assertDoesNotExist(); rule.onNodeWithTag(rowTag("m1")).assertExists()
-        rule.onNodeWithTag("hub.f.app.demo.cal").performScrollTo().performClick(); rule.waitForIdle()
+        setFilters(HubFilters(unreadOnly = true, app = "demo.cal"))
         rule.onNodeWithText("Nothing matches these filters").assertExists()
     }
 
@@ -265,7 +270,8 @@ class HubTest {
         assertEquals(HubDensity.Expanded to HubGrouping.Sender, HubLogic.pinch(HubDensity.Expanded, HubGrouping.Sender, true))
         assertEquals(HubDensity.Compact to HubGrouping.App, HubLogic.pinch(HubDensity.Compact, HubGrouping.Day, false))
         assertEquals(HubDensity.Compact to HubGrouping.Day, HubLogic.pinch(HubDensity.Comfortable, HubGrouping.Day, false).let { HubDensity.Compact to HubGrouping.Day })
-        host(); rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseDensity(HubDensity.Expanded) } }; rule.waitForIdle()
+        assertEquals("wave 27: the default is a flat list, no bands", HubGrouping.Flat, state.grouping)
+        host(); rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseDensity(HubDensity.Expanded); state.chooseGrouping(HubGrouping.Day) } }; rule.waitForIdle()
         rule.onNodeWithTag("host").performTouchInput { pinch(center + Offset(-40f, 0f), center + Offset(-200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f)) }
         rule.waitForIdle()
         assertEquals(HubGrouping.Sender, state.grouping)
@@ -279,30 +285,20 @@ class HubTest {
         store.observe(feed + n("m3", "demo.chat", "Chat", "Mum", "Bring the dessert", at(10, 11, 50)))
         state = newState(true)
         host()
-        rule.onNodeWithTag("hub.options").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("hub.group.Sender").performClick(); rule.waitForIdle()
+        rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseGrouping(HubGrouping.Sender) } }; rule.waitForIdle()
         rule.onNodeWithTag("hub.header.s:Mum").assertExists()
         rule.onNodeWithTag("hub.headerCount.s:Mum", useUnmergedTree = true).assertExists()
         assertEquals("2", rule.onNodeWithTag("hub.headerCount.s:Mum", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text })
         for (single in listOf("s:Team", "s:Standup", "s:Invoice")) rule.onAllNodesWithTag("hub.header.$single").assertCountEquals(0)
-        rule.onNodeWithTag("hub.group.App").performClick(); rule.waitForIdle()
+        rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseGrouping(HubGrouping.App) } }; rule.waitForIdle()
         rule.onNodeWithTag("hub.header.a:demo.chat").assertExists()
         rule.onAllNodesWithTag("hub.header.a:demo.cal").assertCountEquals(0)
-        rule.onNodeWithTag("hub.group.Day").performClick(); rule.waitForIdle()
+        rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseGrouping(HubGrouping.Day) } }; rule.waitForIdle()
         rule.onAllNodesWithTag("hub.headerCount.d:", useUnmergedTree = true).assertCountEquals(0)
         assertTrue(HubLogic.showsGroupHeader(HubGrouping.Day, 1))
         assertFalse(HubLogic.showsGroupHeader(HubGrouping.Sender, 1))
+        assertFalse("flat never has headers", HubLogic.showsGroupHeader(HubGrouping.Flat, 5))
         assertTrue(HubLogic.showsGroupHeader(HubGrouping.App, 2))
-    }
-
-    @Test fun HUB_14_densityAndGroupingHaveButtonEquivalentsInOptions() {
-        host()
-        rule.onNodeWithTag("hub.options").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("hub.density.Compact").performClick(); rule.waitForIdle()
-        assertEquals(HubDensity.Compact, state.density)
-        rule.onNodeWithTag("hub.group.App").performClick(); rule.waitForIdle()
-        assertEquals(HubGrouping.App, state.grouping)
-        rule.onNodeWithTag("hub.header.a:demo.chat").assertExists()
     }
 
     // ---- two-finger gestures ----
@@ -312,7 +308,7 @@ class HubTest {
         twoFingers(-300f, 0f); rule.waitForIdle()
         assertEquals(HubView.Unread, state.view)
         twoFingers(-300f, 0f); rule.waitForIdle()
-        assertEquals(HubView.Read, state.view)
+        assertEquals("wave 27: Read has no tab, the next one after Unread is Files", HubView.Files, state.view)
         twoFingers(300f, 0f); rule.waitForIdle()
         assertEquals(HubView.Unread, state.view)
         twoFingers(300f, 0f); twoFingers(300f, 0f); rule.waitForIdle()
@@ -333,7 +329,7 @@ class HubTest {
     @Test fun HUB_15_swipeDownOnlyMarksWhatTheFiltersShow() {
         host()
         rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag("hub.f.app.demo.chat").performScrollTo().performClick(); rule.mainClock.advanceTimeByFrame()
+        rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.setFilters(HubFilters(app = "demo.chat")) } }; rule.mainClock.advanceTimeByFrame()
         twoFingers(0f, 300f); rule.mainClock.advanceTimeByFrame()
         assertEquals(setOf("m1", "m2"), rows().filter { it.read }.map { it.key }.toSet())
         rule.onNodeWithText("Marked 2 as read").assertExists()
@@ -367,45 +363,13 @@ class HubTest {
 
     // ---- non-gesture equivalents ----
 
-    @Test fun HUB_16_markVisibleReadAndDeleteHistoryAreButtonsAndDeleteNeedsAConfirmation() {
-        host()
-        rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()
-        rule.onNodeWithTag("hub.markVisible").performClick(); rule.mainClock.advanceTimeByFrame()
-        assertTrue(rows().all { it.read })
-        rule.onNodeWithText("Marked 4 as read").assertExists()
-        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()
-        rule.onNodeWithTag("hub.deleteHistory").performClick(); rule.mainClock.advanceTimeByFrame()
-        assertEquals(4, rows().size)                                         // nothing deleted by the first tap
-        rule.onNodeWithTag("hub.deleteConfirm").assertExists()
-        rule.onNodeWithTag("hub.deleteCancel").performClick(); rule.mainClock.advanceTimeByFrame()
-        assertEquals(4, rows().size)
-        rule.onNodeWithTag("hub.deleteHistory").performClick(); rule.mainClock.advanceTimeByFrame()
-        rule.onNodeWithTag("hub.deleteConfirmYes").performClick(); rule.mainClock.advanceTimeByFrame()
-        assertTrue(rows().isEmpty())
-    }
-
-    // Wave 26 (audit of wave 25)
-    @Test fun HUB_16_aHalfMadeDeleteConfirmationIsNotFoundPendingWhenTheOptionsOpenAgain() {
-        host()
-        rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()
-        rule.onNodeWithTag("hub.deleteHistory").performClick(); rule.mainClock.advanceTimeByFrame()
-        rule.onNodeWithTag("hub.deleteConfirm").assertExists()
-        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()  // closed without answering
-        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()  // opened again
-        rule.onNodeWithTag("hub.deleteConfirm").assertDoesNotExist()
-        rule.onNodeWithTag("hub.deleteHistory").assertExists()
-        assertEquals(4, rows().size)
-    }
-
     @Test fun HUB_13_theEmptyStatesSayWhyTheListIsEmpty() {
         store.deleteAll()
         host()
         rule.onNodeWithText("No notifications in history yet").assertExists()
         rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
         rule.onNodeWithText("No unread notifications").assertExists()
-        rule.onNodeWithTag("hub.view.read").performClick(); rule.waitForIdle()
+        selectView(HubView.Read)
         rule.onNodeWithText("Nothing read yet").assertExists()
     }
 
@@ -511,24 +475,14 @@ class HubTest {
         rule.onNodeWithTag(rowTag("m1")).assertExists()                            // persistent history
         rule.onNodeWithTag("hub.view.all").performClick(); rule.waitForIdle()
         rule.onNodeWithTag("lp.row.m1").assertExists()
-        // Options work in the live view; Mark visible as read marks the live rows (and their history).
-        rule.onNodeWithTag("hub.options").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("hub.density.Compact").assertDoesNotExist()
-        try {
-            rule.onNodeWithTag("hub.markVisible").performClick(); rule.waitForIdle()
-            assertTrue(com.bos.sphere.core.data.LaunchpadSettings.readKeys.value.containsAll(listOf("m1", "m2", "c1", "e1")))
-        } finally { com.bos.sphere.core.data.LaunchpadSettings.pruneRead(setOf("none")) }
     }
 
     // ---- screenshot ----
 
-    @Test fun HUB_18_screenshotOfTheHubWithOptionsOpen() {
+    @Test fun HUB_18_screenshotOfTheHub() {
         host()
         rule.mainClock.autoAdvance = false
         shoot("hub-all")
-        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()
-        shoot("hub-options")
-        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()
         rule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { state.chooseDensity(HubDensity.Expanded) } }; rule.onNodeWithTag(rowTag("m1")).performClick(); rule.mainClock.advanceTimeByFrame()
         shoot("hub-expanded")
     }

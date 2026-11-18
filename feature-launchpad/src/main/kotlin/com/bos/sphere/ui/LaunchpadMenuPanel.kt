@@ -63,10 +63,11 @@ import com.bos.sphere.core.design.L10n
  * only fade, as the rest of Launchpad does (NFR-14).
  */
 object LaunchpadMenuMotion {
-    const val MAX_PANEL_DP = 320f
+    /** Wave 27: the panel is 58 percent of the window (the owner's mock-up), at most 380 dp on a wide window. */
+    const val MAX_PANEL_DP = 380f
     const val SCRIM_ALPHA = 0.45f
 
-    fun panelWidthDp(windowWidthDp: Float): Float = minOf(MAX_PANEL_DP, windowWidthDp * 0.86f)
+    fun panelWidthDp(windowWidthDp: Float): Float = minOf(MAX_PANEL_DP, windowWidthDp * CommsStyle.PANEL_FRACTION)
 
     /** The panel's own travel: from fully outside its edge at 0 to in place at 1. */
     fun panelTranslationPx(panelPx: Float, p: Float, reduced: Boolean, dir: Float = 1f): Float = if (reduced) 0f else -dir * panelPx * (1f - p.coerceIn(0f, 1f))
@@ -119,6 +120,9 @@ internal class MenuActions(
     val onFilter: (String?) -> Unit,
     val onGroups: () -> Unit,
     val onClearAll: () -> Unit,
+    /** Wave 27: the hub, for the Options rows (density, default view, read history, mark read, delete history); null on a bare panel. */
+    val hub: HubState? = null,
+    val onMarkRead: () -> Unit = {},
 )
 
 internal fun groupModeText(m: GroupMode) = when (m) {
@@ -130,9 +134,16 @@ internal fun groupModeText(m: GroupMode) = when (m) {
     GroupMode.AppConversation -> L10n.tr("App and conversation")
 }
 
-/** The scrim over the shifted list and the panel itself, laid over the notifications layer; the panel is on the physical left (right in RTL). */
+/**
+ * The scrim over the shifted list and the panel itself, laid over the notifications layer; the panel is on the physical left (right in RTL).
+ * Wave 27 (the owner's Comms menu mock-up): 58 percent wide, #1A1A1A in the dark look; GROUP BY is an icons-only 3 x 2 grid (the labels are
+ * only the cells' accessibility descriptions), then "Show" with a row per app (its real coloured icon, the name, the count right-aligned; All Comms
+ * first), then the Options rows. A tap on a grouping or an app applies it and closes the panel.
+ */
 @Composable
 internal fun androidx.compose.foundation.layout.BoxScope.LaunchpadMenuLayer(menu: LaunchpadMenuState, rtl: Boolean, actions: MenuActions, onClose: () -> Unit) {
+    val hubForReset = actions.hub
+    androidx.compose.runtime.LaunchedEffect(menu.open) { if (!menu.open) hubForReset?.confirmDelete = false }
     if (!menu.visible) return
     val dir = if (rtl) -1f else 1f
     val widthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat()
@@ -153,78 +164,117 @@ internal fun androidx.compose.foundation.layout.BoxScope.LaunchpadMenuLayer(menu
             }
             .shadow(8.dp).background(ink.surface)
             .testTag("lp.menu.panel")
-            .semantics { paneTitle = L10n.tr("Notification menu"); isTraversalGroup = true; traversalIndex = -1f },
+            .semantics { paneTitle = L10n.tr("Comms menu"); isTraversalGroup = true; traversalIndex = -1f },
     ) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp).padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(L10n.tr("Notification menu"), color = ink.ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Box(
-                Modifier.size(48.dp).clip(CircleShape)
-                    .semantics { contentDescription = L10n.tr("Close menu") }
-                    .clickable(onClickLabel = L10n.tr("Close menu"), role = Role.Button, onClick = onClose).testTag("lp.menu.close"),
-                Alignment.Center,
-            ) { CloseIcon(ink.ink) }
-        }
-        Box(Modifier.fillMaxWidth().height1().background(ink.line))
-        LazyColumn(Modifier.weight(1f).navigationBarsPadding().testTag("lp.menu.list")) {
-            item { MenuHeading(L10n.tr("Group by")) }
-            items(GroupMode.entries.toList(), key = { "mode:" + it.name }) { m ->
-                MenuRow(groupModeText(m), selected = m == actions.mode, tag = "lp.menu.mode.${m.name}", radio = true) { actions.onMode(m) }
-            }
-            item { MenuHeading(L10n.tr("Show")) }
-            item { MenuRow(L10n.tr("All"), selected = actions.filter == null, tag = "lp.menu.show.all", radio = true, trailing = actions.counts.sumOf { it.count }.toString()) { actions.onFilter(null) } }
+        LazyColumn(Modifier.weight(1f).statusBarsPadding().navigationBarsPadding().testTag("lp.menu.list")) {
+            item { MenuHeading(L10n.tr("Group by").uppercase()) }
+            item { GroupGrid(actions) }
+            item { MenuHeading(L10n.tr("Show"), top = 28.dp) }
+            item { ShowRow(L10n.tr("All Comms"), selected = actions.filter == null, tag = "lp.menu.show.all", count = actions.counts.sumOf { it.count }, pkg = null) { actions.onFilter(null) } }
             items(actions.counts, key = { "src:" + it.packageName }) { c ->
-                MenuRow(c.appLabel, selected = actions.filter == c.packageName, tag = "lp.menu.show.${c.packageName}", radio = true, trailing = c.count.toString(), pkg = c.packageName) { actions.onFilter(c.packageName) }
+                ShowRow(c.appLabel, selected = actions.filter == c.packageName, tag = "lp.menu.show.${c.packageName}", count = c.count, pkg = c.packageName) { actions.onFilter(c.packageName) }
             }
-            item { Box(Modifier.fillMaxWidth().padding(top = 8.dp).height1().background(ink.line)) }
-            item { MenuRow(L10n.tr("Groups and rules…"), selected = false, tag = "lp.menu.groups", radio = false) { actions.onGroups() } }
-            if (actions.canClear) item { MenuRow(L10n.tr("Clear all"), selected = false, tag = "lp.menu.clear", radio = false) { actions.onClearAll() } }
+            item { MenuHeading(L10n.tr("Options"), top = 28.dp) }
+            optionRows(actions, onClose)
         }
     }
+}
+
+/** The GROUP BY grid: 3 columns by 2 rows of icon-only cells with hairline dividers; the selected cell is drawn in the full ink colour, the others dim. */
+@Composable
+private fun GroupGrid(actions: MenuActions) {
+    val ink = LocalLp.current
+    val grid = GroupGridOrder
+    Column(Modifier.fillMaxWidth().padding(horizontal = CommsStyle.H_PAD_DP.dp, vertical = 8.dp).testTag("lp.menu.grid")) {
+        for (r in 0 until CommsStyle.GRID_ROWS) {
+            if (r > 0) Box(Modifier.fillMaxWidth().height1().background(ink.line))
+            Row(Modifier.fillMaxWidth()) {
+                for (c in 0 until CommsStyle.GRID_COLUMNS) {
+                    val m = grid[r * CommsStyle.GRID_COLUMNS + c]
+                    val sel = m == actions.mode
+                    if (c > 0) Box(Modifier.width(0.5.dp).height(CommsStyle.GRID_CELL_H_DP.dp).background(ink.line))
+                    Box(
+                        Modifier.weight(1f).height(CommsStyle.GRID_CELL_H_DP.dp)
+                            .semantics { this.selected = sel; role = Role.RadioButton; contentDescription = groupModeText(m) }
+                            .clickable { actions.onMode(m) }.testTag("lp.menu.mode.${m.name}"),
+                        Alignment.Center,
+                    ) { GroupModeGlyph(m, if (sel) ink.ink else ink.dim.copy(alpha = 0.75f)) }
+                }
+            }
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.optionRows(actions: MenuActions, onClose: () -> Unit) {
+    val hub = actions.hub
+    if (hub != null) {
+        if (hub.view.history && !hub.listIsLive) item {
+            OptionRow(L10n.tr("Density"), "lp.menu.opt.density", trailing = L10n.tr(hub.density.label)) { hub.chooseDensity(hub.density.looser ?: HubDensity.Compact) }
+        }
+        item {
+            val isDefault = hub.view == hub.defaultView
+            OptionRow(
+                if (isDefault) L10n.tr("Default view") else L10n.tr("Set as default view"), "lp.menu.opt.default",
+                trailing = if (isDefault) L10n.tr(hub.view.label) else "",
+            ) { hub.setDefault(); onClose() }
+        }
+        item { OptionRow(L10n.tr("Read history"), "lp.menu.opt.read") { hub.select(HubView.Read); onClose() } }
+        if (hub.view.history) item { OptionRow(L10n.tr("Mark visible as read"), "lp.menu.opt.markRead") { actions.onMarkRead() } }
+        if (!hub.confirmDelete) item { OptionRow(L10n.tr("Delete history") + "…", "lp.menu.opt.delete") { hub.confirmDelete = true } }
+        else item {
+            Column(Modifier.testTag("hub.deleteConfirm")) {
+                Text(
+                    L10n.tr("Delete all notification history? Notifications in the shade stay."), color = LocalLp.current.ink2, fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = CommsStyle.H_PAD_DP.dp, vertical = 8.dp),
+                )
+                OptionRow(L10n.tr("Cancel"), "lp.menu.opt.deleteCancel") { hub.confirmDelete = false }
+                OptionRow(L10n.tr("Delete history"), "lp.menu.opt.deleteYes") { hub.store?.deleteAll(); hub.confirmDelete = false; hub.undo = null; onClose() }
+            }
+        }
+    }
+    item { OptionRow(L10n.tr("Groups and rules…"), "lp.menu.groups") { actions.onGroups() } }
+    if (actions.canClear) item { OptionRow(L10n.tr("Clear all"), "lp.menu.clear") { actions.onClearAll() } }
 }
 
 private fun Modifier.height1(): Modifier = this.height(0.5.dp)
 
 @Composable
-private fun MenuHeading(text: String) {
+private fun MenuHeading(text: String, top: androidx.compose.ui.unit.Dp = 24.dp) {
     Text(
-        text.uppercase(), color = LocalLp.current.dim, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+        text, color = LocalLp.current.ink2, fontSize = 15.sp, letterSpacing = 0.5.sp,
+        modifier = Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = 16.dp, top = top, bottom = 8.dp),
     )
 }
 
-/** One real list row, 48 dp or taller; the chosen option has a check mark and is announced as selected. */
+/** A Show row: the app's real coloured icon miniaturised to 24 dp (the All Comms row has the comms glyph), an 8 dp gap, the name, the count right-aligned and dim. */
 @Composable
-private fun MenuRow(label: String, selected: Boolean, tag: String, radio: Boolean, trailing: String = "", pkg: String = "", onClick: () -> Unit) {
+private fun ShowRow(label: String, selected: Boolean, tag: String, count: Int, pkg: String?, onClick: () -> Unit) {
     val ink = LocalLp.current
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            .semantics(mergeDescendants = true) { if (radio) { this.selected = selected; role = Role.RadioButton } else role = Role.Button }
-            .clickable(onClick = onClick).testTag(tag).padding(start = 16.dp, end = 20.dp),
+        Modifier.fillMaxWidth().heightIn(min = CommsStyle.SHOW_ROW_MIN_DP.dp)
+            .semantics(mergeDescendants = true) { this.selected = selected; role = Role.RadioButton }
+            .clickable(onClick = onClick).testTag(tag).padding(horizontal = CommsStyle.H_PAD_DP.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(24.dp), Alignment.Center) { if (selected) CheckIcon(BlueLight) }
-        Spacer(Modifier.width(12.dp))
-        if (pkg.isNotEmpty()) { AppIcon(pkg, label, 24); Spacer(Modifier.width(12.dp)) }
-        Text(label, color = if (selected) ink.ink else ink.ink2, fontSize = 16.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        if (trailing.isNotEmpty()) Text(trailing, color = ink.dim, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
+        if (pkg == null) Box(Modifier.size(CommsStyle.SHOW_ICON_DP.dp), Alignment.Center) { GroupModeGlyph(GroupMode.Conversation, ink.ink) }
+        else AppIcon(pkg, label, CommsStyle.SHOW_ICON_DP, Modifier.testTag("$tag.icon"))
+        Spacer(Modifier.width(CommsStyle.SHOW_ICON_GAP_DP.dp))
+        Text(label, color = ink.ink, fontSize = 18.sp, fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(count.toString(), color = ink.dim, fontSize = 18.sp, maxLines = 1, modifier = Modifier.padding(start = 12.dp).testTag("$tag.count"))
     }
 }
 
+/** An Options row: plain text like the Show rows, with an optional value right-aligned in dim. At least 48 dp high. */
 @Composable
-private fun CheckIcon(color: Color) {
-    Canvas(Modifier.size(18.dp)) {
-        val sw = 2.4.dp.toPx(); val w = size.width; val h = size.height
-        drawLine(color, Offset(w * 0.1f, h * 0.55f), Offset(w * 0.4f, h * 0.82f), sw, StrokeCap.Round)
-        drawLine(color, Offset(w * 0.4f, h * 0.82f), Offset(w * 0.92f, h * 0.2f), sw, StrokeCap.Round)
-    }
-}
-
-@Composable
-private fun CloseIcon(color: Color) {
-    Canvas(Modifier.size(18.dp)) {
-        val sw = 2.2.dp.toPx(); val w = size.width; val h = size.height
-        drawLine(color, Offset(w * 0.1f, h * 0.1f), Offset(w * 0.9f, h * 0.9f), sw, StrokeCap.Round)
-        drawLine(color, Offset(w * 0.9f, h * 0.1f), Offset(w * 0.1f, h * 0.9f), sw, StrokeCap.Round)
+private fun OptionRow(label: String, tag: String, trailing: String = "", onClick: () -> Unit) {
+    val ink = LocalLp.current
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics(mergeDescendants = true) { role = Role.Button }
+            .clickable(onClick = onClick).testTag(tag).padding(horizontal = CommsStyle.H_PAD_DP.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = ink.ink2, fontSize = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (trailing.isNotEmpty()) Text(trailing, color = ink.dim, fontSize = 14.sp, maxLines = 1, modifier = Modifier.padding(start = 12.dp))
     }
 }
 

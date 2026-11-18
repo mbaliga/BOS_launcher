@@ -15,6 +15,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -145,7 +146,10 @@ import kotlin.math.roundToInt
 internal class LpColors(val bg: Color, val surface: Color, val ink: Color, val ink2: Color, val dim: Color, val line: Color)
 /** CFG-10: Launchpad's two looks come from the shared design tokens (dark and light variants), not a private palette. */
 internal fun lpColorsFor(variant: com.bos.sphere.core.design.ThemeVariant): LpColors =
-    com.bos.sphere.core.design.HyleColors.tokens(variant).let { LpColors(it.background, it.surface, it.inkBright, it.ink, it.inkDim, it.hairline) }
+    if (variant == com.bos.sphere.core.design.ThemeVariant.Dark)
+        // Wave 27: the dark Comms look is the owner's mock-up palette (near-black navy page, #1A1A1A panel); the light look stays on the shared light tokens.
+        LpColors(CommsStyle.DarkBg, CommsStyle.DarkPanel, CommsStyle.DarkInk, CommsStyle.DarkInk2, CommsStyle.DarkDim, CommsStyle.DarkLine)
+    else com.bos.sphere.core.design.HyleColors.tokens(variant).let { LpColors(it.background, it.surface, it.inkBright, it.ink, it.inkDim, it.hairline) }
 internal val LpDark = lpColorsFor(com.bos.sphere.core.design.ThemeVariant.Dark)
 internal val LpLight = lpColorsFor(com.bos.sphere.core.design.ThemeVariant.Light)
 internal val LocalLp = androidx.compose.runtime.compositionLocalOf { LpDark }
@@ -191,7 +195,7 @@ private fun rememberNow(): Long {
     return now
 }
 
-private val iconCache = ConcurrentHashMap<String, ImageBitmap>()
+internal val iconCache = ConcurrentHashMap<String, ImageBitmap>()
 
 @Composable
 private fun rememberAppIcon(pkg: String): ImageBitmap? {
@@ -199,7 +203,7 @@ private fun rememberAppIcon(pkg: String): ImageBitmap? {
     val icon by produceState(iconCache[pkg], pkg) {
         if (pkg.isBlank()) return@produceState
         value = iconCache[pkg] ?: withContext(Dispatchers.IO) {
-            runCatching { ctx.packageManager.getApplicationIcon(pkg).toBitmap(96, 96).asImageBitmap() }.getOrNull()
+            runCatching { ctx.packageManager.getApplicationIcon(pkg).toBitmap(168, 168).asImageBitmap() }.getOrNull()
         }?.also { iconCache[pkg] = it }
     }
     return icon
@@ -209,12 +213,15 @@ private fun rememberAppIcon(pkg: String): ImageBitmap? {
 internal fun AppIcon(pkg: String, label: String, size: Int, modifier: Modifier = Modifier) {
     val icon = rememberAppIcon(pkg)
     val shape = RoundedCornerShape((size * 0.24f).dp)
+    // A hairline outline keeps a black icon visible on the dark page and a white one on the light page (the mock-up's music icon has one).
+    val outline = Modifier.border(0.75.dp, LocalLp.current.dim.copy(alpha = 0.45f), shape)
     if (icon != null) {
-        Image(icon, null, modifier.size(size.dp).clip(shape))
+        Image(icon, null, modifier.size(size.dp).clip(shape).then(outline))
     } else {
-        Box(modifier.size(size.dp).clip(shape).background(LocalLp.current.surface), Alignment.Center) {
+        // No icon to load: a coloured letter badge (the colour is the app's stable hue), never a grey tile.
+        Box(modifier.size(size.dp).clip(shape).background(HubStyle.stripeFor(pkg)), Alignment.Center) {
             Text(
-                label.take(1).uppercase(), color = LocalLp.current.dim,
+                label.take(1).uppercase(), color = Color.White,
                 fontSize = (size * 0.42f).sp, fontWeight = FontWeight.SemiBold,
             )
         }
@@ -264,8 +271,8 @@ fun LaunchpadPanel(
      * (read [LaunchpadMenuState.progress] and [LaunchpadMenuMotion]); a panel used alone keeps one itself.
      */
     menu: LaunchpadMenuState = rememberLaunchpadMenu(),
-    /** Wave 25 (STR-02): the floating compose button. Launchpad has no composer of its own, so the host decides what opens (Liftoff: Radar on People). */
-    onCompose: () -> Unit = {},
+    /** Wave 27: a tap on the header clock; the host opens the Sound and Vibration popup. Nothing else is wired to it here. */
+    onOpenSound: () -> Unit = {},
     /** Wave 25 (STR-02): a slot in the list's top bar for the history, files, usage and timeline view switcher. */
     viewSwitcher: @Composable () -> Unit = {},
     /** Wave 25 (hubData): renders the Files, Usage and Timeline views of the hub; null leaves the hub with the history views only. */
@@ -346,7 +353,7 @@ fun LaunchpadPanel(
             runAction = { a -> ReplyLogic.run(a) },
             sendReply = { a, text -> ReplyLogic.send(ctx, a, text) },
             onClose = onDismiss,
-            menu = menu, onCompose = onCompose,
+            menu = menu, onOpenSound = onOpenSound,
             onOpenItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss) },
             openItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss).ok },
             openApp = { pkg ->
@@ -431,8 +438,8 @@ fun LaunchpadContent(
     dndOn: Boolean = false,
     /** Wave 25 (STR-01): the menu side panel's state; see [LaunchpadPanel]. */
     menu: LaunchpadMenuState = rememberLaunchpadMenu(),
-    /** Wave 25 (STR-02): the floating compose button's action. */
-    onCompose: () -> Unit = {},
+    /** Wave 27: a tap on the header clock (the Sound and Vibration popup); see [LaunchpadPanel]. */
+    onOpenSound: () -> Unit = {},
     /** Wave 25 (STR-02): the slot for the view switcher (history, files, usage, timeline), in the top bar next to the title. */
     viewSwitcher: @Composable () -> Unit = {},
     hub: HubState? = null,
@@ -536,14 +543,6 @@ fun LaunchpadContent(
         }
     }
 
-    // Where a section starts: its header, or (a one-item group has none) its first row, so the jump strip still lands on it.
-    val headIndex = remember(entries) {
-        buildMap<String, Int> {
-            entries.forEachIndexed { i, e ->
-                when (e) { is Entry.Head -> put(e.sec.key, i); is Entry.Item -> putIfAbsent(e.sec.key, i); else -> Unit }
-            }
-        }
-    }
     // ---- keyboard focus over groups and rows (STR-08) ----
     val order = remember(entries) {
         entries.mapNotNull { e ->
@@ -644,14 +643,22 @@ fun LaunchpadContent(
         }
     }
 
+    // Wave 27: on a history view (Unread, Read) the grid groups that history; on the live list it sets the default grouping of the live list.
+    val historyGrouping = hub != null && !hub.listIsLive && hub.view.history
     val menuActions = MenuActions(
-        mode = prefs.defaultMode, filter = activeFilter, counts = counts, canClear = items.isNotEmpty(),
-        onMode = { onSetDefaultMode(it); menu.open = false },
-        onFilter = { filter = it; menu.open = false },
+        mode = if (historyGrouping && hub != null) hub.grouping.toMode() else prefs.defaultMode, filter = activeFilter, counts = counts, canClear = items.isNotEmpty(),
+        onMode = { m -> if (historyGrouping && hub != null) hub.chooseGrouping(HubGrouping.of(m)) else onSetDefaultMode(m); menu.open = false },
+        onFilter = { f ->
+            filter = f
+            // The app filter follows into the history views, so Show means the same on every tab.
+            hub?.let { h -> HubView.entries.filter { it.history }.forEach { v -> h.setFilters(h.filters(v).copy(app = f), v) } }
+            menu.open = false
+        },
         onGroups = { menu.open = false; groupsOpen = true },
         onClearAll = { onClearAll(); menu.open = false },
+        hub = hub, onMarkRead = { hubMarkRead(); menu.open = false },
     )
-    // Wave 25 (STR-01): the notifications layer (list and compose button) shifts away by the panel's width while the menu is open.
+    // Wave 25 (STR-01): the notifications layer shifts away by the panel's width while the menu is open.
     Box(Modifier.fillMaxSize().graphicsLayer {
         translationX = LaunchpadMenuMotion.listShiftPx(LaunchpadMenuMotion.panelWidthDp(size.width / density) * density, menu.progress, menu.reduced, if (rtlLayout) -1f else 1f)
     }) {
@@ -659,12 +666,12 @@ fun LaunchpadContent(
         modifier
             .fillMaxSize()
             // Beside the home card the host draws the backdrop (it must not fade with the content); alone, the content draws its own.
-            .then(if (endInset > 0.dp) Modifier else Modifier.background(Brush.verticalGradient(listOf(LocalLp.current.bg, androidx.compose.ui.graphics.lerp(LocalLp.current.bg, LocalLp.current.surface, 0.55f)))))
+            .then(if (endInset > 0.dp) Modifier else Modifier.background(LocalLp.current.bg))
             .testTag("lp.root")
-            .semantics { paneTitle = L10n.tr("Launchpad") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
+            .semantics { paneTitle = L10n.tr("Comms") } // wave 23 (NFR-13): TalkBack announces the panel when it opens
             .onPreviewKeyEvent { tracker.onKey(); inputManager.requestInputMode(ComposeInputMode.Keyboard); false }
             .then(if (hub == null) Modifier else Modifier.hubKeys( // outside focusable(): the keys work whether the root or a row has focus
-                onView = { d -> HubLogic.step(hub.views, hub.view, d)?.let(hub::select) },
+                onView = { d -> hub.step(d)?.let(hub::select) },
                 onDensity = { looser -> (if (looser) hub.density.looser else hub.density.denser)?.let(hub::chooseDensity) },
                 onMarkRead = { hubMarkRead() },
             ))
@@ -696,18 +703,18 @@ fun LaunchpadContent(
     ) {
         LaunchpadHeader(
             filterLabel = activeFilter?.let { f -> counts.firstOrNull { it.packageName == f }?.appLabel },
-            onMenu = { menu.open = true }, onClose = onClose,
+            onMenu = { menu.open = true }, onOpenSound = onOpenSound,
+            snapshot = systemState, now = now, is24 = is24, zone = zone, onOpenPanel = onOpenSystemPanel,
             onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
         )
         viewSwitcher()
-        if (hub != null && hub.optionsOpen) HubOptions(hub) { hubMarkRead() }
-        if (systemState != null && hasAccess) SystemStateRow(systemState, is24, onOpenSystemPanel)
+        Box(Modifier.padding(horizontal = CommsStyle.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line).testTag("lp.tabsLine"))
         if (hasAccess && com.bos.sphere.core.data.GroupDnd.breaksThrough(groups, dndOn)) Text(
             L10n.tr("Do Not Disturb is on. Only Priority groups light the edge indicator."), color = LocalLp.current.dim, fontSize = 13.sp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = RoomyList.H_PAD_DP.dp, vertical = 6.dp).testTag("lp.dnd"),
         )
         if (hub != null && !hub.listIsLive) HubBody(
-            hub, now, zone, is24, liveKeys = items.mapTo(HashSet()) { it.key }, modifier = Modifier.weight(1f), hasAccess = hasAccess, onRequestAccess = onRequestAccess, showOptions = false, panelBody = hubPanelBody,
+            hub, now, zone, is24, liveKeys = items.mapTo(HashSet()) { it.key }, modifier = Modifier.weight(1f), hasAccess = hasAccess, onRequestAccess = onRequestAccess, panelBody = hubPanelBody,
             onOpen = { e ->
                 val live = items.firstOrNull { it.key == e.key }
                 if (live != null) open(live) else if (openApp == null) onOpenApp(e.packageName) else if (!openApp(e.packageName)) toast.value = L10n.tr("Couldn't open %s", e.appLabel.ifBlank { e.packageName })
@@ -722,7 +729,6 @@ fun LaunchpadContent(
                     Text(L10n.tr(if (unreadOnly) "No unread notifications" else "All caught up"), color = LocalLp.current.dim, fontSize = 18.sp, fontWeight = FontWeight.Light)
                 }
             } else Column(Modifier.fillMaxSize()) {
-              SectionStrip(sections, listState, headIndex, motion = com.bos.sphere.core.design.rememberMotionPrefs())
               LazyColumn(
                 Modifier.fillMaxSize().navigationBarsPadding().testTag("lp.list"), state = listState,
                 verticalArrangement = Arrangement.spacedBy(RoomyList.ROW_GAP_DP.dp),
@@ -796,7 +802,6 @@ fun LaunchpadContent(
         }
     }
 
-    if (hasAccess) ComposeFab(endPadding = endInset, onClick = onCompose)
     }
     // The menu panel and its scrim sit above the notifications layer, on the left.
     Box(Modifier.fillMaxSize()) { LaunchpadMenuLayer(menu, rtlLayout, menuActions) { menu.open = false; runCatching { rootReq.requestFocus() } } }
@@ -834,16 +839,21 @@ fun LaunchpadContent(
 }
 
 /**
- * The top bar: the menu button (opens the side panel), the title, the slot for the view switcher, the active app filter and "Home".
- * The menu options themselves live in the side panel ([LaunchpadMenuLayer]); there is no pop-up.
+ * Wave 27: the Comms header of the owner's mock-up. First row: the three-line menu glyph and the title (28 sp, the app's name filter while one is on).
+ * Second row: the clock (a tap opens the Sound and Vibration popup through [onOpenSound]) and the four status glyphs. The tab row follows in the
+ * view-switcher slot. There is no "Home" button: the home card's visible edge, Back and a swipe close the screen.
  */
 @Composable
 private fun LaunchpadHeader(
     filterLabel: String?,
     onMenu: () -> Unit,
-    onClose: () -> Unit,
+    onOpenSound: () -> Unit,
+    snapshot: SystemSnapshot?,
+    now: Long,
+    is24: Boolean,
+    zone: ZoneId,
+    onOpenPanel: (SystemTileKind) -> Unit,
     onDoubleTap: () -> Unit,
-    viewSwitcher: @Composable () -> Unit = {},
 ) {
     val ink = LocalLp.current.ink
     Column(
@@ -851,37 +861,30 @@ private fun LaunchpadHeader(
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleTap() }) },
     ) {
         Row(
-            Modifier.fillMaxWidth().statusBarsPadding().height(56.dp).padding(start = 8.dp, end = 4.dp),
+            Modifier.fillMaxWidth().statusBarsPadding().height(56.dp).padding(start = 8.dp, end = CommsStyle.H_PAD_DP.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 Modifier.size(48.dp).clip(CircleShape)
-                    .semantics { contentDescription = L10n.tr("Notification menu") }
-                    .clickable(onClickLabel = L10n.tr("Notification menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
+                    .semantics { contentDescription = L10n.tr("Comms menu") }
+                    .clickable(onClickLabel = L10n.tr("Comms menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
                 Alignment.Center,
             ) { HamburgerIcon(ink) }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(9.dp))
             Text(
-                filterLabel ?: L10n.tr("Launchpad"), color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                filterLabel ?: L10n.tr("Comms"), color = ink, fontSize = CommsStyle.HEADER_TITLE_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("lp.title"),
             )
-            // Wave 25: the slot the view switcher (history, files, usage, timeline) drops into.
-            viewSwitcher()
-            Text(
-                L10n.tr("Home"), color = LocalLp.current.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(end = 4.dp).heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)) // wave 23: 48 dp, a button
-                    .clickable(onClickLabel = L10n.tr("Close Launchpad"), role = androidx.compose.ui.semantics.Role.Button, onClick = onClose).padding(horizontal = 14.dp, vertical = 14.dp),
-            )
         }
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
+        CommsClockRow(snapshot, now, is24, zone, onOpenPanel, onOpenSound)
     }
 }
 
 /** The three-line menu icon of the owner's mock-up. */
 @Composable
 internal fun HamburgerIcon(color: Color) {
-    Canvas(Modifier.size(22.dp)) {
-        val stroke = 2.dp.toPx()
+    Canvas(Modifier.size(20.dp)) {
+        val stroke = 2.4.dp.toPx()
         for (i in 0..2) {
             val y = size.height * (0.22f + 0.28f * i)
             drawLine(color, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)

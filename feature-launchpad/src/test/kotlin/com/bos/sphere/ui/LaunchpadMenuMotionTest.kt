@@ -38,9 +38,10 @@ class LaunchpadMenuMotionTest {
         assertEquals(0f, LaunchpadMenuMotion.cardAlpha(1f, true), 0f)
     }
 
-    @Test fun STR_01_panelIsNeverWiderThan320dpOrMostOfASmallWindow() {
-        assertEquals(320f, LaunchpadMenuMotion.panelWidthDp(800f), 0f)
-        assertEquals(309.6f, LaunchpadMenuMotion.panelWidthDp(360f), 0.01f)
+    // Wave 27 (the owner's Comms menu mock-up): 58 percent of the window, at most 380 dp on a wide window.
+    @Test fun STR_01_panelIs58PercentOfTheWindowAndNeverWiderThan380dp() {
+        assertEquals(380f, LaunchpadMenuMotion.panelWidthDp(800f), 0f)
+        assertEquals(208.8f, LaunchpadMenuMotion.panelWidthDp(360f), 0.01f)
         assertTrue(LaunchpadMenuMotion.panelWidthDp(300f) < 300f)
     }
 }

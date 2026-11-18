@@ -11,7 +11,7 @@ import android.os.BatteryManager
 // STR-10: the system state row at the top of Launchpad. Tiles show state; they never claim to toggle
 // what Android blocks (Wi-Fi, Bluetooth and mobile data cannot be switched by an app since Android 10).
 
-enum class SystemTileKind(val label: String) { Time("Time"), Battery("Battery"), Connectivity("Connectivity"), Sound("Sound") }
+enum class SystemTileKind(val label: String) { Time("Time"), Battery("Battery"), Connectivity("Connectivity"), Sound("Sound"), Brightness("Brightness") }
 
 enum class Connectivity { None, Wifi, Cellular, Ethernet, Other }
 enum class SoundState { Normal, Vibrate, Silent }
@@ -41,12 +41,15 @@ object SystemStateLogic {
     const val ACTION_BATTERY = "android.intent.action.POWER_USAGE_SUMMARY"
     const val ACTION_CONNECTIVITY = "android.settings.panel.action.INTERNET_CONNECTIVITY"
     const val ACTION_SOUND = "android.settings.panel.action.VOLUME"
+    /** Wave 27 (Comms header): the brightness dial opens the public Display settings screen (Settings.ACTION_DISPLAY_SETTINGS). */
+    const val ACTION_BRIGHTNESS = "android.settings.DISPLAY_SETTINGS"
 
     fun panelFor(kind: SystemTileKind): String = when (kind) {
         SystemTileKind.Time -> ACTION_TIME
         SystemTileKind.Battery -> ACTION_BATTERY
         SystemTileKind.Connectivity -> ACTION_CONNECTIVITY
         SystemTileKind.Sound -> ACTION_SOUND
+        SystemTileKind.Brightness -> ACTION_BRIGHTNESS
     }
 
     fun tiles(s: SystemSnapshot): List<SystemTile> = listOf(
@@ -68,6 +71,7 @@ object SystemStateLogic {
             when (s.sound) { SoundState.Normal -> "Sound on"; SoundState.Vibrate -> "Vibrate"; SoundState.Silent -> "Silent" },
             "", panelFor(SystemTileKind.Sound),
         ),
+        SystemTile(SystemTileKind.Brightness, "", "", panelFor(SystemTileKind.Brightness)),
     )
 
     /** Reads the state with public APIs only. Needs ACCESS_NETWORK_STATE, which the app already holds. */

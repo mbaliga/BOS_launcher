@@ -153,18 +153,18 @@ abstract class LaunchpadCardCases(private val orientation: String) : LaunchpadSh
         assertEquals(listOf("Home card. Return to home"), desc)
     }
 
-    // Wave 9: the four system tiles are icon-only buttons in one row (was: text tiles wrapping into rows of two).
+    // Wave 27 (was: four square icon buttons, time, battery, connectivity, sound): the Comms header has the clock and four plain glyphs, brightness, battery, signal, Wi-Fi.
     @Test fun STR_10_card_systemRowIsFourIconButtonsWithoutText() {
         render("system", dark = false)
-        val tags = listOf("lp.sys.time", "lp.sys.battery", "lp.sys.connectivity", "lp.sys.sound")
+        val tags = listOf("lp.sys.brightness", "lp.sys.battery", "lp.sys.signal", "lp.sys.wifi")
         val tops = tags.map { rule.onNodeWithTag(it).assertIsDisplayed().getUnclippedBoundsInRoot().top.value }
         assertTrue("one row: $tops", tops.distinct().size == 1)
-        for (text in listOf("82%", "Wi-Fi", "Vibrate", "12:00 PM", "Charging")) assertTrue("'$text' must not be drawn", rule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty())
+        for (text in listOf("82%", "Wi-Fi", "Vibrate", "Charging")) assertTrue("'$text' must not be drawn", rule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty())
         fun desc(tag: String) = rule.onNodeWithTag(tag).fetchSemanticsNode().config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)
         assertEquals(listOf("Battery: 82%, charging"), desc("lp.sys.battery"))
-        assertEquals(listOf("Connectivity: Wi-Fi"), desc("lp.sys.connectivity"))
-        assertEquals(listOf("Sound: Vibrate"), desc("lp.sys.sound"))
-        assertEquals(listOf("Time: 12:00 PM"), desc("lp.sys.time"))
+        assertEquals(listOf("Connectivity: Wi-Fi"), desc("lp.sys.wifi"))
+        assertEquals(listOf("Connectivity: Wi-Fi"), desc("lp.sys.signal"))
+        assertEquals(listOf("Brightness"), desc("lp.sys.brightness"))
     }
 
     @Test fun STR_10_card_iconTileOpensItsSystemPanelAndIsFocusable() {

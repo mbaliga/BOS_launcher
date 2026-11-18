@@ -35,11 +35,28 @@ enum class HubDensity(val label: String) {
     val looser: HubDensity? get() = entries.getOrNull(ordinal + 1)
 }
 
-/** Grouping granularity, coarse to fine: one group per app, per day, per sender. */
+/**
+ * Grouping granularity, coarse to fine: no groups at all (the Comms default: a flat list, no bands), then one group per app, per day, per sender.
+ * Wave 27: the Comms menu's GROUP BY grid drives it on the history views ([of] and [toMode]).
+ */
 enum class HubGrouping(val label: String) {
-    App("App"), Day("Day"), Sender("Sender");
+    Flat("Flat"), App("App"), Day("Day"), Sender("Sender");
     val coarser: HubGrouping? get() = entries.getOrNull(ordinal - 1)
     val finer: HubGrouping? get() = entries.getOrNull(ordinal + 1)
+    /** The grid cell that shows this grouping as selected. */
+    fun toMode(): com.bos.sphere.core.data.GroupMode = when (this) {
+        Flat -> com.bos.sphere.core.data.GroupMode.Flat; App -> com.bos.sphere.core.data.GroupMode.App
+        Day -> com.bos.sphere.core.data.GroupMode.Time; Sender -> com.bos.sphere.core.data.GroupMode.Sender
+    }
+    companion object {
+        /** History has no conversations of its own: a conversation groups by sender, app and conversation by app. */
+        fun of(m: com.bos.sphere.core.data.GroupMode): HubGrouping = when (m) {
+            com.bos.sphere.core.data.GroupMode.Flat -> Flat
+            com.bos.sphere.core.data.GroupMode.App, com.bos.sphere.core.data.GroupMode.AppConversation -> App
+            com.bos.sphere.core.data.GroupMode.Time -> Day
+            com.bos.sphere.core.data.GroupMode.Sender, com.bos.sphere.core.data.GroupMode.Conversation -> Sender
+        }
+    }
 }
 
 enum class HubRange(val label: String, val days: Int) { Any("All time", 0), Today("Today", 1), Week("7 days", 7) }
@@ -53,7 +70,7 @@ enum class HubSwipe { Left, Right, Down }
 
 object HubLogic {
     /** Wave 26: day bands always show; an app or sender header only when it groups two or more rows (otherwise it repeats the row). */
-    fun showsGroupHeader(g: HubGrouping, count: Int) = g == HubGrouping.Day || count >= 2
+    fun showsGroupHeader(g: HubGrouping, count: Int) = g != HubGrouping.Flat && (g == HubGrouping.Day || count >= 2)
 
     /** The history rows of [view], newest first, with its quick filters applied. */
     fun query(entries: List<HistoryEntry>, view: HubView, f: HubFilters, now: Long, zone: ZoneId): List<HistoryEntry> {
@@ -90,6 +107,7 @@ object HubLogic {
     fun groupKey(e: HistoryEntry, g: HubGrouping, now: Long, zone: ZoneId): String = when (g) {
         HubGrouping.App -> "a:" + e.packageName
         HubGrouping.Sender -> "s:" + e.who
+        HubGrouping.Flat -> "flat"
         HubGrouping.Day -> "d:" + Instant.ofEpochMilli(e.timeMillis).atZone(zone).toLocalDate()
     }
 
@@ -108,7 +126,7 @@ class HubPrefs(private val sp: SharedPreferences?) {
         get() = HubDensity.entries.firstOrNull { it.name == sp?.getString("density", null) } ?: HubDensity.Comfortable
         set(v) { sp?.edit()?.putString("density", v.name)?.apply() }
     var grouping: HubGrouping
-        get() = HubGrouping.entries.firstOrNull { it.name == sp?.getString("grouping", null) } ?: HubGrouping.Day
+        get() = HubGrouping.entries.firstOrNull { it.name == sp?.getString("grouping", null) } ?: HubGrouping.Flat
         set(v) { sp?.edit()?.putString("grouping", v.name)?.apply() }
 
     companion object { fun of(context: Context) = HubPrefs(TolerantPrefs.of(context.applicationContext, "launchpad_hub")) }
@@ -141,11 +159,9 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
         private set
     var defaultView by mutableStateOf(prefs.defaultView)
         private set
-    private var optionsOpenState by mutableStateOf(false)
-    /** Wave 26 (audit): closing or opening the options always drops a half-made "Delete history" confirmation, so it is never found pending on the next visit. */
-    var optionsOpen: Boolean
-        get() = optionsOpenState
-        set(v) { optionsOpenState = v; confirmDelete = false }
+    /** Wave 27: the tab row has no Read tab (the owner's mock-up shows ALL UNREAD FILES USAGE TIMELINE); Read history is a row of the Comms menu. */
+    val tabs: List<HubView> = views.filter { it != HubView.Read }
+    /** A half-made "Delete history" confirmation (a row of the Comms menu); the menu drops it when it closes. */
     var confirmDelete by mutableStateOf(false)
     var undo by mutableStateOf<HubUndo?>(null)
     private var filterMap by mutableStateOf(emptyMap<HubView, HubFilters>())
@@ -158,10 +174,15 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
     fun clearFilters() = setFilters(HubFilters())
 
     fun select(v: HubView) { if (v in views) { view = v; undo = null } }
+    /** The tab [delta] steps away; from the Read history (which has no tab) next is Files and previous is Unread. */
+    fun step(delta: Int): HubView? {
+        if (view == HubView.Read) return if (delta > 0) HubLogic.step(tabs, HubView.Unread, 1) else if (HubView.Unread in tabs) HubView.Unread else null
+        return HubLogic.step(tabs, view, delta)
+    }
     fun swipe(s: HubSwipe, markVisibleRead: () -> Unit) {
         when (s) {
-            HubSwipe.Left -> HubLogic.step(views, view, +1)?.let(::select)
-            HubSwipe.Right -> HubLogic.step(views, view, -1)?.let(::select)
+            HubSwipe.Left -> step(+1)?.let(::select)
+            HubSwipe.Right -> step(-1)?.let(::select)
             HubSwipe.Down -> if (view.history) markVisibleRead()
         }
     }

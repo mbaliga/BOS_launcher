@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -66,14 +67,14 @@ abstract class LaunchpadRoomyCases(private val orientation: String) : LaunchpadS
         scrollTo("And the second part"); rule.onNodeWithText("And the second part").assertIsDisplayed()
     }
 
-    // Updated for wave 25 (owner item 2): the hub's flat rows have a small 32 dp badge and no gap between rows (a divider instead).
-    @Test fun STR_02_row_isAtLeast72dpTall_withA32dpBadge() {
+    // Updated for wave 27 (the owner's Comms mock-up): a 56 dp rounded icon, rows of about 80 dp, 20 dp margins and no gap between rows (an inset divider instead).
+    @Test fun STR_02_row_isAtLeast78dpTall_withA56dpIcon() {
         render("height", dark = false)
         scrollTo("Your code is 4411")
         val h = rule.onNodeWithTag("lp.row.s1", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertTrue("row height ${h.bottom - h.top} is under 72 dp", (h.bottom - h.top) >= 72.dp)
-        assertEquals(32, RoomyList.ICON_DP); assertEquals(72, RoomyList.ROW_MIN_DP)
-        assertEquals(16, RoomyList.H_PAD_DP); assertEquals(12, RoomyList.V_PAD_DP); assertEquals(0, RoomyList.ROW_GAP_DP)
+        assertTrue("row height ${h.bottom - h.top} is under 78 dp", (h.bottom - h.top) >= 78.dp)
+        assertEquals(56, RoomyList.ICON_DP); assertEquals(80, RoomyList.ROW_MIN_DP)
+        assertEquals(20, RoomyList.H_PAD_DP); assertEquals(12, RoomyList.V_PAD_DP); assertEquals(0, RoomyList.ROW_GAP_DP)
     }
 
     @Test fun STR_02_conversation_showsLatestWithMoreThatExpandsInPlace() {
@@ -94,12 +95,11 @@ abstract class LaunchpadRoomyCases(private val orientation: String) : LaunchpadS
         assertTrue("a single notification has no +N more", rule.onAllNodesWithText("+0 more").fetchSemanticsNodes().isEmpty())
     }
 
-    @Test fun STR_02_strip_tapScrollsToTheSection() {
+    // Wave 27: the strip of sender names under the title is gone (the owner's Comms mock-up has none); the list still holds every section.
+    @Test fun STR_02_w27_thereIsNoJumpStrip() {
         render("strip", dark = false)
-        rule.onNodeWithTag("lp.strip").assertIsDisplayed()
-        // The strip itself scrolls sideways; bring the last title into view.
-        rule.onNodeWithTag("lp.strip").performScrollToNode(hasTestTag("lp.strip.appconv:demo.ai:claude responded"))
-        rule.onNodeWithTag("lp.strip.appconv:demo.ai:claude responded").performClick(); rule.waitForIdle(); rule.mainClock.advanceTimeBy(1000)
+        assertTrue(rule.onAllNodesWithTag("lp.strip").fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithTag("lp.list").performScrollToNode(hasTestTag("lp.group.appconv:demo.ai:claude responded"))
         rule.onNodeWithTag("lp.group.appconv:demo.ai:claude responded").assertIsDisplayed()
     }
 

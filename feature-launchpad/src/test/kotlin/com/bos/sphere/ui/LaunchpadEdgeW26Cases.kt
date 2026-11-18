@@ -40,7 +40,7 @@ abstract class LaunchpadEdgeW26Cases(private val orientation: String) : Launchpa
                     LaunchpadContent(
                         items = items, rules = emptyList(), prefs = LaunchpadPrefs(mode), readKeys = setOf("c1"), hasAccess = true, now = now,
                         onClose = {}, onOpenItem = {}, onOpenApp = {}, onDismissItem = {}, onClearAll = {}, onAddRule = {},
-                        onSetDefaultMode = {}, onRequestAccess = {}, systemState = system, zone = zone, onCompose = {},
+                        onSetDefaultMode = {}, onRequestAccess = {}, systemState = system, zone = zone,
                         endInset = (geo.sliverPx / density).dp,
                     )
                 }
@@ -66,16 +66,16 @@ abstract class LaunchpadEdgeW26Cases(private val orientation: String) : Launchpa
         val row = rule.onNodeWithTag("lp.row.m2").getUnclippedBoundsInRoot()
         val head = rule.onNodeWithTag("lp.group.${tags("lp.group.").first().removePrefix("lp.group.")}").getUnclippedBoundsInRoot()
         val time = rule.onNodeWithTag("lp.time.m2", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val sys = rule.onNodeWithTag("lp.sys.sound").getUnclippedBoundsInRoot()
+        val sys = rule.onNodeWithTag("lp.sys.wifi").getUnclippedBoundsInRoot()
         if (!rtl) {
             assertEquals("row right edge is the card's left edge", cardEdge, row.right.value, 1f)
             assertEquals("section band right edge", cardEdge, head.right.value, 1f)
-            assertEquals("time is 16 dp inside the row", row.right.value - 16f, time.right.value, 1.5f)
+            assertEquals("time is 20 dp inside the row", row.right.value - 20f, time.right.value, 1.5f)
             assertTrue("switcher row stays inside the content", sys.right.value <= cardEdge + 0.5f)
         } else {
             assertEquals("row left edge is the card's right edge", cardEdge, row.left.value, 1f)
             assertEquals("section band left edge", cardEdge, head.left.value, 1f)
-            assertTrue("time inside the row (${time.left.value} .. ${time.right.value}, row ${row.left.value}..${row.right.value})", time.right.value <= row.right.value - 15.5f && time.left.value >= row.left.value + 16f)
+            assertTrue("time inside the row (${time.left.value} .. ${time.right.value}, row ${row.left.value}..${row.right.value})", time.right.value <= row.right.value - 19.5f && time.left.value >= row.left.value + 20f)
             assertTrue("switcher row stays inside the content", sys.left.value >= cardEdge - 0.5f)
         }
     }
@@ -86,13 +86,6 @@ abstract class LaunchpadEdgeW26Cases(private val orientation: String) : Launchpa
 
     @Test fun STR_01_w26_rtlMirrorsTheEdgeToEdgeList() {
         render(GroupMode.Sender, rtl = true, shot = "edge-rtl"); assertEdgeToEdge(rtl = true)
-    }
-
-    @Test fun STR_01_w26_composeButtonSitsAtTheCardEdge() {
-        render(GroupMode.Sender)
-        val fab = rule.onNodeWithTag("lp.compose").getUnclippedBoundsInRoot()
-        val cardEdge = winW() - LaunchpadCardGeometry(winW(), 800f, CardEdge.Right, 1f).sliverPx
-        assertEquals("16 dp margin from the card's edge", cardEdge - 16f, fab.right.value, 1.5f)
     }
 
     @Test fun STR_02_w26_aSingleItemGroupHasNoHeaderAndAGroupOfTwoHasOneWithTheCount() {

@@ -54,9 +54,8 @@ class TourBusySmokeTest : TourBase() {
         startBusy()
         swipeFromLeft(); check("launchpad", Surface.Launchpad); rotateAndCheck("busy launchpad")
         assertTrue("the group section is listed", rowTagged("lp.group.").fetchSemanticsNodes().isNotEmpty())
-        val strips = rowTagged("lp.strip.").fetchSemanticsNodes()
-        assertTrue("the group strip is present", strips.isNotEmpty())
-        run { rowTagged("lp.strip.").onFirst().performClick(); settle(); check("group selected", Surface.Launchpad) }
+        // Wave 27: the jump strip of names is gone (the owner's Comms mock-up has none).
+        assertTrue("no group strip", rowTagged("lp.strip.").fetchSemanticsNodes().isEmpty())
         val focusRows = rowTagged("lp.focus.").fetchSemanticsNodes()
         assertTrue("notification rows exist", focusRows.isNotEmpty())
         rowTagged("lp.focus.").onFirst().performClick(); settle(); check("notification tapped")

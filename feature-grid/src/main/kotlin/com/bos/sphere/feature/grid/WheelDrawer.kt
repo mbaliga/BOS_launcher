@@ -156,6 +156,22 @@ internal object WheelGeometry {
     fun cornerY(anchor: Corner, height: Float): Float =
         if (anchor == Corner.BottomRight || anchor == Corner.BottomLeft) height - insetPx else insetPx
 
+    /**
+     * Wave 29 review: the touch box (width, height) of each grouping chip, never overlapping a neighbour. On a small window the chips sit
+     * closer together than the nominal box, so each box is cut to the gap to its neighbour (the wider cut that keeps the larger area wins).
+     */
+    fun chipTouchBoxes(centers: List<WheelPoint>, maxW: Float, maxH: Float): List<Pair<Float, Float>> = centers.mapIndexed { i, c ->
+        var w = maxW; var h = maxH
+        var wByCut = maxW; var hByCut = maxH
+        for ((j, o) in centers.withIndex()) {
+            if (j == i) continue
+            val dx = kotlin.math.abs(o.x - c.x); val dy = kotlin.math.abs(o.y - c.y)
+            if (dx < maxW && dy < maxH) { wByCut = minOf(wByCut, dx); hByCut = minOf(hByCut, dy) }
+        }
+        if (wByCut * maxH >= maxW * hByCut) w = wByCut else h = hByCut
+        w to h
+    }
+
     fun polarToScreen(anchor: Corner, width: Float, height: Float, radius: Float, angleDeg: Float): WheelPoint {
         val rad = Math.toRadians(angleDeg.toDouble())
         return WheelPoint(
@@ -898,13 +914,16 @@ private fun WheelContent(
                     }
                 }
                 // Invisible touch targets over each label.
+                val chipCentres = WheelGrouping.entries.indices.map { i ->
+                    WheelGeometry.polarToScreen(anchor, w, h, with(density) { puck.chipRadiusDp.dp.toPx() }, qs + ChipAngles[i.coerceAtMost(ChipAngles.lastIndex)])
+                }
+                val chipBoxes = WheelGeometry.chipTouchBoxes(chipCentres, with(density) { 72.dp.toPx() }, with(density) { 40.dp.toPx() })
                 WheelGrouping.entries.forEachIndexed { i, g ->
-                    val angle = qs + ChipAngles[i.coerceAtMost(ChipAngles.lastIndex)]
-                    val pt = WheelGeometry.polarToScreen(anchor, w, h, with(density) { puck.chipRadiusDp.dp.toPx() }, angle)
+                    val pt = chipCentres[i]
                     Box(
                         Modifier
                             .centeredAt { Offset(pt.x, pt.y) }
-                            .size(width = 72.dp, height = 40.dp)
+                            .size(width = with(density) { chipBoxes[i].first.toDp() }, height = with(density) { chipBoxes[i].second.toDp() })
                             .semantics { contentDescription = g.label }
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },

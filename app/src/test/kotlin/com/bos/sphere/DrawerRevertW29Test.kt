@@ -4,6 +4,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.HomeLayout
 import com.bos.sphere.core.data.HomeOrder
@@ -29,13 +30,13 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
 class DrawerRevertW29Test : TourBase() {
     private val stores get() = LauncherStores.get(AppSmokeHarness.app)
-    private fun key(i: Int) = AppSmokeHarness.appKey("App %02d".format(i))
+    private fun appKeyOf(i: Int) = AppSmokeHarness.appKey("App %02d".format(i))
     private fun wheelShown() = descShown("Search apps")
 
     private fun start(order: HomeOrder = HomeOrder.LeftToRight, pages: HomePages = HomePages.Paginated, glance: Boolean = true) {
         AppSmokeHarness.seedApps(*Array(12) { "App %02d".format(it) })
         AppSmokeHarness.configureFresh { it.copy(glanceEnabled = glance, homeOrder = order, homePages = pages) }
-        stores.layout.replace(HomeLayout(pages = List(2) { HomePage(keys = listOf(key(it)), id = it + 1L) }, seeded = true))
+        stores.layout.replace(HomeLayout(pages = List(2) { HomePage(keys = listOf(appKeyOf(it)), id = it + 1L) }, seeded = true))
         launch()
     }
 
@@ -63,6 +64,55 @@ class DrawerRevertW29Test : TourBase() {
         var opened = false
         for (d in roles) { rule.onNodeWithContentDescription(d, substring = true).performClick(); settle(); if (wheelShown()) { opened = true; back(); break }; if (radarShown()) back() }
         assertTrue("one of the bottom hotspots opens the wheel disc in right to left order", opened)
+    }
+
+    /** The disc fans out of the corner whose hotspot was tapped (the search button, the hub's centre, sits on that side), in both orders. */
+    private fun openedFromTheTappedSide(order: HomeOrder) {
+        start(order = order); assertTrue(glanceShown())
+        val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
+        for (d in listOf("Bottom left hotspot", "Bottom right hotspot")) {
+            val spot = rule.onNodeWithContentDescription(d, substring = true)
+            val spotX = spot.fetchSemanticsNode().boundsInRoot.center.x
+            spot.performClick(); settle()
+            if (!wheelShown()) { if (radarShown()) back(); continue } // the other bottom hotspot holds a different role
+            val hubX = rule.onNodeWithContentDescription("Search apps").fetchSemanticsNode().boundsInRoot.center.x
+            assertEquals("$d ($order): the hub sits on the tapped side", spotX < width / 2, hubX < width / 2)
+            back(); return
+        }
+        throw AssertionError("no bottom hotspot opened the wheel disc in $order")
+    }
+
+    @Test fun HOM_23_w29_theDiscFansOutOfTheTappedCornerLeftToRight() = openedFromTheTappedSide(HomeOrder.LeftToRight)
+    @Test fun HOM_23_w29_theDiscFansOutOfTheTappedCornerRightToLeft() = openedFromTheTappedSide(HomeOrder.RightToLeft)
+
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
+    fun HOM_01_w29_theAppsHotspotOpensTheWheelDiscInLandscapeAndBackClosesIt() {
+        start(); assertTrue(glanceShown())
+        var opened = false
+        for (d in listOf("Bottom left hotspot", "Bottom right hotspot", "Top left hotspot", "Top right hotspot")) {
+            if (rule.onAllNodesWithContentDescription(d, substring = true).fetchSemanticsNodes().isEmpty()) continue
+            rule.onNodeWithContentDescription(d, substring = true).performClick(); settle()
+            if (wheelShown()) { opened = true; break }
+            back()
+        }
+        assertTrue("one hotspot opens the disc in landscape", opened); assertFalse(drawerShown())
+        val hub = rule.onNodeWithContentDescription("Search apps").fetchSemanticsNode().boundsInRoot
+        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue("the hub's search button is fully on screen: $hub in $root", hub.left >= root.left && hub.top >= root.top && hub.right <= root.right && hub.bottom <= root.bottom)
+        back(); assertFalse(wheelShown())
+    }
+
+    @Test fun INP_18_w29_theOpenPuckChordOpensTheWheelDiscAndEscapeClosesIt() {
+        start(); assertTrue(glanceShown())
+        key(android.view.KeyEvent.KEYCODE_P, ctrl = true)
+        assertTrue("Ctrl+P opens the restored disc", wheelShown())
+        key(ESC); settle(); assertFalse("Esc closes it", wheelShown())
+    }
+
+    @Test fun INP_18_w29_theOpenDrawerChordStillOpensTheListNotTheDisc() {
+        start(); assertTrue(glanceShown())
+        key(android.view.KeyEvent.KEYCODE_D, ctrl = true)
+        assertTrue("Ctrl+D opens the list drawer", drawerShown()); assertFalse(wheelShown())
     }
 
     @Test fun CFG_15_w29_aPuckRingActionOnTheRestoredDiscStillRuns() {

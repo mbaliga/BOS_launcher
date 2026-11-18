@@ -10,8 +10,6 @@ enum class ChromeElement {
     Rail,
     /** The slim edge handle of the Recents panel on the other edge (STR-14). */
     RightHandle,
-    /** The media strip (STR-06). Glance has its own music line, so it draws no strip. */
-    MediaStrip,
     /** The dock (HOM-12). Glance draws it only when the right side is the dock rail. */
     Dock,
     /** The "work profile is paused" banner. */
@@ -23,9 +21,8 @@ data class ChromeSettings(
     val leftPage: LeftPage = LeftPage.Launchpad,
     val launchpadRail: Boolean = false,
     val rightSide: RightSide = RightSide.RecentsPanel,
-    val mediaControls: Boolean = false,
 ) {
-    companion object { fun of(p: LauncherPrefs) = ChromeSettings(p.leftPage, p.launchpadRail, p.rightSide, p.mediaControls) }
+    companion object { fun of(p: LauncherPrefs) = ChromeSettings(p.leftPage, p.launchpadRail, p.rightSide) }
 }
 
 /**
@@ -43,7 +40,6 @@ object HomeChromeRules {
             ChromeElement.WaitingIndicator -> launchpad && !s.launchpadRail
             ChromeElement.Rail -> launchpad && s.launchpadRail
             ChromeElement.RightHandle -> s.rightSide == RightSide.RecentsPanel
-            ChromeElement.MediaStrip -> s.mediaControls && !glance
             ChromeElement.Dock -> !glance || s.rightSide == RightSide.DockRail
             ChromeElement.WorkPausedBanner -> !glance
         }

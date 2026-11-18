@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.dp
-import com.bos.sphere.core.data.MediaInfo
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -56,7 +55,7 @@ class DockScreenshotTest {
         pinned = listOf(item("a", "Mail", true), item("b", "Maps"), item("c", "Notes", true), item("d", "Camera")),
         recent = listOf(item("e", "Music"), item("f", "Files")),
         showEnableRow = false, showRecentSection = true,
-        media = MediaInfo("Midnight City", "M83", "p", playing = true, canPrev = true, canNext = true), collapsed = false,
+        collapsed = false,
     )
 
     @androidx.compose.runtime.Composable
@@ -76,6 +75,22 @@ class DockScreenshotTest {
         shoot("40-dock-portrait")
     }
 
+    /** W25 (owner item 3): no media control and no media title anywhere in the dock; they live only in the Glance notch. */
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h800dp-port-xhdpi")
+    fun DCK_08_theBottomDockHasNoMediaControlOrTitle() = noMedia(DockEdge.Bottom)
+
+    @Test @Config(sdk = [35], qualifiers = "w800dp-h411dp-land-xhdpi")
+    fun DCK_08_theSideDockHasNoMediaControlOrTitle() = noMedia(DockEdge.Left)
+
+    private fun noMedia(edge: DockEdge) {
+        rule.setContent { Rail(full, edge, Alignment.CenterStart) }
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription("Mail, used this session").assertExists()
+        for (d in listOf("Previous track", "Next track", "Pause", "Play", "Previous", "Next", "Now playing")) {
+            assertTrue("$edge has no '$d'", rule.onAllNodes(androidx.compose.ui.test.hasContentDescription(d, substring = true)).fetchSemanticsNodes().isEmpty())
+        }
+    }
+
     @Test @Config(sdk = [35], qualifiers = "w800dp-h411dp-land-xhdpi")
     fun DCK_landscapeSideRail() {
         rule.mainClock.autoAdvance = false
@@ -88,7 +103,7 @@ class DockScreenshotTest {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             Box(Modifier.fillMaxSize().padding(16.dp)) {
-                DockRail(full.copy(recent = emptyList(), showRecentSection = false, showEnableRow = true, media = null), DockEdge.Bottom, "Home", true, 0, false, DockActions(), Modifier.align(Alignment.TopCenter)) { _, size -> Box(Modifier.size(size).background(Color.Gray)) }
+                DockRail(full.copy(recent = emptyList(), showRecentSection = false, showEnableRow = true), DockEdge.Bottom, "Home", true, 0, false, DockActions(), Modifier.align(Alignment.TopCenter)) { _, size -> Box(Modifier.size(size).background(Color.Gray)) }
                 DockRail(full.copy(collapsed = true), DockEdge.Bottom, "Home", false, 0, false, DockActions(), Modifier.align(Alignment.BottomCenter)) { _, size -> Box(Modifier.size(size)) }
             }
         }

@@ -1,7 +1,6 @@
 package com.bos.sphere.feature.dock
 
 import com.bos.sphere.core.capabilities.Tier
-import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.input.LauncherCommand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,8 +13,8 @@ class DockLogicTest {
     private val labels = mapOf("a" to "Alpha", "b" to "Beta", "c" to "Gamma", "d" to "Delta")
     private fun build(
         pins: List<DockItemRef> = listOf(app("a"), app("b")), recent: List<String> = listOf("c", "a", "d"),
-        granted: Boolean = true, mode: DockMode = DockMode.PinnedPlusRecent, used: Set<String> = emptySet(), media: MediaInfo? = null,
-    ) = DockContentBuilder.build(pins, { labels[it.id] }, recent, { labels[it] }, granted, mode, used, media)
+        granted: Boolean = true, mode: DockMode = DockMode.PinnedPlusRecent, used: Set<String> = emptySet(),
+    ) = DockContentBuilder.build(pins, { labels[it.id] }, recent, { labels[it] }, granted, mode, used)
 
     @Test fun DCK_01_pinsReorderByDragAndKeyboard() {
         val pins = listOf(app("a"), app("b"), app("c"))
@@ -87,7 +86,7 @@ class DockLogicTest {
 
     @Test fun DCK_05_numberedItemsAreFirstNineInRailOrder() {
         val many = (1..12).map { app("p$it") }
-        val c = DockContentBuilder.build(many, { it.id }, emptyList(), { null }, true, DockMode.PinnedPlusRecent, emptySet(), null)
+        val c = DockContentBuilder.build(many, { it.id }, emptyList(), { null }, true, DockMode.PinnedPlusRecent, emptySet())
         assertEquals(9, c.numbered.size); assertEquals("p9", c.numbered.last().label)
     }
 
@@ -107,12 +106,6 @@ class DockLogicTest {
         main.reorder(0, 1)
         assertEquals(ext.sharedPins, main.sharedPins)
         hub.release(5); assertEquals(setOf(0), hub.displays()); assertEquals(2, pins.size)
-    }
-
-    @Test fun DCK_08_mediaItemOnlyWhenASessionIsActive() {
-        assertEquals(null, build().media)
-        val m = MediaInfo("t", "a", "p", playing = true, canPrev = true, canNext = false)
-        assertEquals(m, build(media = m).media)
     }
 
     @Test fun DCK_01_uninstalledPinsAreSkippedButKept() {

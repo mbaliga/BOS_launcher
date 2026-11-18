@@ -17,14 +17,14 @@ class HomeSheetMenuTest {
     }
 
     @Test
-    fun HOM_21_theFourSwitchesComeFirstAndCarryTheirState() {
-        val rows = ContextMenus.forHomeSheet(HomeSheetContext(timeOn = true, weatherOn = false, batteryOn = true, mediaOn = false))
+    fun HOM_21_theThreeSwitchesComeFirstAndCarryTheirState() {
+        val rows = ContextMenus.forHomeSheet(HomeSheetContext(timeOn = true, weatherOn = false, batteryOn = true))
         assertEquals(
             listOf(
                 AppMenuEntry.Toggle(SheetToggle.Time, true), AppMenuEntry.Toggle(SheetToggle.Weather, false),
-                AppMenuEntry.Toggle(SheetToggle.Battery, true), AppMenuEntry.Toggle(SheetToggle.Media, false),
+                AppMenuEntry.Toggle(SheetToggle.Battery, true),
             ),
-            rows.take(4),
+            rows.take(3),
         )
         assertEquals("Battery %", rows[2].label)
     }

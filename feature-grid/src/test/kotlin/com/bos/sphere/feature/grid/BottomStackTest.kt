@@ -81,7 +81,7 @@ class BottomStackTest {
     }
 
     @Test
-    fun HOM_19_withNoRailNothingIsReservedAndTheMediaStripKeepsItsPlace() {
+    fun HOM_19_withNoRailNothingIsReservedAndTheGrantChipKeepsItsPlace() {
         val off = HomeBottomStack.plan(false, DockEdge.Bottom, false, 53f, 50f)
         assertFalse(off.reserve.any)
         assertEquals(HomeBottomStack.MEDIA_DEFAULT_DP, off.mediaBottomDp, 0f)

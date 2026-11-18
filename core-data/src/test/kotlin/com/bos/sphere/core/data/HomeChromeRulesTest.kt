@@ -47,11 +47,8 @@ class HomeChromeRulesTest {
             assertEquals("$l $side", side == RightSide.RecentsPanel, HomeChromeRules.shows(l, ChromeElement.RightHandle, defaults.copy(rightSide = side)))
     }
 
-    @Test fun STR_06_theMediaStripNeedsItsSettingAndIsNeverDrawnOnGlance() {
-        for (l in HomeLanding.entries) {
-            assertFalse("$l strip off by default", HomeChromeRules.shows(l, ChromeElement.MediaStrip, defaults))
-            assertEquals("$l strip on", l != HomeLanding.Glance, HomeChromeRules.shows(l, ChromeElement.MediaStrip, defaults.copy(mediaControls = true)))
-        }
+    @Test fun STR_06_noChromeElementIsAMediaStripTheControlsLiveOnlyInTheGlanceNotch() {
+        assertTrue("no media chrome element left", ChromeElement.entries.none { it.name.contains("Media", ignoreCase = true) })
     }
 
     @Test fun HOM_23_theDockIsHiddenOnGlanceUnlessTheRightSideIsTheDockRail() {
@@ -65,10 +62,10 @@ class HomeChromeRulesTest {
 
     @Test fun HOM_23_everyLandingTimesEveryElementIsDecided() {
         var n = 0
-        for (l in HomeLanding.entries) for (e in ChromeElement.entries) for (page in LeftPage.entries) for (side in RightSide.entries) for (rail in listOf(false, true)) for (media in listOf(false, true)) {
-            HomeChromeRules.shows(l, e, ChromeSettings(page, rail, side, media)); n++
+        for (l in HomeLanding.entries) for (e in ChromeElement.entries) for (page in LeftPage.entries) for (side in RightSide.entries) for (rail in listOf(false, true)) {
+            HomeChromeRules.shows(l, e, ChromeSettings(page, rail, side)); n++
         }
-        assertEquals(HomeLanding.entries.size * ChromeElement.entries.size * LeftPage.entries.size * RightSide.entries.size * 4, n)
+        assertEquals(HomeLanding.entries.size * ChromeElement.entries.size * LeftPage.entries.size * RightSide.entries.size * 2, n)
     }
 
     @Test fun HOM_23_onlyTheGlanceHandlesAndWaitingIndicatorAreQuiet() {

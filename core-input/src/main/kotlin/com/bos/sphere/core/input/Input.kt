@@ -167,7 +167,7 @@ enum class HomeMenuAction(val label: String) {
  * [AppMenuEntry.Toggle]; the page rows (align, make home) are states of the page and use the same kind.
  */
 enum class SheetToggle(val label: String) {
-    Time("Time"), Weather("Weather"), Battery("Battery %"), Media("Media"),
+    Time("Time"), Weather("Weather"), Battery("Battery %"),
     AlignTop("Align with top"), AlignBottom("Align with bottom"), MakeHome("Make this home"),
 }
 
@@ -195,7 +195,6 @@ data class HomeSheetContext(
     val timeOn: Boolean = true,
     val weatherOn: Boolean = false,
     val batteryOn: Boolean = false,
-    val mediaOn: Boolean = false,
     /** null on homes without pages: the page rows are not offered. */
     val page: Int? = null,
     val pageCount: Int = 1,
@@ -272,7 +271,7 @@ object ContextMenus {
     const val TRANSITION_GROUP = "Transition"
 
     /**
-     * HOM-21: the rows of the home's long-press sheet: the four switches people use most, this page's rows (align, make
+     * HOM-21: the rows of the home's long-press sheet: the three switches people use most, this page's rows (align, make
      * home, transition, add and delete page) when the home has pages, then the actions. The sheet draws exactly this list,
      * and a touch long-press, a secondary click and the Menu key on empty home space all ask for it.
      */
@@ -280,7 +279,6 @@ object ContextMenus {
         add(AppMenuEntry.Toggle(SheetToggle.Time, c.timeOn))
         add(AppMenuEntry.Toggle(SheetToggle.Weather, c.weatherOn))
         add(AppMenuEntry.Toggle(SheetToggle.Battery, c.batteryOn))
-        add(AppMenuEntry.Toggle(SheetToggle.Media, c.mediaOn))
         if (c.page != null) {
             add(AppMenuEntry.Toggle(SheetToggle.AlignTop, c.alignTop))
             add(AppMenuEntry.Toggle(SheetToggle.AlignBottom, c.alignBottom))

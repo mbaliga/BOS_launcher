@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.DrawerSort
+import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.RailSide
 import com.bos.sphere.core.data.UsageStats
@@ -107,17 +108,21 @@ internal object DrawerOrdering {
     }
 
     fun relativeTime(now: Long, last: Long): String {
-        if (last <= 0L) return "Never"
+        if (last <= 0L) return L10n.tr("Never")
         val d = (now - last).coerceAtLeast(0L)
         val min = d / 60_000
         return when {
-            min < 1 -> "Just now"
-            min < 60 -> "$min min ago"
-            min < 60 * 24 -> "${min / 60} h ago"
-            min < 60 * 24 * 30 -> "${min / (60 * 24)} d ago"
-            else -> "${min / (60 * 24 * 30)} mo ago"
+            min < 1 -> L10n.tr("Just now")
+            min < 60 -> L10n.tr("%d min ago", min)
+            min < 60 * 24 -> L10n.tr("%d h ago", min / 60)
+            min < 60 * 24 * 30 -> L10n.tr("%d d ago", min / (60 * 24))
+            else -> L10n.tr("%d mo ago", min / (60 * 24 * 30))
         }
     }
+
+    /** The second detail line of a drawer row in details view: category, launch count, last used (all translated). */
+    fun detailsLine(category: String, count: Int, now: Long, last: Long): String =
+        "${L10n.tr(category)}  ·  ${if (count == 1) L10n.tr("1 launch") else L10n.tr("%d launches", count)}  ·  ${relativeTime(now, last)}"
 
     /** Sections for [sort]. [categoryOf] may return null for "unknown" (grouped under "Other"). */
     fun <T> sections(
@@ -508,7 +513,7 @@ private fun DrawerHeader(
 @Composable
 private fun SectionTitle(title: String) {
     Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title.uppercase(), color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Medium)
+        Text(L10n.tr(title).uppercase(), color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Medium)
         Box(Modifier.padding(start = 12.dp).weight(1f).height(1.dp).background(Color(0x14FFFFFF)))
     }
 }
@@ -598,7 +603,7 @@ private fun DrawerList(
                             val cat = categories?.get(r.app.packageName)?.let { wheelCategoryName(it) } ?: "…"
                             Text(r.app.packageName, color = HyleColors.InkDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
-                                "$cat  ·  ${u?.count ?: 0} launches  ·  ${DrawerOrdering.relativeTime(now, u?.lastMillis ?: 0L)}",
+                                DrawerOrdering.detailsLine(cat, u?.count ?: 0, now, u?.lastMillis ?: 0L),
                                 color = HyleColors.InkDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }

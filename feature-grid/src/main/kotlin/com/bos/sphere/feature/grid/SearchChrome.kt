@@ -199,9 +199,13 @@ internal fun CategoryWheel(
                         onTouchNow(); if (cat != selected) { onTickNow(); onSelectNow(cat) }
                     },
             ) {
+                // Wave 26 (audit): a big font scale made the longest label wider than its half of the screen and cut it (EVERYTHIN); the label shrinks in steps until it fits.
+                var shrink by remember(cat) { mutableStateOf(1f) }
                 Text(
-                    (cat?.label ?: L10n.tr("Everything")).uppercase(), color = Color.White, fontSize = 16.sp, letterSpacing = 0.8.sp,
-                    fontWeight = if (cat == selected) FontWeight.Medium else FontWeight.Normal, maxLines = 1,
+                    (cat?.label ?: L10n.tr("Everything")).uppercase(), color = Color.White, fontSize = (16f * shrink).sp, letterSpacing = 0.8.sp,
+                    fontWeight = if (cat == selected) FontWeight.Medium else FontWeight.Normal, maxLines = 1, softWrap = false,
+                    onTextLayout = { if (it.didOverflowWidth && shrink > 0.45f) shrink *= 0.92f },
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (n > 0 && cat != selected) {
                     Text(

@@ -24,6 +24,7 @@ import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -162,6 +163,53 @@ abstract class UsageLegendW29Cases(private val orientation: String) : LaunchpadS
         val rowW = rule.onNodeWithTag("timeline.filter").getUnclippedBoundsInRoot().let { it.right.value - it.left.value }
         assertEquals(280f, rowW, 1f)
         assertTrue("the options are wider than the row (${b.last().right}), so it scrolls ($rowW)", b.last().right.value > rowW)
+    }
+
+    private fun columnsInside(fs: Float, pct: Int) {
+        host(fontScale = fs, percent = pct)
+        val root = rule.onNodeWithTag("usage.block").getUnclippedBoundsInRoot(); val last = rule.onNodeWithTag("usage.steps.col.6").getUnclippedBoundsInRoot()
+        assertTrue("$orientation font $fs comms $pct: the last day column ends at ${last.right} but the screen at ${root.right} (cropped chart)", last.right.value <= root.right.value + 0.5f)
+    }
+    @Test fun USG_35_theWeekColumnsStayInsideTheScreenAtComms125() = columnsInside(1f, 125)
+    @Test fun USG_35_theWeekColumnsStayInsideTheScreenAtComms125Font2() = columnsInside(2f, 125)
+    @Test fun USG_35_theWeekColumnsStayInsideTheScreenAtComms100() = columnsInside(1f, 100)
+
+    @Test fun USG_36_theAppNameKeepsRoomAtLargeTextAndNarrowWidthNotZeroWidth() {
+        host(fontScale = 2f, percent = 125, blockWidth = 300)
+        (0..4).forEach { i ->
+            val b = rule.onNodeWithTag("usage.legend.name.$i", useUnmergedTree = true).getUnclippedBoundsInRoot()
+            assertTrue("name $i is only ${b.right.value - b.left.value} dp wide", b.right.value - b.left.value >= 40f)
+        }
+    }
+
+    @Test fun USG_37_theLabelFitListHasOneEntryPerPartEvenWhenAPartIsEmpty() {
+        var fits: List<Boolean> = emptyList()
+        rule.setContent {
+            CommsScaleHost(100) { Themed(true) {
+                fits = com.bos.sphere.ui.viz.rememberStackLabelFits(listOf(
+                    com.bos.sphere.ui.viz.VizPart(50.0, com.bos.sphere.ui.viz.VizTexture.Solid, "50%", "a", "a"),
+                    com.bos.sphere.ui.viz.VizPart(0.0, com.bos.sphere.ui.viz.VizTexture.Solid, "0%", "b", "b"),
+                    com.bos.sphere.ui.viz.VizPart(50.0, com.bos.sphere.ui.viz.VizTexture.Solid, "50%", "c", "c"),
+                ), 300.dp)
+            } }
+        }
+        rule.waitForIdle()
+        assertEquals("index i of the fit list must be part i of the input: $fits", listOf(true, false, true), fits)
+    }
+
+    @Test fun USG_38_aPickedLegendLineThatNoLongerExistsHighlightsNothing() {
+        assertEquals(-1, com.bos.sphere.ui.viz.clampPick(4, 3)); assertEquals(2, com.bos.sphere.ui.viz.clampPick(2, 3)); assertEquals(-1, com.bos.sphere.ui.viz.clampPick(-1, 3))
+    }
+
+    @Test fun TLF_03_eachFilterGroupIsASelectableGroupForScreenReaders() {
+        host(filters = true)
+        val groups = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup)).fetchSemanticsNodes()
+        assertEquals("range and kind are two groups", 2, groups.size)
+    }
+
+    @Test fun TLF_04_arabicAndHindiLabelsAreNotLetterSpacedBecauseSpacingBreaksCursiveScripts() {
+        assertEquals(0f, com.bos.sphere.ui.filterLetterSpacingSp("الكل"), 0f); assertEquals(0f, com.bos.sphere.ui.filterLetterSpacingSp("सभी"), 0f)
+        assertEquals(1f, com.bos.sphere.ui.filterLetterSpacingSp("SCHEDULED"), 0f)
     }
 
     @Test fun USG_34_screenshotDarkWithDataAndFilters() { host(dark = true, filters = true); capture("w29-timeline-top-dark") }

@@ -100,3 +100,6 @@ fun VizLegend(
         }
     }
 }
+
+/** The picked legend line when it still exists among [count] lines, else -1 (data changed under a saved pick: nothing is dimmed). */
+fun clampPick(picked: Int, count: Int): Int = if (picked in 0 until count) picked else -1

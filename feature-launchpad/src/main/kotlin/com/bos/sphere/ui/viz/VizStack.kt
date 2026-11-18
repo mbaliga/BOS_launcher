@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -51,7 +52,8 @@ fun VizStack(
     highlight: Int = -1,
 ) {
     val measurer = rememberTextMeasurer()
-    val shown = parts.filter { VizFormat.safe(it.weight) > 0.0 }
+    val shownIdx = parts.indices.filter { VizFormat.safe(parts[it].weight) > 0.0 }
+    val shown = shownIdx.map { parts[it] }
     val total = shown.sumOf { VizFormat.safe(it.weight) }
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     // Large text: the label row under the pill grows with the font scale (up to 2x).
@@ -67,14 +69,14 @@ fun VizStack(
                 shown.forEachIndexed { i, p ->
                     val w = widths[i] * d
                     val left = if (rtl) size.width - x - w else x
-                    drawRoundRect(VizTextures.brush(p.texture, tone.ink, scale = TEXTURE_SCALE, density = d, fadeTop = 0f, fadeBottom = th), Offset(left, 0f), Size(w, th), CornerRadius(3f * d), alpha = if (highlight < 0 || highlight == i) 1f else 0.4f)
+                    drawRoundRect(VizTextures.brush(p.texture, tone.ink, scale = TEXTURE_SCALE, density = d, fadeTop = 0f, fadeBottom = th), Offset(left, 0f), Size(w, th), CornerRadius(3f * d), alpha = if (highlight < 0 || highlight == shownIdx[i]) 1f else 0.4f)
                     x += w + VizStackGeometry.GAP * d
                 }
             }
             var x = 0f
             shown.forEachIndexed { i, p ->
                 val w = widths[i] * d
-                if (p.label.isNotEmpty() && (labelFits == null || labelFits.getOrNull(i) == true)) {
+                if (p.label.isNotEmpty() && (labelFits == null || labelFits.getOrNull(shownIdx[i]) == true)) {
                     val t = measurer.measure(p.label, TextStyle(fontSize = 11.sp, color = tone.ink.copy(alpha = 0.72f)), maxLines = 1)
                     // `est(label) <= sw - 4`: the label stays only where it fits its part.
                     if (t.size.width <= w - 4f * d) drawText(t, topLeft = Offset(if (rtl) size.width - x - t.size.width - 1f * d else x + 1f * d, th + 3f * d))
@@ -106,10 +108,16 @@ fun VizStack(
 fun rememberStackLabelFits(parts: List<VizPart>, width: Dp): List<Boolean> {
     val measurer = rememberTextMeasurer()
     val d = LocalDensity.current
-    val shown = parts.filter { VizFormat.safe(it.weight) > 0.0 }
-    val widths = VizStackGeometry.widths(shown.map { it.weight }, width.value)
-    return shown.mapIndexed { i, p ->
-        p.label.isNotEmpty() && measurer.measure(p.label, TextStyle(fontSize = 11.sp), maxLines = 1).size.width <= (widths[i] - 4f) * d.density
+    return remember(parts, width, d.density, d.fontScale) {
+        // One entry per INPUT part (false for an empty one), so index i is part i for the caller.
+        val shownIdx = parts.indices.filter { VizFormat.safe(parts[it].weight) > 0.0 }
+        val widths = VizStackGeometry.widths(shownIdx.map { parts[it].weight }, width.value)
+        val fits = BooleanArray(parts.size)
+        shownIdx.forEachIndexed { k, i ->
+            val p = parts[i]
+            fits[i] = p.label.isNotEmpty() && measurer.measure(p.label, TextStyle(fontSize = 11.sp), maxLines = 1).size.width <= (widths[k] - 4f) * d.density
+        }
+        fits.toList()
     }
 }
 

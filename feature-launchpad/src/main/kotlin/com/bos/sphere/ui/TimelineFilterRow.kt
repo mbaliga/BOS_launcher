@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,7 @@ fun CommsFilterRow(groups: List<List<FilterOpt>>, modifier: Modifier = Modifier,
     Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag(tag), verticalAlignment = Alignment.CenterVertically) {
         groups.forEachIndexed { gi, g ->
             if (gi > 0) Box(Modifier.padding(end = 14.dp).width(CommsStyle.HAIR_DP.dp).height(16.dp).background(lp.line))
+            Row(Modifier.selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
             g.forEach { o ->
                 Box(
                     Modifier.heightIn(min = 32.dp)
@@ -52,13 +54,18 @@ fun CommsFilterRow(groups: List<List<FilterOpt>>, modifier: Modifier = Modifier,
                     Alignment.Center,
                 ) {
                     Text(
-                        o.label.uppercase(), color = if (o.selected) lp.ink else lp.tabDim, fontSize = CommsStyle.CHIP_SP.sp, letterSpacing = 1.sp,
+                        o.label.uppercase(), color = if (o.selected) lp.ink else lp.tabDim, fontSize = CommsStyle.CHIP_SP.sp, letterSpacing = filterLetterSpacingSp(o.label).sp,
                         fontWeight = if (o.selected) FontWeight.Medium else FontWeight.Normal, maxLines = 1, softWrap = false,
                         modifier = Modifier.padding(vertical = 6.dp),
                     )
                 }
                 androidx.compose.foundation.layout.Spacer(Modifier.width(14.dp))
             }
+            }
         }
     }
 }
+
+/** Letter spacing of a filter label: 1 sp for Latin capitals, none for cursive or joined scripts (Arabic, Devanagari) where spacing breaks the letters apart. */
+fun filterLetterSpacingSp(label: String): Float =
+    if (label.any { Character.UnicodeScript.of(it.code) in setOf(Character.UnicodeScript.ARABIC, Character.UnicodeScript.DEVANAGARI) }) 0f else 1f

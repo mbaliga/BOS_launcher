@@ -52,6 +52,9 @@ data class HubFilters(val app: String? = null, val sender: String? = null, val r
 enum class HubSwipe { Left, Right, Down }
 
 object HubLogic {
+    /** Wave 26: day bands always show; an app or sender header only when it groups two or more rows (otherwise it repeats the row). */
+    fun showsGroupHeader(g: HubGrouping, count: Int) = g == HubGrouping.Day || count >= 2
+
     /** The history rows of [view], newest first, with its quick filters applied. */
     fun query(entries: List<HistoryEntry>, view: HubView, f: HubFilters, now: Long, zone: ZoneId): List<HistoryEntry> {
         if (!view.history) return emptyList()

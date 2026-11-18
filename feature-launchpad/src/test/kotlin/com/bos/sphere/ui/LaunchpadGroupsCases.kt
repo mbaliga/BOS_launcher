@@ -162,7 +162,8 @@ abstract class LaunchpadGroupsCases(private val orientation: String) : Launchpad
 
     @Test fun STR_13_column_noGroupsLooksLikeBefore() {
         render("none", dark = false, groups = GroupsConfig())
-        shown("Chat", substring = true)
+        // Wave 26: the conversation headers of one-item groups are gone; the rows remain.
+        shown("Deck is ready")
         assertTrue(rule.onAllNodesWithText("Everything else").fetchSemanticsNodes().isEmpty())
     }
 

@@ -215,16 +215,21 @@ fun HubBody(
                 val groups = remember(shown, state.grouping) { shown.groupBy { HubLogic.groupKey(it, state.grouping, now, zone) }.entries.toList() }
                 LazyColumn(Modifier.fillMaxSize().navigationBarsPadding().testTag("hub.list")) {
                     groups.forEach { (key, list) ->
-                        item(key = "h:$key") {
+                        // Wave 26: a day band always shows; an app or sender header only when it holds two or more rows (it carries the count),
+                        // because with one row the header would repeat what the row already says.
+                        if (HubLogic.showsGroupHeader(state.grouping, list.size)) item(key = "h:$key") {
                             val title = when (state.grouping) {
                                 HubGrouping.Day -> dayTitle(Instant.ofEpochMilli(list.first().timeMillis).atZone(zone).toLocalDate(), today)
                                 HubGrouping.App -> list.first().appLabel.ifBlank { list.first().packageName }
                                 HubGrouping.Sender -> list.first().who
                             }
-                            Text(
-                                title, color = lp.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp).testTag("hub.header.$key"),
-                            )
+                            Row(
+                                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp).testTag("hub.header.$key"),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(title, color = lp.dim, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                if (state.grouping != HubGrouping.Day) Text("${list.size}", color = lp.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp).testTag("hub.headerCount.$key"))
+                            }
                         }
                         items(list, key = { it.id }) { e ->
                             HubRow(

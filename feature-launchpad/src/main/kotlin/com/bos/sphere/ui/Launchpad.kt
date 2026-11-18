@@ -290,7 +290,8 @@ fun LaunchpadPanel(
     // The home card leaves only a thin sliver at the far edge (STR-01); the panel is full width and its content is inset from the sliver.
     val geo = LaunchpadCardGeometry(maxWidth.value, maxHeight.value, CardEdge.forLaunchpad(rtl), 1f, motion.reduced)
     // The panel is full width and static; only its content is inset from the sliver side (at least a 48 dp return zone).
-    val cardInset = if (underlay) geo.returnZonePx.dp else 0.dp
+    // Wave 26: the list ends exactly at the card's near edge (the visible sliver), so rows, bands and dividers run edge to edge; text keeps its own padding.
+    val cardInset = if (underlay) geo.sliverPx.dp else 0.dp
     AnimatedVisibility(
         visible = visible,
         modifier = Modifier.fillMaxSize()
@@ -519,13 +520,15 @@ fun LaunchpadContent(
                 if (hidden > 0) add(Entry.More(id, hidden, open))
             }
             sections.forEachIndexed { i, sec ->
-                val isCollapsed = sec.key in collapsed
-                add(Entry.Head(sec, isCollapsed, first = i == 0 && view.held.isEmpty()))
+                // Wave 26: a one-item group has no header (it would repeat the row below); with no header it cannot be collapsed either.
+                val headed = GroupColumn.showsHeader(sec.key, sec.items.size)
+                val isCollapsed = headed && sec.key in collapsed
+                if (headed) add(Entry.Head(sec, isCollapsed, first = i == 0 && view.held.isEmpty()))
                 if (!isCollapsed) {
                     val gs = view.grouped.firstOrNull { it.key == sec.key }
                     if (gs == null) addRows(sec, sec.key, sec.items, sec.pinned)
                     else gs.sections.forEach { inner ->
-                        if (GroupColumn.showSubHeads(gs)) add(Entry.Sub(inner.title, inner.key))
+                        if (GroupColumn.showSubHeads(gs) && GroupColumn.showsHeader(inner.key, inner.items.size)) add(Entry.Sub(inner.title, inner.key))
                         addRows(sec, inner.key, inner.items, inner.pinned)
                     }
                 }
@@ -533,7 +536,14 @@ fun LaunchpadContent(
         }
     }
 
-    val headIndex = remember(entries) { entries.withIndex().filter { it.value is Entry.Head }.associate { (it.value as Entry.Head).sec.key to it.index } }
+    // Where a section starts: its header, or (a one-item group has none) its first row, so the jump strip still lands on it.
+    val headIndex = remember(entries) {
+        buildMap<String, Int> {
+            entries.forEachIndexed { i, e ->
+                when (e) { is Entry.Head -> put(e.sec.key, i); is Entry.Item -> putIfAbsent(e.sec.key, i); else -> Unit }
+            }
+        }
+    }
     // ---- keyboard focus over groups and rows (STR-08) ----
     val order = remember(entries) {
         entries.mapNotNull { e ->
@@ -682,7 +692,7 @@ fun LaunchpadContent(
                     null, sections,
                 )
             }
-            .padding(end = if (endInset > 0.dp) endInset + 8.dp else 0.dp),
+            .padding(end = endInset),
     ) {
         LaunchpadHeader(
             filterLabel = activeFilter?.let { f -> counts.firstOrNull { it.packageName == f }?.appLabel },
@@ -786,7 +796,7 @@ fun LaunchpadContent(
         }
     }
 
-    if (hasAccess) ComposeFab(endPadding = if (endInset > 0.dp) endInset + 8.dp else 0.dp, onClick = onCompose)
+    if (hasAccess) ComposeFab(endPadding = endInset, onClick = onCompose)
     }
     // The menu panel and its scrim sit above the notifications layer, on the left.
     Box(Modifier.fillMaxSize()) { LaunchpadMenuLayer(menu, rtlLayout, menuActions) { menu.open = false; runCatching { rootReq.requestFocus() } } }
@@ -799,7 +809,8 @@ fun LaunchpadContent(
             )
         }
     }
-    LaunchpadGroupsOverlay(groupsOpen, items, endInset = endInset) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
+    // The manager is a screen of buttons, so it stays clear of the card's 48 dp return zone (the list behind runs to the card's edge).
+    LaunchpadGroupsOverlay(groupsOpen, items, endInset = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
     groupFor?.let { n ->
         GroupAssignSheet(
             n, groups, contacts, items,

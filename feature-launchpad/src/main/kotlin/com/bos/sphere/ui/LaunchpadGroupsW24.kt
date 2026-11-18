@@ -108,7 +108,7 @@ internal fun LaunchpadGroupsOverlay(
             .onPreviewKeyEvent { if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) { onClose(); true } else false }
             .focusRequester(req).focusable()
             .statusBarsPadding().navigationBarsPadding()
-            .padding(end = if (endInset > 0.dp) endInset + 8.dp else 0.dp),
+            .padding(end = endInset), // the caller passes the return zone plus a margin
     ) {
         Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(L10n.tr("Groups and rules"), color = c.ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })

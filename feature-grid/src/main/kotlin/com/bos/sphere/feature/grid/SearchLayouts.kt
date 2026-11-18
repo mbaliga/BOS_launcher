@@ -338,16 +338,17 @@ internal fun Orbit(
     androidx.compose.runtime.LaunchedEffect(motion) {
         var last = 0L
         while (true) {
-            androidx.compose.runtime.withFrameNanos { now ->
-                val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.05f)
-                last = now
-                if (!dragging[0]) {
-                    // PAL-23: the feel constants are read live, so the Lab page retunes a running Orbit.
-                    val feel = OrbitFeel.current
-                    val base = if (motion) with(density0) { feel.creepDp.dp.toPx() } else 0f
-                    travel.floatValue += (base + extra[0]) * dt
-                    extra[0] = OrbitMotion.decay(extra[0], dt, feel)
-                }
+            // The rings' creep is an endless animation: it asks the platform's infinite-animation policy for its frames (plain withFrameNanos on a device;
+            // a UI test that auto-advances its clock ends the loop instead of never becoming idle).
+            val now = infiniteFrameNanos()
+            val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.05f)
+            last = now
+            if (!dragging[0]) {
+                // PAL-23: the feel constants are read live, so the Lab page retunes a running Orbit.
+                val feel = OrbitFeel.current
+                val base = if (motion) with(density0) { feel.creepDp.dp.toPx() } else 0f
+                travel.floatValue += (base + extra[0]) * dt
+                extra[0] = OrbitMotion.decay(extra[0], dt, feel)
             }
         }
     }

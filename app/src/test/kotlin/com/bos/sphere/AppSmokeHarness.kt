@@ -60,10 +60,6 @@ internal object AppSmokeHarness {
             LauncherInput.typeHook = null
             LauncherInput.overlayOpen = false
         }
-        runCatching { // wave 26: the dock's 'has something to show' flag is process state a finished activity leaves behind (it is internal to the dock module)
-            val o = Class.forName("com.bos.sphere.feature.dock.DockPresence"); val inst = o.getDeclaredField("INSTANCE").get(null)
-            o.methods.first { it.name.startsWith("setHasItems") }.invoke(inst, false)
-        }
         HomeOpenRequests.folder.value = null
         CrashLoopGuard.exitProbe = { null } // a fresh process: no exit record unless a test says one
         runCatching { // CrashLoopGuard.safeMode is a process value: a new process decides it again in onStart

@@ -3,6 +3,7 @@ package com.bos.sphere
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -181,10 +182,11 @@ class HomeLandingItemsW24Test : TourBase() {
         openQuickSheet()
         rule.onNodeWithText("Files, usage and timeline").performScrollTo().performClick(); settle()
         // Wave 25 (hubData): the panels are views of the Launchpad hub now (no sheet of their own); its switcher scrolls on a narrow screen.
-        assertTrue("the Comms hub has the three panel views", textShown("FILES") && textShown("USAGE") && textShown("TIMELINE"))
+        assertTrue("the Comms hub has the Files and Timeline panel views (wave 28: Usage is part of Timeline)", textShown("FILES") && textShown("TIMELINE") && !textShown("USAGE"))
         rule.onNodeWithText("TIMELINE", useUnmergedTree = true).performScrollTo().performClick(); settle()
         waitFor("the timeline lists the seeded opens") { textShown("Bravo") && textShown("Alpha") }
-        rule.onNodeWithText("USAGE", useUnmergedTree = true).performScrollTo().performClick(); settle() // HOM-17: without usage access it explains how to grant it, and does not crash
+        // HOM-17 (wave 28): the usage block above the timeline offers "Allow usage access" without access (and does not crash).
+        waitFor("the usage block is in the timeline") { textShown("Allow usage access") || rule.onAllNodesWithTag("usage.block").fetchSemanticsNodes().isNotEmpty() }
         check("panels on Glance")
         closeSheet(); assertEquals("the landing is untouched by looking at the panels", HomeShown.Glance, landing())
     }

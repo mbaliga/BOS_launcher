@@ -55,8 +55,12 @@ class HomeInfoW3AuditTest {
     }
 
     @Test fun HOM_17_usageAccessIsAReadOnlySpecialAccessGrantedInSystemSettings() {
-        assertTrue(text(panels).contains("ACTION_USAGE_ACCESS_SETTINGS"))
-        assertFalse("no network call in the panels", text(panels).contains("HttpURLConnection") || text(panels).contains("java.net.URL("))
+        // Wave 28: the Usage panel is the usage block of the Timeline (feature-launchpad); it asks through the shared grant support.
+        assertTrue(text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/GrantSupport.kt").contains("ACTION_USAGE_ACCESS_SETTINGS"))
+        assertTrue(text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/UsageTimelineBlock.kt").contains("GrantKind.UsageAccess"))
+        listOf(panels, "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/UsageTimelineBlock.kt", "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/UsageWeek.kt").forEach {
+            assertFalse("no network call in $it", text(it).contains("HttpURLConnection") || text(it).contains("java.net.URL("))
+        }
     }
 }
 

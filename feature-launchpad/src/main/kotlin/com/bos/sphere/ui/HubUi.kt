@@ -57,7 +57,7 @@ import java.util.Locale
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 /**
- * Wave 27: the tab row of the owner's Comms mock-up: ALL UNREAD FILES USAGE TIMELINE in capitals with letter spacing, the selected one in the full ink
+ * Wave 27: the tab row of the owner's Comms mock-up: ALL UNREAD FILES TIMELINE in capitals with letter spacing, the selected one in the full ink
  * colour and the others grey (no underline, no options button: Options live in the Comms menu). 48 dp high; it scrolls when the labels do not fit.
  */
 @Composable
@@ -121,7 +121,7 @@ fun HubState.markVisibleRead(now: Long, zone: ZoneId) {
 }
 
 /**
- * The hub's body: the history list of a history view with its quick filters, or [panelBody] for Files, Usage and Timeline. Tapping a row
+ * The hub's body: the history list of a history view with its quick filters, or [panelBody] for Files and Timeline. Tapping a row
  * marks it read and expands it; its buttons open it, flip its read mark, or delete it from history.
  */
 @Composable

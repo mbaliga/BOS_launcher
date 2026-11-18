@@ -162,11 +162,12 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
     }
 
     // ---- tabs ----
-    @Test fun STR_02_w27_tabsAreUppercaseAllUnreadFilesUsageTimelineInOneRowAndReadHasNoTab() {
+    @Test fun STR_02_w28_tabsAreUppercaseAllUnreadFilesTimelineInOneRowAndReadAndUsageHaveNoTab() {
         render(feed(4), home = false)
-        listOf("ALL", "UNREAD", "FILES", "USAGE", "TIMELINE").forEach { assertTrue("$it tab", rule.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty()) }
+        listOf("ALL", "UNREAD", "FILES", "TIMELINE").forEach { assertTrue("$it tab", rule.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty()) }
+        assertEquals("no USAGE tab (wave 28)", 0, rule.onAllNodesWithText("USAGE").fetchSemanticsNodes().size + rule.onAllNodesWithTag("hub.view.usage").fetchSemanticsNodes().size)
         assertEquals("no READ tab", 0, rule.onAllNodesWithTag("hub.view.read").fetchSemanticsNodes().size)
-        val tabs = listOf("all", "unread", "files", "usage", "timeline").map { b("hub.view.$it") }
+        val tabs = listOf("all", "unread", "files", "timeline").map { b("hub.view.$it") }
         tabs.forEach { assertEquals("each tab is 48 dp high", 48f, it.bottom.value - it.top.value, 0.5f) }
         assertTrue("one row", tabs.all { it.top.value == tabs[0].top.value })
         assertTrue("left to right in order", tabs.zipWithNext().all { (a, c) -> a.right.value <= c.left.value + 0.5f })

@@ -994,7 +994,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val leftProgress = reveal.progress
         val leftActive = leftOpen || leftProgress > 0.001f
         val hubPanelBody: @Composable (com.bos.sphere.ui.HubView) -> Unit = { v ->
-            HomePanelsBody(com.bos.sphere.core.catalog.PanelTab.entries.firstOrNull { it.uriName == v.id } ?: com.bos.sphere.core.catalog.PanelTab.Files, timelineLog, appsByKey) { a -> leftOpen = false; hubStandalone = false; launch(a) }
+            HomePanelsBody(v, timelineLog, appsByKey) { a -> leftOpen = false; hubStandalone = false; launch(a) }
         }
         if (hubStandalone && prefs.leftPage != com.bos.sphere.core.data.LeftPage.Launchpad) com.bos.sphere.ui.LaunchpadPanel(
             visible = true, onDismiss = { hubStandalone = false },
@@ -1644,7 +1644,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
         if (panelsOpen || homeItems.panelRequest >= 0) {
-            // Wave 25 (hubData): Files, Usage and Timeline are views of the Launchpad hub; the old sheet is gone and every entry point lands there.
+            // Wave 25 (hubData): Files and Timeline are views of the Launchpad hub; the old sheet is gone and every entry point lands there (Usage opens Timeline, wave 28).
             LaunchedEffect(panelsOpen, homeItems.panelRequest) {
                 val tab = com.bos.sphere.core.catalog.PanelTab.entries.getOrNull(homeItems.panelRequest) ?: com.bos.sphere.core.catalog.PanelTab.Files
                 com.bos.sphere.ui.LaunchpadHubNav.request(com.bos.sphere.ui.HubView.forPanel(tab.uriName))

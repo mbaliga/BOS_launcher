@@ -15,15 +15,17 @@ import java.time.ZoneId
 
 /**
  * Wave 25 (hubData, owner item 2): the Launchpad hub. One place with six views: the notification history (All, Unread, Read) and the
- * Files, Usage and Timeline panels that used to open in their own sheet.
+ * Files and Timeline panels (Usage is part of Timeline since wave 28) that used to open in their own sheet.
  */
 enum class HubView(val id: String, val label: String, val history: Boolean) {
     All("all", "All", true), Unread("unread", "Unread", true), Read("read", "Read", true),
-    Files("files", "Files", false), Usage("usage", "Usage", false), Timeline("timeline", "Timeline", false);
+    Files("files", "Files", false), Timeline("timeline", "Timeline", false);
 
     companion object {
-        fun fromId(id: String?): HubView? = entries.firstOrNull { it.id == id }
-        /** A home panel link (`liftoff-panel://files`) lands on the matching hub view. */
+        /** Wave 28: the Usage view was merged into Timeline; a stored or linked "usage" lands on Timeline. */
+        const val LEGACY_USAGE = "usage"
+        fun fromId(id: String?): HubView? = if (id == LEGACY_USAGE) Timeline else entries.firstOrNull { it.id == id }
+        /** A home panel link (`liftoff-panel://files`) lands on the matching hub view; `usage` opens Timeline, scrolled to the top where its usage block is. */
         fun forPanel(uriName: String): HubView = fromId(uriName)?.takeIf { !it.history } ?: Files
     }
 }
@@ -120,7 +122,10 @@ object HubLogic {
 /** The persisted hub settings: the default view, the row density and the grouping. */
 class HubPrefs(private val sp: SharedPreferences?) {
     var defaultView: HubView
-        get() = HubView.fromId(sp?.getString("defaultView", null)) ?: HubView.All
+        get() = (sp?.getString("defaultView", null)).let { raw ->
+            // Wave 28: a stored default of the removed Usage view becomes Timeline, and is rewritten so the migration runs once.
+            HubView.fromId(raw)?.also { if (raw == HubView.LEGACY_USAGE) sp?.edit()?.putString("defaultView", it.id)?.apply() } ?: HubView.All
+        }
         set(v) { sp?.edit()?.putString("defaultView", v.id)?.apply() }
     var density: HubDensity
         get() = HubDensity.entries.firstOrNull { it.name == sp?.getString("density", null) } ?: HubDensity.Comfortable
@@ -145,7 +150,7 @@ class HubUndo(val message: String, val ids: List<String>)
 
 /**
  * The hub's state: the view, the quick filters of each view (kept while the user moves between views), density and grouping
- * (persisted), and the undo of the last mark-read. [panels] says whether Files, Usage and Timeline can be shown (the host supplies them).
+ * (persisted), and the undo of the last mark-read. [panels] says whether Files and Timeline can be shown (the host supplies them).
  * With [liveAll] the All view is the Launchpad's live grouped list (everything in the shade now, with groups, digests and row actions) and
  * Unread and Read are the persistent history; without it All is the history too.
  */
@@ -159,7 +164,7 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
         private set
     var defaultView by mutableStateOf(prefs.defaultView)
         private set
-    /** Wave 27: the tab row has no Read tab (the owner's mock-up shows ALL UNREAD FILES USAGE TIMELINE); Read history is a row of the Comms menu. */
+    /** Wave 27: the tab row has no Read tab (the tabs are ALL UNREAD FILES TIMELINE); Read history is a row of the Comms menu. */
     val tabs: List<HubView> = views.filter { it != HubView.Read }
     /** A half-made "Delete history" confirmation (a row of the Comms menu); the menu drops it when it closes. */
     var confirmDelete by mutableStateOf(false)

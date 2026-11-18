@@ -130,12 +130,11 @@ class HubTest {
         host()
         rule.onNodeWithTag("hub.switcher").assertHeightIsAtLeast(48.dp)
         HubView.entries.filter { it != HubView.Read }.forEach { rule.onNodeWithTag("hub.view.${it.id}").assertExists() }
-        rule.onNodeWithTag("hub.view.read").assertDoesNotExist() // wave 27: the mock-up's tabs are ALL UNREAD FILES USAGE TIMELINE
+        rule.onNodeWithTag("hub.view.read").assertDoesNotExist() // wave 27: Read has no tab
+        rule.onNodeWithTag("hub.view.usage").assertDoesNotExist() // wave 28: Usage is part of Timeline; the tabs are ALL UNREAD FILES TIMELINE
         rule.onNodeWithTag("hub.view.all").assertIsSelected()
         rule.onNodeWithTag("hub.view.files").performClick(); rule.waitForIdle()
         rule.onNodeWithTag("panel.files").assertExists()
-        rule.onNodeWithTag("hub.view.usage").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("panel.usage").assertExists()
         rule.onNodeWithTag("hub.view.timeline").performClick(); rule.waitForIdle()
         rule.onNodeWithTag("panel.timeline").assertExists()
         rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
@@ -150,7 +149,7 @@ class HubTest {
     }
 
     @Test fun HUB_10_aHomePanelLinkLandsOnTheMatchingHubView() {
-        assertEquals(HubView.Usage, HubView.forPanel("usage"))
+        assertEquals(HubView.Timeline, HubView.forPanel("usage")) // wave 28: the removed Usage view opens Timeline
         assertEquals(HubView.Timeline, HubView.forPanel("timeline"))
         assertEquals(HubView.Files, HubView.forPanel("files"))
         assertEquals(HubView.Files, HubView.forPanel("anything-else"))
@@ -435,10 +434,10 @@ class HubTest {
         NotificationHistory.setForTest(store)
         com.bos.sphere.core.data.NotificationProvider.publishForTest(feed)
         try {
-            LaunchpadHubNav.request(HubView.Usage)
+            LaunchpadHubNav.request(HubView.forPanel("usage"))
             rule.setContent { LaunchpadPanel(visible = true, onDismiss = {}, onOpenApp = {}, panelBody = { v -> Text("panel ${v.id}", modifier = Modifier.testTag("panel.${v.id}")) }) }
             rule.waitUntil(10_000) { rule.onAllNodesWithTag("hub.switcher").fetchSemanticsNodes().isNotEmpty() }
-            rule.waitUntil(10_000) { rule.onAllNodesWithTag("panel.usage").fetchSemanticsNodes().isNotEmpty() }   // landed on the requested view
+            rule.waitUntil(10_000) { rule.onAllNodesWithTag("panel.timeline").fetchSemanticsNodes().isNotEmpty() }   // landed on the requested view (an old Usage link opens Timeline)
             rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
             rule.onNodeWithTag("hub.list").assertExists()
         } finally { NotificationHistory.setForTest(null); com.bos.sphere.core.data.NotificationProvider.publishForTest(emptyList()); com.bos.sphere.core.data.LaunchpadSettings.unbindForTest() }

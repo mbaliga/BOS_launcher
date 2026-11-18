@@ -98,7 +98,6 @@ class A11ySweepTourTest : TourBase() {
             back(); settle()
             rule.onNodeWithTag("hub.view.files", useUnmergedTree = true).performClick(); settle()
             sweep("hub files")
-            rule.onNodeWithTag("hub.view.usage", useUnmergedTree = true).performClick(); settle(); sweep("hub usage")
             rule.onNodeWithTag("hub.view.timeline", useUnmergedTree = true).performClick(); settle(); sweep("hub timeline")
             java.io.File(System.getProperty("user.dir"), "build/a11y-small-layouts-w25.txt").apply { parentFile.mkdirs() }.writeText(small.joinToString("\n"))
             assertTrue("hub controls narrower than 48 dp (their hit areas would share space with a neighbour):\n" + small.filter { "tag=hub." in it }.joinToString("\n"), small.none { "tag=hub." in it })

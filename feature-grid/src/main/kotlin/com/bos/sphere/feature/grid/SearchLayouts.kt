@@ -472,13 +472,17 @@ internal fun Orbit(
                     .semantics(mergeDescendants = true) { testTag = RADAR_ORBIT_TILE_TAG; traversalIndex = i.toFloat(); contentDescription = tile.caption(); stateDescription = tierDescription },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                androidx.compose.foundation.layout.Box(
-                    Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape).secondaryClick { actions.onSecondary(tile) }.radarDragOut(tile, pointer = false).orbitClick(tile, actions),
-                ) { TileFace(tile, tileSize) }
-                Text(
-                    tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
-                )
+                // Wave 29 (review): the face and its caption are one touch target (a tap on the name under the icon used to fall through and close Radar).
+                Column(
+                    Modifier.secondaryClick { actions.onSecondary(tile) }.radarDragOut(tile, pointer = false).orbitClick(tile, actions),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    androidx.compose.foundation.layout.Box(Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape)) { TileFace(tile, tileSize) }
+                    Text(
+                        tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
                 if (tile is Tile.App) ShortcutCircleRow(tile, colW, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) }, modifier = Modifier.padding(top = 0.dp))
             }
         }

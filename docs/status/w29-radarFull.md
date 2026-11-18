@@ -35,3 +35,19 @@ Changed or removed (each listed with the reason):
 | RadarGlassW22Test `NFR_13_theQueryLineTheResultsAndTheMicAreSeparateTraversalGroupsReadTopToBottom` | Checks the groups' traversal indices (0, 1, 2) instead of their geometry, which now overlaps. |
 | RadarAuditGlassW22UiTest `NFR_13_theTypedOrbitStripPillsAre48dp...` | "The mic is not inside a results group" is now a tree check (no big traversal-group ancestor) instead of a geometry check. |
 | RadarShortcutFormW25UiTest `PAL_03_flatShortcutRowDoesNotOverlap_*` | A Flat row may pass under the mic (it is an overlay and the visible part stays tappable); the pair row x mic is skipped. |
+
+## Adversarial review (second pass)
+
+Found by reading the diff and the screenshots; each has a test that failed first (`RadarFullReviewW29UiTest`) except where noted.
+
+| # | Finding | Fix |
+| --- | --- | --- |
+| 1 | The category wheel's own box was half the screen wide (`fillMaxWidth` in a weight box) and carries tap and drag handlers, so a tile revolving through the right half of the wheel's box could not be tapped; the first pass's 40-point test counted the whole wheel box as an overlay, so it could not see it. `PAL_20_w29_theWheelTakesTouchesOnlyWhereItsLabelsAre` | The wheel is as wide as its widest label. |
+| 2 | A tile's caption (the name under the icon) was dead: only the face had the click, so a tap on the name fell through and closed Radar when the query was empty. The first pass listed this as "not asserted". `PAL_20_w29_aTilesCaptionTakesTheTapLikeItsFace` | Face and caption are one touch target (tap, long-press, drag-out); the shortcut circles stay separate. |
+| 3 | The Flat list still lived inside the safe-drawing box, so it was cut by a straight line at the status bar / cutout and at the navigation bar (the first pass's test ran without bars and passed trivially). `PAL_18_w29_theFlatListReachesTheTrueScreenEdgesUnderTheStatusBarAndTheNavigationBar` (edge to edge window, bars faked) | The Flat list is a layer of its own (imePadding only); the bars, the field and the mic are content padding. |
+| 4 | `radarGlass.md` and `shortcutForm.md` still stated the clipped-region rules with no pointer to the record that supersedes them (the README row said so, the records did not). No test. | A superseded note at the top of both. |
+| 5 | Unused `clipToBounds` import left in `SearchOverlay.kt`. | Removed. |
+| 6 | The first pass's claim "test (b) never nothing" was weaker than stated: overlays were any node with a click plus the full wheel box, so a dead overlay-sized band passed. | Closed by 1; the wheel box is now narrow, so test (b) skips only real controls. |
+
+Checked and found fine: the rings are not laid out around a wrong centre in the first frames (a frame by frame test passed, so no change was made); RTL (the tile offset mirrors about the layer's centre, which is the wheel's); no new strings (no L10n change); no new persisted state; no main-thread work added.
+Not changed, owner call: a tile passing under the field shows through its dark translucent fill (the "Clau10" in the landscape typed screenshot).

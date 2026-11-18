@@ -31,6 +31,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -85,7 +90,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.SearchCategory
@@ -530,6 +534,25 @@ internal fun SearchScreen(
                 )
             }
         }
+        // Typing, or the Flat layout at rest (what you open most): a plain results list. Wave 29 (review): it is a layer of its own like the Orbit, from the top edge of the screen to the
+        // keyboard (the bottom edge when it is down), so no row is cut by a line at the status bar, the cutout or the navigation bar; the bars, the field and the mic are content padding.
+        if (flatMode) {
+            val bars = WindowInsets.safeDrawing.exclude(WindowInsets.ime).asPaddingValues() // the keyboard itself is the imePadding below
+            val dir = androidx.compose.ui.platform.LocalLayoutDirection.current
+            Box(Modifier.fillMaxSize().imePadding().semantics { isTraversalGroup = true; traversalIndex = 1f }) {
+                FlatResults(
+                    data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
+                    onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
+                    onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
+                    plain = true, onPreview = onPreview,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp + bars.calculateStartPadding(dir), end = 16.dp + bars.calculateEndPadding(dir),
+                        top = bars.calculateTopPadding() + RadarQueryBarHeight + 4.dp, bottom = bars.calculateBottomPadding() + micStripNow + 8.dp,
+                    ),
+                )
+            }
+        }
         // Wave 18 (owner): the query line is always at the top, below the status bar and cutout, in every layout and both
         // orientations. The results fill the space below it and end where the keyboard starts (imePadding), so none hides under it.
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
@@ -541,18 +564,6 @@ internal fun SearchScreen(
             SideEffect { micStripNow = micStrip } // the action list below sits outside this box and needs the same number
             // Wave 22 (audit): the results are one reading group, so TalkBack reads the field, its buttons, the whole results area and the mic last
             // (the Orbit rings are a group inside it); without the groups the ring indices 1, 2 ... sorted after the mic, which has index 0.
-            if (flatMode) Box(Modifier.fillMaxSize().semantics { isTraversalGroup = true; traversalIndex = 1f }) {
-                // Typing, or the Flat layout at rest (what you open most): a plain results list under the query line. Wave 29: it fills the area edge to edge and scrolls under the
-                // field and above the mic (its content padding keeps the first and last row clear at rest), so no row is cut by a line.
-                FlatResults(
-                    data = data, scope = userCat, suggestions = if (showSuggestions) groups else emptyList(),
-                    onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
-                    onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
-                    plain = true, onPreview = onPreview,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = RadarQueryBarHeight + 4.dp, bottom = micStrip + 8.dp),
-                )
-            }
             // Wave 29: no clip here (it was a straight line across the rings at the field's bottom and the mic's top); the Orbit has its own full-screen layer above, and the lists
             // scroll under the field and above the mic with their own content padding.
             Box(Modifier.fillMaxSize().padding(top = RadarQueryBarHeight, bottom = micStrip).onGloballyPositioned { c ->
@@ -589,7 +600,7 @@ internal fun SearchScreen(
                                         selected = selected, counts = counts,
                                         onSelect = { setWheel(it); touched = true },
                                         onTick = { tick() }, onTouch = { touched = true },
-                                        modifier = Modifier.fillMaxWidth().testTag(RADAR_WHEEL_TAG), spec = wheel, onBlankTap = { showKeyboard() },
+                                        modifier = Modifier.testTag(RADAR_WHEEL_TAG), spec = wheel, onBlankTap = { showKeyboard() },
                                     )
                                 }
                             }

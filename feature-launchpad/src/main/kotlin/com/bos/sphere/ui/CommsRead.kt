@@ -38,6 +38,14 @@ object CommsRead {
         else -> null
     }
 
+    /**
+     * The direction of a two-finger move that has changed the spread to [ratio] times its start, with the spread itself having changed by [spreadDelta] px
+     * and the pair's centre having travelled [centerTravel] px. A swipe moves the centre far and lets the spread drift a little; a pinch changes the spread
+     * by at least as much as the centre moves, so the drift of a swipe is not read as a pinch.
+     */
+    fun pinchOf(ratio: Float, spreadDelta: Float, centerTravel: Float): PinchDir? =
+        if (kotlin.math.abs(spreadDelta) < centerTravel) null else direction(ratio)
+
     /** The stop the hub is at: the filter on the All view, Unread on the Unread tab, Read on the Read history; null for Files and Timeline. */
     fun stopOf(view: HubView, filter: ReadFilter): ReadFilter? = when (view) {
         HubView.All -> filter
@@ -85,8 +93,16 @@ object CommsRead {
         val newest = HashMap<String, HistoryEntry>()
         for (e in history) { val c = newest[e.key]; if (c == null || e.timeMillis > c.timeMillis) newest[e.key] = e }
         val only = newest.filterKeys { it !in liveKeys }
+        // A key whose older posts were read but whose newest post is unread was updated after the read (a new message in a chat): the live read mark
+        // belongs to the old post, so the row is unread again.
+        val updatedSinceRead = HashSet<String>()
+        for (e in history) { val c = newest[e.key]; if (c != null && e.read && e.timeMillis < c.timeMillis && !c.read) updatedSinceRead += e.key }
         val read = HashSet<String>()
-        for (n in live) if (n.key in liveRead || newest[n.key]?.let { it.read && it.timeMillis == n.timestamp } == true) read += n.key
+        for (n in live) {
+            val h = newest[n.key]
+            val updated = h != null && !h.read && h.timeMillis == n.timestamp && n.key in updatedSinceRead
+            if ((n.key in liveRead && !updated) || h?.let { it.read && it.timeMillis == n.timestamp } == true) read += n.key
+        }
         for (e in only.values) if (e.read) read += e.key
         val items = (live + only.values.map(::fromEntry)).sortedByDescending { it.timestamp }
         return Merged(items, read, only)

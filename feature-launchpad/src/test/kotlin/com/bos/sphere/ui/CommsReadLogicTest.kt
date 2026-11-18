@@ -113,4 +113,20 @@ class CommsReadLogicTest {
         assertTrue("the oldest went", kept.none { it.key == "k1" })
         assertEquals(5000, CommsRead.merge(emptyList(), kept, emptySet()).items.size)
     }
+
+    @Test fun STR_02_w29_aLiveRowReadInTheShadeIsUnreadAgainWhenItsChatGetsANewMessageUnderTheSameKey() {
+        // the in-memory read mark is by key; the history knows the post: read at 500, the new post at 900 is unread
+        val m = CommsRead.merge(listOf(live("a", "chat", 900)), listOf(hist("a", "chat", 500, read = true, dismissed = false), hist("a", "chat", 900, dismissed = false)), setOf("a"))
+        assertTrue("the new message is unread although the key carries an old read mark", "a" !in m.readKeys)
+        // a mark that the history has not caught up with (no older read post) still counts
+        val fresh = CommsRead.merge(listOf(live("b", "chat", 900)), listOf(hist("b", "chat", 900, dismissed = false)), setOf("b"))
+        assertTrue("b" in fresh.readKeys)
+    }
+
+    @Test fun STR_02_w29_aSwipeWhoseSpreadDriftsIsNotAPinchButARealPinchIs() {
+        assertNull("centre moved 150 px, spread 17 px: a swipe", CommsRead.pinchOf(1.12f, 17f, 150f))
+        assertEquals(PinchDir.Out, CommsRead.pinchOf(1.5f, 100f, 0f))
+        assertEquals("one finger fixed: the centre moves half the spread change", PinchDir.In, CommsRead.pinchOf(0.5f, -100f, 50f))
+        assertNull("inside the dead zone whatever the centre did", CommsRead.pinchOf(1.05f, 10f, 0f))
+    }
 }

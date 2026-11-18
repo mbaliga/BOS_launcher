@@ -17,6 +17,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -229,6 +230,70 @@ abstract class CommsReadScreenCases(private val orientation: String) : Launchpad
         }
         rule.waitForIdle()
         assertEquals(ReadFilter.Read, hub.readFilter)
+    }
+
+    private fun twoFingers(a0: Offset, b0: Offset, steps: Int, da: (Float) -> Offset, db: (Float) -> Offset) {
+        rule.onNodeWithTag("lp.root").performTouchInput {
+            val c = center
+            down(0, c + a0); down(1, c + b0)
+            for (i in 1..steps) { val f = i / steps.toFloat(); updatePointerTo(0, c + a0 + da(f)); updatePointerTo(1, c + b0 + db(f)); move() }
+            up(0); up(1)
+        }
+        rule.waitForIdle()
+    }
+
+    @Test fun STR_02_w29_aTwoFingerSwipeWhoseFingersDriftApartIsStillASwipeNotAPinch() {
+        render()
+        twoFingers(Offset(-70f, 0f), Offset(70f, 0f), 12, { f -> Offset(-300f * f - 30f * minOf(4f * f, 1f), 0f) }, { f -> Offset(-300f * f + 30f * minOf(4f * f, 1f), 0f) }) // spread 140 to 200 in the first quarter, centre 300 px left
+        assertEquals("the drift of the fingers did not make it a pinch", ReadFilter.All, hub.readFilter)
+        assertEquals(HubView.Unread, hub.view)
+    }
+
+    @Test fun STR_02_w29_aFingerThatLiftsAndLandsElsewhereDoesNotMakeAPinchAgainstTheOldPair() {
+        render()
+        rule.onNodeWithTag("lp.root").performTouchInput {
+            val c = center
+            down(0, c + Offset(-70f, 0f)); down(1, c + Offset(70f, 0f)); move()
+            up(1); move()
+            down(2, c + Offset(300f, 0f)); move() // the pair is now 370 px wide, far over the old 140 px
+            up(0); up(2)
+        }
+        rule.waitForIdle()
+        assertEquals("a broken-up pair starts afresh", ReadFilter.All, hub.readFilter)
+    }
+
+    @Test fun STR_02_w29_markVisibleAsReadOnlyReadsTheRowsOnScreenNotWhatTheFilterHides() {
+        render(); markRead("m1")
+        rule.runOnIdle { com.bos.sphere.core.data.LaunchpadSettings.pruneRead(emptySet()) }
+        a11y("Show read only").action!!.invoke(); rule.waitForIdle()
+        twoFingers(Offset(-70f, 0f), Offset(70f, 0f), 12, { f -> Offset(0f, 200f * f) }, { f -> Offset(0f, 200f * f) }) // two-finger swipe down
+        assertEquals("the unread rows hidden by the Read filter stay unread", emptySet<String>(), com.bos.sphere.core.data.LaunchpadSettings.readKeys.value)
+        a11y("Show all").action!!.invoke(); rule.waitForIdle()
+        twoFingers(Offset(-70f, 0f), Offset(70f, 0f), 12, { f -> Offset(0f, 200f * f) }, { f -> Offset(0f, 200f * f) })
+        assertEquals("on screen, they are read", setOf("m2", "m3", "c1", "e1"), com.bos.sphere.core.data.LaunchpadSettings.readKeys.value)
+    }
+
+    @Test fun STR_02_w29_theTalkBackFilterActionsFromFilesTakeTheUserBackToTheAllView() {
+        render()
+        edit { hub.select(HubView.Files) }
+        a11y("Show unread only").action!!.invoke(); rule.waitForIdle()
+        assertEquals(HubView.All, hub.view)
+        assertEquals(ReadFilter.Unread, hub.readFilter)
+    }
+
+    @Test fun STR_02_w29_aChatReadInTheShadeIsUnreadAgainWhenANewMessageArrivesUnderItsKey() {
+        render(); markRead("m1")
+        assertEquals(false, present("m1").not())
+        edit { liveItems = liveItems.map { if (it.key == "m1") it.copy(summary = "Second message", timestamp = it.timestamp + 60_000) else it }; store.observe(liveItems) }
+        a11y("Show unread only").action!!.invoke(); rule.waitForIdle()
+        assertTrue("the new message shows under Unread only", present("m1"))
+    }
+
+    @Test fun STR_02_w29_dismissingALiveRowSaysItWasClearedFromTheShadeAndTheRowStays() {
+        render()
+        rule.onNodeWithTag("lp.focus.m1").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Dismiss" }.action!!.invoke(); rule.waitForIdle()
+        rule.onNodeWithText("Cleared from the shade").assertExists()
+        assertTrue(present("m1"))
     }
 
     // ---- screenshots (read by hand) ----

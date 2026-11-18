@@ -22,7 +22,7 @@ One state machine in `CommsRead` (pure, tested): `ReadFilter` with three stops, 
 - The active filter shows as a quiet muted line at the top of the list ("Unread only", "Read only"; nothing for All); a tap on it resets to All.
 - Haptic tick on each step through the launcher's strength-aware haptics (`rememberLauncherHaptics()` in HomeScreen, passed to the panel as `haptics`).
 - Non-gesture equivalents: TalkBack custom actions on the Comms pane "Show unread only", "Show read only", "Show all"; Ctrl+U (one stop toward Unread) and Ctrl+Shift+U (toward Read) in the panel's key handler; the label's tap. The old gesture actions (show unread, toggle unread) set the same filter.
-- Two-finger swipes (view switch, mark visible read) are unchanged and distinguished by the same rule as before: a swipe has the spread unchanged and the pair moving 56 dp; once a pair has swiped it is not a pinch and the other way round.
+- Two-finger swipes (view switch, mark visible read) keep working and are told from a pinch by `CommsRead.pinchOf`: a pinch changes the spread by at least as much as the pair's centre moves, so a swipe whose fingers drift apart stays a swipe; once a pair has swiped it is not a pinch and the other way round; a pair that breaks up starts afresh. Mark visible as read marks only the rows on screen (not what a filter or rule hides). A chat read in the shade becomes unread again when a newer post arrives under the same key.
 - The Comms size is changed by the stepper (Ground Control, the menu) and Ctrl+Plus / Ctrl+Minus only. `CommsScale.fromPinch` and its test are deleted.
 
 ## The menu's SHOW list

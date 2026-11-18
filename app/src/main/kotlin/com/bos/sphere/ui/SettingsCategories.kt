@@ -536,7 +536,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     },
                 ) { v -> upd { it.copy(launchpadTheme = v) } },
             )
-            // Wave 28: the size of the Comms content, 75 to 125 percent in 5s (also an Options row of the Comms menu and the pinch on the list).
+            // Wave 28: the size of the Comms content, 75 to 125 percent in 5s (also Ctrl+Plus and Ctrl+Minus on the list).
             add(
                 SettingItem.Stepper(
                     x("Comms size"), Glyphs.Pinch, com.bos.sphere.core.data.CommsScaleSettings.percent.value,

@@ -41,7 +41,7 @@ internal fun Modifier.hubGestures(
             val ev = awaitPointerEvent(PointerEventPass.Initial)
             val down = ev.changes.filter { it.pressed }.sortedBy { it.id.value }
             if (down.isEmpty()) break
-            if (down.size < 2) continue
+            if (down.size < 2) { startSpread = 0f; continue } // a pair that broke up starts afresh when two fingers are down again
             val a = down[0].position; val b = down[1].position
             val spread = (a - b).getDistance()
             val center = (a + b) / 2f
@@ -49,7 +49,7 @@ internal fun Modifier.hubGestures(
             else if (startSpread > 1f) {
                 val ratio = spread / startSpread
                 val d = center - startCenter
-                val dir = if (!pinched && !swiped) CommsRead.direction(ratio) else null
+                val dir = if (!pinched && !swiped) CommsRead.pinchOf(ratio, spread - startSpread, d.getDistance()) else null
                 if (dir != null) { pinched = true; onPinch(dir) }
                 else if (!pinched && !swiped && onSwipe != null && d.getDistance() > swipeDistance) {
                     if (d.y > abs(d.x)) { swiped = true; onSwipe(HubSwipe.Down) }

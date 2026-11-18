@@ -20,3 +20,14 @@ Device-only: the pinch feel and dead zone on a real display, TalkBack announceme
 ## New tests
 - CommsReadLogicTest (JVM): every filter transition, dead zone, merge (union, de-dup, order, read kept after leaving the shade, same-post read, delete), filtered counts, bound.
 - CommsReadScreenPortraitTest (Robolectric): reproduction of the disappearing notification, Clear all keeps history, Show list keeps apps (all-read-and-gone; zero under Unread), history-only row tap / chips / delete, live row keeps its chips, pinch in and out with pointer injection (once per gesture, scale pref unchanged), label tap, TalkBack actions, Ctrl+U, two-finger swipe still switches views, screenshots `comms-read-portrait-*.png` (all, all with gone rows, unread, read, menu with a zero-unread app).
+
+## Adversarial review (second pass): defects found and fixed
+Each has a test that failed before the fix (screen cases in CommsReadScreenCases, pure rules in CommsReadLogicTest).
+1. A two-finger swipe whose fingers drift apart by more than 8 percent was read as a pinch (the view switch never fired). `CommsRead.pinchOf` now needs the spread to change at least as much as the pair's centre travels. Test: aTwoFingerSwipeWhoseFingersDriftApartIsStillASwipeNotAPinch.
+2. A pair that broke up (one finger lifted, a finger landed elsewhere) was measured against the old pair's spread and could fire a pinch. The reference now resets when fewer than two fingers are down. Test: aFingerThatLiftsAndLandsElsewhereDoesNotMakeAPinchAgainstTheOldPair.
+3. "Mark visible as read" (two-finger swipe down, Ctrl+Shift+M, the menu) marked every unread row of the merged list, including rows hidden by the Read filter, the app filter or a rule. It now marks what is on screen. Test: markVisibleAsReadOnlyReadsTheRowsOnScreenNotWhatTheFilterHides.
+4. A chat read in the shade stayed "read" when a new message arrived under the same key (the in-memory read mark is by key), so a new message was hidden under Unread only. The merge now takes the history into account: an unread newest post after an older read post makes the row unread. Tests: aLiveRowReadInTheShadeIsUnreadAgain... (JVM) and aChatReadInTheShadeIsUnreadAgainWhenANewMessageArrives... (screen).
+5. The TalkBack read-filter actions did nothing visible from Files or Timeline (the filter belongs to the All view). They now switch to All. Test: theTalkBackFilterActionsFromFilesTakeTheUserBackToTheAllView.
+6. Dismissing a live row (swipe, menu) looked like a no-op now that the row stays as history. It says "Cleared from the shade". Test: dismissingALiveRowSaysItWasClearedFromTheShadeAndTheRowStays.
+
+Not changed: the merge runs on the main thread when the feed or the history changes (a sort of up to 5000 small entries, no I/O); a pinch landing on an end stop gives no haptic.

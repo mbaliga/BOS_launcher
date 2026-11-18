@@ -518,7 +518,7 @@ fun LaunchpadContent(
             com.bos.sphere.core.data.LaunchpadAction.CollapseAll ->
                 collapsed = if (collapsed.size >= sections.size) emptySet() else sections.map { it.key }.toSet()
             com.bos.sphere.core.data.LaunchpadAction.ClearAll -> onClearAll()
-            com.bos.sphere.core.data.LaunchpadAction.Dismiss -> n?.takeIf { !it.isOngoing }?.let(onDismissItem)
+            com.bos.sphere.core.data.LaunchpadAction.Dismiss -> n?.takeIf { !it.isOngoing }?.let { onDismissItem(it); if (hub?.liveAll == true) toast.value = L10n.tr("Cleared from the shade") } // wave 29: the row stays in Comms (history), so say what happened
             com.bos.sphere.core.data.LaunchpadAction.MarkRead -> n?.let { LaunchpadSettings.markRead(it.key); toast.value = L10n.tr("Marked as read") }
             com.bos.sphere.core.data.LaunchpadAction.OpenApp -> if (pkg.isNotBlank()) {
                 if (openApp == null) onOpenApp(pkg) else if (!openApp(pkg)) toast.value = L10n.tr("Couldn't open %s", n?.appLabel?.ifBlank { pkg } ?: pkg)
@@ -679,7 +679,9 @@ fun LaunchpadContent(
     }
 
     // Wave 25: "mark what is visible as read" for the hub: the live list marks its unread rows, a history view uses the store (with undo).
-    val liveNow = androidx.compose.runtime.rememberUpdatedState(merged.items to effRead)
+    // Only what is on screen: not what a filter, the app filter or a rule hides (marking everything under "Read only" would read what the user never saw).
+    val visibleNow = androidx.compose.runtime.rememberUpdatedState(CommsRead.filter(LaunchpadLogic.filter(visible, activeFilter), effRead, readFilter) to effRead)
+    val liveNow = visibleNow
     val hubMarkRead: () -> Unit = {
         if (hub != null) {
             if (hub.listIsLive) {
@@ -697,7 +699,7 @@ fun LaunchpadContent(
         if (changed) tick()
     }
     fun chooseFilter(f: ReadFilter) {
-        if (hub != null && hub.view.history && hub.view != HubView.All) hub.select(HubView.All)
+        if (hub != null && hub.view != HubView.All && HubView.All in hub.views) hub.select(HubView.All) // from Unread, Read, Files or Timeline too: the filter is the All view's
         if (readFilter != f) tick()
         setReadFilter(f)
     }

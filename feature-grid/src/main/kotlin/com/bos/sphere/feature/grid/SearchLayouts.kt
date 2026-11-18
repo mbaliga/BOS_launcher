@@ -382,22 +382,26 @@ internal fun Orbit(
                 drawOval(Color.White.copy(alpha = 0.16f - 0.035f * r), topLeft = Offset((e[0] - e[2]) * density.density, (e[1] - e[3]) * density.density), size = androidx.compose.ui.geometry.Size(2 * e[2] * density.density, 2 * e[3] * density.density), style = Stroke(width = 1.dp.toPx()))
             }
         }
-        // TalkBack: one quiet heading per ring that has results, named for its tier.
-        fit.slots.take(shown.size).map { it.ring }.distinct().forEach { r ->
+        // TalkBack: one quiet heading per tier that has results (the rank bands 5, 9, 13, 17), placed at the ellipse of the tier's best tile.
+        val tiersAll = RadarRings.assign(shown.size, RadarRings.capacities)
+        tiersAll.distinct().forEach { t ->
+            val r = fit.slots[tiersAll.indexOf(t)].ring
             androidx.compose.foundation.layout.Box(
                 Modifier
                     .offset { IntOffset((wDp / 2f * density.density).roundToInt(), ((fit.rings[r][1] - fit.rings[r][3]) * density.density).roundToInt()) }
                     .size(1.dp)
-                    .semantics { heading(); contentDescription = L10n.tr(tierNames[r.coerceIn(0, tierNames.lastIndex)]) },
+                    .semantics { heading(); contentDescription = L10n.tr(tierNames[t.coerceIn(0, tierNames.lastIndex)]) },
             )
         }
         val wPx = wDp * density.density
         val hPx = hDp * density.density
         val boxHPx = fit.boxH * density.density
 
+        // The tier (Most used, Often used ...) follows the rank (5, 9, 13, 17 best results), not which ellipse a slot sits on: a ring the wheel crowds may hold fewer tiles.
+        val tierOf = RadarRings.assign(shown.size, RadarRings.capacities)
         shown.forEachIndexed { i, tile ->
             val slot = fit.slots[i]
-            val ring = slot.ring
+            val ring = tierOf.getOrElse(i) { slot.ring }
             val tierDescription = L10n.tr(tierNames[ring.coerceIn(0, tierNames.lastIndex)])
             Column(
                 Modifier

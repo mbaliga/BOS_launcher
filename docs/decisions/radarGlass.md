@@ -199,3 +199,7 @@ Owner/device report: landscape with the keyboard up, the reserved 72 dp mic stri
   off (a press still asks for it, CFG-07); a device with no on-device recogniser still draws no mic at all (INP-13).
 - Not run on a device: the real keyboard height and insets (Robolectric fakes them), how TalkBack speaks the state, and whether a state change is read
   too early or too late.
+
+## Wave 26 (owner): no stacked columns in Radar
+
+The owner asked for the stacked-columns fill to be reverted: icons stacked column by column belong to the home's scroll pages (after Glance), not to Radar. `OrbitFit` no longer has the staggered "packed" fallback: only elliptical rings place tiles. Each ring takes the most tiles (up to its tier capacity 5, 9, 13, 17) that fit evenly spaced inside the region, clear of the wheel and of each other, starting at the top (or at a side when the region is short); a ring that cannot place even one tile is pushed outward; icons shrink to 32 dp first. The tier (Most used, Often used, ...) follows the rank, not the ellipse a tile sits on. Consequence, measured: 411x891 holds 17 of 44 recents on its rings, 360x640 holds 6, the 1280x800 tablet all 44; "see all recents at once" therefore holds only where the rings have room.

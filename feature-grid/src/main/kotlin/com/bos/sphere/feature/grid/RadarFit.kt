@@ -32,7 +32,7 @@ internal object OrbitFit {
      */
     fun wheelRoom(availDp: Float): Float = availDp * 0.5f + 8f
 
-    fun boxW(icon: Float, rowW: Float = 0f) = maxOf(icon + 12f, 56f, rowW)
+    fun boxW(icon: Float, rowW: Float = 0f) = maxOf(icon + 8f, 46f, rowW)
     /** Icon, a 3 dp gap and one caption line (10 sp at the font scale and the pinch scale). */
     /** Wave 25: [rowH] is the row of shortcut circles under the caption (0 when no tile has shortcuts). */
     fun boxH(icon: Float, fontScale: Float, resultScale: Float = 1f, rowH: Float = 0f) = icon + 3f + 10f * fontScale * resultScale * 1.3f + rowH
@@ -47,8 +47,8 @@ internal object OrbitFit {
         val want = minOf(count, RadarRings.capacities.sum())
         var icon = MAX_ICON
         while (true) {
-            // The elliptical rings first (the Orbit look); when they cannot hold every result at this size, a staggered fill of the same region may.
-            for (f in listOf(place(w, h, cy, keepLeft, keepRight, keepHalfH, count, fontScale, resultScale, icon, rowW, rowH), packed(w, h, cy, keepLeft, keepRight, keepHalfH, count, fontScale, resultScale, icon, rowW, rowH))) {
+            // Only the elliptical rings (the Orbit look). Wave 25 had a staggered column fill here for crowded regions; the owner asked for it to go: stacked columns of icons belong to the home's scroll pages, not to Radar.
+            for (f in listOf(place(w, h, cy, keepLeft, keepRight, keepHalfH, count, fontScale, resultScale, icon, rowW, rowH))) {
                 if (best == null || f.slots.size > best.slots.size) best = f
                 if (f.slots.size >= want) return f
             }
@@ -56,38 +56,6 @@ internal object OrbitFit {
             icon = maxOf(MIN_ICON, icon - 2f)
         }
         return best!!
-    }
-
-    /**
-     * The crowded case: an even grid over the whole region (every cell at least a tile box), minus what the wheel keeps, filled from the middle outward so the
-     * best results are still the innermost. The ring ellipses are then the tiers' outlines.
-     */
-    private fun packed(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float, icon: Float, rowW: Float, rowH: Float): Fit {
-        val bw = boxW(icon, rowW); val bh = boxH(icon, fontScale, resultScale, rowH)
-        val cx = w / 2f
-        val left = bw / 2f + EDGE + BOB; val top = bh / 2f + BOB
-        val availW = w - 2 * left; val availH = h - 2 * top
-        if (availW < 0f || availH < 0f) return Fit(icon, bw, bh, emptyList(), emptyList(), 0)
-        val nc = (availW / bw).toInt() + 1; val nr = (availH / bh).toInt() + 1
-        val rxMax = maxOf(availW / 2f, 1f); val ryMax = maxOf(minOf(cy - top, h - cy - top), 1f)
-        val cells = ArrayList<Pair<Slot, Float>>()
-        for (j in 0 until nr) for (i in 0 until nc) {
-            val x = if (nc == 1) cx else left + availW * i / (nc - 1)
-            val y = if (nr == 1) h / 2f else top + availH * j / (nr - 1)
-            if (y < top - 0.01f || y > h - top + 0.01f) continue
-            val onWheel = x + bw / 2f > cx - keepLeft && x - bw / 2f < cx + keepRight && abs(y - cy) < keepHalfH + bh / 2f
-            if (onWheel) continue
-            val d = kotlin.math.hypot(((x - cx) / rxMax).toDouble(), ((y - cy) / ryMax).toDouble()).toFloat()
-            cells += Slot(0, x, y) to d
-        }
-        val chosen = cells.sortedBy { it.second }.take(minOf(count, RadarRings.capacities.sum()))
-        val ringOf = RadarRings.assign(chosen.size, RadarRings.capacities)
-        val slots = chosen.mapIndexed { k, (s, _) -> Slot(ringOf[k], s.x, s.y) }
-        val rings = (0 until RadarRings.MAX_RINGS).map { r ->
-            val d = chosen.filterIndexed { k, _ -> ringOf[k] == r }.maxOfOrNull { it.second } ?: 0f
-            floatArrayOf(cx, cy, rxMax * d, ryMax * d)
-        }
-        return Fit(icon, bw, bh, slots, rings, cells.size, guides = false) // a tight fill does not sit on ellipses, so no guide lines are drawn
     }
 
     private fun place(w: Float, h: Float, cy: Float, keepLeft: Float, keepRight: Float, keepHalfH: Float, count: Int, fontScale: Float, resultScale: Float, icon: Float, rowW: Float, rowH: Float): Fit {
@@ -98,45 +66,54 @@ internal object OrbitFit {
         val rxMax = (w / 2f - padX).coerceAtLeast(0f)
         val ryMax = minOf(cy - padY, h - cy - padY).coerceAtLeast(0f)
         val rings = ArrayList<FloatArray>()
-        val all = ArrayList<Slot>()
-        val perRing = ArrayList<List<Slot>>()
         if (rxMax <= 0f || ryMax <= 0f) return Fit(icon, bw, bh, emptyList(), rings, 0)
-        for (r in 0 until RadarRings.MAX_RINGS) {
-            val f = 0.40f + 0.60f * r / (RadarRings.MAX_RINGS - 1)
-            val rx = rxMax * f; val ry = ryMax * f
-            rings += floatArrayOf(cx, cy, rx, ry)
-            // Walk the ellipse in small steps from the top (alternate rings start half a step round), keep a point when its box is clear of every placed box and of the wheel.
-            val cap = RadarRings.capacity(r)
-            val steps = 360
-            val mine = ArrayList<Slot>()
-            val offset = if (r % 2 == 1) PI / cap else 0.0
-            for (i in 0 until steps) {
-                if (mine.size >= cap) break
-                val a = -PI / 2 + offset + i * 2 * PI / steps
-                val x = cx + rx * cos(a).toFloat(); val y = cy + ry * sin(a).toFloat()
-                if (x < padX || x > w - padX || y < padY || y > h - padY) continue
-                val onWheel = x + bw / 2f > cx - keepLeft && x - bw / 2f < cx + keepRight && abs(y - cy) < keepHalfH + bh / 2f
-                if (onWheel) continue
-                if (all.any { abs(it.x - x) < bw && abs(it.y - y) < bh }) continue
-                val s = Slot(r, x, y); mine += s; all += s
-            }
-            perRing += mine
-        }
-        // Rank order: ring by ring; inside a ring the slots nearest the top first (the best result sits straight above the centre, the rest alternate outward).
+        val all = ArrayList<Slot>()
         val ordered = ArrayList<Slot>()
         var left = minOf(count, RadarRings.capacities.sum())
-        for (r in perRing.indices) {
-            val mine = perRing[r]
-            // A tier is its capacity (5, 9, 13, 17) of the best results: when a ring cannot hold the tier's share the later results have no place at this size.
-            val need = minOf(left, RadarRings.capacity(r))
-            val take = minOf(need, mine.size)
-            if (take <= 0) break
-            left -= take
-            // Spread a part-filled ring over its slots instead of bunching it at the top.
-            val spread = if (take == mine.size) mine else List(take) { j -> mine[(j * mine.size.toDouble() / take).toInt().coerceAtMost(mine.lastIndex)] }
-            ordered += spread.sortedBy { abs(Math.atan2((it.x - cx) / rings[r][2].toDouble(), -(it.y - cy) / rings[r][3].toDouble())) }
-            if (take < need) break
+        var total = 0
+        var prevF = 0.40f
+        for (r in 0 until RadarRings.MAX_RINGS) {
+            // Rings are ellipses scaled to the region, the inner one just outside the wheel's keep-out, the outer one at the region's edge. A ring that cannot place a tile at its
+            // nominal size (the wheel is in the way, the region is short) is pushed outward until it can, never inward and never past the region.
+            val nominal = maxOf(0.52f + 0.48f * r / (RadarRings.MAX_RINGS - 1), prevF + 0.06f)
+            val cap = RadarRings.capacity(r)
+            val offset = if (r % 2 == 1) PI / cap else 0.0
+            var mine: List<Slot> = emptyList()
+            var ringF = nominal.coerceAtMost(1f)
+            // First at the nominal size (the most tiles that fit evenly spaced), and only when not one fits there is the ring pushed outward.
+            fun tryRing(f: Float, kk: Int, turn: Double = 0.0): List<Slot>? {
+                val rx = rxMax * f; val ry = ryMax * f
+                val cand = List(kk) { j ->
+                    val a = -PI / 2 + offset + turn + j * 2 * PI / kk
+                    Slot(r, cx + rx * cos(a).toFloat(), cy + ry * sin(a).toFloat())
+                }
+                val ok = cand.withIndex().all { (i, c) ->
+                    c.x >= padX && c.x <= w - padX && c.y >= padY && c.y <= h - padY &&
+                        !(c.x + bw / 2f > cx - keepLeft && c.x - bw / 2f < cx + keepRight && abs(c.y - cy) < keepHalfH + bh / 2f) &&
+                        all.none { abs(it.x - c.x) < bw && abs(it.y - c.y) < bh } &&
+                        cand.withIndex().none { (j, o) -> j < i && abs(o.x - c.x) < bw && abs(o.y - c.y) < bh }
+                }
+                return if (ok) cand else null
+            }
+            val want = minOf(left, cap)
+            var k = want
+            while (k > 0 && mine.isEmpty()) {
+                // The top first; when the region is short and the wheel is in the way a part-filled ring may start at its sides (a quarter turn either way).
+                for (turn in listOf(0.0, PI / 2, -PI / 2)) { if (mine.isEmpty()) tryRing(nominal, k, turn)?.let { mine = it; ringF = nominal } }
+                k--
+            }
+            if (mine.isEmpty()) {
+                var f = nominal + 0.06f
+                while (f <= 1.0001f && mine.isEmpty()) { for (turn in listOf(0.0, PI / 2, -PI / 2)) { if (mine.isEmpty()) tryRing(f, 1, turn)?.let { mine = it; ringF = f } }; f += 0.06f }
+            }
+            val rx = rxMax * ringF; val ry = ryMax * ringF
+            rings += floatArrayOf(cx, cy, rx, ry)
+            prevF = ringF
+            all += mine; total += mine.size; left -= mine.size
+            // Rank order inside a ring: the slot nearest the top first, the rest alternating outward.
+            ordered += mine.sortedBy { abs(Math.atan2((it.x - cx) / rx.toDouble(), -(it.y - cy) / ry.toDouble())) }
+            if (left <= 0) break
         }
-        return Fit(icon, bw, bh, ordered, rings, perRing.sumOf { it.size })
+        return Fit(icon, bw, bh, ordered, rings, total)
     }
 }

@@ -1235,7 +1235,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             } else {
             Box(
                 Modifier.align(leftEdge).absolutePadding(left = 2.dp).width(5.dp).height(64.dp)
-                    .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
+                    .background(com.bos.sphere.feature.grid.HomeHandleBar.color(com.bos.sphere.feature.grid.isDarkSurface()), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
             )
             // Kept narrow so it never sits over the first column of icons; tall so it is still easy to hit.
             Box(
@@ -1262,7 +1262,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             } else {
             Box(
                 Modifier.align(rightEdge).absolutePadding(right = if (launchpadRtl) 0.dp else 2.dp, left = if (launchpadRtl) 2.dp else 0.dp).width(5.dp).height(64.dp)
-                    .background(Color.White.copy(alpha = 0.28f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
+                    .background(com.bos.sphere.feature.grid.HomeHandleBar.color(com.bos.sphere.feature.grid.isDarkSurface()), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
             )
             Box(
                 Modifier.align(rightEdge).width(24.dp).height(180.dp).then(Modifier.testTag("recents.handle"))

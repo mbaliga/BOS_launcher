@@ -60,7 +60,9 @@ class MotionGestureService : Service() {
                 runner.run(item)
             }
         }
-        stores.prefs.prefs.onEach { sensors.sensitivity = it.motionSensitivity }.launchIn(scope)
+        // Wave 23 second review: a START_STICKY restart (or a boot) brings the process up with only this service, no activity, so nothing has
+        // applied the chosen app language yet: its toasts and notification would follow the system language instead. Apply it here too.
+        stores.prefs.prefs.onEach { sensors.sensitivity = it.motionSensitivity; com.bos.sphere.core.design.L10n.setLanguage(it.language.code) }.launchIn(scope)
         // Don't listen (or act) with the screen off: saves battery and avoids pocket triggers.
         registerReceiver(
             screenReceiver,
@@ -105,14 +107,14 @@ class MotionGestureService : Service() {
 
     private fun notification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
-        if (nm.getNotificationChannel(CHANNEL) == null) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Motion gestures", NotificationManager.IMPORTANCE_MIN).apply {
-                    description = "Shown while Liftoff listens for motion gestures in the background"
-                    setShowBadge(false)
-                },
-            )
-        }
+        // Wave 23 second review: the channel's name and description are in the app language; creating an existing channel again only
+        // renames it (the user's importance choice stays), so a language change reaches the system settings page too.
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, com.bos.sphere.core.design.L10n.tr("Motion gestures"), NotificationManager.IMPORTANCE_MIN).apply {
+                description = com.bos.sphere.core.design.L10n.tr("Shown while Liftoff listens for motion gestures in the background")
+                setShowBadge(false)
+            },
+        )
         val open = PendingIntent.getActivity(
             this,
             0,
@@ -121,8 +123,8 @@ class MotionGestureService : Service() {
         )
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_mono)
-            .setContentTitle("Motion gestures on")
-            .setContentText("Shake, flick or flip to run your shortcuts")
+            .setContentTitle(com.bos.sphere.core.design.L10n.tr("Motion gestures on"))
+            .setContentText(com.bos.sphere.core.design.L10n.tr("Shake, flick or flip to run your shortcuts"))
             .setContentIntent(open)
             .setOngoing(true)
             .build()

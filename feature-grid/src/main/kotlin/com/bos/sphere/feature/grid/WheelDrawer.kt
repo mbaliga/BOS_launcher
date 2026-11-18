@@ -294,6 +294,12 @@ internal val WheelLetterOrder: Comparator<String> = Comparator { a, b ->
     }
 }
 
+/**
+ * Wave 23 second review: the words drawn on a category or Recent band. The grouping keys stay English ([WheelCategoryOrder]); only the
+ * shown label is in the app language (the bands read "Games", "Social" on every phone before).
+ */
+internal fun wheelGroupLabel(name: String): String = com.bos.sphere.core.design.L10n.tr(name)
+
 /** Display order of category spokes. */
 internal val WheelCategoryOrder = listOf(
     "Games", "Audio", "Video", "Images", "Social", "News", "Maps", "Productivity", "Accessibility", "Other",
@@ -366,13 +372,13 @@ private fun buildWheelGroups(
         emptyList()
     } else {
         val byName = apps.groupBy { wheelCategoryName(categories[it.packageName] ?: ApplicationInfo.CATEGORY_UNDEFINED) }
-        WheelCategoryOrder.mapNotNull { name -> byName[name]?.let { WheelGroup(name, it.sortedWith(ByLabel)) } }
+        WheelCategoryOrder.mapNotNull { name -> byName[name]?.let { WheelGroup(wheelGroupLabel(name), it.sortedWith(ByLabel)) } }
     }
 
     WheelGrouping.Recent -> {
         val byKey = apps.associateBy { it.key }
         val recent = recentKeys.asSequence().distinct().mapNotNull { byKey[it] }.take(MAX_RECENT).toList()
-        if (recent.isEmpty()) emptyList() else listOf(WheelGroup("Recent", recent))
+        if (recent.isEmpty()) emptyList() else listOf(WheelGroup(wheelGroupLabel("Recent"), recent))
     }
 }
 

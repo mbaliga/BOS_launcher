@@ -261,7 +261,7 @@ class ActionRunner(
     }
 
     private fun toast(key: String, vararg args: Any?) {
-        val text = translate(key).let { if (args.isEmpty()) it else String.format(it, *args) }
+        val text = ActionToastText.of(translate, key, *args)
         val show = { Toast.makeText(ctx, text, Toast.LENGTH_SHORT).show() }
         if (Looper.myLooper() == Looper.getMainLooper()) show() else Handler(Looper.getMainLooper()).post(show)
     }
@@ -316,5 +316,17 @@ object Torch {
         } else {
             null
         }
+    }
+}
+
+/**
+ * Wave 23 second review: the words of an [ActionRunner] toast. A translation whose placeholders do not match the arguments must not throw
+ * (in the motion-gesture service a throw ends the service): it falls back to the English words, as `L10n.tr` does.
+ */
+internal object ActionToastText {
+    fun of(translate: (String) -> String, key: String, vararg args: Any?): String {
+        val words = runCatching { translate(key) }.getOrDefault(key)
+        if (args.isEmpty()) return words
+        return runCatching { String.format(words, *args) }.getOrElse { runCatching { String.format(key, *args) }.getOrDefault(key) }
     }
 }

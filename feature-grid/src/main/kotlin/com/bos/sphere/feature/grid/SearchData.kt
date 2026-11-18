@@ -228,7 +228,8 @@ internal fun buildSuggestionGroups(
     // "Name contains" is already offered once under Filenames: don't repeat it per category. The model's labels are English: the
     // test is on that English, never on the translated words (a translated phone showed the chip twice), and each shown label is translated.
     val appText = chips.filter { it.kind == SuggestionKind.Text || it.kind == SuggestionKind.Natural }
-        .filter { !it.label.startsWith("Name contains") }
+        // Wave 23 second review: only while the Filenames row is there; without file search the app name chip is the only way to refine by name.
+        .filter { !filesAvailable || !it.label.startsWith("Name contains") }
         .map { SuggItem(localizeChip(it.label), it.insertion, null) }
     val all = buildList {
         if (filesAvailable) add(SuggGroup(L10n.tr("Filenames"), listOf(SuggItem(L10n.tr("Name contains “%s”", q), null, SearchCategory.Files))))

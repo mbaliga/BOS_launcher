@@ -44,6 +44,12 @@ object GlanceHandleFade {
     fun tint(dark: Boolean): Color = GlanceInk.clock(dark)
 }
 
+/** Wave 23 second review: the plain (not quiet) edge bars of the other landings were white too, and as faint on the light theme's light home. */
+object HomeHandleBar {
+    const val ALPHA = 0.28f
+    fun color(dark: Boolean): Color = GlanceInk.clock(dark).copy(alpha = ALPHA)
+}
+
 /**
  * HOM-23, STR-01, STR-14 (wave 17): the slim, quiet edge handle of the Glance home: a short bar at low alpha that fades to almost
  * nothing after [GlanceHandleFade.IDLE_AFTER_MS] and returns when [wake] changes (any touch on the screen) or the handle is touched.

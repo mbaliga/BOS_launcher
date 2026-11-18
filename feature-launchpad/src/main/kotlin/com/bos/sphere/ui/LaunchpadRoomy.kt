@@ -42,11 +42,11 @@ import kotlinx.coroutines.launch
 
 /** STR-02: the measures of the roomy, fully expanded notification list, and which conversations fold behind "+N more". */
 internal object RoomyList {
-    const val ROW_MIN_DP = 72
-    const val H_PAD_DP = 16
-    const val V_PAD_DP = 12
-    /** Wave 25: the app badge is small (the hub's), the rows are flat with a divider and no gap. */
-    const val ICON_DP = 32
+    const val ROW_MIN_DP = CommsStyle.ROW_MIN_DP
+    const val H_PAD_DP = CommsStyle.H_PAD_DP
+    const val V_PAD_DP = CommsStyle.ROW_V_PAD_DP
+    /** Wave 27: the app icon is the Comms mock-up's 56 dp rounded square; the rows are flat with an inset divider and no gap. */
+    const val ICON_DP = CommsStyle.ICON_DP
     const val ROW_GAP_DP = 0
     /** Extra air above a new conversation or section, drawn with a hairline. */
     const val GROUP_GAP_DP = 16
@@ -93,48 +93,4 @@ internal fun MoreLine(hidden: Int, expanded: Boolean, id: String, onClick: () ->
             .heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) // NFR-13: 48 dp target, announced as a button
             .padding(horizontal = 12.dp, vertical = 14.dp).testTag("lp.more.$id"),
     )
-}
-
-/**
- * STR-02: the compact title strip at the top. Tapping a title scrolls the long list to that section; the section in view is
- * marked. It is a jump list, not a tab bar: every section is always in the list.
- */
-@Composable
-internal fun SectionStrip(sections: List<Section>, listState: LazyListState, headIndex: Map<String, Int>, motion: com.bos.sphere.core.quality.MotionPrefs) {
-    if (sections.size < 2) return
-    val scope = rememberCoroutineScope()
-    val current by remember(headIndex) {
-        derivedStateOf {
-            val first = listState.firstVisibleItemIndex
-            sections.lastOrNull { (headIndex[it.key] ?: -1).let { i -> i in 0..first } }?.key ?: sections.first().key
-        }
-    }
-    LazyRow(
-        Modifier.fillMaxWidth().testTag("lp.strip"),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = RoomyList.H_PAD_DP.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
-    ) {
-        items(sections, key = { it.key }) { s ->
-            val on = s.key == current
-            // The chip is drawn 40 dp high; its touch target is 48 dp (NFR-13).
-            Box(
-                Modifier.heightIn(min = 48.dp)
-                    .semantics { selected = on; role = androidx.compose.ui.semantics.Role.Tab; contentDescription = L10n.tr("Jump to %s", s.title) }
-                    .clickable {
-                        val i = headIndex[s.key] ?: -1
-                        if (i >= 0) scope.launch { if (motion.reduced) listState.scrollToItem(i) else listState.animateScrollToItem(i) }
-                    }
-                    .testTag("lp.strip.${s.key}"),
-                contentAlignment = Alignment.Center,
-            ) {
-                // Wave 25: flat text tabs (the hub has no pills); the one in view is bold with a thin blue underline.
-                Text(
-                    s.title, color = if (on) LocalLp.current.ink else LocalLp.current.dim, fontSize = 13.sp,
-                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.drawBehind { if (on) drawRect(BlueLight, androidx.compose.ui.geometry.Offset(0f, size.height - 2.dp.toPx()), androidx.compose.ui.geometry.Size(size.width, 2.dp.toPx())) }
-                        .padding(horizontal = 6.dp, vertical = 8.dp),
-                )
-            }
-        }
-    }
 }

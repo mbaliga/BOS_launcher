@@ -152,8 +152,8 @@ abstract class LaunchpadGroupsCases(private val orientation: String) : Launchpad
 
     @Test fun STR_13_column_aWorkSectionShowsOnePersonFromEveryApp() {
         render("work", dark = false)
-        // Updated from "selecting the Work title shows its rows": the rows are always there; the strip jumps to the section.
-        rule.onNodeWithTag("lp.strip.group:work").performClick(); rule.waitForIdle(); rule.mainClock.advanceTimeBy(1000)
+        // Updated from "selecting the Work title shows its rows": the rows are always there. Wave 27: the jump strip is gone, so the test scrolls the list to the section.
+        rule.onNodeWithTag("lp.list").performScrollToNode(androidx.compose.ui.test.hasTestTag("lp.group.group:work")); rule.waitForIdle()
         rule.onNodeWithTag("lp.group.group:work").assertIsDisplayed()
         shown("Deck is ready"); shown("Review at 3?")
     }

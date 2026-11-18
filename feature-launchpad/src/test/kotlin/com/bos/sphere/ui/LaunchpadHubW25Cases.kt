@@ -51,7 +51,6 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         )
     }
 
-    private var composed = 0
     private var menuRef: LaunchpadMenuState? = null
 
     @Composable
@@ -68,7 +67,7 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
                     LaunchpadContent(
                         items = items, rules = emptyList(), prefs = LaunchpadPrefs(mode), readKeys = setOf("h1", "h2"), hasAccess = true, now = now,
                         onClose = {}, onOpenItem = {}, onOpenApp = {}, onDismissItem = {}, onClearAll = {}, onAddRule = {},
-                        onSetDefaultMode = {}, onRequestAccess = {}, zone = zone, menu = menu, onCompose = { composed++ }, viewSwitcher = switcher,
+                        onSetDefaultMode = {}, onRequestAccess = {}, zone = zone, menu = menu, viewSwitcher = switcher,
                         endInset = if (home) (geo.sliverPx / density).dp else 0.dp,
                     )
                 }
@@ -112,7 +111,7 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         val w = winW()
         assertEquals("the panel sits on the left edge", 0f, panel.left.value, 1f)
         assertEquals("full height", winH(), panel.bottom.value - panel.top.value, 1f)
-        assertTrue("at most 320 dp wide and never the whole window (${panel.right.value})", panel.right.value <= 320.5f && panel.right.value < w)
+        assertEquals("the panel is 58 percent of the window (at most 380 dp)", minOf(380f, w * 0.58f), panel.right.value, 1.5f)
         // The notification list has shifted right by the panel's width.
         val list = rule.onNodeWithTag("lp.root").getUnclippedBoundsInRoot()
         assertTrue("the list shifted right (left=${list.left.value})", list.left.value >= panel.right.value - 1f)
@@ -123,17 +122,13 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         assertEquals("the list is back", 0f, rule.onNodeWithTag("lp.root").getUnclippedBoundsInRoot().left.value, 1f)
     }
 
-    @Test fun STR_01_menu_closeButtonAndEscapeAlsoClose() {
+    @Test fun STR_01_menu_escapeAlsoCloses() {
         render(hub(5), false)
-        openMenu()
-        rule.onNodeWithTag("lp.menu.close").performClick(); rule.waitForIdle(); rule.mainClock.advanceTimeBy(1000)
-        assertFalse(menuRef!!.open)
         openMenu()
         rule.onNodeWithTag("lp.root").performKeyEscape()
         rule.waitForIdle()
         assertFalse("Esc closes the panel before it would leave Comms", menuRef!!.open)
     }
-
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.performKeyEscape() =
         performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Escape) }
 
@@ -149,8 +144,10 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
             val b = rule.onNodeWithTag(t).getUnclippedBoundsInRoot()
             assertTrue("$t is ${b.bottom.value - b.top.value} dp tall, under 48", b.bottom.value - b.top.value >= 47.9f)
         }
-        val count = rule.onNodeWithTag("lp.menu.show.com.whatsapp").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)
-        assertTrue("the app row reads its label and its count: $count", count!!.joinToString { it.text }.contains("WhatsApp") && count.joinToString { it.text }.contains("2"))
+        val count = rule.onNodeWithTag("lp.menu.show.com.whatsapp.count", useUnmergedTree = true).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)
+        assertEquals("the app row's count is its own right-aligned text", "2", count!!.joinToString { it.text })
+        val name = rule.onNodeWithTag("lp.menu.show.com.whatsapp").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)
+        assertTrue("the app row reads its label: $name", name!!.joinToString { it.text }.contains("WhatsApp"))
     }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.performScrollToNodeTag(tag: String) =
@@ -197,44 +194,31 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         assertEquals("the panel comes from the right edge", winW(), panel.right.value, 1f)
     }
 
-    // ---- the floating compose button -----------------------------------------------------------------------------------------------
-    @Test fun STR_02_compose_isACircular56dpBlueButtonBottomRightLabelledCompose() {
+    // ---- the floating compose button is gone (the owner's Comms mock-up does not show it) ----------------------------------------
+    @Test fun STR_02_w27_thereIsNoFloatingComposeButton() {
         render(hub(30), false)
-        val b = rule.onNodeWithTag("lp.compose").assertIsDisplayed().getUnclippedBoundsInRoot()
-        assertEquals(56f, b.right.value - b.left.value, 0.5f); assertEquals(56f, b.bottom.value - b.top.value, 0.5f)
-        assertEquals("16 dp from the right edge", winW() - 16f, b.right.value, 1f)
-        assertTrue("bottom right, in the lower half (top=${b.top.value})", b.top.value > winH() / 2)
-        assertTrue("clear of the bottom edge by at least 16 dp (bottom=${b.bottom.value}, window=${winH()})", b.bottom.value <= winH() - 15.9f)
-        assertEquals(listOf("Compose"), rule.onNodeWithTag("lp.compose").fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription))
-        assertEquals(0xFF0F8FD8.toInt(), HubStyle.FabBlue.value.shr(32).toInt())
-        rule.onNodeWithTag("lp.compose").performClick()
-        assertEquals(1, composed)
-    }
-
-    @Test fun STR_02_compose_thereIsNoDockedComposeStrip() {
-        render(hub(3), false)
+        assertTrue(rule.onAllNodesWithTag("lp.compose").fetchSemanticsNodes().isEmpty())
         assertTrue(rule.onAllNodesWithTag("lp.composebar").fetchSemanticsNodes().isEmpty())
-        assertEquals("only the floating button composes", 1, rule.onAllNodesWithTag("lp.compose").fetchSemanticsNodes().size)
     }
 
     // ---- rows ----------------------------------------------------------------------------------------------------------------------
-    @Test fun STR_02_row_hubGeometry_stripeBadgeTitleTimePreview() {
+    @Test fun STR_02_row_commsGeometry_iconTitleTimeSender() {
         render(hub(8), false)
         val row = rule.onNodeWithTag("lp.row.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val h = row.bottom.value - row.top.value
-        assertTrue("row height $h dp is not 72..90", h in 72f..90f)
-        val stripe = rule.onNodeWithTag("lp.stripe.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals("stripe is 4 dp wide", 4f, stripe.right.value - stripe.left.value, 0.5f)
-        assertEquals("on the leading edge", 0f, stripe.left.value, 0.5f)
-        assertEquals("as tall as the row less its divider", h, stripe.bottom.value - stripe.top.value, 1.5f)
+        assertTrue("row height $h dp is not 78..90", h in 78f..90f)
+        assertTrue("no stripe any more", rule.onAllNodesWithTag("lp.stripe.h0", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         val badge = rule.onNodeWithTag("lp.badge.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals(32f, badge.right.value - badge.left.value, 0.5f)
-        assertEquals("badge starts 16 dp from the edge", 16f, badge.left.value, 0.5f)
+        assertEquals(56f, badge.right.value - badge.left.value, 0.5f)
+        assertEquals("icon starts 20 dp from the edge", 20f, badge.left.value, 0.5f)
         val time = rule.onNodeWithTag("lp.time.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals("time is right-aligned with the 16 dp padding", winW() - 16f, time.right.value, 1f)
-        val preview = rule.onNodeWithTag("lp.preview.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals("one line of preview (at most 22 dp)", true, preview.bottom.value - preview.top.value <= 22f)
-        assertEquals("the preview aligns with the title", HubStyle.TEXT_START_DP.toFloat(), preview.left.value, 1f)
+        assertEquals("time is right-aligned with the 20 dp padding", winW() - 20f, time.right.value, 1f)
+        val title = rule.onNodeWithTag("lp.title.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val second = rule.onNodeWithTag("lp.preview.h0", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals("the title starts after the icon and a 16 dp gap", 20f + 56f + 16f, title.left.value, 1f)
+        assertEquals("the sender line aligns with the title", title.left.value, second.left.value, 1f)
+        assertTrue("the sender line is under the title", second.top.value >= title.bottom.value - 1f)
+        assertTrue("the time sits on the sender line, not the title line", time.top.value >= title.bottom.value - 6f)
         // Rows are separated by a thin divider only, never a gap: the next row starts where this one ends.
         val next = rule.onNodeWithTag("lp.row.h1", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertEquals(row.bottom.value, next.top.value, 1f)
@@ -268,8 +252,8 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
     @Test fun STR_02_topBarHasASlotForTheViewSwitcher() {
         render(hub(3), false, switcher = { Text("VIEWS", Modifier.fillMaxWidth().testTag("slot.views")) })
         val slot = rule.onNodeWithTag("slot.views").assertIsDisplayed().getUnclippedBoundsInRoot()
-        val menu = rule.onNodeWithTag("lp.menu").getUnclippedBoundsInRoot()
-        assertTrue("the switcher row sits directly below the title bar (menu bottom=${menu.bottom.value}, slot top=${slot.top.value})", slot.top.value >= menu.bottom.value && slot.top.value - menu.bottom.value <= 12f)
+        val clock = rule.onNodeWithTag("lp.clock").getUnclippedBoundsInRoot()
+        assertTrue("the tab row sits directly below the clock row (clock bottom=${clock.bottom.value}, slot top=${slot.top.value})", slot.top.value >= clock.bottom.value - 1f && slot.top.value - clock.bottom.value <= 16f)
         assertEquals("the switcher row starts at the left edge", 0f, slot.left.value, 1f)
         assertEquals("the switcher row spans the width", winW(), slot.right.value - slot.left.value, 1f)
     }

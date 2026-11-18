@@ -32,13 +32,10 @@ import java.util.Locale
 
 /** Wave 25 (STR-02): measures and colours of the hub-style list, kept in one place so rows, tests and the hub views agree. */
 internal object HubStyle {
-    const val STRIPE_DP = 4
-    const val BADGE_DP = 32
-    const val FAB_DP = 56
-    const val FAB_MARGIN_DP = 16
-    /** Where the text of a row starts, from the row's leading edge: the stripe, the padding, the badge and a gap. */
-    const val TEXT_START_DP = STRIPE_DP + 12 + BADGE_DP + 12
-    val FabBlue = Color(0xFF0F8FD8)
+    /** Wave 27: no stripe and no compose button any more (the Comms mock-ups show neither); the badge is the 56 dp app icon. */
+    const val BADGE_DP = CommsStyle.ICON_DP
+    /** Where the text of a row starts, from the row's leading edge: the padding, the icon and a gap. */
+    const val TEXT_START_DP = CommsStyle.H_PAD_DP + BADGE_DP + CommsStyle.TEXT_GAP_DP
 
     /** The section header of a day section: "Thu 20 Aug 2015". Other sections keep their own title. */
     fun dayHeader(sectionKey: String, fallback: String, locale: Locale = Locale.getDefault()): String {
@@ -59,34 +56,5 @@ internal object HubStyle {
         if (packageName.isBlank()) return Color(0xFF9E9E9E)
         known[packageName]?.let { return Color(it) }
         return Color(palette[(packageName.hashCode() and 0x7fffffff) % palette.size])
-    }
-}
-
-/** The circular compose button of the hub: blue, 56 dp, a pencil, bottom right above the gesture bar. Opens what the host wires to [onClick]. */
-@Composable
-internal fun BoxScope.ComposeFab(endPadding: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
-    val label = L10n.tr("Compose")
-    Box(
-        Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
-            .padding(end = endPadding + HubStyle.FAB_MARGIN_DP.dp, bottom = HubStyle.FAB_MARGIN_DP.dp)
-            .size(HubStyle.FAB_DP.dp).shadow(6.dp, CircleShape).clip(CircleShape).background(HubStyle.FabBlue)
-            .testTag("lp.compose")
-            .semantics { contentDescription = label }
-            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick),
-        Alignment.Center,
-    ) { PencilIcon(Color.White) }
-}
-
-@Composable
-internal fun PencilIcon(color: Color, size: Int = 24) {
-    Canvas(Modifier.size(size.dp)) {
-        val s = this.size.width
-        val sw = 2.dp.toPx()
-        val p = Path().apply {
-            moveTo(s * 0.18f, s * 0.82f); lineTo(s * 0.22f, s * 0.60f); lineTo(s * 0.62f, s * 0.20f)
-            lineTo(s * 0.80f, s * 0.38f); lineTo(s * 0.40f, s * 0.78f); close()
-        }
-        drawPath(p, color, style = Stroke(sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        drawLine(color, Offset(s * 0.54f, s * 0.28f), Offset(s * 0.72f, s * 0.46f), sw, StrokeCap.Round)
     }
 }

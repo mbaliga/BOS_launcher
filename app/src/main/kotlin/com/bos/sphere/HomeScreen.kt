@@ -1019,8 +1019,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 // STR-02: reports whether the app started, so a failed open keeps Launchpad up with a message.
                 launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
                 menu = lpMenu,
-                // Wave 25 (STR-02): the floating compose button has no composer of its own to open, so it opens Radar on People (reach someone to message).
-                onCompose = { leftOpen = false; radarScope = com.bos.sphere.core.data.SearchCategory.Contacts; wheelOpen = false; drawerOpen = false; searchOpen = true },
                 panelBody = hubPanelBody,
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }

@@ -209,8 +209,6 @@ internal fun NotificationRow(
     onKeyOther: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
     replyOpen: Boolean,
     modifier: Modifier = Modifier,
-    /** Wave 25: the colour of the 4 dp stripe on the leading edge (one per source app). */
-    stripeColor: Color = HubStyle.stripeFor(n.packageName),
     /** Wave 25: the action chips (Reply and the notification's own actions) show only when the row is expanded. */
     actionsOpen: Boolean = false,
 ) {
@@ -221,7 +219,6 @@ internal fun NotificationRow(
     val hoverSource = remember { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
     LaunchedEffect(hovered) { if (hovered) onPointer() }
-    val weight = if (unread) FontWeight.Bold else FontWeight.Normal
     val density = LocalDensity.current
     val reply = remember(n.actions) { ReplyLogic.pick(n.actions) }
     val plain = remember(n.actions) { ReplyLogic.plain(n.actions).take(3) }
@@ -304,33 +301,32 @@ internal fun NotificationRow(
                 .heightIn(min = RoomyList.ROW_MIN_DP.dp)
                 .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
         ) {
-            // Wave 25 (STR-02): the hub's 4 dp stripe, the full height of the row, one colour per source app.
-            Box(Modifier.width(HubStyle.STRIPE_DP.dp).fillMaxHeight().background(stripeColor).testTag("lp.stripe.${n.key}"))
+            // Wave 27 (the owner's Comms mock-up): no stripe. A 56 dp rounded app icon, the headline (a message's text; else the title) in 24 sp,
+            // a grey second line (the sender; else the text) with the time right-aligned on it.
             Row(
-                Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp, end = RoomyList.H_PAD_DP.dp, top = RoomyList.V_PAD_DP.dp, bottom = RoomyList.V_PAD_DP.dp),
+                Modifier.weight(1f).fillMaxHeight().padding(horizontal = CommsStyle.H_PAD_DP.dp, vertical = CommsStyle.ROW_V_PAD_DP.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-            AppIcon(n.packageName, n.appLabel.ifBlank { n.title }, RoomyList.ICON_DP, Modifier.testTag("lp.badge.${n.key}"))
-            Spacer(Modifier.width(12.dp))
+            AppIcon(n.packageName, n.appLabel.ifBlank { n.title }, CommsStyle.ICON_DP, Modifier.testTag("lp.badge.${n.key}"))
+            Spacer(Modifier.width(CommsStyle.TEXT_GAP_DP.dp))
+            val messaging = n.isMessaging && n.summary.isNotEmpty()
+            val headline = if (messaging) n.summary else n.title.ifBlank { n.summary }
+            val second = if (messaging) n.title else if (n.title.isNotBlank()) n.summary.ifBlank { n.appLabel } else n.appLabel
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    headline, color = if (unread && !silent) LocalLp.current.ink else LocalLp.current.ink2, fontSize = CommsStyle.TITLE_SP.sp, fontWeight = FontWeight.Normal,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("lp.title.${n.key}"),
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        n.title, color = LocalLp.current.ink, fontSize = 16.sp, fontWeight = weight,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                        second, color = LocalLp.current.dim, fontSize = CommsStyle.SUB_SP.sp, fontWeight = FontWeight.Normal,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("lp.preview.${n.key}"),
                     )
                     Spacer(Modifier.width(8.dp))
-                    if (pinned || important) Box(Modifier.padding(end = 6.dp).size(6.dp).background(BlueLight, CircleShape))
+                    if (pinned || important) Box(Modifier.padding(end = 6.dp, bottom = 5.dp).size(6.dp).background(BlueLight, CircleShape))
                     Text(
-                        formatStamp(n.timestamp, now, is24, zone), color = LocalLp.current.dim, fontSize = 12.sp,
-                        fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal, maxLines = 1,
-                        modifier = Modifier.testTag("lp.time.${n.key}"),
-                    )
-                }
-                if (n.summary.isNotEmpty()) {
-                    Text(
-                        n.summary, color = if (unread && !silent) LocalLp.current.ink2 else LocalLp.current.dim, fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp).testTag("lp.preview.${n.key}"),
+                        formatStamp(n.timestamp, now, is24, zone), color = LocalLp.current.dim, fontSize = CommsStyle.TIME_SP.sp,
+                        maxLines = 1, modifier = Modifier.testTag("lp.time.${n.key}"),
                     )
                 }
             }
@@ -361,7 +357,7 @@ internal fun NotificationRow(
         if (replyOpen && reply != null) {
             ReplyRow(reply, hint = reply.reply?.hint, onSend = { text -> handlers.onSendReply(reply, text) })
         }
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(LocalLp.current.line))
+        Box(Modifier.padding(horizontal = CommsStyle.H_PAD_DP.dp).fillMaxWidth().height(0.5.dp).background(LocalLp.current.line).testTag("lp.rowLine.${n.key}"))
     }
 }
 

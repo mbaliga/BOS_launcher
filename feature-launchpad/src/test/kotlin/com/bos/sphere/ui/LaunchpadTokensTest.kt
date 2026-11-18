@@ -12,8 +12,9 @@ import org.junit.Test
 class LaunchpadTokensTest {
     @Test fun CFG_10_launchpadPaletteIsTheSharedTokensForDarkAndLight() {
         val d = HyleColors.tokens(ThemeVariant.Dark); val l = HyleColors.tokens(ThemeVariant.Light)
-        assertEquals(d.background, LpDark.bg); assertEquals(d.surface, LpDark.surface); assertEquals(d.inkBright, LpDark.ink)
-        assertEquals(d.inkDim, LpDark.dim); assertEquals(d.hairline, LpDark.line)
+        // Wave 27: the dark look is the owner's Comms mock-up palette (near-black navy page, #1A1A1A panel); only the light look is the shared tokens.
+        assertEquals(CommsStyle.DarkBg, LpDark.bg); assertEquals(CommsStyle.DarkPanel, LpDark.surface); assertEquals(CommsStyle.DarkInk, LpDark.ink)
+        assertEquals(CommsStyle.DarkDim, LpDark.dim); assertEquals(CommsStyle.DarkLine, LpDark.line)
         assertEquals(l.background, LpLight.bg); assertEquals(l.surface, LpLight.surface); assertEquals(l.inkBright, LpLight.ink)
     }
 

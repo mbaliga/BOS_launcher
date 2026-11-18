@@ -41,6 +41,7 @@ import com.bos.sphere.ui.viz.VizKey
 import com.bos.sphere.ui.viz.VizLegend
 import com.bos.sphere.ui.viz.VizPart
 import com.bos.sphere.ui.viz.VizStack
+import com.bos.sphere.ui.viz.rememberStackLabelFits
 import com.bos.sphere.ui.viz.VizStat
 import com.bos.sphere.ui.viz.VizStepColumn
 import com.bos.sphere.ui.viz.VizSteps
@@ -157,16 +158,24 @@ private fun UsageReady(week: UsageWeek, tone: VizTone, labelOf: (String) -> Stri
             week.columns.indices.map { listOf(UsageTexts.dayCaption(it, week), UsageFormat.full(week.total(it))) }, tone, tagPrefix = "usage.table",
         ) else VizSteps(
             week.columns.mapIndexed { i, c -> VizStepColumn(c.initial, c.totalMs.toDouble(), UsageFormat.compact(c.totalMs), UsageTexts.columnDescription(i, week), accent = c.isToday) },
-            sel, { selected = it }, tone, tagPrefix = "usage.steps",
+            sel, { selected = it }, tone, tagPrefix = "usage.steps", minCell = 36.dp,
         )
     }
     Spacer(Modifier.height(4.dp))
-    VizStack(
-        parts.map { VizPart(it.ms.toDouble(), it.texture, "${it.percent}%", UsageTexts.partDescription(it, labelOf), it.key) }, tone, tagPrefix = "usage.stack",
-    )
-    VizLegend(
-        parts.map { VizKey(it.texture, UsageTexts.nameOf(it.key, labelOf), UsageFormat.full(it.ms), it.key) }, tone,
-        Modifier, tagPrefix = "usage.legend",
-        lead = { k -> if (k.tag.isNotEmpty()) AppIcon(k.tag, k.label, 14) },
-    )
+    // Wave 29: the percentage is printed on the stack parts wide enough for it and in the legend line of the others: one place each, never both.
+    var picked by rememberSaveable(sel) { mutableIntStateOf(-1) }
+    val vparts = parts.map { VizPart(it.ms.toDouble(), it.texture, "${it.percent}%", UsageTexts.partDescription(it, labelOf), it.key) }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val fits = rememberStackLabelFits(vparts, maxWidth)
+        Column(Modifier.fillMaxWidth()) {
+            VizStack(vparts, tone, tagPrefix = "usage.stack", labelFits = fits, highlight = com.bos.sphere.ui.viz.clampPick(picked, parts.size))
+            Spacer(Modifier.height(8.dp))
+            VizLegend(
+                parts.mapIndexed { i, it -> VizKey(it.texture, UsageTexts.nameOf(it.key, labelOf), UsageFormat.full(it.ms), it.key, percent = if (fits.getOrNull(i) == true) null else "${it.percent}%") }, tone,
+                Modifier, tagPrefix = "usage.legend", textSp = CommsStyle.NOTE_SP,
+                selected = com.bos.sphere.ui.viz.clampPick(picked, parts.size), onSelect = { picked = if (picked == it) -1 else it },
+                lead = { k -> if (k.tag.isNotEmpty()) AppIcon(k.tag, k.label, 16) },
+            )
+        }
+    }
 }

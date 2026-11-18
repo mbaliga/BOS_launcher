@@ -317,6 +317,7 @@ fun LaunchpadPanel(
         val groups by GroupsSettings.config.collectAsStateWithLifecycle()
         val contacts = rememberContactDirectory()
         val sys = rememberSystemSnapshot()
+        val dnd = rememberDndOn() // wave 24: Priority groups break through Do Not Disturb in Liftoff's own UI
         LaunchedEffect(items) {
             // An empty feed can be the listener reconnecting; neither read marks nor snoozes are forgotten because of it.
             LaunchpadSettings.pruneToFeed(items.map { it.key }.toSet(), System.currentTimeMillis())
@@ -328,6 +329,7 @@ fun LaunchpadPanel(
             endInset = cardInset,
             policies = policies, snoozed = snoozed, askedBefore = asked,
             groups = groups, contacts = contacts,
+            dndOn = dnd,
             systemState = sys,
             onOpenSystemPanel = { openSystemPanel(ctx, it) },
             onSnooze = { n, until -> LaunchpadSettings.snooze(n.key, until) },
@@ -416,6 +418,8 @@ fun LaunchpadContent(
     sendReply: ((HubAction, String) -> Boolean)? = null,
     openApp: ((String) -> Boolean)? = null,
     zone: ZoneId = remember { ZoneId.systemDefault() },
+    /** Wave 24: system Do Not Disturb is on (read only); with a Priority group the column says Priority still breaks through. */
+    dndOn: Boolean = false,
 ) {
     val ctx = LocalContext.current
     val is24 = remember(ctx) { DateFormat.is24HourFormat(ctx) }
@@ -430,6 +434,7 @@ fun LaunchpadContent(
     var unreadOnly by remember { mutableStateOf(false) }
     var groupFor by remember { mutableStateOf<HubNotification?>(null) }
     var ruleFrom by remember { mutableStateOf<HubNotification?>(null) }
+    var groupsOpen by remember { mutableStateOf(false) } // wave 24: the Groups manager inside Launchpad
     val shown = remember(items, readKeys, unreadOnly) { if (unreadOnly) items.filter { it.key !in readKeys } else items }
     val toast = remember { mutableStateOf<String?>(null) }
     LaunchedEffect(toast.value) { if (toast.value != null) { delay(1400); toast.value = null } }
@@ -634,10 +639,14 @@ fun LaunchpadContent(
         LaunchpadHeader(
             counts = counts, filter = activeFilter, mode = prefs.defaultMode,
             onFilter = { filter = it }, onMode = onSetDefaultMode, onClearAll = onClearAll,
-            canClear = items.isNotEmpty(), onClose = onClose,
+            canClear = items.isNotEmpty(), onClose = onClose, onGroups = { groupsOpen = true },
             onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
         )
         if (systemState != null && hasAccess) SystemStateRow(systemState, is24, onOpenSystemPanel)
+        if (hasAccess && com.bos.sphere.core.data.GroupDnd.breaksThrough(groups, dndOn)) Text(
+            L10n.tr("Do Not Disturb is on. Only Priority groups light the edge indicator."), color = LocalLp.current.dim, fontSize = 13.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = RoomyList.H_PAD_DP.dp, vertical = 6.dp).testTag("lp.dnd"),
+        )
         GrantGate(
             kind = GrantKind.Notifications, granted = hasAccess, askedBefore = askedBefore, onEnable = onRequestAccess,
             colors = GrantColors(LocalLp.current.bg, LocalLp.current.surface, LocalLp.current.ink, LocalLp.current.dim, BlueLight, Color.White),
@@ -727,6 +736,7 @@ fun LaunchpadContent(
             )
         }
     }
+    LaunchpadGroupsOverlay(groupsOpen, items) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
     groupFor?.let { n ->
         GroupAssignSheet(
             n, groups, contacts, items,
@@ -760,6 +770,7 @@ private fun LaunchpadHeader(
     canClear: Boolean,
     onClose: () -> Unit,
     onDoubleTap: () -> Unit,
+    onGroups: () -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     val ink = LocalLp.current.ink
@@ -817,6 +828,11 @@ private fun LaunchpadHeader(
                             onClick = { onFilter(c.packageName); open = false },
                         )
                     }
+                    // Wave 24 (STR-13): groups, people and rules two taps away from the notifications they change.
+                    DropdownMenuItem(
+                        text = { Text("     " + L10n.tr("Groups and rules…")) },
+                        onClick = { open = false; onGroups() }, modifier = Modifier.testTag("lp.menu.groups"),
+                    )
                     if (canClear) {
                         MenuLabel("")
                         DropdownMenuItem(

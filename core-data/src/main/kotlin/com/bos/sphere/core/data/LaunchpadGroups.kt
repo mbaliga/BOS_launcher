@@ -75,10 +75,15 @@ data class GroupsConfig(
     val rules: List<GroupRule> = emptyList(),
     /** The user's own last name (private; typed, or prefilled from the owner profile when the contacts grant exists). */
     val myLastName: String = "",
+    /**
+     * Wave 24: while system Do Not Disturb is on, only Priority groups light Liftoff's own edge indicator and Glance dot (they
+     * "break through"); the list itself still shows everything. Liftoff never changes Do Not Disturb. Default on.
+     */
+    val priorityBreaksDnd: Boolean = true,
     /** Fields of the stored object this build does not know (JSON text), kept for a round trip. */
     val extra: String = "{}",
 ) {
-    val isEmpty: Boolean get() = groups.isEmpty() && people.isEmpty() && assignments.isEmpty() && rules.isEmpty() && myLastName.isBlank()
+    val isEmpty: Boolean get() = groups.isEmpty() && people.isEmpty() && assignments.isEmpty() && rules.isEmpty() && myLastName.isBlank() && priorityBreaksDnd
     fun group(id: String?): LaunchpadGroup? = id?.let { i -> groups.firstOrNull { it.id == i } }
     fun person(id: String): Person? = people.firstOrNull { it.id == id }
 
@@ -176,6 +181,8 @@ object GroupsEdit {
     }
 
     fun setMyLastName(c: GroupsConfig, name: String) = c.copy(myLastName = name.trim().take(60))
+
+    fun setPriorityBreaksDnd(c: GroupsConfig, on: Boolean) = c.copy(priorityBreaksDnd = on)
 
     /**
      * "This is the same person as...": joins two sender names (or a contact) into one stored [Person]. Assignments made for

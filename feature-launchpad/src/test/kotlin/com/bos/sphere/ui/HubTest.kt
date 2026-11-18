@@ -363,6 +363,43 @@ class HubTest {
         assertTrue(rows().isEmpty())
     }
 
+    // Wave 26 (audit of wave 25)
+    @Test fun HUB_16_aHalfMadeDeleteConfirmationIsNotFoundPendingWhenTheOptionsOpenAgain() {
+        host()
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("hub.deleteHistory").performClick(); rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("hub.deleteConfirm").assertExists()
+        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()  // closed without answering
+        rule.onNodeWithTag("hub.options").performClick(); rule.mainClock.advanceTimeByFrame()  // opened again
+        rule.onNodeWithTag("hub.deleteConfirm").assertDoesNotExist()
+        rule.onNodeWithTag("hub.deleteHistory").assertExists()
+        assertEquals(4, rows().size)
+    }
+
+    @Test fun HUB_13_theEmptyStatesSayWhyTheListIsEmpty() {
+        store.deleteAll()
+        host()
+        rule.onNodeWithText("No notifications in history yet").assertExists()
+        rule.onNodeWithTag("hub.view.unread").performClick(); rule.waitForIdle()
+        rule.onNodeWithText("No unread notifications").assertExists()
+        rule.onNodeWithTag("hub.view.read").performClick(); rule.waitForIdle()
+        rule.onNodeWithText("Nothing read yet").assertExists()
+    }
+
+    @Test fun HUB_13_withoutNotificationAccessTheHubSaysNewNotificationsAreNotRecordedAndOffersTheGrant() {
+        var asked = 0
+        rule.setContent {
+            CompositionLocalProvider(LocalLp provides LpDark) {
+                HubBody(state, now, zone, true, liveKeys = emptySet(), onOpen = {}, onMore = {}, hasAccess = false, onRequestAccess = { asked++ })
+            }
+        }
+        rule.onNodeWithTag("hub.noAccess").assertExists()
+        rule.onNodeWithText("Notification access is off, so new notifications are not recorded.").assertExists()
+        rule.onNodeWithTag("hub.grant").performClick()
+        assertEquals(1, asked)
+    }
+
     @Test fun HUB_16_theHardwareKeyboardSwitchesViewsChangesDensityAndMarksRead() {
         host()
         rule.onNodeWithTag("host").requestFocus()

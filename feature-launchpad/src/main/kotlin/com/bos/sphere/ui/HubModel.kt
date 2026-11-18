@@ -138,7 +138,11 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
         private set
     var defaultView by mutableStateOf(prefs.defaultView)
         private set
-    var optionsOpen by mutableStateOf(false)
+    private var optionsOpenState by mutableStateOf(false)
+    /** Wave 26 (audit): closing or opening the options always drops a half-made "Delete history" confirmation, so it is never found pending on the next visit. */
+    var optionsOpen: Boolean
+        get() = optionsOpenState
+        set(v) { optionsOpenState = v; confirmDelete = false }
     var confirmDelete by mutableStateOf(false)
     var undo by mutableStateOf<HubUndo?>(null)
     private var filterMap by mutableStateOf(emptyMap<HubView, HubFilters>())

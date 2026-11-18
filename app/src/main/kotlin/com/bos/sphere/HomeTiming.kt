@@ -21,6 +21,7 @@ object HomeTiming {
         if (reported) return
         withFrameNanos { }
         reported = true
+        ColdStart.firstFrameDrawn(context) // NFR-12 (wave 23): the Lab's cold-start readout
         Trace.endAsyncSection(TraceSections.HOME_INTERACTIVE, COOKIE)
         var c: Context? = context
         while (c is ContextWrapper) { if (c is Activity) { c.reportFullyDrawn(); break }; c = c.baseContext }

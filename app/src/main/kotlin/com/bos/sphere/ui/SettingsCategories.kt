@@ -735,7 +735,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     if (m.lab.isNotEmpty() && LabGate.visible()) { // CFG-17
         out += SettingCategory(
             x("Lab"), Glyphs.Sliders,
-            listOf<SettingItem>(SettingItem.Action(x("Copy all results"), Glyphs.Info, "", onClick = { m.copyText(m.lab.joinToString("\n\n") { "${it.title}\n${it.result}" }) })) +
+            listOf<SettingItem>(SettingItem.Action(x("Copy all results"), Glyphs.Info, "", onClick = { m.copyText(m.lab.joinToString("\n\n") { "${it.title}\n${it.result}" }) }), deviceChecksItem()) + // wave 23: the Device checks page (frame timing, cold start, checklist, report)
                 m.lab.map { e -> SettingItem.Action(e.title, Glyphs.Bolt, e.result, navigates = e.run != null, onClick = { e.run?.invoke() }) },
         )
     }

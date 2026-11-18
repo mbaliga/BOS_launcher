@@ -463,12 +463,27 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         android.widget.Toast.makeText(context, L10n.tr("Home landing: %s", L10n.tr(next.label)), android.widget.Toast.LENGTH_SHORT).show()
     }
 
+    // INP-05, STR-14 (wave 24): "Focus the dock" (Ctrl+H) and "Open recents" with Right side = Dock rail. Whatever hides the rail
+    // (DockLayer's visible flags, the Recents panel included) is closed first, unless no rail can appear: then nothing closes and a toast says why.
+    fun focusDockFromHome(c: com.bos.sphere.core.input.LauncherCommand): Boolean = com.bos.sphere.ui.FocusDockRouting.focusDock(
+        c, overlayOpen = searchOpen || drawerOpen || wheelOpen || leftOpen || rightOpen || settingsOpen,
+        closeOverlays = { searchOpen = false; drawerOpen = false; wheelOpen = false; leftOpen = false; rightOpen = false; settingsOpen = false },
+        dock = dockController::handle,
+        noDock = com.bos.sphere.ui.FocusDockRouting.noDock(
+            landing, com.bos.sphere.core.data.ChromeSettings.of(prefs),
+            com.bos.sphere.feature.dock.WorkspaceRepository.get(context).current.dock.isEnabled(com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs())),
+            editing = homeEdit.active, // the rail is hidden while the home is edited (DockLayer's visible flag)
+        ),
+        onNoDock = { why -> android.widget.Toast.makeText(context, L10n.tr(why.message), android.widget.Toast.LENGTH_SHORT).show() },
+    )
+
     // STR-14: "Open recents" (edge swipe, handle, shortcut, corner or gesture). Recents panel: opens the right-hand card; Dock rail: reveals the
     // existing dock rail; Off: says so (never nothing).
     fun openRecents(): Boolean {
         return when (prefs.rightSide) {
             com.bos.sphere.core.data.RightSide.RecentsPanel -> { leftOpen = false; rightOpen = true; true }
-            com.bos.sphere.core.data.RightSide.DockRail -> { dockController.handle(com.bos.sphere.core.input.LauncherCommand.FocusDock); true }
+            // Wave 24: the same route as Ctrl+H, so what hides the rail closes first (the drawer, Radar...) and, with no rail to come, a toast says why.
+            com.bos.sphere.core.data.RightSide.DockRail -> { focusDockFromHome(com.bos.sphere.core.input.LauncherCommand.FocusDock); true }
             com.bos.sphere.core.data.RightSide.Off -> {
                 android.widget.Toast.makeText(context, L10n.tr("The right side is off. Turn it on in Ground Control, Home, Right side."), android.widget.Toast.LENGTH_SHORT).show()
                 false
@@ -559,11 +574,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 // Workspace switching and the dock's focus and number shortcuts belong to the dock controller (DCK-05, WSP-07).
                 // INP-05: Dock 1 to 9 and the workspace step act with Radar, the drawer, Ground Control or the puck open (the controller
                 // falls back to the pin list when no rail is shown); "focus dock" closes whatever hides the rail so the rail can take focus.
-                com.bos.sphere.core.input.LauncherCommand.FocusDock -> com.bos.sphere.ui.FocusDockRouting.focusDock(
-                    c, overlayOpen = searchOpen || drawerOpen || wheelOpen || leftOpen || settingsOpen,
-                    closeOverlays = { searchOpen = false; drawerOpen = false; wheelOpen = false; leftOpen = false; settingsOpen = false },
-                    dock = dockController::handle,
-                )
+                com.bos.sphere.core.input.LauncherCommand.FocusDock -> focusDockFromHome(c)
                 else -> dockController.handle(c)
             }
         },

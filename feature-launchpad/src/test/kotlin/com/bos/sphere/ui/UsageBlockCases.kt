@@ -70,7 +70,7 @@ abstract class UsageBlockCases(private val orientation: String) : LaunchpadShots
         val block = rule.onNodeWithTag("usage.block").getUnclippedBoundsInRoot(); val row = rule.onNodeWithTag("timeline.row.0").getUnclippedBoundsInRoot()
         assertTrue("block ${block.bottom} above the first row ${row.top}", block.bottom.value <= row.top.value + 0.5f)
         val h = block.bottom.value - block.top.value
-        assertTrue("the block is $h dp high (about 120 to 150 dp, a little more with a five-key legend that wraps)", h in 120f..185f)
+        assertTrue("the block is $h dp high (wave 29: five 24 dp legend lines 8 dp apart under the chart)", h in 230f..300f)
         assertEquals("same horizontal margin as the list", 20f, block.left.value, 0.5f)
         assertEquals("a quiet header line with the total", "Today, 2 h 34 min", desc("usage.stat"))
     }

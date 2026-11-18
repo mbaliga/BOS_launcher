@@ -244,8 +244,15 @@ private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, App
     LazyColumn(Modifier.testTag("timeline.list")) {
         item { com.bos.sphere.ui.UsageTimelineBlock(usage, labelOf) }
         item {
-            SettingChips(TimelineDepth.entries, depth, { L10n.tr(it.label) }, ink) { depth = it; prefs.timelineDepth = it }
-            SettingChips(listOf(true, false), withScheduled, { if (it) L10n.tr("With scheduled launches") else L10n.tr("Opens only") }, ink) { withScheduled = it; prefs.timelineScheduled = it }
+            // Wave 29: one flat scrolling row (range, then kind), not two rows of pills; the same persisted prefs.
+            val depthText = mapOf(TimelineDepth.Short to ("30" to "Last 30 opens"), TimelineDepth.Medium to ("100" to "Last 100 opens"), TimelineDepth.Full to (L10n.tr("All") to "Everything recorded, up to 5000"))
+            com.bos.sphere.ui.CommsFilterRow(
+                listOf(
+                    TimelineDepth.entries.map { d -> com.bos.sphere.ui.FilterOpt(depthText.getValue(d).first, L10n.tr(depthText.getValue(d).second), d == depth, "timeline.filter.range.${d.name}") { depth = d; prefs.timelineDepth = d } },
+                    listOf(true, false).map { s -> com.bos.sphere.ui.FilterOpt(if (s) L10n.tr("Scheduled") else L10n.tr("Opens only"), if (s) L10n.tr("With scheduled launches") else L10n.tr("Opens only"), s == withScheduled, "timeline.filter.kind.${if (s) "scheduled" else "opens"}") { withScheduled = s; prefs.timelineScheduled = s } },
+                ),
+                Modifier.padding(top = 4.dp),
+            )
         }
         if (entries.isEmpty()) item { Text(L10n.tr("Nothing yet. Opened apps and scheduled launches appear here."), color = ink.ink, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) }
         itemsIndexed(rows) { i, r ->

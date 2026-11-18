@@ -166,11 +166,7 @@ object VoiceStates {
  * held) works too. Draws nothing when the device has no on-device recogniser. The text goes to [onText] as it comes.
  */
 @Composable
-<<<<<<< HEAD
-fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}, size: androidx.compose.ui.unit.Dp = GlassSpec.BigButton) {
-=======
-fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}, recogniserOverride: OnDeviceRecogniser? = null) {
->>>>>>> w23-auditSweep
+fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, availableOverride: Boolean? = null, shade: Float = 0f, onFocusChange: (Boolean) -> Unit = {}, size: androidx.compose.ui.unit.Dp = GlassSpec.BigButton, recogniserOverride: OnDeviceRecogniser? = null) {
     val context = LocalContext.current
     val available = remember(context, availableOverride) { availableOverride ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
     if (!available) return

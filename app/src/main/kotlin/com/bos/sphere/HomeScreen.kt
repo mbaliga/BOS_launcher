@@ -757,13 +757,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // WSP-05: a group placed on the page grid runs like the dock's group item.
     homeItems.runGroup = { g -> scope.launch { appLauncher.runGroup(g) } }
-<<<<<<< HEAD
     // Wave 24: an item placed from Glance, Recents or All apps lands on pages; show the landing that draws them.
     homeItems.onPlaced = { com.bos.sphere.core.data.HomePlacementLanding.after(stores.prefs.prefs.value.homeLanding)?.let { l -> stores.prefs.update { it.copy(homeLanding = l) } } }
-    val contactSource = remember { if (true) com.bos.sphere.core.data.ContactSource(context) else null }
-=======
     val contactSource = remember { com.bos.sphere.core.data.ContactSource(context) }
->>>>>>> w23-auditSweep
     val searchHub = remember {
         val palette = com.bos.sphere.feature.search.palette.PaletteHost.get(context)
         com.bos.sphere.feature.search.palette.FileIndexScheduler.schedule(context)

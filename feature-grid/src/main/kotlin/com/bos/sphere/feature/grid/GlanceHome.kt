@@ -168,9 +168,10 @@ fun GlanceSurface(
     /** Wave 17: the indicator's Launchpad glyph and its right-hand dots are real buttons. */
     onOpenLaunchpad: () -> Unit = {},
     onOpenRight: () -> Unit = {},
-    /** Wave 26: how many stops the deck has after Glance (the pages; the scroll counts as one): the dots count Glance as the first stop, a tap steps forward. 0 draws none. */
-    pageStops: Int = 0,
-    onOpenPages: () -> Unit = {},
+    /** Wave 28: the home hosts the ONE page indicator above its pager (it counts Glance as the first stop); false: this surface draws none. True (default): a standalone Glance draws the indicator with the one stop. */
+    indicator: Boolean = true,
+    /** Called when the user touches the surface (a tap, a control): the host wakes the indicator it draws. */
+    onAwake: () -> Unit = {},
     gestures: HomeGestureSpec? = null,
     dark: Boolean = isDarkSurface(),
     underlay: @Composable () -> Unit = {},
@@ -195,12 +196,12 @@ fun GlanceSurface(
         }
     }
     var awakeNonce by remember { mutableIntStateOf(0) }
-    fun interact() { pop = pop.interact(SystemClock.uptimeMillis(), hideMs); awakeNonce++ }
-    fun tapSurface() { pop = pop.tapSurface(SystemClock.uptimeMillis(), playing, hideMs); awakeNonce++ }
+    fun interact() { pop = pop.interact(SystemClock.uptimeMillis(), hideMs); awakeNonce++; onAwake() }
+    fun tapSurface() { pop = pop.tapSurface(SystemClock.uptimeMillis(), playing, hideMs); awakeNonce++; onAwake() }
 
     val effect = if (GlanceContent.showsWeather(items)) GlanceWeather.effectOf(weather, GlanceWeather.isDaylight(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))) else null
 
-    BoxWithConstraints(modifier.fillMaxSize().background(if (dark) Color.Black else Color(0xFFF3F3F6))) {
+    BoxWithConstraints(modifier.fillMaxSize().background(if (dark) Color.Black else Color(0xFFF3F3F6)).testTag("glance.surface")) {
         val w = maxWidth.value; val h = maxHeight.value
         GlanceWeatherLayer(effect, prefs.glanceWeatherIntensity, dark)
         underlay()
@@ -237,8 +238,11 @@ fun GlanceSurface(
         }
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             GlanceHotspotLayer(hotspots, appsByKey, onRun, tint = inkDim)
-            if (pageStops > 0) DeckDots(pageStops + 1, 0, ink, Modifier.align(Alignment.BottomCenter).padding(bottom = if (prefs.glanceIndicator) 34.dp else 4.dp), onOpenPages)
-            if (prefs.glanceIndicator) GlanceIndicator(hasLaunchpad, rightDestinations, awakeNonce, reduced, ink, Modifier.align(Alignment.BottomCenter), onOpenLaunchpad, onOpenRight)
+            if (indicator && prefs.glanceIndicator) PageIndicator(
+                count = 0, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
+                onMenu = if (hasLaunchpad) onOpenLaunchpad else null, menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad",
+                rtl = LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl, onGlance = {}, glanceCurrent = true, right = rightDestinations, onRight = onOpenRight, quiet = true, awakeNonce = awakeNonce,
+            )
         }
     }
 }
@@ -443,35 +447,8 @@ private fun GlanceControlButton(id: String, glyph: ImageVector, label: String, e
     ) { Icon(glyph, null, tint = Color.White, modifier = Modifier.padding(top = GlanceNotch.ICON_TOP_DP.dp).size(GlanceNotch.ICON_DP.dp)) }
 }
 
-/**
- * The small, quiet row at the bottom centre: Launchpad (list glyph), home (current, brighter, not interactive), the right-side dots.
- * Wave 17: the list glyph and each dot are buttons (48 dp targets, labels) that open Launchpad and the right-hand destination.
- * Mirrors in RTL.
- */
 @Composable
-internal fun GlanceIndicator(
-    hasLaunchpad: Boolean, right: List<RightDestination>, awakeNonce: Int, reduced: Boolean, ink: Color, modifier: Modifier = Modifier,
-    onOpenLaunchpad: () -> Unit = {}, onOpenRight: () -> Unit = {},
-) {
-    var awake by remember { mutableStateOf(true) }
-    LaunchedEffect(awakeNonce) { awake = true; delay(4000); awake = false }
-    val a by animateFloatAsState(if (awake) 1f else 0.38f, tween(if (reduced) 0 else 600), label = "glanceIndicator")
-    Row(
-        modifier.padding(bottom = 4.dp).graphicsLayer { alpha = a },
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        if (hasLaunchpad) IndicatorButton("glance.indicator.launchpad", L10n.tr("Open Comms"), onOpenLaunchpad) { Icon(Glyphs.Menu, null, tint = ink.copy(alpha = 0.55f), modifier = Modifier.size(16.dp)) }
-        // The current surface: not interactive, one spoken line.
-        Box(Modifier.size(32.dp).semantics { contentDescription = L10n.tr("Glance home") }, contentAlignment = Alignment.Center) { Icon(Glyphs.Home, null, tint = ink, modifier = Modifier.size(18.dp)) }
-        for (d in right) {
-            val label = L10n.tr(if (d == RightDestination.Recents) "Open recents" else "Show the dock")
-            IndicatorButton("glance.indicator.right.${d.name}", label, onOpenRight) { Box(Modifier.size(5.dp).background(ink.copy(alpha = 0.55f), CircleShape)) }
-        }
-    }
-}
-
-@Composable
-private fun IndicatorButton(tag: String, label: String, onClick: () -> Unit, glyph: @Composable () -> Unit) {
+internal fun IndicatorButton(tag: String, label: String, onClick: () -> Unit, glyph: @Composable () -> Unit) {
     Box(
         Modifier.size(48.dp).clip(CircleShape).testTag(tag)
             .launcherItem(tag, focusable = true, onActivate = onClick, ringRadiusDp = 24f)
@@ -502,25 +479,4 @@ internal fun rememberBatteryPercent(): Int {
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
     return pct
-}
-
-/**
- * Wave 26: the deck dots on Glance. [stops] counts Glance as the first stop, then one per page (the scroll is one stop); [current] is lit.
- * Drawn in the layout direction of its parent, which the home sets from the order (so right to left puts the first stop at the right).
- * A tap on any dot after the first steps forward to the first page: the visible way from Glance to the pages.
- */
-@Composable
-internal fun DeckDots(stops: Int, current: Int, ink: Color, modifier: Modifier = Modifier, onForward: () -> Unit = {}) {
-    Row(
-        modifier.testTag("glance.deckdots")
-            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clickable(role = Role.Button, onClickLabel = L10n.tr("Next page"), onClick = onForward)
-            .semantics { contentDescription = L10n.tr("Glance home, stop %s of %s", current + 1, stops) },
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-    ) {
-        for (i in 0 until stops) {
-            val on = i == current
-            Box(Modifier.size(if (on) 8.dp else 6.dp).background(ink.copy(alpha = if (on) 0.9f else 0.4f), CircleShape).testTag("glance.deckdot.$i"))
-        }
-    }
 }

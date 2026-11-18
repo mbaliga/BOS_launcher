@@ -44,10 +44,10 @@ class HomeLandingW12AuditTest {
 
     @Test fun HOM_22_theHomeSettingsArePlainExportedPrefsInLauncherPrefsNotDeviceBoundKeysAndTheLandingKeyIsRetired() {
         val stores = text("core-data/src/main/kotlin/com/bos/sphere/core/data/LauncherStores.kt")
-        for (k in listOf("glanceEnabled", "homeOrder", "pagesModeChosen")) assertTrue(k, stores.contains("put") && stores.contains("\"$k\""))
+        for (k in listOf("glanceEnabled", "homeOrder", "homePages")) assertTrue(k, stores.contains("put") && stores.contains("\"$k\""))
         assertFalse("the landing is not written any more", stores.contains("putString(\"homeLanding\""))
         val schema = text("core-data/src/main/kotlin/com/bos/sphere/core/data/StateSchema.kt")
-        for (k in listOf("glanceEnabled", "homeOrder", "pagesModeChosen")) assertFalse(schema.substringAfter("DEVICE_BOUND_PREF_KEYS").substringBefore("\n").contains(k))
+        for (k in listOf("glanceEnabled", "homeOrder", "homePages")) assertFalse(schema.substringAfter("DEVICE_BOUND_PREF_KEYS").substringBefore("\n").contains(k))
     }
 
     @Test fun HOM_22_noNewAnimationOrNetworkInTheLandingLogic() {

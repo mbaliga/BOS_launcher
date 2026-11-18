@@ -12,12 +12,12 @@ object HomeShownRules {
     /** What a long press on empty home does. */
     enum class LongPress { EditHome, QuickSheet }
 
-    /** A long press edits the pages; on Glance it opens the quick sheet (which has "Add page"). */
+    /** A long press edits the pages; on Glance it opens the quick sheet (Pages chips, "Edit home", and "Add page" when Pages is Paginated). */
     fun longPress(s: HomeShown): LongPress = if (s == HomeShown.Pages) LongPress.EditHome else LongPress.QuickSheet
 
     fun allowsEditMode(s: HomeShown): Boolean = s == HomeShown.Pages
 
-    /** The surface "Edit home pages" and "Add page" go to. */
+    /** The surface "Edit home" and "Add page" go to. */
     val editHomePagesSurface: HomeShown = HomeShown.Pages
 
     /** Pages (page dots, the page carousel, folders, widgets and tiles) exist on the pages surface only. */

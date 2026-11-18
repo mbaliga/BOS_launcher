@@ -70,7 +70,7 @@ class GlanceEdgesSmokeTest {
 
     @Test fun STR_01_aFreshStateIsOnGlanceWithTheLeftPageOnLaunchpad() {
         startFresh()
-        assertTrue(LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled); assertTrue(tagShown("glance.deckdots"))
+        assertTrue(LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled); assertTrue(tagShown("glance.surface"))
         assertEquals(LeftPage.Launchpad, LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.leftPage)
     }
     @Test fun STR_01_aTouchSwipeFromTheLeftEdgeOpensLaunchpadOnGlance() { startFresh(); swipeFromLeft(); assertTrue(launchpadShown()) }

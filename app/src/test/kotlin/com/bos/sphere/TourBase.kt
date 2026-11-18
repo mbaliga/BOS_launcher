@@ -65,7 +65,11 @@ abstract class TourBase {
     protected fun settingsShown() = descShown("Close settings")
     protected fun quickSheetShown() = tagShown("quick.glance")
     /** Wave 26: Glance is the surface on screen (its deck dots are drawn only there); otherwise the pages are. */
-    protected fun glanceShown() = tagShown("glance.deckdots")
+    /** Glance is on screen when its title slot is inside the window: the one pager may keep a neighbouring stop composed off screen (wave 28). */
+    protected fun glanceShown(): Boolean {
+        val w = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
+        return rule.onAllNodesWithTag("glance.surface", useUnmergedTree = true).fetchSemanticsNodes().any { it.boundsInRoot.let { b -> b.right > 0f && b.left < w } }
+    }
     protected fun editShown() = descShown("Page carousel")
     protected fun controlsShown() = descShown("Next")
 

@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.bos.sphere.core.data.HomePage
-import com.bos.sphere.core.data.HomeScroll
+import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.HomeStyle
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.LeftPage
@@ -51,8 +51,8 @@ class TourPanesSmokeTest {
     )
 
     private fun variants() = listOf(
-        "Pages" to LauncherPrefs(homeStyle = HomeStyle.Grid, homeScroll = HomeScroll.Paged),
-        "Continuous" to LauncherPrefs(homeStyle = HomeStyle.Grid, homeScroll = HomeScroll.Continuous),
+        "Pages" to LauncherPrefs(homeStyle = HomeStyle.Grid, homePages = HomePages.Paginated),
+        "Continuous" to LauncherPrefs(homeStyle = HomeStyle.Grid, homePages = HomePages.Continuous),
         "List" to LauncherPrefs(homeStyle = HomeStyle.List), "PSP" to LauncherPrefs(homeStyle = HomeStyle.Psp), "DSi" to LauncherPrefs(homeStyle = HomeStyle.Dsi),
     )
 

@@ -234,8 +234,8 @@ fun GridHome(
     reserveStart: Dp = 0.dp,
     reserveEnd: Dp = 0.dp,
     reserveBottom: Dp = 0.dp,
-    /** Wave 26: when Glance is on, the page dots count it as the first stop and this returns to it. */
-    onGlance: (() -> Unit)? = null,
+    /** Wave 28: the home hosts the ONE page indicator above its pager; the grid then draws none of its own. */
+    drawIndicator: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val ex by rememberUpdatedState(extras)
@@ -738,14 +738,13 @@ fun GridHome(
             }
         }
 
-        PageIndicator(
+        if (drawIndicator) PageIndicator(
             count = pageCount,
             current = pagerState.currentPage,
             vertical = indicatorAtStart,
             onSelect = { scope.launch { pagerState.pageTo(it, stillPaging) } },
             onMenu = { onEmptyLongPress(pagerState.currentPage) },
             rtl = rtl,
-            onGlance = onGlance,
             homeIndex = prefs.homePage.coerceIn(0, (pageCount - 1).coerceAtLeast(0)),
             modifier = if (indicatorAtStart) {
                 Modifier.align(Alignment.CenterStart).windowInsetsPadding(safe).padding(start = 14.dp)
@@ -1022,6 +1021,12 @@ private fun Modifier.pageEffect(t: com.bos.sphere.core.data.PageTransition, vert
         }
     }
 
+/**
+ * THE page indicator of the home (wave 28, homeUnify): one component, one place, for every stop of the one pager. When Glance is on it is the first stop
+ * ([onGlance] non-null: the house glyph, lit while Glance shows, [glanceCurrent]); the pages follow as dots (the current one a long pill); on Glance the same
+ * row is the quiet Glance indicator the owner already had (the Comms glyph [onMenu], the house, then the right-hand dots [right]) and fades after a few
+ * seconds when [quiet]. The host draws it ONCE at a fixed place above the pager, so nothing jumps or duplicates when swiping from Glance to page 1.
+ */
 @Composable
 fun PageIndicator(
     count: Int,
@@ -1030,54 +1035,82 @@ fun PageIndicator(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     onMenu: (() -> Unit)? = null,
-    /** Which page carries the house (the one the Home button returns to). */
+    /** Which page carries the house (the one the Home button returns to). Not drawn when the Glance stop (the house) is there. */
     homeIndex: Int = 0,
-    /** Wave 26: right to left order draws the first page's dot at the right (the row is mirrored, whatever the app language is). */
+    /** Wave 26: right to left order draws the first stop at the right (the row is mirrored, whatever the app language is). */
     rtl: Boolean = false,
-    /** Wave 26: Glance is the first stop of the deck: a leading dot (tag "pages.glancedot") that returns to it. Null: Glance is off, no dot. */
+    /** Glance is the first stop: a leading house glyph (tag "pages.glancedot") that goes to it. Null: Glance is off, no stop. */
     onGlance: (() -> Unit)? = null,
+    /** True while Glance is the stop on screen: the house is lit and no page dot is. */
+    glanceCurrent: Boolean = false,
+    /** The label of the leading glyph (Comms by default on the home; "Page options" on a bare grid). */
+    menuLabel: String = com.bos.sphere.core.design.L10n.tr("Page options"),
+    menuTag: String? = null,
+    /** The right-hand dots (Recents, the dock) the Glance indicator always had. */
+    right: List<com.bos.sphere.core.data.RightDestination> = emptyList(),
+    onRight: () -> Unit = {},
+    /** The row dims after a few quiet seconds ([awakeNonce] wakes it); false keeps it fully lit. */
+    quiet: Boolean = false,
+    awakeNonce: Int = 0,
 ) {
-    if (count <= 1 && onGlance == null) return
+    if (count <= 1 && onGlance == null && onMenu == null && right.isEmpty()) return
+    val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    var awake by remember { mutableStateOf(true) }
+    LaunchedEffect(awakeNonce, quiet) { awake = true; if (quiet) { kotlinx.coroutines.delay(4000); awake = false } }
+    val fade by androidx.compose.animation.core.animateFloatAsState(if (awake || !quiet) 1f else 0.38f, androidx.compose.animation.core.tween(if (reduced) 0 else 600), label = "pageIndicator")
+    val stops = count + (if (onGlance != null) 1 else 0)
+    val slot = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.8f / stops.coerceAtLeast(1)).coerceIn(24f, 48f).dp // every stop is a tappable square of this width and 48 dp height
     val content: @Composable () -> Unit = {
-        if (onGlance != null) {
-            Box(
-                Modifier.testTag("pages.glancedot").padding(horizontal = 2.dp).size(24.dp).pointerInput(Unit) { detectTapGesturesSimple { onGlance() } }
-                    .semantics { role = androidx.compose.ui.semantics.Role.Button; contentDescription = com.bos.sphere.core.design.L10n.tr("Glance home, stop %s of %s", 1, count + 1); onClick(com.bos.sphere.core.design.L10n.tr("Glance home")) { onGlance(); true } },
-                contentAlignment = Alignment.Center,
-            ) { Box(Modifier.size(7.dp).background(HyleColors.Ink.copy(alpha = 0.75f), androidx.compose.foundation.shape.CircleShape)) }
-        }
-        // ≡ then ⌂ then the dots: the menu opens this page's options, the house is the first page.
         if (onMenu != null) {
-            Icon(
-                Glyphs.Menu, contentDescription = com.bos.sphere.core.design.L10n.tr("Page options"), tint = HyleColors.InkDim,
-                modifier = Modifier.padding(horizontal = 2.dp).size(16.dp).pointerInput(Unit) { detectTapGesturesSimple { onMenu() } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick(com.bos.sphere.core.design.L10n.tr("Page options")) { onMenu(); true } }.padding(1.dp), // wave 23: TalkBack can activate it
-            )
+            IndicatorButton(menuTag ?: "pages.menu", menuLabel, onMenu) { Icon(Glyphs.Menu, null, tint = HyleColors.InkDim, modifier = Modifier.size(16.dp)) }
+        }
+        if (onGlance != null) {
+            val lit = glanceCurrent
+            // The stop on screen is not interactive (one spoken line); the others are buttons that go to it.
+            Box(
+                Modifier.testTag("pages.glancedot").size(width = slot, height = 48.dp)
+                    .then(if (lit) Modifier.semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Glance home"); selected = true } else Modifier.pointerInput(Unit) { detectTapGesturesSimple { onGlance() } }
+                        .semantics {
+                            role = androidx.compose.ui.semantics.Role.Button; selected = false
+                            contentDescription = com.bos.sphere.core.design.L10n.tr("Glance home, stop %s of %s", 1, stops)
+                            onClick(com.bos.sphere.core.design.L10n.tr("Glance home")) { onGlance(); true }
+                        }),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Glyphs.Home, null, tint = if (lit) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), modifier = Modifier.size(if (lit) 18.dp else 14.dp)) }
         }
         for (i in 0 until count) {
-            val active = i == current
-            if (i == homeIndex) {
-                Icon(
-                    Glyphs.Home, contentDescription = com.bos.sphere.core.design.L10n.tr("Home page"), tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
-                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 16.dp else 14.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick(com.bos.sphere.core.design.L10n.tr("Home page")) { onSelect(i); true } },
-                )
+            val active = !glanceCurrent && i == current
+            val position = i + 1 + (if (onGlance != null) 1 else 0)
+            if (onGlance == null && i == homeIndex) {
+                Box(
+                    Modifier.testTag("pages.dot.$i").size(width = slot, height = 48.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }
+                        .semantics { role = androidx.compose.ui.semantics.Role.Button; selected = active; contentDescription = com.bos.sphere.core.design.L10n.tr("Home page"); onClick(com.bos.sphere.core.design.L10n.tr("Home page")) { onSelect(i); true } },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Glyphs.Home, contentDescription = null, tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), modifier = Modifier.size(if (active) 16.dp else 14.dp)) }
                 continue
             }
             val long by animateDpAsState(if (active) 20.dp else 6.dp, label = "pill")
             Box(
                 Modifier
-                    .padding(4.dp)
-                    .size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp)
-                    .background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp))
-                    .semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Page %s of %s", i + 1, count); role = androidx.compose.ui.semantics.Role.Button; selected = active; onClick(com.bos.sphere.core.design.L10n.tr("Page %s", i + 1)) { onSelect(i); true } }
+                    .testTag("pages.dot.$i")
+                    .size(width = if (vertical) 48.dp else slot, height = if (vertical) slot else 48.dp)
+                    .semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Page %s of %s", position, stops); role = androidx.compose.ui.semantics.Role.Button; selected = active; onClick(com.bos.sphere.core.design.L10n.tr("Page %s", position)) { onSelect(i); true } }
                     .pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp).background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp)))
+            }
+        }
+        for (d in right) {
+            val label = com.bos.sphere.core.design.L10n.tr(if (d == com.bos.sphere.core.data.RightDestination.Recents) "Open recents" else "Show the dock")
+            IndicatorButton("glance.indicator.right.${d.name}", label, onRight) { Box(Modifier.size(5.dp).background(HyleColors.Ink.copy(alpha = 0.55f), androidx.compose.foundation.shape.CircleShape)) }
         }
     }
     if (vertical) {
-        Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { content() }
+        Column(modifier.graphicsLayer { alpha = fade }.testTag("page.indicator"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { content() }
     } else {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-            Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) { content() }
+            Row(modifier.graphicsLayer { alpha = fade }.testTag("page.indicator"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) { content() }
         }
     }
 }

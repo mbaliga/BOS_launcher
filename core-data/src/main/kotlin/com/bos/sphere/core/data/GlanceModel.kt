@@ -184,15 +184,27 @@ object GlanceWeather {
  * The old "Continuous" scroll setting becomes the Scroll mode (and counts as a choice); the old paged layout becomes Paginated.
  */
 object HomeModelMigration {
-    data class Result(val glanceEnabled: Boolean, val pagesModeChosen: Boolean, val pagesMode: HomeScroll)
+    data class Result(val glanceEnabled: Boolean)
 
-    val RETIRED_KEYS = listOf("homeLanding", "landingChosen")
+    /** The keys of the removed model (home landing; wave 28: the Scroll / Paginated choice and its "chosen" flag). Deleted on the next save, read only as migration input. */
+    val RETIRED_KEYS = listOf("homeLanding", "landingChosen", "homeScroll", "pagesModeChosen")
 
-    fun resolve(storedLanding: String?, storedGlanceEnabled: Boolean?, storedPagesChosen: Boolean?, storedHomeScroll: String?): Result {
-        val mode = HomeScroll.entries.firstOrNull { it.name == storedHomeScroll } ?: HomeScroll.Paged
+    fun resolve(storedLanding: String?, storedGlanceEnabled: Boolean?): Result =
         // Whatever the old landing was, Glance is on: the old value only decides nothing now. A stored new value always wins.
-        val glance = storedGlanceEnabled ?: true
-        val chosen = storedPagesChosen ?: (mode == HomeScroll.Continuous)
-        return Result(glance, chosen, mode)
+        Result(storedGlanceEnabled ?: true)
+
+    /**
+     * Wave 28 (homeUnify): the "Pages" setting from what an install stored. A stored `homePages` always wins. Otherwise: a user who chose (or had) the
+     * Scroll gets Continuous, one who chose Paginated gets Paginated, one who never chose gets Paginated when the home already has pages with items
+     * (an existing home never loses its pages) and Off when it has none.
+     */
+    fun pagesMode(storedPages: String?, storedHomeScroll: String?, storedChosen: Boolean?, hasPages: Boolean): HomePages {
+        HomePages.entries.firstOrNull { it.name == storedPages }?.let { return it }
+        if (storedHomeScroll == "Continuous") return HomePages.Continuous
+        if (storedChosen == true) return HomePages.Paginated
+        return if (hasPages) HomePages.Paginated else HomePages.Off
     }
+
+    /** True when the home layout holds anything the user built: more than one page, or an item on the first. */
+    fun hasBuiltPages(pages: List<HomePage>): Boolean = pages.size > 1 || pages.any { it.keys.isNotEmpty() }
 }

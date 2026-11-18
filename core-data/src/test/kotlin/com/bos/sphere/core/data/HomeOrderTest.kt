@@ -39,9 +39,7 @@ class HomeOrderTest {
 
     @Test fun HOM_01_theDeckIsGlanceThenPagesAndGlanceOffStartsOnThePages() {
         assertEquals(HomeShown.Glance, HomeDeck.startSurface(true)); assertEquals(HomeShown.Pages, HomeDeck.startSurface(false))
-        assertEquals(HomeShown.Pages, HomeDeck.forward(HomeShown.Glance))
-        assertEquals(HomeShown.Glance, HomeDeck.backwardFromFirstPage(true)); assertEquals(null, HomeDeck.backwardFromFirstPage(false))
-        assertEquals(HomeShown.Pages, HomeDeck.afterGlanceSetting(false, HomeShown.Glance)); assertEquals(HomeShown.Glance, HomeDeck.afterGlanceSetting(true, HomeShown.Glance))
+        assertEquals(HomeShown.Glance, HomeDeck.surfaceAt(true, 0)); assertEquals(HomeShown.Pages, HomeDeck.surfaceAt(true, 1)); assertEquals(HomeShown.Pages, HomeDeck.surfaceAt(false, 0))
     }
 
     @Test fun HOM_01_addPageFromGlanceCreatesPageOneAndLaterOnesGoAfterTheLastPage() {
@@ -57,9 +55,38 @@ class HomeOrderTest {
         assertEquals(3, mid.pages.size); assertEquals(1, mid.index); assertTrue(mid.pages[1].keys.isEmpty())
     }
 
-    @Test fun HOM_01_theIndicatorCountsGlanceAsTheFirstStop() {
-        assertEquals(3, HomeDeck.stops(true, 2, false)); assertEquals(2, HomeDeck.stops(false, 2, false))
-        assertEquals(2, HomeDeck.stops(true, 5, true)) // the scroll is one stop
-        assertEquals(2, HomeDeck.stops(true, 0, false))
+
+    @Test fun HOM_01_w28_theHomeIsOnePagerWhoseStopsAreGlanceThenThePagesStopAndPagesOffRemovesTheExtraStop() {
+        // Glance on: Off = Glance only; Paginated / Continuous = Glance + the pages stop
+        assertEquals(1, HomeDeck.outerCount(true, HomePages.Off)); assertEquals(2, HomeDeck.outerCount(true, HomePages.Paginated)); assertEquals(2, HomeDeck.outerCount(true, HomePages.Continuous))
+        assertEquals(null, HomeDeck.pagesIndex(true, HomePages.Off)); assertEquals(1, HomeDeck.pagesIndex(true, HomePages.Paginated))
+        // Glance off: the first page is home even with Pages Off
+        assertEquals(1, HomeDeck.outerCount(false, HomePages.Off)); assertEquals(0, HomeDeck.pagesIndex(false, HomePages.Off)); assertEquals(0, HomeDeck.pagesIndex(false, HomePages.Continuous))
+        assertEquals(1, HomeDeck.visiblePages(HomePages.Off, 5)); assertEquals(5, HomeDeck.visiblePages(HomePages.Paginated, 5))
+    }
+
+    @Test fun HOM_23_w28_theOneIndicatorCountsEveryStopIncludingGlanceAsTheFirstDot() {
+        assertEquals(1, HomeDeck.stops(true, HomePages.Off, 3)); assertEquals(4, HomeDeck.stops(true, HomePages.Paginated, 3)); assertEquals(2, HomeDeck.stops(true, HomePages.Continuous, 3))
+        assertEquals(3, HomeDeck.stops(false, HomePages.Paginated, 3)); assertEquals(1, HomeDeck.stops(false, HomePages.Off, 3)); assertEquals(1, HomeDeck.stops(false, HomePages.Continuous, 3))
+        // which dot is lit, and where a tap on a dot goes (outer stop, inner page)
+        assertEquals(0, HomeDeck.lit(true, 0, 0, HomePages.Paginated)); assertEquals(1, HomeDeck.lit(true, 1, 0, HomePages.Paginated)); assertEquals(3, HomeDeck.lit(true, 1, 2, HomePages.Paginated))
+        assertEquals(1, HomeDeck.lit(true, 1, 7, HomePages.Continuous)); assertEquals(2, HomeDeck.lit(false, 0, 2, HomePages.Paginated))
+        assertEquals(0 to null, HomeDeck.target(true, HomePages.Paginated, 0)); assertEquals(1 to 0, HomeDeck.target(true, HomePages.Paginated, 1)); assertEquals(1 to 2, HomeDeck.target(true, HomePages.Paginated, 3))
+        assertEquals(1 to null, HomeDeck.target(true, HomePages.Continuous, 1)); assertEquals(0 to 2, HomeDeck.target(false, HomePages.Paginated, 2))
+    }
+
+    @Test fun HOM_23_theIndicatorRowIsDrawnWheneverThereIsMoreThanOneStopWhateverTheGlanceIndicatorPreference() {
+        assertTrue(HomeDeck.indicatorShown(true, false, HomePages.Paginated, 2))
+        assertTrue(HomeDeck.indicatorShown(true, false, HomePages.Continuous, 0))
+        assertFalse("Glance alone with its indicator off draws nothing", HomeDeck.indicatorShown(true, false, HomePages.Off, 0))
+        assertTrue(HomeDeck.indicatorShown(true, true, HomePages.Off, 0))
+        assertFalse("one regular page and no Glance draws nothing", HomeDeck.indicatorShown(false, true, HomePages.Paginated, 1))
+    }
+
+    @Test fun HOM_23_aSwipeBackHandsOverToGlanceOnlyWhenGlanceIsOnAndNotEditingAndNoCardIsOpen() {
+        assertTrue(HomeDeck.backSwipeToGlance(true, editing = false, cardOpen = false))
+        assertFalse("Comms opens from the edge only, never from a swipe in the middle of the first page", HomeDeck.backSwipeToGlance(false, editing = false, cardOpen = false))
+        assertFalse("dragging an icon in edit mode is not a swipe", HomeDeck.backSwipeToGlance(true, editing = true, cardOpen = false))
+        assertFalse(HomeDeck.backSwipeToGlance(true, editing = false, cardOpen = true))
     }
 }

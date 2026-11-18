@@ -47,8 +47,8 @@ object HomeBottomStack {
      * W26 rule: the dock sits ABOVE the position indicator with at least this much clear space.
      */
     const val GAP_DP = 8f
-    /** W26: how far up from the (inset) bottom edge the page-dot row reaches when no bottom clock shares the band (26 dp padding, a row of at most 20 dp). */
-    const val PAGE_DOTS_TOP_DP = 46f
+    /** W26: how far up from the (inset) bottom edge the page-dot row reaches when no bottom clock shares the band (wave 28: the ONE indicator row is the same row on Glance and on the pages: 4 dp padding and its 48 dp buttons). */
+    const val PAGE_DOTS_TOP_DP = 52f
     /** W26: how far up the Glance indicator reaches (4 dp padding and its 48 dp buttons). */
     const val GLANCE_INDICATOR_TOP_DP = 52f
 
@@ -59,7 +59,7 @@ object HomeBottomStack {
      */
     fun lowerStackDp(stackDp: Float, glance: Boolean, glanceIndicator: Boolean, pageDotsAtBottom: Boolean, clockAtBottom: Boolean): Float = when {
         glance -> if (glanceIndicator) GLANCE_INDICATOR_TOP_DP else 0f
-        pageDotsAtBottom && !clockAtBottom -> maxOf(stackDp, PAGE_DOTS_TOP_DP)
+        pageDotsAtBottom -> maxOf(stackDp, PAGE_DOTS_TOP_DP) // wave 28: the one indicator row (48 dp buttons) is drawn at the bottom whatever the clock does
         else -> stackDp
     }
     /** Where the media strip sits with no rail (it clears the clock and dots in the band). */

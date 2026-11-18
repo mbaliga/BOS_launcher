@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +32,7 @@ import com.bos.sphere.core.data.HomeLayoutMath
 import com.bos.sphere.core.data.HomeLayout
 import com.bos.sphere.core.data.HomeOrder
 import com.bos.sphere.core.data.HomePage
-import com.bos.sphere.core.data.HomeScroll
+import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.HyleTheme
@@ -79,7 +81,7 @@ class HomePagesW26ScreenshotTest {
                     prefs = LauncherPrefs(homeOrder = order), weather = null, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
                     rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
                     onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {},
-                    pageStops = 2, modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
@@ -93,42 +95,48 @@ class HomePagesW26ScreenshotTest {
             GridHome(
                 pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = state, suggestion = null, gesturesBound = emptySet(),
                 capacityOf = { it.capacity(false, prefs) }, onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {},
-                onClockTap = {}, onTileLongPress = { _, _ -> }, onGlance = if (withGlance) ({}) else null,
+                onClockTap = {}, onTileLongPress = { _, _ -> }, drawIndicator = false,
+            )
+            // wave 28: the home draws the ONE indicator above the pager; Glance is its first stop when it is on
+            PageIndicator(
+                count = pages.size, current = state.currentPage, vertical = false, onSelect = {}, rtl = prefs.homeOrder.rtl,
+                onGlance = if (withGlance) ({}) else null, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter).padding(bottom = 4.dp),
             )
         }
         LaunchedEffect(Unit) { state.goToPage(0, animate = false) }
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_01_glanceDrawsDeckDotsThatCountGlanceAsTheFirstStopAndALeftToRightOrderPutsItFirstOnTheLeft() {
+    fun HOM_23_w28_glanceDrawsTheOnePageIndicatorWithTheHouseAsItsLitFirstStopAndNoSecondSetOfDots() {
         rule.mainClock.autoAdvance = false
         glance(HomeOrder.LeftToRight, languageRtl = false)
-        rule.onNodeWithTag("glance.deckdots", useUnmergedTree = true).assertIsDisplayed()
-        val dots = rule.onNodeWithTag("glance.deckdots", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val first = rule.onNodeWithTag("glance.deckdot.0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val second = rule.onNodeWithTag("glance.deckdot.1", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("Glance is the first stop, at the left in left to right order", first.left < second.left && first.left >= dots.left)
-        shoot("w26-glance-deckdots-ltr")
+        rule.onNodeWithTag("pages.glancedot", useUnmergedTree = true).assertIsDisplayed()
+        assertTrue("no second set of dots on Glance", rule.onAllNodesWithTagCount("glance.deckdots") == 0)
+        val comms = rule.onNodeWithTag("glance.indicator.launchpad", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val house = rule.onNodeWithTag("pages.glancedot", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val recents = rule.onNodeWithTag("glance.indicator.right.Recents", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("the row is the Glance indicator the owner has: Comms glyph, the house, the right-hand dot", comms.left < house.left && house.left < recents.left)
+        shoot("w28-glance-indicator-ltr")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_rightToLeftOrderPutsTheGlanceStopFirstOnTheRight() {
+    fun HOM_23_rightToLeftOrderMirrorsTheGlanceIndicatorRow() {
         rule.mainClock.autoAdvance = false
         glance(HomeOrder.RightToLeft, languageRtl = false)
-        val first = rule.onNodeWithTag("glance.deckdot.0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val second = rule.onNodeWithTag("glance.deckdot.1", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("Glance is the first stop, at the right in right to left order", first.left > second.left)
-        shoot("w26-glance-deckdots-rtl-order")
+        val comms = rule.onNodeWithTag("glance.indicator.launchpad", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val recents = rule.onNodeWithTag("glance.indicator.right.Recents", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("in right to left order the Comms glyph is at the right", comms.left > recents.left)
+        shoot("w28-glance-indicator-rtl-order")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun HOM_01_paginatedPagesShowTheGlanceStopThenThePageDots() {
         rule.mainClock.autoAdvance = false
-        val prefs = LauncherPrefs(homeScroll = HomeScroll.Paged)
+        val prefs = LauncherPrefs(homePages = HomePages.Paginated)
         rule.setContent { Pages(prefs, withGlance = true) }
         rule.mainClock.advanceTimeBy(500)
         rule.onNodeWithTag("pages.glancedot", useUnmergedTree = true).assertIsDisplayed()
-        shoot("w26-paginated-2pages-glance-on")
+        shoot("w28-paginated-2pages-glance-on")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -137,7 +145,7 @@ class HomePagesW26ScreenshotTest {
         rule.setContent { Pages(LauncherPrefs(glanceEnabled = false), withGlance = false) }
         rule.mainClock.advanceTimeBy(500)
         assertTrue(rule.onAllNodesWithTagCount("pages.glancedot") == 0)
-        shoot("w26-paginated-2pages-glance-off")
+        shoot("w28-paginated-2pages-glance-off")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -148,7 +156,7 @@ class HomePagesW26ScreenshotTest {
         cell0.assertIsDisplayed()
         val b0 = cell0.fetchSemanticsNode().boundsInRoot
         assertTrue("App 0 is the right-most icon of the first row: ${b0.left}", b0.left > 411f * 2f * 0.55f)
-        shoot("w26-paginated-2pages-rtl-order")
+        shoot("w28-paginated-2pages-rtl-order")
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagCount(t: String) =

@@ -92,9 +92,6 @@ class A11ySweepTourTest : TourBase() {
             // Wave 27: the chip rows and the inline options panel are gone; their rows live in the Comms menu.
             rule.onNodeWithContentDescription("Comms menu", useUnmergedTree = true).performClick(); settle()
             sweep("hub unread, Comms menu")
-            rule.onNodeWithTag("lp.menu.list", useUnmergedTree = true).performScrollToNode(androidx.compose.ui.test.hasTestTag("lp.menu.opt.delete"))
-            rule.onNodeWithTag("lp.menu.opt.delete", useUnmergedTree = true).performClick(); settle()
-            assertTrue("the delete confirmation shows", tagShown("hub.deleteConfirm")); sweep("hub delete confirmation")
             back(); settle()
             rule.onNodeWithTag("hub.view.files", useUnmergedTree = true).performClick(); settle()
             sweep("hub files")

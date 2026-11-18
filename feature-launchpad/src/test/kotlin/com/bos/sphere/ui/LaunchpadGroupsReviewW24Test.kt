@@ -78,8 +78,8 @@ class LaunchpadGroupsReviewW24Test {
     }
 
     private fun openGroups() {
-        rule.onNodeWithTag("lp.menu").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("lp.menu.groups").performClick(); rule.waitForIdle()
+        // Wave 29: the manager is opened from Ground Control's "Groups and rules" row, through the Comms nav request.
+        LaunchpadHubNav.openComms(groupsManager = true); rule.waitForIdle()
         rule.onNodeWithTag("lp.groups").assertExists()
     }
 

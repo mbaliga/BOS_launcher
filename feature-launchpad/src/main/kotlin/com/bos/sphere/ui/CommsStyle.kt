@@ -155,7 +155,6 @@ internal object CommsStyle {
     const val SHOW_ICON_DP = 16.5f
     const val SHOW_ICON_GAP_DP = 16.5f
     const val SHOW_SP = 17f
-    const val SECTION_GAP_DP = 24f
 
     /** The Comms dark palette read off the mock-ups; the light one is the shared light tokens (see docs/decisions/commsDesign.md). */
     val DarkBg = Color(0xFF0E121A)

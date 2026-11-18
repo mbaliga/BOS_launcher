@@ -85,7 +85,8 @@ fun SettingItem.description(): String? = when (this) {
     is SettingItem.Slider -> hint
     is SettingItem.Choice<*> -> hint
     is SettingItem.Stepper -> hint
-    is SettingItem.Action, is SettingItem.Pane -> null
+    is SettingItem.Action -> hint
+    is SettingItem.Pane -> null
 }
 
 /** A [SettingsResultSource] over a category list; [onOpen] jumps to the entry's category and row. */

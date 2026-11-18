@@ -59,7 +59,7 @@ import java.util.Locale
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 /**
  * Wave 27: the tab row of the owner's Comms mock-up: ALL UNREAD FILES TIMELINE in capitals with letter spacing, the selected one in the full ink
- * colour and the others grey (no underline, no options button: Options live in the Comms menu). Wave 28: 17 sp labels 19 dp apart, 35 dp high; it scrolls when the labels do not fit.
+ * colour and the others grey (no underline, no options button: the options live in Ground Control). Wave 28: 17 sp labels 19 dp apart, 35 dp high; it scrolls when the labels do not fit.
  */
 @Composable
 fun HubSwitcher(state: HubState, modifier: Modifier = Modifier) {

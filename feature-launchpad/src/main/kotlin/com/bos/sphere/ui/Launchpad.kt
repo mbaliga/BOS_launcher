@@ -712,7 +712,7 @@ fun LaunchpadContent(
     // Wave 27: on a history view (Unread, Read) the grid groups that history; on the live list it sets the default grouping of the live list.
     val historyGrouping = hub != null && !hub.listIsLive && hub.view.history
     val menuActions = MenuActions(
-        mode = if (historyGrouping && hub != null) hub.grouping.toMode() else prefs.defaultMode, filter = activeFilter, counts = counts, canClear = items.isNotEmpty(),
+        mode = if (historyGrouping && hub != null) hub.grouping.toMode() else prefs.defaultMode, filter = activeFilter, counts = counts,
         onMode = { m -> if (historyGrouping && hub != null) hub.chooseGrouping(HubGrouping.of(m)) else onSetDefaultMode(m); menu.open = false },
         onFilter = { f ->
             filter = f
@@ -720,10 +720,7 @@ fun LaunchpadContent(
             hub?.let { h -> HubView.entries.filter { it.history }.forEach { v -> h.setFilters(h.filters(v).copy(app = f), v) } }
             menu.open = false
         },
-        onGroups = { menu.open = false; groupsOpen = true },
-        onClearAll = { onClearAll(); menu.open = false },
-        hub = hub, onMarkRead = { hubMarkRead(); menu.open = false },
-        scalePercent = commsScalePercent, onScale = { CommsScaleSettings.set(it) },
+        scalePercent = commsScalePercent,
     )
     // Wave 25 (STR-01): the notifications layer shifts away by the panel's width while the menu is open.
     Box(Modifier.fillMaxSize().graphicsLayer {
@@ -897,6 +894,7 @@ fun LaunchpadContent(
         }
     }
     // The manager is a screen of buttons, so it stays clear of the card's 48 dp return zone (the list behind runs to the card's edge).
+    LaunchedEffect(Unit) { LaunchpadHubNav.groups.collect { if (it) { LaunchpadHubNav.takeGroups(); menu.open = false; groupsOpen = true } } } // wave 29: Ground Control's "Groups and rules" opens the manager here
     LaunchpadGroupsOverlay(groupsOpen, items, endInset = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
     if (soundSheet.open) SoundVibrationSheet(onDismiss = { soundSheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp))
     groupFor?.let { n ->

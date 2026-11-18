@@ -1505,9 +1505,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val capabilityRows = remember(capInputs) { com.bos.sphere.core.capabilities.CapabilityEvaluator.evaluate(capInputs) }
         val labResults = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
         val labEntries = com.bos.sphere.ui.rememberLabEntries(capInputs, labResults)
-        remember(context) { com.bos.sphere.core.data.CommsScaleSettings.init(context); true }
+        remember(context) { com.bos.sphere.core.data.CommsScaleSettings.init(context); com.bos.sphere.ui.CommsOptions.init(context); true }
+        val commsDefaultView by com.bos.sphere.ui.CommsOptions.defaultView.collectAsState() // wave 29: the Default view row shows the live value
         val commsScalePct by com.bos.sphere.core.data.CommsScaleSettings.percent.collectAsState() // wave 28: the Comms size row shows the live value
-        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct) {
+        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView) {
             buildSettingsCategories(
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
@@ -1701,6 +1702,15 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 val tab = com.bos.sphere.core.catalog.PanelTab.entries.getOrNull(homeItems.panelRequest) ?: com.bos.sphere.core.catalog.PanelTab.Files
                 com.bos.sphere.ui.LaunchpadHubNav.request(com.bos.sphere.ui.HubView.forPanel(tab.uriName))
                 panelsOpen = false; homeItems.panelRequest = -1
+                if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad) leftOpen = true else hubStandalone = true
+            }
+        }
+        // Wave 29: Ground Control's Comms rows (Read history, Groups and rules) bring Comms up through the same request the panel tiles use.
+        val commsOpenSignal by com.bos.sphere.ui.LaunchpadHubNav.openSignal.collectAsState()
+        LaunchedEffect(commsOpenSignal) {
+            if (commsOpenSignal) {
+                com.bos.sphere.ui.LaunchpadHubNav.openSignal.value = false
+                settingsOpen = false
                 if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad) leftOpen = true else hubStandalone = true
             }
         }

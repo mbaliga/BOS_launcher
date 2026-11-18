@@ -138,7 +138,7 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         val sel = rule.onNodeWithTag("lp.menu.mode.Time").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected)
         val other = rule.onNodeWithTag("lp.menu.mode.Flat").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected)
         assertEquals(true, sel); assertEquals(false, other)
-        val tags = GroupMode.entries.map { "lp.menu.mode.${it.name}" } + listOf("lp.menu.show.all", "lp.menu.show.com.whatsapp", "lp.menu.groups", "lp.menu.clear")
+        val tags = GroupMode.entries.map { "lp.menu.mode.${it.name}" } + listOf("lp.menu.show.all", "lp.menu.show.com.whatsapp")
         for (t in tags) {
             if (rule.onAllNodesWithTag(t).fetchSemanticsNodes().isEmpty()) rule.onNodeWithTag("lp.menu.list").performScrollToNodeTag(t)
             val b = rule.onNodeWithTag(t).getUnclippedBoundsInRoot()

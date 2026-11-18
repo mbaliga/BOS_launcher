@@ -90,6 +90,7 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
                     suspended = (info.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SUSPENDED) != 0,
                     versionStamp = runCatching { java.io.File(info.applicationInfo.sourceDir).lastModified() }.getOrDefault(0L),
                     archived = AppFlags.archived(info.applicationInfo.flags),
+                    isSystem = !AppUninstall.isRemovable(info.applicationInfo.flags),
                     iconLoader = {
                         // Density 0 → let the system pick; LauncherApps badges for the profile.
                         runCatching { info.getBadgedIcon(0) }.getOrNull()
@@ -109,12 +110,7 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
     }
 
     override fun requestUninstall(entry: AppEntry) {
-        val intent = Intent(Intent.ACTION_DELETE).apply {
-            data = Uri.fromParts("package", entry.packageName, null)
-            putExtra(Intent.EXTRA_USER, entry.user)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        runCatching { appContext.startActivity(intent) }
+        AppUninstall.start(appContext, entry)
     }
 
 }

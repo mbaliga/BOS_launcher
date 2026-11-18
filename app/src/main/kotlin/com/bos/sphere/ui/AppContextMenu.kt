@@ -73,7 +73,7 @@ fun AppContextMenu(
     Dialog(onDismissRequest = onDismiss) {
         DialogControllerKeys()
         val shape = RoundedCornerShape(24.dp)
-        val ctx = AppMenuModel.context(isHidden, isOnHome, hasIconColour = onIconColor != null, hasHomeSettings = onHomeSettings != null)
+        val ctx = AppMenuModel.context(isHidden, isOnHome, hasIconColour = onIconColor != null, hasHomeSettings = onHomeSettings != null, canUninstall = !app.isSystem)
         val rows = AppMenuModel.rows(ctx)
         Column(
             modifier = Modifier

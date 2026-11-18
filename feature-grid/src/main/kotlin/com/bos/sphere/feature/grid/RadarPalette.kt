@@ -83,8 +83,7 @@ internal object HubOrdering {
     }
 }
 
-internal fun appUninstallIntent(app: AppEntry): Intent =
-    Intent(Intent.ACTION_DELETE).setData(Uri.fromParts("package", app.packageName, null)).putExtra(Intent.EXTRA_USER, app.user).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+internal fun appUninstallIntent(app: AppEntry): Intent = com.bos.sphere.core.data.AppUninstall.intent(app)
 
 private fun Modifier.clip14(): Modifier = this.clip(RoundedCornerShape(14.dp))
 

@@ -429,7 +429,7 @@ internal fun SearchScreen(
     LaunchedEffect(trimmed, selected) { nav = RadarNav(navTiles.size) }
     val selectedKey = if (inputMode == InputMode.Keyboard && navNow.active) navTiles.getOrNull(navNow.selected)?.key else null
     selectedHitHolder[0] = selectedKey?.takeIf { it.startsWith("h:") }?.removePrefix("h:")
-    fun menuFor(t: Tile) = NestedShortcuts.menuFor(t, ResultMenus.forKind(tileKind(t), otherDisplays = otherDisplays, adjacentSupported = adjacentSupported))
+    fun menuFor(t: Tile) = NestedShortcuts.menuFor(t, ResultMenus.forKind(tileKind(t), canUninstall = !(t is Tile.App && t.app.isSystem), otherDisplays = otherDisplays, adjacentSupported = adjacentSupported))
     fun runMenu(tile: Tile, entry: ResultMenuEntry) {
         when {
             entry.shortcut != null -> tap(Tile.Hit(entry.shortcut)) // PAL-03: a nested app shortcut
@@ -437,7 +437,7 @@ internal fun SearchScreen(
             entry.alias && tile is Tile.App -> aliasFor = tile.app
             entry.action == MenuAction.Open -> tap(tile)
             entry.action == MenuAction.AppInfo && tile is Tile.App -> onOpenIntent(appInfoIntent(tile.app.packageName))
-            entry.action == MenuAction.Uninstall && tile is Tile.App -> onOpenIntent(appUninstallIntent(tile.app))
+            entry.action == MenuAction.Uninstall && tile is Tile.App -> com.bos.sphere.core.data.AppUninstall.start(context, tile.app)
             // PAL-08: display, beside and dock run from here when the host can; a display or workspace pick opens Radar's own chooser; "more" opens the host's sheet.
             tile is Tile.App -> if (entry.action == null || !onRunAppAction(tile.app, entry.action)) {
                 val choices = entry.action?.let { onAppActionChoices(tile.app, it) }?.takeIf { it.isNotEmpty() }

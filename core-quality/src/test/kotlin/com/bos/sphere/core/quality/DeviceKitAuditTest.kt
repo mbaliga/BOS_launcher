@@ -47,7 +47,7 @@ class DeviceKitAuditTest {
         val manifest = Repo.file("app/src/main/AndroidManifest.xml").readText()
         val declared = Regex("""<uses-permission android:name="([^"]+)"""").findAll(manifest).map { it.groupValues[1] }.toSortedSet()
         val expected = setOf(
-            "android.permission.QUERY_ALL_PACKAGES", "android.permission.RECORD_AUDIO", "android.permission.PACKAGE_USAGE_STATS", "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
+            "android.permission.QUERY_ALL_PACKAGES", "android.permission.REQUEST_DELETE_PACKAGES", "android.permission.RECORD_AUDIO", "android.permission.PACKAGE_USAGE_STATS", "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
             "android.permission.health.READ_STEPS", "android.permission.health.READ_FLOORS_CLIMBED", "android.permission.health.READ_ELEVATION_GAINED", "android.permission.health.READ_DISTANCE",
             "android.permission.health.READ_ACTIVE_CALORIES_BURNED", "android.permission.ACTIVITY_RECOGNITION", "android.permission.INTERNET", "com.bos.sphere.permission.READ_SEARCH",
             "android.permission.READ_CONTACTS", "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VIDEO", "android.permission.READ_MEDIA_AUDIO",

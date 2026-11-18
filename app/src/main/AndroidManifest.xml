@@ -4,6 +4,8 @@
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- W25: ACTION_DELETE shows nothing on Android 9+ without this normal permission; it only lets the system confirmation dialog appear. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- HOM-17: usage access is a special access the user grants in system settings; read-only, never leaves the device. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />

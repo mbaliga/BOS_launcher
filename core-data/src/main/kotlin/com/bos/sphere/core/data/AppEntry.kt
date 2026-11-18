@@ -23,6 +23,8 @@ data class AppEntry(
     val versionStamp: Long = 0L,
     /** HOM-10: the app is archived (Android 15): still listed, its code is not on the device, launching restores it. */
     val archived: Boolean = false,
+    /** W25: a system app that is not an updated copy of one: it cannot be uninstalled, only disabled (App info). */
+    val isSystem: Boolean = false,
     private val iconLoader: () -> Drawable?,
 ) {
     /** Stable identity across reorders / refreshes (component + profile). */

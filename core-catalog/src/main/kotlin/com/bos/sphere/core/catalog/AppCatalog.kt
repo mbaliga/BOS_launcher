@@ -115,15 +115,4 @@ class AppCatalog(context: Context) {
 
     fun startShortcut(s: ShortcutInfo): Boolean = runCatching { launcherApps.startShortcut(s, null, null); true }.getOrDefault(false)
 
-    // ---- widget providers (HOM-07) -------------------------------------------------------
-
-    fun widgetProviders(): List<WidgetChoiceRef> {
-        val wm = AppWidgetManager.getInstance(app)
-        return wm.installedProviders.mapNotNull { p ->
-            runCatching {
-                val appLabel = pm.getApplicationLabel(pm.getApplicationInfo(p.provider.packageName, 0)).toString()
-                WidgetChoiceRef(p.provider.flattenToString(), appLabel, p.loadLabel(pm), p.minWidth, p.minHeight)
-            }.getOrNull()
-        }
-    }
 }

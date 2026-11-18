@@ -2,6 +2,7 @@ package com.bos.sphere.core.signals
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import kotlinx.coroutines.flow.toList
 import org.junit.Test
 
 /** PAL-24: SignalState normalisation and debounce (pure). */
@@ -35,7 +36,6 @@ class RadarSignalTest {
 
     @Test fun PAL_24_wordsForTheDescription() {
         assertEquals("good", SignalLogic.levelWord(3))
-        assertEquals("Wi-Fi", SignalLogic.kindWord(SignalKind.Wifi))
     }
 
     @Test fun PAL_24_forcedStates() {
@@ -43,12 +43,12 @@ class RadarSignalTest {
         assertEquals(4, SignalState.forced(9).level)
     }
 
-    @Test fun PAL_24_debounceDropsAFlickerAndKeepsAStableChange() {
+    /** The real operator the live source uses, on virtual time (wave 23: replaces a pure copy of the rule that nothing in the app called). */
+    @Test fun PAL_24_debounceDropsAFlickerAndKeepsAStableChange() = kotlinx.coroutines.test.runTest {
         val a = SignalState.forced(3); val b = SignalState.NoSignal; val c = SignalState.forced(1)
-        // a at 0, b for 100 ms (flicker), a again, then c stays for good.
-        val out = SignalLogic.settle(listOf(0L to a, 1000L to b, 1100L to a, 5000L to c), 600)
-        assertEquals(listOf(a, c), out)
-        // A change that holds for the window is emitted.
-        assertEquals(listOf(a, b), SignalLogic.settle(listOf(0L to a, 1000L to b), 600))
+        val flicker = kotlinx.coroutines.flow.flow { emit(a); kotlinx.coroutines.delay(1000); emit(b); kotlinx.coroutines.delay(100); emit(a); kotlinx.coroutines.delay(3900); emit(c) }
+        assertEquals(listOf(a, c), flicker.settled(600).toList())
+        val stable = kotlinx.coroutines.flow.flow { emit(a); kotlinx.coroutines.delay(1000); emit(b) }
+        assertEquals(listOf(a, b), stable.settled(600).toList())
     }
 }

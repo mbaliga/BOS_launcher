@@ -167,6 +167,7 @@ internal fun StepperSettingRow(item: SettingItem.Stepper, onTick: () -> Unit) {
     )
 }
 
+<<<<<<< HEAD
 @Composable
 private fun RoundStep(text: String, enabled: Boolean, description: String, onClick: () -> Unit) {
     Box(
@@ -178,6 +179,8 @@ private fun RoundStep(text: String, enabled: Boolean, description: String, onCli
     ) { Text(text, color = if (enabled) HyleColors.InkBright else HyleColors.InkDim.copy(alpha = 0.4f), fontSize = 18.sp) }
 }
 
+=======
+>>>>>>> w23-auditSweep
 /** Up to this many options step in place with the ⌃⌄ arrows; more open a dropdown menu. */
 internal const val INLINE_CHOICE_MAX = 6
 

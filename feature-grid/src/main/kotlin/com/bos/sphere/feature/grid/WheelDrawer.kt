@@ -294,6 +294,12 @@ internal val WheelLetterOrder: Comparator<String> = Comparator { a, b ->
     }
 }
 
+/**
+ * Wave 23 second review: the words drawn on a category or Recent band. The grouping keys stay English ([WheelCategoryOrder]); only the
+ * shown label is in the app language (the bands read "Games", "Social" on every phone before).
+ */
+internal fun wheelGroupLabel(name: String): String = com.bos.sphere.core.design.L10n.tr(name)
+
 /** Display order of category spokes. */
 internal val WheelCategoryOrder = listOf(
     "Games", "Audio", "Video", "Images", "Social", "News", "Maps", "Productivity", "Accessibility", "Other",
@@ -366,13 +372,13 @@ private fun buildWheelGroups(
         emptyList()
     } else {
         val byName = apps.groupBy { wheelCategoryName(categories[it.packageName] ?: ApplicationInfo.CATEGORY_UNDEFINED) }
-        WheelCategoryOrder.mapNotNull { name -> byName[name]?.let { WheelGroup(name, it.sortedWith(ByLabel)) } }
+        WheelCategoryOrder.mapNotNull { name -> byName[name]?.let { WheelGroup(wheelGroupLabel(name), it.sortedWith(ByLabel)) } }
     }
 
     WheelGrouping.Recent -> {
         val byKey = apps.associateBy { it.key }
         val recent = recentKeys.asSequence().distinct().mapNotNull { byKey[it] }.take(MAX_RECENT).toList()
-        if (recent.isEmpty()) emptyList() else listOf(WheelGroup("Recent", recent))
+        if (recent.isEmpty()) emptyList() else listOf(WheelGroup(wheelGroupLabel("Recent"), recent))
     }
 }
 
@@ -1034,32 +1040,6 @@ private fun WheelIcon(
                 onClick = onClick,
             ),
     )
-}
-
-@Composable
-private fun GroupingChip(
-    label: String,
-    selected: Boolean,
-    rotationDeg: Float,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val bg by animateColorAsState(if (selected) HyleColors.Violet.copy(alpha = 0.22f) else Color.Transparent, label = "chipBg")
-    val edge by animateColorAsState(if (selected) HyleColors.Violet.copy(alpha = 0.75f) else HyleColors.Hairline, label = "chipEdge")
-    val ink by animateColorAsState(if (selected) HyleColors.InkBright else HyleColors.InkDim, label = "chipInk")
-    val shape = RoundedCornerShape(50)
-    Box(
-        modifier = modifier
-            .graphicsLayer { rotationZ = rotationDeg }
-            .clip(shape)
-            .background(bg, shape)
-            .border(1.dp, edge, shape)
-            .clickable(role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 7.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = label, color = ink, fontSize = 10.5.sp, letterSpacing = 0.6.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-    }
 }
 
 /** The hub's search glyph (the Concepts eyedropper analogue): a bare magnifier, no enclosing shape. */

@@ -105,6 +105,20 @@ class TimelineLogTest {
         assertEquals(4, file.readLines().size)
     }
 
+    /** Wave 23 sweep: a FULL log (max lines) read after a launch was recorded: the list stays max long, so a size check missed it and the launch never reached the file. */
+    @Test
+    fun HOM_18_aLaunchRecordedWhileAFullLogLoadsStillReachesTheFile() {
+        val file = tmp.newFolder("f4").resolve("usage/timeline.log")
+        file.parentFile.mkdirs()
+        file.writeText((0 until 5).joinToString("") { TimelineLogCodec.encode(ev(it)) + "\n" })
+        val io = QueueExecutor()
+        val log = TimelineLogStore(file, io, max = 5, slack = 100)
+        log.record(ev(10))
+        io.drain()
+        assertEquals(listOf("app1", "app2", "app3", "app4", "app10"), log.events.value.map { it.key })
+        assertEquals(listOf("app1", "app2", "app3", "app4", "app10"), file.readLines().mapNotNull(TimelineLogCodec::decode).map { it.key })
+    }
+
     @Test
     fun HOM_18_theOlderHistoryIsSeededOnceWithoutDuplicates() {
         val file = tmp.newFolder("f4").resolve("usage/timeline.log")

@@ -325,6 +325,22 @@ class PaletteTest {
         assertTrue(engine.search("chrome").any { it.title == "Chrome" })
     }
 
+    // ---------------------------------------------------------------- PAL-11
+    // Wave 23 sweep: the wave 20 cleanup deleted this helper and the reconcile test with the removed providers, but later tests still used it (the module's tests did not compile).
+    private fun fe(name: String, src: String = "media", mod: Long = 1, size: Long = 10) = FileEntry("content://$src/$name", name, "text/plain", size, mod, src, "Docs")
+
+    @Test fun PAL_11_reconcileIsIncremental() {
+        val idx = FileIndex()
+        assertEquals(FileIndex.Diff(2, 0, 0), idx.reconcile("media", listOf(fe("a.txt"), fe("b.txt"))))
+        assertEquals(FileIndex.Diff(0, 0, 0), idx.reconcile("media", listOf(fe("a.txt"), fe("b.txt"))))
+        assertEquals(FileIndex.Diff(1, 1, 1), idx.reconcile("media", listOf(fe("a.txt", mod = 2), fe("c.txt"))))
+        // another source is untouched by reconciling media
+        idx.reconcile("tree:x", listOf(fe("t.txt", "tree:x")))
+        idx.reconcile("media", emptyList())
+        assertEquals(1, idx.size())
+        assertEquals(1, idx.dropSource("tree:x")); assertEquals(0, idx.size())
+    }
+
     // ---------------------------------------------------------------- PAL-12
     @Test fun PAL_11_indexSurvivesRestartViaEncoding() {
         val idx = FileIndex()

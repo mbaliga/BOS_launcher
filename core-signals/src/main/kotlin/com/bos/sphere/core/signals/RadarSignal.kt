@@ -57,22 +57,6 @@ object SignalLogic {
 
     /** English level word ("none", "weak", "fair", "good", "excellent"); the UI translates it. */
     fun levelWord(level: Int): String = when (level.coerceIn(0, 4)) { 0 -> "none"; 1 -> "weak"; 2 -> "fair"; 3 -> "good"; else -> "excellent" }
-
-    fun kindWord(kind: SignalKind): String = when (kind) { SignalKind.Wifi -> "Wi-Fi"; SignalKind.Cellular -> "Mobile data"; SignalKind.Ethernet -> "Wired"; SignalKind.None -> "Offline" }
-
-    /**
-     * The same debounce the live source uses, as a pure function over timestamped values (ms): a value is emitted when
-     * no newer one arrives within [windowMs]; the first is emitted at once; repeats are dropped.
-     */
-    fun <T> settle(events: List<Pair<Long, T>>, windowMs: Long): List<T> {
-        val out = ArrayList<T>()
-        events.forEachIndexed { i, (at, v) ->
-            val next = events.getOrNull(i + 1)?.first
-            val stable = i == 0 || next == null || next - at >= windowMs
-            if (stable && (out.isEmpty() || out.last() != v)) out += v
-        }
-        return out
-    }
 }
 
 /** PAL-24: where the Radar background gets its signal; tests inject [FixedSignalSource]. */

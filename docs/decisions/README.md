@@ -33,3 +33,4 @@ One line per record, newest wave first. A record explains why a requirement is b
 | [a11ySweep.md](a11ySweep.md) | 23 | Glance notch hit area (drawn = touchable, 48 dp), the whole-app TalkBack and semantics sweep, its exceptions and limits |
 | [deviceKit.md](deviceKit.md) | 23 | Lab Device checks page: frame-timing probe, cold start, checklist and copyable report (NFR-05, NFR-12 to NFR-14, SPK-01); evidence only |
 | [launchpadRules.md](launchpadRules.md) | 24 | Launchpad groups: the manager inside Launchpad, the people picker and members, Priority breaks through Do Not Disturb in Liftoff (STR-13) |
+| [auditSweep.md](auditSweep.md) | 23 | Independent sweep of waves 17 to 22: what was found and fixed, what was removed as dead, and the three calls that are decisions (English-only recovery screen, preview inertness, a retired-key marker per wave) |

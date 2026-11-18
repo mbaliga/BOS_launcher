@@ -9,7 +9,7 @@ enum class PaletteScope { Everything, Apps, Files, Settings, Contacts, Actions, 
  */
 enum class ResultActionId {
     Open, OpenOnDisplay, OpenBeside, AppInfo, AddToDock, AddToWorkspace, Uninstall, Rename, Remove, MoveToFolder,
-    Copy, Call, Message, Email, OpenContact, EnablePermission, SearchWeb, SearchStore, Run,
+    Copy, Call, Message, Email, OpenContact, EnablePermission, SearchWeb, Run,
 }
 
 /** One entry of a result's action list. Labels are resolved by the UI layer (localised), never here. */
@@ -77,7 +77,6 @@ class ProviderRegistry(initial: List<PaletteProvider> = emptyList()) {
 /** Localisable strings the engine needs for rows it creates itself. The Android adapter supplies L10n-backed ones. */
 class PaletteStrings(
     val searchWeb: (String) -> String = { "Search the web for “$it”" },
-    val searchStore: (String) -> String = { "Search the app store for “$it”" },
     val enableContacts: String = "Allow contacts to search people",
     val enableFiles: String = "Allow files to search them",
     val calculatorHint: String = "Press Enter to copy",

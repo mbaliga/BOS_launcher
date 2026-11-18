@@ -81,9 +81,7 @@ class UsageRecents(private val context: Context) {
             val e = UsageEvents.Event()
             while (q.hasNextEvent()) {
                 q.getNextEvent(e)
-                @Suppress("DEPRECATION")
-                val fg = e.eventType == UsageEvents.Event.ACTIVITY_RESUMED || e.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
-                out += UsageEv(e.packageName, e.timeStamp, fg)
+                out += UsageEv(e.packageName, e.timeStamp, UsageEventKinds.isForeground(e.eventType))
             }
             RecentsLogic.recents(out, setOf(appContext.packageName), limit)
         }.getOrDefault(emptyList())

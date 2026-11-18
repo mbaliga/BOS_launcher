@@ -79,7 +79,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("cornerStyle", next.cornerStyle.name)
             .putString("drawerStyle", next.drawerStyle.name)
             .putString("clockPosition", next.clockPosition.name)
-            .putBoolean("networkDots", next.networkDots)
             .putBoolean("uiSounds", next.uiSounds)
             .putFloat("uiSoundVolume", next.uiSoundVolume)
             .putString("strip", next.strip.entries.joinToString(",") { "${it.key.name}:${it.value.name}" })
@@ -172,7 +171,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             cornerStyle = enumOr(sp.getString("cornerStyle", null), d.cornerStyle),
             drawerStyle = enumOr(sp.getString("drawerStyle", null), d.drawerStyle),
             clockPosition = enumOr(sp.getString("clockPosition", null), d.clockPosition),
-            networkDots = sp.getBoolean("networkDots", d.networkDots),
             uiSounds = sp.getBoolean("uiSounds", d.uiSounds),
             uiSoundVolume = sp.getFloat("uiSoundVolume", d.uiSoundVolume).coerceIn(0f, 1f),
             strip = sp.getString("strip", null)?.let { raw ->

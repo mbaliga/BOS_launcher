@@ -1084,6 +1084,7 @@ fun rememberNow(): Date {
     return now
 }
 
+<<<<<<< HEAD
 /** "12:01 PM" (or 24-hour), following the system setting. */
 @Composable
 fun HomeClock(onTap: () -> Unit, modifier: Modifier = Modifier) {
@@ -1102,6 +1103,8 @@ fun HomeClock(onTap: () -> Unit, modifier: Modifier = Modifier) {
     )
 }
 
+=======
+>>>>>>> w23-auditSweep
 /** HOM-08: a widget tile in its span box on a grid page. */
 @Composable
 private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit, editing: Boolean = false, onRemove: () -> Unit = {}) {

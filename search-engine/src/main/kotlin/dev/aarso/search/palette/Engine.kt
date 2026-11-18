@@ -81,5 +81,4 @@ class PaletteEngine(
 
     fun resetLearning() = ranker.reset()
 
-    fun cancelProviders() = registry.providers().forEach { runCatching { it.cancel() } }
 }

@@ -37,12 +37,10 @@ import com.bos.sphere.feature.dock.DockController
 import com.bos.sphere.feature.dock.DockEdge
 import com.bos.sphere.feature.dock.DockHost
 import com.bos.sphere.feature.dock.DockPanel
-import com.bos.sphere.feature.dock.GroupPaletteProvider
 import com.bos.sphere.feature.dock.PanelApp
 import com.bos.sphere.feature.dock.Scheduler
 import com.bos.sphere.feature.dock.ScheduledLaunch
 import com.bos.sphere.feature.dock.WorkspaceHooks
-import com.bos.sphere.feature.dock.WorkspacePaletteProvider
 import com.bos.sphere.feature.dock.WorkspaceRepository
 import com.bos.sphere.core.signals.NotificationSignals
 import com.bos.sphere.core.signals.NotificationScope
@@ -312,17 +310,6 @@ private fun BoxScope.GroupShelfSlot(groups: List<com.bos.sphere.core.launch.AppG
         Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = (shelfBottomDp ?: if (dockOn) 84f else 8f).dp),
     )
 }
-
-/** The palette result sources from this stream (groups, workspaces, sessions), for the search stream to register. */
-fun dockPaletteProviders(context: android.content.Context, launcher: AppLauncher): List<com.bos.sphere.feature.dock.PaletteProvider> {
-    val manager = WorkspaceRepository.get(context)
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    return listOf(
-        GroupPaletteProvider({ manager.current.groups }) { g -> scope.launch { launcher.runGroup(g) } },
-        WorkspacePaletteProvider({ manager.current }, { manager.switchTo(it) }) { s -> scope.launch { launcher.restore(s) } },
-    )
-}
-
 
 /** Radar results for groups, workspaces, sessions, workspace-pinned actions and the desktop (WSP-05, WSP-07, EXT-02, EXT-10). */
 fun dockSearchProvider(context: android.content.Context): com.bos.sphere.core.data.SearchProvider {

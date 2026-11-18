@@ -103,8 +103,22 @@ object ReplyLogic {
  * Singleton provider for the notification stream. The actual service runs in the system
  * notification daemon; this manager provides a Flow API for composables.
  */
+/**
+ * Wave 23 sweep: the one bound instance of a service. The platform may create the next instance before the old one's onDestroy runs
+ * (a rebind after the user toggles notification access), and a late release by the OLD instance must not unbind the NEW one.
+ */
+internal class BoundSlot<T : Any> {
+    @Volatile var current: T? = null
+        private set
+    fun bind(instance: T) { current = instance }
+    /** Releases only when [instance] is still the bound one; true when it was. */
+    fun release(instance: T): Boolean { if (current !== instance) return false; current = null; return true }
+    /** Wave 23 second review: whether [instance] is the bound one; a late callback of an old instance (its disconnect, a last update) must not act for the new one. */
+    fun owns(instance: T): Boolean = current === instance
+}
+
 object NotificationProvider {
-    private var listener: NotificationListenerService? = null
+    private val slot = BoundSlot<NotificationListenerService>()
     private val _state = MutableStateFlow<List<HubNotification>>(emptyList())
 
     /** Current notifications (newest first). Replays the latest value to new collectors. */
@@ -127,19 +141,25 @@ object NotificationProvider {
         _state.value = notifs
     }
 
-    internal fun setListener(svc: NotificationListenerService?) {
-        listener = svc
-        if (svc == null) _state.value = emptyList()
-    }
+    internal fun bindListener(svc: NotificationListenerService) = slot.bind(svc)
+
+    /** The list as [svc] reads it; ignored when [svc] is an old instance that a newer one has replaced. */
+    internal fun listedBy(svc: NotificationListenerService, notifs: List<HubNotification>) { if (slot.owns(svc)) _state.value = notifs }
+
+    /** [svc] lost its connection: its list is no longer live. A late disconnect of an old instance leaves the new one's list alone. */
+    internal fun disconnectedBy(svc: NotificationListenerService) { if (slot.owns(svc)) _state.value = emptyList() }
+
+    /** The service went away. Only the instance that is bound now may clear the feed. */
+    internal fun releaseListener(svc: NotificationListenerService) { if (slot.release(svc)) _state.value = emptyList() }
 
     /** Remove one notification from the system shade (no-op if the listener is not bound). */
     fun dismiss(key: String) {
-        runCatching { listener?.cancelNotification(key) }
+        runCatching { slot.current?.cancelNotification(key) }
     }
 
     /** Clear every clearable notification (no-op if the listener is not bound). */
     fun clearAll() {
-        runCatching { listener?.cancelAllNotifications() }
+        runCatching { slot.current?.cancelAllNotifications() }
     }
 }
 
@@ -154,17 +174,23 @@ class SphereNotificationListener : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
-        NotificationProvider.setListener(this)
+        NotificationProvider.bindListener(this)
     }
 
     override fun onDestroy() {
-        NotificationProvider.setListener(null)
+        NotificationProvider.releaseListener(this)
         super.onDestroy()
     }
 
     override fun onListenerConnected() {
         MediaNow.onAccessMayHaveChanged()
         updateNotifications()
+    }
+
+    /** Access was turned off or the system dropped the binding: what was listed is no longer live, so it must not stay on screen. */
+    override fun onListenerDisconnected() {
+        NotificationProvider.disconnectedBy(this)
+        super.onListenerDisconnected()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -190,7 +216,7 @@ class SphereNotificationListener : NotificationListenerService() {
             if (summary && (sbn.packageName to n.group) in groupsWithChildren) null
             else runCatching { parseNotification(sbn) }.getOrNull()
         }.sortedByDescending { it.timestamp }
-        NotificationProvider.onNotificationsChanged(current)
+        NotificationProvider.listedBy(this, current)
     }
 
     private fun appLabelOf(pkg: String): String = labelCache.getOrPut(pkg) {

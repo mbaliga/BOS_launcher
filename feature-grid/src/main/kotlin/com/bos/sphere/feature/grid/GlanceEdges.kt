@@ -40,6 +40,14 @@ object GlanceHandleFade {
     const val IDLE_ALPHA = 0.06f
     const val IDLE_AFTER_MS = 4000L
     fun alpha(awake: Boolean) = if (awake) AWAKE_ALPHA else IDLE_ALPHA
+    /** Wave 23 sweep: the bar takes the Glance ink of the theme; a white bar vanished on the light theme's light grey Glance home. */
+    fun tint(dark: Boolean): Color = GlanceInk.clock(dark)
+}
+
+/** Wave 23 second review: the plain (not quiet) edge bars of the other landings were white too, and as faint on the light theme's light home. */
+object HomeHandleBar {
+    const val ALPHA = 0.28f
+    fun color(dark: Boolean): Color = GlanceInk.clock(dark).copy(alpha = ALPHA)
 }
 
 /**

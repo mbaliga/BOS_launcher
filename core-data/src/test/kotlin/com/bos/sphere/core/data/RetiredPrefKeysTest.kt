@@ -13,7 +13,7 @@ class RetiredPrefKeysTest {
     @get:Rule val tmp = TemporaryFolder()
 
     private fun files(): Map<String, MapSharedPreferences> = mapOf(
-        "launcher_prefs" to MapSharedPreferences(mapOf("bgKind" to "Live", "bgPreset" to "aurora", "bgA" to 1L, "wallpaper" to true, "minimalHints" to true, "style" to "Grid", "bgSlot1" to "spire")),
+        "launcher_prefs" to MapSharedPreferences(mapOf("bgKind" to "Live", "bgPreset" to "aurora", "bgA" to 1L, "wallpaper" to true, "minimalHints" to true, "networkDots" to true, "style" to "Grid", "bgSlot1" to "spire")),
         "palette" to MapSharedPreferences(mapOf("scopeMapping" to "a=Apps", "prefixes" to "x", "usage" to "u", "aliases" to "a\tb")),
         "crash_loop" to MapSharedPreferences(mapOf("rapid" to 3, "crashes" to 1)),
     )
@@ -21,8 +21,8 @@ class RetiredPrefKeysTest {
     @Test fun CFG_03_everyRetiredKeyIsRemovedAndEveryLiveKeyStays() {
         val f = files()
         val n = RetiredPrefKeys.purge { f[it] }
-        assertEquals("4 background + minimalHints + 2 palette + rapid", 8, n)
-        for (k in listOf("bgKind", "bgPreset", "bgA", "wallpaper", "minimalHints")) assertFalse(k, f.getValue("launcher_prefs").contains(k))
+        assertEquals("4 background + minimalHints + networkDots + 2 palette + rapid", 9, n)
+        for (k in listOf("bgKind", "bgPreset", "bgA", "wallpaper", "minimalHints", "networkDots")) assertFalse(k, f.getValue("launcher_prefs").contains(k))
         assertTrue(f.getValue("launcher_prefs").contains("style")); assertTrue(f.getValue("launcher_prefs").contains("bgSlot1"))
         assertFalse(f.getValue("palette").contains("scopeMapping")); assertFalse(f.getValue("palette").contains("prefixes"))
         assertTrue(f.getValue("palette").contains("usage")); assertTrue(f.getValue("palette").contains("aliases"))

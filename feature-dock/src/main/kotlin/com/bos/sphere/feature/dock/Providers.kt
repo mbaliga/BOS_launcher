@@ -13,12 +13,6 @@ import com.bos.sphere.core.launch.LaunchTarget
 import com.bos.sphere.core.launch.Placement
 import com.bos.sphere.core.launch.Session
 
-/** A result the palette can show. The search stream renders these; running one does the thing. */
-data class PaletteHit(val id: String, val title: String, val subtitle: String, val run: () -> Unit)
-
-/** The hook the palette calls for extra result sources (WSP-05: a group is a palette result). */
-fun interface PaletteProvider { fun results(query: String): List<PaletteHit> }
-
 object PaletteMatch {
     /** Prefix of the whole name or of any word, case-insensitive; an empty query matches nothing. */
     fun matches(query: String, name: String): Boolean {
@@ -26,29 +20,6 @@ object PaletteMatch {
         if (q.isEmpty()) return false
         val n = name.lowercase()
         return n.startsWith(q) || n.split(' ', '-', '_').any { it.startsWith(q) } || q.length >= 3 && n.contains(q)
-    }
-}
-
-class GroupPaletteProvider(private val groups: () -> List<AppGroup>, private val launch: (AppGroup) -> Unit) : PaletteProvider {
-    override fun results(query: String): List<PaletteHit> =
-        groups().filter { PaletteMatch.matches(query, it.name) }.map { g ->
-            PaletteHit("group:${g.id}", g.name, "App group, ${g.members.size} apps") { launch(g) }
-        }
-}
-
-/** "Switch to <workspace>" and "Restore <session>" results (WSP-07 palette route, WSP-09). */
-class WorkspacePaletteProvider(
-    private val state: () -> DockWorkspaceState,
-    private val switchTo: (String) -> Unit,
-    private val restore: (Session) -> Unit,
-) : PaletteProvider {
-    override fun results(query: String): List<PaletteHit> {
-        val s = state()
-        val ws = s.workspaces.filter { it.id != s.activeId && (PaletteMatch.matches(query, it.name) || PaletteMatch.matches(query, "workspace")) && query.isNotBlank() }
-            .map { w -> PaletteHit("workspace:${w.id}", "Switch to ${w.name}", "Workspace") { switchTo(w.id) } }
-        val ss = s.sessions.filter { PaletteMatch.matches(query, it.name) }
-            .map { x -> PaletteHit("session:${x.id}", "Restore ${x.name}", "Session, reopens apps only") { restore(x) } }
-        return ws + ss
     }
 }
 

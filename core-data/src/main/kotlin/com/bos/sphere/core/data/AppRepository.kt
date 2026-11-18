@@ -117,8 +117,4 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
         runCatching { appContext.startActivity(intent) }
     }
 
-    companion object {
-        /** Convenience for callers that only have a [ComponentName]/package and the current user. */
-        fun currentUser(): UserHandle = Process.myUserHandle()
-    }
 }

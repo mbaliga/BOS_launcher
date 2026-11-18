@@ -73,7 +73,7 @@ enum class ProbeSurface(val id: String, val english: String) {
     Glance("glance", "Glance"),
     DrawerScroll("drawer", "Drawer scroll"),
     RadarTyping("radar", "Radar: open and type"),
-    LaunchpadOpenClose("launchpad", "Launchpad: open and close"),
+    LaunchpadOpenClose("launchpad", "Comms: open and close"),
     PageSwipe("pages", "Page swipe"),
 }
 

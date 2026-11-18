@@ -34,7 +34,7 @@ class A11yPolishW23AuditTest {
     }
 
     @Test fun NFR_13_theLaunchpadAndTheRecentsPanelAnnounceThemselvesWithAPaneTitle() {
-        assertTrue(Repo.file("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/Launchpad.kt").readText().contains("paneTitle = L10n.tr(\"Launchpad\")"))
+        assertTrue(Repo.file("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/Launchpad.kt").readText().contains("paneTitle = L10n.tr(\"Comms\")"))
         assertTrue(Repo.file("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/RecentsPanel.kt").readText().contains("paneTitle = L10n.tr(\"Recent apps\")"))
     }
 }

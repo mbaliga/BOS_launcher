@@ -38,7 +38,7 @@ class LaunchpadStringsTest {
         addAll(GrantGateLogic.allEnglish)
         addAll(AccessLogic.allEnglish)
         PaletteSource.entries.forEach { add(it.label) }
-        addAll(listOf("Default", "Slide left runs", "Delivery per app", "Add an app (type to search)", "App and conversation", "Digest", "next at %s", "Reply sent", "Snoozed", "Write a reply", "Send", "Reply", "Close Launchpad", "Home", "%d waiting. Launchpad", "%d held for the digest at %s", DigestWidgetLogic.EMPTY, "%d in the digest"))
+        addAll(listOf("Default", "Slide left runs", "Delivery per app", "Add an app (type to search)", "App and conversation", "Digest", "next at %s", "Reply sent", "Snoozed", "Write a reply", "Send", "Reply", "Close Comms", "Home", "%d waiting. Comms", "%d held for the digest at %s", DigestWidgetLogic.EMPTY, "%d in the digest"))
     }
 
     @Test fun CFG_19_launchpadLabelsExistInAllEightLanguages() {

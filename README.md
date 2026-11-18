@@ -28,13 +28,13 @@ gated for capable devices. The product spec is `docs/Spec.md`; how far each requ
 | `:feature-search` | Radar's providers and wiring (apps, settings, files, shortcuts, calculator) over the shared engine, plus the always-on keyboard |
 | `:feature-dock` | The dock, workspaces and the Desktop-class footprint |
 | `:feature-desktop` | The desktop surface and its widgets |
-| `:feature-launchpad` | Launchpad (the left card), the Recents panel (right card) and notification groups |
+| `:feature-launchpad` | Comms (the left card), the Recents panel (right card) and notification groups |
 | `:search-engine` | Vendored `search-core` from Shared-Libraries-asoc: query language, facets, relative dates, natural-language interpretation, ranking; and the Radar provider model |
 | `:crash-recovery` | Vendored `crash-recovery` 1.4.0 from Shared-Libraries-asoc: the crash splash and recovery screen (readable report, Copy, Save, Share, Continue, loop-gated Reset), plain android.widget; our Safe mode is its second layer |
 | `:shaders` | AGSL capability gate (`RuntimeShader` is API 33+) with a fallback path |
 
 Removed in wave 15 and later: the background gallery and its picture and wallpaper options, Radar's typed prefixes and `!bang`
-syntax, the bottom search field, and the full-screen portrait Launchpad.
+syntax, the bottom search field, and the full-screen portrait Comms.
 
 ## What works now
 

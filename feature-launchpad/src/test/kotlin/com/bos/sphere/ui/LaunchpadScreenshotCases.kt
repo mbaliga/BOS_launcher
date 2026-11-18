@@ -35,7 +35,7 @@ abstract class LaunchpadScreenshotCases(private val orientation: String) : Launc
 
     @Test fun STR_05_noGrantAfterAskedSaysStillOff() {
         render("no-grant-asked", true) { Body(grouped, hasAccess = false, asked = true) }
-        shown("Notification access is still off, so Launchpad and the media strip stay empty.")
+        shown("Notification access is still off, so Comms and the media strip stay empty.")
     }
 
     private val emptyChecks = { shown("All caught up") }

@@ -26,7 +26,7 @@ class DestructiveLimiterTest {
         assertTrue(l.allow("hide app", 1_000L))
         assertTrue("state before the corner edit includes the hidden app", l.allow("clear corner", 1_500L))
         assertFalse(l.allow("clear corner", 2_000L))
-        assertTrue(l.allow("remove Launchpad rule", 2_500L))
+        assertTrue(l.allow("remove Comms rule", 2_500L))
     }
 
     @Test
@@ -45,7 +45,7 @@ class DestructiveLimiterTest {
         // Older snapshots exist from earlier in the day.
         for (i in 1..3) { store.take("old $i", "state-old-$i", force = true); now += 10_000L }
         now += 10_000L
-        val kinds = listOf("hide app", "clear corner", "clear gesture", "remove from home", "remove Launchpad rule", "clear Launchpad policy")
+        val kinds = listOf("hide app", "clear corner", "clear gesture", "remove from home", "remove Comms rule", "clear Comms policy")
         var state = "state-before-burst"
         for ((i, k) in kinds.withIndex()) {
             if (limiter.allow(k, now)) store.take(k, state)
@@ -66,7 +66,7 @@ class DestructiveLimiterTest {
         val store = SnapshotStore(tmp.newFolder("p"), SnapshotStore.MAX_SNAPSHOTS) { now }
         for (i in 1..3) { store.take("old $i", "state-old-$i", force = true); now += 10_000L }
         now += 10_000L
-        val kinds = listOf("hide app", "clear corner", "clear gesture", "remove from home", "remove Launchpad rule", "clear Launchpad policy", "delete page", "remove tile")
+        val kinds = listOf("hide app", "clear corner", "clear gesture", "remove from home", "remove Comms rule", "clear Comms policy", "delete page", "remove tile")
         for ((i, k) in kinds.withIndex()) {
             val d = limiter.decide(k, now)
             if (d.take) store.take(k, "state-before-$i", pin = d.burstStart)

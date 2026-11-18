@@ -316,7 +316,7 @@ abstract class LaunchpadGroupsCases(private val orientation: String) : Launchpad
         rule.setContent { Themed(false) { WaitingIndicatorView(5, null, {}, priorityCount = 2, accent = androidx.compose.ui.graphics.Color(0xFFE5547A)) } }
         rule.waitForIdle()
         shown("★ 5")
-        val d = rule.onNode(androidx.compose.ui.test.hasContentDescription("5 waiting, 2 priority. Launchpad")).fetchSemanticsNode()
+        val d = rule.onNode(androidx.compose.ui.test.hasContentDescription("5 waiting, 2 priority. Comms")).fetchSemanticsNode()
         assertNotNull(d)
     }
 

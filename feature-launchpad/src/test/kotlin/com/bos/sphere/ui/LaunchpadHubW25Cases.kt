@@ -131,7 +131,7 @@ abstract class LaunchpadHubW25Cases(private val orientation: String) : Launchpad
         openMenu()
         rule.onNodeWithTag("lp.root").performKeyEscape()
         rule.waitForIdle()
-        assertFalse("Esc closes the panel before it would leave Launchpad", menuRef!!.open)
+        assertFalse("Esc closes the panel before it would leave Comms", menuRef!!.open)
     }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.performKeyEscape() =

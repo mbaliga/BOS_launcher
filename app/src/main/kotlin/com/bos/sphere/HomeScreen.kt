@@ -1250,7 +1250,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
             if (quietLeft) {
                 com.bos.sphere.feature.grid.GlanceEdgeHandle(
-                    label = L10n.tr("Open Launchpad"), tag = "glance.handle.left", rightEdge = launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = com.bos.sphere.feature.grid.GlanceHandleFade.tint(com.bos.sphere.feature.grid.isDarkSurface()),
+                    label = L10n.tr("Open Comms"), tag = "glance.handle.left", rightEdge = launchpadRtl, wake = { glanceWake.intValue }, reduced = glanceMotionReduced, tint = com.bos.sphere.feature.grid.GlanceHandleFade.tint(com.bos.sphere.feature.grid.isDarkSurface()),
                     onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge),
                 )
             } else {

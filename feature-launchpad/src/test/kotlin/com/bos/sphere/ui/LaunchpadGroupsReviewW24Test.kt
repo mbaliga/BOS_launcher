@@ -102,7 +102,7 @@ class LaunchpadGroupsReviewW24Test {
         rule.onNodeWithTag("lp.groups").performKeyInput { pressKey(Key.Escape) }
         rule.waitForIdle()
         assertTrue(!groupsOpen())
-        assertEquals("Launchpad itself was not dismissed", 0, dismissed)
+        assertEquals("Comms itself was not dismissed", 0, dismissed)
     }
 
     @Test fun STR_08_backClosesOnlyTheManagerNotLaunchpad() {
@@ -111,7 +111,7 @@ class LaunchpadGroupsReviewW24Test {
         rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
         rule.waitForIdle()
         assertTrue("Back closed the manager", !groupsOpen())
-        assertEquals("Launchpad itself was not dismissed", 0, dismissed)
+        assertEquals("Comms itself was not dismissed", 0, dismissed)
         rule.onNodeWithTag("lp.root").assertExists()
     }
 

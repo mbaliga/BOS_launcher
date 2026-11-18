@@ -58,7 +58,7 @@ class A11ySweepTourTest : TourBase() {
         MediaNow.publishForTest(track); settle()
         tapAt(0.5f, 0.72f); assertTrue(controlsShown()); sweep("glance")
         waitFor("controls out", 12_000) { !controlsShown() }
-        swipeFromLeft(); check("launchpad", Surface.Launchpad); sweep("launchpad", pane = "Launchpad"); back()
+        swipeFromLeft(); check("launchpad", Surface.Launchpad); sweep("launchpad", pane = "Comms"); back()
         key(KeyEvent.KEYCODE_R, ctrl = true); check("recents", Surface.Recents); sweep("recents", headings = true, pane = "Recent apps"); back()
         key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer); sweep("drawer"); back()
         key(KeyEvent.KEYCODE_B); check("radar", Surface.Radar); sweep("radar"); key(KeyEvent.KEYCODE_R); key(KeyEvent.KEYCODE_A); sweep("radar typed"); back()
@@ -84,7 +84,7 @@ class A11ySweepTourTest : TourBase() {
         try {
             start()
             swipeFromLeft(); check("launchpad", Surface.Launchpad)
-            rule.onNodeWithContentDescription("Notification menu", useUnmergedTree = true).performClick(); settle()
+            rule.onNodeWithContentDescription("Comms menu", useUnmergedTree = true).performClick(); settle()
             assertTrue("the side panel is open", tagShown("lp.menu.panel")); sweep("launchpad menu panel")
             rule.onNodeWithTag("lp.menu.close", useUnmergedTree = true).performClick(); settle(); assertFalse(tagShown("lp.menu.panel"))
             rule.onNodeWithTag("hub.view.unread", useUnmergedTree = true).performClick(); settle()

@@ -99,7 +99,7 @@ class PendingIntentLauncherTest {
         PendingIntentLauncher.sender = Recorder(PendingIntent.CanceledException())
         val seen = Seen()
         assertEquals(HandOff.Failed, open(note(pi()), seen, fallbackWorks = false))
-        assertEquals("a failed hand-off keeps Launchpad open", 0, seen.closed)
+        assertEquals("a failed hand-off keeps Comms open", 0, seen.closed)
         assertEquals("but the item is still marked read", 1, seen.read)
         assertFalse(HandOff.Failed.ok)
     }

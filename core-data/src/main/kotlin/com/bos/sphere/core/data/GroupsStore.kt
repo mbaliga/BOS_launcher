@@ -201,7 +201,7 @@ object GroupsSettings {
     /** CFG-04: snapshot first, then delete the group together with the assignments and rules that pointed at it. */
     fun deleteGroup(id: String) {
         if (_config.value.group(id) == null) return
-        DestructiveEdits.before("delete Launchpad group")
+        DestructiveEdits.before("delete Comms group")
         edit { GroupsEdit.delete(it, id) }
     }
 
@@ -212,7 +212,7 @@ object GroupsSettings {
 
     fun unassign(kind: AssignKind, target: String) {
         if (_config.value.assignments.none { it.kind == kind && it.target == target }) return
-        DestructiveEdits.before("remove Launchpad assignment")
+        DestructiveEdits.before("remove Comms assignment")
         edit { GroupsEdit.unassign(it, kind, target) }
     }
 
@@ -221,7 +221,7 @@ object GroupsSettings {
     fun moveRule(id: String, delta: Int) = edit { GroupsEdit.moveRule(it, id, delta) }
     fun removeRule(id: String) {
         if (_config.value.rules.none { it.id == id }) return
-        DestructiveEdits.before("remove Launchpad group rule")
+        DestructiveEdits.before("remove Comms group rule")
         edit { GroupsEdit.removeRule(it, id) }
     }
 

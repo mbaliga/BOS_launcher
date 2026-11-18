@@ -16,7 +16,7 @@ class LaunchpadDestructiveEditTest {
         LaunchpadSettings.addRule(Rule(id = "r1", packageName = "a.b", action = RuleAction.entries.first()))
         assertTrue("adding is not destructive", seen.isEmpty())
         LaunchpadSettings.removeRule("r1")
-        assertEquals(listOf("remove Launchpad rule" to 1), seen) // the rule was still present when the hook ran
+        assertEquals(listOf("remove Comms rule" to 1), seen) // the rule was still present when the hook ran
         LaunchpadSettings.removeRule("missing")
         assertEquals(1, seen.size)
     }
@@ -27,7 +27,7 @@ class LaunchpadDestructiveEditTest {
         LaunchpadSettings.setPolicy(AppPolicy("p.q", mode = DeliveryMode.entries.first { it != DeliveryMode.Immediate }))
         DestructiveEdits.install { seen += it }
         LaunchpadSettings.setPolicy(AppPolicy("p.q")) // back to the default: the stored policy is dropped
-        assertEquals(listOf("clear Launchpad policy"), seen)
+        assertEquals(listOf("clear Comms policy"), seen)
         LaunchpadSettings.setPolicy(AppPolicy("p.q"))
         assertEquals(1, seen.size) // nothing stored any more
     }

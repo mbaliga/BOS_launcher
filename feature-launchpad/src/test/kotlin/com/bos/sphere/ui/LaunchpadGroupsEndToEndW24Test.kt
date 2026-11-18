@@ -270,12 +270,12 @@ class LaunchpadGroupsEndToEndW24Test {
             }
         }
         rule.waitUntil(10_000) { rule.onAllNodesWithTag("lp.dnd").fetchSemanticsNodes().isNotEmpty() }
-        rule.waitUntil(10_000) { rule.onAllNodes(SemanticsMatcher("indicator") { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() == "1 waiting, 1 priority. Launchpad" }).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10_000) { rule.onAllNodes(SemanticsMatcher("indicator") { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() == "1 waiting, 1 priority. Comms" }).fetchSemanticsNodes().isNotEmpty() }
         // The list still shows everything; only the edge indicator is held back.
         assertEquals(setOf("a", "b", "c", "d", "e"), column().flatMap { it.second }.toSet())
         // Switched off in the manager: Do Not Disturb no longer holds anything back.
         rule.runOnIdle { GroupsSettings.setPriorityBreaksDnd(false) }
-        rule.waitUntil(10_000) { rule.onAllNodes(SemanticsMatcher("indicator") { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() == "5 waiting, 1 priority. Launchpad" }).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10_000) { rule.onAllNodes(SemanticsMatcher("indicator") { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() == "5 waiting, 1 priority. Comms" }).fetchSemanticsNodes().isNotEmpty() }
         assertTrue(rule.onAllNodesWithTag("lp.dnd").fetchSemanticsNodes().isEmpty())
         rule.runOnIdle { Snapshot.withMutableSnapshot { gate = false } }
     }

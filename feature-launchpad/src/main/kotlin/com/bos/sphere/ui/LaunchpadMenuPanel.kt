@@ -153,10 +153,10 @@ internal fun androidx.compose.foundation.layout.BoxScope.LaunchpadMenuLayer(menu
             }
             .shadow(8.dp).background(ink.surface)
             .testTag("lp.menu.panel")
-            .semantics { paneTitle = L10n.tr("Notification menu"); isTraversalGroup = true; traversalIndex = -1f },
+            .semantics { paneTitle = L10n.tr("Comms menu"); isTraversalGroup = true; traversalIndex = -1f },
     ) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp).padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(L10n.tr("Notification menu"), color = ink.ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(L10n.tr("Comms menu"), color = ink.ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Box(
                 Modifier.size(48.dp).clip(CircleShape)
                     .semantics { contentDescription = L10n.tr("Close menu") }

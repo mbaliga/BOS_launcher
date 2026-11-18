@@ -41,7 +41,7 @@ object LauncherActions {
         LauncherActionDef("NextWorkspace", "Switch to next workspace", listOf("switch workspace", "next workspace", "workspace")),
         LauncherActionDef("PreviousWorkspace", "Switch to previous workspace", listOf("switch workspace", "previous workspace", "workspace")),
         LauncherActionDef("OpenDrawer", "Open all apps", listOf("drawer", "app list", "all apps")),
-        LauncherActionDef("OpenLaunchpad", "Open Launchpad", listOf("notifications", "launchpad", "status")),
+        LauncherActionDef("OpenLaunchpad", "Open Comms", listOf("notifications", "launchpad", "comms", "status")),
         LauncherActionDef("ShortcutSheet", "Show keyboard shortcuts", listOf("keys", "shortcuts", "hotkeys", "help")),
     )
 }

@@ -11,9 +11,9 @@ import java.time.ZoneId
 // All of this only changes what Liftoff's own surfaces show. Android's own notifications are untouched.
 
 enum class DeliveryMode(val label: String, val hint: String) {
-    Immediate("Show immediately", "Appears in Launchpad as it arrives"),
+    Immediate("Show immediately", "Appears in Comms as it arrives"),
     Digest("Batch into a digest", "Held back and released at the times you choose"),
-    SilentInLaunchpad("Silent, Launchpad only", "Listed in Launchpad, but never counted or highlighted"),
+    SilentInLaunchpad("Silent, Comms only", "Listed in Comms, but never counted or highlighted"),
 }
 
 /** The sentence Launchpad shows wherever rules are edited (STR-04: "Launchpad says so"). */

@@ -39,7 +39,7 @@ class SettingsIndex(val entries: List<SettingEntry>) {
         return entries.mapNotNull { e ->
             var total = 0
             for (w in words) {
-                val s = score(e, w)
+                val s = maxOf(score(e, w), ALIASES[w]?.let { score(e, it) } ?: 0)
                 if (s == 0) return@mapNotNull null
                 total += s
             }
@@ -65,6 +65,9 @@ class SettingsIndex(val entries: List<SettingEntry>) {
     fun byId(id: String): SettingEntry? = entries.firstOrNull { it.id == id }
 
     companion object {
+        /** Hidden search aliases: the product word before the rename ("Launchpad") still finds Comms. Never shown. */
+        private val ALIASES = mapOf("launchpad" to "comms")
+
         fun id(category: Int, item: Int) = "$category/$item"
 
         /** An index of every row of every category, built from the live list so no setting can be missing. */

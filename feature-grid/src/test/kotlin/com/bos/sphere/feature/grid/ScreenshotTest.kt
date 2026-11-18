@@ -331,7 +331,7 @@ class ScreenshotTest {
             SettingCategory("Gestures", Glyphs.Pinch, emptyList()),
             SettingCategory("App drawer", Glyphs.Widget, emptyList()),
             SettingCategory("Radar", Glyphs.Search, emptyList()),
-            SettingCategory("Launchpad", Glyphs.Bell, emptyList()),
+            SettingCategory("Comms", Glyphs.Bell, emptyList()),
             SettingCategory("System & sound", Glyphs.Gear, emptyList()),
             SettingCategory("About", Glyphs.Info, emptyList()),
         )

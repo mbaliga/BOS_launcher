@@ -61,7 +61,7 @@ private fun deliveryLabel(d: DeliveryMode?) = when (d) {
     null -> L10n.tr("Default")
     DeliveryMode.Immediate -> L10n.tr("Show at once")
     DeliveryMode.Digest -> L10n.tr("Digest")
-    DeliveryMode.SilentInLaunchpad -> L10n.tr("Silent in Launchpad")
+    DeliveryMode.SilentInLaunchpad -> L10n.tr("Silent in Comms")
 }
 
 /**
@@ -107,7 +107,7 @@ internal fun LaunchpadGroupsPane(
     Column(modifier.fillMaxWidth().testTag("grp.pane"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(L10n.tr("Groups"), color = c.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            L10n.tr("Groups become the sections of Launchpad. Priority groups show at once in Liftoff and can light the edge indicator. System notifications and Do Not Disturb are not changed."),
+            L10n.tr("Groups become the sections of Comms. Priority groups show at once in Liftoff and can light the edge indicator. System notifications and Do Not Disturb are not changed."),
             color = c.dim, fontSize = 12.sp,
         )
         if (cfg.groups.isEmpty()) Text(L10n.tr("No groups yet"), color = c.dim, fontSize = 13.sp)
@@ -118,7 +118,7 @@ internal fun LaunchpadGroupsPane(
             c, L10n.tr("Priority groups break through Do Not Disturb"), cfg.priorityBreaksDnd, tag = "grp.dnd",
             description = L10n.tr("Priority groups break through Do Not Disturb") + ": " + (if (cfg.priorityBreaksDnd) L10n.tr("On") else L10n.tr("Off")),
         ) { GroupsSettings.setPriorityBreaksDnd(!cfg.priorityBreaksDnd) }
-        Text(L10n.tr("While Do Not Disturb is on, only Priority groups light Liftoff's edge indicator. Launchpad still lists everything. Do Not Disturb itself is not changed."), color = c.dim, fontSize = 12.sp)
+        Text(L10n.tr("While Do Not Disturb is on, only Priority groups light Liftoff's edge indicator. Comms still lists everything. Do Not Disturb itself is not changed."), color = c.dim, fontSize = 12.sp)
 
         Column(Modifier.fillMaxWidth().background(c.surface, RoundedCornerShape(14.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GField(c, newName, { newName = it }, L10n.tr("New group name"), tag = "grp.pane.newName")

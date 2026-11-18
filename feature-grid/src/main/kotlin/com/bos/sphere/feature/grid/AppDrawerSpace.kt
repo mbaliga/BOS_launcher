@@ -447,7 +447,7 @@ private fun DrawerHeader(
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Apps", color = HyleColors.InkBright, fontSize = 22.sp, fontWeight = FontWeight.Light, maxLines = 1, softWrap = false)
+            Text(L10n.tr("Apps"), color = HyleColors.InkBright, fontSize = 22.sp, fontWeight = FontWeight.Light, maxLines = 1, softWrap = false)
             Text("$count", color = HyleColors.InkDim, fontSize = 11.sp)
         }
         // View: one quiet segmented pill.
@@ -504,7 +504,7 @@ private fun DrawerHeader(
             }
         }
         Icon(
-            Glyphs.Close, contentDescription = "Close apps", tint = HyleColors.Ink,
+            Glyphs.Close, contentDescription = L10n.tr("Close apps"), tint = HyleColors.Ink,
             modifier = Modifier.padding(start = 2.dp).size(48.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { sounds?.play(UiSound.Close); onClose() }.padding(13.dp),
         )
     }

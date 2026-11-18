@@ -42,8 +42,6 @@ object BlackSpec {
     /** Black at the top of a surface, and at its bottom (the gradient runs between the two, straight down). */
     const val TOP_ALPHA = 0.96f
     const val BOTTOM_ALPHA = 0.70f
-    /** Listening and pressed: a solid black (no colour, no glow). */
-    const val PRESSED_ALPHA = 1f
     /** The 56 dp round button (the mic), and the 48 dp touch target everything else keeps (NFR-13). */
     val BigButton: Dp = 56.dp
     val Target: Dp = 48.dp

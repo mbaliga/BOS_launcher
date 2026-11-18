@@ -98,9 +98,6 @@ private val WheelRow = 34.dp
 /** The wheel at its roomiest: five rows. */
 internal val WheelHeight = WheelRow * 5
 
-/** How far above and below the middle of the wheel its labels are still bright enough to be in the way of a tile. */
-internal val WheelRowHalfVisible = WheelRow * 1.6f
-
 /**
  * Wave 22: the wheel sized to the room it really has. [rows] is odd (the selected label sits in the middle row) and [row] grows with the
  * font scale so two labels never overlap; [height] is the wheel's own box, which is the only place a label is drawn.

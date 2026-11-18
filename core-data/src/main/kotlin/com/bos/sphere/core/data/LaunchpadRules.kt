@@ -515,6 +515,10 @@ object LaunchpadSettings {
     /** Keys of notifications the user has opened (not persisted). */
     val readKeys: StateFlow<Set<String>> = _read.asStateFlow()
 
+    /** Test seam: forgets the preferences file the settings were bound to, so the next [init] binds to the test's own context. */
+    @Synchronized
+    fun unbindForTest() { sp = null }
+
     @Synchronized
     fun init(context: Context) {
         if (sp != null) return
@@ -549,7 +553,7 @@ object LaunchpadSettings {
         savePrefs(_prefs.value.copy(perApp = m))
     }
 
-    fun markRead(key: String) { _read.value = _read.value + key }
+    fun markRead(key: String) { _read.value = _read.value + key; NotificationHistory.markRead(key) }
 
     /**
      * Forgets read marks and expired snoozes for notifications that are gone. An empty feed is not trusted: it is also what

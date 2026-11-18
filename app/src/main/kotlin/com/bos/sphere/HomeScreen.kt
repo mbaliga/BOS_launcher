@@ -242,7 +242,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var menuRecents by remember { mutableStateOf(false) } // the open app menu was opened from the Recent apps landing
     val homeEdit = rememberHomeEdit(stores.layout, remember(context) { WorkspaceHomeDockPins(com.bos.sphere.feature.dock.WorkspaceRepository.get(context)) }) // HOM-12 (layout and dock pins share one undo)
     SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }, onRebased = { homeEdit.rebase() }) // HOM-11: one arrangement per window size class; HOM-12: a swap is not an undoable edit
-    var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18
+    var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18: a request to show the hub's Files view
+    var hubStandalone by remember { mutableStateOf(false) } // wave 25: the hub shown by itself when the left page is not Launchpad
     val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()
     val landscapeCorners by stores.shortcuts.landscapeCorners.collectAsStateWithLifecycle()
     val gestures by stores.shortcuts.gestures.collectAsStateWithLifecycle()
@@ -562,7 +563,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // INP-11: an app dragged out of the drawer with a mouse and dropped on the home is added to the current page.
     // ---- keyboard, pointer and controller (INP-04, INP-05, INP-16, HOM-21): shortcuts go to the same openers the touch paths use
     com.bos.sphere.feature.grid.LauncherInputWiring(
-        overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || leftOpen || rightOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
+        overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || hubStandalone || leftOpen || rightOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
         onCommand = { c ->
             when (c) {
                 com.bos.sphere.core.input.LauncherCommand.OpenPalette -> { internal(CornerActionId.Search, null); true }
@@ -977,6 +978,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // The left page lies UNDER the home: the home slides right, casting a shadow onto it.
         val leftProgress = reveal.progress
         val leftActive = leftOpen || leftProgress > 0.001f
+        val hubPanelBody: @Composable (com.bos.sphere.ui.HubView) -> Unit = { v ->
+            HomePanelsBody(com.bos.sphere.core.catalog.PanelTab.entries.firstOrNull { it.uriName == v.id } ?: com.bos.sphere.core.catalog.PanelTab.Files, timelineLog, appsByKey) { a -> leftOpen = false; hubStandalone = false; launch(a) }
+        }
+        if (hubStandalone && prefs.leftPage != com.bos.sphere.core.data.LeftPage.Launchpad) com.bos.sphere.ui.LaunchpadPanel(
+            visible = true, onDismiss = { hubStandalone = false },
+            onOpenApp = { pkg -> hubStandalone = false; apps.firstOrNull { it.packageName == pkg }?.let(::launch) ?: appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))) },
+            modifier = Modifier.fillMaxSize(), theme = prefs.launchpadTheme,
+            launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
+            panelBody = hubPanelBody,
+        )
         when (prefs.leftPage) {
             com.bos.sphere.core.data.LeftPage.Launchpad -> if (leftActive) com.bos.sphere.ui.LaunchpadPanel(
                 visible = true,
@@ -995,6 +1006,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 menu = lpMenu,
                 // Wave 25 (STR-02): the floating compose button has no composer of its own to open, so it opens Radar on People (reach someone to message).
                 onCompose = { leftOpen = false; radarScope = com.bos.sphere.core.data.SearchCategory.Contacts; wheelOpen = false; drawerOpen = false; searchOpen = true },
+                panelBody = hubPanelBody,
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
@@ -1616,7 +1628,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
         if (panelsOpen || homeItems.panelRequest >= 0) {
-            HomePanelsSheet(timelineLog, appsByKey, onDismiss = { panelsOpen = false; homeItems.panelRequest = -1 }, initialTab = homeItems.panelRequest.coerceAtLeast(0), onLaunch = { a -> panelsOpen = false; homeItems.panelRequest = -1; launch(a) })
+            // Wave 25 (hubData): Files, Usage and Timeline are views of the Launchpad hub; the old sheet is gone and every entry point lands there.
+            LaunchedEffect(panelsOpen, homeItems.panelRequest) {
+                val tab = com.bos.sphere.core.catalog.PanelTab.entries.getOrNull(homeItems.panelRequest) ?: com.bos.sphere.core.catalog.PanelTab.Files
+                com.bos.sphere.ui.LaunchpadHubNav.request(com.bos.sphere.ui.HubView.forPanel(tab.uriName))
+                panelsOpen = false; homeItems.panelRequest = -1
+                if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad) leftOpen = true else hubStandalone = true
+            }
         }
         // HOM-06: the work profile pause chip, shown while a work profile exists.
         val workPaused by com.bos.sphere.core.catalog.WorkProfileState.workPaused.collectAsStateWithLifecycle()

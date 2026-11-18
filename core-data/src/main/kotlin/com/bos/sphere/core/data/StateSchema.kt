@@ -74,14 +74,14 @@ object StateSchema {
      * the desktop profile table describe this device, and crash reports hold stack traces. The user's own export file is
      * the portable copy of the part of this that is setup (aliases).
      */
-    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE)
+    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE, "launchpad_hub")
     val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage")
 
     /**
      * Files (relative to the app's files directory) that hold usage history and are never exported (HOM-18): the timeline
      * log of up to 5000 opens, and the recents list's removals (HOM-22). Each lives under a directory in [BACKUP_EXCLUDED_FILES], so system backup skips it too.
      */
-    val NEVER_EXPORTED_FILES: Set<String> = setOf(TimelineLogStore.RELATIVE_PATH, RecentsStateStore.RELATIVE_PATH)
+    val NEVER_EXPORTED_FILES: Set<String> = setOf(TimelineLogStore.RELATIVE_PATH, RecentsStateStore.RELATIVE_PATH, NotificationHistoryStore.RELATIVE_PATH)
 
     val NEVER_EXPORTED_STORES: Set<String> = setOf(
         "launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "liftoff_misc",

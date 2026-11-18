@@ -139,12 +139,13 @@ object NotificationProvider {
 
     internal fun onNotificationsChanged(notifs: List<HubNotification>) {
         _state.value = notifs
+        NotificationHistory.observe(notifs)
     }
 
     internal fun bindListener(svc: NotificationListenerService) = slot.bind(svc)
 
     /** The list as [svc] reads it; ignored when [svc] is an old instance that a newer one has replaced. */
-    internal fun listedBy(svc: NotificationListenerService, notifs: List<HubNotification>) { if (slot.owns(svc)) _state.value = notifs }
+    internal fun listedBy(svc: NotificationListenerService, notifs: List<HubNotification>) { if (slot.owns(svc)) { _state.value = notifs; NotificationHistory.observe(notifs) } }
 
     /** [svc] lost its connection: its list is no longer live. A late disconnect of an old instance leaves the new one's list alone. */
     internal fun disconnectedBy(svc: NotificationListenerService) { if (slot.owns(svc)) _state.value = emptyList() }
@@ -174,6 +175,7 @@ class SphereNotificationListener : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
+        NotificationHistory.init(applicationContext) // wave 25: history records every post from here on
         NotificationProvider.bindListener(this)
     }
 

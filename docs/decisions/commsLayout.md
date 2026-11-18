@@ -34,7 +34,7 @@ Measuring revealed the owner's reading was a little high: title cap 27 px is 17 
 
 ## Comms size
 - 75..125 in 5s (11 detents), default 100; `CommsScale` (pure stepping, clamp, snap, parse of garbage), `CommsScaleSettings` (pref file `comms_scale`, key `pct`, `TolerantPrefs`; exported with launcher settings through `PrefFilesSource.ALLOWED`; classified in the W13 audit and the `StateSchema` notes; additive, no schema bump).
-- Controls: Ground Control, Comms category, a stepper row (minus, "100%", plus; Left/Right keys; progress semantics); Options row of the Comms menu (same control, 48 dp keys); pinch on the list (live, the start size times the finger spread snapped to a detent, a dead zone of 8 percent before it counts; Ctrl+Plus and Ctrl+Minus step one detent).
+- Controls: Ground Control, Comms category, a stepper row (minus, "100%", plus; Left/Right keys; progress semantics); no control in the Comms menu any more (wave 29); pinch on the list (live, the start size times the finger spread snapped to a detent, a dead zone of 8 percent before it counts; Ctrl+Plus and Ctrl+Minus step one detent).
 - Removed: the wave 25 row density (Compact, Comfortable, Expanded) and its pref key (nothing migrated; an old `density` value in `launchpad_hub` is ignored). The pinch that changed grouping granularity after the density saturated depended on density, so it is dropped (grouping is chosen in the menu grid). The two pinch bindings of the Comms gesture settings (show unread / show all) are no longer offered because a pinch sets the size now; the stored values stay unused.
 
 ## Tests

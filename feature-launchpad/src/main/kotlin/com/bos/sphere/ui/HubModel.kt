@@ -189,10 +189,8 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
         private set
     var defaultView by mutableStateOf(prefs.defaultView)
         private set
-    /** Wave 27: the tab row has no Read tab (the tabs are ALL UNREAD FILES TIMELINE); Read history is a row of the Comms menu. */
+    /** Wave 27: the tab row has no Read tab (the tabs are ALL UNREAD FILES TIMELINE); Read history is a row of Ground Control's Comms category. */
     val tabs: List<HubView> = views.filter { it != HubView.Read }
-    /** A half-made "Delete history" confirmation (a row of the Comms menu); the menu drops it when it closes. */
-    var confirmDelete by mutableStateOf(false)
     var undo by mutableStateOf<HubUndo?>(null)
     private var filterMap by mutableStateOf(emptyMap<HubView, HubFilters>())
 

@@ -16,3 +16,13 @@ Removed or changed tests
 - `CommsStyle.SECTION_GAP_DP` removed (unused; `CommsReviewCases.REV_04`).
 
 Device-only: the hand-off from Ground Control to the Comms surface in the real HomeScreen (covered by the nav request tests, not by a full-app run).
+
+Adversarial review fixes (each with a test in `CommsOptionsW29Test`)
+- The three action rows and the two navigation rows had no summary (the five hint strings sat unused in the table): `SettingItem.Action` got `hint`, shown on the row and searchable (`theActionRowsHaveASummaryLikeEveryOtherRow`).
+- Back with a confirmation open closed Ground Control; it now answers the confirmation with no (`backDismissesTheConfirmationNotGroundControl`).
+- The Comms size row title was squeezed to "Co m..." at font scale 2.0; the stepper goes beneath the title at 1.5 and above (`theCommsSizeTitleIsNotCutAtFontScale2`).
+- The shared segment-slab rule was changed for every choice row (Web engine lost its slab); now only rows with `stepped = true` (Default view) use the arrows (`onlyTheDefaultViewRowIsForcedOffTheSegmentSlab`).
+- The translation test only checked the English keys; it now checks every Comms row string (title, summary, confirmation, button) in all eight tables (`everyCommsRowStringIsTranslatedIn8Languages`).
+- Dead `HubState.confirmDelete` and stale comments/docs that still put Options in the Comms menu (commsDesign, commsLayout, hubData, HubUi) removed or corrected (`noLeftoverOptionsInTheMenuCodeOrDocs`).
+- Confirmation buttons checked on screen at font scale 2.0 (`confirmationButtonsStayOnScreenAtFontScale2`, passed).
+- Not a defect: Ground Control forces left-to-right layout by design, so its RTL runs equal the LTR ones. TalkBack actions and the quick sheet have no links to the old Options (searched). Orphaned table strings of the removed menu rows ("Set as default view", "Mark visible as read") are left in place (the translation audit tolerates extras).

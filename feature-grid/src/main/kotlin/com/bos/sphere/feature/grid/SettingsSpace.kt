@@ -133,6 +133,8 @@ sealed interface SettingItem {
         val hint: String? = null,
         /** When set, a "Preview…" link on the row opens this as a full page (the visual picker). */
         val preview: (@Composable ColumnScope.() -> Unit)? = null,
+        /** Wave 29: never the one-slab segment control, always the arrows (for labels too long to share a slab, like the five Comms views). */
+        val stepped: Boolean = false,
         val onSelect: (T) -> Unit,
     ) : SettingItem {
         override val value: String get() = label(selected)
@@ -153,7 +155,9 @@ sealed interface SettingItem {
     /** Runs on tap (opens a dialog, adds a page …). */
     data class Action(override val title: String, override val glyph: ImageVector, override val value: String = "", val navigates: Boolean = false,
         /** Wave 29: a destructive action asks first: this text in a confirmation sheet whose confirm button is [confirmLabel]. */
-        val confirm: String? = null, val confirmLabel: String = "Confirm", val onClick: () -> Unit) : SettingItem
+        val confirm: String? = null, val confirmLabel: String = "Confirm",
+        /** Wave 29: the summary line under the title, like every other row. */
+        val hint: String? = null, val onClick: () -> Unit) : SettingItem
 
     /** Opens a full-screen page with its own controls; the row shows the current value and a chevron. */
     class Pane(
@@ -265,6 +269,7 @@ private fun SettingsSpaceContent(
 
     BackHandler {
         when {
+            confirming != null -> { confirming = null; sounds?.play(UiSound.Back) } // wave 29: Back answers the confirmation with "no"
             paneOpen >= 0 -> { paneOpen = -1; sounds?.play(UiSound.Back) }
             searching -> { closeSearch(); sounds?.play(UiSound.Back) }
             else -> { sounds?.play(UiSound.Close); onClose() }
@@ -429,7 +434,7 @@ private fun SettingsSpaceContent(
                                     @Suppress("UNCHECKED_CAST")
                                     ChoiceSettingRow(it as SettingItem.Choice<Any?>, { sounds?.play(UiSound.Tick); tick() }, { openDetail(i) })
                                 }
-                                is SettingItem.Action -> NavigationSettingRow(it, chevron = it.navigates, highlighted = false, onClick = { sounds?.play(UiSound.Select); if (it.confirm != null) confirming = it else it.onClick() })
+                                is SettingItem.Action -> NavigationSettingRow(it, chevron = it.navigates, highlighted = false, hint = it.hint, onClick = { sounds?.play(UiSound.Select); if (it.confirm != null) confirming = it else it.onClick() })
                                 is SettingItem.Pane -> NavigationSettingRow(it, chevron = true, highlighted = i == paneOpen, onClick = { openDetail(i) })
                             }
                         }

@@ -158,17 +158,18 @@ internal fun SliderSettingRow(item: SettingItem.Slider, onTick: () -> Unit) {
 
 @Composable
 internal fun StepperSettingRow(item: SettingItem.Stepper, onTick: () -> Unit) {
-    SettingRowFrame(
-        item.glyph, item.title, hint = item.hint,
-        trailing = {
-            TactileStepper(
-                item.value, item.count > item.range.first, item.count < item.range.last,
-                { onTick(); item.onChange((item.count - item.step).coerceAtLeast(item.range.first)) }, { onTick(); item.onChange((item.count + item.step).coerceAtMost(item.range.last)) }, item.title,
-                progress = Triple(item.count.toFloat(), item.range.first.toFloat()..item.range.last.toFloat(), item.step),
-                onProgress = { v -> item.onChange(item.fromProgress(v)) },
-            )
-        },
-    )
+    // Wave 29: at large font sizes the title would be squeezed to a few letters beside the control, so the control goes beneath it.
+    val big = androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.5f
+    val control: @Composable () -> Unit = {
+        TactileStepper(
+            item.value, item.count > item.range.first, item.count < item.range.last,
+            { onTick(); item.onChange((item.count - item.step).coerceAtLeast(item.range.first)) }, { onTick(); item.onChange((item.count + item.step).coerceAtMost(item.range.last)) }, item.title,
+            progress = Triple(item.count.toFloat(), item.range.first.toFloat()..item.range.last.toFloat(), item.step),
+            onProgress = { v -> item.onChange(item.fromProgress(v)) },
+        )
+    }
+    if (big) SettingRowFrame(item.glyph, item.title, hint = item.hint, below = { Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.CenterEnd) { control() } })
+    else SettingRowFrame(item.glyph, item.title, hint = item.hint, trailing = control)
 }
 
 /** Up to this many options step in place with the ⌃⌄ arrows; more open a dropdown menu. */
@@ -193,7 +194,7 @@ internal fun <T> ChoiceSettingRow(item: SettingItem.Choice<T>, onTick: () -> Uni
         }
         return
     }
-    if (!dropdown && item.options.size >= 2 && item.options.all { item.label(it).length <= 11 } && item.options.sumOf { item.label(it).length } <= 24) { // wave 29: five long labels do not fit one slab (Timeline was cut), they step with the arrows
+    if (!dropdown && !item.stepped && item.options.size >= 2 && item.options.all { item.label(it).length <= 11 }) {
         Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
             TactileLabel(item.title, Modifier.padding(start = LocalRailInset.current + 4.dp, bottom = 10.dp))
             SegmentSlab(item.options.map { item.label(it) }, index, { i -> if (i != index) { onTick(); item.onSelect(item.options[i]) } })

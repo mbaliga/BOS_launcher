@@ -552,11 +552,11 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Default view"), Glyphs.Bell, com.bos.sphere.ui.HubView.entries, comms.defaultView.value, { x(it.label) },
-                    hint = x("What Comms shows first when it opens."),
+                    hint = x("What Comms shows first when it opens."), stepped = true,
                 ) { v -> comms.setDefaultView(v) },
             )
-            add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })
-            add(SettingItem.Action(x("Groups and rules"), Glyphs.Message, x("Open"), navigates = true) { m.openComms(null, true) })
+            add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true, hint = x("Opens the notifications you have already read.")) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })
+            add(SettingItem.Action(x("Groups and rules"), Glyphs.Message, x("Open"), navigates = true, hint = x("Opens the groups and rules manager in Comms.")) { m.openComms(null, true) })
             add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })
             add(
                 SettingItem.Pane(x("Comms gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {
@@ -574,9 +574,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             add(SettingItem.Pane(x("Grouping & rules"), Glyphs.Message, x("Per app, sender, conversation")) { com.bos.sphere.ui.LaunchpadRulesPane() })
             add(SettingItem.Pane(x("Access Liftoff asks for"), Glyphs.Gear, x("Turn on or review what Liftoff may read")) { com.bos.sphere.ui.AccessPane() })
-            add(SettingItem.Action(x("Mark all as read"), Glyphs.Bell, confirm = "Mark every notification, in the list and in the history, as read?", confirmLabel = "Mark all as read") { comms.markAllRead() })
-            add(SettingItem.Action(x("Clear all notifications"), Glyphs.Close, confirm = "Clear all notifications from the list? The history stays.", confirmLabel = "Clear all") { comms.clearAll() })
-            add(SettingItem.Action(x("Delete history"), Glyphs.Close, confirm = "Delete all notification history? Notifications in the shade stay.", confirmLabel = "Delete history") { comms.deleteHistory() })
+            add(SettingItem.Action(x("Mark all as read"), Glyphs.Bell, confirm = "Mark every notification, in the list and in the history, as read?", confirmLabel = "Mark all as read", hint = x("Marks every notification in the list and in the history as read.")) { comms.markAllRead() })
+            add(SettingItem.Action(x("Clear all notifications"), Glyphs.Close, confirm = "Clear all notifications from the list? The history stays.", confirmLabel = "Clear all", hint = x("Dismisses everything in the Comms list. The history stays.")) { comms.clearAll() })
+            add(SettingItem.Action(x("Delete history"), Glyphs.Close, confirm = "Delete all notification history? Notifications in the shade stay.", confirmLabel = "Delete history", hint = x("Deletes the stored notification history. Notifications in the shade stay.")) { comms.deleteHistory() })
         },
     )
 

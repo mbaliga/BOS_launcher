@@ -7,6 +7,10 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.semantics.getOrNull
+import com.bos.sphere.feature.grid.description
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
@@ -193,5 +197,84 @@ class CommsOptionsW29Test {
         val keys = listOf("What Comms shows first when it opens.", "Opens the notifications you have already read.", "Opens the groups and rules manager in Comms.", "Mark all as read",
             "Clear all notifications", "Deletes the stored notification history. Notifications in the shade stay.", "Clear all notifications from the list? The history stays.")
         for (k in keys) assertTrue("'$k' is a known string", k in L10n.englishKeys)
+    }
+
+    // ---- adversarial review additions ----
+    private val commsStrings: List<String> get() = comms().items.flatMap { i ->
+        listOfNotNull(i.title, i.value.takeIf { it.isNotEmpty() && i is SettingItem.Action }, i.description(),
+            (i as? SettingItem.Action)?.confirm, (i as? SettingItem.Action)?.confirmLabel.takeIf { i is SettingItem.Action && i.confirm != null })
+    } + listOf("Cancel", "All", "Unread", "Read", "Files", "Timeline")
+
+    @Test fun STR_01_w29_everyCommsRowStringIsTranslatedIn8Languages() {
+        for (lang in listOf("es", "fr", "de", "pt", "hi", "zh", "ja", "ar")) {
+            val t = L10n.tableFor(lang) ?: throw AssertionError("no table for $lang")
+            for (s in commsStrings) assertTrue("'$s' translated to $lang", t.containsKey(s))
+        }
+    }
+
+    @Test fun STR_01_w29_theActionRowsHaveASummaryLikeEveryOtherRow() {
+        for (t in listOf("Read history", "Groups and rules", "Mark all as read", "Clear all notifications", "Delete history")) {
+            assertTrue("'$t' has a summary", !(row(t) as SettingItem.Action).hint.isNullOrBlank())
+        }
+        assertNotNull("search matches the summary text", SettingsIndex.fromCategories(cats()).search("shade").firstOrNull { it.title == "Delete history" })
+    }
+
+    @Test fun STR_01_w29_onlyTheDefaultViewRowIsForcedOffTheSegmentSlab() {
+        val stepped = cats().flatMap { c -> c.items.filterIsInstance<SettingItem.Choice<*>>() }.filter { it.stepped }.map { it.title }
+        assertEquals("other rows keep their slab (Web engine and the like)", listOf("Default view"), stepped)
+    }
+    @Suppress("UNCHECKED_CAST") private fun SettingItem.Choice<*>.labelOf(o: Any?): String = (this as SettingItem.Choice<Any?>).label(o)
+
+    private fun showClosing(font: Float = 1f, closed: IntArray) = rule.setContent {
+        val d = androidx.compose.ui.platform.LocalDensity.current
+        CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides Density(d.density, font)) {
+            val all = androidx.compose.runtime.remember { cats() }
+            SphereTheme { SettingsSpace(visible = true, categories = all, initialCategory = all.indexOfFirst { it.title == "Comms" }, sounds = null, onClose = { closed[0]++ }, session = 0) }
+        }
+    }
+    private fun openConfirm(title: String) {
+        rule.onAllNodes(androidx.compose.ui.test.hasScrollAction())[0].performScrollToNode(hasText(title)); rule.waitForIdle()
+        rule.onAllNodes(hasText(title))[0].performClick(); rule.waitForIdle()
+        rule.onNodeWithTag("gc.confirm.text").assertExists()
+    }
+
+    @Test fun STR_01_w29_backDismissesTheConfirmationNotGroundControl() {
+        val closed = intArrayOf(0); showClosing(1f, closed); rule.waitForIdle()
+        openConfirm("Mark all as read")
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }; rule.waitForIdle()
+        rule.onAllNodesWithTag("gc.confirm.text").assertCountEquals(0)
+        assertEquals("Ground Control stays open", 0, closed[0])
+        assertTrue("nothing was marked", store.entries.value.none { it.read })
+    }
+
+    @Test fun STR_01_w29_confirmationButtonsStayOnScreenAtFontScale2() {
+        val closed = intArrayOf(0); showClosing(2f, closed); rule.waitForIdle()
+        openConfirm("Delete history")
+        val w = rule.activity.resources.displayMetrics.widthPixels.toFloat()
+        for (label in listOf("Cancel", "Delete history")) {
+            val n = rule.onAllNodes(hasText(label)).fetchSemanticsNodes().last().boundsInRoot
+            assertTrue("'$label' inside the window: $n of $w", n.left >= 0f && n.right <= w + 0.5f)
+        }
+    }
+
+    @Test fun STR_01_w29_theCommsSizeTitleIsNotCutAtFontScale2() {
+        show(2f, false); rule.waitForIdle()
+        val cut = rule.onAllNodes(hasText("Comms size")).fetchSemanticsNodes().mapNotNull { n ->
+            val r = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            n.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult)?.action?.invoke(r); r.firstOrNull()
+        }
+        assertTrue("the title composes", cut.isNotEmpty())
+        assertTrue("the title stays whole on one line: ${cut.map { it.layoutInput.text.text + it.lineCount }}", cut.all { it.lineCount == 1 && !it.isLineEllipsized(0) })
+    }
+
+    @Test fun STR_01_w29_noLeftoverOptionsInTheMenuCodeOrDocs() {
+        val root = File(System.getProperty("user.dir")).parentFile
+        fun text(p: String) = File(root, p).readText()
+        assertFalse("HubState keeps no delete confirmation of the removed menu row", text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/HubModel.kt").contains("confirmDelete"))
+        assertFalse(text("feature-launchpad/src/main/kotlin/com/bos/sphere/ui/HubUi.kt").contains("Options live in the Comms menu"))
+        for (d in listOf("docs/decisions/commsLayout.md", "docs/decisions/hubData.md", "docs/decisions/commsDesign.md")) {
+            val t = text(d)
+            assertFalse("$d still describes Options in the Comms menu", Regex("Options row of the Comms menu|in Options stores|the switcher tabs, Options|Options are inline|then the Options rows|Options live in the Comms menu").containsMatchIn(t))
+        }
     }
 }

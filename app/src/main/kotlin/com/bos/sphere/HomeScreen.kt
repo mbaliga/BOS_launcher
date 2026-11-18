@@ -363,7 +363,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val lastTouch = remember { com.bos.sphere.ui.homeLastTouch { rootView } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.feature.grid.LauncherInput.registry }
-    val puckActionIds by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).actions }.collectAsStateWithLifecycle()
     fun launch(app: AppEntry) {
         com.bos.sphere.feature.dock.SessionUse.mark(app.key)
         appLauncher.launch(app, lastTouch.sourceRect())
@@ -1389,26 +1388,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             },
         )
 
-        WheelDrawer(
-            visible = wheelOpen,
-            anchor = wheelAnchor,
-            apps = apps,
-            grouping = prefs.wheelGrouping,
-            onGroupingChange = { g -> stores.prefs.update { it.copy(wheelGrouping = g) } },
-            switcherStyle = prefs.switcherStyle,
-            recentKeys = remember(history) { history.asReversed().map { it.key }.distinct() },
-            onLaunch = ::launch,
-            onLongPressApp = { menuApp = it },
+        // W28 (arcShortcuts): the alphabet wheel and its shortcuts (at rest next to the four squares with "Always", with the wheel otherwise).
+        val allAppsCorner: Corner? = if (landing == HomeShown.Glance) glanceHotspotItems.firstOrNull { (it.item as? CornerItem.Action)?.id == CornerActionId.AllApps }?.screen
+        else placements.firstOrNull { p -> val sl = p.slot; sl is CornerSlot.Single && (sl.item as? CornerItem.Action)?.id == CornerActionId.AllApps }?.screen
+        com.bos.sphere.feature.grid.ArcWheelHost(
+            wheelOpen = wheelOpen, wheelAnchor = wheelAnchor, restCorner = allAppsCorner,
+            restHidden = drawerOpen || searchOpen || settingsOpen || leftOpen || rightOpen || homeEdit.active,
+            apps = apps, appsByKey = appsByKey,
+            shortcutsOn = prefs.drawerShortcutsOn, shortcutKeys = prefs.drawerShortcuts, shortcutsShown = prefs.drawerShortcutsShown,
+            liftDp = dockReserve.bottom + bottomClear.value,
+            onLaunch = ::launch, onLongPress = { menuApp = it },
             onSearch = { wheelOpen = false; searchOpen = true },
-            // CFG-15: the ring shows what the user chose in Ground Control > Puck (default: the shipped five).
-            actions = puckActionIds.map { id ->
-                com.bos.sphere.feature.grid.PuckAction(L10n.tr(id.label), com.bos.sphere.feature.grid.Glyphs.forAction(id)) {
-                    if (id.internal) wheelOpen = false
-                    runner.run(id)
-                }
-            },
             onDismiss = { wheelOpen = false },
-            modifier = Modifier.fillMaxSize(),
         )
 
         DefaultLauncherBanner(

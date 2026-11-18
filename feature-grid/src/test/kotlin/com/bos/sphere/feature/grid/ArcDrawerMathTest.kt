@@ -2,192 +2,166 @@ package com.bos.sphere.feature.grid
 
 import com.bos.sphere.core.data.Corner
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.hypot
 
-/** W26 arcDrawer: looped sections and the polar layout of the expanded drawer (pure JVM). */
+/** W28 arcShortcuts: the pure geometry of the alphabet wheel, its app fan and the shortcut placement. */
 class ArcDrawerMathTest {
-    // ---- looped sections (clause 1)
+    // ---- the looped alphabet
 
-    @Test fun ARC_01_sections_wrap_forward_past_the_last_into_the_first() {
-        assertEquals(0, ArcMath.step(4, +1, 5))
-        assertEquals(1, ArcMath.step(4, +2, 5))
-        assertEquals(3, ArcMath.step(3, +5, 5))
+    @Test fun ARC_01_the_ring_is_a_to_z_then_hash_and_hash_sits_between_z_and_a() {
+        assertEquals(27, AlphabetRing.COUNT)
+        assertEquals("A", AlphabetRing.LETTERS.first()); assertEquals("Z", AlphabetRing.LETTERS[25]); assertEquals("#", AlphabetRing.LETTERS[26])
+        assertEquals("#", AlphabetRing.LETTERS[AlphabetRing.step(AlphabetRing.indexOf("Z"), 1)])
+        assertEquals("A", AlphabetRing.LETTERS[AlphabetRing.step(AlphabetRing.indexOf("#"), 1)])
+        assertEquals("Z", AlphabetRing.LETTERS[AlphabetRing.step(AlphabetRing.indexOf("A"), -2)])
     }
 
-    @Test fun ARC_01_sections_wrap_backward_before_the_first_to_the_last() {
-        assertEquals(4, ArcMath.step(0, -1, 5))
-        assertEquals(3, ArcMath.step(0, -2, 5))
-        assertEquals(2, ArcMath.step(2, -5, 5))
+    @Test fun ARC_01_the_alphabet_loops_in_both_directions_with_no_ends() {
+        assertEquals(0, AlphabetRing.step(26, 1)); assertEquals(26, AlphabetRing.step(0, -1))
+        assertEquals(5, AlphabetRing.step(5, 27)); assertEquals(5, AlphabetRing.step(5, -54))
+        // The letters seen at the corner going round read X Y Z # A B C when the ring is turned to Z.
+        val z = AlphabetRing.indexOf("Z").toFloat()
+        val seen = AlphabetRing.LETTERS.indices.filter { AlphabetRing.letterU(z, it) in -5f..95f }.sortedByDescending { AlphabetRing.letterU(z, it) }.map { AlphabetRing.LETTERS[it] }
+        val s = seen.joinToString("")
+        assertTrue("the visible letters run X Y Z # A B: $s", s.contains("XYZ#AB") || s.contains("YZ#ABC") || s.contains("Z#ABCD") || s.contains("WXYZ#"))
     }
 
-    @Test fun ARC_01_one_section_stays_and_two_sections_alternate() {
-        assertEquals(0, ArcMath.step(0, +1, 1)); assertEquals(0, ArcMath.step(0, -1, 1)); assertEquals(0, ArcMath.step(0, 7, 1))
-        assertEquals(1, ArcMath.step(0, +1, 2)); assertEquals(0, ArcMath.step(1, +1, 2)); assertEquals(1, ArcMath.step(0, -1, 2))
-        assertEquals(0, ArcMath.step(0, 1, 0)) // no sections: harmless
+    @Test fun ARC_01_labels_fall_into_letters_with_hash_for_everything_else() {
+        assertEquals("A", arcLetterOf("Alarm")); assertEquals("E", arcLetterOf("Énergie")); assertEquals("#", arcLetterOf("1Password"))
+        assertEquals("#", arcLetterOf("")); assertEquals("#", arcLetterOf("  ")); assertEquals("#", arcLetterOf("日本語")); assertEquals("Z", arcLetterOf(" zen"))
     }
 
-    @Test fun ARC_01_many_sections_a_full_lap_returns_to_the_start_and_the_order_is_kept() {
-        val n = 26
-        var i = 5
-        val seen = ArrayList<Int>()
-        repeat(n) { seen += i; i = ArcMath.step(i, 1, n) }
-        assertEquals(5, i)
-        assertEquals((0 until n).map { (5 + it) % n }, seen)
+    @Test fun ARC_01_a_typed_character_jumps_to_its_letter() {
+        assertEquals(0, AlphabetRing.indexOfChar('a')); assertEquals(25, AlphabetRing.indexOfChar('Z')); assertEquals(26, AlphabetRing.indexOfChar('7')); assertEquals(26, AlphabetRing.indexOfChar('#'))
+        assertEquals(-1, AlphabetRing.indexOfChar('é')); assertEquals(-1, AlphabetRing.indexOfChar(' '))
     }
 
-    @Test fun ARC_01_the_switcher_shows_the_first_section_repeated_after_the_last() {
-        assertEquals(listOf(4, 0, 1), ArcMath.wedgeSections(4, 5))
-        assertEquals(listOf(3, 4, 0), ArcMath.wedgeSections(3, 5))
-        assertEquals(listOf(0, 1, 2), ArcMath.wedgeSections(0, 5))
-        assertEquals(listOf(0), ArcMath.wedgeSections(0, 1))
-        assertEquals(listOf(1, 0), ArcMath.wedgeSections(1, 2))
-        assertEquals(emptyList<Int>(), ArcMath.wedgeSections(0, 0))
-    }
-
-    @Test fun ARC_02_wedge_hit_test_splits_the_quarter_in_thirds() {
-        assertEquals(0, ArcMath.wedgeAt(5f, 3)); assertEquals(1, ArcMath.wedgeAt(45f, 3)); assertEquals(2, ArcMath.wedgeAt(89f, 3))
-        assertEquals(-1, ArcMath.wedgeAt(-3f, 3))
-    }
-
-    // ---- polar layout (clause 3)
-
-    private val w = 1080f; private val h = 2340f; private val cell = 150f; private val gap = 8f; private val inset = 110f
-
-    private fun rings(anchor: Corner, width: Float = w, height: Float = h, hub: Float = 420f) =
-        ArcMath.rings(anchor, if (ArcMath.onRight(anchor)) width - inset else inset, if (ArcMath.onBottom(anchor)) height - inset else inset, width, height, hub, cell, gap, 8)
-
-    private fun corner(a: Corner, width: Float = w, height: Float = h) =
-        (if (ArcMath.onRight(a)) width - inset else inset) to (if (ArcMath.onBottom(a)) height - inset else inset)
-
-    @Test fun ARC_03_rings_stack_outward_one_cell_apart_and_outer_rings_hold_more_cells() {
-        val r = rings(Corner.BottomLeft)
-        assertTrue("several rings", r.size >= 4)
-        for (i in 1 until r.size) assertEquals(cell + gap, r[i].radius - r[i - 1].radius, 1e-3f)
-        for (i in 1 until minOf(r.size, 3)) assertTrue("ring $i holds at least as many as ${i - 1}", r[i].capacity >= r[i - 1].capacity)
-        assertTrue(r[2].capacity > r[0].capacity)
-        assertTrue(r.first().capacity >= 1)
-    }
-
-    @Test fun ARC_03_cells_of_a_ring_do_not_overlap_and_rings_do_not_touch() {
-        for (a in Corner.entries) {
-            val (cx, cy) = corner(a)
-            val rs = rings(a)
-            for (ring in rs) {
-                val count = ring.capacity + 3
-                val sq = (0 until count).map { j ->
-                    val u = ArcMath.cellU(ring, j, 0f)
-                    ArcMath.cellCorners(ArcMath.pointX(a, cx, ring.radius, u), ArcMath.pointY(a, cy, ring.radius, u), cell, ArcMath.cellRotation(a, u))
-                }
-                for (i in 0 until count - 1) assertTrue("$a ring ${ring.index} cells $i/${i + 1} overlap", !overlap(sq[i], sq[i + 1]))
-            }
-            for (i in 1 until rs.size) {
-                val inner = rs[i - 1].radius + cell / 2f
-                val outer = rs[i].radius - cell / 2f
-                assertTrue(outer - inner >= gap - 1e-3f)
-            }
+    @Test fun ARC_01_the_selected_letter_sits_at_the_selected_angle_and_its_neighbours_a_step_either_side() {
+        for (i in 0 until 27) {
+            assertEquals(AlphabetRing.SELECT_U, AlphabetRing.letterU(i.toFloat(), i), 1e-4f)
+            assertEquals(i, AlphabetRing.selected(i.toFloat()))
+            assertEquals(AlphabetRing.SELECT_U - AlphabetRing.STEP_DEG, AlphabetRing.letterU(i.toFloat(), AlphabetRing.wrap(i + 1)), 1e-4f)
         }
     }
 
-    @Test fun ARC_03_every_reachable_cell_stays_on_screen_and_inside_the_hit_area() {
-        for ((width, height) in listOf(w to h, h to w)) for (a in Corner.entries) {
-            val (cx, cy) = corner(a, width, height)
-            for (ring in rings(a, width, height)) {
-                for (j in 0 until ring.capacity) {
-                    val u = ArcMath.cellU(ring, j, 0f)
-                    val c = ArcMath.cellCorners(ArcMath.pointX(a, cx, ring.radius, u), ArcMath.pointY(a, cy, ring.radius, u), cell, ArcMath.cellRotation(a, u))
-                    for (i in 0 until 4) {
-                        assertTrue("$a ring ${ring.index} cell $j x=${c[2 * i]}", c[2 * i] in -0.5f..width + 0.5f)
-                        assertTrue("$a ring ${ring.index} cell $j y=${c[2 * i + 1]}", c[2 * i + 1] in -0.5f..height + 0.5f)
-                    }
-                    assertTrue(u in 0f..90f)
-                }
+    @Test fun ARC_01_hit_testing_finds_the_letter_under_a_finger_and_nothing_between_letters_off_the_ring() {
+        val rot = 3f
+        for (i in 0 until 27) assertEquals(i, AlphabetRing.letterAt(rot, AlphabetRing.letterU(rot, i)))
+        assertEquals(3, AlphabetRing.letterAt(rot, AlphabetRing.SELECT_U + 1f))
+        assertEquals("a point just past half a step belongs to the next letter", 2, AlphabetRing.letterAt(rot, AlphabetRing.SELECT_U + AlphabetRing.STEP_DEG / 2f + 0.5f))
+    }
+
+    @Test fun ARC_01_dragging_along_the_ring_rotates_it_and_the_shortest_way_to_a_letter_wraps() {
+        assertEquals(1f, AlphabetRing.rotateBy(0f, AlphabetRing.STEP_DEG), 1e-4f)
+        assertEquals(-2f, AlphabetRing.rotateBy(0f, -2 * AlphabetRing.STEP_DEG), 1e-4f)
+        assertEquals(27f, AlphabetRing.rotationFor(25f, 0), 1e-4f) // from Z on to A: two steps forward, not 25 back
+        assertEquals(-1f, AlphabetRing.rotationFor(0f, 26), 1e-4f)
+        assertEquals(26, AlphabetRing.selected(-1f))
+    }
+
+    // ---- corner mapping
+
+    @Test fun ARC_02_the_right_hand_corner_is_the_mirror_image_of_the_left() {
+        val w = 400f; val h = 800f
+        for (u in listOf(0f, 20f, 45f, 90f)) {
+            val lx = ArcMath.pointX(Corner.BottomLeft, 30f, 100f, u); val rx = ArcMath.pointX(Corner.BottomRight, w - 30f, 100f, u)
+            assertEquals(w - lx, rx, 1e-3f)
+            assertEquals(ArcMath.pointY(Corner.BottomLeft, h - 30f, 100f, u), ArcMath.pointY(Corner.BottomRight, h - 30f, 100f, u), 1e-3f)
+            val back = ArcMath.uOf(Corner.BottomRight, w - 30f, h - 30f, rx, ArcMath.pointY(Corner.BottomRight, h - 30f, 100f, u))
+            assertEquals(u, back, 1e-2f)
+        }
+    }
+
+    // ---- the fan
+
+    private fun slots(w: Float, h: Float, anchor: Corner = Corner.BottomLeft, bottom: Boolean = true) =
+        ArcFan.slots(anchor, 30f, h - 30f, w, h, 90f, 48f, 56f, 8f, 4f, useBottomChain = bottom)
+            .let { s -> if (anchor == Corner.BottomLeft) s else ArcFan.slots(anchor, w - 30f, h - 30f, w, h, 90f, 48f, 56f, 8f, 4f, useBottomChain = bottom) }
+
+    @Test fun ARC_03_the_fan_slots_never_overlap_and_stay_on_screen() {
+        for ((w, h) in listOf(360f to 640f, 411f to 891f, 891f to 411f, 1280f to 800f, 280f to 653f)) for (a in listOf(Corner.BottomLeft, Corner.BottomRight)) {
+            val s = slots(w, h, a)
+            assertTrue("some slots at ${w}x$h", s.isNotEmpty())
+            for (i in s.indices) {
+                assertTrue(s[i].x - 24f >= 4f - 1e-3f && s[i].x + 24f <= w - 4f + 1e-3f && s[i].y - 24f >= 4f - 1e-3f && s[i].y + 24f <= h - 4f + 1e-3f)
+                for (j in i + 1 until s.size) assertTrue("slots $i and $j clear (square icons)", maxOf(abs(s[i].x - s[j].x), abs(s[i].y - s[j].y)) >= 52f - 1e-3f)
             }
         }
     }
 
-    @Test fun ARC_03_the_left_handed_corner_is_the_exact_mirror_of_the_right_handed_one() {
-        val l = rings(Corner.BottomLeft); val r = rings(Corner.BottomRight)
-        assertEquals(l.size, r.size)
-        for (i in l.indices) {
-            assertEquals(l[i].capacity, r[i].capacity); assertEquals(l[i].radius, r[i].radius, 1e-3f); assertEquals(l[i].lo, r[i].lo, 1e-3f)
-            val (lx, ly) = corner(Corner.BottomLeft); val (rx, ry) = corner(Corner.BottomRight)
-            for (j in 0 until l[i].capacity) {
-                val u = ArcMath.cellU(l[i], j, 0f)
-                assertEquals(ArcMath.pointX(Corner.BottomLeft, lx, l[i].radius, u) - lx, rx - ArcMath.pointX(Corner.BottomRight, rx, r[i].radius, u), 1e-2f)
-                assertEquals(ArcMath.pointY(Corner.BottomLeft, ly, l[i].radius, u), ArcMath.pointY(Corner.BottomRight, ry, r[i].radius, u), 1e-3f)
-                assertEquals(-ArcMath.cellRotation(Corner.BottomLeft, u), ArcMath.cellRotation(Corner.BottomRight, u), 1e-3f)
+    @Test fun ARC_03_the_first_slot_is_just_outside_the_ring_and_slots_run_nearest_to_farthest() {
+        val s = slots(411f, 891f)
+        val d = s.map { hypot(it.x - 30f, it.y - 861f) }
+        assertTrue("first slot clears the ring: ${d.first()}", d.first() >= 90f + 24f)
+        assertTrue(d.zipWithNext().all { (a, b) -> a <= b + 2.01f })
+    }
+
+    @Test fun ARC_03_there_are_chains_along_the_left_edge_diagonals_and_the_bottom_edge() {
+        val s = slots(411f, 891f)
+        assertTrue("a column along the left edge", s.count { it.chain == 0 } >= 5)
+        assertTrue("diagonals at several angles", s.map { it.chain }.toSet().size >= 5)
+        assertTrue("a row along the bottom edge", s.count { it.chain == ArcFan.CHAINS.lastIndex } >= 4)
+        assertTrue("the bottom chain is free for the shortcuts", slots(411f, 891f, bottom = false).none { it.chain == ArcFan.CHAINS.lastIndex })
+    }
+
+    @Test fun ARC_03_the_fan_shows_zero_to_sixty_apps_and_scrolls_the_overflow() {
+        val cap = slots(411f, 891f).size
+        assertTrue("capacity $cap", cap in 12..80)
+        for (n in 0..60) {
+            val r = ArcFan.shown(n, cap, 0)
+            assertEquals(minOf(n, cap), r.count())
+            for (start in listOf(-3, 0, 5, 99)) {
+                val rr = ArcFan.shown(n, cap, start)
+                assertTrue(rr.isEmpty() || (rr.first >= 0 && rr.last < n && rr.count() <= cap))
+            }
+        }
+        assertEquals(0, ArcFan.clampStart(-4, 10, 5)); assertEquals(5, ArcFan.clampStart(99, 10, 5)); assertEquals(0, ArcFan.clampStart(3, 4, 8))
+        assertEquals(-1, ArcFan.stepsFor(60f, 56f)); assertEquals(1, ArcFan.stepsFor(-60f, 56f)); assertEquals(0, ArcFan.stepsFor(40f, 56f))
+    }
+
+    // ---- shortcuts
+
+    @Test fun ARC_04_the_wheel_row_runs_along_the_bottom_edge_from_the_ring() {
+        val row = ShortcutPlacement.wheelRow(Corner.BottomLeft, 30f, 861f, 90f, 48f, 56f, 8f, 4)
+        assertEquals(4, row.size)
+        assertTrue(row.all { abs(it.second - 861f) < 1e-3f })
+        assertEquals(30f + 90f + 24f + 8f, row[0].first, 1e-3f)
+        assertEquals(56f, row[1].first - row[0].first, 1e-3f)
+        val mirror = ShortcutPlacement.wheelRow(Corner.BottomRight, 381f, 861f, 90f, 48f, 56f, 8f, 4)
+        assertEquals(411f - row[0].first, mirror[0].first, 1e-3f)
+    }
+
+    private val screens = listOf(360f to 640f, 411f to 891f, 891f to 411f, 1280f to 800f, 280f to 653f)
+
+    @Test fun ARC_05_shortcuts_at_rest_never_overlap_the_dock_the_indicator_or_the_hotspots() {
+        for ((w, h) in screens) for (a in listOf(Corner.BottomLeft, Corner.BottomRight)) for (lift in listOf(0f, 72f)) for (n in 1..4) {
+            val c = ShortcutsAtRest.centres(a, w, h, n, lift)
+            val rects = c.map { FRect(it.first - 24f, it.second - 24f, it.first + 24f, it.second + 24f) }
+            val glyph = if (a == Corner.BottomLeft) FRect(0f, h - 64f, 64f, h) else FRect(w - 64f, h - 64f, w, h)
+            val otherBottom = if (a == Corner.BottomLeft) FRect(w - 64f, h - 64f, w, h) else FRect(0f, h - 64f, 64f, h)
+            val topLeft = FRect(0f, 0f, 64f, 64f); val topRight = FRect(w - 64f, 0f, w, 64f)
+            val indicator = FRect(w / 2f - 56f, h - 76f, w / 2f + 56f, h)
+            val dock = FRect(0f, h - lift, w, h)
+            for ((i, r) in rects.withIndex()) {
+                val ctx = "${w}x$h $a n=$n lift=$lift icon $i"
+                assertTrue("$ctx on screen", r.l >= 0 && r.t >= 0 && r.r <= w && r.b <= h)
+                assertFalse("$ctx glyph", r.intersects(glyph)); assertFalse("$ctx other corner", r.intersects(otherBottom))
+                assertFalse("$ctx top corners", r.intersects(topLeft) || r.intersects(topRight))
+                assertFalse("$ctx indicator", r.intersects(indicator))
+                if (lift > 0) assertFalse("$ctx dock", r.intersects(dock))
+                for (j in i + 1 until rects.size) assertFalse("$ctx overlaps $j", r.intersects(rects[j]))
             }
         }
     }
 
-    @Test fun ARC_03_cells_never_read_upside_down() {
-        for (a in Corner.entries) for (u in 0..90 step 5) assertTrue(abs(ArcMath.cellRotation(a, u.toFloat())) <= 180f)
-        for (a in listOf(Corner.BottomLeft, Corner.BottomRight)) for (u in 0..90 step 5) assertTrue("$a $u", abs(ArcMath.cellRotation(a, u.toFloat())) <= 90.01f)
-    }
-
-    @Test fun ARC_03_counts_per_ring_scroll_bounds_and_visible_range() {
-        val ring = rings(Corner.BottomLeft)[1]
-        val cap = ring.capacity
-        // Fewer cells than fit: no scrolling, all visible.
-        assertEquals(0f..0f, ArcMath.offsetBounds(ring, cap - 1))
-        assertEquals(0 until cap - 1, ArcMath.visibleCells(ring, cap - 1, 0f).let { it.first..it.last })
-        // Many cells: the last one can be brought to the far edge, and not further.
-        val count = cap * 4
-        val b = ArcMath.offsetBounds(ring, count)
-        assertEquals(ring.window - count * ring.pitchDeg, b.start, 1e-3f)
-        assertEquals(0f, b.endInclusive, 0f)
-        assertEquals(b.start, ArcMath.clampOffset(ring, count, -9999f), 0f)
-        assertEquals(0f, ArcMath.clampOffset(ring, count, 50f), 0f)
-        val last = ArcMath.visibleCells(ring, count, b.start)
-        assertEquals(count - 1, last.last)
-        assertTrue(ArcMath.visibleCells(ring, count, 0f).first == 0)
-        // Showing a far cell moves the offset until it is inside the window.
-        val o = ArcMath.offsetToShow(ring, count, 0f, count - 1)
-        assertEquals(b.start, o, 1e-3f)
-        val o2 = ArcMath.offsetToShow(ring, count, o, 0)
-        assertEquals(0f, o2, 1e-3f)
-    }
-
-    @Test fun ARC_03_the_primary_apps_are_reachable_in_portrait_and_landscape() {
-        for ((width, height) in listOf(1080f to 2340f, 2340f to 1080f)) {
-            val rs = ArcMath.rings(Corner.BottomRight, width - 110f, height - 110f, width, height, 420f, 150f, 8f, 8)
-            assertTrue("rings in ${width}x$height", rs.isNotEmpty())
-            val first = rs.first()
-            assertTrue("first ring shows a cell at its leading edge", ArcMath.visibleCells(first, 30, 0f).first == 0)
-            // The innermost ring is reachable by a thumb: its cells sit within 2.2x the hub radius of the corner.
-            assertTrue(first.radius < 420f * 2.2f)
-        }
-    }
-
-    @Test fun ARC_03_polar_round_trip() {
-        val (cx, cy) = corner(Corner.BottomLeft)
-        val x = ArcMath.pointX(Corner.BottomLeft, cx, 500f, 33f); val y = ArcMath.pointY(Corner.BottomLeft, cy, 500f, 33f)
-        assertEquals(33f, ArcMath.uOf(Corner.BottomLeft, cx, cy, x, y), 1e-2f)
-        assertEquals(500f, hypot(x - cx, y - cy), 1e-2f)
-        val (rx, ry) = corner(Corner.BottomRight)
-        val x2 = ArcMath.pointX(Corner.BottomRight, rx, 500f, 33f); val y2 = ArcMath.pointY(Corner.BottomRight, ry, 500f, 33f)
-        assertEquals(33f, ArcMath.uOf(Corner.BottomRight, rx, ry, x2, y2), 1e-2f)
-    }
-
-    @Test fun ARC_03_ring_hit_test_by_radius() {
-        val rs = rings(Corner.BottomLeft)
-        assertEquals(0, ArcMath.ringAt(rs, rs[0].radius + 10f, cell, gap))
-        assertEquals(2, ArcMath.ringAt(rs, rs[2].radius - 20f, cell, gap))
-        assertEquals(-1, ArcMath.ringAt(rs, 10f, cell, gap))
-    }
-
-    // SAT on two convex quads (x0,y0,..x3,y3).
-    private fun overlap(a: FloatArray, b: FloatArray): Boolean {
-        for (poly in listOf(a, b)) for (i in 0 until 4) {
-            val x1 = poly[2 * i]; val y1 = poly[2 * i + 1]; val x2 = poly[2 * ((i + 1) % 4)]; val y2 = poly[2 * ((i + 1) % 4) + 1]
-            val nx = y1 - y2; val ny = x2 - x1
-            fun range(p: FloatArray): Pair<Float, Float> { val ds = (0 until 4).map { p[2 * it] * nx + p[2 * it + 1] * ny }; return ds.min() to ds.max() }
-            val (a0, a1) = range(a); val (b0, b1) = range(b)
-            if (a1 <= b0 || b1 <= a0) return false
-        }
-        return true
+    @Test fun ARC_05_a_wide_screen_gets_a_row_along_the_bottom_and_a_narrow_one_a_column_up_the_edge() {
+        val wide = ShortcutsAtRest.centres(Corner.BottomLeft, 1280f, 800f, 4, 0f)
+        assertTrue(wide.all { abs(it.second - wide[0].second) < 1e-3f }); assertTrue(wide.zipWithNext().all { (a, b) -> b.first > a.first })
+        val narrow = ShortcutsAtRest.centres(Corner.BottomLeft, 360f, 640f, 4, 0f)
+        assertTrue(narrow.all { abs(it.first - narrow[0].first) < 1e-3f }); assertTrue(narrow.zipWithNext().all { (a, b) -> b.second < a.second })
     }
 }

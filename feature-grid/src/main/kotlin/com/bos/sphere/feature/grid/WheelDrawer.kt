@@ -257,30 +257,24 @@ internal fun buildWheelGroups(
 // =============================================================================================
 
 /**
- * The "All apps" drawer as a corner arc (W26): first a quarter-ring SWITCHER of section wedges round a hub (looped, so the first
- * section is shown again after the last; [switcherStyle] decides icon only or icon with a count), and, when it expands, a Concepts
- * colour-picker style fan of rings of rotated app cells, one ring per section, all in [ArcDrawerContent] and [ArcMath].
- * Tapping the scrim outside collapses, then dismisses ([onDismiss]); Back does the same. Category grouping reads
- * `ApplicationInfo.category` off the main thread, cached in [WheelCategoryCache].
+ * The "All apps" drawer as the corner ALPHABET WHEEL (W28): a looped ring of letters round a black hub with a back arrow and a search
+ * wedge, and the apps of the selected letter fanned out from it as plain launcher icons; up to four shortcuts form the bottom row.
+ * All in [ArcDrawerContent] and the pure [ArcMath], [AlphabetRing] and [ArcFan]. Tapping empty space or Back closes ([onDismiss]).
  */
 @Composable
 fun WheelDrawer(
     visible: Boolean,
     anchor: Corner,
     apps: List<AppEntry>,
-    grouping: WheelGrouping,
-    onGroupingChange: (WheelGrouping) -> Unit,
-    recentKeys: List<String>,
     onLaunch: (AppEntry) -> Unit,
     onLongPressApp: (AppEntry) -> Unit,
     onSearch: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    /** More buttons for the hub, like the tool puck in Concepts. */
-    actions: List<PuckAction> = emptyList(),
-    switcherStyle: com.bos.sphere.core.data.SwitcherStyle = com.bos.sphere.core.data.SwitcherStyle.Expanded,
-    /** Start with the fan open (tests and screenshots). */
-    startExpanded: Boolean = false,
+    /** W28: the shortcuts (already clamped to four) shown as the bottom row while the wheel is open. */
+    shortcuts: List<AppEntry> = emptyList(),
+    /** The letter the wheel opens on ("A".."Z", "#"); null = the first letter that has apps. */
+    startLetter: String? = null,
 ) {
     // NFR-14: with animations off the drawer does not unfold; it cross-fades in place.
     val motion = com.bos.sphere.core.design.rememberMotionPrefs()
@@ -291,36 +285,26 @@ fun WheelDrawer(
         label = "wheelOpen",
     )
     val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
-    var expanded by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(startExpanded) }
-    // Closing resets to the switcher, so the next open starts there.
-    LaunchedEffect(visible) { if (!visible) expanded = false }
-    // Back collapses the fan first; the handler registered last wins over the predictive one above while the fan is open.
-    androidx.activity.compose.BackHandler(enabled = visible && expanded) { expanded = false }
     val visibleNow by rememberUpdatedState(visible)
     val shown by remember { derivedStateOf { visibleNow || progress.value > 0.002f } }
     if (!shown) return
     val geometry = remember(motion) { derivedStateOf { com.bos.sphere.core.quality.MorphPolicy.geometry(motion, progress.value, visibleNow) } }
 
-    // The arc is physical geometry around a screen corner: lay it out LTR so RTL locales mirror nothing here; the corner
-    // the user chose decides the side (the left-handed corner is the mirror image).
+    // The wheel is physical geometry around a screen corner: lay it out LTR so RTL locales mirror nothing here; the corner
+    // the user chose decides the side (the right-handed corner is the mirror image).
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
     ) {
         ArcDrawerContent(
             anchor = anchor,
             apps = apps,
-            grouping = grouping,
-            onGroupingChange = onGroupingChange,
-            recentKeys = recentKeys,
+            shortcuts = shortcuts,
+            startLetter = startLetter,
             onLaunch = onLaunch,
             onLongPressApp = onLongPressApp,
             onSearch = onSearch,
-            actions = actions,
             onDismiss = onDismiss,
             interactive = visible,
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-            switcherStyle = switcherStyle,
             progress = if (motion.reduced) geometry else progress,
             modifier = (if (motion.reduced) modifier.graphicsLayer { alpha = com.bos.sphere.core.quality.MorphPolicy.alpha(motion, progress.value) } else modifier).predictiveBackLayer(backProgress),
         )
@@ -338,7 +322,7 @@ internal fun Modifier.centeredAt(position: () -> Offset): Modifier = layout { me
 
 /** The hub's search glyph (the Concepts eyedropper analogue): a bare magnifier, no enclosing shape. */
 @Composable
-internal fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = HyleColors.InkBright) {
     Box(
         modifier = modifier
             .size(48.dp)
@@ -349,10 +333,10 @@ internal fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             val stroke = 1.8.dp.toPx()
             val r = size.minDimension * 0.24f
             val c = Offset(size.width * 0.44f, size.height * 0.44f)
-            drawCircle(HyleColors.InkBright, radius = r, center = c, style = Stroke(stroke))
+            drawCircle(tint, radius = r, center = c, style = Stroke(stroke))
             val d = r / 1.4142135f
             drawLine(
-                HyleColors.InkBright,
+                tint,
                 Offset(c.x + d, c.y + d),
                 Offset(c.x + d + r * 0.85f, c.y + d + r * 0.85f),
                 strokeWidth = stroke,

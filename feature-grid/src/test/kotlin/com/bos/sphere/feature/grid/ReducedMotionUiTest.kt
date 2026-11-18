@@ -95,7 +95,6 @@ class ReducedMotionUiTest {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 WheelDrawer(
                     visible = open, anchor = com.bos.sphere.core.data.Corner.BottomRight, apps = sampleApps(),
-                    grouping = com.bos.sphere.core.data.WheelGrouping.Letter, onGroupingChange = {}, recentKeys = emptyList(),
                     onLaunch = {}, onLongPressApp = {}, onSearch = {}, onDismiss = {}, modifier = Modifier.fillMaxSize(),
                 )
             }

@@ -207,7 +207,7 @@ class UpgradeSmokeTest {
     @Test fun HOM_16_builds43to46_everyRemovedEnumNameAndRadarValueInEveryEnumKeyStarts() {
         val keys = listOf("style", "homeScroll", "drawerViewSwitch", "scrollAxis", "pPaging", "lPaging", "cornerStyle", "drawerStyle", "clockPosition", "healthSource", "webEngine",
             "leftPage", "lpTheme", "settingsBackdrop", "searchLayout", "pageTransition", "radarIntensity", "radarSignalForce", "clockLayout", "clockFormat", "cornerIconMode",
-            "appsOnHome", "pageMode", "drawerView", "drawerSort", "drawerRail", "indMetric", "themeMode", "iconShape", "iconTint", "language", "wheelGrouping", "switcherStyle", "glanceWeather", "rightSide")
+            "appsOnHome", "pageMode", "drawerView", "drawerSort", "drawerRail", "indMetric", "themeMode", "iconShape", "iconTint", "language", "wheelGrouping", "drawerShortcutsShown", "glanceWeather", "rightSide")
         for (bad in listOf("Bubbles", "Sphere", "Minimal", "Live", "Picture", "None", "", "null", "grid", "ÄÖÜ", "💥")) {
             prefs("launcher_prefs") { clear(); putBoolean("onboardingDone", true); keys.forEach { putString(it, bad) }; putString("strip", "$bad:$bad,Time:Left"); putString("indEffects", "$bad,DotsBreathe") }
             AppSmokeHarness.resetProcess()

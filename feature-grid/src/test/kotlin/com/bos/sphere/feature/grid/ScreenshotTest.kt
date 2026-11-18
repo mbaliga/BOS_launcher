@@ -259,8 +259,8 @@ class ScreenshotTest {
         rule.setContent {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 WheelDrawer(
-                    visible = true, anchor = Corner.BottomRight, apps = many, grouping = WheelGrouping.Letter,
-                    onGroupingChange = {}, recentKeys = emptyList(), onLaunch = {}, onLongPressApp = {}, onSearch = {}, onDismiss = {},
+                    visible = true, anchor = Corner.BottomRight, apps = many,
+                    onLaunch = {}, onLongPressApp = {}, onSearch = {}, onDismiss = {},
                     modifier = Modifier.fillMaxSize(),
                 )
             }

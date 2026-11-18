@@ -96,6 +96,20 @@ object HomeDeck {
             HomePages.Paginated -> pageCount.coerceAtLeast(1)
         }
 
+    /**
+     * Whether the ONE indicator row is drawn: several stops (Glance counts), or Glance alone with its indicator preference on. The bottom stack
+     * the dock clears reads this same answer, so the rail never sits on a row that is drawn (a Glance indicator preference that is off hides the
+     * row only when there is nothing else to count).
+     */
+    fun indicatorShown(glanceOn: Boolean, glanceIndicatorPref: Boolean, mode: HomePages, pageCount: Int): Boolean =
+        stops(glanceOn, mode, pageCount) > 1 || (glanceOn && glanceIndicatorPref)
+
+    /**
+     * Whether a swipe back at the first page / the start of the scroll hands over to Glance. Only when Glance is on (Comms opens from its screen
+     * edge, never from a swipe in the middle of a page) and never while editing (an icon being dragged toward the start edge is not a swipe) or while a card is open.
+     */
+    fun backSwipeToGlance(glanceOn: Boolean, editing: Boolean, cardOpen: Boolean): Boolean = glanceOn && !editing && !cardOpen
+
     /** The dot lit for outer pager [outerIndex] and inner page [pageIndex]. */
     fun lit(glanceOn: Boolean, outerIndex: Int, pageIndex: Int, mode: HomePages): Int =
         if (glanceOn && outerIndex == 0) 0 else (if (glanceOn) 1 else 0) + (if (mode == HomePages.Paginated) pageIndex else 0)

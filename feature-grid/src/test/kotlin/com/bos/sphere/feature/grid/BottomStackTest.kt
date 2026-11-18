@@ -102,9 +102,7 @@ class BottomStackTest {
 
     /** The indicator's box in window dp, as the home draws it: Glance row 4 to 52 dp up, 160 dp wide; page dots row 26 to 46 dp up (or in the clock band). */
     private fun indicatorRect(w: Int, h: Int, glance: Boolean, clockBottom: Boolean): R =
-        if (glance) R(w / 2f - 80f, h - HomeBottomStack.GLANCE_INDICATOR_TOP_DP, w / 2f + 80f, h - 4f)
-        else if (clockBottom) R(w / 2f - 80f, h - 17f, w / 2f + 80f, h - 1f)
-        else R(w / 2f - 80f, h - HomeBottomStack.PAGE_DOTS_TOP_DP, w / 2f + 80f, h - 26f)
+        R(w / 2f - 80f, h - maxOf(HomeBottomStack.GLANCE_INDICATOR_TOP_DP, HomeBottomStack.PAGE_DOTS_TOP_DP), w / 2f + 80f, h - 4f) // wave 28: one indicator row, one place, on Glance and on the pages
 
     @Test
     fun HOM_19_W26_theDockSitsAboveThePositionIndicatorWithAtLeastEightDpClearAtEverySize() {
@@ -141,7 +139,9 @@ class BottomStackTest {
         assertEquals(HomeBottomStack.GLANCE_INDICATOR_TOP_DP, HomeBottomStack.lowerStackDp(18f, glance = true, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = false), 0f)
         assertEquals(0f, HomeBottomStack.lowerStackDp(18f, glance = true, glanceIndicator = false, pageDotsAtBottom = true, clockAtBottom = false), 0f)
         assertEquals(HomeBottomStack.PAGE_DOTS_TOP_DP, HomeBottomStack.lowerStackDp(18f, glance = false, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = false), 0f)
-        assertEquals(50f, HomeBottomStack.lowerStackDp(50f, glance = false, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = true), 0f)
+        assertEquals("a taller clock stack wins", 70f, HomeBottomStack.lowerStackDp(70f, glance = false, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = true), 0f)
+        assertEquals("the one indicator row is always cleared", HomeBottomStack.PAGE_DOTS_TOP_DP, HomeBottomStack.lowerStackDp(30f, glance = false, glanceIndicator = true, pageDotsAtBottom = true, clockAtBottom = true), 0f)
+        assertEquals("one indicator: the Glance row and the page row are the same height", HomeBottomStack.GLANCE_INDICATOR_TOP_DP, HomeBottomStack.PAGE_DOTS_TOP_DP, 0f)
         assertEquals(0f, HomeBottomStack.lowerStackDp(0f, glance = false, glanceIndicator = true, pageDotsAtBottom = false, clockAtBottom = false), 0f)
     }
 

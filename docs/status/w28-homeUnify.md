@@ -35,3 +35,15 @@ Touch feel of the swipe back to Glance (it runs on release through `deckSwipe`, 
 | feature-launchpad `W13LabelsTest` | `HomePages` labels | renamed |
 | new | `HomeUnifyFlowTest`, `HomeUnifyRowsTest`, `HomeUnifyScreenshotTest`, HomeDeck and migration tests in core-data | |
 | docs/TEST_COVERAGE.md | regenerated with tools/spec_coverage.py | RepoHygieneAuditTest was already red on the base (three removed PAL_20 tests still listed) |
+
+## Navigation and indicator review (first adversarial pass)
+Found and fixed, each with a test that failed first (`HomeUnifyReviewFlowTest`, `HomeOrderTest`, `BottomStackTest`):
+| Issue | Fix |
+|---|---|
+| On Glance with the Glance indicator preference off and Pages on, the one indicator row was drawn but the dock reserved nothing for it (rail on the indicator) | `HomeDeck.indicatorShown` is the single answer for the row and the bottom stack |
+| The page-dot clearance (46 dp) was smaller than the real one-row height (52 dp with the Comms glyph), so the dock gap fell under 8 dp on pages | `PAGE_DOTS_TOP_DP` 52 and always cleared, also with a bottom clock |
+| Page dots, house dot and Home page glyph were 14 to 32 dp targets | every stop is a 48 dp high square, 48 dp wide (shrinks to 24 dp only when many pages share the row) |
+| The swipe back from page 1 ran in edit mode, so dragging an icon toward the start edge left edit mode for Glance | `HomeDeck.backSwipeToGlance`: never while editing or a card is open |
+| With Glance off a swipe anywhere on page 1 opened Comms | Comms opens from its edge only; the hand-over exists only to reach Glance |
+| `rightEdgeSwipe` (dock rail on the right side) did not consume the gesture, so one right-edge swipe opened the dock AND paged the home from Glance | the gesture is consumed once it triggers |
+Not changed (device only): the swipe back to Glance runs on release, not as a live drag.

@@ -91,7 +91,17 @@ fun Modifier.rightEdgeSwipe(enabled: Boolean, rtl: Boolean = false, onSwipe: () 
                 if (!ch.pressed) break
                 val d = ch.positionChange()
                 dx += if (rtl) d.x else -d.x; dy += d.y
-                if (dx > slop * 2 && dx > abs(dy) * 1.5f) { onSwipe(); break }
+                if (dx > slop * 2 && dx > abs(dy) * 1.5f) {
+                    // Wave 28: the home is one pager; an edge swipe that opens the dock or Recents must not also page the home, so the rest of the gesture is this swipe's.
+                    ch.consume()
+                    onSwipe()
+                    while (true) {
+                        val e2 = awaitPointerEvent(PointerEventPass.Initial)
+                        e2.changes.forEach { it.consume() }
+                        if (e2.changes.none { it.pressed }) break
+                    }
+                    break
+                }
                 if (abs(dy) > slop * 3 && abs(dy) > dx) break
             }
         }

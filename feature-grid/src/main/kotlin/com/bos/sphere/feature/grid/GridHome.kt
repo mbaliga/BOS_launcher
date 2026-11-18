@@ -1059,6 +1059,7 @@ fun PageIndicator(
     LaunchedEffect(awakeNonce, quiet) { awake = true; if (quiet) { kotlinx.coroutines.delay(4000); awake = false } }
     val fade by androidx.compose.animation.core.animateFloatAsState(if (awake || !quiet) 1f else 0.38f, androidx.compose.animation.core.tween(if (reduced) 0 else 600), label = "pageIndicator")
     val stops = count + (if (onGlance != null) 1 else 0)
+    val slot = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.8f / stops.coerceAtLeast(1)).coerceIn(24f, 48f).dp // every stop is a tappable square of this width and 48 dp height
     val content: @Composable () -> Unit = {
         if (onMenu != null) {
             IndicatorButton(menuTag ?: "pages.menu", menuLabel, onMenu) { Icon(Glyphs.Menu, null, tint = HyleColors.InkDim, modifier = Modifier.size(16.dp)) }
@@ -1067,7 +1068,7 @@ fun PageIndicator(
             val lit = glanceCurrent
             // The stop on screen is not interactive (one spoken line); the others are buttons that go to it.
             Box(
-                Modifier.testTag("pages.glancedot").size(32.dp)
+                Modifier.testTag("pages.glancedot").size(width = slot, height = 48.dp)
                     .then(if (lit) Modifier.semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Glance home"); selected = true } else Modifier.pointerInput(Unit) { detectTapGesturesSimple { onGlance() } }
                         .semantics {
                             role = androidx.compose.ui.semantics.Role.Button; selected = false
@@ -1081,22 +1082,24 @@ fun PageIndicator(
             val active = !glanceCurrent && i == current
             val position = i + 1 + (if (onGlance != null) 1 else 0)
             if (onGlance == null && i == homeIndex) {
-                Icon(
-                    Glyphs.Home, contentDescription = com.bos.sphere.core.design.L10n.tr("Home page"), tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f),
-                    modifier = Modifier.padding(horizontal = 2.dp).size(if (active) 16.dp else 14.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }.semantics { role = androidx.compose.ui.semantics.Role.Button; onClick(com.bos.sphere.core.design.L10n.tr("Home page")) { onSelect(i); true } },
-                )
+                Box(
+                    Modifier.testTag("pages.dot.$i").size(width = slot, height = 48.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }
+                        .semantics { role = androidx.compose.ui.semantics.Role.Button; selected = active; contentDescription = com.bos.sphere.core.design.L10n.tr("Home page"); onClick(com.bos.sphere.core.design.L10n.tr("Home page")) { onSelect(i); true } },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Glyphs.Home, contentDescription = null, tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), modifier = Modifier.size(if (active) 16.dp else 14.dp)) }
                 continue
             }
             val long by animateDpAsState(if (active) 20.dp else 6.dp, label = "pill")
             Box(
                 Modifier
-                    .padding(4.dp)
-                    .size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp)
-                    .background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp))
                     .testTag("pages.dot.$i")
+                    .size(width = if (vertical) 48.dp else slot, height = if (vertical) slot else 48.dp)
                     .semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Page %s of %s", position, stops); role = androidx.compose.ui.semantics.Role.Button; selected = active; onClick(com.bos.sphere.core.design.L10n.tr("Page %s", position)) { onSelect(i); true } }
                     .pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp).background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp)))
+            }
         }
         for (d in right) {
             val label = com.bos.sphere.core.design.L10n.tr(if (d == com.bos.sphere.core.data.RightDestination.Recents) "Open recents" else "Show the dock")

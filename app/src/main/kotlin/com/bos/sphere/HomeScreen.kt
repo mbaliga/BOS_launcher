@@ -942,7 +942,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         collapsed = dockState.dock.mode == com.bos.sphere.feature.dock.DockMode.Collapsed, bandDp = frame.value,
         lowerStackDp = com.bos.sphere.feature.dock.HomeBottomStack.lowerStackDp(
             stackDp = com.bos.sphere.feature.grid.bottomStackDp(prefs, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()),
-            glance = landing == HomeShown.Glance, glanceIndicator = prefs.glanceIndicator,
+            glance = landing == HomeShown.Glance, glanceIndicator = prefs.glanceIndicator || pageDotsAtBottom, // the one indicator is drawn on Glance whenever there are several stops, whatever the Glance indicator preference
             pageDotsAtBottom = pageDotsAtBottom, clockAtBottom = prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Bottom,
         ),
         shelfShown = com.bos.sphere.feature.dock.GroupShelfModel.visible(dockState.groups, dockState.dock.groupShelf).isNotEmpty(),
@@ -1083,10 +1083,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val pagesEdgePx = with(androidx.compose.ui.platform.LocalDensity.current) { HomeChromeRules.edgeZoneDp(HomeShown.Pages).dp.toPx() }
         // Wave 28: a swipe back (towards the Comms edge) at the first page or the start of the scroll goes to Glance when it is on (the previous stop of the one pager;
         // the grid and the scroll are scrollables inside the pager and keep that drag for themselves, so this hand-over is taken here), else it opens the Comms as before.
-        val backSwipeEnabled = prefs.glanceEnabled || prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off
+        val backSwipeEnabled = com.bos.sphere.core.data.HomeDeck.backSwipeToGlance(prefs.glanceEnabled, homeEdit.active, leftOpen || rightOpen) // Comms opens from its edge only
         val backSwipeAccepts: (Float) -> Boolean = { dx -> homeOrder.isTowardsLaunchpad(dx) }
-        val backSwipeAction: () -> Unit = { if (prefs.glanceEnabled) showStop(0) else leftOpen = true }
-        val indicatorShown = com.bos.sphere.core.data.HomeDeck.stops(prefs.glanceEnabled, prefs.homePages, pages.size) > 1 || (prefs.glanceEnabled && prefs.glanceIndicator)
+        val backSwipeAction: () -> Unit = { showStop(0) }
+        val indicatorShown = com.bos.sphere.core.data.HomeDeck.indicatorShown(prefs.glanceEnabled, prefs.glanceIndicator, prefs.homePages, pages.size)
         Box(
             Modifier.fillMaxSize().launchpadMenuAside(lpMenu, launchpadGeometry.widthPx, launchpadRtl).editCardLayer { editCard.frame() }.homeCardLayer(launchpadGeometry) { reveal.progress }
                 .homeCardLayer(recentsGeometry) { if (recentsEnabled) rightReveal.progress else 0f }

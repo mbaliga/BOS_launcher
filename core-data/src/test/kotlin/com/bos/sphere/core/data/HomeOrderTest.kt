@@ -74,4 +74,19 @@ class HomeOrderTest {
         assertEquals(0 to null, HomeDeck.target(true, HomePages.Paginated, 0)); assertEquals(1 to 0, HomeDeck.target(true, HomePages.Paginated, 1)); assertEquals(1 to 2, HomeDeck.target(true, HomePages.Paginated, 3))
         assertEquals(1 to null, HomeDeck.target(true, HomePages.Continuous, 1)); assertEquals(0 to 2, HomeDeck.target(false, HomePages.Paginated, 2))
     }
+
+    @Test fun HOM_23_theIndicatorRowIsDrawnWheneverThereIsMoreThanOneStopWhateverTheGlanceIndicatorPreference() {
+        assertTrue(HomeDeck.indicatorShown(true, false, HomePages.Paginated, 2))
+        assertTrue(HomeDeck.indicatorShown(true, false, HomePages.Continuous, 0))
+        assertFalse("Glance alone with its indicator off draws nothing", HomeDeck.indicatorShown(true, false, HomePages.Off, 0))
+        assertTrue(HomeDeck.indicatorShown(true, true, HomePages.Off, 0))
+        assertFalse("one regular page and no Glance draws nothing", HomeDeck.indicatorShown(false, true, HomePages.Paginated, 1))
+    }
+
+    @Test fun HOM_23_aSwipeBackHandsOverToGlanceOnlyWhenGlanceIsOnAndNotEditingAndNoCardIsOpen() {
+        assertTrue(HomeDeck.backSwipeToGlance(true, editing = false, cardOpen = false))
+        assertFalse("Comms opens from the edge only, never from a swipe in the middle of the first page", HomeDeck.backSwipeToGlance(false, editing = false, cardOpen = false))
+        assertFalse("dragging an icon in edit mode is not a swipe", HomeDeck.backSwipeToGlance(true, editing = true, cardOpen = false))
+        assertFalse(HomeDeck.backSwipeToGlance(true, editing = false, cardOpen = true))
+    }
 }

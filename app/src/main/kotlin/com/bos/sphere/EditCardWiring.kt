@@ -1,10 +1,14 @@
 package com.bos.sphere
 
 import android.os.Process
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,28 +26,54 @@ import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.PageLayout
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.rememberMotionPrefs
+import com.bos.sphere.feature.grid.AddCarouselDrag
 import com.bos.sphere.feature.grid.EditCardGeometry
-import com.bos.sphere.feature.grid.EditCardHost
+import com.bos.sphere.feature.grid.PageEditorGeometry
+import com.bos.sphere.feature.grid.PageEditorHost
+import com.bos.sphere.feature.grid.rememberPageEditorLayout
 import com.bos.sphere.feature.grid.GridHomeState
 import com.bos.sphere.feature.grid.UndoNotice
 import com.bos.sphere.feature.grid.rememberEditCardProgress
-import com.bos.sphere.feature.grid.rememberEditCardTarget
 import kotlinx.coroutines.launch
 
 /**
  * HOM-12: the home as a card while it is edited. The progress and the target are read only inside the home layer's
  * graphicsLayer (see [com.bos.sphere.feature.grid.editCardLayer]), so the transition never recomposes the home.
  */
-class EditCardState(val progress: State<Float>, val target: EditCardGeometry.Target, val reduced: Boolean) {
-    fun frame(): EditCardGeometry.Frame = EditCardGeometry.frame(target, progress.value, reduced)
+class EditCardState(val progress: State<Float>, val layout: PageEditorGeometry.Layout, val reduced: Boolean, val continuous: Boolean) {
+    val target: EditCardGeometry.Target get() = layout.target
+    /** Wave 36 (pageEditor): the swing of the live page into the focus slot (0 = at the tapped card, 1 = at rest) and where the tapped card was, in px from the slot. */
+    val swingProgress = mutableFloatStateOf(1f)
+    val swingDx = mutableFloatStateOf(0f)
+    val swingDy = mutableFloatStateOf(0f)
+    /** True while the Glance card is the focus: the live page is out of the way and the editor draws the Glance card in the slot. */
+    val glanceFocus = mutableStateOf(false)
+    /** The app being dragged out of the Apps tab (the home draws its ghost above everything: [com.bos.sphere.feature.grid.PageEditorGhost]). */
+    val drag = AddCarouselDrag()
+
+    fun swing(): PageEditorGeometry.Swing = PageEditorGeometry.swing(swingProgress.floatValue, swingDx.floatValue, swingDy.floatValue, reduced)
+
+    /** The card frame of the live page, with the swing added. Read only inside the home layer's graphicsLayer. */
+    fun frame(): EditCardGeometry.Frame {
+        val f = EditCardGeometry.frame(target, progress.value, reduced)
+        val s = swing()
+        val away = if (glanceFocus.value) HIDDEN_PX else 0f
+        if (s.atRest && away == 0f) return f
+        return f.copy(
+            scale = f.scale * s.scale, translationX = f.translationX + s.translationX + away, translationY = f.translationY + s.translationY,
+            rotationX = s.rotationX, rotationY = s.rotationY, layerAlpha = s.alpha,
+        )
+    }
+
+    private companion object { const val HIDDEN_PX = 100_000f }
 }
 
 @Composable
-fun rememberEditCardState(active: Boolean): EditCardState {
+fun rememberEditCardState(active: Boolean, continuous: Boolean = false, orderRtl: Boolean = false): EditCardState {
     val progress = rememberEditCardProgress(active)
-    val target = rememberEditCardTarget()
+    val layout = rememberPageEditorLayout(continuous, orderRtl)
     val reduced = rememberMotionPrefs().reduced
-    return remember(progress, target, reduced) { EditCardState(progress, target, reduced) }
+    return remember(progress, layout, reduced, continuous) { EditCardState(progress, layout, reduced, continuous) }
 }
 
 /** HOM-12 / HOM-01: the page carousel and the add carousel in the background of the edit card, wired to the live layout and its undo stack. */
@@ -70,8 +100,23 @@ fun EditCardOverlay(
     val scope = rememberCoroutineScope()
     var notice by remember { mutableStateOf<UndoNotice?>(null) }
     var goto by remember { mutableIntStateOf(-1) }
+    // Paginated: the page being edited is the home pager's page. Continuous has no pager, so the editor keeps the selected page itself.
+    var contSel by remember { mutableIntStateOf(0) }
+    val current = (if (card.continuous) contSel else gridState.currentPage).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    fun showPage(i: Int) { if (card.continuous) contSel = i else scope.launch { gridState.goToPage(i, animate = false) } }
     LaunchedEffect(goto, pages.size) {
-        if (goto >= 0) { val t = goto.coerceAtMost(pages.size - 1).coerceAtLeast(0); goto = -1; gridState.goToPage(t) }
+        if (goto >= 0) { val t = goto.coerceAtMost(pages.size - 1).coerceAtLeast(0); goto = -1; card.glanceFocus.value = false; showPage(t) }
+    }
+    LaunchedEffect(homeEdit.active) { if (!homeEdit.active) { card.glanceFocus.value = false; card.swingProgress.floatValue = 1f } }
+    // The swing: the live page starts where the tapped card was and tilts into the focus slot (about 350 ms; a quick cross-fade with reduced motion). Nothing runs when idle.
+    val swingAnim = remember { Animatable(1f) }
+    fun startSwing(dx: Float, dy: Float) {
+        card.swingDx.floatValue = dx; card.swingDy.floatValue = dy; card.swingProgress.floatValue = 0f
+        scope.launch {
+            swingAnim.snapTo(0f)
+            swingAnim.animateTo(1f, tween(if (card.reduced) PageEditorGeometry.SWING_REDUCED_MS else PageEditorGeometry.SWING_MS, easing = FastOutSlowInEasing)) { card.swingProgress.floatValue = value }
+            card.swingProgress.floatValue = 1f
+        }
     }
     fun apply(r: HomePageOps.Result) { savePages(r.pages); goto = r.focus }
     val me = remember { Process.myUserHandle() }
@@ -96,24 +141,28 @@ fun EditCardOverlay(
         PageDeleteConfirm(HomePageOps.itemCount(pages, i), onConfirm = { confirmDelete = null; deleteNow(i) }, onDismiss = { confirmDelete = null })
     }
     val onHome = remember(layout, folderKeys) { layout.pages.flatMapTo(HashSet()) { it.keys } + folderKeys }
-    EditCardHost(
-        progress = card.progress, reduced = card.reduced, target = card.target,
-        pages = pages, current = { gridState.currentPage }, appsByKey = appsByKey, prefs = prefs, isLandscape = isLandscape,
+    // Wave 30 (pagesExplicit): the app goes on the page asked for; a full page says so and nothing else moves or opens.
+    fun addAppTo(app: AppEntry, page: Int): Boolean {
+        val placed = AddCarouselModel.place(pages, app.key, page, capacityOf)
+        if (placed == null) { android.widget.Toast.makeText(homeItems.context(), L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show(); return false }
+        stores.layout.replace(layout.copy(pages = HomeLayoutMath.toStored(placed, layout.pages, preserve), removed = layout.removed - app.key, seeded = true))
+        stores.layout.markExplicit()
+        return true
+    }
+    PageEditorHost(
+        progress = card.progress, reduced = card.reduced, layout = card.layout, continuous = card.continuous,
+        pages = pages, current = current, glanceOn = prefs.glanceEnabled, glanceFocus = card.glanceFocus.value, swing = { card.swing() },
+        appsByKey = appsByKey, prefs = prefs, isLandscape = isLandscape,
         apps = apps, onHome = onHome, hasWork = remember(apps) { apps.any { it.user != me } }, isWork = { it.user != me },
-        onSelect = { i -> scope.launch { gridState.goToPage(i) } },
+        drag = card.drag,
+        onSelectPage = { i, dx, dy -> if (card.glanceFocus.value || i != current) { startSwing(dx, dy); card.glanceFocus.value = false; showPage(i) } },
+        onSelectGlance = { dx, dy -> if (!card.glanceFocus.value) { startSwing(dx, dy); card.glanceFocus.value = true } },
+        onAddPage = { dx, dy -> startSwing(dx, dy); apply(HomePageOps.add(pages, pages.size - 1)) },
         onDelete = { i -> if (HomePageOps.itemCount(pages, i) == 0) deleteNow(i) else confirmDelete = i },
         onMove = { i, d -> HomePageOps.move(pages, i, d)?.let(::apply) },
-        onMoveTo = { i, t -> HomePageOps.moveTo(pages, i, t)?.let(::apply) },
-        onAddPage = { apply(HomePageOps.add(pages, gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))) },
-        onAddApp = { app ->
-            // Wave 30 (pagesExplicit): the app goes on the page being edited; a full page says so and nothing else moves or opens.
-            val placed = AddCarouselModel.place(pages, app.key, gridState.currentPage, capacityOf)
-            if (placed == null) android.widget.Toast.makeText(homeItems.context(), L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show()
-            else {
-                stores.layout.replace(layout.copy(pages = HomeLayoutMath.toStored(placed, layout.pages, preserve), removed = layout.removed - app.key, seeded = true))
-                stores.layout.markExplicit()
-                goto = placed.indexOfFirst { app.key in it.keys }.coerceAtLeast(0)
-            }
+        onAddApp = { app -> if (addAppTo(app, current)) goto = current },
+        onDropApp = { app, page ->
+            if (addAppTo(app, page) && page != current) android.widget.Toast.makeText(homeItems.context(), L10n.tr("Added to page %d", page + 1), android.widget.Toast.LENGTH_SHORT).show()
         },
         onWidget = { homeItems.widgetRequest++ },
         onFolder = { homeItems.folderOpen = true },
@@ -121,6 +170,7 @@ fun EditCardOverlay(
         onLink = { homeItems.linkOpen = true },
         onFile = { homeItems.fileRequest++ },
         onGroup = { homeItems.groupOpen = true },
+        onPrefs = { f -> stores.prefs.update(f) },
         notice = notice, onNoticeDone = { notice = null },
         focusAdd = focusAdd, onExit = { homeEdit.exit() },
         modifier = modifier,

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import com.bos.sphere.core.data.AppsOnHome
@@ -113,7 +114,8 @@ class EditCardAppTest {
         val camera = AppSmokeHarness.appKey("Camera"); val alpha = AppSmokeHarness.appKey("Alpha")
         stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
         assertEquals(listOf(listOf(camera), listOf(alpha)), pageKeys(stores))
-        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle()
+        rule.onNodeWithTag("pe.page.1").performClick(); settle(700) // wave 36: the page editor's rail acts on the page being edited, so the card is tapped first
+        rule.onNodeWithContentDescription("Delete page 2").performClick(); settle()
         rule.onNodeWithText("1 item will be removed from this page. It stays in the drawer.").assertIsDisplayed() // wave 30: it asks first
         confirmDelete()
         assertEquals("wave 30: the deleted page's items leave the home, none joins the previous page", listOf(listOf(camera)), pageKeys(stores))
@@ -127,7 +129,8 @@ class EditCardAppTest {
         rule.onNodeWithText("Long press to add apps").performClick(); settle()
         val camera = AppSmokeHarness.appKey("Camera"); val alpha = AppSmokeHarness.appKey("Alpha"); val bravo = AppSmokeHarness.appKey("Bravo")
         stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
-        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle(300); confirmDelete()
+        rule.onNodeWithTag("pe.page.1").performClick(); settle(700) // wave 36: select the page, then the rail's Delete
+        rule.onNodeWithContentDescription("Delete page 2").performClick(); settle(300); confirmDelete()
         rule.onNodeWithContentDescription("Add to home: Bravo").performClick(); settle(300) // the notice lasts six seconds
         val afterAdd = pageKeys(stores)
         assertTrue(bravo in afterAdd.flatten())

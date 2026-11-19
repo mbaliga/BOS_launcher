@@ -90,7 +90,11 @@ object EditCardGeometry {
     }
 
     /** The layer transform at [progress] 0 (full screen) .. 1 (card). */
-    data class Frame(val scale: Float, val translationX: Float, val translationY: Float, val cornerDp: Float, val carouselAlpha: Float, val shadowAlpha: Float)
+    data class Frame(
+        val scale: Float, val translationX: Float, val translationY: Float, val cornerDp: Float, val carouselAlpha: Float, val shadowAlpha: Float,
+        /** Page editor swing (wave 36): tilt about the card's own centre, in degrees, and the layer's alpha (1 = opaque). */
+        val rotationX: Float = 0f, val rotationY: Float = 0f, val layerAlpha: Float = 1f,
+    )
 
     /**
      * NFR-14: with reduced motion there is no shrink: the card is at rest from the first frame of the change and the
@@ -122,6 +126,8 @@ fun Modifier.editCardLayer(frame: () -> EditCardGeometry.Frame): Modifier = grap
     transformOrigin = TransformOrigin.Center
     scaleX = f.scale; scaleY = f.scale
     translationX = f.translationX; translationY = f.translationY
+    if (f.rotationX != 0f || f.rotationY != 0f) { rotationX = f.rotationX; rotationY = f.rotationY; cameraDistance = PageEditorGeometry.CAMERA_DISTANCE_DP * density }
+    alpha = f.layerAlpha
     if (f.cornerDp > 0.01f) {
         shape = RoundedCornerShape((f.cornerDp / f.scale.coerceAtLeast(0.1f)).dp)
         clip = true

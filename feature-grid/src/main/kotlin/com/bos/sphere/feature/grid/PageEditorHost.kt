@@ -1,0 +1,354 @@
+package com.bos.sphere.feature.grid
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import com.bos.sphere.core.data.AppEntry
+import com.bos.sphere.core.data.Corner
+import com.bos.sphere.core.data.HomePage
+import com.bos.sphere.core.data.LauncherPrefs
+import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.L10n
+import kotlinx.coroutines.delay
+
+private const val GAP_DP = 12f
+private const val RAIL_DP = 56f
+private val CARD_CORNER = EditCardGeometry.CORNER_DP.dp
+
+/** The page editor's layout for this window: banner room above, the edit bar below, mirrored for RTL and for the right-to-left page order. */
+@Composable
+fun rememberPageEditorLayout(continuous: Boolean, orderRtl: Boolean): PageEditorGeometry.Layout {
+    val cfg = LocalConfiguration.current
+    val d = LocalDensity.current
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val top = WindowInsets.safeDrawing.getTop(d)
+    val bottom = WindowInsets.safeDrawing.getBottom(d)
+    return remember(cfg.screenWidthDp, cfg.screenHeightDp, d.density, rtl, orderRtl, continuous, top, bottom) {
+        PageEditorGeometry.layout(
+            cfg.screenWidthDp * d.density, cfg.screenHeightDp * d.density, continuous, PageEditorGeometry.mirrored(rtl, orderRtl),
+            topReservePx = top + 52f * d.density, bottomReservePx = bottom + 68f * d.density, railPx = RAIL_DP * d.density, gapPx = GAP_DP * d.density,
+        )
+    }
+}
+
+/**
+ * Wave 36 (pageEditor): the page editor. Everything that lives around the live page while it is shrunken: the strip of page cards, the
+ * tabs with their content, the rail of page buttons, the Glance card, the drag ghost seam and the undo notice. The live page itself is the
+ * home's own layer (see [editCardLayer]) in the focus slot, so it stays directly editable.
+ *
+ * Paginated: the strip runs down the end side; Continuous (portrait): across the top. The tabs and their content take the rest. Tapping a card
+ * reports where the card was ([onSelectPage] with its offset from the focus slot) so the live layer can swing in from there.
+ */
+@Composable
+fun PageEditorHost(
+    progress: State<Float>,
+    reduced: Boolean,
+    layout: PageEditorGeometry.Layout,
+    continuous: Boolean,
+    pages: List<HomePage>,
+    current: Int,
+    glanceOn: Boolean,
+    glanceFocus: Boolean,
+    swing: () -> PageEditorGeometry.Swing,
+    appsByKey: Map<String, AppEntry>,
+    prefs: LauncherPrefs,
+    isLandscape: Boolean,
+    apps: List<AppEntry>,
+    onHome: Set<String>,
+    hasWork: Boolean,
+    isWork: (AppEntry) -> Boolean,
+    drag: AddCarouselDrag,
+    onSelectPage: (page: Int, dx: Float, dy: Float) -> Unit,
+    onSelectGlance: (dx: Float, dy: Float) -> Unit,
+    onAddPage: (dx: Float, dy: Float) -> Unit,
+    onDelete: (Int) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onAddApp: (AppEntry) -> Unit,
+    onDropApp: (AppEntry, Int) -> Unit,
+    onWidget: () -> Unit,
+    onFolder: () -> Unit,
+    onShortcut: () -> Unit,
+    onLink: () -> Unit,
+    onFile: () -> Unit,
+    onGroup: (() -> Unit)?,
+    onPrefs: ((LauncherPrefs) -> LauncherPrefs) -> Unit,
+    notice: UndoNotice?,
+    onNoticeDone: () -> Unit,
+    focusAdd: Boolean,
+    onExit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    fun alphaNow() = EditCardGeometry.frame(layout.target, progress.value, reduced).carouselAlpha
+    val d = LocalDensity.current
+    val dir = LocalLayoutDirection.current
+    val focus = remember { FocusRequester() }
+    val show by remember { androidx.compose.runtime.derivedStateOf { progress.value > 0.01f } }
+    var tab by rememberSaveable { mutableStateOf(EditorTab.Apps) }
+    // The Glance has no apps or widgets: its card brings the Settings tab (its own options) forward.
+    LaunchedEffect(glanceFocus) { if (glanceFocus) tab = EditorTab.Settings }
+    LaunchedEffect(focusAdd, show) { if (focusAdd && show) { tab = EditorTab.Apps; androidx.compose.runtime.withFrameNanos { }; runCatching { focus.requestFocus() } } }
+    var hostOrigin by remember { mutableStateOf(Offset.Zero) }
+    val stripState = rememberLazyListState()
+    val vertical = layout.axis == PageEditorGeometry.Axis.Vertical
+    val tabsVertical = PageEditorGeometry.tabsVertical(continuous, layout.target.landscape)
+
+    // The drop targets in host px: the live card (the page being edited) and every laid-out, clipped card of the strip (their rectangles are recorded as they are placed).
+    val rects = remember { HashMap<Int, EdgeRect>() }
+    fun dropTargets(): List<PageEditorGeometry.DropTarget> {
+        val out = ArrayList<PageEditorGeometry.DropTarget>()
+        if (!glanceFocus) out += PageEditorGeometry.DropTarget(current, layout.card)
+        for ((page, r) in rects) {
+            if (page !in pages.indices || (page == current && !glanceFocus)) continue
+            val local = EdgeRect(r.left - hostOrigin.x, r.top - hostOrigin.y, r.right - hostOrigin.x, r.bottom - hostOrigin.y)
+            val clipped = PageEditorGeometry.visible(local, layout.strip) ?: continue
+            out += PageEditorGeometry.DropTarget(page, clipped)
+        }
+        return out
+    }
+    val latestDrop by androidx.compose.runtime.rememberUpdatedState(onDropApp)
+    drag.onDrop = { app, windowPos ->
+        val p = windowPos - hostOrigin
+        PageEditorGeometry.hit(dropTargets(), p.x, p.y)?.let { latestDrop(app, it) }
+    }
+
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(
+            modifier.fillMaxSize().onGloballyPositioned { hostOrigin = it.positionInWindow() }
+                .onKeyEvent { e -> if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) { onExit(); true } else false },
+        ) {
+            Box(
+                Modifier.fillMaxSize().graphicsLayer { alpha = alphaNow() }
+                    .background(Brush.verticalGradient(listOf(HyleColors.Background, HyleColors.Surface.copy(alpha = 0.9f)))),
+            )
+            fun Modifier.place(r: EdgeRect) = this
+                .absoluteOffset { androidx.compose.ui.unit.IntOffset(r.left.toInt(), r.top.toInt()) }
+                .size(with(d) { r.width.toDp() }, with(d) { r.height.toDp() })
+                .graphicsLayer { alpha = alphaNow() }
+            if (show) {
+                CompositionLocalProvider(LocalLayoutDirection provides dir) {
+                    // ---- tabs and their content ----
+                    Column(Modifier.place(layout.tabs).testTag("page-editor-tabs"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        PageEditorTabRow(tab, { tab = it }, vertical = tabsVertical, modifier = Modifier.padding(start = 16.dp, end = 8.dp))
+                        PageEditorContent(
+                            tab = tab, page = if (glanceFocus) null else current, pageCount = pages.size, prefs = prefs, apps = apps, onHome = onHome, hasWork = hasWork, isWork = isWork,
+                            drag = drag, focusRequester = focus, onAddApp = onAddApp, onWidget = onWidget, onFolder = onFolder, onShortcut = onShortcut, onLink = onLink, onFile = onFile, onGroup = onGroup,
+                            settings = PageEditorSettingsActions(onPrefs, onDelete), modifier = Modifier.weight(1f).fillMaxSize(),
+                        )
+                    }
+                    // ---- the strip ----
+                    val stripRect = if (vertical) EdgeRect(layout.card.left, layout.strip.top, layout.card.right, layout.strip.bottom) else EdgeRect(0f, layout.card.top, layout.strip.right, layout.card.bottom)
+                    PageStrip(
+                        layout = layout, stripRect = stripRect, state = stripState, pages = pages, current = current, glanceOn = glanceOn, glanceFocus = glanceFocus,
+                        appsByKey = appsByKey, prefs = prefs, isLandscape = isLandscape, reduced = reduced, hostOrigin = { hostOrigin }, rects = rects,
+                        onSelectPage = onSelectPage, onSelectGlance = onSelectGlance, onAddPage = onAddPage,
+                        modifier = Modifier.place(stripRect),
+                    )
+                    // ---- the Glance as the focus card ----
+                    if (glanceOn && glanceFocus) {
+                        Box(
+                            Modifier.place(layout.card).graphicsLayer {
+                                val s = swing()
+                                translationX = s.translationX; translationY = s.translationY; rotationX = s.rotationX; rotationY = s.rotationY
+                                scaleX = s.scale; scaleY = s.scale; alpha = s.alpha * alphaNow(); cameraDistance = PageEditorGeometry.CAMERA_DISTANCE_DP * density
+                            }.testTag("page-editor-glance-focus"),
+                        ) { GlanceCardFace(prefs, Modifier.fillMaxSize(), big = true) }
+                    }
+                    // ---- the rail: move earlier / later and delete ----
+                    if (!glanceFocus && current in pages.indices) PageRail(layout, current, pages.size, vertical, onMove, onDelete, Modifier.place(layout.rail))
+                }
+                if (notice != null) {
+                    LaunchedEffect(notice.id) { delay(6000); onNoticeDone() }
+                    Row(
+                        Modifier.align(Alignment.BottomCenter).padding(bottom = 76.dp).background(HyleColors.Surface, RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 8.dp)
+                            .semantics { liveRegion = LiveRegionMode.Polite; contentDescription = notice.message },
+                        horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(notice.message, color = HyleColors.InkBright, fontSize = 13.sp)
+                        CarouselButton(L10n.tr("Undo"), onClick = { notice.onUndo(); onNoticeDone() }, prominent = true)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The dragged app's icon under the finger. Drawn by the home above everything (the editor's own layer lies under the live page); it takes no touches. */
+@Composable
+fun PageEditorGhost(drag: AddCarouselDrag, modifier: Modifier = Modifier) {
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInWindow() }) {
+        drag.app?.let { a ->
+            val p = drag.pos - origin
+            Box(Modifier.absoluteOffset { androidx.compose.ui.unit.IntOffset((p.x - 28.dp.toPx()).toInt(), (p.y - 28.dp.toPx()).toInt()) }.testTag("page-editor-ghost")) { AppIcon(a, 56.dp) }
+        }
+    }
+}
+
+@Composable
+private fun PageRail(layout: PageEditorGeometry.Layout, index: Int, count: Int, vertical: Boolean, onMove: (Int, Int) -> Unit, onDelete: (Int) -> Unit, modifier: Modifier) {
+    val back = if (vertical) "↑" else if (layout.mirrored) "→" else "←"
+    val fwd = if (vertical) "↓" else if (layout.mirrored) "←" else "→"
+    @Composable fun Buttons() {
+        CarouselButton(L10n.tr("Move earlier"), enabled = index > 0, onClick = { onMove(index, -1) }, glyph = back, description = L10n.tr("Move page %d earlier", index + 1))
+        CarouselButton(L10n.tr("Move later"), enabled = index < count - 1, onClick = { onMove(index, 1) }, glyph = fwd, description = L10n.tr("Move page %d later", index + 1))
+        CarouselButton(L10n.tr("Delete page"), onClick = { onDelete(index) }, glyph = "×", danger = true, description = L10n.tr("Delete page %d", index + 1))
+    }
+    if (vertical) Column(modifier, verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) { Buttons() }
+    else Row(modifier, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Buttons() }
+}
+
+@Composable
+private fun PageStrip(
+    layout: PageEditorGeometry.Layout, stripRect: EdgeRect, state: LazyListState,
+    pages: List<HomePage>, current: Int, glanceOn: Boolean, glanceFocus: Boolean,
+    appsByKey: Map<String, AppEntry>, prefs: LauncherPrefs, isLandscape: Boolean, reduced: Boolean, hostOrigin: () -> Offset, rects: MutableMap<Int, EdgeRect>,
+    onSelectPage: (Int, Float, Float) -> Unit, onSelectGlance: (Float, Float) -> Unit, onAddPage: (Float, Float) -> Unit,
+    modifier: Modifier,
+) {
+    val d = LocalDensity.current
+    val vertical = layout.axis == PageEditorGeometry.Axis.Vertical
+    val entries = remember(glanceOn, pages.size) { PageEditorGeometry.entries(glanceOn, pages.size) }
+    val focus = PageEditorGeometry.focusPosition(glanceOn, glanceFocus, current).coerceIn(0, entries.lastIndex)
+    // The focus card sits in the middle of the strip: the padding before the first item puts the item scrolled to the top of the strip into the focus slot.
+    val padPx = if (vertical) (stripRect.height - layout.card.height) / 2f else (stripRect.width - layout.card.width) / 2f
+    val pad = with(d) { padPx.coerceAtLeast(0f).toDp() }
+    LaunchedEffect(focus, entries.size) { if (reduced) state.scrollToItem(focus) else state.animateScrollToItem(focus) }
+    val cw = with(d) { layout.card.width.toDp() }; val ch = with(d) { layout.card.height.toDp() }
+    // The offset of a tapped card from the focus slot, from where it really is now (the strip may have been scrolled by hand).
+    fun offsetFrom(c: LayoutCoordinates?): Pair<Float, Float> {
+        val p = c?.takeIf { it.isAttached }?.positionInWindow() ?: return 0f to 0f
+        val o = hostOrigin()
+        return (p.x - o.x - layout.card.left) to (p.y - o.y - layout.card.top)
+    }
+    @Composable fun Item(pos: Int) {
+        val e = entries[pos]
+        var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+        val m = Modifier.size(cw, ch).onGloballyPositioned {
+            coords = it
+            if (e.kind == PageEditorGeometry.Kind.Page && it.isAttached) { val p = it.positionInWindow(); rects[e.page] = EdgeRect(p.x, p.y, p.x + it.size.width, p.y + it.size.height) }
+        }
+        when (e.kind) {
+            PageEditorGeometry.Kind.Glance -> StripCard(
+                m, label = L10n.tr("Glance"), selected = glanceFocus, hue = 220f, outlineOnly = glanceFocus, tag = "pe.glance",
+                onClick = { val (dx, dy) = offsetFrom(coords); onSelectGlance(dx, dy) },
+            ) { if (!glanceFocus) GlanceCardFace(prefs, Modifier.fillMaxSize(), big = false) }
+            PageEditorGeometry.Kind.Page -> {
+                val page = pages[e.page]
+                val isFocus = !glanceFocus && e.page == current
+                androidx.compose.runtime.DisposableEffect(e.page) { onDispose { rects.remove(e.page) } }
+                val label = L10n.tr("Page %d of %d", e.page + 1, pages.size) + if (page.keys.isEmpty()) ", " + L10n.tr("empty") else ""
+                StripCard(
+                    m, label = label, selected = isFocus, hue = PageEditorGeometry.hue(e.page), outlineOnly = isFocus, tag = "pe.page.${e.page}",
+                    onClick = { val (dx, dy) = offsetFrom(coords); onSelectPage(e.page, dx, dy) },
+                ) {
+                    if (!isFocus) {
+                        PagePreview(page, appsByKey, prefs, isLandscape, Modifier.fillMaxSize().padding(start = 8.dp, end = 8.dp, bottom = 8.dp, top = 26.dp))
+                        if (page.keys.isEmpty()) Text(L10n.tr("Empty page"), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.align(Alignment.Center))
+                        Text("${e.page + 1}", color = HyleColors.InkDim, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.TopStart).padding(12.dp))
+                    }
+                }
+            }
+            PageEditorGeometry.Kind.Add -> StripCard(
+                m, label = L10n.tr("Add page"), selected = false, hue = 0f, outlineOnly = true, dashed = true, tag = "pe.add",
+                onClick = { val (dx, dy) = offsetFrom(coords); onAddPage(dx, dy) },
+            ) { Text("+", color = HyleColors.InkDim, fontSize = 40.sp, modifier = Modifier.align(Alignment.Center)) }
+        }
+    }
+    if (vertical) {
+        LazyColumn(modifier.testTag("page-editor-strip").semantics { contentDescription = L10n.tr("Page carousel") }, state = state, contentPadding = PaddingValues(vertical = pad), verticalArrangement = Arrangement.spacedBy(GAP_DP.dp)) {
+            items(entries.size, key = { i -> entries[i].let { "${it.kind}:${it.page}" } }) { Item(it) }
+        }
+    } else {
+        LazyRow(modifier.testTag("page-editor-strip").semantics { contentDescription = L10n.tr("Page carousel") }, state = state, reverseLayout = layout.mirrored, contentPadding = PaddingValues(horizontal = pad), horizontalArrangement = Arrangement.spacedBy(GAP_DP.dp)) {
+            items(entries.size, key = { i -> entries[i].let { "${it.kind}:${it.page}" } }) { Item(it) }
+        }
+    }
+}
+
+/** One card of the strip: a large rounded tile with a soft gradient (the reference's tall cards); the focus card is an empty outline, its page is the live layer above it. */
+@Composable
+private fun StripCard(
+    modifier: Modifier, label: String, selected: Boolean, hue: Float, outlineOnly: Boolean, onClick: () -> Unit, tag: String, dashed: Boolean = false,
+    content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(CARD_CORNER)
+    val tintTop = Color.hsv(hue, 0.55f, if (com.bos.sphere.core.design.HyleTheme.isLight) 0.98f else 0.75f)
+    val fill = if (outlineOnly) Modifier else Modifier.background(Brush.verticalGradient(listOf(tintTop.copy(alpha = 0.55f), HyleColors.Surface.copy(alpha = 0.95f))), shape)
+    Box(
+        modifier.testTag(tag).clip(shape).then(fill)
+            .border(if (selected) 2.dp else 1.dp, if (selected) HyleColors.Violet else HyleColors.InkDim.copy(alpha = if (dashed) 0.5f else 0.28f), shape)
+            .clickable(onClickLabel = L10n.tr("Show this page"), onClick = onClick)
+            .semantics { role = Role.Button; this.selected = selected; contentDescription = label },
+        content = content,
+    )
+}
+
+/** The Glance as a card: its wallpaper-like gradient, its name and a dot at each hotspot that is on. */
+@Composable
+private fun GlanceCardFace(prefs: LauncherPrefs, modifier: Modifier, big: Boolean) {
+    val shape = RoundedCornerShape(CARD_CORNER)
+    Box(modifier.clip(shape).background(Brush.verticalGradient(listOf(Color(0xFF3A3F7A), Color(0xFF14172B))), shape)) {
+        Text(L10n.tr("Glance"), color = Color.White, fontSize = if (big) 22.sp else 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.Center))
+        Corner.entries.filter { it in prefs.glanceHotspots }.forEach { c ->
+            val a = when (c) { Corner.TopLeft -> Alignment.TopStart; Corner.TopRight -> Alignment.TopEnd; Corner.BottomLeft -> Alignment.BottomStart; Corner.BottomRight -> Alignment.BottomEnd }
+            Box(Modifier.align(a).padding(12.dp).size(10.dp).background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(50)))
+        }
+    }
+}

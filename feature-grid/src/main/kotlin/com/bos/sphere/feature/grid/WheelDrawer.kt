@@ -593,7 +593,7 @@ private fun WheelContent(
 
         // INP-19: hub and ring spacing come from the window size, so nothing overlaps or clips when it is small.
         val minSideDp = with(density) { metrics.minSide.toDp().value }
-        val puck = remember(minSideDp, actions.size) { PuckLayout.compute(minSideDp, actions.size) }
+        val puck = remember(minSideDp) { PuckLayout.compute(minSideDp, 0) }
 
         // INP-18: keyboard and scroll wheel. The puck owns its keys while open (ahead of the home's shortcuts).
         val currentGroups by rememberUpdatedState(groups)
@@ -622,7 +622,7 @@ private fun WheelContent(
                     is PuckEffect.SelectItem -> kbItem = eff.index
                     PuckEffect.Launch -> g?.apps?.getOrNull(currentKbItem)?.let { onLaunch(it) }
                     PuckEffect.Search -> onSearch()
-                    is PuckEffect.Action -> currentActions.getOrNull(eff.index)?.onClick?.invoke()
+                    is PuckEffect.Action -> currentActions.getOrNull(eff.index)?.takeIf { !it.empty }?.onClick?.invoke()
                     PuckEffect.Close -> currentDismiss()
                     null -> Unit
                 }
@@ -932,25 +932,8 @@ private fun WheelContent(
                             ) { if (g != grouping) onGroupingChange(g) },
                     )
                 }
-                // The puck: Radar at the very centre, a ring of crater buttons around it, group labels outside.
-                val sp = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
-                Crater(puck.searchSizeDp.dp, accent = true, modifier = Modifier.centeredAt { Offset(sp.x, sp.y) }.semantics { traversalIndex = 0f }) {
-                    SearchButton(onClick = onSearch, modifier = Modifier.size(puck.searchSizeDp.dp))
-                }
-                actions.take(puck.slots.size).forEachIndexed { i, a ->
-                    val slot = puck.slots[i]
-                    val pt = WheelGeometry.polarToScreen(anchor, w, h, with(density) { slot.radiusDp.dp.toPx() }, qs + slot.angleDeg)
-                    Crater(puck.actionSizeDp.dp, modifier = Modifier.centeredAt { Offset(pt.x, pt.y) }.semantics { traversalIndex = (i + 1).toFloat() }) {
-                        Box(
-                            Modifier
-                                .size(puck.actionSizeDp.dp)
-                                .semantics { contentDescription = a.label }
-                                .launcherItem("puck.action.$i", FocusKind.PuckRing, order = i + 1, layer = 3, focusable = false, ringRadiusDp = 21f)
-                                .clickable(role = Role.Button) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); a.onClick() },
-                            contentAlignment = Alignment.Center,
-                        ) { androidx.compose.material3.Icon(a.glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size((puck.actionSizeDp * 0.52f).dp)) }
-                    }
-                }
+                // Wave 30: four wedge sections around a round Back hub (PuckSections.kt), group labels outside.
+                PuckSectionsLayer(anchor, corner, remember(puck) { PuckSectionsGeometry.ring(puck.hubRadiusDp, puck.chipRadiusDp) }, actions, onDismiss)
             }
 
             // Spokes (only those near the visible quadrant are composed).
@@ -1058,52 +1041,4 @@ private fun WheelIcon(
                 onClick = onClick,
             ),
     )
-}
-
-/** The hub's search glyph (the Concepts eyedropper analogue): a bare magnifier, no enclosing shape. */
-@Composable
-private fun SearchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Search apps") }
-            .clickable(role = Role.Button, onClick = onClick),
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val stroke = 1.8.dp.toPx()
-            val r = size.minDimension * 0.24f
-            val c = Offset(size.width * 0.44f, size.height * 0.44f)
-            drawCircle(HyleColors.InkBright, radius = r, center = c, style = Stroke(stroke))
-            val d = r / 1.4142135f
-            drawLine(
-                HyleColors.InkBright,
-                Offset(c.x + d, c.y + d),
-                Offset(c.x + d + r * 0.85f, c.y + d + r * 0.85f),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round,
-            )
-        }
-    }
-}
-
-/** One extra button on the all-apps puck. */
-class PuckAction(val label: String, val glyph: androidx.compose.ui.graphics.vector.ImageVector, val onClick: () -> Unit)
-
-/** A tactile "crater" button: a dark concave dish with a lit lower lip (the Hyle kit's crater), optionally ringed in the accent. */
-@Composable
-private fun Crater(size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, accent: Boolean = false, content: @Composable () -> Unit) {
-    Box(
-        modifier
-            .size(size)
-            .drawBehind {
-                val r = this.size.minDimension / 2f
-                drawCircle(Brush.radialGradient(listOf(Color(0xFF06060A), Color(0xFF14141C)), center = Offset(this.size.width / 2f, this.size.height * 0.42f), radius = r), radius = r)
-                drawCircle(
-                    Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent, Color(0x40FFFFFF))),
-                    radius = r - 0.5.dp.toPx(), style = Stroke(1.5.dp.toPx()),
-                )
-                if (accent) drawCircle(HyleColors.Violet.copy(alpha = 0.55f), radius = r, style = Stroke(1.5.dp.toPx()))
-            },
-        contentAlignment = Alignment.Center,
-    ) { content() }
 }

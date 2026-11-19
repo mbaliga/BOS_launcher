@@ -39,8 +39,8 @@ class RehydrationTest {
         val b = SnapshotStore(dir, 5) { 2_000L }
         assertEquals(1, b.list().size); assertEquals("{\"v\":1}", b.read(b.list().first().id))
         val sp = MapSharedPreferences()
-        PuckActionsStore(sp).set(listOf(CornerActionId.Phone, CornerActionId.Messages))
-        assertEquals(listOf(CornerActionId.Phone, CornerActionId.Messages), PuckActionsStore(sp).actions.value)
+        PuckActionsStore(sp).setAll(listOf(PuckSlot.Action(CornerActionId.Phone), PuckSlot.Action(CornerActionId.Messages)))
+        assertEquals(listOf<PuckSlot>(PuckSlot.Action(CornerActionId.Phone), PuckSlot.Action(CornerActionId.Messages), PuckSlot.Empty, PuckSlot.Empty), PuckActionsStore(sp).slots.value)
         val ex = File(tmp.root, "ex.json")
         StateExtrasStore(ex).setSection(StateSchema.K_WORKSPACES, JSONArray().put("w"))
         assertEquals("w", StateExtrasStore(ex).section(StateSchema.K_WORKSPACES).getString(0))

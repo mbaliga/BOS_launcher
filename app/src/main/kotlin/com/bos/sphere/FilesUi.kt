@@ -242,7 +242,7 @@ private fun FileListRow(f: RecentFile, now: Long, bright: Color, dim: Color, onO
         FileThumb(f, kind, px, Modifier.size(48.dp), 9f, badges = false)
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             NameLine(f.name, bright, 14f)
-            Text(FileFormat.meta(RecentFilesModel.age(now, f.modifiedMs), f.sizeBytes, kindLabel(kind)), color = dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(FileFormat.meta(localAge(now, f.modifiedMs), f.sizeBytes, kindLabel(kind)), color = dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -259,7 +259,7 @@ private fun FileGridCell(f: RecentFile, now: Long, bright: Color, dim: Color, on
     ) {
         FileThumb(f, kind, px, Modifier.fillMaxWidth().aspectRatio(1f), 12f)
         Text(f.name, color = bright, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-        Text(FileFormat.meta(RecentFilesModel.age(now, f.modifiedMs), f.sizeBytes, ""), color = dim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(FileFormat.meta(localAge(now, f.modifiedMs), f.sizeBytes, ""), color = dim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -352,5 +352,17 @@ internal fun openRecentFile(context: android.content.Context, f: RecentFile) {
     runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(f.uri), f.mime.ifEmpty { "*/*" })
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    }
+}
+
+/** W33: the relative age in the user's language (the catalog model's text is English only). */
+internal fun localAge(nowMs: Long, thenMs: Long): String {
+    val d = (nowMs - thenMs).coerceAtLeast(0) / 1000
+    return when {
+        d < 60 -> com.bos.sphere.core.design.L10n.tr("Just now")
+        d < 3600 -> com.bos.sphere.core.design.L10n.tr("%d min ago", d / 60)
+        d < 86_400 -> com.bos.sphere.core.design.L10n.tr("%d h ago", d / 3600)
+        d < 172_800 -> com.bos.sphere.core.design.L10n.tr("Yesterday")
+        else -> com.bos.sphere.core.design.L10n.tr("%d days ago", d / 86_400)
     }
 }

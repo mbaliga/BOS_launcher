@@ -293,11 +293,12 @@ abstract class CommsReadScreenCases(private val orientation: String) : Launchpad
         assertTrue("the new message shows under Unread only", present("m1"))
     }
 
-    @Test fun STR_02_w29_dismissingALiveRowSaysItWasClearedFromTheShadeAndTheRowStays() {
+    @Test fun STR_02_w32_dismissingALiveRowMarksItReadAndTheRowStays() { // W32: in a persistent store dismiss is mark as read
         render()
         rule.onNodeWithTag("lp.focus.m1").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Dismiss" }.action!!.invoke(); rule.waitForIdle()
-        rule.onNodeWithText("Cleared from the shade").assertExists()
+        rule.onNodeWithText("Marked as read").assertExists()
         assertTrue(present("m1"))
+        assertTrue("m1 is read now", "m1" in com.bos.sphere.core.data.LaunchpadSettings.readKeys.value)
     }
 
     // ---- screenshots (read by hand) ----

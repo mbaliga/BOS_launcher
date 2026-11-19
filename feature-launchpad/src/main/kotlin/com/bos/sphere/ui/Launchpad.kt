@@ -518,7 +518,9 @@ fun LaunchpadContent(
             com.bos.sphere.core.data.LaunchpadAction.CollapseAll ->
                 collapsed = if (collapsed.size >= sections.size) emptySet() else sections.map { it.key }.toSet()
             com.bos.sphere.core.data.LaunchpadAction.ClearAll -> onClearAll()
-            com.bos.sphere.core.data.LaunchpadAction.Dismiss -> n?.takeIf { !it.isOngoing }?.let { onDismissItem(it); if (hub?.liveAll == true) toast.value = L10n.tr("Cleared from the shade") } // wave 29: the row stays in Comms (history), so say what happened
+            com.bos.sphere.core.data.LaunchpadAction.Dismiss -> n?.takeIf { !it.isOngoing }?.let { // W32: in a persistent store, dismiss = mark as read (it leaves the places of importance: the Unread view and the unread styling), and it clears the shade; the row stays as history
+                LaunchpadSettings.markRead(it.key); onDismissItem(it); toast.value = L10n.tr("Marked as read")
+            }
             com.bos.sphere.core.data.LaunchpadAction.MarkRead -> n?.let { LaunchpadSettings.markRead(it.key); toast.value = L10n.tr("Marked as read") }
             com.bos.sphere.core.data.LaunchpadAction.OpenApp -> if (pkg.isNotBlank()) {
                 if (openApp == null) onOpenApp(pkg) else if (!openApp(pkg)) toast.value = L10n.tr("Couldn't open %s", n?.appLabel?.ifBlank { pkg } ?: pkg)
@@ -660,7 +662,7 @@ fun LaunchpadContent(
     fun command(cmd: RowCommand, n: HubNotification) {
         val h = historyOnly[n.key]
         if (h != null && (cmd == RowCommand.MarkRead || cmd == RowCommand.Dismiss)) { // wave 29: history-only rows mark in, and leave, the history
-            if (cmd == RowCommand.MarkRead) { hub?.store?.setRead(listOf(h.id), true); toast.value = L10n.tr("Marked as read") } else hub?.store?.delete(history.filter { it.key == n.key }.map { it.id })
+            hub?.store?.setRead(listOf(h.id), true); toast.value = L10n.tr("Marked as read") // W32: dismiss and mark-read are the same on a history row
             return
         }
         when (cmd) {

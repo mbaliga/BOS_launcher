@@ -1,14 +1,17 @@
 package com.bos.sphere.core.data
 
 /**
- * HOM-16 (wave 26, owner clause 10): the wallpaper of a surface is exactly one of three kinds: a solid colour, a two-stop
- * linear gradient, or a live wallpaper (the signal-driven [BackgroundChoice]). The Glance has one, the pages (paginated or
- * scroll alike) either share it or have their own. Nothing else is a wallpaper.
+ * HOM-16 (wave 26, owner clause 10; wave 34 adds two): the wallpaper of a surface is exactly one of five kinds: a solid colour, a two-stop
+ * linear gradient, a signal wallpaper (the signal-driven [BackgroundChoice], stored as "live"), the system's own live wallpaper (the launcher
+ * draws nothing, so what the system shows behind it shows through) or a picture from the gallery (a still or an animated GIF / WebP).
+ * The Glance has one, the pages (paginated or scroll alike) either share it or have their own. Nothing else is a wallpaper.
  */
 enum class WallpaperKind(val id: String, val label: String) {
     Solid("solid", "Solid colour"),
     Gradient("gradient", "Gradient"),
-    Live("live", "Live wallpaper");
+    Live("live", "Signal wallpaper"),
+    System("system", "System live wallpaper"),
+    Picture("picture", "Picture");
 
     companion object { fun forId(id: String?): WallpaperKind? = entries.firstOrNull { it.id == id } }
 }
@@ -28,20 +31,23 @@ data class GradientSpec(val from: Long = DEFAULT_FROM, val to: Long = DEFAULT_TO
     }
 }
 
-/** One wallpaper: all three kinds' settings are kept so switching kind never loses the others; [kind] says which one is drawn. */
+/** One wallpaper: all kinds' settings are kept so switching kind never loses the others; [kind] says which one is drawn. */
 data class Wallpaper(
     val kind: WallpaperKind = WallpaperKind.Live,
     val solid: Long = DEFAULT_SOLID,
     val gradient: GradientSpec = GradientSpec(),
     val live: BackgroundChoice = BackgroundChoice.DEFAULT,
+    val picture: PictureSpec = PictureSpec(),
+    /** Percent of black over the system wallpaper (kind [WallpaperKind.System]), one of [PictureLimits.DIMS]. */
+    val systemDim: Int = 0,
 ) {
     companion object { const val DEFAULT_SOLID = 0xFF16161CL }
 }
 
 /** The stored form of one surface's wallpaper (see [LauncherPrefs.wallpaper]). */
 fun LauncherPrefs.rawWallpaper(surface: WallpaperSurface): Wallpaper = when (surface) {
-    WallpaperSurface.Glance -> Wallpaper(glanceWallpaperKind, glanceSolid, GradientSpec(glanceGradFrom, glanceGradTo, glanceGradAngle), BackgroundChoice(backgroundSlot1, backgroundSlot2))
-    WallpaperSurface.Pages -> Wallpaper(pagesWallpaperKind, pagesSolid, GradientSpec(pagesGradFrom, pagesGradTo, pagesGradAngle), BackgroundChoice(pagesSlot1, pagesSlot2))
+    WallpaperSurface.Glance -> Wallpaper(glanceWallpaperKind, glanceSolid, GradientSpec(glanceGradFrom, glanceGradTo, glanceGradAngle), BackgroundChoice(backgroundSlot1, backgroundSlot2), glancePicture, glanceSystemDim)
+    WallpaperSurface.Pages -> Wallpaper(pagesWallpaperKind, pagesSolid, GradientSpec(pagesGradFrom, pagesGradTo, pagesGradAngle), BackgroundChoice(pagesSlot1, pagesSlot2), pagesPicture, pagesSystemDim)
 }
 
 /** What is drawn on [surface]: the pages show the Glance wallpaper while [LauncherPrefs.pagesSameAsGlance] is on. */
@@ -53,8 +59,8 @@ fun LauncherPrefs.withWallpaper(surface: WallpaperSurface, w: Wallpaper): Launch
     val g = w.gradient.normalised()
     val c = BackgroundChoice.normalised(w.live.slot1, w.live.slot2)
     return when (surface) {
-        WallpaperSurface.Glance -> copy(glanceWallpaperKind = w.kind, glanceSolid = w.solid or GradientSpec.OPAQUE, glanceGradFrom = g.from, glanceGradTo = g.to, glanceGradAngle = g.angle, backgroundSlot1 = c.slot1, backgroundSlot2 = c.slot2)
-        WallpaperSurface.Pages -> copy(pagesWallpaperKind = w.kind, pagesSolid = w.solid or GradientSpec.OPAQUE, pagesGradFrom = g.from, pagesGradTo = g.to, pagesGradAngle = g.angle, pagesSlot1 = c.slot1, pagesSlot2 = c.slot2)
+        WallpaperSurface.Glance -> copy(glanceWallpaperKind = w.kind, glanceSolid = w.solid or GradientSpec.OPAQUE, glanceGradFrom = g.from, glanceGradTo = g.to, glanceGradAngle = g.angle, backgroundSlot1 = c.slot1, backgroundSlot2 = c.slot2, glancePicture = w.picture.normalised(), glanceSystemDim = PictureLimits.nearestDim(w.systemDim))
+        WallpaperSurface.Pages -> copy(pagesWallpaperKind = w.kind, pagesSolid = w.solid or GradientSpec.OPAQUE, pagesGradFrom = g.from, pagesGradTo = g.to, pagesGradAngle = g.angle, pagesSlot1 = c.slot1, pagesSlot2 = c.slot2, pagesPicture = w.picture.normalised(), pagesSystemDim = PictureLimits.nearestDim(w.systemDim))
     }
 }
 

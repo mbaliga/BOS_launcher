@@ -19,7 +19,7 @@ class WallpaperModelTest {
         assertTrue(p.pagesSameAsGlance)
         assertEquals(p.wallpaper(WallpaperSurface.Glance), p.wallpaper(WallpaperSurface.Pages))
         assertTrue(p.sharesWallpaper(WallpaperSurface.Pages))
-        assertEquals(3, WallpaperKind.entries.size) // solid, gradient, live: nothing else is a wallpaper
+        assertEquals(listOf("solid", "gradient", "live", "system", "picture"), WallpaperKind.entries.map { it.id }) // wave 34: exactly these five
     }
 
     @Test fun CFG_03_anInstallFromBeforeKeepsItsBackgroundAsTheGlanceWallpaperWithSameAsGlanceOn() {

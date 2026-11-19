@@ -1639,7 +1639,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {
-                    com.bos.sphere.feature.grid.SignalBackground(prefs, Modifier.fillMaxSize(), dark = true, baseFill = true, animate = false, announce = false)
+                    com.bos.sphere.feature.grid.HomeSurfaceBackground(com.bos.sphere.core.data.WallpaperSurface.Glance, prefs, Modifier.fillMaxSize(), baseFill = true, animate = false, announce = false, scrim = false, play = false, alert = false, dark = true) // wave 34: the wallpaper of any kind
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = prefs.settingsDim.coerceIn(0f, 1f))))
                 }
             },

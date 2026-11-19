@@ -26,5 +26,6 @@
     <exclude domain="file" path="index" />
     <exclude domain="file" path="notifications" />
     <exclude domain="file" path="usage" />
+    <exclude domain="file" path="wallpapers" />
     <exclude domain="file" path="home_layout_legacy.json" />
 </full-backup-content>

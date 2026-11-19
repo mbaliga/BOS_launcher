@@ -267,6 +267,11 @@ data class LauncherPrefs(
     val pagesGradAngle: Int = GradientSpec.DEFAULT_ANGLE,
     val pagesSlot1: BgItem = BackgroundChoice.DEFAULT.slot1,
     val pagesSlot2: BgItem = BackgroundChoice.DEFAULT.slot2,
+    // --- wave 34 (wallpaper): the picture (gallery still or animated GIF / WebP) and the dim over the system wallpaper, per surface; see WallpaperPicture.kt
+    val glancePicture: PictureSpec = PictureSpec(),
+    val pagesPicture: PictureSpec = PictureSpec(),
+    val glanceSystemDim: Int = 0,
+    val pagesSystemDim: Int = 0,
 
     // --- search
     val webEngine: WebEngine = WebEngine.DuckDuckGo,

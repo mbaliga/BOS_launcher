@@ -67,7 +67,15 @@ object StateSchema {
      * another install (widgets re-bind, CFG-02), a picture path points into this app's private storage, and
      * onboarding state belongs to the install.
      */
-    val DEVICE_BOUND_PREF_KEYS: Set<String> = setOf("leftWidgetId", "bgPicture", "onboardingDone")
+
+    /**
+     * Wave 34 (wallpaper): the gallery picture of a surface is a copy in the app's private files/wallpapers folder, which is not carried by the export file or by system
+     * backup (a user's photos stay on the device). The prefs that name or describe that file therefore stay out of export and import too; the fit, dim and animation mode are
+     * kept with the rest of the settings and apply to whatever picture is chosen next. A restored install whose kind is Picture but has no file draws the solid colour.
+     */
+    val WALLPAPER_PICTURE_KEYS: Set<String> = listOf("wpGlance", "wpPages").flatMap { p -> listOf("Pic", "PicAnim", "PicVid", "PicMs", "PicOk", "PicBounce").map { p + it } }.toSet()
+
+    val DEVICE_BOUND_PREF_KEYS: Set<String> = setOf("leftWidgetId", "bgPicture", "onboardingDone") + WALLPAPER_PICTURE_KEYS
 
     /**
      * What an export never contains (CFG-01, NFR-18). This is documentation the tests enforce: no SharedPreferences
@@ -80,7 +88,7 @@ object StateSchema {
      * the portable copy of the part of this that is setup (aliases).
      */
     val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE, "launchpad_hub")
-    val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage", LegacyHomeBackup.FILE)
+    val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage", "wallpapers", LegacyHomeBackup.FILE)
 
     /**
      * Files (relative to the app's files directory) that hold usage history and are never exported (HOM-18): the timeline

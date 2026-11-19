@@ -98,6 +98,7 @@ import com.bos.sphere.core.data.GlanceContent
 import com.bos.sphere.core.data.GlanceItem
 import com.bos.sphere.core.data.GlanceWeather
 import com.bos.sphere.core.data.LauncherPrefs
+import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.data.WeatherCodes
@@ -201,7 +202,9 @@ fun GlanceSurface(
 
     val effect = if (GlanceContent.showsWeather(items)) GlanceWeather.effectOf(weather, GlanceWeather.isDaylight(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))) else null
 
-    BoxWithConstraints(modifier.fillMaxSize().background(if (dark) Color.Black else Color(0xFFF3F3F6)).testTag("glance.surface")) {
+    // Wave 34: with the system live wallpaper chosen the surface has no base colour at all, so the wallpaper behind the window shows through.
+    val systemWallpaper = prefs.wallpaper(com.bos.sphere.core.data.WallpaperSurface.Glance).kind == com.bos.sphere.core.data.WallpaperKind.System
+    BoxWithConstraints(modifier.fillMaxSize().background(if (systemWallpaper) Color.Transparent else if (dark) Color.Black else Color(0xFFF3F3F6)).testTag("glance.surface")) {
         val w = maxWidth.value; val h = maxHeight.value
         GlanceWeatherLayer(effect, prefs.glanceWeatherIntensity, dark)
         underlay()

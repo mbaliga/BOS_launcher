@@ -41,7 +41,7 @@ import java.io.File
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w411dp-h1200dp-port-mdpi")
+@Config(sdk = [35], qualifiers = "w411dp-h1500dp-port-mdpi")
 class BackgroundPaneUiTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private var prefs by mutableStateOf(LauncherPrefs())

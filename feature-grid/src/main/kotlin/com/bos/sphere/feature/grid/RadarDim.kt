@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.RadarBackground
+import com.bos.sphere.core.data.WallpaperKind
+import com.bos.sphere.core.data.WallpaperSurface
+import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.design.rememberMotionPrefs
 import kotlin.math.pow
 
@@ -88,12 +91,19 @@ internal object RadarDim {
  */
 @Composable
 internal fun RadarBackgroundLayer(prefs: LauncherPrefs, wheelZone: () -> Rect?, modifier: Modifier = Modifier) {
-    if (prefs.radarBackground == RadarBackground.TrueBlack) return
+    if (prefs.radarBackground == RadarBackground.TrueBlack) {
+        // Wave 34: True black draws no wallpaper, but the spider-sense alert (no connectivity) still shows: only the comic lines, nothing else.
+        SpiderSenseAlert(prefs, modifier.fillMaxSize(), dark = true)
+        return
+    }
     val reduced = rememberMotionPrefs().reduced
     val fade = remember { Animatable(if (reduced) 1f else 0f) }
     LaunchedEffect(reduced) { if (reduced) fade.snapTo(1f) else fade.animateTo(1f, tween(RadarDim.FADE_MS)) }
     Box(modifier.fillMaxSize().graphicsLayer { alpha = fade.value }.testTag(RADAR_DIM_TAG)) {
-        SignalBackground(prefs, Modifier.fillMaxSize(), dark = true) // Radar is dark in every theme; HOM-16, PAL-24: the two background items, the same on every surface
+        val glance = prefs.wallpaper(WallpaperSurface.Glance)
+        if (glance.kind == WallpaperKind.Live) SignalBackground(prefs, Modifier.fillMaxSize(), dark = true, choice = glance.live) // Radar is dark in every theme; HOM-16, PAL-24: the two background items, the same on every surface
+        // Wave 34: any other wallpaper kind of the Glance (solid, gradient, picture, the system's), drawn still (an animated picture or video shows its first frame: nothing plays on Radar) and dimmed like the rest.
+        else HomeSurfaceBackground(WallpaperSurface.Glance, prefs, Modifier.fillMaxSize(), scrim = false, play = false, alert = false)
         Box(
             Modifier.fillMaxSize().drawWithCache {
                 val zone = wheelZone()
@@ -111,6 +121,9 @@ internal fun RadarBackgroundLayer(prefs: LauncherPrefs, wheelZone: () -> Rect?, 
                 }
             },
         )
+        // Wave 34: the alert is above the dim, so it stays visible (a signal wallpaper with items draws its own comic lines under the dim).
+        val g = prefs.wallpaper(WallpaperSurface.Glance)
+        if (g.kind != WallpaperKind.Live || g.live.items.isEmpty()) SpiderSenseAlert(prefs, Modifier.fillMaxSize(), dark = true)
     }
 }
 

@@ -102,9 +102,9 @@ class WallpaperPaneUiTest {
         assertEquals(0, rule.onAllNodesWithContentDescription("Laser", substring = true).fetchSemanticsNodes().size)
     }
 
-    @Test fun HOM_16_theThreeTypesAreTheOnlyOnesAndEachShowsItsOwnControls() {
+    @Test fun HOM_16_theFiveTypesAreTheOnlyOnesAndEachShowsItsOwnControls() {
         show(WallpaperSurface.Glance)
-        for (label in listOf("Solid colour", "Gradient", "Live wallpaper")) rule.onNodeWithText(label).assertExists()
+        for (label in listOf("Solid colour", "Gradient", "Signal wallpaper", "System live wallpaper", "Picture")) rule.onNodeWithText(label).assertExists()
         rule.onNodeWithText("Solid colour").performScrollTo().performClick(); rule.waitForIdle()
         assertEquals(WallpaperKind.Solid, prefs.wallpaper(WallpaperSurface.Glance).kind)
         rule.onNodeWithContentDescription("Saturation and brightness").assertExists()
@@ -115,7 +115,7 @@ class WallpaperPaneUiTest {
         rule.onNodeWithText("135°").performScrollTo().performClick(); rule.waitForIdle()
         assertEquals(135, prefs.glanceGradAngle)
         shot("glance-gradient")
-        rule.onNodeWithText("Live wallpaper").performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithText("Signal wallpaper").performScrollTo().performClick(); rule.waitForIdle()
         assertEquals(WallpaperKind.Live, prefs.glanceWallpaperKind)
         shot("glance-live")
     }
@@ -128,7 +128,7 @@ class WallpaperPaneUiTest {
         assertEquals(WallpaperKind.Solid, prefs.pagesWallpaperKind)
         assertEquals("the Glance one is untouched", WallpaperKind.Live, prefs.glanceWallpaperKind)
         shot("pages-solid")
-        rule.onNodeWithText("Live wallpaper").performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithText("Signal wallpaper").performScrollTo().performClick(); rule.waitForIdle()
         shot("pages-live")
     }
 

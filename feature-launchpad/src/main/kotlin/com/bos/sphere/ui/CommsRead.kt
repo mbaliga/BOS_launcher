@@ -104,8 +104,29 @@ object CommsRead {
             if ((n.key in liveRead && !updated) || h?.let { it.read && it.timeMillis == n.timestamp } == true) read += n.key
         }
         for (e in only.values) if (e.read) read += e.key
-        val items = (live + only.values.map(::fromEntry)).sortedByDescending { it.timestamp }
-        return Merged(items, read, only)
+        val items = dropTwins(live, only.values.map(::fromEntry)).sortedByDescending { it.timestamp }
+        val kept = items.mapTo(HashSet()) { it.key }
+        return Merged(items, read, only.filterKeys { it in kept })
+    }
+
+    /** Two posts at most this far apart with the same app, title and text are one notification shown twice (W32). */
+    const val TWIN_WINDOW_MS = 60_000L
+
+    /**
+     * W32: some apps post the same message under two keys (another profile, a second channel, a re-post), so it showed twice. Rows with the same
+     * app, title, text and a post time within [TWIN_WINDOW_MS] collapse into one; a live row wins over a history row, then the newer one.
+     */
+    internal fun dropTwins(live: List<HubNotification>, hist: List<HubNotification>): List<HubNotification> {
+        val liveKeys = live.mapTo(HashSet()) { it.key }
+        val out = ArrayList<HubNotification?>()
+        val byText = HashMap<Triple<String, String, String>, MutableList<Int>>() // same app, title and text: only these are compared
+        for (n in live + hist.sortedByDescending { it.timestamp }) {
+            val slots = byText.getOrPut(Triple(n.packageName, n.title, n.summary)) { ArrayList() }
+            val twin = slots.firstOrNull { val o = out[it]!!; o.key != n.key && kotlin.math.abs(o.timestamp - n.timestamp) <= TWIN_WINDOW_MS }
+            if (twin == null) { slots += out.size; out += n; continue }
+            if (n.key in liveKeys && out[twin]!!.key !in liveKeys) out[twin] = n
+        }
+        return out.filterNotNull()
     }
 
     fun filter(items: List<HubNotification>, readKeys: Set<String>, f: ReadFilter): List<HubNotification> =

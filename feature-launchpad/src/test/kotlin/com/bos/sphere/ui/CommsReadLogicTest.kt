@@ -130,3 +130,25 @@ class CommsReadLogicTest {
         assertNull("inside the dead zone whatever the centre did", CommsRead.pinchOf(1.05f, 10f, 0f))
     }
 }
+
+class CommsTwinsW32Test {
+    private fun n(key: String, t: Long, title: String = "Ilovu and missu", text: String = "Tulika Pandey", pkg: String = "wa") =
+        com.bos.sphere.core.data.HubNotification(id = key, key = key, source = "x", title = title, summary = text, timestamp = t, packageName = pkg, appLabel = pkg)
+
+    @org.junit.Test fun same_post_under_two_keys_shows_once() {
+        val m = CommsRead.merge(listOf(n("a", 1000), n("b", 1500)), emptyList(), emptySet())
+        org.junit.Assert.assertEquals(1, m.items.size)
+    }
+
+    @org.junit.Test fun a_live_row_wins_over_its_history_twin() {
+        val h = com.bos.sphere.core.data.HistoryEntry("h1", "old", "wa", "wa", "Tulika Pandey", "Ilovu and missu", "Tulika Pandey", "", 1200L)
+        val m = CommsRead.merge(listOf(n("a", 1000)), listOf(h), emptySet())
+        org.junit.Assert.assertEquals(listOf("a"), m.items.map { it.key })
+        org.junit.Assert.assertTrue(m.historyOnly.isEmpty())
+    }
+
+    @org.junit.Test fun different_text_time_or_app_stays_separate() {
+        val m = CommsRead.merge(listOf(n("a", 1000), n("b", 1000, text = "other"), n("c", 1000 + CommsRead.TWIN_WINDOW_MS + 1), n("d", 1000, pkg = "other")), emptyList(), emptySet())
+        org.junit.Assert.assertEquals(4, m.items.size)
+    }
+}

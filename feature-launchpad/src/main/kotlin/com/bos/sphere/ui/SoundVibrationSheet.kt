@@ -142,70 +142,18 @@ fun rememberAndroidVolumeController(): VolumeController {
 /** The sheet over its scrim for a given [state]; [onSet] asks for a new value on a row. Separate so tests can drive it with a fake. */
 @Composable
 internal fun SoundVibrationContent(state: SoundVibrationState, onDismiss: () -> Unit, modifier: Modifier = Modifier, onSet: (SoundRowKind, Int) -> Unit) {
-    BackHandler(enabled = true, onBack = onDismiss)
-    val reduced = rememberMotionPrefs().reduced
-    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
-    val req = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { req.requestFocus() } }
-    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480 // landscape phones: less air, the rest scrolls
-    var drag by remember { mutableFloatStateOf(0f) }
-    val onDismissLatest by rememberUpdatedState(onDismiss)
-    val dismissPx = with(androidx.compose.ui.platform.LocalDensity.current) { 96.dp.toPx() }
-    Box(
-        modifier.fillMaxSize().testTag("snd.root")
-            .onPreviewKeyEvent { if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) { onDismiss(); true } else false }
-            .focusRequester(req).focusable(),
-    ) {
-        Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)).testTag("snd.scrim")
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = L10n.tr("Close Sound and Vibration"), onClick = onDismiss),
-        )
-        AnimatedVisibility(
-            visibleState = visible, modifier = Modifier.align(Alignment.BottomCenter),
-            enter = if (reduced) fadeIn(tween(150)) else slideInVertically(tween(260)) { it } + fadeIn(tween(200)),
-        ) {
-            Column(
-                Modifier.widthIn(max = if (compact) 760.dp else 640.dp).fillMaxWidth().testTag("snd.sheet")
-                    .graphicsLayer { translationY = drag.coerceAtLeast(0f) }
-                    .nestedScroll(remember(dismissPx) {
-                        // A drag down that the scrolling content cannot use (it is at the top, or fits) moves the sheet; letting go far enough closes it.
-                        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-                            override fun onPreScroll(available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
-                                if (drag <= 0f || available.y >= 0f) return Offset.Zero
-                                val used = maxOf(available.y, -drag); drag += used; return Offset(0f, used)
-                            }
-                            override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
-                                if (available.y <= 0f) return Offset.Zero
-                                drag += available.y; return Offset(0f, available.y)
-                            }
-                            override suspend fun onPostFling(consumed: androidx.compose.ui.unit.Velocity, available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
-                                if (drag > dismissPx || (drag > 0f && available.y > 1800f)) onDismissLatest() else drag = 0f
-                                return available
-                            }
-                        }
-                    })
-                    .background(SheetBlack, RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 28.dp),
-            ) {
-                Text(
-                    L10n.tr("Sound and Vibration"), color = InkWhite, fontSize = 22.sp, textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = if (compact) 18.dp else 36.dp, bottom = if (compact) 8.dp else 22.dp).testTag("snd.title").semantics { heading() },
-                )
-                @Composable fun rows(kinds: List<SoundRowKind>, mod: Modifier) = Column(mod) {
-                    for (kind in kinds) {
-                        if (kind == SoundRowKind.Vibration) Box(Modifier.padding(vertical = if (compact) 6.dp else 18.dp).fillMaxWidth().height(1.dp).background(Color(0x33FFFFFF)).testTag("snd.divider"))
-                        SoundRowView(state.row(kind)) { onSet(kind, it) }
-                    }
-                }
-                if (compact) Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) { // landscape: two columns so all four sliders show without scrolling
-                    rows(listOf(SoundRowKind.Media, SoundRowKind.Notifications), Modifier.weight(1f))
-                    rows(listOf(SoundRowKind.Alarms, SoundRowKind.Vibration), Modifier.weight(1f))
-                } else rows(SoundRowKind.entries, Modifier.fillMaxWidth())
-                Spacer(Modifier.height(if (compact) 8.dp else 24.dp))
+    PopupSheet(L10n.tr("Sound and Vibration"), L10n.tr("Close Sound and Vibration"), "snd", onDismiss, modifier) { compact ->
+        @Composable fun rows(kinds: List<SoundRowKind>, mod: Modifier) = Column(mod) {
+            for (kind in kinds) {
+                if (kind == SoundRowKind.Vibration) Box(Modifier.padding(vertical = if (compact) 6.dp else 18.dp).fillMaxWidth().height(1.dp).background(Color(0x33FFFFFF)).testTag("snd.divider"))
+                SoundRowView(state.row(kind)) { onSet(kind, it) }
             }
         }
+        if (compact) Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) { // landscape: two columns so all four sliders show without scrolling
+            rows(listOf(SoundRowKind.Media, SoundRowKind.Notifications), Modifier.weight(1f))
+            rows(listOf(SoundRowKind.Alarms, SoundRowKind.Vibration), Modifier.weight(1f))
+        } else rows(SoundRowKind.entries, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(if (compact) 8.dp else 24.dp))
     }
 }
 

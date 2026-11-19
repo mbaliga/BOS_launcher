@@ -466,6 +466,8 @@ fun LaunchpadContent(
     hubPanelBody: @Composable (HubView) -> Unit = {},
     /** Wave 27: the Sound and Vibration sheet; the header's sound hook calls [SoundSheetState.show], the system row's sound button does too. */
     soundSheet: SoundSheetState = rememberSoundSheetState(),
+    /** Wave 34: the Connectivity sheet; the signal and Wi-Fi glyphs of the header open it (it replaces the system Internet panel). */
+    connectivitySheet: ConnectivitySheetState = rememberConnectivitySheetState(),
     /** Wave 28: the Comms size in percent (75 to 125); by default the persisted setting, which the Comms size stepper and the pinch change. */
     commsScalePercent: Int = rememberCommsScalePercent(),
     /** Wave 29 (commsRead): the tick performed on each read-filter step (null: none). */
@@ -774,7 +776,7 @@ fun LaunchpadContent(
         LaunchpadHeader(
             filterLabel = activeFilter?.let { f -> counts.firstOrNull { it.packageName == f }?.appLabel },
             onMenu = { menu.open = true }, onOpenSound = { onOpenSound(); soundSheet.show() },
-            snapshot = systemState, now = now, is24 = is24, zone = zone, onOpenPanel = onOpenSystemPanel,
+            snapshot = systemState, now = now, is24 = is24, zone = zone, onOpenPanel = { k -> if (k == SystemTileKind.Connectivity) connectivitySheet.show() else onOpenSystemPanel(k) },
             onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
         )
         viewSwitcher()
@@ -899,6 +901,7 @@ fun LaunchpadContent(
     LaunchedEffect(Unit) { LaunchpadHubNav.groups.collect { if (it) { LaunchpadHubNav.takeGroups(); menu.open = false; groupsOpen = true } } } // wave 29: Ground Control's "Groups and rules" opens the manager here
     LaunchpadGroupsOverlay(groupsOpen, items, endInset = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
     if (soundSheet.open) SoundVibrationSheet(onDismiss = { soundSheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp))
+    if (connectivitySheet.open) ConnectivitySheet(onDismiss = { connectivitySheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp))
     groupFor?.let { n ->
         GroupAssignSheet(
             n, groups, contacts, items,

@@ -71,7 +71,7 @@ and layout only. The items below need real fingers, a real window and real notif
 | 4 | Export the configuration | The Comms rules, per-app delivery and gestures are present. No notification text is |
 | 5 | Post a new notification with the unread strip off | The left-edge indicator widens for a few seconds, then shrinks to the count. It never takes keyboard focus |
 | 6 | Post a notification from a muted app | The indicator does not widen |
-| 7 | Tap each tile of the system row | Date settings, battery usage, the internet panel and the volume panel open. No tile changes anything |
+| 7 | Tap each tile of the system row | Date settings and battery usage open; the signal and Wi-Fi glyphs open the Connectivity sheet (wave 34, see its own rows below); the sound button opens the Sound and Vibration sheet. No tile changes anything |
 | 8 | Airplane mode on | Connectivity reads Offline |
 
 ## Ground Control visuals (CFG-10, CFG-16, CFG-18)
@@ -133,3 +133,16 @@ and layout only. The items below need real fingers, a real window and real notif
 | 7 | Tap a title in the strip at the top | The list scrolls to that section; the strip highlights the section in view |
 | 8 | Keyboard: arrows walk the rows, left on a title folds it, right opens it, Esc returns home | As before (STR-08); nothing is folded until you fold it |
 | 9 | Android 13 or older device, if available | Tapping a row still opens the app |
+
+## Connectivity sheet (wave 34, not yet run on a device)
+
+| # | Step | Expected |
+|---|---|---|
+| C1 | Tap the signal glyph, then the Wi-Fi glyph in the Comms header | Both open the same black "Connectivity" sheet (not the system Internet panel) |
+| C2 | Compare the mobile and Wi-Fi switches with Quick Settings | They show the same on/off state. Tapping one opens the system panel and the switch here does not move by itself |
+| C3 | Return from the system panel after changing Wi-Fi | The switch follows within about two seconds |
+| C4 | Connected to Wi-Fi, no location permission | One blue "Connected network" row with a tune button, and a one-line note; "See all" opens the system Wi-Fi panel |
+| C5 | Wi-Fi off | The Wi-Fi switch is off; the last known network stays listed, dimmed |
+| C6 | Airplane mode on / device without a SIM | Note "Airplane mode is on" and mobile off / no mobile row |
+| C7 | Tune button, Share Wi-Fi | Both open the system Wi-Fi settings (there is no public share action) |
+| C8 | Back, tap outside, drag down, Done | Each closes the sheet |

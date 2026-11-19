@@ -155,13 +155,20 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
     @Test fun STR_02_w27_statusGlyphsOpenTheSystemPanelsAndTheClockTheSoundPopup() {
         render(feed(4), home = false)
         rule.onNodeWithTag("lp.sys.brightness").performClick(); rule.onNodeWithTag("lp.sys.battery").performClick()
-        rule.onNodeWithTag("lp.sys.signal").performClick(); rule.onNodeWithTag("lp.sys.wifi").performClick()
-        assertEquals(listOf(SystemTileKind.Brightness, SystemTileKind.Battery, SystemTileKind.Connectivity, SystemTileKind.Connectivity), opened)
-        assertEquals("android.settings.DISPLAY_SETTINGS", com.bos.sphere.core.data.SystemStateLogic.panelFor(SystemTileKind.Brightness))
+        assertEquals(listOf(SystemTileKind.Brightness, SystemTileKind.Battery), opened) // signal and Wi-Fi now open the Connectivity sheet (wave 34, next test)
         rule.onNodeWithTag("lp.clock").performClick()
         assertEquals(1, soundOpened)
         assertEquals("the old four square buttons are gone", 0, rule.onAllNodesWithTag("lp.sys.time").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.sys.sound").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.system").fetchSemanticsNodes().size)
         assertEquals("no jump strip", 0, rule.onAllNodesWithTag("lp.strip").fetchSemanticsNodes().size)
+        assertEquals("android.settings.DISPLAY_SETTINGS", com.bos.sphere.core.data.SystemStateLogic.panelFor(SystemTileKind.Brightness))
+    }
+
+    @Test fun STR_02_w34_signalAndWifiGlyphsOpenTheConnectivitySheetNotASystemPanel() {
+        render(feed(4), home = false)
+        rule.onNodeWithTag("lp.sys.signal").performClick()
+        rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
+        assertEquals(1, rule.onAllNodesWithTag("cn.sheet", useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals("no system panel was started for it", emptyList<SystemTileKind>(), opened)
     }
 
     // ---- tabs ----

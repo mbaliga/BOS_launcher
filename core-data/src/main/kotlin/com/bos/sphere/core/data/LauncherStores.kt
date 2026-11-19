@@ -113,7 +113,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("wpPagesSame", next.pagesSameAsGlance).putString("wpPagesKind", next.pagesWallpaperKind.id).putLong("wpPagesSolid", next.pagesSolid)
             .putLong("wpPagesFrom", next.pagesGradFrom).putLong("wpPagesTo", next.pagesGradTo).putInt("wpPagesAngle", next.pagesGradAngle)
             .putString("wpPagesSlot1", next.pagesSlot1.id).putString("wpPagesSlot2", next.pagesSlot2.id)
-            .putString("radarIntensity", next.radarIntensity.name).putString("radarSignalForce", next.radarSignalForce.name)
+            .putString("radarIntensity", next.radarIntensity.name).putString("radarSignalForce", next.radarSignalForce.name).putString("radarBackground", next.radarBackground.name)
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
             .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
@@ -245,6 +245,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             searchMotion = sp.getBoolean("searchMotion", d.searchMotion),
             radarIntensity = enumOr(sp.getString("radarIntensity", null), d.radarIntensity),
             radarSignalForce = enumOr(sp.getString("radarSignalForce", null), d.radarSignalForce),
+            radarBackground = enumOr(sp.getString("radarBackground", null), d.radarBackground),
             searchFiles = sp.getBoolean("searchFiles", d.searchFiles),
             searchActions = sp.getBoolean("searchActions", d.searchActions),
             searchDeep = sp.getBoolean("searchDeep", d.searchDeep),

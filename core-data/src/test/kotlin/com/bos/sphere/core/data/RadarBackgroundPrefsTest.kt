@@ -57,3 +57,20 @@ class RadarBackgroundPrefsTest {
         assertTrue(sp.contains("style"))
     }
 }
+
+/** Wave 30 (radarDim): Radar's own background setting, exactly two options, default Dimmed wallpaper. */
+class RadarBackgroundW30Test {
+    @Test fun PAL_24_w30_radarBackgroundHasExactlyTwoOptionsAndDefaultsToDimmed() {
+        assertEquals(listOf("Dimmed wallpaper", "True black"), RadarBackground.entries.map { it.label })
+        assertEquals(RadarBackground.Dimmed, LauncherPrefs().radarBackground)
+        assertEquals(RadarBackground.Dimmed, LauncherPrefsStore(MapSharedPreferences()).prefs.value.radarBackground)
+    }
+
+    @Test fun PAL_24_w30_radarBackgroundPersistsInTheLauncherPrefsFileAndAnUnknownValueFallsBack() {
+        val sp = MapSharedPreferences()
+        LauncherPrefsStore(sp).update { it.copy(radarBackground = RadarBackground.TrueBlack) }
+        assertEquals("TrueBlack", sp.getString("radarBackground", null))
+        assertEquals(RadarBackground.TrueBlack, LauncherPrefsStore(sp).prefs.value.radarBackground)
+        assertEquals(RadarBackground.Dimmed, LauncherPrefsStore(MapSharedPreferences(mapOf("radarBackground" to "Bright"))).prefs.value.radarBackground)
+    }
+}

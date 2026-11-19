@@ -96,6 +96,9 @@ enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right(
 /** How the search screen presents results. */
 enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
 
+/** Wave 30 (radarDim): what Radar shows behind its wheel, rings and tiles. Exactly two: the dimmed wallpaper (default) or pure black. */
+enum class RadarBackground(val label: String) { Dimmed("Dimmed wallpaper"), TrueBlack("True black") }
+
 /** What sits one swipe to the left of the first home page. */
 enum class LeftPage(val label: String) { Off("Off"), Launchpad("Comms"), Widget("A widget") }
 
@@ -316,6 +319,8 @@ data class LauncherPrefs(
     val radarIntensity: RadarIntensity = RadarIntensity.Normal,
     /** PAL-24: Lab override of the signal state (Live = the phone's real state). */
     val radarSignalForce: SignalForce = SignalForce.Live,
+    /** Wave 30 (radarDim): Radar's own background, Dimmed wallpaper (default) or True black. */
+    val radarBackground: RadarBackground = RadarBackground.Dimmed,
     val searchActions: Boolean = true,
     /** Ask installed Fylz / Fotoz for deep (text-in-image, content) matches. */
     val searchDeep: Boolean = true,

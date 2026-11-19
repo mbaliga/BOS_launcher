@@ -275,6 +275,7 @@ internal fun SearchScreen(
     var barFocused by remember { mutableStateOf(false) }
     // Wave 29 (radarFull): the Orbit is its own layer over the whole display area; where the category wheel sits comes from the layout of the region under the field.
     var orbitGeo by remember { mutableStateOf<OrbitGeo?>(null) }
+    var wheelZone by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) } // root pixels: the wheel row, where the dimmed wallpaper gets its extra cap
     var rootCoords by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     var micFocused by remember { mutableStateOf(false) }
     var field by remember { mutableStateOf(TextFieldValue(initialQuery, TextRange(initialQuery.length))) }
@@ -516,7 +517,8 @@ internal fun SearchScreen(
     val emptyTapNow by androidx.compose.runtime.rememberUpdatedState(emptyTap)
     Box(Modifier.fillMaxSize().onGloballyPositioned { rootCoords = it }.radarScaleGestures(scale).trackPointerMode(tracker).onPreviewKeyEvent(onRadarKey).pointerInput(Unit) { detectTapGestures { emptyTapNow() } }) {
         SearchBackdrop(Modifier.fillMaxSize())
-        SignalBackground(prefs, Modifier.fillMaxSize(), dark = true) // Radar is black in every theme; HOM-16, PAL-24: the two background items, the same on every surface
+        // Wave 30 (radarDim): Radar's own background, Dimmed wallpaper (default) or True black (nothing drawn, no SignalBackground composed); docs/decisions/radarDim.md.
+        RadarBackgroundLayer(prefs, { wheelZone })
         // Wave 29 (radarFull, owner: the rings and icons are cropped and part of them cannot be touched): the Orbit's drawing and touch layer is the whole display area, edge to
         // edge and from the top of the screen to the top of the keyboard (the bottom edge when it is down). The field, the buttons, the mic, the strip circles and the wheel are
         // drawn above it and each takes only its own bounds; the only clip is the true screen or keyboard edge (docs/decisions/radarFull.md).
@@ -592,7 +594,15 @@ internal fun SearchScreen(
                         val centre = ((availH - below) / 2).coerceAtLeast(wheel.height / 2)
                         val wheelRow: @Composable () -> Unit = {
                             // "SEARCH" ends just left of the centre line and the wheel starts just right of it.
-                            Row(Modifier.fillMaxWidth()) {
+                            val wheelDensity = androidx.compose.ui.platform.LocalDensity.current.density
+                            Row(Modifier.fillMaxWidth().testTag(RADAR_WHEEL_ROW_TAG).onGloballyPositioned { c ->
+                                val root = rootCoords ?: c.findRootCoordinates()
+                                if (root.isAttached && c.isAttached) {
+                                    val o = root.localPositionOf(c, Offset.Zero)
+                                    val r = RadarDim.wheelZone(androidx.compose.ui.geometry.Rect(o, androidx.compose.ui.geometry.Size(c.size.width.toFloat(), c.size.height.toFloat())), wheelDensity)
+                                    if (wheelZone != r) wheelZone = r
+                                }
+                            }) {
                                 // Wave 25 (shortcutForm): its tap area is only the word and the visible part of the wheel's height, so a result beside it never lies under it.
                                 Box(Modifier.weight(1f).align(Alignment.CenterVertically).padding(end = 10.dp), contentAlignment = Alignment.CenterEnd) { QueryDisplay(onTap = { showKeyboard() }, modifier = Modifier.widthIn(min = 48.dp), height = minOf(wheel.height, wheel.halfVisible * 2)) }
                                 Box(Modifier.weight(1f)) {

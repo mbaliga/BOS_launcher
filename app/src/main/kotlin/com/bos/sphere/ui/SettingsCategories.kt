@@ -676,6 +676,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 },
             ) { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } },
             SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: Radar opens as a flat list while a keyboard or mouse is in use")) { v -> upd { it.copy(searchLayoutPinned = v) } },
+            SettingItem.Choice(x("Radar background"), Glyphs.Moon, com.bos.sphere.core.data.RadarBackground.entries, p.radarBackground, { x(it.label) }, hint = x("Dimmed shows your wallpaper at a quarter of its brightness; True black draws nothing, for the most contrast")) { v -> upd { it.copy(radarBackground = v) } },
             SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly; off keeps them still until you move them")) { v -> upd { it.copy(searchMotion = v) } },
             SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("The web row hands your search to this engine; nothing is sent until you tap it")) { v -> upd { it.copy(webEngine = v) } },
             SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },

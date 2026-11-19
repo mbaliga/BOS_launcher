@@ -1050,11 +1050,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val leftProgress = reveal.progress
         val leftActive = leftOpen || leftProgress > 0.001f
         val hubPanelBody: @Composable (com.bos.sphere.ui.HubView) -> Unit = { v ->
-            HomePanelsBody(v, timelineLog, appsByKey) { a -> leftOpen = false; hubStandalone = false; launch(a) }
+            HomePanelsBody(v, timelineLog, appsByKey) { a -> launch(a) } // W31: Comms (and the standalone hub) stay open under the app, so Back returns to them
         }
         if (hubStandalone && prefs.leftPage != com.bos.sphere.core.data.LeftPage.Launchpad) com.bos.sphere.ui.LaunchpadPanel(
             visible = true, onDismiss = { hubStandalone = false },
-            onOpenApp = { pkg -> hubStandalone = false; apps.firstOrNull { it.packageName == pkg }?.let(::launch) ?: appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))) },
+            onOpenApp = { pkg -> apps.firstOrNull { it.packageName == pkg }?.let(::launch) ?: appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))) },
             modifier = Modifier.fillMaxSize(), theme = prefs.launchpadTheme,
             launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
             panelBody = hubPanelBody, haptics = com.bos.sphere.feature.grid.rememberLauncherHaptics(),
@@ -1063,8 +1063,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             com.bos.sphere.core.data.LeftPage.Launchpad -> if (leftActive) com.bos.sphere.ui.LaunchpadPanel(
                 visible = true,
                 onDismiss = { leftOpen = false },
-                onOpenApp = { pkg ->
-                    leftOpen = false
+                onOpenApp = { pkg -> // W31: Comms stays open under the app
                     apps.firstOrNull { it.packageName == pkg }?.let(::launch)
                         ?: appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg)))
                 },

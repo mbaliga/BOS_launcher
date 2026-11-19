@@ -375,14 +375,12 @@ fun LaunchpadPanel(
             sendReply = { a, text -> ReplyLogic.send(ctx, a, text) },
             onClose = onDismiss,
             menu = menu, onOpenSound = onOpenSound,
-            onOpenItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss) },
-            openItem = { n -> openThrough(ctx, n, launchApp, onOpenApp, onDismiss).ok },
+            onOpenItem = { n -> openThrough(ctx, n, launchApp, onOpenApp) },
+            openItem = { n -> openThrough(ctx, n, launchApp, onOpenApp).ok },
             openApp = { pkg ->
-                val ok = launchApp?.invoke(pkg) ?: run { onOpenApp(pkg); true }
-                if (ok) onDismiss()
-                ok
+                launchApp?.invoke(pkg) ?: run { onOpenApp(pkg); true } // W31: Comms stays open under the app, so Back returns to it
             },
-            onOpenApp = { pkg -> onOpenApp(pkg); onDismiss() },
+            onOpenApp = { pkg -> onOpenApp(pkg) }, // W31: stays open
             onDismissItem = { NotificationProvider.dismiss(it.key) },
             onClearAll = { NotificationProvider.clearAll() },
             onAddRule = { LaunchpadSettings.addRule(it) },
@@ -396,10 +394,10 @@ fun LaunchpadPanel(
 
 /** STR-02: the shared hand-off for a tapped notification: mark read, send its intent (or start the app), cancel if asked, then close. */
 private fun openThrough(
-    ctx: Context, n: HubNotification, launchApp: ((String) -> Boolean)?, onOpenApp: (String) -> Unit, onDismiss: () -> Unit,
+    ctx: Context, n: HubNotification, launchApp: ((String) -> Boolean)?, onOpenApp: (String) -> Unit,
 ) = LaunchpadOpen.open(
     n, ctx, launchApp ?: { pkg -> onOpenApp(pkg); true },
-    markRead = { LaunchpadSettings.markRead(it) }, cancel = { NotificationProvider.dismiss(it) }, close = onDismiss,
+    markRead = { LaunchpadSettings.markRead(it) }, cancel = { NotificationProvider.dismiss(it) }, close = {}, // W31: opening a notification no longer closes Comms: Back from the app returns to it
 )
 
 private sealed interface Entry {

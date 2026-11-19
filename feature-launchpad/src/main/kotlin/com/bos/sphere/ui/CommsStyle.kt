@@ -321,7 +321,7 @@ internal fun CommsClockRow(
         if (snapshot != null) {
             val conn = snapshot.connectivity
             val half = (CommsStyle.GLYPH_GAP_DP / 2)
-            StatusGlyph("lp.sys.volume", L10n.tr("Volume"), SystemTileKind.Sound, { onOpenSound() }, CommsStyle.SUN_DP, CommsStyle.SUN_DP, CommsStyle.SUN_DY_DP) { c -> VolumeWheelGlyph(c, lp.bg) } // W34: this is the volume wheel, not brightness; a tap opens the Sound and Vibration popup
+            StatusGlyph("lp.sys.volume", L10n.tr("Volume"), SystemTileKind.Sound, { onOpenSound() }, CommsStyle.SUN_DP, CommsStyle.SUN_DP, CommsStyle.SUN_DY_DP) { c -> VolumeKnobGlyph(c, lp.bg) } // W34: this is the volume knob, not brightness; a tap opens the Sound and Vibration popup
             StatusGlyph("lp.sys.battery", L10n.tr("Battery") + (if (snapshot.batteryPercent in 0..100) ": ${snapshot.batteryPercent}%" else "") + (if (snapshot.charging) ", " + L10n.tr("Charging").lowercase() else ""), SystemTileKind.Battery, onOpenPanel, CommsStyle.BATTERY_W_DP, CommsStyle.BATTERY_H_DP) { c -> BatteryGlyph(c, snapshot.batteryPercent) }
             StatusGlyph("lp.sys.signal", L10n.tr("Connectivity") + ": " + connectivityText(conn), SystemTileKind.Connectivity, onOpenPanel, CommsStyle.SIGNAL_DP, CommsStyle.SIGNAL_DP) { c -> SignalGlyph(if (conn == Connectivity.None) lp.dim else c) }
             StatusGlyph("lp.sys.wifi", L10n.tr("Connectivity") + ": " + connectivityText(conn), SystemTileKind.Connectivity, onOpenPanel, CommsStyle.WIFI_W_DP, CommsStyle.WIFI_H_DP) { c -> WifiGlyph(if (conn == Connectivity.Wifi) c else lp.dim) }
@@ -353,8 +353,8 @@ private fun StatusGlyph(
 
 // ---- the glyphs: plain strokes and fills, no resources; each fills the box it is given ----
 
-/** W34: a volume wheel: a knob with its pointer, ringed by volume markers that grow from small to large over a 270 degree sweep. */
-@Composable internal fun VolumeWheelGlyph(color: Color, cut: Color) {
+/** W34: a volume knob: a knob with its pointer, ringed by volume markers that grow from small to large over a 270 degree sweep. */
+@Composable internal fun VolumeKnobGlyph(color: Color, cut: Color) {
     Canvas(Modifier.size(CommsStyle.SUN_DP.dp)) {
         val k = size.minDimension / 24f
         val c = Offset(12f * k, 12f * k)

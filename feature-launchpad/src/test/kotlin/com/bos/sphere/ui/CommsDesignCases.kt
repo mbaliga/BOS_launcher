@@ -156,7 +156,7 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         render(feed(4), home = false)
         rule.onNodeWithTag("lp.sys.volume").performClick(); rule.onNodeWithTag("lp.sys.battery").performClick()
         rule.onNodeWithTag("lp.sys.signal").performClick(); rule.onNodeWithTag("lp.sys.wifi").performClick()
-        assertEquals(1, soundOpened); soundOpened = 0 // W34: the volume wheel opens the Sound and Vibration popup
+        assertEquals(1, soundOpened); soundOpened = 0 // W34: the volume knob opens the Sound and Vibration popup
         assertEquals(listOf(SystemTileKind.Battery, SystemTileKind.Connectivity, SystemTileKind.Connectivity), opened)
         rule.onNodeWithTag("lp.clock").performClick()
         assertEquals(1, soundOpened)

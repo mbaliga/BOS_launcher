@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -65,7 +67,35 @@ internal fun FlatWallpaper(w: Wallpaper, modifier: Modifier = Modifier) {
 }
 
 /** Which background instance is on screen: the pages' own, or the Glance's, plus the kind and (live only) the choice. */
-private data class WallpaperKey(val owner: WallpaperSurface, val kind: WallpaperKind, val live: BackgroundChoice?)
+private data class WallpaperKey(val owner: WallpaperSurface, val kind: WallpaperKind, val live: BackgroundChoice?, val pic: String = "")
+
+/**
+ * Wave 34: the system live wallpaper kind. The launcher draws NOTHING opaque here (the window is transparent and wallpaper-backed, see themes.xml), so
+ * whatever the system shows behind the launcher, a live wallpaper included, shows through. Only the optional dim (a black layer, 0 / 25 / 50 percent) is drawn.
+ */
+@Composable
+internal fun SystemWallpaperLayer(w: Wallpaper, modifier: Modifier = Modifier) {
+    val dim = w.systemDim
+    Box(modifier.fillMaxSize().clearAndSetSemantics { }.testTag(SYSTEM_WALLPAPER_TAG).drawBehind { if (dim > 0) drawRect(Color.Black.copy(alpha = dim / 100f)) })
+}
+internal const val SYSTEM_WALLPAPER_TAG = "system-wallpaper-layer"
+internal const val SPIDER_SENSE_TAG = "spider-sense-alert"
+
+/**
+ * The spider-sense alert (owner: "the comic-book lines alert appears when there is an issue, like lack of connectivity"): the comic speed lines of
+ * [ComicPainter], drawn alone, over any wallpaper that does not already draw them (everything but a signal wallpaper with items, which draws them itself).
+ * It follows the same motion policy as the signal wallpaper: one shared clock only while the app is resumed and focused, a still frame under reduced motion.
+ * It paints nothing while there is signal (or the signal is not known yet), and collects the signal only while composed and started.
+ */
+@Composable
+fun SpiderSenseAlert(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = isDarkSurface()) {
+    val reduced = rememberMotionPrefs().reduced
+    val active = rememberRadarActive()
+    val clock = rememberRadarClock(active, reduced)
+    val cfg = remember(prefs.radarIntensity, dark) { BackgroundConfig(BackgroundChoice(com.bos.sphere.core.data.BgItem.None, com.bos.sphere.core.data.BgItem.None), prefs.radarIntensity, dark, baseFill = false) }
+    val signal = rememberRadarSignal(prefs.radarSignalForce, wanted = true)
+    SignalBackgroundCanvas(cfg, signal, clock, reduced, modifier.testTag(SPIDER_SENSE_TAG))
+}
 
 /** The legibility scrim for a solid or gradient wallpaper (live wallpapers sample their painters, see [rememberHomeScrim]). */
 @Composable
@@ -94,28 +124,42 @@ fun HomeSurfaceBackground(
     animate: Boolean = true,
     announce: Boolean = true,
     scrim: Boolean = true,
+    /** Wave 34: false draws an animated picture or video as its still first frame (Radar, thumbnails). */
+    play: Boolean = true,
+    /** Wave 34: the spider-sense alert over this wallpaper; off only where the caller draws it itself. */
+    alert: Boolean = true,
+    dark: Boolean = isDarkSurface(),
 ) {
     val w = prefs.wallpaper(surface)
     val owner = if (prefs.sharesWallpaper(surface)) WallpaperSurface.Glance else surface
-    val key = WallpaperKey(owner, w.kind, if (w.kind == WallpaperKind.Live) w.live else null)
+    val key = WallpaperKey(owner, w.kind, if (w.kind == WallpaperKind.Live) w.live else null, if (w.kind == WallpaperKind.Picture) w.picture.file else "")
     val latest = remember { HashMap<WallpaperKey, Wallpaper>() }.also { it[key] = w }
     val motion = rememberMotionPrefs()
-    val dark = isDarkSurface()
     Box(modifier) {
         Crossfade(key, Modifier.fillMaxSize(), animationSpec = tween(motion.crossFadeMs(260)), label = "wallpaper") { k ->
             val shown = latest[k] ?: w
-            if (shown.kind == WallpaperKind.Live) SignalBackground(prefs, Modifier.fillMaxSize(), dark = dark, baseFill = baseFill, animate = animate, announce = announce, choice = shown.live)
-            else FlatWallpaper(shown)
+            when (shown.kind) {
+                WallpaperKind.Live -> SignalBackground(prefs, Modifier.fillMaxSize(), dark = dark, baseFill = baseFill, animate = animate, announce = announce, choice = shown.live)
+                WallpaperKind.System -> SystemWallpaperLayer(shown)
+                WallpaperKind.Picture -> PictureWallpaper(shown, play = play && animate)
+                else -> FlatWallpaper(shown)
+            }
         }
         if (scrim) {
-            if (w.kind == WallpaperKind.Live) HomeScrim(rememberHomeScrim(w.live, prefs.radarIntensity, dark))
-            else HomeScrim(rememberFlatScrim(w))
+            when (w.kind) {
+                WallpaperKind.Live -> HomeScrim(rememberHomeScrim(w.live, prefs.radarIntensity, dark))
+                WallpaperKind.System, WallpaperKind.Picture -> Unit // the user's own dim chips do the job; a picture or the system wallpaper has no colour the app knows
+                else -> HomeScrim(rememberFlatScrim(w))
+            }
         }
+        // Wave 34: the alert over every kind; a signal wallpaper that has items draws it itself, inside its own layers.
+        if (alert && (w.kind != WallpaperKind.Live || w.live.items.isEmpty())) SpiderSenseAlert(prefs, Modifier.fillMaxSize(), dark = dark)
     }
 }
 
 /** English summary of a wallpaper for a settings row: its kind, and the items for a live one. */
 fun wallpaperSummary(w: Wallpaper, tr: (String) -> String): String = when (w.kind) {
     WallpaperKind.Live -> tr(w.kind.label) + ": " + (w.live.items.joinToString(" + ") { tr(it.label) }.ifEmpty { tr("None") })
+    WallpaperKind.Picture -> tr(w.kind.label) + (if (w.picture.plays) ": " + tr(if (w.picture.video) "Video" else "Animated") + ", " + tr("uses more power") else "")
     else -> tr(w.kind.label)
 }

@@ -63,6 +63,7 @@ fun BackgroundPane(prefs: LauncherPrefs, surface: WallpaperSurface = WallpaperSu
     val shared = surface == WallpaperSurface.Pages && prefs.pagesSameAsGlance
     val wp = prefs.wallpaper(surface)
     fun edit(f: (Wallpaper) -> Wallpaper) = update { it.withWallpaper(surface, f(it.rawWallpaper(surface))) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         WallpaperPreview(wp, prefs.radarIntensity)
         if (shared) {
@@ -70,10 +71,15 @@ fun BackgroundPane(prefs: LauncherPrefs, surface: WallpaperSurface = WallpaperSu
             return@Column
         }
         Text(L10n.tr("Wallpaper type"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
-        ChipRow(WallpaperKind.entries.toList(), wp.kind, { L10n.tr(it.label) }) { k -> edit { it.copy(kind = k) } }
+        ChipRow(WallpaperKind.entries.toList(), wp.kind, { L10n.tr(it.label) }) { k ->
+            // Switching to a picture that plays and was never confirmed starts as a still: the power warning is asked when the user turns the animation on.
+            edit { it.copy(kind = k, picture = if (k == WallpaperKind.Picture && com.bos.sphere.core.data.PowerWarning.mustAsk(it.picture)) it.picture.copy(gif = com.bos.sphere.core.data.GifMode.Still) else it.picture) }
+        }
         when (wp.kind) {
             WallpaperKind.Solid -> Box(Modifier.padding(top = 10.dp)) { ColorPicker(wp.solid, { c -> edit { it.copy(solid = c) } }) }
             WallpaperKind.Gradient -> GradientEditor(wp.gradient) { g -> edit { it.copy(gradient = g) } }
+            WallpaperKind.System -> SystemEditor(wp) { n -> edit { n } }
+            WallpaperKind.Picture -> PictureEditor(surface, wp, { n -> edit { n } }) { name -> Thread { PictureFiles.delete(ctx, name) }.start() }
             WallpaperKind.Live -> LiveWallpaperEditor(wp.live, prefs.radarIntensity, { c -> edit { it.copy(live = c) } }, { v -> update { it.copy(radarIntensity = v) } })
         }
     }
@@ -115,6 +121,10 @@ private fun LiveWallpaperEditor(choice: BackgroundChoice, intensity: RadarIntens
 internal fun WallpaperPreview(w: Wallpaper, intensity: RadarIntensity, modifier: Modifier = Modifier) {
     when (w.kind) {
         WallpaperKind.Live -> BackgroundPreview(w.live, SignalForce.Good, intensity, modifier)
+        WallpaperKind.Picture -> Box(modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black).semantics { contentDescription = L10n.tr("Preview") }) { PictureWallpaper(w, play = false) }
+        WallpaperKind.System -> Box(modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF202028)).semantics { contentDescription = L10n.tr("Preview") }, contentAlignment = Alignment.Center) {
+            Text(L10n.tr("Your system wallpaper shows here"), color = HyleColors.InkDim, fontSize = 12.sp)
+        }
         else -> Box(modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black).semantics { contentDescription = L10n.tr("Preview") }) { FlatWallpaper(w) }
     }
 }

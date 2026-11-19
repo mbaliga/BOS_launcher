@@ -152,7 +152,7 @@ private val StripGap = 14.dp
 private const val LOOP_COUNT = Int.MAX_VALUE
 
 /** The next frame time for an endless animation: the platform's infinite-animation policy decides (none on a device, so this is plain withFrameNanos there; a test that auto-advances its clock ends the loop). */
-private suspend fun infiniteFrameNanos(): Long {
+internal suspend fun infiniteFrameNanos(): Long {
     val policy = kotlin.coroutines.coroutineContext[androidx.compose.ui.platform.InfiniteAnimationPolicy]
     return if (policy != null) policy.onInfiniteOperation { androidx.compose.runtime.withFrameNanos { it } } else androidx.compose.runtime.withFrameNanos { it }
 }

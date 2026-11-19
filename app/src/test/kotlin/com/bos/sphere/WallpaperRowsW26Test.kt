@@ -78,7 +78,7 @@ class WallpaperRowsW26Test {
             val toggle = items.firstOrNull { it.title == "Pages use the same wallpaper as Glance" } as? SettingItem.Toggle
             assertNotNull("$name: the switch", toggle); assertEquals(name, p.pagesSameAsGlance, toggle!!.checked)
             assertEquals("$name: the Pages row exists exactly when the switch is off", !p.pagesSameAsGlance, items.any { it.title == "Pages wallpaper" })
-            assertTrue("$name: the live wallpaper is named in the summary", (items.first { it.title == "Glance wallpaper" } as SettingItem.Pane).value.contains("Live wallpaper"))
+            assertTrue("$name: the signal wallpaper is named in the summary", (items.first { it.title == "Glance wallpaper" } as SettingItem.Pane).value.contains("Signal wallpaper"))
         }
     }
 

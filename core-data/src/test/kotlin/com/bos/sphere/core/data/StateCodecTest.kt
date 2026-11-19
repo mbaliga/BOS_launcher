@@ -45,11 +45,12 @@ class StateCodecTest {
 
     private fun variants(v: Any?, type: Class<*>): List<Any?> = when {
         v is Boolean -> listOf(!v)
-        v is Int -> listOf(v + 1, v + 2, v - 1)
+        v is Int -> listOf(v + 1, v + 2, v - 1, v + 25) // wave 34: +25 is a valid wallpaper dim step
         v is Long -> listOf(v xor 0x123456L)
         v is Float -> listOf(v + 0.1f, v - 0.1f, v * 1.3f, v * 0.7f, v + 3f)
         v is String -> listOf(v + "x")
         v is Enum<*> -> type.enumConstants.filter { it != v }
+        v is PictureSpec -> listOf(v.copy(fit = PictureFit.Fit, dim = 25, gif = GifMode.Once)) // wave 34: the file and what describes it are device-bound on purpose (StateSchema.WALLPAPER_PICTURE_KEYS); fit, dim and mode travel
         v is GridSpec -> listOf(GridSpec(v.columns + 1, v.rows + 1), GridSpec(v.columns - 1, v.rows - 1))
         v is Map<*, *> -> listOf(emptyMap<Any, Any>(), mapOf(StripItem.entries.first() to StripZone.entries.last()))
         v is Set<*> -> listOf(emptySet<Any>(), IndicatorEffect.entries.toSet())

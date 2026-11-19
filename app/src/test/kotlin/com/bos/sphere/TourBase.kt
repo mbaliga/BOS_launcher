@@ -3,6 +3,9 @@ package com.bos.sphere
 import android.view.KeyEvent
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.down
@@ -64,7 +67,12 @@ abstract class TourBase {
     protected fun radarShown() = descShown("Speak to search")
     protected fun drawerShown() = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.") }
     protected fun settingsShown() = descShown("Close settings")
-    protected fun quickSheetShown() = tagShown("quick.glance")
+    protected fun quickSheetShown() = tagShown("quick.sheet")
+    /** Wave 34: the long-press Home sheet no longer has Edit home, Add page, the Glance switch or the item picker; they are rows in Ground Control, Home screen, one tap from the sheet's Ground Control row. */
+    protected fun quickGoTo(row: String) {
+        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        rule.onNodeWithText(row, useUnmergedTree = true).performScrollTo().performClick(); settle()
+    }
     /** Wave 26: Glance is the surface on screen (its deck dots are drawn only there); otherwise the pages are. */
     /** Glance is on screen when its title slot is inside the window: the one pager may keep a neighbouring stop composed off screen (wave 28). */
     protected fun glanceShown(): Boolean {

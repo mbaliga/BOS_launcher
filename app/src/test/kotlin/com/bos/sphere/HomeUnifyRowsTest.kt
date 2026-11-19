@@ -51,4 +51,22 @@ class HomeUnifyRowsTest {
             assertFalse(items(LauncherPrefs(homePages = m)).any { it.title == "Edit home pages" })
         }
     }
+
+    @Test fun HOM_22_w34_removedFromTheQuickSheetGroundControlHomeHasTheGlanceSwitchEditHomeAndTheItemPicker() {
+        prefs = LauncherPrefs()
+        val glance = items(prefs).filterIsInstance<SettingItem.Toggle>().single { it.title == "Calm home screen (Glance)" }
+        glance.onChange(false); assertFalse(prefs.glanceEnabled)
+        glance.onChange(true); assertTrue(prefs.glanceEnabled)
+        var picker = 0
+        val rows = buildSettingsCategories(
+            SettingsModel(
+                prefs = prefs, updatePrefs = { f -> prefs = f(prefs) }, pageIndex = 0, pages = listOf(HomePage(keys = emptyList(), id = 1L)),
+                setPageLayout = { _, _ -> }, addPageAfter = {}, deletePage = {}, setClockTile = { _, _ -> }, corners = emptyMap(), gestures = emptyMap(), setGesture = { _, _ -> },
+                requestHealth = {}, about = listOf("Version" to "test"), healthAvailable = false, appsByKey = emptyMap(), isLandscape = false, chosenApp = { null },
+                pickLeftWidget = {}, leftWidgetLabel = null, pickAppFor = {}, motionAvailable = false, editCorner = {}, editGesture = {},
+                system = SystemLinks({}, {}, {}, {}), lab = emptyList(), addHomeItems = { picker++ },
+            ),
+        ).first { it.title == "Home screen" }.items
+        (rows.single { it.title == "Widgets, folders and icons" } as SettingItem.Action).onClick(); assertEquals(1, picker)
+    }
 }

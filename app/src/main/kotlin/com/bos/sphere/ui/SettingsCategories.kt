@@ -118,6 +118,8 @@ class SettingsModel(
     /** Wave 26: "Add page" (wave 28: Paginated only, never asks anything) and "Edit home" (turns Pages on first when it is Off). */
     val addHomePage: () -> Unit = {},
     val editHomePages: () -> Unit = {},
+    /** Wave 34: "Widgets, folders and icons" (the item picker), moved here from the long-press Home sheet. */
+    val addHomeItems: () -> Unit = {},
     /** Wave 30: "Restore previous pages" while the backup of an auto-filled home is still kept (null otherwise). */
     val restorePages: (() -> Unit)? = null,
     /** Wave 29: bring Comms up (on a hub view and/or with the Groups and rules manager open), closing settings; the app wires it to the Comms surface. */
@@ -274,6 +276,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             if (p.homePages == com.bos.sphere.core.data.HomePages.Paginated) add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("Adds a page after the last one")) { m.addHomePage() })
             add(SettingItem.Action(x("Edit home"), Glyphs.Apps, x("Add icons, widgets and folders to the pages")) { m.editHomePages() })
+            add(SettingItem.Action(x("Widgets, folders and icons"), Glyphs.Plus, x("Add icons, widgets and folders to the pages")) { m.addHomeItems() })
             // Wave 30 (pagesExplicit): after the one-time reset of an auto-filled home, the old pages come back from here for 30 days.
             m.restorePages?.let { restore -> add(SettingItem.Action(x("Restore previous pages"), Glyphs.Home, x("Brings back the pages from before the reset (kept for 30 days)")) { restore() }) }
             add(

@@ -240,7 +240,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var menuRecents by remember { mutableStateOf(false) } // the open app menu was opened from the Recent apps landing
     val homeEdit = rememberHomeEdit(stores.layout, remember(context) { WorkspaceHomeDockPins(com.bos.sphere.feature.dock.WorkspaceRepository.get(context)) }) // HOM-12 (layout and dock pins share one undo)
     SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }, epoch = layoutEpoch, onRebased = { homeEdit.rebase() }) // HOM-11: one arrangement per window size class; HOM-12: a swap is not an undoable edit
-    var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18: a request to show the hub's Files view
     var hubStandalone by remember { mutableStateOf(false) } // wave 25: the hub shown by itself when the left page is not Launchpad
     val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()
     val landscapeCorners by stores.shortcuts.landscapeCorners.collectAsStateWithLifecycle()
@@ -1591,6 +1590,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 addHomePage = { settingsOpen = false; requestAddPage(null) },
                 restorePages = if (legacyAvailable) ({ if (com.bos.sphere.core.data.PagesExplicitMigration.restoreReplacesEdits(stores.layout)) { settingsOpen = false; confirmRestore = true } else restorePreviousPages() }) else null,
                 editHomePages = { settingsOpen = false; editHome() },
+                addHomeItems = { settingsOpen = false; homeItems.openSheet() }, // wave 34: the item picker left the long-press sheet
                 healthAvailable = healthAvailable,
                 appsByKey = appsByKey,
                 isLandscape = isLandscape,
@@ -1753,23 +1753,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 prefs = prefs, update = { f -> stores.prefs.update(f) },
                 page = quickPage?.takeIf { landing == HomeShown.Pages && prefs.homeStyle == HomeStyle.Grid && prefs.homePages == com.bos.sphere.core.data.HomePages.Paginated },
                 pageCount = pages.size,
-                onAddPage = { quickOpen = false; requestAddPage(quickPage) },
                 onDeletePage = { requestDeletePage(quickPage ?: 0); quickOpen = false },
-                // HOM-22: "Edit home pages" on another landing switches to Selected apps first, then enters edit mode.
-                onEdit = { quickOpen = false; editFocusAdd = false; editHome() },
-                onPanels = { quickOpen = false; panelsOpen = true },
                 onWallpaper = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) }, // HOM-16 (wave 26): the wallpaper rows are in Home screen
                 onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
                 onDismiss = { quickOpen = false },
-                onHomeItems = { quickOpen = false; homeItems.openSheet() },
             )
         }
-        if (panelsOpen || homeItems.panelRequest >= 0) {
+        if (homeItems.panelRequest >= 0) {
             // Wave 25 (hubData): Files and Timeline are views of the Launchpad hub; the old sheet is gone and every entry point lands there (Usage opens Timeline, wave 28).
-            LaunchedEffect(panelsOpen, homeItems.panelRequest) {
+            LaunchedEffect(homeItems.panelRequest) {
                 val tab = com.bos.sphere.core.catalog.PanelTab.entries.getOrNull(homeItems.panelRequest) ?: com.bos.sphere.core.catalog.PanelTab.Files
                 com.bos.sphere.ui.LaunchpadHubNav.request(com.bos.sphere.ui.HubView.forPanel(tab.uriName))
-                panelsOpen = false; homeItems.panelRequest = -1
+                homeItems.panelRequest = -1
                 if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad) leftOpen = true else hubStandalone = true
             }
         }

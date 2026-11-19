@@ -40,20 +40,23 @@ class HomeModelTest {
     private fun List<HomePage>.keys() = map { it.keys }
 
     @Test
-    fun `unseeded layout flows all apps across pages of the given capacity`() {
+    fun `PGX an unseeded layout with every app installed is one empty page, nothing flows onto pages`() {
         val out = HomeLayoutMath.visualPages(HomeLayout(), apps, cap(3))
-        assertEquals(listOf(listOf("app1", "app2", "app3"), listOf("app4", "app5", "app6"), listOf("app7")), out.keys())
+        assertEquals(listOf(emptyList<String>()), out.keys())
     }
 
     @Test
-    fun `visual pages drop unknown and duplicate keys, append new apps, honour removals`() {
+    fun `PGX visual pages drop unknown and duplicate keys and never append installed apps`() {
         val layout = HomeLayout(
             pages = pages(listOf("app3", "gone", "app1"), listOf("app1", "app2")),
             removed = setOf("app5"),
             seeded = true,
         )
         val out = HomeLayoutMath.visualPages(layout, apps, cap(10))
-        assertEquals(listOf(listOf("app3", "app1"), listOf("app2", "app4", "app6", "app7")), out.keys())
+        assertEquals(listOf(listOf("app3", "app1"), listOf("app2")), out.keys())
+        // the user's own non-app items another arrangement lacks are the only thing appended
+        val withStray = HomeLayoutMath.visualPages(layout, apps + "folder:f", cap(10), strays = listOf("folder:f", "app9"))
+        assertEquals(listOf(listOf("app3", "app1"), listOf("app2", "folder:f")), withStray.keys())
     }
 
     @Test
@@ -127,8 +130,8 @@ class HomeModelTest {
     @Test
     fun `pinned-only home does not auto-place apps`() {
         val layout = HomeLayout(pages = pages(listOf("app1")), seeded = true)
-        assertEquals(listOf(listOf("app1")), HomeLayoutMath.visualPages(layout, apps, cap(9), autoPlace = false).keys())
-        assertEquals(listOf(listOf<String>()), HomeLayoutMath.visualPages(HomeLayout(), apps, cap(9), autoPlace = false).keys())
+        assertEquals(listOf(listOf("app1")), HomeLayoutMath.visualPages(layout, apps, cap(9)).keys())
+        assertEquals(listOf(listOf<String>()), HomeLayoutMath.visualPages(HomeLayout(), apps, cap(9)).keys())
     }
 
     @Test
@@ -143,44 +146,44 @@ class HomeModelTest {
     }
 
     @Test
-    fun `move into a full page cascades the overflow forward`() {
-        val out = HomeLayoutMath.move(pages(listOf("a", "b"), listOf("c", "d")), "d", 0, 0, cap(2))
-        assertEquals(listOf(listOf("d", "a"), listOf("b", "c")), out.keys())
+    fun `a drop on a full page is refused and nothing spills or opens a page`() {
+        val p = pages(listOf("a", "b"), listOf("c", "d"))
+        assertEquals(p, HomeLayoutMath.move(p, "d", 0, 0, cap(2)))
+        assertEquals(listOf(listOf("b", "a"), listOf("c", "d")), HomeLayoutMath.move(p, "a", 0, 1, cap(2)).keys()) // inside its own page it never overflows
     }
 
     @Test
-    fun `overflow page inherits the spilling page's layout`() {
+    fun `a density change still continues the overflow on a page with the same layout`() {
         val circle = PageLayout(shape = PageShape.Circle)
-        val out = HomeLayoutMath.move(listOf(HomePage(listOf("a", "b"), circle)), "c", 0, 0, cap(2))
-        assertEquals(listOf(listOf("c", "a"), listOf("b")), out.keys())
+        val out = HomeLayoutMath.setLayout(listOf(HomePage(listOf("a", "b", "c"), circle, 1L)), 0, circle) { 2 }
+        assertEquals(listOf(listOf("a", "b"), listOf("c")), out.keys())
         assertEquals(circle, out[1].layout)
     }
 
     @Test
-    fun `moving past the end creates a page and only the emptied source page is dropped`() {
+    fun `moving past the end creates a page and a page emptied by it stays until the user deletes it`() {
         val p = pages(listOf("a"), listOf("b"), emptyList())
-        assertEquals(listOf(listOf("b"), emptyList(), listOf("a")), HomeLayoutMath.move(p, "a", 3, 0, cap(4)).keys())
-        // Preview keeps the emptied source page so indices stay stable.
-        assertEquals(
-            listOf(emptyList(), listOf("b"), emptyList(), listOf("a")),
-            HomeLayoutMath.move(p, "a", 3, 0, cap(4), dropEmpty = false).keys(),
-        )
+        assertEquals(listOf(emptyList(), listOf("b"), emptyList(), listOf("a")), HomeLayoutMath.move(p, "a", 3, 0, cap(4)).keys())
     }
 
     @Test
-    fun `add prefers the given page and falls back to the last`() {
+    fun `add prefers the given page, falls back to a page with room and never makes a page`() {
         val p = pages(listOf("a", "b"), listOf("c"))
         assertEquals(listOf(listOf("a", "b"), listOf("c", "x")), HomeLayoutMath.add(p, "x", 0, cap(2)).keys())
         assertEquals(listOf(listOf("a", "b", "x"), listOf("c")), HomeLayoutMath.add(p, "x", 0, cap(3)).keys())
+        val full = pages(listOf("a", "b"), listOf("c", "d"))
+        assertEquals(full, HomeLayoutMath.add(full, "x", 0, cap(2)))
+        assertTrue(!HomeLayoutMath.hasRoom(full, cap(2)))
         assertEquals(listOf(listOf("b"), listOf("c")), HomeLayoutMath.remove(p, "a").keys())
+        assertEquals(listOf(listOf("b"), emptyList()), HomeLayoutMath.remove(pages(listOf("a", "b"), listOf("c")), "a").let { HomeLayoutMath.remove(it, "c") }.keys()) // an emptied page stays
     }
 
     @Test
     fun `page insert, delete and relayout`() {
         val p = pages(listOf("a", "b", "c"), listOf("d"))
         assertEquals(listOf(listOf("a", "b", "c"), emptyList(), listOf("d")), HomeLayoutMath.insertPage(p, 0).keys())
-        assertEquals(listOf(listOf("a", "b", "c", "d")), HomeLayoutMath.deletePage(p, 1, cap(9)).keys())
-        assertEquals(listOf(listOf("a")), HomeLayoutMath.deletePage(pages(listOf("a")), 0, cap(9)).keys()) // sole page is kept
+        assertEquals(listOf(listOf("a", "b", "c")), HomeLayoutMath.deletePage(p, 1).keys()) // its items go with it, none join a neighbour
+        assertEquals(listOf(emptyList<String>()), HomeLayoutMath.deletePage(pages(listOf("a")), 0).keys()) // the sole page is emptied, not removed
         val small = PageLayout(portrait = GridSpec(2, 1))
         val relaid = HomeLayoutMath.setLayout(p, 0, small) { if (it == small) 2 else 9 }
         assertEquals(listOf(listOf("a", "b"), listOf("c", "d")), relaid.keys())

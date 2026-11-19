@@ -95,7 +95,7 @@ class HomeWiringTest {
         s = HomeEdit.createFolder(s, listOf("a", "b"), "f", "F", cap)
         val extras = s.copy(pages = emptyList())
         val layout = HomeLayout(pages = s.pages, seeded = true)
-        val visual = HomeLayoutMath.visualPages(HomeResolve.layoutFor(layout, extras), HomeResolve.available(listOf("a", "b"), extras), cap, autoPlace = true)
+        val visual = HomeLayoutMath.visualPages(HomeResolve.layoutFor(layout, extras), HomeResolve.available(listOf("a", "b"), extras), cap)
         val keys = visual.flatMap { it.keys }
         assertTrue(ItemKeys.folder("f") in keys && ItemKeys.link("https://x.org") in keys && w in keys)
         // Apps in the folder are not auto-placed back onto a page.

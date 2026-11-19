@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.map
  * active class.
  */
 @Composable
-fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<String> = emptySet(), onRebased: () -> Unit = {}) {
+fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<String> = emptySet(), epoch: Int = 0, onRebased: () -> Unit = {}) {
     val rebased by rememberUpdatedState(onRebased)
     val installed by rememberUpdatedState(installedKeys)
     val context = LocalContext.current
@@ -36,6 +36,8 @@ fun SizeClassLayoutBinding(layoutStore: HomeLayoutStore, installedKeys: Set<Stri
     val sc = SizeClass.of(cfg.screenWidthDp, cfg.screenHeightDp)
     val store = remember { SizeClassLayoutStore(context) }
     var active by remember { mutableStateOf<SizeClass?>(null) }
+    // Wave 30 (pagesExplicit): the one-time reset of an auto-filled home starts every class over from the one empty page.
+    LaunchedEffect(epoch) { if (epoch > 0) store.reset(sc, layoutStore.layout.value) }
     LaunchedEffect(sc.key) {
         val now = layoutStore.layout.value
         val next = store.activate(sc, now, active)

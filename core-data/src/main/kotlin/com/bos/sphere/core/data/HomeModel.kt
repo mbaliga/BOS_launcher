@@ -698,9 +698,8 @@ data class HomePage(
 )
 
 /**
- * The persisted home arrangement. [seeded] is false until the first arrangement is written
- * (before that, every app flows onto the pages alphabetically). [removed] holds apps the user
- * took off the home pages (still in the drawer).
+ * The persisted home arrangement. [seeded] is false until the first arrangement is written. [removed] holds apps the user
+ * took off the home pages (still in the drawer). Wave 30: apps are never placed for the user, so [removed] only records what was taken off.
  */
 data class HomeLayout(
     val pages: List<HomePage> = emptyList(),
@@ -717,35 +716,34 @@ object HomeLayoutMath {
 
     /**
      * Resolves the stored [layout] into what is drawn: unknown / hidden keys dropped, duplicates
-     * removed, apps not yet placed (new installs, first run) appended to the last page, and every
-     * stored page split into as many visual pages (same layout and id) as it needs, so a density
-     * change never hides an app. A page stored empty (a deliberate blank page) is kept; a page that
-     * only *became* empty because its apps are hidden or unavailable is not drawn. Always returns
-     * at least one page.
+     * removed, and every stored page split into as many visual pages (same layout and id) as it
+     * needs, so a density change never hides an app. Wave 30 (pagesExplicit): no APP is ever placed
+     * on a page for the user: an app that is installed but not on a page (a new install, a first run,
+     * an app taken off the home) is not appended anywhere, it lives in the drawer. Only [strays] are
+     * appended to the last page: items the user made themselves (folders, widgets, shortcuts, links)
+     * that another window size class's arrangement does not list yet, so a widget made in portrait is
+     * not missing in landscape. A page stored empty
+     * (a deliberate blank page) is kept; a page that only *became* empty because its apps are hidden or
+     * unavailable is not drawn. Always returns at least one page.
      */
     fun visualPages(
         layout: HomeLayout,
         available: List<String>,
         capacityOf: (PageLayout) -> Int,
-        /** false = only apps the user placed appear (new installs are not appended). */
-        autoPlace: Boolean = true,
+        strays: Collection<String> = emptyList(),
     ): List<HomePage> {
         val known = available.toHashSet().apply { addAll(HomeTiles.ALL) }
         val placed = HashSet<String>()
         val stored = normalizeIds(layout.pages)
         val pages = stored.map { page ->
             page to page.copy(keys = page.keys.filter { it in known && placed.add(it) })
-        }.toMutableList()
-        val extras = if (autoPlace) available.filter { it !in placed && it !in layout.removed } else emptyList()
-        if (extras.isNotEmpty()) {
-            if (pages.isEmpty()) {
-                val fresh = HomePage(id = 1L)
-                pages += fresh to fresh
-            }
-            val (orig, last) = pages.last()
-            pages[pages.lastIndex] = orig to last.copy(keys = last.keys + extras)
         }
-        val out = pages.flatMap { (orig, page) ->
+        val extras = strays.filter { it in known && it !in placed && it !in layout.removed }
+        val withStrays = if (extras.isEmpty()) pages else {
+            val base = pages.ifEmpty { listOf(HomePage(id = 1L).let { it to it }) }
+            base.dropLast(1) + base.last().let { (orig, last) -> orig to last.copy(keys = last.keys + extras) }
+        }
+        val out = withStrays.flatMap { (orig, page) ->
             when {
                 page.keys.isNotEmpty() ->
                     page.keys.chunked(capacityOf(page.layout).coerceAtLeast(1)).map { HomePage(it, page.layout, page.id) }
@@ -790,9 +788,8 @@ object HomeLayoutMath {
 
     /**
      * Moves [key] to ([toPage], [toIndex]). `toPage == pages.size` creates a new page (default
-     * layout, new id). Overflow cascades into following pages; a page created by overflow belongs
-     * to the page it spilled from (same layout and id). With [dropEmpty] false the page count is
-     * preserved (the live drag preview, so page indices don't shift under the finger).
+     * layout, new id). A full target page refuses the drop (pages come back unchanged). Pages are never dropped when emptied (wave 30), so [dropEmpty]
+     * no longer changes anything; it stays for the callers.
      */
     fun move(
         pages: List<HomePage>,
@@ -806,46 +803,56 @@ object HomeLayoutMath {
         val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout, p.id) }.toMutableList()
         val target = toPage.coerceIn(0, work.size)
         if (target == work.size) work += Work(mutableListOf(), PageLayout(), nextId(pages))
+        // Wave 30 (pagesExplicit): a drop on a page that is full is refused ("page full"), it never pushes an item onto the next page or creates a page.
+        // Moving inside the page the item already is on never overflows.
+        else if (src != target && work[target].keys.size >= capacityOf(work[target].layout).coerceAtLeast(1)) return pages
         val page = work[target].keys
         page.add(toIndex.coerceIn(0, page.size), key)
         cascade(work, capacityOf)
-        // Only the page the item was dragged out of is dropped when emptied; deliberate blank pages stay.
-        return finish(work, dropIndex = if (dropEmpty && src != target) src else -1)
+        return finish(work)
     }
 
-    /** Removes [key] from the pages (its page is dropped if that empties it). */
+    /** Removes [key] from the pages (an emptied page stays: only the user deletes a page). */
     fun remove(pages: List<HomePage>, key: String): List<HomePage> {
-        val src = pages.indexOfFirst { key in it.keys }
         val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout, p.id) }.toMutableList()
-        return finish(work, dropIndex = src)
+        return finish(work)
     }
 
-    /** Adds [key] at the end of [preferredPage] if it has room, else at the end of the last page. */
+    /**
+     * Adds [key] at the end of [preferredPage] when it has a free slot, else on the first other page with room (later pages first). Wave 30
+     * (pagesExplicit): it never creates a page and never pushes an item off another one; with every page full the pages come back unchanged
+     * ([hasRoom] says so beforehand, the caller shows "Page full"). With no page at all one empty page is made (the first page is the user's).
+     */
     fun add(pages: List<HomePage>, key: String, preferredPage: Int, capacityOf: (PageLayout) -> Int): List<HomePage> {
-        val src = pages.indexOfFirst { key in it.keys }
         val work = pages.map { p -> Work(p.keys.filter { it != key }.toMutableList(), p.layout, p.id) }.toMutableList()
         if (work.isEmpty()) work += Work(mutableListOf(), PageLayout(), 1L)
         val pref = preferredPage.coerceIn(0, work.lastIndex)
-        val dest = if (work[pref].keys.size < capacityOf(work[pref].layout)) pref else work.lastIndex
+        val order = (pref..work.lastIndex) + (0 until pref)
+        val dest = order.firstOrNull { work[it].keys.size < capacityOf(work[it].layout).coerceAtLeast(1) } ?: return pages
         work[dest].keys.add(key)
-        cascade(work, capacityOf)
-        return finish(work, dropIndex = if (src != dest) src else -1)
+        return finish(work)
     }
+
+    /** True when [add] can place a new item: some page has a free slot (or there is no page yet). */
+    fun hasRoom(pages: List<HomePage>, capacityOf: (PageLayout) -> Int): Boolean =
+        pages.isEmpty() || pages.any { it.keys.size < capacityOf(it.layout).coerceAtLeast(1) }
+
+    /** True when page [index] has a free slot. */
+    fun hasRoomOn(pages: List<HomePage>, index: Int, capacityOf: (PageLayout) -> Int): Boolean =
+        pages.getOrNull(index)?.let { it.keys.size < capacityOf(it.layout).coerceAtLeast(1) } ?: pages.isEmpty()
 
     /** Inserts a blank page after [afterPage]. */
     fun insertPage(pages: List<HomePage>, afterPage: Int, layout: PageLayout = PageLayout()): List<HomePage> =
         pages.toMutableList().apply { add((afterPage + 1).coerceIn(0, size), HomePage(emptyList(), layout, nextId(pages))) }
 
-    /** Deletes page [index]; its apps move to the end of the previous (or next) page. */
-    fun deletePage(pages: List<HomePage>, index: Int, capacityOf: (PageLayout) -> Int): List<HomePage> {
-        if (index !in pages.indices || pages.size == 1) return pages
-        val orphans = pages[index].keys
-        val work = pages.filterIndexed { i, _ -> i != index }
-            .map { Work(it.keys.toMutableList(), it.layout, it.id) }.toMutableList()
-        val dest = (index - 1).coerceAtLeast(0)
-        work[dest].keys.addAll(orphans)
-        cascade(work, capacityOf)
-        return finish(work, dropIndex = -1)
+    /**
+     * Deletes page [index] and every placement on it (wave 30, pagesExplicit: the items do not move to a neighbour page, they leave the home and
+     * stay in the drawer). The last remaining page is emptied rather than removed. Callers that need the removed keys read them off [pages] first.
+     */
+    fun deletePage(pages: List<HomePage>, index: Int): List<HomePage> {
+        if (index !in pages.indices) return pages
+        if (pages.size == 1) return listOf(pages[0].copy(keys = emptyList(), id = if (pages[0].id == 0L) 1L else pages[0].id))
+        return pages.filterIndexed { i, _ -> i != index }
     }
 
     /**
@@ -860,7 +867,7 @@ object HomeLayoutMath {
             Work(p.keys.toMutableList(), if (mine) layout else p.layout, p.id)
         }.toMutableList()
         cascade(work, capacityOf)
-        return finish(work, dropIndex = -1)
+        return finish(work)
     }
 
     /** True if some page has free slots while a later page still has items (a density change leaves these). */
@@ -924,11 +931,12 @@ object HomeLayoutMath {
         }
     }
 
-    /** Freezes [work]; page [dropIndex] is dropped if it ended up empty (-1 = keep all). */
-    private fun finish(work: List<Work>, dropIndex: Int): List<HomePage> {
-        val out = work.mapIndexedNotNull { i, w ->
-            if (i == dropIndex && w.keys.isEmpty()) null else HomePage(w.keys.toList(), w.layout, w.id)
-        }
+    /**
+     * Freezes [work]. Wave 30 (pagesExplicit): a page the user added stays until the user deletes it, so a page emptied by moving or removing its
+     * last item is kept.
+     */
+    private fun finish(work: List<Work>): List<HomePage> {
+        val out = work.map { w -> HomePage(w.keys.toList(), w.layout, w.id) }
         return out.ifEmpty { listOf(HomePage(id = 1L)) }
     }
 }

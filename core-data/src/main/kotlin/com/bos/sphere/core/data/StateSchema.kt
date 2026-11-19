@@ -80,7 +80,7 @@ object StateSchema {
      * the portable copy of the part of this that is setup (aliases).
      */
     val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE, "launchpad_hub")
-    val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage")
+    val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage", LegacyHomeBackup.FILE)
 
     /**
      * Files (relative to the app's files directory) that hold usage history and are never exported (HOM-18): the timeline

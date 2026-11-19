@@ -65,7 +65,7 @@ object PackageReconcile {
     fun visible(state: HomeState, apps: List<AppRecord>, cap: (PageLayout) -> Int): List<HomePage> =
         HomeLayoutMath.visualPages(
             com.bos.sphere.core.data.HomeLayout(pages = state.pages, seeded = true),
-            apps.map { it.key } + state.nonAppKeys(), cap, autoPlace = false,
+            apps.map { it.key } + state.nonAppKeys(), cap,
         )
 }
 

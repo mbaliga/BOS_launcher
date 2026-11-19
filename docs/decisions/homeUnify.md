@@ -1,5 +1,7 @@
 # Home unify (wave 28, HOM-01, HOM-22, HOM-23): decisions
 
+> Wave 30 (pagesExplicit.md) supersedes the rule that the pages hold every app when Apps on home is All apps, and Delete page moving items to the previous page: pages are explicit, nothing is auto-placed.
+
 Supersedes the deck part of [homePages.md](homePages.md) (the separate "Pages" surface, deck dots, the add-page "Scroll or Paginated" question and `pagesModeChosen`). The rest of homePages.md (Order, ColumnFill, hotspots, Glance on/off) stands.
 
 Owner: "A user can only turn on more page(s) - paginated or continuous; and manually add icons to it by long press -> edit and selecting apps and widgets to add to it. And the way that opens is incorrect, the calm home just as a regular home and the rest are regular pages. Right now there is a page indicator, and when I swipe to go right, this app drawer opens up and has its own dots in a new place - that's wrong also."

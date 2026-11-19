@@ -72,7 +72,7 @@ class HomeRestW5Test {
         val stack = WidgetStacks.stackKey("s")
         // the other class still has the old per-widget arrangement
         val other = layout(w(1), w(2), w(3))
-        val shown = HomeLayoutMath.visualPages(HomeResolve.layoutFor(other, s), HomeResolve.available(emptyList(), s), cap).flatMap { it.keys }
+        val shown = HomeResolve.visual(other, emptyList(), s, cap).flatMap { it.keys }
         assertEquals(listOf(w(3), stack).sorted(), shown.sorted())
         assertEquals(1, shown.count { it == stack })
     }
@@ -80,7 +80,7 @@ class HomeRestW5Test {
     @Test fun HOM_11_aStackThatWasDissolvedElsewhereLeavesNoGhostInAnotherClass() {
         val s = withWidgets(1, 2) // the stack no longer exists
         val stale = layout(w(1), WidgetStacks.stackKey("gone"), w(2))
-        val shown = HomeLayoutMath.visualPages(HomeResolve.layoutFor(stale, s), HomeResolve.available(emptyList(), s), cap).flatMap { it.keys }
+        val shown = HomeResolve.visual(stale, emptyList(), s, cap).flatMap { it.keys }
         assertEquals(listOf(w(1), w(2)), shown)
     }
 
@@ -88,7 +88,7 @@ class HomeRestW5Test {
         var s = WidgetStacks.create(withWidgets(1, 2, 3), w(1), w(2), "s")
         s = WidgetStacks.takeOut(s, WidgetStacks.stackKey("s"), w(1), 0, cap)
         val other = layout(w(3), WidgetStacks.stackKey("s"))
-        val shown = HomeLayoutMath.visualPages(HomeResolve.layoutFor(other, s), HomeResolve.available(emptyList(), s), cap).flatMap { it.keys }
+        val shown = HomeResolve.visual(other, emptyList(), s, cap).flatMap { it.keys }
         // the stack dissolved into w2; w1 is a page widget again; nothing is shown twice or lost
         assertEquals(listOf(w(1), w(2), w(3)), shown.sorted())
     }

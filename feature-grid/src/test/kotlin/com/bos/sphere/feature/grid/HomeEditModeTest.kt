@@ -55,7 +55,7 @@ class HomeEditModeTest {
     private fun Scene(edit: Boolean, probe: Probe) {
         val prefs = LauncherPrefs()
         val state = rememberGridHomeState()
-        val pages = HomeLayoutMath.visualPages(com.bos.sphere.core.data.HomeLayout(), apps.map { it.key }, capacityOf = { it.capacity(false, prefs) })
+        val pages = HomeLayoutMath.visualPages(com.bos.sphere.core.data.HomeLayout(pages = listOf(com.bos.sphere.core.data.HomePage(apps.map { it.key }, id = 1L)), seeded = true), apps.map { it.key }, capacityOf = { it.capacity(false, prefs) })
         Box(Modifier.fillMaxSize()) {
             GridHome(
                 pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = state, suggestion = null,

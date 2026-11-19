@@ -323,6 +323,7 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
         // CFG-04: an edit that drops an app or a page from the arrangement snapshots first.
         if (cur.pages.size > next.size || cur.pages.any { p -> p.keys.any { k -> next.none { k in it.keys } } }) DestructiveEdits.before("remove from home")
         write(cur.copy(pages = next, seeded = true))
+        markExplicit()
     }
 
     /** Replaces the whole arrangement, used when a workspace is switched (WSP-07). */
@@ -341,6 +342,7 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
                 seeded = true,
             ),
         )
+        markExplicit()
     }
 
     /** Puts [key] back on the home pages. */
@@ -353,7 +355,18 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
                 seeded = true,
             ),
         )
+        markExplicit()
     }
+
+    // Wave 30 (pagesExplicit): the markers that keep the one-time legacy-layout migration from ever touching a layout the user edited.
+    /** True once the user added, removed or moved something on the pages (every edit path calls [markExplicit]). */
+    fun explicitEdit(): Boolean = sp.getBoolean("explicitEdit", false)
+    fun markExplicit() { if (!explicitEdit()) sp.edit().putBoolean("explicitEdit", true).apply() }
+    fun pagesExplicitVersion(): Int = sp.getInt("pagesExplicitVersion", 0)
+    fun markPagesExplicitDone() { sp.edit().putInt("pagesExplicitVersion", PagesExplicit.VERSION).apply() }
+    /** The one-time "Home pages were reset" notice has not been dealt with yet. */
+    fun noticePending(): Boolean = sp.getBoolean("resetNoticePending", false)
+    fun setNoticePending(v: Boolean) { sp.edit().putBoolean("resetNoticePending", v).apply() }
 
     /** Forgets "removed from home" for apps no longer installed, so a reinstall lands on home again. */
     fun pruneRemoved(installed: Set<String>) {

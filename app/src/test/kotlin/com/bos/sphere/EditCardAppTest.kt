@@ -80,12 +80,13 @@ class EditCardAppTest {
         for (label in listOf("Alpha", "Bravo", "Delta")) assertFalse("$label was not added by the launcher", onHome(label))
     }
 
-    @Test fun HOM_01_aReturningUserWithoutALayoutStillSeesTheirAppsFlow() {
+    // Wave 30 (pagesExplicit), replaces HOM_01_aReturningUserWithoutALayoutStillSeesTheirAppsFlow: nothing is placed for the user, not even for a user from before.
+    @Test fun PGX_aReturningUserWithoutALayoutGetsNoAppsFlowedOntoThePages() {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
         AppSmokeHarness.configure { it.copy(appsOnHome = AppsOnHome.Everything) } // onboarding done: a user from before this change
         scenario = AppSmokeHarness.launch(); rule.waitForIdle(); settle()
-        assertTrue(onHome("Camera"))
-        assertTrue(rule.onAllNodesWithContentDescription("Long press to add apps").fetchSemanticsNodes().isEmpty())
+        for (label in listOf("Alpha", "Bravo", "Delta")) assertFalse("$label is not placed for the user", onHome(label))
+        assertTrue(LauncherStores.get(AppSmokeHarness.app).layout.layout.value.pages.flatMap { it.keys }.isEmpty())
     }
 
     @Test fun HOM_12_theHintOpensEditModeWithTheCarouselsAndBackLeaves() {
@@ -103,6 +104,8 @@ class EditCardAppTest {
     }
 
     private fun pageKeys(stores: LauncherStores) = stores.layout.layout.value.pages.map { it.keys }
+    private fun confirmDelete() { rule.onNode(androidx.compose.ui.test.hasText("Delete page") and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.isDialog()), useUnmergedTree = true).performClick(); settle(300) }
+
 
     @Test fun HOM_12_deletePageThenUndoRestoresItAndALaterEditIsNotUndoneByTheNotice() {
         val stores = startFresh()
@@ -111,7 +114,9 @@ class EditCardAppTest {
         stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
         assertEquals(listOf(listOf(camera), listOf(alpha)), pageKeys(stores))
         rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle()
-        assertEquals("the deleted page's items joined the previous page", listOf(listOf(camera, alpha)), pageKeys(stores))
+        rule.onNodeWithText("1 item will be removed from this page. It stays in the drawer.").assertIsDisplayed() // wave 30: it asks first
+        confirmDelete()
+        assertEquals("wave 30: the deleted page's items leave the home, none joins the previous page", listOf(listOf(camera)), pageKeys(stores))
         rule.onNodeWithText("Page deleted").assertIsDisplayed()
         rule.onNodeWithText("Undo", useUnmergedTree = true).performClick(); settle()
         assertEquals("one tap on the notice brought the whole page back", listOf(listOf(camera), listOf(alpha)), pageKeys(stores))
@@ -122,7 +127,7 @@ class EditCardAppTest {
         rule.onNodeWithText("Long press to add apps").performClick(); settle()
         val camera = AppSmokeHarness.appKey("Camera"); val alpha = AppSmokeHarness.appKey("Alpha"); val bravo = AppSmokeHarness.appKey("Bravo")
         stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
-        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle(300)
+        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle(300); confirmDelete()
         rule.onNodeWithContentDescription("Add to home: Bravo").performClick(); settle(300) // the notice lasts six seconds
         val afterAdd = pageKeys(stores)
         assertTrue(bravo in afterAdd.flatten())
@@ -135,7 +140,7 @@ class EditCardAppTest {
         val stores = startFresh()
         rule.onNodeWithText("Long press to add apps").performClick(); settle()
         rule.onNodeWithContentDescription("Add to home: Camera").performClick(); settle()
-        rule.onNodeWithContentDescription("Delete page 1").performClick(); settle()
+        rule.onNodeWithContentDescription("Delete page 1").performClick(); settle(); confirmDelete()
         assertEquals(1, stores.layout.layout.value.pages.size)
         assertTrue(stores.layout.layout.value.pages[0].keys.isEmpty())
         rule.onNodeWithContentDescription("Add to home: Camera").assertIsDisplayed() // back in the carousel

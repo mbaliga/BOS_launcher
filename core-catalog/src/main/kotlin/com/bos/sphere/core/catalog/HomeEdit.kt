@@ -24,9 +24,12 @@ object HomeEdit {
     /** Adds a new item (app, shortcut, widget, link) to the end of [page], defining it when it carries data. */
     fun add(state: HomeState, def: ItemDef, page: Int, cap: (PageLayout) -> Int, span: WidgetSpan? = null): HomeState {
         if (def.key in state.allKeys()) return state
+        // Wave 30 (pagesExplicit): a full home refuses the item ("page full"); it never opens a page of its own.
+        val placed = HomeLayoutMath.add(state.pages, def.key, page, cap)
+        if (placed.none { def.key in it.keys }) return state
         val items = if (def.kind == ItemKind.App || def.kind == ItemKind.Tile) state.items else state.items + (def.key to def)
         val widgets = if (span != null) state.widgets + (def.key to span) else state.widgets
-        return state.copy(pages = HomeLayoutMath.add(state.pages, def.key, page, cap), items = items, widgets = widgets)
+        return state.copy(pages = placed, items = items, widgets = widgets)
     }
 
     /** Moves a top-level item (or one taken out of a folder or the dock) to ([page], [index]) on the pages. */

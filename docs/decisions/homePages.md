@@ -1,5 +1,7 @@
 # Home pages (wave 26, HOM-01, HOM-22, HOM-23): decisions
 
+> Wave 30 (pagesExplicit.md) supersedes: the migration note that keeps every page as built (an auto-filled home is reset once), `HomeDeck.addPage` rules stay, and deleting a page no longer moves its items to a neighbour.
+
 Owner request (clauses 4 to 9): "Home view will only be glance, no option to change. User can add a page after that and choose if successive pages are a scroll or paginated. Glance can be turned on or off. If it's off, the first page or scroll appears. In scroll view, the icons stack to fill the occupy-able middle space in portrait or landscape view column by column. [...] User can choose between left to right or right to left ordering. Right to left means the notifications are on the right edge and the columns get filled right to left."
 Owner bug on build 54: "I can't add pages after the glance calm home page."
 

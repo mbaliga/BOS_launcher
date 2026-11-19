@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.WallpaperSurface
 import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.data.AppEntry
-import com.bos.sphere.core.data.AppsOnHome
 import com.bos.sphere.core.data.ClockFormat
 import com.bos.sphere.core.data.CornerIconMode
 import com.bos.sphere.core.data.DrawerSort
@@ -119,6 +118,8 @@ class SettingsModel(
     /** Wave 26: "Add page" (wave 28: Paginated only, never asks anything) and "Edit home" (turns Pages on first when it is Off). */
     val addHomePage: () -> Unit = {},
     val editHomePages: () -> Unit = {},
+    /** Wave 30: "Restore previous pages" while the backup of an auto-filled home is still kept (null otherwise). */
+    val restorePages: (() -> Unit)? = null,
     /** Wave 29: bring Comms up (on a hub view and/or with the Groups and rules manager open), closing settings; the app wires it to the Comms surface. */
     val openComms: (com.bos.sphere.ui.HubView?, Boolean) -> Unit = { v, g -> com.bos.sphere.ui.LaunchpadHubNav.openComms(v, g) },
 )
@@ -251,7 +252,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         }
         add(SettingItem.Toggle(x("Clock tile on this page"), Glyphs.Clock, HomeTiles.CLOCK in page.keys, x("Moves it here if it is on another page")) { on -> m.setClockTile(m.pageIndex, on) })
         add(SettingItem.Action(x("Add a page after this"), Glyphs.Plus, "") { m.addPageAfter(m.pageIndex) })
-        if (m.pages.size > 1) add(SettingItem.Action(x("Delete this page"), Glyphs.Close, x("Apps move to the previous page")) { m.deletePage(m.pageIndex) })
+        if (m.pages.size > 1 || page.keys.isNotEmpty()) add(SettingItem.Action(x("Delete this page"), Glyphs.Close, x("Items on it leave the home; they stay in the drawer")) { m.deletePage(m.pageIndex) })
     }
     out += SettingCategory(x("Page %d", m.pageIndex + 1), Glyphs.Widget, pageItems)
     }
@@ -270,6 +271,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             if (p.homePages == com.bos.sphere.core.data.HomePages.Paginated) add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("Adds a page after the last one")) { m.addHomePage() })
             add(SettingItem.Action(x("Edit home"), Glyphs.Apps, x("Add icons, widgets and folders to the pages")) { m.editHomePages() })
+            // Wave 30 (pagesExplicit): after the one-time reset of an auto-filled home, the old pages come back from here for 30 days.
+            m.restorePages?.let { restore -> add(SettingItem.Action(x("Restore previous pages"), Glyphs.Home, x("Brings back the pages from before the reset (kept for 30 days)")) { restore() }) }
             add(
                 SettingItem.Choice(
                     x("Order"), Glyphs.Swipe, com.bos.sphere.core.data.HomeOrder.entries, p.homeOrder, { x(it.label) },
@@ -418,7 +421,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Choice(x("Quick scrub side"), Glyphs.Swipe, RailSide.entries, p.drawerRail, { x(it.label) }, hint = x("Run a finger down the edge to jump through the list.")) { v -> upd { it.copy(drawerRail = v) } })
             add(SettingItem.Toggle(x("Show the A–Z letters"), Glyphs.Message, p.drawerRailVisible, x("Off hides the letters; the strip still scrubs")) { v -> upd { it.copy(drawerRailVisible = v) } })
             // Only the paged home has pages to curate; the scrolling homes always show every app.
-            if (paged) add(SettingItem.Choice(x("Apps on home"), Glyphs.Apps, AppsOnHome.entries, p.appsOnHome, { x(it.label) }, hint = x("\"Only ones I add\" keeps the pages for what you choose; everything else lives in the drawer.")) { v -> upd { it.copy(appsOnHome = v) } })
             if (paged) add(SettingItem.Choice(x("Pages"), Glyphs.Swipe, PageMode.entries, p.pageMode, { x(it.label) }, hint = x("One page shows just the first page; the rest stay in the drawer.")) { v -> upd { it.copy(pageMode = v) } })
             add(
                 SettingItem.Pane(x("Open with"), Glyphs.Apps, x("Choose the app for Music, Browser…")) {

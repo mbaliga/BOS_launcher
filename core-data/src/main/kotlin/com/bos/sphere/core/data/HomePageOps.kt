@@ -22,24 +22,25 @@ object HomePageOps {
     data class Result(val pages: List<HomePage>, val taken: Set<String>, val focus: Int)
 
     /**
-     * Deletes page [index]. Its items join the end of the page before (the next one for the first page), as the quick
-     * sheet's delete always did. The last remaining page cannot vanish: it is emptied instead and its items are
-     * reported in [Result.taken] so the caller can mark them removed from home.
+     * Deletes page [index] with everything placed on it (wave 30, pagesExplicit; before, its items joined the previous page, so a delete
+     * looked like it did nothing). A stored page that overflowed into several visual pages is one page: deleting any chunk deletes it whole.
+     * [Result.taken] holds every key that left the home so the caller can take apps off the home and drop folders, widgets and shortcuts the usual
+     * way. The last remaining page is emptied (Pages stays on with one empty page).
      */
-    fun delete(pages: List<HomePage>, index: Int, capacityOf: (PageLayout) -> Int): Result {
+    fun delete(pages: List<HomePage>, index: Int): Result {
         if (index !in pages.indices) return Result(pages, emptySet(), index.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))
-        // A stored page that overflowed into several visual pages is one page: deleting any chunk deletes it whole (otherwise its items
-        // would join a sibling chunk and overflow straight back, so the page could never be removed).
         val g = groupOf(pages, index)
-        val whole = if (g.last > g.first) pages.take(g.first) + pages[g.first].copy(keys = g.flatMap { pages[it].keys }) + pages.drop(g.last + 1) else pages
-        val at = g.first
-        if (whole.size == 1) {
-            val p = whole[0]
-            return Result(listOf(p.copy(keys = emptyList(), id = if (p.id == 0L) 1L else p.id)), p.keys.toSet(), 0)
+        val taken = g.flatMapTo(LinkedHashSet()) { pages[it].keys }
+        val rest = pages.filterIndexed { i, _ -> i !in g }
+        if (rest.isEmpty()) {
+            val p = pages[g.first]
+            return Result(listOf(p.copy(keys = emptyList(), id = if (p.id == 0L) 1L else p.id)), taken, 0)
         }
-        val out = HomeLayoutMath.deletePage(whole, at, capacityOf)
-        return Result(out, emptySet(), (at - 1).coerceIn(0, out.lastIndex))
+        return Result(rest, taken, (g.first - 1).coerceIn(0, rest.lastIndex))
     }
+
+    /** How many items deleting the page group holding [index] removes (what the confirmation says). */
+    fun itemCount(pages: List<HomePage>, index: Int): Int = groupOf(pages, index).sumOf { pages[it].keys.size }
 
     /** Moves the page group holding [index] by [delta] groups (-1 = up/earlier, +1 = down/later). Null when it cannot move. */
     fun move(pages: List<HomePage>, index: Int, delta: Int): Result? {
@@ -134,22 +135,20 @@ object AddCarouselModel {
         apps(all, onHome, query, work, isWork, { it.key }, { it.label })
 
     /**
-     * Where a tap puts a new item: the current page when it has a free cell, else the first page after it with one,
-     * else a new page at the end. Returns the page index (== pages.size means "new page").
+     * Wave 30 (pagesExplicit): a tap puts the item on the CURRENT page when it has a free cell; a full page is "page full" ([place] returns null),
+     * never another page and never a new one. Returns the page index to use, or null when the current page is full.
      */
-    fun targetPage(pages: List<HomePage>, current: Int, capacityOf: (PageLayout) -> Int): Int {
+    fun targetPage(pages: List<HomePage>, current: Int, capacityOf: (PageLayout) -> Int): Int? {
         if (pages.isEmpty()) return 0
-        val order = (current.coerceIn(0, pages.lastIndex)..pages.lastIndex) + (0 until current.coerceIn(0, pages.lastIndex))
-        return order.firstOrNull { pages[it].keys.size < capacityOf(pages[it].layout) } ?: pages.size
+        val i = current.coerceIn(0, pages.lastIndex)
+        return i.takeIf { pages[it].keys.size < capacityOf(pages[it].layout).coerceAtLeast(1) }
     }
 
-    /** The visual pages after adding [key] in the first free cell (see [targetPage]); a full home grows a page. */
-    fun place(pages: List<HomePage>, key: String, current: Int, capacityOf: (PageLayout) -> Int): List<HomePage> {
+    /** The visual pages after adding [key] on the current page (see [targetPage]); null when that page is full (the caller says "Page full"). */
+    fun place(pages: List<HomePage>, key: String, current: Int, capacityOf: (PageLayout) -> Int): List<HomePage>? {
         if (pages.any { key in it.keys }) return pages
         val base = pages.ifEmpty { listOf(HomePage(id = 1L)) }
-        val t = targetPage(base, current, capacityOf)
-        val withRoom = if (t >= base.size) HomeLayoutMath.insertPage(base, base.lastIndex) else base
-        val idx = t.coerceAtMost(withRoom.lastIndex)
-        return withRoom.mapIndexed { i, p -> if (i == idx) p.copy(keys = p.keys + key) else p }
+        val idx = targetPage(base, current, capacityOf) ?: return null
+        return base.mapIndexed { i, p -> if (i == idx) p.copy(keys = p.keys + key) else p }
     }
 }

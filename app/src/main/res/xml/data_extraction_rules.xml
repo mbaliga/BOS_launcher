@@ -31,6 +31,7 @@
         <exclude domain="file" path="index" />
         <exclude domain="file" path="notifications" />
         <exclude domain="file" path="usage" />
+        <exclude domain="file" path="home_layout_legacy.json" />
         <exclude domain="root" path="." />
     </cloud-backup>
     <device-transfer>
@@ -59,5 +60,6 @@
         <exclude domain="file" path="index" />
         <exclude domain="file" path="notifications" />
         <exclude domain="file" path="usage" />
+        <exclude domain="file" path="home_layout_legacy.json" />
     </device-transfer>
 </data-extraction-rules>

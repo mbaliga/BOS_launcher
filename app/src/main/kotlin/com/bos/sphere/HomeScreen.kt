@@ -47,7 +47,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.bos.sphere.core.data.AppsOnHome
 import com.bos.sphere.core.data.HomeShown
 import com.bos.sphere.core.data.HomeSurface
 import com.bos.sphere.core.data.SurfaceScroll
@@ -236,10 +235,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.core.catalog.AdaptivePrefs.effective(storedPrefs, windowCfg.screenWidthDp, windowCfg.screenHeightDp)
     }
     val layout by stores.layout.layout.collectAsStateWithLifecycle()
+    var layoutEpoch by remember { mutableIntStateOf(0) } // wave 30: bumped by the one-time reset of an auto-filled home so every size class starts over
     // HOM-22: the live Recent apps (only collected while that landing is on) and whether usage access is granted.
     var menuRecents by remember { mutableStateOf(false) } // the open app menu was opened from the Recent apps landing
     val homeEdit = rememberHomeEdit(stores.layout, remember(context) { WorkspaceHomeDockPins(com.bos.sphere.feature.dock.WorkspaceRepository.get(context)) }) // HOM-12 (layout and dock pins share one undo)
-    SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }, onRebased = { homeEdit.rebase() }) // HOM-11: one arrangement per window size class; HOM-12: a swap is not an undoable edit
+    SizeClassLayoutBinding(stores.layout, remember(allApps) { allApps.mapTo(HashSet()) { it.key } }, epoch = layoutEpoch, onRebased = { homeEdit.rebase() }) // HOM-11: one arrangement per window size class; HOM-12: a swap is not an undoable edit
     var panelsOpen by remember { mutableStateOf(false) } // HOM-15, HOM-17, HOM-18: a request to show the hub's Files view
     var hubStandalone by remember { mutableStateOf(false) } // wave 25: the hub shown by itself when the left page is not Launchpad
     val portraitCorners by stores.shortcuts.corners.collectAsStateWithLifecycle()
@@ -277,11 +277,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val extrasState by extrasStore.state.collectAsStateWithLifecycle()
     val allPages = remember(layout, apps, isLandscape, prefs, extrasState) {
         com.bos.sphere.core.catalog.SpanReflow.reflow(
-            HomeLayoutMath.visualPages(
-                com.bos.sphere.core.catalog.HomeResolve.layoutFor(layout, extrasState),
-                com.bos.sphere.core.catalog.HomeResolve.available(apps.map { it.key }, extrasState),
-                capacityOf, autoPlace = prefs.appsOnHome == AppsOnHome.Everything,
-            ),
+            com.bos.sphere.core.catalog.HomeResolve.visual(layout, apps.map { it.key }, extrasState, capacityOf),
             extrasState::spanOf,
         ) { l -> l.gridFor(isLandscape, prefs).let { it.columns to it.rows } }
     }
@@ -299,20 +295,30 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         freshDecided = true
     }
-    // A fresh "only the ones I add" home isn't blank: Settings, Phone and Messages are put there once.
-    LaunchedEffect(prefs.appsOnHome, apps.isNotEmpty(), freshDecided) {
-        if (!freshDecided) return@LaunchedEffect
-        val misc = context.getSharedPreferences("liftoff_misc", android.content.Context.MODE_PRIVATE)
-        if (prefs.appsOnHome == AppsOnHome.PinnedOnly && apps.isNotEmpty() && !misc.getBoolean("defaultHomeSeeded", false) &&
-            layout.pages.all { it.keys.isEmpty() }
-        ) {
-            val keys = mutableListOf(HomeTiles.SETTINGS)
-            listOf(CornerActionId.Phone, CornerActionId.Messages).forEach { id ->
-                ActionApps.resolve(context, id)?.packageName?.let { pkg -> apps.firstOrNull { it.packageName == pkg }?.let { keys += it.key } }
+    // Wave 30 (pagesExplicit): nothing is placed for the user, not even three starter apps: the old "Settings, Phone and Messages are put there once" seed is gone.
+    // One-time migration of an auto-filled legacy home (see PagesExplicitMigration): ONE empty page and the old arrangement kept for "Restore previous pages".
+    var resetNotice by remember { mutableStateOf(stores.layout.noticePending()) }
+    var legacyAvailable by remember { mutableStateOf(false) }
+    LaunchedEffect(layoutEpoch) { legacyAvailable = withContext(kotlinx.coroutines.Dispatchers.IO) { com.bos.sphere.core.data.LegacyHomeBackup(context.filesDir).available(System.currentTimeMillis()) != null } }
+    fun restorePreviousPages() {
+        scope.launch {
+            val ok = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.bos.sphere.core.data.PagesExplicitMigration.restore(stores.layout, com.bos.sphere.core.data.LegacyHomeBackup(context.filesDir), System.currentTimeMillis())
             }
-            stores.layout.setPages(listOf(HomePage(keys = keys)))
-            misc.edit().putBoolean("defaultHomeSeeded", true).apply()
+            if (ok) withContext(kotlinx.coroutines.Dispatchers.Main) { layoutEpoch++; resetNotice = false; android.widget.Toast.makeText(context, L10n.tr("Previous pages restored"), android.widget.Toast.LENGTH_SHORT).show() }
         }
+    }
+    LaunchedEffect(freshDecided, apps.isNotEmpty()) {
+        if (!freshDecided || apps.isEmpty()) return@LaunchedEffect
+        val installedOrders = listOf(apps.map { it.key }, apps.sortedBy { it.label.lowercase() }.map { it.key })
+        val result = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.bos.sphere.core.data.PagesExplicitMigration.run(
+                stores.layout, com.bos.sphere.core.data.LegacyHomeBackup(context.filesDir), installedOrders, capacityOf,
+                legacyEverything = storedPrefs.appsOnHome == com.bos.sphere.core.data.AppsOnHome.Everything, nowMillis = System.currentTimeMillis(),
+            )
+        }
+        if (storedPrefs.appsOnHome != com.bos.sphere.core.data.AppsOnHome.PinnedOnly) stores.prefs.update { it.copy(appsOnHome = com.bos.sphere.core.data.AppsOnHome.PinnedOnly) }
+        if (result == com.bos.sphere.core.data.PagesMigrationResult.Reset) { layoutEpoch++; resetNotice = true }
     }
     // "One page" shows only the first page; the rest of the apps stay in the drawer.
     // Wave 28: Pages Off shows the first page only (Glance off: that page is home); the other pages stay stored and come back when Pages is turned on.
@@ -399,8 +405,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // setting is the choice. From Glance the page goes after the last one; with Pages Off or Continuous it first turns Paginated on.
     var pendingPages by remember { mutableIntStateOf(0) } // 1 = show the pages stop once it exists, 2 = show it in edit mode (see turnPagesOn)
     fun addPageNow(afterIndex: Int?) {
-        if (prefs.homePages != com.bos.sphere.core.data.HomePages.Paginated) stores.prefs.update { it.copy(homePages = com.bos.sphere.core.data.HomePages.Paginated) }
-        val added = com.bos.sphere.core.data.HomeDeck.addPage(pages, afterIndex)
+        val wasOn = prefs.homePages == com.bos.sphere.core.data.HomePages.Paginated
+        if (!wasOn) stores.prefs.update { it.copy(homePages = com.bos.sphere.core.data.HomePages.Paginated) }
+        val added = com.bos.sphere.core.data.HomeDeck.addPage(pages, afterIndex, pagesAlreadyOn = wasOn)
         if (added.pages !== pages) savePages(added.pages)
         pendingPages = 1
         settingsPage = added.index
@@ -499,7 +506,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             stores.prefs.update { newPrefs }
             if (delta > 0) {
                 val capNew: (PageLayout) -> Int = { it.capacity(isLandscape, newPrefs) }
-                val vis = HomeLayoutMath.visualPages(layout, apps.map { it.key }, capNew, autoPlace = prefs.appsOnHome == AppsOnHome.Everything)
+                val vis = HomeLayoutMath.visualPages(layout, apps.map { it.key }, capNew)
                 savePages(HomeLayoutMath.reflow(vis, capNew))
             }
             android.widget.Toast.makeText(context, "${ns.columns} × ${ns.rows}", android.widget.Toast.LENGTH_SHORT).show()
@@ -662,6 +669,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         gridDims = { pages.getOrNull(gridState.currentPage)?.layout?.gridFor(isLandscape, prefs)?.let { it.columns to it.rows } ?: (prefs.gridFor(isLandscape).let { it.columns to it.rows }) },
     )
     androidx.compose.runtime.SideEffect { homeEdit.hooks = homeItems }
+    // Wave 30 (pagesExplicit): "Delete page" really removes the page and what the user put on it. A page that holds something asks first
+    // ("N items will be removed from this page; they stay in the drawer"); the last page is emptied (Pages stays on with one empty page).
+    var pendingDelete by remember { mutableStateOf<Int?>(null) }
+    fun requestDeletePage(i: Int) {
+        if (com.bos.sphere.core.data.HomePageOps.itemCount(pages, i) == 0) deletePageNow(i, pages, layout, preserve, appsByKey, homeItems, stores) else pendingDelete = i
+    }
     com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
         if (appsByKey[key] != null && pages.none { key in it.keys }) { stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve); homeItems.onPlaced() }
     }, onItems = { defs -> homeItems.addDropped(defs) }, onTouchDrag = { menuApp = null })
@@ -1516,7 +1529,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         remember(context) { com.bos.sphere.core.data.CommsScaleSettings.init(context); com.bos.sphere.ui.CommsOptions.init(context); true }
         val commsDefaultView by com.bos.sphere.ui.CommsOptions.defaultView.collectAsState() // wave 29: the Default view row shows the live value
         val commsScalePct by com.bos.sphere.core.data.CommsScaleSettings.percent.collectAsState() // wave 28: the Comms size row shows the live value
-        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView) {
+        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, legacyAvailable) {
             buildSettingsCategories(
             SettingsModel(
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
@@ -1537,11 +1550,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         gridState.goToPage(i + 1)
                     }
                 },
-                deletePage = { i ->
-                    com.bos.sphere.core.data.StateService.beforeDestructive(context, "delete page")
-                    savePages(HomeLayoutMath.deletePage(pages, i, capacityOf))
-                    settingsPage = (i - 1).coerceAtLeast(0)
-                },
+                deletePage = { i -> requestDeletePage(i); settingsPage = (i - 1).coerceAtLeast(0) },
                 setClockTile = { page, present ->
                     // Put it first on that page; a full page spills its last app forward.
                     savePages(
@@ -1558,6 +1567,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 copyText = { t -> (context.getSystemService(android.content.ClipboardManager::class.java)).setPrimaryClip(android.content.ClipData.newPlainText("Liftoff", t)) },
                 lab = labEntries,
                 addHomePage = { settingsOpen = false; requestAddPage(null) },
+                restorePages = if (legacyAvailable) ({ restorePreviousPages() }) else null,
                 editHomePages = { settingsOpen = false; editHome() },
                 healthAvailable = healthAvailable,
                 appsByKey = appsByKey,
@@ -1667,6 +1677,24 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 ColorPicker(current, { v -> stores.iconColors.set(app.key, v) })
             }
         }
+        pendingDelete?.let { i ->
+            PageDeleteConfirm(
+                com.bos.sphere.core.data.HomePageOps.itemCount(pages, i),
+                onConfirm = { pendingDelete = null; deletePageNow(i, pages, layout, preserve, appsByKey, homeItems, stores) },
+                onDismiss = { pendingDelete = null },
+            )
+        }
+        if (resetNotice) {
+            // Wave 30: the one-time notice after an auto-filled home was reset. Restoring is also in Settings, Home screen, for 30 days.
+            ConfirmDialog(
+                title = L10n.tr("Home pages were reset"),
+                text = L10n.tr("Home pages were reset: they held every app automatically. Add your own in Edit home."),
+                confirm = L10n.tr("Restore previous pages"),
+                dismiss = L10n.tr("OK"),
+                onConfirm = { restorePreviousPages(); resetNotice = false },
+                onDismiss = { stores.layout.setNoticePending(false); resetNotice = false },
+            )
+        }
         if (fillPrompt) {
             ConfirmDialog(
                 title = L10n.tr("Fill the empty space?"),
@@ -1694,7 +1722,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 page = quickPage?.takeIf { landing == HomeShown.Pages && prefs.homeStyle == HomeStyle.Grid && prefs.homePages == com.bos.sphere.core.data.HomePages.Paginated },
                 pageCount = pages.size,
                 onAddPage = { quickOpen = false; requestAddPage(quickPage) },
-                onDeletePage = { val i = quickPage ?: 0; com.bos.sphere.core.data.StateService.beforeDestructive(context, "delete page"); savePages(HomeLayoutMath.deletePage(pages, i, capacityOf)); quickOpen = false },
+                onDeletePage = { requestDeletePage(quickPage ?: 0); quickOpen = false },
                 // HOM-22: "Edit home pages" on another landing switches to Selected apps first, then enters edit mode.
                 onEdit = { quickOpen = false; editFocusAdd = false; editHome() },
                 onPanels = { quickOpen = false; panelsOpen = true },

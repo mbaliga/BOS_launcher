@@ -11,6 +11,8 @@ data class RecentFile(
     val modifiedMs: Long,
     /** The granted tree this came from. */
     val source: String,
+    /** Bytes, or -1 when the provider did not say (W31: shown in the Files tab's secondary line). */
+    val sizeBytes: Long = -1,
 )
 
 data class PinnedFolder(val uri: String, val name: String)

@@ -47,6 +47,11 @@ class HomePanelPrefs(context: Context) {
     var filesPerFolder: Int
         get() = sp.getInt("panel.files.count", 20).coerceIn(5, 50)
         set(v) { sp.edit().putInt("panel.files.count", v.coerceIn(5, 50)).apply() }
+
+    /** W31: the Files tab as a list (default) or a grid of previews; one choice for the folders and the recent files. */
+    var filesView: FilesViewMode
+        get() = FilesViewMode.parse(runCatching { sp.getString("panel.files.view", null) }.getOrNull())
+        set(v) { sp.edit().putString("panel.files.view", v.name).apply() }
 }
 
 object FilesView {

@@ -187,32 +187,23 @@ private fun FilesPanel(prefs: HomePanelPrefs) {
         }
     }
     val now = System.currentTimeMillis()
-    LazyColumn {
-        item {
-            Text(L10n.tr("Folders"), color = HyleColors.InkDim, fontSize = 11.sp)
-            if (folders.isEmpty()) Text(L10n.tr("No folder chosen yet. Pick one and its newest files show here; nothing else is read."), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
-        }
-        items(folders) { f ->
-            Line(f.name, if (only == f.uri) L10n.tr("Pinned folder") + " · " + L10n.tr("Showing only this folder (long-press it again for all)") else L10n.tr("Pinned folder"), onLong = { only = if (only == f.uri) null else f.uri }) {
+    var mode by remember { mutableStateOf(prefs.filesView) }
+    val thumbs = remember { RealFileThumbs(context) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalFileThumbs provides thumbs) {
+        FilesPanelContent(
+            folders, FilesView.filter(files, only), only, mode, now, HyleColors.InkBright, HyleColors.Ink, HyleColors.InkDim, HyleColors.Violet,
+            onToggle = { mode = mode.other(); prefs.filesView = mode },
+            onChoose = { pick.launch(null) },
+            onFolderOpen = { f ->
                 runCatching {
                     val tree = Uri.parse(f.uri)
                     context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree)), DocumentsContract.Document.MIME_TYPE_DIR)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
                 }
-            }
-        }
-        item {
-            Text(L10n.tr("Choose a folder"), color = HyleColors.Violet, fontSize = 13.sp, modifier = Modifier.heightIn(min = 48.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { pick.launch(null) }.wrapContentHeight(androidx.compose.ui.Alignment.CenterVertically))
-            Text(L10n.tr("Recent files"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
-        }
-        items(FilesView.filter(files, only)) { f ->
-            Line(f.name, RecentFilesModel.age(now, f.modifiedMs)) {
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(f.uri), f.mime.ifEmpty { "*/*" })
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                }
-            }
-        }
+            },
+            onFolderLong = { f -> only = if (only == f.uri) null else f.uri },
+            onFileOpen = { openRecentFile(context, it) },
+        )
     }
 }
 

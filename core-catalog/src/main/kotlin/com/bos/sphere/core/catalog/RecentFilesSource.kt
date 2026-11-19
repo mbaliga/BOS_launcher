@@ -25,14 +25,14 @@ class RecentFilesSource(context: Context) {
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, docId)
         val proj = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_LAST_MODIFIED, DocumentsContract.Document.COLUMN_SIZE,
         )
         val out = ArrayList<RecentFile>()
         resolver.query(children, proj, null, null, null)?.use { c ->
             while (c.moveToNext()) {
                 val mime = c.getString(2).orEmpty()
                 if (mime == DocumentsContract.Document.MIME_TYPE_DIR) continue
-                out += RecentFile(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)).toString(), c.getString(1).orEmpty(), mime, c.getLong(3), tree.toString())
+                out += RecentFile(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)).toString(), c.getString(1).orEmpty(), mime, c.getLong(3), tree.toString(), if (c.isNull(4)) -1 else c.getLong(4))
             }
         }
         out.sortedByDescending { it.modifiedMs }.take(limit)

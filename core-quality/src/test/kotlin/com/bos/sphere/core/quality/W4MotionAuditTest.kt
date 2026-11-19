@@ -49,7 +49,7 @@ class W4MotionAuditTest {
             "GlanceEdges.kt" to 1, // wave 17: the quiet edge handle fade, tween 0 when reduced (the caller passes rememberMotionPrefs().reduced)
             // press spring already snaps under reduced motion (`still`)
         )
-        val gatedFiles = setOf("ContinuousHome.kt", "SettingsSpace.kt", "HomeScreen.kt")
+        val gatedFiles = setOf("ContinuousHome.kt", "SettingsSpace.kt", "HomeScreen.kt", "FilesUi.kt") // W31: FilesUi fades a loaded thumbnail in through rememberMotionPrefs().gate(tween(180))
         val counts = HashMap<String, Int>()
         Repo.mainSources().forEach { f ->
             val n = f.readLines().count { Regex("""\banimate(Float|Color|Dp|Int|Offset|Size|IntOffset|Rect)AsState\(""").containsMatchIn(it) }

@@ -194,7 +194,7 @@ abstract class UsageSimplifyW29Cases(private val orientation: String) : Launchpa
     @Test fun USG_45_theBlockAboutFillsTheHeightTheOwnerAskedForAt100Percent() {
         host()
         val h = bounds("usage.block").let { it.bottom.value - it.top.value }
-        assertTrue("block is $h dp high (about 260 to 300 dp with five rows; content-sized, never fixed)", h in 250f..320f)
+        assertTrue("block is $h dp high (W33: about 340 to 380 dp with five 48 dp rows; content-sized, never fixed)", h in 250f..380f)
     }
 
     // ---- selecting ----

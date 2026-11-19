@@ -64,28 +64,44 @@ import java.util.Locale
 @Composable
 fun HubSwitcher(state: HubState, modifier: Modifier = Modifier) {
     val lp = LocalLp.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val labels = state.tabs.map { L10n.tr(it.label).uppercase() }
+    val labelStyle = androidx.compose.material3.LocalTextStyle.current.merge(androidx.compose.ui.text.TextStyle(fontSize = CommsStyle.TAB_SP.sp, fontWeight = FontWeight.Normal)) // the labels' own style (with its letter spacing) is what is measured and tightened
+    val baseSpacing = labelStyle.letterSpacing.takeIf { it.isSp }?.value ?: 0f
     // The row is 35 dp high and the label sits centred on it; each tab is a 48 dp target centred on the row (it overlaps the rows above and below, which are transparent there).
-    Row(
-        modifier.fillMaxWidth().padding(top = CommsStyle.TABS_GAP_DP.dp).height(CommsStyle.TAB_H_DP.dp).horizontalScroll(rememberScrollState()).testTag("hub.switcher"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Spacer(Modifier.width((CommsStyle.H_PAD_DP - CommsStyle.TAB_PAD_DP).dp))
-        state.tabs.forEachIndexed { i, v ->
-            val sel = v == state.view
-            val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
-            LaunchedEffect(sel) { if (sel) bring.bringIntoView() } // a view picked by a swipe or a link scrolls into sight
-            Box(
-                Modifier.requiredHeight(maxOf(48.dp, commsTarget())).widthIn(min = (CommsStyle.TAB_SLOTS_DP.getOrNull(i) ?: 0f).dp).bringIntoViewRequester(bring).clickable { state.select(v) }
-                    .semantics { role = Role.Tab; selected = sel; contentDescription = L10n.tr(v.label) }.testTag("hub.view.${v.id}"),
-                Alignment.CenterStart,
-            ) {
-                Text(
-                    L10n.tr(v.label).uppercase(), color = if (sel) lp.ink else lp.tabDim, fontSize = CommsStyle.TAB_SP.sp, fontWeight = FontWeight.Normal,
-                    maxLines = 1, modifier = Modifier.padding(horizontal = CommsStyle.TAB_PAD_DP.dp),
-                )
-            }
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth().padding(top = CommsStyle.TABS_GAP_DP.dp).height(CommsStyle.TAB_H_DP.dp)) {
+        // Wave 33: at a large Comms size or font the labels tighten before the row scrolls (see [CommsTabFit]).
+        val plan = with(density) {
+            CommsTabFit.plan(
+                labelPx = labels.map { measurer.measure(it, labelStyle, maxLines = 1).size.width.toFloat() }, chars = labels.map { it.length },
+                slotPx = state.tabs.indices.map { (CommsStyle.TAB_SLOTS_DP.getOrNull(it) ?: 0f).dp.toPx() }, padPx = CommsStyle.TAB_PAD_DP.dp.toPx(),
+                fixedPx = (CommsStyle.H_PAD_DP - CommsStyle.TAB_PAD_DP + (CommsStyle.END_PAD_DP - CommsStyle.TAB_PAD_DP).coerceAtLeast(0f)).dp.toPx(),
+                availablePx = maxWidth.toPx(), spPx = 1.sp.toPx(), tabSp = CommsStyle.TAB_SP, targetPx = 48.dp.toPx(),
+            )
         }
-        Spacer(Modifier.width((CommsStyle.END_PAD_DP - CommsStyle.TAB_PAD_DP).coerceAtLeast(0f).dp))
+        Row(
+            Modifier.fillMaxWidth().fillMaxHeight().horizontalScroll(rememberScrollState()).testTag("hub.switcher"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Spacer(Modifier.width((CommsStyle.H_PAD_DP - CommsStyle.TAB_PAD_DP).dp))
+            state.tabs.forEachIndexed { i, v ->
+                val sel = v == state.view
+                val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+                LaunchedEffect(sel, plan.scrolls) { if (sel) bring.bringIntoView() } // a view picked by a swipe or a link scrolls into sight
+                Box(
+                    Modifier.requiredHeight(maxOf(48.dp, commsTarget())).widthIn(min = if (plan.useSlots) (CommsStyle.TAB_SLOTS_DP.getOrNull(i) ?: 0f).dp else 48.dp).bringIntoViewRequester(bring).clickable { state.select(v) }
+                        .semantics { role = Role.Tab; selected = sel; contentDescription = L10n.tr(v.label) }.testTag("hub.view.${v.id}"),
+                    Alignment.CenterStart,
+                ) {
+                    Text(
+                        labels[i], color = if (sel) lp.ink else lp.tabDim, fontSize = CommsStyle.TAB_SP.sp, fontWeight = FontWeight.Normal,
+                        letterSpacing = if (plan.trackingSp == 0f) androidx.compose.ui.unit.TextUnit.Unspecified else (baseSpacing + plan.trackingSp).sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = CommsStyle.TAB_PAD_DP.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.width((CommsStyle.END_PAD_DP - CommsStyle.TAB_PAD_DP).coerceAtLeast(0f).dp))
+        }
     }
 }
 

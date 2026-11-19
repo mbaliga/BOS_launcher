@@ -179,7 +179,7 @@ private fun UsagePlaceholder(tone: VizTone) {
         Spacer(Modifier.height(gap))
         repeat(UsageShaping.TOP + 1) { i ->
             // The same row as a finished one (a line of text height over the bar), so each is as high as a real row.
-            Row(Modifier.fillMaxWidth().heightIn(min = CommsStyle.USAGE_ROW_DP.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = maxOf(CommsStyle.USAGE_ROW_DP.dp, commsTarget())).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(CommsStyle.USAGE_ICON_DP.dp).background(quiet, RoundedCornerShape(3.dp)))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -237,17 +237,25 @@ private fun UsageReady(week: UsageWeek, tone: VizTone, labelOf: (String) -> Stri
     var picked by rememberSaveable(sel) { mutableIntStateOf(-1) }
     val pick = com.bos.sphere.ui.viz.clampPick(picked, rows.size)
     Column(Modifier.fillMaxWidth().testTag("usage.rows")) {
+        // W33: a day with no recorded time (the week has data, this day has none) says so in one quiet line instead of an empty gap.
+        if (rows.isEmpty()) Text(
+            L10n.tr("No recorded time"), color = tone.ink.copy(alpha = 0.72f), fontSize = CommsStyle.NOTE_SP.sp,
+            modifier = Modifier.fillMaxWidth().testTag("usage.rows.none").heightIn(min = commsTarget()).wrapContentHeight(Alignment.CenterVertically),
+        )
         rows.forEachIndexed { i, r -> UsageRowLine(r, i, labelOf, tone, dim = pick >= 0 && pick != i, chosen = pick == i) { picked = if (picked == i) -1 else i } }
     }
 }
 
-/** One ranked row: icon, name (ellipsizes), time right-aligned in muted ink, and under them the bar. At least 36 dp high, taller when the text is. */
+/**
+ * One ranked row: icon, name (ellipsizes), time right-aligned in muted ink, and under them the bar. W33: the row is at least 48 dp high (the touch
+ * target) while the ink stays compact: the content is centred in the row, so the extra height is quiet padding above and below it.
+ */
 @Composable
 private fun UsageRowLine(r: UsageRow, i: Int, labelOf: (String) -> String, tone: VizTone, dim: Boolean, chosen: Boolean, onClick: () -> Unit) {
     val name = UsageTexts.nameOf(r.key, labelOf)
     val spoken = UsageTexts.rowDescription(r, labelOf)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = CommsStyle.USAGE_ROW_DP.dp).testTag("usage.row.$i")
+        Modifier.fillMaxWidth().heightIn(min = maxOf(CommsStyle.USAGE_ROW_DP.dp, commsTarget())).testTag("usage.row.$i")
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = spoken; selected = chosen }
             .alpha(if (dim) 0.4f else 1f)

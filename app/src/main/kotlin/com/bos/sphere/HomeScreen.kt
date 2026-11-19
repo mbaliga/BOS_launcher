@@ -358,7 +358,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var wheelOpen by remember { mutableStateOf(false) }
     var wheelAnchor by remember { mutableStateOf(Corner.BottomLeft) }
     var hubOpen by remember { mutableStateOf(false) }
-    var leftOpen by remember { mutableStateOf(false) }
+    var leftOpen by rememberCommsOpen(homeSignal) // wave 33: saved with the activity state, so Comms (which stays open under an opened app) survives the process being killed; a Home press closes it
     // STR-14: the Recents panel, the right-hand mirror of Launchpad. Warm once opened so the list is ready on the next swipe.
     var rightOpen by remember { mutableStateOf(false) }
     var recentsWarm by remember { mutableStateOf(false) }

@@ -150,6 +150,7 @@ internal object CommsStyle {
     const val USAGE_GAP_DP = 12f
     const val USAGE_DAY_SP = 14f
     const val USAGE_FIGURE_SP = 28f
+    /** The ink's row height; the row itself is at least 48 dp (W33), see [UsageTimelineBlock]. */
     const val USAGE_ROW_DP = 36f
     const val USAGE_ICON_DP = 20f
     const val USAGE_BAR_DP = 4f
@@ -236,8 +237,7 @@ internal val ReadIconFilter: androidx.compose.ui.graphics.ColorFilter by lazy {
 
 /** The tone of a row, cross-fading over [CommsStyle.READ_FADE_MS] when [unread] flips (no animation with reduced motion). */
 @Composable
-internal fun rememberRowTone(unread: Boolean, quiet: Boolean = false): CommsRowTone {
-    val lp = LocalLp.current
+internal fun rememberRowTone(unread: Boolean, quiet: Boolean = false, lp: LpColors = LocalLp.current): CommsRowTone {
     val target = remember(unread, quiet, lp) { CommsRowTone.of(unread, lp, BlueLight, quiet) }
     val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
     val spec = androidx.compose.animation.core.tween<Color>(if (reduced) 0 else CommsStyle.READ_FADE_MS)

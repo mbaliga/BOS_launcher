@@ -44,6 +44,7 @@ class StateCodecTest {
     }
 
     private fun variants(v: Any?, type: Class<*>): List<Any?> = when {
+        v == null && type.isEnum -> type.enumConstants.toList() // wave 35: a null-by-default choice (the alert effect)
         v is Boolean -> listOf(!v)
         v is Int -> listOf(v + 1, v + 2, v - 1)
         v is Long -> listOf(v xor 0x123456L)
@@ -52,7 +53,7 @@ class StateCodecTest {
         v is Enum<*> -> type.enumConstants.filter { it != v }
         v is GridSpec -> listOf(GridSpec(v.columns + 1, v.rows + 1), GridSpec(v.columns - 1, v.rows - 1))
         v is Map<*, *> -> listOf(emptyMap<Any, Any>(), mapOf(StripItem.entries.first() to StripZone.entries.last()))
-        v is Set<*> -> listOf(emptySet<Any>(), IndicatorEffect.entries.toSet())
+        v is Set<*> -> listOf(emptySet<Any>(), setOf("a", "b"))
         v is List<*> -> listOf(listOf("a/M#0", "b/M#0"))
         else -> error("no test variant for ${type.name}")
     }

@@ -43,7 +43,7 @@ class LauncherStores private constructor(context: Context) {
 }
 
 class LauncherPrefsStore internal constructor(private val sp: SharedPreferences, private val device: SharedPreferences? = null) {
-    private val _prefs = MutableStateFlow(run { DeviceBound.migratePrefs(sp, device); read() })
+    private val _prefs = MutableStateFlow(run { DeviceBound.migratePrefs(sp, device); migrateEffects(); read() })
     val prefs: StateFlow<LauncherPrefs> = _prefs.asStateFlow()
 
     /**
@@ -135,10 +135,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("drawerSort", next.drawerSort.name)
             .putString("drawerRail", next.drawerRail.name)
             .putString("indMetric", next.indicatorMetric.name)
-            .putString("indEffects", next.indicatorEffects.joinToString(",") { it.name })
+            .putString("indCalm", IndicatorMigration.store(next.indicatorCalm)).putString("indAlert", IndicatorMigration.store(next.indicatorAlert))
             .putLong("indLow", next.indicatorLow).putLong("indMid", next.indicatorMid)
             .putLong("indHigh", next.indicatorHigh).putLong("indIdle", next.indicatorIdle)
-            .putBoolean("indInvert", next.indicatorInvert)
             .putFloat("indIntensity", next.indicatorIntensity)
             .putFloat("indSpeed", next.indicatorSpeed)
             .putString("themeMode", next.themeMode.name)
@@ -160,6 +159,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .apply()
         // Wave 26: the removed home-landing keys are deleted once (HomeModelMigration read them).
         if (HomeModelMigration.RETIRED_KEYS.any { sp.contains(it) }) sp.edit().also { e -> HomeModelMigration.RETIRED_KEYS.forEach { e.remove(it) } }.apply()
+        if (sp.contains("indEffects") || sp.contains("indInvert")) sp.edit().remove("indEffects").remove("indInvert").apply() // wave 35: the old effect set and the ramp flip
         // Wave 15: the keys of the removed background gallery are deleted once, so nothing of it lingers.
         if (RetiredBackgroundKeys.KEYS.any { it != "bgPicture" && sp.contains(it) }) {
             sp.edit().also { e -> RetiredBackgroundKeys.KEYS.forEach { e.remove(it) } }.apply()
@@ -167,11 +167,31 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         DeviceBound.writePrefs(sp, device, next.leftWidgetId)
     }
 
+    /** Wave 35: the calm / alert selections; the old `indEffects` set (read through [IndicatorMigration]) only when the new keys were never written. */
+    private fun readEffects(d: LauncherPrefs): IndicatorSelection {
+        val legacy = sp.getString("indEffects", null) // read (and so accounted for) on every path, so an import never carries it as an unknown field
+        return if (sp.contains("indCalm") || sp.contains("indAlert")) {
+            IndicatorSelection(
+                if (sp.contains("indCalm")) IndicatorMigration.parse<CalmEffect>(sp.getString("indCalm", null)) else d.indicatorCalm,
+                IndicatorMigration.parse<AlertEffect>(sp.getString("indAlert", null)),
+            )
+        } else IndicatorMigration.fromLegacy(legacy) ?: IndicatorSelection(d.indicatorCalm, d.indicatorAlert)
+    }
+
+    /** Wave 35: persists the migrated selections once and drops the old `indEffects` / `indInvert` keys, so a later retired-key purge has nothing to lose. */
+    private fun migrateEffects() {
+        if (!sp.contains("indEffects") && !sp.contains("indInvert")) return
+        val sel = readEffects(LauncherPrefs())
+        sp.edit().putString("indCalm", IndicatorMigration.store(sel.calm)).putString("indAlert", IndicatorMigration.store(sel.alert))
+            .remove("indEffects").remove("indInvert").apply()
+    }
+
     private fun read(): LauncherPrefs {
         val d = LauncherPrefs()
         // Wave 15: any stored choice of the old background gallery is ignored; no stored slots means the default pair.
         val bg = BackgroundChoice.fromStored(sp.getString("bgSlot1", null), sp.getString("bgSlot2", null))
         val pagesBg = BackgroundChoice.fromStored(sp.getString("wpPagesSlot1", null), sp.getString("wpPagesSlot2", null))
+        val effects = readEffects(d)
         val migrated = HomeModelMigration.resolve(sp.getString("homeLanding", null), if (sp.contains("glanceEnabled")) sp.getBoolean("glanceEnabled", true) else null)
         // Wave 28: the Pages setting; the old Scroll / Paginated choice is read only when no homePages is stored (LauncherStores.migratePages settles the unchosen case with the layout).
         val pagesMode = HomeModelMigration.pagesMode(
@@ -274,13 +294,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             drawerSort = enumOr(sp.getString("drawerSort", null), d.drawerSort),
             drawerRail = enumOr(sp.getString("drawerRail", null), d.drawerRail),
             indicatorMetric = enumOr(sp.getString("indMetric", null), d.indicatorMetric),
-            indicatorEffects = sp.getString("indEffects", null)
-                ?.split(',')?.filter { it.isNotEmpty() }
-                ?.mapNotNull { n -> IndicatorEffect.entries.firstOrNull { it.name == n } }?.toSet()
-                ?: d.indicatorEffects,
+            indicatorCalm = effects.calm, indicatorAlert = effects.alert,
             indicatorLow = sp.getLong("indLow", d.indicatorLow), indicatorMid = sp.getLong("indMid", d.indicatorMid),
             indicatorHigh = sp.getLong("indHigh", d.indicatorHigh), indicatorIdle = sp.getLong("indIdle", d.indicatorIdle),
-            indicatorInvert = sp.getBoolean("indInvert", d.indicatorInvert),
             indicatorIntensity = sp.getFloat("indIntensity", d.indicatorIntensity).coerceIn(0f, 1f),
             indicatorSpeed = sp.getFloat("indSpeed", d.indicatorSpeed).coerceIn(0f, 1f),
             themeMode = enumOr(sp.getString("themeMode", null), d.themeMode),

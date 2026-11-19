@@ -32,7 +32,8 @@ import com.bos.sphere.core.data.RailSide
 import com.bos.sphere.core.data.DrawerSort
 import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.IndicatorColors
-import com.bos.sphere.core.data.IndicatorEffect
+import com.bos.sphere.core.data.CalmEffect
+import com.bos.sphere.core.data.IndicatorMetric
 import com.bos.sphere.core.data.ReadingKind
 import com.bos.sphere.core.data.IndicatorReading
 import com.bos.sphere.core.data.ComplicationKind
@@ -109,14 +110,15 @@ class ScreenshotTest {
         corners: Map<Corner, CornerSlot> = DefaultCorners,
         rotation: Int = if (landscape) 1 else 0,
         status: IndicatorReading = IndicatorReading(ReadingKind.Live, 0.9f, ""),
-        effects: Set<IndicatorEffect> = setOf(IndicatorEffect.DotsBreathe),
+        calm: CalmEffect? = CalmEffect.AnimatedDots,
+        alert: com.bos.sphere.core.data.AlertEffect? = null,
         prefs2: LauncherPrefs? = null,
         weather: com.bos.sphere.core.data.WeatherInfo? = null,
     ) {
         val state = rememberGridHomeState()
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             IndicatorLayer(
-                status, effects,
+                status, calm, alert, IndicatorMetric.Signal,
                 IndicatorColors.argb(status, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, false),
                 0.6f, 0.5f, Modifier.fillMaxSize(),
             )
@@ -230,7 +232,7 @@ class ScreenshotTest {
             Corner.TopRight to CornerSlot.Palette("Media", listOf(CornerActionId.Music, CornerActionId.Camera, CornerActionId.Gallery, CornerActionId.Flashlight).map(CornerItem::Action)),
             Corner.BottomLeft to CornerSlot.ComplicationCluster(listOf(ComplicationKind.Battery, ComplicationKind.Date, ComplicationKind.Ringer)),
         )
-        rule.setContent { Scene(prefs, landscape = false, pages = pages, corners = corners, status = IndicatorReading(ReadingKind.Live, 0.15f, ""), effects = setOf(IndicatorEffect.DotsBreathe, IndicatorEffect.Vignette)) }
+        rule.setContent { Scene(prefs, landscape = false, pages = pages, corners = corners, status = IndicatorReading(ReadingKind.Live, 0.15f, ""), alert = com.bos.sphere.core.data.AlertEffect.Vignette) }
         shoot("04-circle-bubbles-portrait")
     }
 
@@ -344,7 +346,7 @@ class ScreenshotTest {
         rule.setContent {
             Scene(
                 prefs, landscape = false, pages = pagesFor(prefs, false),
-                effects = setOf(IndicatorEffect.DotsBloomCentre, IndicatorEffect.SnakeOutline, IndicatorEffect.EdgeMeter),
+                calm = CalmEffect.Bloom,
             )
         }
         shoot("08-big-clock-effects", settleMs = 2_000)

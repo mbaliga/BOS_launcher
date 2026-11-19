@@ -175,6 +175,8 @@ fun SearchOverlay(
     onAppActionChoices: (AppEntry, MenuAction) -> List<RadarChoice>? = { _, _ -> null },
     /** Wave 18: the home's launch log; with what Radar learned it decides which ring an app sits on before anything is typed. */
     launchHistory: List<com.bos.sphere.core.data.LaunchEvent> = emptyList(),
+    /** Wave 35: the signal alert (vignette / comic lines) drawn above Radar's background, also with True black, which composes no SignalBackground. */
+    alertLayer: @Composable () -> Unit = {},
 ) {
     val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier.predictiveBackLayer(backProgress)) {
@@ -186,7 +188,7 @@ fun SearchOverlay(
             onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
             initialQuery = initialQuery, initialCategory = initialCategory, onRunCommand = onRunCommand,
             onRunAppAction = onRunAppAction, adjacentSupported = adjacentSupported, onAppActionChoices = onAppActionChoices,
-            launchHistory = launchHistory,
+            launchHistory = launchHistory, alertLayer = alertLayer,
         )
     }
 }
@@ -251,6 +253,8 @@ internal fun SearchScreen(
     nowMillis: () -> Long = { System.currentTimeMillis() },
     /** Test seam (wave 21): whether the push-to-talk button exists; null asks the device (an on-device recogniser is needed, INP-13). */
     voiceAvailable: Boolean? = null,
+    /** Wave 35: the signal alert drawn above the background (see [SearchOverlay]). */
+    alertLayer: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
     val voiceOn = remember(context, voiceAvailable) { voiceAvailable ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
@@ -519,6 +523,7 @@ internal fun SearchScreen(
         SearchBackdrop(Modifier.fillMaxSize())
         // Wave 30 (radarDim): Radar's own background, Dimmed wallpaper (default) or True black (nothing drawn, no SignalBackground composed); docs/decisions/radarDim.md.
         RadarBackgroundLayer(prefs, { wheelZone })
+        alertLayer() // wave 35: the signal alert is above the background and below everything Radar shows, with Dimmed and with True black (no SignalBackground there)
         // Wave 29 (radarFull, owner: the rings and icons are cropped and part of them cannot be touched): the Orbit's drawing and touch layer is the whole display area, edge to
         // edge and from the top of the screen to the top of the keyboard (the bottom edge when it is down). The field, the buttons, the mic, the strip circles and the wheel are
         // drawn above it and each takes only its own bounds; the only clip is the true screen or keyboard edge (docs/decisions/radarFull.md).

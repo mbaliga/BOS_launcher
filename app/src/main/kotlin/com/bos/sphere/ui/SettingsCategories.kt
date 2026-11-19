@@ -24,7 +24,8 @@ import com.bos.sphere.core.data.DrawerSort
 import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.IconShape
 import com.bos.sphere.core.data.IconTint
-import com.bos.sphere.core.data.IndicatorEffect
+import com.bos.sphere.core.data.AlertEffect
+import com.bos.sphere.core.data.CalmEffect
 import com.bos.sphere.core.data.IndicatorMetric
 import com.bos.sphere.core.data.PageMode
 import com.bos.sphere.core.data.RailSide
@@ -704,18 +705,28 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Indicator"),
         Glyphs.Dial,
         buildList {
+            // Wave 35: one calm effect (Dot bloom or Animated dots) and one alert effect (Coloured vignette or Comic-book lines), each also Off; at most one of each pair.
             add(
                 SettingItem.Choice(
-                    x("Glow: measurement"), Glyphs.Dial, IndicatorMetric.entries, p.indicatorMetric, { x(it.label) },
-                    hint = x("What the background reads out: low to high is red → amber → green."),
-                ) { v -> upd { it.copy(indicatorMetric = v, indicatorInvert = v == IndicatorMetric.Storage || v == IndicatorMetric.Memory) } },
+                    x("Calm effect"), Glyphs.Dial, listOf<CalmEffect?>(null, *CalmEffect.entries.toTypedArray()), p.indicatorCalm, { if (it == null) x("Off") else x(it.label) },
+                    hint = x("Lit while the value is healthy: red, amber, green."),
+                ) { v -> upd { it.copy(indicatorCalm = v) } },
             )
-            IndicatorEffect.entries.forEach { e ->
-                add(SettingItem.Toggle("${x("Glow")}: ${x(e.label)}", Glyphs.Bolt, e in p.indicatorEffects) { v -> upd { it.copy(indicatorEffects = if (v) it.indicatorEffects + e else it.indicatorEffects - e) } })
-            }
+            add(
+                SettingItem.Choice(
+                    x("Alert effect"), Glyphs.Bolt, listOf<AlertEffect?>(null, *AlertEffect.entries.toTypedArray()), p.indicatorAlert, { if (it == null) x("Off") else x(it.label) },
+                    hint = x("Alert effects only appear when the value is low, and become urgent when it is lost."),
+                ) { v -> upd { it.copy(indicatorAlert = v) } },
+            )
+            add(
+                SettingItem.Choice(
+                    x("Show"), Glyphs.Dial, IndicatorMetric.entries, p.indicatorMetric, { x(it.label) },
+                    hint = x("What the effects map to: the signal level, or the battery (charging counts as healthy)."),
+                ) { v -> upd { it.copy(indicatorMetric = v) } },
+            )
             add(SettingItem.Slider(x("Glow: intensity"), Glyphs.Dial, p.indicatorIntensity, 0f..1f, pct(p.indicatorIntensity)) { v -> upd { it.copy(indicatorIntensity = v) } })
             add(SettingItem.Slider(x("Glow: speed"), Glyphs.Dial, p.indicatorSpeed, 0f..1f, pct(p.indicatorSpeed)) { v -> upd { it.copy(indicatorSpeed = v) } })
-            add(SettingItem.Toggle(x("Glow: flip the ramp"), Glyphs.Flip, p.indicatorInvert, x("For measurements where low is good (storage used)")) { v -> upd { it.copy(indicatorInvert = v) } })
+            add(SettingItem.Pane(x("Glow: preview"), Glyphs.Dial, "") { com.bos.sphere.feature.grid.IndicatorPreview(p) })
             add(
                 SettingItem.Pane(x("Glow: colours"), Glyphs.Palette, "") {
                     var which by remember { mutableIntStateOf(0) }

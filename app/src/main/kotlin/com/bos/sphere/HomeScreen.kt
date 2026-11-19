@@ -752,9 +752,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // ---- indicator: the background dots / effects read out any measurement
     val indicator = remember { IndicatorSource(context) }
-    LaunchedEffect(prefs.indicatorMetric) { indicator.setMetric(prefs.indicatorMetric) }
+    LaunchedEffect(prefs.indicatorMetric) { indicator.setMetric(prefs.indicatorMetric) } // wave 35: Signal or Battery
     val reading by indicator.reading.collectAsStateWithLifecycle()
-    val indicatorTarget = IndicatorColors.argb(reading, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, prefs.indicatorInvert)
+    val indicatorTarget = IndicatorColors.argb(reading, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, false)
     val indicatorColor by androidx.compose.animation.animateColorAsState(Color(indicatorTarget.toInt()), com.bos.sphere.core.design.rememberMotionPrefs().gate(androidx.compose.animation.core.tween(800)), label = "indicator")
 
     val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo((landing == HomeShown.Glance && com.bos.sphere.core.data.GlanceItem.NowPlaying in prefs.glanceContent)) // STR-06, HOM-23: W25: the media controls and title live only in the Glance notch, no strip and nothing in the dock
@@ -931,11 +931,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         com.bos.sphere.feature.grid.HomeSurfaceBackground(surface, prefs, Modifier.fillMaxSize(), baseFill = baseFill)
         IndicatorLayer(
             reading = reading,
-            effects = prefs.indicatorEffects,
+            calm = prefs.indicatorCalm,
+            alert = prefs.indicatorAlert,
+            metric = prefs.indicatorMetric,
             colorArgb = indicatorColor.toArgb().toLong() and 0xFFFFFFFFL,
             intensity = prefs.indicatorIntensity,
             speed = prefs.indicatorSpeed,
             modifier = Modifier.fillMaxSize(),
+            low = prefs.indicatorLow, mid = prefs.indicatorMid,
         )
     }
 
@@ -1453,6 +1456,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onRequestContactsPermission = { grantPrompter.ask(com.bos.sphere.core.design.GrantKind.Contacts) { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) } },
             onDismiss = { searchOpen = false },
             modifier = Modifier.fillMaxSize(),
+            // Wave 35: the signal alert (not the calm dots) also shows over Radar, whatever its background (Dimmed or True black).
+            alertLayer = {
+                if (prefs.indicatorAlert != null) IndicatorLayer(
+                    reading = reading, calm = null, alert = prefs.indicatorAlert, metric = prefs.indicatorMetric,
+                    colorArgb = 0L, intensity = prefs.indicatorIntensity, speed = prefs.indicatorSpeed,
+                    modifier = Modifier.fillMaxSize(), low = prefs.indicatorLow, mid = prefs.indicatorMid,
+                )
+            },
             settingsSource = settingsSource,
             initialQuery = typedQuery,
             initialCategory = radarScope,

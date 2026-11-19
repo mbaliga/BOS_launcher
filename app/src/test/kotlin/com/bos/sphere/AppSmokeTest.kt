@@ -72,6 +72,9 @@ class AppSmokeTest {
     private fun start(restoreSurfaces: Boolean = false, apps: AppsOnHome = AppsOnHome.Everything, dock: Boolean = true): ActivityScenario<MainActivity> {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
         AppSmokeHarness.configure { it.copy(appsOnHome = apps, restoreOpenSurfaces = restoreSurfaces) }
+        // Wave 30 (pagesExplicit): nothing is placed for the user, so a test that wants apps on the page places them (as the user's own, recorded edit).
+        LauncherStores.get(AppSmokeHarness.app).layout.replace(com.bos.sphere.core.data.HomeLayout(pages = listOf(com.bos.sphere.core.data.HomePage(listOf("Alpha", "Bravo", "Camera", "Delta").map { AppSmokeHarness.appKey(it) }, id = 1L)), seeded = true))
+        LauncherStores.get(AppSmokeHarness.app).layout.markExplicit()
         if (dock) {
             WorkspaceRepository.get(AppSmokeHarness.app).setDock { it.copy(enabled = true) }
             WorkspaceRepository.get(AppSmokeHarness.app).setPins(listOf(DockItemRef.app(AppSmokeHarness.appKey("Alpha"))))

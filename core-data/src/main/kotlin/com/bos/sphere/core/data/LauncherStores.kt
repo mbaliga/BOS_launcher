@@ -324,6 +324,7 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
         // CFG-04: an edit that drops an app or a page from the arrangement snapshots first.
         if (cur.pages.size > next.size || cur.pages.any { p -> p.keys.any { k -> next.none { k in it.keys } } }) DestructiveEdits.before("remove from home")
         write(cur.copy(pages = next, seeded = true))
+        markExplicit()
     }
 
     /** Replaces the whole arrangement, used when a workspace is switched (WSP-07). */
@@ -342,10 +343,15 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
                 seeded = true,
             ),
         )
+        markExplicit()
     }
 
-    /** Puts [key] back on the home pages. */
-    fun addToHome(key: String, visual: List<HomePage>, preferredPage: Int, capacityOf: (PageLayout) -> Int, preserve: Set<String> = emptySet()) {
+    /**
+     * Puts [key] back on the home pages. Wave 30: false (and nothing written) when no page has a free slot: the caller says "Page full"; a
+     * page is never made for it. The preferred page is tried first, then the others.
+     */
+    fun addToHome(key: String, visual: List<HomePage>, preferredPage: Int, capacityOf: (PageLayout) -> Int, preserve: Set<String> = emptySet()): Boolean {
+        if (!HomeLayoutMath.hasRoom(visual, capacityOf)) return false
         val cur = _layout.value
         write(
             cur.copy(
@@ -354,7 +360,19 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
                 seeded = true,
             ),
         )
+        markExplicit()
+        return true
     }
+
+    // Wave 30 (pagesExplicit): the markers that keep the one-time legacy-layout migration from ever touching a layout the user edited.
+    /** True once the user added, removed or moved something on the pages (every edit path calls [markExplicit]). */
+    fun explicitEdit(): Boolean = sp.getBoolean("explicitEdit", false)
+    fun markExplicit() { if (!explicitEdit()) sp.edit().putBoolean("explicitEdit", true).apply() }
+    fun pagesExplicitVersion(): Int = sp.getInt("pagesExplicitVersion", 0)
+    fun markPagesExplicitDone() { sp.edit().putInt("pagesExplicitVersion", PagesExplicit.VERSION).apply() }
+    /** The one-time "Home pages were reset" notice has not been dealt with yet. */
+    fun noticePending(): Boolean = sp.getBoolean("resetNoticePending", false)
+    fun setNoticePending(v: Boolean) { sp.edit().putBoolean("resetNoticePending", v).apply() }
 
     /** Forgets "removed from home" for apps no longer installed, so a reinstall lands on home again. */
     fun pruneRemoved(installed: Set<String>) {

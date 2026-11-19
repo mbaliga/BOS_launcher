@@ -75,43 +75,45 @@ fun EditCardOverlay(
     }
     fun apply(r: HomePageOps.Result) { savePages(r.pages); goto = r.focus }
     val me = remember { Process.myUserHandle() }
+    var confirmDelete by remember { mutableStateOf<Int?>(null) }
+    fun deleteNow(i: Int) {
+        val r = HomePageOps.delete(pages, i)
+        val base = homeEdit.undoDepth
+        val before = layout
+        deletePageNow(i, pages, layout, preserve, appsByKey, homeItems, stores)
+        goto = r.focus
+        // The layout as this page edit left it: the Undo button only acts while it is still that, so a later edit is never undone by it.
+        val after = stores.layout.layout.value
+        notice = UndoNotice(L10n.tr(if (pages.size == 1) "Page emptied" else "Page deleted"), onUndo = {
+            if (stores.layout.layout.value == after) {
+                // One tap undoes the whole page edit, however many layout writes it took; it stops as soon as the page is back.
+                var left = (homeEdit.undoDepth - base).coerceAtLeast(2)
+                while (left-- > 0 && homeEdit.canUndo && stores.layout.layout.value != before) homeEdit.undo()
+            }
+        })
+    }
+    confirmDelete?.let { i ->
+        PageDeleteConfirm(HomePageOps.itemCount(pages, i), onConfirm = { confirmDelete = null; deleteNow(i) }, onDismiss = { confirmDelete = null })
+    }
     val onHome = remember(layout, folderKeys) { layout.pages.flatMapTo(HashSet()) { it.keys } + folderKeys }
     EditCardHost(
         progress = card.progress, reduced = card.reduced, target = card.target,
         pages = pages, current = { gridState.currentPage }, appsByKey = appsByKey, prefs = prefs, isLandscape = isLandscape,
         apps = apps, onHome = onHome, hasWork = remember(apps) { apps.any { it.user != me } }, isWork = { it.user != me },
         onSelect = { i -> scope.launch { gridState.goToPage(i) } },
-        onDelete = { i ->
-            val r = HomePageOps.delete(pages, i, capacityOf)
-            val base = homeEdit.undoDepth
-            val before = layout
-            if (r.taken.isEmpty()) {
-                com.bos.sphere.core.data.StateService.beforeDestructive(homeItems.context(), "delete page")
-                apply(r)
-            } else {
-                // The last page cannot vanish: it is emptied. Apps go off the home (they stay in the drawer); folders, widgets and shortcuts are removed the usual way.
-                r.taken.filter { it !in appsByKey }.forEach { homeItems.removeFromHome(it) }
-                val apps0 = r.taken.filter { it in appsByKey }.toSet()
-                stores.layout.replace(layout.copy(pages = HomeLayoutMath.toStored(r.pages, layout.pages, preserve - r.taken), removed = layout.removed + apps0, seeded = true))
-                goto = 0
-            }
-            // The layout as this page edit left it: the Undo button only acts while it is still that, so a later edit is never undone by it.
-            val after = stores.layout.layout.value
-            notice = UndoNotice(L10n.tr(if (r.taken.isEmpty()) "Page deleted" else "Page emptied"), onUndo = {
-                if (stores.layout.layout.value == after) {
-                    // One tap undoes the whole page edit, however many layout writes it took; it stops as soon as the page is back.
-                    var left = (homeEdit.undoDepth - base).coerceAtLeast(2)
-                    while (left-- > 0 && homeEdit.canUndo && stores.layout.layout.value != before) homeEdit.undo()
-                }
-            })
-        },
+        onDelete = { i -> if (HomePageOps.itemCount(pages, i) == 0) deleteNow(i) else confirmDelete = i },
         onMove = { i, d -> HomePageOps.move(pages, i, d)?.let(::apply) },
         onMoveTo = { i, t -> HomePageOps.moveTo(pages, i, t)?.let(::apply) },
         onAddPage = { apply(HomePageOps.add(pages, gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))) },
         onAddApp = { app ->
+            // Wave 30 (pagesExplicit): the app goes on the page being edited; a full page says so and nothing else moves or opens.
             val placed = AddCarouselModel.place(pages, app.key, gridState.currentPage, capacityOf)
-            stores.layout.replace(layout.copy(pages = HomeLayoutMath.toStored(placed, layout.pages, preserve), removed = layout.removed - app.key, seeded = true))
-            goto = placed.indexOfFirst { app.key in it.keys }.coerceAtLeast(0)
+            if (placed == null) android.widget.Toast.makeText(homeItems.context(), L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show()
+            else {
+                stores.layout.replace(layout.copy(pages = HomeLayoutMath.toStored(placed, layout.pages, preserve), removed = layout.removed - app.key, seeded = true))
+                stores.layout.markExplicit()
+                goto = placed.indexOfFirst { app.key in it.keys }.coerceAtLeast(0)
+            }
         },
         onWidget = { homeItems.widgetRequest++ },
         onFolder = { homeItems.folderOpen = true },
@@ -122,5 +124,38 @@ fun EditCardOverlay(
         notice = notice, onNoticeDone = { notice = null },
         focusAdd = focusAdd, onExit = { homeEdit.exit() },
         modifier = modifier,
+    )
+}
+
+/**
+ * Wave 30 (pagesExplicit): deletes visual page [i] with everything placed on it. The items leave the home (apps stay in the drawer; folders,
+ * widgets, shortcuts and links are removed the usual way, so edit mode's undo can bring them back), nothing moves to a neighbour page, and
+ * nothing is placed again afterwards. The last page is emptied (Pages stays on with one empty page).
+ */
+fun deletePageNow(
+    i: Int, pages: List<HomePage>, layout: HomeLayout, preserve: Set<String>,
+    appsByKey: Map<String, AppEntry>, homeItems: HomeItems, stores: LauncherStores,
+): HomePageOps.Result {
+    val r = HomePageOps.delete(pages, i)
+    com.bos.sphere.core.data.StateService.beforeDestructive(homeItems.context(), "delete page")
+    r.taken.filter { it !in appsByKey }.forEach { homeItems.removeFromHome(it) }
+    val gone = HomePageOps.groupOf(pages, i).map { pages[it].id }.toSet()
+    val goneStored = layout.pages.filter { it.id in gone }.flatMapTo(HashSet()) { it.keys }
+    val apps0 = r.taken.filter { it in appsByKey }.toSet()
+    stores.layout.replace(layout.copy(pages = HomeLayoutMath.toStored(r.pages, layout.pages, preserve - r.taken - goneStored), removed = layout.removed + apps0, seeded = true))
+    stores.layout.markExplicit()
+    return r
+}
+
+/** "N items will be removed from this page; they stay in the drawer." before a page that holds something is deleted. */
+@Composable
+fun PageDeleteConfirm(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    com.bos.sphere.feature.grid.ConfirmDialog(
+        title = L10n.tr("Delete this page?"),
+        text = if (count == 1) L10n.tr("1 item will be removed from this page. It stays in the drawer.") else L10n.tr("%d items will be removed from this page. They stay in the drawer.", count),
+        confirm = L10n.tr("Delete page"),
+        dismiss = L10n.tr("Cancel"),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
     )
 }

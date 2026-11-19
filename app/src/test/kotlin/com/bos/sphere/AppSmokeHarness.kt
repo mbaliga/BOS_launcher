@@ -118,6 +118,12 @@ internal object AppSmokeHarness {
      * Wave 26: what the system does after an uninstall is confirmed: the package leaves the launcher-apps inventory and the `onPackageRemoved`
      * callback fires (the fake callback of the brief: Robolectric's shadow posts it to the callback the repository registered).
      */
+    /** Wave 30: an install while the launcher runs: the app joins the inventory and the system's package-added callback fires. */
+    fun installApp(label: String) {
+        seedApps(label)
+        Shadows.shadowOf(app.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps).notifyPackageAdded(packageOf(label))
+    }
+
     fun removeApp(label: String) {
         val pkg = packageOf(label)
         val shadow = Shadows.shadowOf(app.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps)

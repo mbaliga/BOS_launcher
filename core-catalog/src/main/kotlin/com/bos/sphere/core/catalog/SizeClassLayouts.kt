@@ -43,6 +43,13 @@ class SizeClassLayoutStore(context: Context) {
         return layout
     }
 
+    /** Wave 30 (pagesExplicit): forgets every stored arrangement but [current] for [sc] (the legacy auto-filled pages were seeded into the other classes too). */
+    fun reset(sc: SizeClass, current: HomeLayout) {
+        sp.edit().apply { sp.all.keys.filter { it.startsWith("pages:") || it.startsWith("removed:") }.forEach { remove(it) } }.apply()
+        data = LayoutsBySizeClass().with(sc, current)
+        persist(sc.key)
+    }
+
     /** Keeps the stored copy of the active class current while the user edits. */
     fun record(sc: SizeClass, layout: HomeLayout) {
         data = data.with(sc, layout)

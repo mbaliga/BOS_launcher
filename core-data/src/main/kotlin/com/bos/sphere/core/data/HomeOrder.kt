@@ -124,11 +124,12 @@ object HomeDeck {
     /**
      * "Add page" (the edit card, the quick sheet). From Glance ([afterIndex] null) the page goes after the last one; when the
      * home has no page yet, or only the one untouched blank page a fresh install starts with, that blank page IS page 1 (it is shown, no
-     * second blank page is stacked on it). From a page ([afterIndex] set) the new blank page goes right after it.
+     * second blank page is stacked on it). From a page ([afterIndex] set) the new blank page goes right after it. Wave 30: that reuse is only for
+     * turning Pages on ([pagesAlreadyOn] false); with Pages already on, every Add page adds exactly ONE new empty page.
      */
-    fun addPage(pages: List<HomePage>, afterIndex: Int?): Added = when {
+    fun addPage(pages: List<HomePage>, afterIndex: Int?, pagesAlreadyOn: Boolean = false): Added = when {
         pages.isEmpty() -> Added(HomeLayoutMath.insertPage(pages, -1), 0)
-        afterIndex == null && pages.size == 1 && pages[0].keys.isEmpty() -> Added(pages, 0)
+        afterIndex == null && pages.size == 1 && pages[0].keys.isEmpty() && !pagesAlreadyOn -> Added(pages, 0)
         afterIndex == null -> Added(HomeLayoutMath.insertPage(pages, pages.size - 1), pages.size)
         else -> Added(HomeLayoutMath.insertPage(pages, afterIndex), (afterIndex + 1).coerceIn(0, pages.size))
     }

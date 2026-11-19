@@ -17,35 +17,36 @@ class EditCardAuditW13Test {
         // the sibling chunk and overflowed straight back, so the page could never be removed.
         val pages = listOf(page(1, "a"), page(2, "b", "c"), page(2, "d"), page(3, "e"))
         for (chunk in 1..2) {
-            val r = HomePageOps.delete(pages, chunk, cap)
-            assertEquals("deleting chunk $chunk", listOf("a", "b", "c", "d", "e"), r.pages.flatMap { it.keys })
+            val r = HomePageOps.delete(pages, chunk)
+            assertEquals("deleting chunk $chunk", listOf("a", "e"), r.pages.flatMap { it.keys })
             assertEquals(setOf(1L, 3L), r.pages.map { it.id }.filter { it != 0L }.toSet().intersect(setOf(1L, 3L)))
             assertFalse("the deleted page's id is gone", r.pages.any { it.id == 2L })
-            assertTrue(r.taken.isEmpty())
+            assertEquals(setOf("b", "c", "d"), r.taken)
             assertEquals(0, r.focus)
         }
     }
 
     @Test fun HOM_12_deletingTheOnlyStoredPageEvenWhenItOverflowedEmptiesItAndReportsEveryKey() {
-        val r = HomePageOps.delete(listOf(page(7, "a", "b"), page(7, "c")), 1, cap)
+        val r = HomePageOps.delete(listOf(page(7, "a", "b"), page(7, "c")), 1)
         assertEquals(1, r.pages.size)
         assertTrue(r.pages[0].keys.isEmpty()); assertEquals(7L, r.pages[0].id)
         assertEquals(setOf("a", "b", "c"), r.taken)
         assertEquals(0, r.focus)
     }
 
-    @Test fun HOM_12_deletingTheFirstPageSendsItsItemsToTheNextAndTheFocusStaysInRange() {
-        val r = HomePageOps.delete(listOf(page(1, "a"), page(2, "b")), 0, cap)
-        assertEquals(listOf(listOf("b", "a")), r.pages.map { it.keys })
+    @Test fun HOM_12_deletingTheFirstPageDropsItsItemsAndTheFocusStaysInRange() {
+        val r = HomePageOps.delete(listOf(page(1, "a"), page(2, "b")), 0)
+        assertEquals(listOf(listOf("b")), r.pages.map { it.keys })
+        assertEquals(setOf("a"), r.taken)
         assertEquals(0, r.focus)
-        val none = HomePageOps.delete(listOf(page(1, "a")), 5, cap) // a stale index changes nothing
+        val none = HomePageOps.delete(listOf(page(1, "a")), 5) // a stale index changes nothing
         assertEquals(listOf(page(1, "a")), none.pages); assertEquals(0, none.focus)
     }
 
     @Test fun HOM_12_deleteNeverLosesOrDuplicatesAKeyWhateverTheIndex() {
         val pages = listOf(page(1, "a", "b"), page(2, "c", "d"), page(2, "e"), page(3, "f"), page(4))
         for (i in pages.indices) {
-            val r = HomePageOps.delete(pages, i, cap)
+            val r = HomePageOps.delete(pages, i)
             val all = r.pages.flatMap { it.keys } + r.taken
             assertEquals("index $i", pages.flatMap { it.keys }.sorted(), all.sorted())
             assertTrue(r.pages.isNotEmpty())

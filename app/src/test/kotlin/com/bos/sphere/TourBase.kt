@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.down
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
@@ -71,6 +72,8 @@ abstract class TourBase {
         return rule.onAllNodesWithTag("glance.surface", useUnmergedTree = true).fetchSemanticsNodes().any { it.boundsInRoot.let { b -> b.right > 0f && b.left < w } }
     }
     protected fun editShown() = descShown("Page carousel")
+    /** Wave 30: deleting a page that holds items asks first; this answers the dialog's Delete page. */
+    protected fun confirmDeletePage() { rule.onNode(androidx.compose.ui.test.hasText("Delete page") and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.isDialog()), useUnmergedTree = true).performClick(); settle(300) }
     protected fun controlsShown() = descShown("Next")
 
     enum class Surface { Home, Launchpad, Recents, Radar, Drawer, Settings, QuickSheet, Edit }

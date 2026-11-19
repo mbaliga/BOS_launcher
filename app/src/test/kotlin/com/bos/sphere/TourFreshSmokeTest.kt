@@ -154,7 +154,7 @@ class TourFreshSmokeTest : TourBase() {
         rule.onNodeWithContentDescription("Add to home: Camera").performClick(); settle()
         assertEquals(listOf(camera), stores.layout.layout.value.pages.flatMap { it.keys }); check("added", Surface.Edit)
         stores.layout.replace(com.bos.sphere.core.data.HomeLayout(pages = listOf(com.bos.sphere.core.data.HomePage(keys = listOf(camera), id = 7L), com.bos.sphere.core.data.HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
-        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle(); check("deleted", Surface.Edit)
+        rule.onNodeWithContentDescription("Delete page 2").performScrollTo().performClick(); settle(); confirmDeletePage(); settle(); check("deleted", Surface.Edit)
         assertEquals(1, stores.layout.layout.value.pages.size)
         rule.onNodeWithText("Undo", useUnmergedTree = true).performClick(); settle(); check("undone", Surface.Edit)
         assertEquals("undo brought the page back", 2, stores.layout.layout.value.pages.size)

@@ -12,20 +12,21 @@ class EditCardPagesTest {
     private fun page(id: Long, vararg keys: String) = HomePage(keys.toList(), PageLayout(), id)
 
     // ---- HOM-12 page delete / undo-able result / reorder
-    @Test fun HOM_12_deleteMovesItemsToThePreviousPage() {
-        val r = HomePageOps.delete(listOf(page(1, "a"), page(2, "b", "c"), page(3, "d")), 1, cap)
-        assertEquals(listOf(listOf("a", "b", "c"), listOf("d")), r.pages.map { it.keys })
-        assertTrue(r.taken.isEmpty()); assertEquals(0, r.focus)
+    // Wave 30 (pagesExplicit): replaces HOM_12_deleteMovesItemsToThePreviousPage: a deleted page takes its items with it (they stay in the drawer), nothing joins a neighbour.
+    @Test fun PGX_deleteRemovesThePageAndItsItemsAndNothingMovesToANeighbour() {
+        val r = HomePageOps.delete(listOf(page(1, "a"), page(2, "b", "c"), page(3, "d")), 1)
+        assertEquals(listOf(listOf("a"), listOf("d")), r.pages.map { it.keys })
+        assertEquals(setOf("b", "c"), r.taken); assertEquals(0, r.focus)
     }
 
     @Test fun HOM_12_deletingTheLastPageEmptiesIt() {
-        val r = HomePageOps.delete(listOf(page(5, "a", "b")), 0, cap)
+        val r = HomePageOps.delete(listOf(page(5, "a", "b")), 0)
         assertEquals(1, r.pages.size); assertTrue(r.pages[0].keys.isEmpty()); assertEquals(5L, r.pages[0].id)
         assertEquals(setOf("a", "b"), r.taken)
     }
 
     @Test fun HOM_12_deletingTheOnlyEmptyPageStillLeavesOnePage() {
-        val r = HomePageOps.delete(listOf(page(0)), 0, cap)
+        val r = HomePageOps.delete(listOf(page(0)), 0)
         assertEquals(1, r.pages.size); assertEquals(1L, r.pages[0].id)
     }
 
@@ -82,7 +83,7 @@ class EditCardPagesTest {
     }
 
     @Test fun HOM_01_freshVisualPagesAreOneEmptyPageEvenWithAppsInstalled() {
-        val v = HomeLayoutMath.visualPages(FreshHome.emptyLayout(), listOf("a", "b", "c"), cap, autoPlace = false)
+        val v = HomeLayoutMath.visualPages(FreshHome.emptyLayout(), listOf("a", "b", "c"), cap)
         assertEquals(1, v.size); assertTrue(v[0].keys.isEmpty())
     }
 
@@ -102,20 +103,20 @@ class EditCardPagesTest {
 
     @Test fun HOM_04_tapPlacesInTheFirstFreeCellOfTheCurrentPage() {
         val ps = listOf(page(1, "a"), page(2, "b"))
-        val r = AddCarouselModel.place(ps, "x", 1, cap)
+        val r = AddCarouselModel.place(ps, "x", 1, cap)!!
         assertEquals(listOf("a"), r[0].keys); assertEquals(listOf("b", "x"), r[1].keys)
     }
 
-    @Test fun HOM_04_fullPageSpillsToTheNextWithRoomThenGrowsAPage() {
+    // Wave 30 (pagesExplicit), replaces HOM_04_fullPageSpillsToTheNextWithRoomThenGrowsAPage: a full current page is "page full": nothing moves to another page and no page appears.
+    @Test fun PGX_fullCurrentPageRefusesTheItemInsteadOfSpillingOrGrowingAPage() {
         val full = listOf(page(1, "a", "b", "c", "d"), page(2, "e"))
-        assertEquals(listOf("e", "x"), AddCarouselModel.place(full, "x", 0, cap)[1].keys)
-        val allFull = listOf(page(1, "a", "b", "c", "d"))
-        val grown = AddCarouselModel.place(allFull, "x", 0, cap)
-        assertEquals(2, grown.size); assertEquals(listOf("x"), grown[1].keys); assertEquals(4, grown[0].keys.size)
+        assertNull(AddCarouselModel.place(full, "x", 0, cap))
+        assertEquals(listOf("e"), AddCarouselModel.place(full, "x", 1, cap)!![1].keys.dropLast(1))
+        assertNull(AddCarouselModel.place(listOf(page(1, "a", "b", "c", "d")), "x", 0, cap))
     }
 
     @Test fun HOM_04_anEmptyHomeStillTakesTheFirstItemAndNeverDuplicates() {
-        assertEquals(listOf("x"), AddCarouselModel.place(emptyList(), "x", 0, cap)[0].keys)
+        assertEquals(listOf("x"), AddCarouselModel.place(emptyList(), "x", 0, cap)!![0].keys)
         val ps = listOf(page(1, "x"))
         assertEquals(ps, AddCarouselModel.place(ps, "x", 0, cap))
     }

@@ -56,7 +56,7 @@ class HomeBehaviourTest {
         assertEquals(setOf("a/x", "c/x"), diff.changed.map { it.key }.toSet()) // update and suspend
         assertEquals(setOf("a/x", "c/x", "b/x"), diff.iconKeysToEvict())
         val layout = HomeLayout(listOf(HomePage(listOf("a/x", "b/x", "c/x", "d/x"), id = 1)), seeded = true)
-        val pages = HomeLayoutMath.visualPages(layout, after.map { it.key }, { 20 }, autoPlace = false)
+        val pages = HomeLayoutMath.visualPages(layout, after.map { it.key }, { 20 })
         assertEquals(listOf("a/x", "c/x", "d/x"), pages.single().keys) // b is gone, the rest close up
     }
 

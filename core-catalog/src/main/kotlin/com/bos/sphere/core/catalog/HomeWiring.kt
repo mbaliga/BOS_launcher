@@ -1,6 +1,7 @@
 package com.bos.sphere.core.catalog
 
 import com.bos.sphere.core.data.HomeLayout
+import com.bos.sphere.core.data.HomeLayoutMath
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.PageLayout
 import com.bos.sphere.core.data.PageShape
@@ -153,6 +154,10 @@ object HomeResolve {
         val stacked = WidgetStacks.members(extras)
         return appKeys + extras.nonAppKeys().filter { it !in stacked }
     }
+
+    /** The visual pages: the stored ones, plus the user's own folders, widgets, shortcuts and links this arrangement lacks. Apps are never added (wave 30). */
+    fun visual(layout: HomeLayout, appKeys: List<String>, extras: HomeState, capacityOf: (PageLayout) -> Int): List<HomePage> =
+        HomeLayoutMath.visualPages(layoutFor(layout, extras), available(appKeys, extras), capacityOf, strays = available(emptyList(), extras))
 
     fun layoutFor(layout: HomeLayout, extras: HomeState): HomeLayout {
         val held = extras.folders.values.flatMap { it.keys } + extras.dock + WidgetStacks.members(extras)

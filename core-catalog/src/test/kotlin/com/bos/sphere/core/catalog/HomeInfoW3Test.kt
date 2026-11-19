@@ -113,13 +113,13 @@ class HomeInfoW3Test {
         val apps = listOf("a/x#0", "b/x#0", "c/x#0")
         // the other class never knew folder f1: it is placed at the end, the app inside it is not shown twice
         val otherClass = layout("a/x#0", "b/x#0", "c/x#0")
-        val shown = HomeLayoutMath.visualPages(HomeResolve.layoutFor(otherClass, extras), HomeResolve.available(apps, extras), capacityOf = { 12 }).flatMap { it.keys }
+        val shown = HomeResolve.visual(otherClass, apps, extras, capacityOf = { 12 }).flatMap { it.keys }
         assertEquals(listOf("a/x#0", "b/x#0", "folder:f1"), shown)
         // a class that still lists a folder that was dissolved elsewhere shows nothing for it
         val stale = layout("a/x#0", "folder:gone", "b/x#0")
-        val after = HomeLayoutMath.visualPages(stale, HomeResolve.available(apps, HomeState()), capacityOf = { 12 }).flatMap { it.keys }
+        val after = HomeResolve.visual(stale, apps, HomeState(), capacityOf = { 12 }).flatMap { it.keys }
         assertFalse("folder:gone" in after)
-        assertEquals(listOf("a/x#0", "b/x#0", "c/x#0"), after)
+        assertEquals(listOf("a/x#0", "b/x#0"), after) // wave 30: c is not on this arrangement and an app is never placed for the user
     }
 
     @Test

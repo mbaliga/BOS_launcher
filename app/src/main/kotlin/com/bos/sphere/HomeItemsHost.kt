@@ -188,9 +188,17 @@ class HomeItems internal constructor(
     private fun newId() = "f" + System.currentTimeMillis().toString(36)
     private fun page() = currentPage().coerceIn(0, (pagesNow().size - 1).coerceAtLeast(0))
 
+    /** Wave 30 (pagesExplicit): with every page full an added item is refused and no page is made for it; the user is told. True = refused. */
+    private fun pageFull(): Boolean {
+        if (com.bos.sphere.core.data.HomeLayoutMath.hasRoom(pagesNow(), capacityOf)) return false
+        android.widget.Toast.makeText(context, L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show()
+        return true
+    }
+
     // ---- adding things
     fun addWidget(id: Int, label: String) {
         val info = host.providerInfo(id) ?: return
+        if (pageFull()) return
         val d = context.resources.displayMetrics.density
         val span = WidgetSizing.spanFor((info.minWidth / d).toInt(), (info.minHeight / d).toInt(), 80f)
         edit { HomeEdit.add(it, ItemDef(ItemKeys.widget(id), ItemKind.Widget, label, info.provider.flattenToString()), page(), capacityOf, span) }
@@ -209,6 +217,7 @@ class HomeItems internal constructor(
     internal var groupOpen by mutableStateOf(false)
 
     fun addGroup(id: String, name: String) {
+        if (pageFull()) return
         edit { HomeEdit.add(it, ItemDef(ItemKeys.group(id), ItemKind.Group, name, id), page(), capacityOf) }
         onPlaced()
     }
@@ -220,6 +229,7 @@ class HomeItems internal constructor(
     }
 
     fun addLink(uri: String, label: String, isFile: Boolean) {
+        if (pageFull()) return
         val def = ItemDef(ItemKeys.link(uri), ItemKind.Link, label, uri, isFile)
         edit { HomeEdit.add(it, def, page(), capacityOf) }
         onPlaced()
@@ -235,7 +245,7 @@ class HomeItems internal constructor(
 
     /** INP-11: items dropped on the home (links, files, search text) are placed on the current page like any added item. */
     fun addDropped(defs: List<ItemDef>) {
-        if (defs.isEmpty()) return
+        if (defs.isEmpty() || pageFull()) return
         edit { s -> defs.fold(s) { acc, def -> HomeEdit.add(acc, def, page(), capacityOf) } }
         onPlaced()
     }
@@ -259,6 +269,7 @@ class HomeItems internal constructor(
     }
 
     fun addShortcut(app: AppEntry, s: PinnableShortcut) {
+        if (pageFull()) return
         val def = ItemDef(ItemKeys.shortcut(app.packageName, s.id, app.user.hashCode()), ItemKind.Shortcut, s.label, s.id)
         edit { HomeEdit.add(it, def, page(), capacityOf) }
         onPlaced()

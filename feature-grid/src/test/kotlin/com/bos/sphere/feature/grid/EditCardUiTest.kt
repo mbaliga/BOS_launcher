@@ -213,7 +213,7 @@ class EditCardUiTest {
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun HOM_12_lastPageDeleteLeavesAnEmptyPageViaThePureRule() {
-        val r = HomePageOps.delete(listOf(page(1, apps[0])), 0) { 20 }
+        val r = HomePageOps.delete(listOf(page(1, apps[0])), 0)
         assertEquals(1, r.pages.size); assertTrue(r.pages[0].keys.isEmpty())
     }
 }

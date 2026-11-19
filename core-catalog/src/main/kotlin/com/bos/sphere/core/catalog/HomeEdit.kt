@@ -24,14 +24,19 @@ object HomeEdit {
     /** Adds a new item (app, shortcut, widget, link) to the end of [page], defining it when it carries data. */
     fun add(state: HomeState, def: ItemDef, page: Int, cap: (PageLayout) -> Int, span: WidgetSpan? = null): HomeState {
         if (def.key in state.allKeys()) return state
+        // Wave 30 (pagesExplicit): a full home refuses the item ("page full"); it never opens a page of its own.
+        val placed = HomeLayoutMath.add(state.pages, def.key, page, cap)
+        if (placed.none { def.key in it.keys }) return state
         val items = if (def.kind == ItemKind.App || def.kind == ItemKind.Tile) state.items else state.items + (def.key to def)
         val widgets = if (span != null) state.widgets + (def.key to span) else state.widgets
-        return state.copy(pages = HomeLayoutMath.add(state.pages, def.key, page, cap), items = items, widgets = widgets)
+        return state.copy(pages = placed, items = items, widgets = widgets)
     }
 
     /** Moves a top-level item (or one taken out of a folder or the dock) to ([page], [index]) on the pages. */
     fun move(state: HomeState, key: String, page: Int, index: Int, cap: (PageLayout) -> Int): HomeState {
         if (find(state, key) >= 0) return state.copy(pages = HomeLayoutMath.move(state.pages, key, page, index, cap))
+        // Wave 30: an item from a folder or the dock goes onto the page it is dropped on; a full page refuses it (it stays where it was).
+        if (!HomeLayoutMath.hasRoomOn(state.pages, page.coerceIn(0, (state.pages.size - 1).coerceAtLeast(0)), cap)) return state
         val inFolder = state.folders.values.firstOrNull { key in it.keys }
         val base = if (inFolder != null) removeFromFolderKeys(state, inFolder.id, key) else state.copy(dock = DockEntries.without(state.dock, key))
         val placed = HomeLayoutMath.add(base.pages, key, page, cap)
@@ -100,7 +105,11 @@ object HomeEdit {
             pageAnchor != null ->
                 s.copy(pages = s.pages.map { p -> p.copy(keys = p.keys.mapNotNull { if (it == pageAnchor) folder.key else if (it in others) null else it }) })
             dockAnchor != null -> s
-            else -> s.copy(pages = HomeLayoutMath.add(s.pages, folder.key, 0, cap))
+            else -> {
+                // Wave 30: a folder of items that are on no page needs a free slot; a full home does not make a page for it.
+                if (!HomeLayoutMath.hasRoom(s.pages, cap)) return state
+                s.copy(pages = HomeLayoutMath.add(s.pages, folder.key, 0, cap))
+            }
         }
         return s.copy(pages = s.pages.map { p -> p.copy(keys = p.keys.filter { it !in others }) }, folders = s.folders + (id to folder))
     }
@@ -142,6 +151,7 @@ object HomeEdit {
     fun takeOut(state: HomeState, folderId: String, key: String, page: Int, index: Int, cap: (PageLayout) -> Int): HomeState {
         val f = state.folders[folderId] ?: return state
         if (key !in f.keys) return state
+        if (!HomeLayoutMath.hasRoomOn(state.pages, page.coerceIn(0, (state.pages.size - 1).coerceAtLeast(0)), cap)) return state // wave 30: a full page refuses it
         val s = removeFromFolderKeys(state, folderId, key)
         val pages = HomeLayoutMath.add(s.pages, key, page, cap)
         return s.copy(pages = HomeLayoutMath.move(pages, key, page.coerceIn(0, pages.lastIndex), index, cap))

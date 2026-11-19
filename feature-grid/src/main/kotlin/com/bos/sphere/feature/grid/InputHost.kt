@@ -260,6 +260,10 @@ fun Modifier.launcherItem(
     /** Called when keyboard focus arrives, so a scrolling or paged host can bring the item into view. */
     onFocused: (() -> Unit)? = null,
     ringRadiusDp: Float = 14f,
+    /** False when the item draws its own focus outline (the drawer disc's wedges, wave 32). */
+    drawRing: Boolean = true,
+    /** Reports keyboard focus gained or lost to an item that draws its own outline. */
+    onFocusState: ((Boolean) -> Unit)? = null,
 ): Modifier = composed {
     val requester = remember { FocusRequester() }
     val modeState = LocalInputMode.current
@@ -281,7 +285,7 @@ fun Modifier.launcherItem(
         }
         .semantics { if (order != null) traversalIndex = order.toFloat() }
         .focusRequester(requester)
-        .onFocusChanged { focused = it.isFocused || it.hasFocus; LauncherInput.focus.onFocus(id, focused); if (it.isFocused) latestFocused?.invoke() }
+        .onFocusChanged { focused = it.isFocused || it.hasFocus; onFocusState?.invoke(focused); LauncherInput.focus.onFocus(id, focused); if (it.isFocused) latestFocused?.invoke() }
     if (focusable) m = m.focusable()
     m = m
         .onKeyEvent { e ->
@@ -312,10 +316,10 @@ fun Modifier.launcherItem(
         .drawWithContent {
             drawContent()
             val mode = modeState.value
-            if (mode == InputMode.Pointer && hovered) {
+            if (drawRing && mode == InputMode.Pointer && hovered) {
                 drawRoundRect(wash, size = size, cornerRadius = CornerRadius(ringRadiusDp.dp.toPx()))
             }
-            if (mode == InputMode.Keyboard && focused) {
+            if (drawRing && mode == InputMode.Keyboard && focused) {
                 val w = 2.dp.toPx()
                 drawRoundRect(
                     ring, topLeft = androidx.compose.ui.geometry.Offset(w / 2, w / 2),

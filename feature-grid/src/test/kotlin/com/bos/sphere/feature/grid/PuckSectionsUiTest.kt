@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.WheelGrouping
+import com.bos.sphere.core.design.HyleTheme
+import com.bos.sphere.core.design.ThemeVariant
 import com.bos.sphere.core.design.ReducedMotionTesting
 import com.bos.sphere.core.quality.MotionPrefs
 import org.junit.After
@@ -56,7 +58,7 @@ import java.io.File
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
 class PuckSectionsUiTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
-    @After fun reset() = ReducedMotionTesting.force(null)
+    @After fun reset() { ReducedMotionTesting.force(null); HyleTheme.apply(ThemeVariant.Dark, 0xFF8E7BFF) }
     private val outDir = File(System.getProperty("user.dir"), "build/screenshots").apply { mkdirs() }
 
     private val tints = longArrayOf(0xFFE1306C, 0xFF2F6BFF, 0xFF25C04A, 0xFFFF9A3C, 0xFF8E7BFF, 0xFF3A9BFF)
@@ -221,12 +223,113 @@ class PuckSectionsUiTest {
         }
     }
 
-    private fun shoot(name: String, anchor: Corner, sections: List<PuckAction> = four) {
-        show(anchor, sections)
+    private fun grab(): Bitmap {
         val view = rule.activity.findViewById<android.view.View>(android.R.id.content)
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         rule.runOnUiThread { view.draw(Canvas(bmp)) }
-        File(outDir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return bmp
+    }
+
+    private fun shoot(name: String, anchor: Corner, sections: List<PuckAction> = four, light: Boolean = false) {
+        if (light) HyleTheme.apply(ThemeVariant.Light, 0xFF6D5BFF)
+        show(anchor, sections)
+        File(outDir, "$name.png").outputStream().use { grab().compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    /** Pixel (px) of the point at [radiusDp] and [deg] from the wheel's centre for [anchor] in the grabbed window. */
+    private fun pixel(bmp: Bitmap, anchor: Corner, radiusDp: Float, deg: Float): Int {
+        val d = rule.activity.resources.displayMetrics.density
+        val inset = 63f * d
+        val cx = if (anchor == Corner.TopRight || anchor == Corner.BottomRight) bmp.width - inset else inset
+        val cy = if (anchor == Corner.BottomRight || anchor == Corner.BottomLeft) bmp.height - inset else inset
+        val a = Math.toRadians(deg.toDouble())
+        return bmp.getPixel((cx + radiusDp * d * kotlin.math.cos(a)).toInt(), (cy + radiusDp * d * kotlin.math.sin(a)).toInt())
+    }
+    private fun ringOf(): SectionRing {
+        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        val d = rule.activity.resources.displayMetrics.density
+        val hub = com.bos.sphere.core.input.PuckLayout.compute(minOf(root.width, root.height) / d, 0)
+        return PuckSectionsGeometry.ring(hub.hubRadiusDp, hub.chipRadiusDp)
+    }
+    private fun rgb(c: Int) = Triple(android.graphics.Color.red(c), android.graphics.Color.green(c), android.graphics.Color.blue(c))
+    private fun near(c: Int, v: Int, tol: Int = 6): Boolean = rgb(c).let { (r, g, b) -> kotlin.math.abs(r - v) <= tol && kotlin.math.abs(g - v) <= tol && kotlin.math.abs(b - v) <= tol }
+
+    @Test fun W32_darkThemeDrawsASolidWhiteRingFromTheHubToTheOuterEdgeWithBlackHairlineDividersAndABlackHub() {
+        show(Corner.BottomLeft)
+        val bmp = grab(); val ring = ringOf()
+        val w = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)
+        for (wd in w) {
+            val deg = wd.midDeg
+            assertTrue("hard against the hub, no gap: ${rgb(pixel(bmp, Corner.BottomLeft, ring.inner + 1f, deg))}", near(pixel(bmp, Corner.BottomLeft, ring.inner + 1f, deg), 255))
+            assertTrue("outer edge", near(pixel(bmp, Corner.BottomLeft, ring.outer - 2f, deg), 255))
+            assertTrue("hub is black", near(pixel(bmp, Corner.BottomLeft, ring.backRadius - 3f, deg), 0))
+        }
+        for (deg in PuckSectionsGeometry.dividerAngles(Corner.BottomLeft))
+            assertTrue("divider at $deg is black: ${rgb(pixel(bmp, Corner.BottomLeft, ring.mid + 12f, deg))}", near(pixel(bmp, Corner.BottomLeft, ring.mid + 12f, deg), 0, 40))
+        // no outline beyond the ring: just outside the outer edge is the drawer (not white)
+        assertFalse("clean outer arc", near(pixel(bmp, Corner.BottomLeft, ring.outer + 3f, w[0].midDeg), 255, 3))
+    }
+
+    @Test fun W32_lightThemeDrawsANearBlackRingWithWhiteDividersAndAWhiteHub() {
+        HyleTheme.apply(ThemeVariant.Light, 0xFF6D5BFF)
+        show(Corner.BottomLeft)
+        val bmp = grab(); val ring = ringOf()
+        val deg = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)[0].midDeg
+        assertTrue("ring ${rgb(pixel(bmp, Corner.BottomLeft, ring.outer - 2f, deg))}", near(pixel(bmp, Corner.BottomLeft, ring.outer - 2f, deg), 0x61, 8))
+        assertTrue("hub is white", near(pixel(bmp, Corner.BottomLeft, ring.backRadius - 3f, deg), 255))
+        val div = PuckSectionsGeometry.dividerAngles(Corner.BottomLeft)[1]
+        assertTrue("divider is white", near(pixel(bmp, Corner.BottomLeft, ring.mid + 12f, div), 255, 40))
+    }
+
+    @Test fun W32_aPressedWedgeIsLightGreyInDarkAndSettlesAfterTheShortAnimation() {
+        show(Corner.BottomLeft)
+        val n = rule.onNodeWithContentDescription("Alarm")
+        n.performTouchInput { down(centroidOf(1, Corner.BottomLeft, n)) }
+        rule.mainClock.advanceTimeBy(300)
+        val bmp = grab(); val ring = ringOf()
+        val deg = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)[1].midDeg
+        assertTrue("pressed ${rgb(pixel(bmp, Corner.BottomLeft, ring.outer - 3f, deg))}", near(pixel(bmp, Corner.BottomLeft, ring.outer - 3f, deg), 217, 5))
+        val other = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)[2].midDeg
+        assertTrue("its neighbour stays white", near(pixel(bmp, Corner.BottomLeft, ring.outer - 3f, other), 255))
+        n.performTouchInput { up() }
+    }
+
+    @Test fun NFR_14_w32_underReducedMotionThePressedFillIsInstant() {
+        fun pressedValue(reduced: Boolean): Int {
+            if (reduced) ReducedMotionTesting.force(MotionPrefs(0f, 0f, 0f))
+            show(Corner.BottomLeft)
+            val n = rule.onNodeWithContentDescription("Alarm")
+            n.performTouchInput { down(centroidOf(1, Corner.BottomLeft, n)) }
+            rule.mainClock.advanceTimeBy(32)
+            val bmp = grab(); val ring = ringOf()
+            val v = android.graphics.Color.red(pixel(bmp, Corner.BottomLeft, ring.outer - 3f, PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)[1].midDeg))
+            n.performTouchInput { up() }
+            return v
+        }
+        assertTrue("instant under reduced motion", kotlin.math.abs(pressedValue(true) - 217) <= 5)
+    }
+
+    @Test fun W32_anEmptySlotShowsAFaintBlackPlusAndAnUnavailableActionAFaintGlyph() {
+        show(Corner.BottomLeft, four.take(3) + PuckAction("Drawer shortcut 4, empty") {})
+        val bmp = grab(); val ring = ringOf()
+        val g = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)[3]
+        val (gx, gy) = PuckSectionsGeometry.centroid(g, ring)
+        val d = rule.activity.resources.displayMetrics.density
+        // somewhere on the plus's horizontal bar around the centroid there is a grey (black at 40%) pixel, and the pixel is not pure black
+        var darkest = 255
+        for (dx in -6..6) for (dy in -6..6) {
+            val deg = Math.toDegrees(kotlin.math.atan2(gy + dy.toFloat(), gx + dx.toFloat()).toDouble()).toFloat()
+            val r = kotlin.math.hypot(gx + dx.toFloat(), gy + dy.toFloat())
+            darkest = minOf(darkest, android.graphics.Color.red(pixel(bmp, Corner.BottomLeft, r, deg)))
+        }
+        assertTrue("the plus is drawn, faint: darkest $darkest", darkest in 100..190)
+    }
+
+    @Test fun W32_aFocusedWedgeInKeyboardModeKeepsItsRingFillAndDrawsNoWhiteBoxRing() {
+        // the generic white focus ring is off for wedges (white on white): the wedge's own fill is unchanged when nothing is pressed
+        show(Corner.BottomLeft)
+        val bmp = grab(); val ring = ringOf()
+        for (wd in PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)) assertTrue(near(pixel(bmp, Corner.BottomLeft, ring.outer - 2f, wd.midDeg), 255))
     }
 
     @Test fun CFG_15_w30_shotPortraitLeftPressed() {
@@ -238,16 +341,22 @@ class PuckSectionsUiTest {
         val view = rule.activity.findViewById<android.view.View>(android.R.id.content)
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         rule.runOnUiThread { view.draw(Canvas(bmp)) }
-        File(outDir, "w30-sections-portrait-left-pressed.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(outDir, "w32-puck-portrait-left-pressed.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         n.performTouchInput { up() }
     }
 
     private val withEmpty get() = four.take(1) + PuckAction("Drawer shortcut 2, empty") {} + four.drop(2).map { it }
 
-    @Test fun CFG_15_w30_shotPortraitLeft() = shoot("w30-sections-portrait-left", Corner.BottomLeft)
-    @Test fun CFG_15_w30_shotPortraitRight() = shoot("w30-sections-portrait-right", Corner.BottomRight)
-    @Test fun CFG_15_w30_shotPortraitLeftWithAnEmptySlot() = shoot("w30-sections-portrait-left-empty", Corner.BottomLeft, withEmpty)
-    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun CFG_15_w30_shotLandscapeLeft() = shoot("w30-sections-landscape-left", Corner.BottomLeft)
-    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun CFG_15_w30_shotLandscapeRightWithAnEmptySlot() = shoot("w30-sections-landscape-right-empty", Corner.BottomRight, withEmpty)
+    @Test fun CFG_15_w30_shotPortraitLeft() = shoot("w32-puck-portrait-left", Corner.BottomLeft)
+    @Test fun W32_shotLightPortraitLeft() = shoot("w32-puck-light-portrait-left", Corner.BottomLeft, light = true)
+    @Test fun W32_shotLightPortraitRight() = shoot("w32-puck-light-portrait-right", Corner.BottomRight, light = true)
+    @Test fun W32_shotLightPortraitLeftEmptyAndApp() = shoot("w32-puck-light-portrait-left-empty-app", Corner.BottomLeft, listOf(PuckAction("Notes", app = app(7, "Notes")) {}, PuckAction("Drawer shortcut 2, empty") {}, four[2], four[3]), light = true)
+    @Test fun W32_shotDarkPortraitLeftEmptyAndApp() = shoot("w32-puck-dark-portrait-left-empty-app", Corner.BottomLeft, listOf(PuckAction("Notes", app = app(7, "Notes")) {}, PuckAction("Drawer shortcut 2, empty") {}, four[2], four[3]))
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W32_shotLightLandscapeLeft() = shoot("w32-puck-light-landscape-left", Corner.BottomLeft, light = true)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W32_shotLightLandscapeRight() = shoot("w32-puck-light-landscape-right", Corner.BottomRight, light = true)
+    @Test fun CFG_15_w30_shotPortraitRight() = shoot("w32-puck-portrait-right", Corner.BottomRight)
+    @Test fun CFG_15_w30_shotPortraitLeftWithAnEmptySlot() = shoot("w32-puck-portrait-left-empty", Corner.BottomLeft, withEmpty)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun CFG_15_w30_shotLandscapeLeft() = shoot("w32-puck-landscape-left", Corner.BottomLeft)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun CFG_15_w30_shotLandscapeRightWithAnEmptySlot() = shoot("w32-puck-landscape-right-empty", Corner.BottomRight, withEmpty)
 }
 

@@ -11,22 +11,60 @@ import kotlin.math.sin
 class PuckSectionsGeometryTest {
     private val ring = PuckSectionsGeometry.ring(hubDp = 122f, chipDp = 108f) // a 360 dp wide phone
 
-    @Test fun CFG_15_thereAreFourWedgesFillingTheQuadrantInOrderWithGapsBetween() {
+    @Test fun CFG_15_thereAreFourEqualWedgesFillingTheQuadrantInOrderAndTouching() {
         for (c in Corner.entries) {
             val q = PuckSectionsGeometry.quadrantStart(c)
             val w = PuckSectionsGeometry.wedges(c, ring).sortedBy { it.startDeg }
             assertEquals(4, w.size)
             assertEquals("$c starts at the quadrant edge", q, w.first().startDeg, 0.001f)
             assertEquals("$c ends at the other edge", q + 90f, w.last().endDeg, 0.001f)
-            for (i in 0 until 3) assertEquals("gap between wedges ${i} and ${i + 1}", PuckSectionsGeometry.gapDeg(ring), w[i + 1].startDeg - w[i].endDeg, 0.001f)
-            w.forEach { assertEquals(w[0].sweep, it.sweep, 0.5f) }
+            for (i in 0 until 3) assertEquals("no gap between wedges $i and ${i + 1}", w[i].endDeg, w[i + 1].startDeg, 0.0001f)
+            w.forEach { assertEquals(22.5f, it.sweep, 0.0001f) }
         }
     }
 
-    @Test fun CFG_15_theGapIsOneDpWideAtTheMidRadius() {
-        val w = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring).sortedBy { it.startDeg }
-        val gapDp = Math.toRadians((w[1].startDeg - w[0].endDeg).toDouble()) * ring.mid
-        assertEquals(1.0, gapDp, 0.01)
+    @Test fun W32_theRingFillsFromTheHubToTheOuterRadiusWithNoGapAndIsDeeperThanTheReference() {
+        for (side in listOf(320f, 360f, 411f, 600f, 800f)) {
+            val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
+            val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
+            assertEquals("$side: the ring starts exactly at the hub", r.backRadius, r.inner, 0f)
+            assertTrue("$side: the ring is at least 0.9 x the hub radius deep (${r.thickness} vs ${r.backRadius})", r.thickness >= 0.9f * r.backRadius)
+            // every radius from the hub edge to the outer edge hits a slot (a point in the quadrant), none of it is None
+            for (f in listOf(0f, 0.05f, 0.25f, 0.5f, 0.99f, 1f)) {
+                val rad = r.inner + (r.outer - r.inner) * f
+                if (f == 0f) continue
+                assertTrue("$side f=$f", PuckSectionsGeometry.hit(Corner.BottomLeft, r, rad * 0.97f, -rad * 0.2f) is PuckSectionsGeometry.Hit.Slot)
+            }
+        }
+    }
+
+    @Test fun W32_dividersAreThreeHairlinesOnTheSharedEdgesOnly() {
+        assertTrue("hairline: at most 2 dp", PuckSectionsGeometry.DIVIDER_DP in 1.5f..2f)
+        for (c in Corner.entries) {
+            val d = PuckSectionsGeometry.dividerAngles(c)
+            val w = PuckSectionsGeometry.wedges(c, ring).sortedBy { it.startDeg }
+            assertEquals(3, d.size)
+            for (i in 0 until 3) assertEquals("$c divider $i sits on the shared edge", w[i].endDeg, d[i], 0.0001f)
+        }
+    }
+
+    @Test fun W32_theGlyphIsCentredOnTheMidRadiusAndMidAngleOfItsWedge() {
+        for (c in Corner.entries) for (w in PuckSectionsGeometry.wedges(c, ring)) {
+            val (x, y) = PuckSectionsGeometry.centroid(w, ring)
+            assertEquals(ring.mid, kotlin.math.hypot(x, y), 0.01f)
+            val ang = (Math.toDegrees(kotlin.math.atan2(y, x).toDouble()).toFloat() + 360f) % 360f
+            assertEquals(w.midDeg % 360f, ang, 0.01f)
+        }
+    }
+
+    @Test fun W32_anAppIconIsSixtyPercentOfTheWedgesSmallerDimensionAndTheWedgeIsAsWideAsTheGeometryAllows() {
+        val w = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)[0]
+        val smaller = minOf(PuckSectionsGeometry.arcWidth(w, ring), ring.thickness)
+        assertEquals(0.6f * smaller, PuckSectionsGeometry.glyphSize(w, ring, PuckSectionsGeometry.APP_ICON_SHARE), 0.001f)
+        // across the arc a wedge is under 48 dp at mid radius but 36 to 47 dp at its outer edge: the best four wedges in a quarter turn allow
+        val outerArc = Math.toRadians(w.sweep.toDouble()).toFloat() * ring.outer
+        assertTrue("outer arc $outerArc", outerArc >= 36f)
+        assertTrue("the ring is deeper than 48 dp", PuckSectionsGeometry.deepEnough(ring))
     }
 
     @Test fun CFG_15_theRightHandCornerIsTheExactMirrorOfTheLeftHandOne() {
@@ -48,7 +86,7 @@ class PuckSectionsGeometryTest {
         }
     }
 
-    @Test fun CFG_15_everyPointOfAWedgeHitsItsSlotAndTheGapBelongsToANeighbourNotToNothing() {
+    @Test fun CFG_15_everyPointOfAWedgeHitsItsSlotAndASharedEdgeBelongsToANeighbourNotToNothing() {
         for (c in Corner.entries) for (w in PuckSectionsGeometry.wedges(c, ring)) {
             for (f in listOf(0.1f, 0.5f, 0.9f)) {
                 val a = Math.toRadians((w.startDeg + (w.endDeg - w.startDeg) * f).toDouble())
@@ -75,7 +113,7 @@ class PuckSectionsGeometryTest {
         for (side in listOf(320f, 360f, 411f, 600f, 800f)) {
             val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
             val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
-            assertTrue("$side: back < inner < outer", r.backRadius < r.inner && r.inner < r.outer)
+            assertTrue("$side: back < inner < outer", r.backRadius <= r.inner && r.inner < r.outer)
             assertTrue("$side: the Back button is at least 48 dp across", r.backRadius * 2f >= 48f)
             assertTrue("$side: the ring is ${r.thickness} dp deep, at least 48", PuckSectionsGeometry.deepEnough(r))
             assertTrue("$side: the labels clear the ring", r.outer <= hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)

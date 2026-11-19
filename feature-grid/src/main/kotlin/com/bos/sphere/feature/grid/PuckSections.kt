@@ -7,6 +7,15 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.drawscope.clipPath
+import com.bos.sphere.core.design.HyleTheme
+import com.bos.sphere.core.design.rememberMotionPrefs
+import com.bos.sphere.core.input.InputMode
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -89,6 +98,30 @@ internal val BackGlyph: ImageVector = ImageVector.Builder("back", 24.dp, 24.dp, 
     }
 }.build()
 
+/**
+ * Colours of the disc (wave 32), after the Concepts quick switcher: a solid ring with hairline dividers, glyphs in the divider colour, a hub
+ * in the opposite tone. Dark themes: white ring, black glyphs and dividers, black hub with a white arrow. Light theme: a near-black ring
+ * (relative luminance about 0.12) with white glyphs and dividers, a white hub with a black arrow, so it still contrasts with the light drawer.
+ */
+internal class PuckLook(
+    val ring: Color, val pressed: Color, val divider: Color, val glyph: Color, val hub: Color, val hubPressed: Color, val hubGlyph: Color,
+) {
+    companion object {
+        /** Share of the glyph's opacity for an empty slot's plus and for an unavailable action. */
+        const val EMPTY_ALPHA = 0.40f
+        const val UNAVAILABLE_ALPHA = 0.38f
+        val Dark = PuckLook(
+            ring = Color.White, pressed = Color(0xFFD9D9D9), divider = Color.Black, glyph = Color.Black,
+            hub = Color.Black, hubPressed = Color(0xFF1C1C1C), hubGlyph = Color.White,
+        )
+        val Light = PuckLook(
+            ring = Color(0xFF616161), pressed = Color(0xFF3A3A3A), divider = Color.White, glyph = Color.White,
+            hub = Color.White, hubPressed = Color(0xFFDDDDDD), hubGlyph = Color.Black,
+        )
+        fun of(light: Boolean): PuckLook = if (light) Light else Dark
+    }
+}
+
 private class WedgeShape(val path: Path) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline = Outline.Generic(path)
 }
@@ -99,7 +132,7 @@ private class WedgeDraw(
     val left: Float, val top: Float, val width: Float, val height: Float,
     val shape: WedgeShape,
     val glyphX: Float, val glyphY: Float,
-    val arcTopLeft: Offset, val arcSize: Size, val arcStart: Float, val arcSweep: Float,
+    val glyphDp: Float, val appDp: Float,
 )
 
 /**
@@ -131,23 +164,20 @@ internal fun BoxScope.PuckSectionsLayer(
                 arcTo(Rect(local.x - inner, local.y - inner, local.x + inner, local.y + inner), w.endDeg, -w.sweep, false)
                 close()
             }
-            val er = outer - 1.5f * d
             WedgeDraw(
                 w.slot, left, top, b.width * d, b.height * d, WedgeShape(p),
                 local.x + c.first * d, local.y + c.second * d,
-                Offset(local.x - er, local.y - er), Size(er * 2, er * 2), w.startDeg + 0.8f, w.sweep - 1.6f,
+                maxOf(PuckSectionsGeometry.MIN_GLYPH_DP, PuckSectionsGeometry.glyphSize(w, ring, PuckSectionsGeometry.APP_ICON_SHARE)),
+                PuckSectionsGeometry.glyphSize(w, ring, PuckSectionsGeometry.APP_ICON_SHARE),
             )
         }
     }
-    val surface = HyleColors.Surface
-    val pressedFill = remember(surface) { lerp(surface, Color.Black, 0.78f) }
-    val idleFill = remember(surface) { lerp(surface, HyleColors.Ink, 0.17f) }
-    val emptyFill = remember(surface) { lerp(surface, HyleColors.Ink, 0.05f).copy(alpha = 0.6f) }
+    val look = PuckLook.of(HyleTheme.isLight)
     val accent = HyleColors.Violet
-    val arcStroke = remember(d) { Stroke(width = 2.5f * d, cap = StrokeCap.Round) }
-    val hairline = remember(d) { Stroke(width = 1f * d) }
-    val glyphDp = 22.dp
-    val glyphPx = glyphDp.value * d
+    val reduced = rememberMotionPrefs().reduced
+    val keyboard = LocalInputMode.current.value == InputMode.Keyboard
+    val hairline = remember(d) { Stroke(width = PuckSectionsGeometry.DIVIDER_DP * d) }
+    val focusStroke = remember(d) { Stroke(width = 4f * d) } // clipped to the wedge, so the visible outline is 2 dp inside it
     var tip by remember { mutableIntStateOf(-1) }
     LaunchedEffect(tip) { if (tip >= 0) { delay(1800); tip = -1 } }
 
@@ -155,6 +185,8 @@ internal fun BoxScope.PuckSectionsLayer(
         val a = actions.getOrNull(w.slot) ?: PuckAction(L10n.tr("Drawer shortcut %d, empty", w.slot + 1)) {}
         val source = remember { MutableInteractionSource() }
         val pressed by source.collectIsPressedAsState()
+        var focused by remember { mutableStateOf(false) }
+        val press by animateFloatAsState(if (pressed) 1f else 0f, if (reduced) snap() else tween(90), label = "puckPress")
         val empty = a.empty
         val label = if (empty) L10n.tr("Drawer shortcut %d, empty", w.slot + 1) else a.label
         Box(
@@ -168,11 +200,13 @@ internal fun BoxScope.PuckSectionsLayer(
                 }
                 .clip(w.shape)
                 .drawBehind {
-                    val fill = when { pressed -> pressedFill; empty -> emptyFill; else -> idleFill }
-                    drawPath(w.shape.path, fill)
-                                        if (pressed) drawArc(accent, w.arcStart, w.arcSweep, false, w.arcTopLeft, w.arcSize, style = arcStroke)
+                    drawPath(w.shape.path, lerp(look.ring, look.pressed, press))
+                    if (focused && keyboard) clipPath(w.shape.path) { drawPath(w.shape.path, accent, style = focusStroke) }
                 }
-                .launcherItem("puck.section.${w.slot}", FocusKind.PuckRing, order = w.slot + 1, layer = 3, focusable = false, ringRadiusDp = 14f)
+                .launcherItem(
+                    "puck.section.${w.slot}", FocusKind.PuckRing, order = w.slot + 1, layer = 3, focusable = false, ringRadiusDp = 14f,
+                    drawRing = false, onFocusState = { focused = it },
+                )
                 .combinedClickable(
                     interactionSource = source, indication = null, role = Role.Button,
                     onLongClickLabel = if (empty) L10n.tr("Edit drawer shortcuts") else L10n.tr("Show name"),
@@ -187,22 +221,36 @@ internal fun BoxScope.PuckSectionsLayer(
                     },
                 ),
         ) {
-            if (!empty) {
-                val alpha = if (a.available) 1f else 0.38f
-                Box(
-                    Modifier
-                        .offset { IntOffset((w.glyphX - glyphPx / 2f).roundToInt(), (w.glyphY - glyphPx / 2f).roundToInt()) }
-                        .size(glyphDp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    when {
-                        a.app != null -> AppIcon(a.app, glyphDp, Modifier.graphicsLayer { this.alpha = alpha })
-                        a.glyph != null -> Icon(a.glyph, null, tint = HyleColors.InkBright.copy(alpha = alpha), modifier = Modifier.size(glyphDp))
-                    }
+            val alpha = when { empty -> PuckLook.EMPTY_ALPHA; !a.available -> PuckLook.UNAVAILABLE_ALPHA; else -> 1f }
+            val boxDp = if (a.app != null) w.appDp else w.glyphDp
+            val glyphPx = boxDp * d
+            Box(
+                Modifier
+                    .offset { IntOffset((w.glyphX - glyphPx / 2f).roundToInt(), (w.glyphY - glyphPx / 2f).roundToInt()) }
+                    .size(boxDp.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    empty -> Icon(Glyphs.Plus, null, tint = look.glyph.copy(alpha = alpha), modifier = Modifier.size((w.glyphDp * 0.7f).dp))
+                    // Apps stay app icons: no tile, no tint, no extra clip (the icon theme's own shape, e.g. a circle, still applies).
+                    a.app != null -> AppIcon(a.app, boxDp.dp, Modifier.graphicsLayer { this.alpha = alpha })
+                    a.glyph != null -> Icon(a.glyph, null, tint = look.glyph.copy(alpha = alpha), modifier = Modifier.size(boxDp.dp))
                 }
             }
         }
     }
+
+    // Hairline dividers over the shared edges, from the hub to the outer arc (drawn once, above the wedges, below the glyphs' hit areas).
+    Box(Modifier.fillMaxSize().drawBehind {
+        for (deg in PuckSectionsGeometry.dividerAngles(anchor)) {
+            val r = Math.toRadians(deg.toDouble())
+            val c = kotlin.math.cos(r).toFloat(); val sn = kotlin.math.sin(r).toFloat()
+            drawLine(
+                look.divider, Offset(corner.x + c * ring.inner * d, corner.y + sn * ring.inner * d),
+                Offset(corner.x + c * ring.outer * d, corner.y + sn * ring.outer * d), strokeWidth = hairline.width,
+            )
+        }
+    })
 
     // The long-press name, over the wedge it belongs to.
     val shown = wedges.getOrNull(tip)
@@ -219,10 +267,11 @@ internal fun BoxScope.PuckSectionsLayer(
         )
     }
 
-    // The Back button: a plain round hub at the corner (Concepts' hub carries no glyph of its own; ours is the way out).
+    // The Back button: the round hub at the corner, hard against the ring (no gap), opposite tone to the ring.
     val backDp = ring.backRadius * 2f
     val backSource = remember { MutableInteractionSource() }
     val backPressed by backSource.collectIsPressedAsState()
+    var backFocused by remember { mutableStateOf(false) }
     Box(
         Modifier
             .offset { IntOffset((corner.x - ring.backRadius * d).roundToInt(), (corner.y - ring.backRadius * d).roundToInt()) }
@@ -230,16 +279,19 @@ internal fun BoxScope.PuckSectionsLayer(
             .semantics { contentDescription = L10n.tr("Back"); traversalIndex = 0f }
             .clip(CircleShape)
             .drawBehind {
-                drawCircle(if (backPressed) Color(0xFF050507) else Color.Black)
-                drawCircle(if (backPressed) accent else HyleColors.Hairline, radius = size.minDimension / 2f - 0.5f * d, style = hairline)
+                drawCircle(if (backPressed) look.hubPressed else look.hub)
+                if (backFocused && keyboard) drawCircle(accent, radius = size.minDimension / 2f - 1f * d, style = Stroke(width = 2f * d))
             }
-            .launcherItem("puck.back", FocusKind.PuckHub, order = 0, layer = 3, focusable = false, ringRadiusDp = ring.backRadius)
+            .launcherItem(
+                "puck.back", FocusKind.PuckHub, order = 0, layer = 3, focusable = false, ringRadiusDp = ring.backRadius,
+                drawRing = false, onFocusState = { backFocused = it },
+            )
             .clickable(interactionSource = backSource, indication = null, role = Role.Button) {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onBack()
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(BackGlyph, null, tint = HyleColors.InkBright, modifier = Modifier.size(24.dp))
+        Icon(BackGlyph, null, tint = look.hubGlyph, modifier = Modifier.size(24.dp))
     }
 }

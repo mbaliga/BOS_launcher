@@ -47,6 +47,7 @@ class W4MotionAuditTest {
             "GlanceHome.kt" to 1,
             "CommsStyle.kt" to 4, // wave 30: the Comms row's read/unread cross-fade (three colours and the icon opacity), a 150 ms tween that is 0 ms under reduced motion (rememberRowTone reads the motion prefs)
             "GlanceEdges.kt" to 1, // wave 17: the quiet edge handle fade, tween 0 when reduced (the caller passes rememberMotionPrefs().reduced)
+            "PuckSections.kt" to 1, // wave 32: a wedge's pressed fill, a 90 ms tween that is snap() under reduced motion (reads rememberMotionPrefs().reduced)
             // press spring already snaps under reduced motion (`still`)
         )
         val gatedFiles = setOf("ContinuousHome.kt", "SettingsSpace.kt", "HomeScreen.kt", "FilesUi.kt") // W31: FilesUi fades a loaded thumbnail in through rememberMotionPrefs().gate(tween(180))

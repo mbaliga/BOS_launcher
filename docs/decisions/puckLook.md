@@ -1,0 +1,15 @@
+# Puck look: a solid ring with hairline dividers (wave 32)
+
+Source: the owner: "The fan of the shortcuts in the app drawer disc needs to look more like this. With icons, of course, but please understand the layout", with a crop of the Concepts drawing app (a black round hub with a white back arrow, wrapped tightly by a thick solid white ring cut into equal wedges by hairline black dividers, one black glyph per wedge). Supersedes the look part of [puckSections.md](puckSections.md); behaviour (four slots, Back hub, picker, order, mirror) is unchanged.
+
+## Decisions
+- **Ring.** Wedges touch: the 1 dp angular gap and the 4 dp hub gap are gone (`PuckSectionsGeometry.ring`: `inner == backRadius`; `wedges` are four equal 22.5 degree cells). The ring is drawn as one solid fill from the hub edge to the outer arc, with no outline. The three shared edges get 1.5 dp hairline dividers (`DIVIDER_DP`), drawn once above the wedges.
+- **Depth.** The reference ring is about 0.9 x the hub radius deep. Ours is deeper on purpose (about 85 dp on a 411 dp phone against a 33 dp hub radius): it runs out to just inside the group labels, which puts the wedges at a larger radius and makes them wider across the arc (about 30 dp at mid radius, 40 to 47 dp at the outer edge; four wedges in a quarter turn cannot reach 48 dp at mid radius).
+- **Colours** (`PuckLook`). Dark and Amoled: white ring, black glyphs and dividers, black hub, white arrow. Light: ring grey 0x616161 (relative luminance about 0.12), white glyphs and dividers, white hub, black arrow, so the disc still contrasts with the light drawer. Active glyph against its wedge is at least 4.5:1 in both (21:1 and 6:1).
+- **States.** Pressed wedge: 85 percent white in dark (0xD9D9D9), 0x3A3A3A in light, a 90 ms tween, instant under reduced motion (`rememberMotionPrefs().reduced`). Empty slot: a small plus at 40 percent opacity, tap does nothing, long press opens the editor as before. Unavailable action: glyph at 38 percent, same state description. Focus (keyboard): a 2 dp accent outline inset in the wedge (the shared white box ring of `launcherItem` is switched off for wedges, `drawRing = false`, because it was white on white); the hub gets a 2 dp accent circle.
+- **Glyphs.** One per wedge, centred at mid radius and mid angle, upright. App slots: the app icon at 60 percent of the wedge's smaller dimension, drawn by `AppIcon` as everywhere (the icon theme's own shape applies; no extra clip, no tile, no tint). Action glyphs: existing glyphs tinted with the glyph colour, at least 22 dp.
+- **Not changed.** Touch areas (wedge shaped, whole cell), Back semantics and first traversal index, 4 slots, order, mirrored corner, RTL, landscape, labels outside the ring.
+
+## Known differences from the reference
+- The ring covers the visible quarter turn only (flat ends on the two quadrant edges), because the wheel's centre sits inside the window; the reference ring continues round the hub.
+- App icons at 60 percent of the wedge are about 18 dp on a phone (small by spec).

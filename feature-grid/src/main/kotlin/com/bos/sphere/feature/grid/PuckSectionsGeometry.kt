@@ -51,14 +51,21 @@ internal object PuckSectionsGeometry {
     /** The group labels' baseline sits on the chip radius and their ink rises about 10 dp above it. */
     private const val LABEL_CLEAR = 7f
 
+    /** The Back hub's radius on a roomy window (wave 33: 44 dp, up from 34, so the hub reads as the Concepts hub) and the smallest it shrinks to. */
+    const val BACK_MAX_DP = 44f
+    const val BACK_MIN_DP = 24f
+    /** Wave 33: the least width, across the arc, a wedge keeps at its outer edge when the window is roomy (a thumb-sized target). */
+    const val OUTER_ARC_DP = 44f
+
     /**
-     * Hub radius [hubDp] and label radius [chipDp] (both from `PuckLayout`) give the ring: a hub just big enough for a 48 dp Back button, and a
-     * ring wrapped directly around it (no gap, [SectionRing.inner] equals [SectionRing.backRadius]) out to just inside the labels. The reference
-     * ring is about 0.9 x the hub radius deep; ours is deeper on purpose (the space out to the labels), because a deeper ring puts the wedges at
-     * a larger radius and so makes them wider across the arc, closer to a 48 dp tap target.
+     * Hub radius [hubDp] and label radius [chipDp] (both from `PuckLayout`) give the ring: a Back hub of [BACK_MAX_DP] on a roomy window, and a
+     * ring wrapped directly around it (no gap, [SectionRing.inner] equals [SectionRing.backRadius]) out to just inside the labels. The owner's
+     * reference has a ring about as deep as the hub radius; four wedges in a quarter turn only reach [OUTER_ARC_DP] across the arc at the outer
+     * edge when the outer radius is at least 44 / (pi / 8) = 112 dp, so the outer edge stays where the labels leave room for it (119 dp on a 411 dp
+     * phone) and the depth is whatever is left outside the larger hub (75 dp there, not 56): a deeper ring means wider, more tappable wedges.
      */
     fun ring(hubDp: Float, chipDp: Float): SectionRing {
-        val back = (hubDp * 0.24f).coerceIn(24f, 34f)
+        val back = (hubDp * 0.315f).coerceIn(BACK_MIN_DP, BACK_MAX_DP)
         val inner = back
         val outer = max(inner + 20f, chipDp - LABEL_CLEAR)
         return SectionRing(back, inner, outer)

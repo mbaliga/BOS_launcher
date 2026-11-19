@@ -94,7 +94,8 @@ class WheelLoopW30UiTest {
         return sections().fetchSemanticsNodes().associate { n ->
             val c = n.boundsInRoot.center
             val polar = WheelGeometry.screenToPolar(anchor, size.width.toFloat(), size.height.toFloat(), c.x, c.y)
-            labelOf(n.config[SemanticsProperties.ContentDescription].single()) to WheelGeometry.normalize360(polar.angleDeg - WheelGeometry.quadrantStart(anchor))
+            // Signed (-180..180): a section just outside the quadrant is a small negative angle, not 355 (wave 33 widened the spokes, which moved Z just out).
+            labelOf(n.config[SemanticsProperties.ContentDescription].single()) to WheelGeometry.normalize180(polar.angleDeg - WheelGeometry.quadrantStart(anchor))
         }
     }
 
@@ -191,7 +192,8 @@ class WheelLoopW30UiTest {
         val node = rule.onNodeWithContentDescription("Section B", useUnmergedTree = true)
         val b = node.fetchSemanticsNode().boundsInRoot
         val dp = rule.activity.resources.displayMetrics.density
-        assertTrue("48 dp target, was ${b.width / dp}", b.width / dp >= 47.9f && b.height / dp >= 47.9f)
+        // Wave 33: the node is its own slice of the band turned along it, 48 dp deep radially; its upright bounding box is therefore at least 48 dp both ways.
+        assertTrue("at least 48 dp, was ${b.width / dp} x ${b.height / dp}", b.width / dp >= 47.9f && b.height / dp >= 47.9f)
         node.performSemanticsAction(SemanticsActions.OnClick); settle()
         assertEquals("B", selected())
     }

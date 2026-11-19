@@ -129,4 +129,22 @@ class PuckSectionsGeometryTest {
             }
         }
     }
+
+    @Test fun CFG_15_w33_the_hub_is_44dp_on_a_phone_and_the_outer_edge_of_every_wedge_is_at_least_44dp_across() {
+        for (side in listOf(411f, 480f, 600f, 840f)) {
+            val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
+            val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
+            assertEquals("$side hub", 44f, r.backRadius, 0.001f)
+            val outerArc = Math.toRadians(22.5) * r.outer
+            assertTrue("$side: outer arc $outerArc", outerArc >= PuckSectionsGeometry.OUTER_ARC_DP - 0.01)
+            assertEquals("no gap between hub and ring", r.backRadius, r.inner, 0f)
+        }
+        // smaller windows shrink the hub but never below 24 dp, and the ring is never thinner than 20 dp
+        for (side in listOf(240f, 280f, 320f, 360f)) {
+            val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
+            val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
+            assertTrue("$side hub ${r.backRadius}", r.backRadius in 24f..44f)
+            assertTrue("$side thickness ${r.thickness}", r.thickness >= 20f)
+        }
+    }
 }

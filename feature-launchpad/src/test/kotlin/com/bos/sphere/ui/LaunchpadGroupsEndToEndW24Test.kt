@@ -126,7 +126,7 @@ class LaunchpadGroupsEndToEndW24Test {
     /** The column top to bottom as (section key, row keys), read from where the real heads and rows are laid out. */
     private fun column(): List<Pair<String, List<String>>> {
         rule.waitForIdle()
-        val nodes = rule.onAllNodes(SemanticsMatcher("head or row") { tagOf(it).startsWith("lp.group.") || tagOf(it).startsWith("lp.row.") }, useUnmergedTree = true)
+        val nodes = rule.onAllNodes(SemanticsMatcher("head or row") { tagOf(it).startsWith("lp.group.") || (tagOf(it).startsWith("lp.row.") && !tagOf(it).startsWith("lp.row.unreadDot.")) }, useUnmergedTree = true)
             .fetchSemanticsNodes().sortedBy { it.boundsInRoot.top }
         val out = ArrayList<Pair<String, MutableList<String>>>()
         nodes.forEach { n ->
@@ -310,7 +310,7 @@ class LaunchpadGroupsEndToEndW24Test {
         launch()
         rule.waitUntil(10_000) { sectionOf("c") == "group:w" }
         val density = rule.activity.resources.displayMetrics.density
-        rule.onAllNodes(hasTestTagPrefix("lp.row."), useUnmergedTree = true).fetchSemanticsNodes().forEach { n ->
+        rule.onAllNodes(hasTestTagPrefix("lp.row.") and !hasTestTagPrefix("lp.row.unreadDot."), useUnmergedTree = true).fetchSemanticsNodes().forEach { n ->
             assertTrue("${tagOf(n)} is ${n.boundsInRoot.height / density} dp", n.boundsInRoot.height / density >= 70f - 0.5f)
         }
     }

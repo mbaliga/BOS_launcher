@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.TextStyle
@@ -130,6 +131,8 @@ internal fun SectionHeader(
     badge: String = "",
     /** Wave 25: the text shown; a day section passes its date ("Thu 20 Aug 2015"). */
     title: String = sec.title,
+    /** Wave 30 (commsPolish): a collapsed group or the digest with an unread item inside shows the unread dot in the left margin. */
+    unreadAny: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     // Wave 25 (STR-02): the hub's date band: a small quiet title (a day reads "Thu 20 Aug 2015"), left-aligned with the rows' badges, a thin divider below.
@@ -143,6 +146,8 @@ internal fun SectionHeader(
             .then(if (showRing && focused) Modifier.border(2.dp, FocusRing, RoundedCornerShape(10.dp)) else Modifier)
             .clickable(onClick = onToggle),
     ) {
+      Box(Modifier.fillMaxWidth()) {
+        if (unreadAny) UnreadDot("lp.group.unreadDot.${sec.key}", Modifier.align(Alignment.CenterStart))
         Row(
             Modifier.fillMaxWidth().heightIn(min = 32.dp).padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -169,8 +174,16 @@ internal fun SectionHeader(
             Text("${sec.items.size}", color = LocalLp.current.dim, fontSize = CommsStyle.NOTE_SP.sp)
             if (collapsed) { Spacer(Modifier.width(6.dp)); Chevron(LocalLp.current.dim, down = false, size = 14) }
         }
+      }
         CommsRowLine()
     }
+}
+
+/** Wave 30 (commsPolish): the solid accent dot of an unread row, in the left margin (its centre [CommsStyle.UNREAD_DOT_CENTRE_X_DP] from the start edge). The caller aligns it vertically. */
+@Composable
+internal fun UnreadDot(tag: String, modifier: Modifier = Modifier) {
+    val color = unreadDotColor(LocalLp.current)
+    Box(modifier.offset(x = (CommsStyle.UNREAD_DOT_CENTRE_X_DP - CommsStyle.UNREAD_DOT_DP / 2f).dp).testTag(tag).size(CommsStyle.UNREAD_DOT_DP.dp).background(color, CircleShape))
 }
 
 /** A line under a group saying how many items wait for the next digest (STR-04). */
@@ -280,7 +293,7 @@ internal fun NotificationRow(
                 .offset { IntOffset(offsetPx.roundToInt(), 0) }
                 .background(LocalLp.current.bg)
                 .testTag("lp.focus.${n.key}")
-                .semantics { customActions = a11yActions }
+                .semantics { customActions = a11yActions; stateDescription = L10n.tr(if (unread) "Unread" else "Read") }
                 .pointerInput(n.key, leftAction) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -319,7 +332,7 @@ internal fun NotificationRow(
             val second = if (messaging) n.title else if (n.title.isNotBlank()) n.summary.ifBlank { n.appLabel } else n.appLabel
             CommsRowContent(
                 pkg = n.packageName, appLabel = n.appLabel.ifBlank { n.title }, iconTag = "lp.badge.${n.key}",
-                headline = headline, headlineColor = if (unread && !silent) LocalLp.current.ink else LocalLp.current.ink2, titleTag = "lp.title.${n.key}", read = !unread,
+                headline = headline, unread = unread, quiet = silent, dotTag = "lp.row.unreadDot.${n.key}", titleTag = "lp.title.${n.key}",
                 second = second, previewTag = "lp.preview.${n.key}", stamp = formatStamp(n.timestamp, now, is24, zone), timeTag = "lp.time.${n.key}",
                 dot = pinned || important, modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
@@ -517,35 +530,38 @@ internal fun CommsRowLine(modifier: Modifier = Modifier) =
 @Composable
 internal fun CommsRowContent(
     pkg: String, appLabel: String, iconTag: String,
-    headline: String, headlineColor: Color, titleTag: String,
+    headline: String, titleTag: String,
     second: String, previewTag: String, stamp: String, timeTag: String,
     modifier: Modifier = Modifier, dot: Boolean = false, expanded: Boolean = false,
-    /** Wave 29: a read row is quieter: its second line is dimmer still (the headline colour is the caller's). */
-    read: Boolean = false,
+    /** Wave 30 (commsPolish): the read state: an unread row has the heavier full-ink headline, the accent time, the full icon and a dot in the left margin ([dotTag]); a read row is muted. [quiet]: a silenced unread row keeps the second ink. */
+    unread: Boolean = false, quiet: Boolean = false, dotTag: String = "",
     trailing: @Composable () -> Unit = {},
 ) {
     val lp = LocalLp.current
+    val tone = rememberRowTone(unread, quiet)
     // With big system fonts the mock-up's baselines (headline and second line 19.5 dp apart) would overlap: stack the lines instead.
     val stacked = expanded || LocalDensity.current.fontScale > 1.3f
-    Row(modifier.padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp)) {
-        AppIcon(pkg, appLabel, CommsStyle.ICON_DP, Modifier.padding(top = CommsStyle.ICON_TOP_DP.dp).testTag(iconTag))
+    Box(modifier) {
+    if (unread) UnreadDot(dotTag.ifEmpty { "lp.row.unreadDot" }, Modifier.align(Alignment.TopStart).offset(y = (CommsStyle.ICON_TOP_DP + CommsStyle.ICON_DP / 2f - CommsStyle.UNREAD_DOT_DP / 2f).dp))
+    Row(Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp)) {
+        AppIcon(pkg, appLabel, CommsStyle.ICON_DP, Modifier.padding(top = CommsStyle.ICON_TOP_DP.dp).testTag(iconTag), alpha = tone.iconAlpha)
         Spacer(Modifier.width(CommsStyle.TEXT_GAP_DP.dp))
         val titleText: @Composable (Modifier) -> Unit = { m ->
             Text(
-                headline, color = headlineColor, fontSize = CommsStyle.TITLE_ROW_SP.sp, fontWeight = FontWeight.Normal,
+                headline, color = tone.title, fontSize = CommsStyle.TITLE_ROW_SP.sp, fontWeight = tone.titleWeight,
                 maxLines = if (expanded) 12 else 1, overflow = TextOverflow.Ellipsis, modifier = m.testTag(titleTag),
             )
         }
         val subLine: @Composable (Boolean) -> Unit = { baselineAligned ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = if (baselineAligned) Alignment.Top else Alignment.Bottom) {
                 Text(
-                    second, color = if (read) lp.dim.copy(alpha = lp.dim.alpha * 0.75f) else lp.dim, fontSize = CommsStyle.SUB_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    second, color = tone.sub, fontSize = CommsStyle.SUB_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).then(if (baselineAligned) Modifier.paddingFromBaseline(top = CommsStyle.SUB_BASELINE_DP.dp) else Modifier).testTag(previewTag),
                 )
                 Spacer(Modifier.width(8.dp))
                 if (dot) Box(Modifier.padding(end = 6.dp, top = (CommsStyle.TIME_BASELINE_DP - 8f).dp).size(6.dp).background(BlueLight, CircleShape))
                 Text(
-                    stamp, color = lp.dim, fontSize = CommsStyle.TIME_SP.sp, maxLines = 1,
+                    stamp, color = tone.time, fontSize = CommsStyle.TIME_SP.sp, maxLines = 1,
                     modifier = (if (baselineAligned) Modifier.paddingFromBaseline(top = CommsStyle.TIME_BASELINE_DP.dp) else Modifier).testTag(timeTag),
                 )
             }
@@ -558,5 +574,6 @@ internal fun CommsRowContent(
             subLine(true)
         }
         trailing()
+    }
     }
 }

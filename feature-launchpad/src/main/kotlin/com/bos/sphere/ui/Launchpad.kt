@@ -227,13 +227,15 @@ private fun rememberAppIcon(pkg: String): ImageBitmap? {
 internal fun AppIcon(pkg: String, label: String, size: Int, modifier: Modifier = Modifier) = AppIcon(pkg, label, size.toFloat(), modifier)
 
 @Composable
-internal fun AppIcon(pkg: String, label: String, size: Float, modifier: Modifier = Modifier) {
+internal fun AppIcon(pkg: String, label: String, size: Float, modifier: Modifier = Modifier, alpha: Float = 1f) {
     val icon = rememberAppIcon(pkg)
+    // Wave 30: a read row's icon is dimmer and a little greyer (alpha < 1): the whole icon, its outline and the letter badge.
+    val modifier = if (alpha < 1f) modifier.alpha(alpha) else modifier
     val shape = RoundedCornerShape((size * CommsStyle.ICON_RADIUS_FRACTION).dp)
     // A hairline outline keeps a black icon visible on the dark page and a white one on the light page (the mock-up's music icon has one).
     val outline = Modifier.border(0.75.dp, LocalLp.current.dim.copy(alpha = 0.45f), shape)
     if (icon != null) {
-        Image(icon, null, modifier.size(size.dp).clip(shape).then(outline))
+        Image(icon, null, modifier.size(size.dp).clip(shape).then(outline), colorFilter = if (alpha < 1f) ReadIconFilter else null)
     } else {
         // No icon to load: a coloured letter badge (the colour is the app's stable hue), never a grey tile.
         Box(modifier.size(size.dp).clip(shape).background(HubStyle.stripeFor(pkg)), Alignment.Center) {
@@ -816,7 +818,7 @@ fun LaunchpadContent(
                             val target = FocusTarget.Group(sec.key)
                             val grp = view.grouped.firstOrNull { it.key == sec.key }?.group
                             SectionHeader(
-                                sec, e.collapsed, title = HubStyle.dayHeader(sec.key, sec.title), first = e.first, onToggle = { if (e.collapsed) toggleGroup(sec.key, true) },
+                                sec, e.collapsed, unreadAny = (e.collapsed || sec.key == LaunchpadView.DIGEST_KEY) && sec.items.any { it.key !in effRead }, title = HubStyle.dayHeader(sec.key, sec.title), first = e.first, onToggle = { if (e.collapsed) toggleGroup(sec.key, true) },
                                 accent = grp?.let { g -> g.colorArgb?.let { Color(it) } ?: if (g.priority == GroupPriority.Priority) BlueLight else null },
                                 badge = grp?.takeIf { it.priority != GroupPriority.Normal }?.let { GroupTexts.priorityLabel(it.priority) }.orEmpty(),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
@@ -937,38 +939,68 @@ private fun LaunchpadHeader(
     onDoubleTap: () -> Unit,
 ) {
     val ink = LocalLp.current.ink
-    // The menu target is 48 dp of real screen at least; the glyph stays where the mock-up has it (32 dp from the edge) and the title keeps its own left edge.
+    // The menu target is 48 dp of real screen at least (invisible padding around the glyph); the glyph keeps its left edge 32 dp from the screen edge.
     val box = maxOf(CommsStyle.HEADER_ROW_DP.dp, commsTarget())
-    val glyph = CommsStyle.MENU_GLYPH_DP.dp
+    // Wave 30: the glyph is as high as the capitals of the title (follows the font scale), and its middle bar sits on their middle.
+    val capDp = with(androidx.compose.ui.platform.LocalDensity.current) { (CommsStyle.CAP_HEIGHT_EM * CommsStyle.TITLE_SP).sp.toDp() }
+    val glyphW = capDp * CommsStyle.MENU_GLYPH_ASPECT
     Column(
         Modifier.fillMaxWidth()
             .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleTap() }) },
     ) {
-        Row(
-            Modifier.fillMaxWidth().statusBarsPadding().padding(top = CommsStyle.HEADER_TOP_DP.dp, start = (CommsStyle.H_PAD_DP.dp - (box - glyph) / 2).coerceAtLeast(0.dp), end = CommsStyle.END_PAD_DP.dp)
-                .height(CommsStyle.HEADER_ROW_DP.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.requiredSize(box).clip(CircleShape)
-                    .semantics { contentDescription = L10n.tr("Comms menu") }
-                    .clickable(onClickLabel = L10n.tr("Comms menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
-                Alignment.Center,
-            ) { HamburgerIcon(ink) }
-            Text(
-                filterLabel ?: L10n.tr("Comms"), color = ink, fontSize = CommsStyle.TITLE_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).offset(x = CommsStyle.TITLE_X_DP.dp - (CommsStyle.H_PAD_DP.dp + glyph / 2 + box / 2), y = CommsStyle.TITLE_DY_DP.dp).testTag("lp.title"),
-            )
-        }
+        CommsHeaderPair(
+            Modifier.fillMaxWidth().statusBarsPadding().padding(top = CommsStyle.HEADER_TOP_DP.dp, end = CommsStyle.END_PAD_DP.dp).height(CommsStyle.HEADER_ROW_DP.dp),
+            box = box, glyphWidth = glyphW,
+            menu = {
+                Box(
+                    Modifier.requiredSize(box).clip(CircleShape)
+                        .semantics { contentDescription = L10n.tr("Comms menu") }
+                        .clickable(onClickLabel = L10n.tr("Comms menu"), role = androidx.compose.ui.semantics.Role.Button, onClick = onMenu).testTag("lp.menu"),
+                    Alignment.Center,
+                ) { HamburgerIcon(ink, glyphW, capDp) }
+            },
+            title = {
+                Text(
+                    filterLabel ?: L10n.tr("Comms"), color = ink, fontSize = CommsStyle.TITLE_SP.sp, fontWeight = FontWeight.Normal, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("lp.title"),
+                )
+            },
+        )
         CommsClockRow(snapshot, now, is24, zone, onOpenPanel, onOpenSound)
     }
 }
 
-/** The three-line menu icon of the owner's mock-up. */
+/**
+ * Wave 30 (commsPolish): the header's first row. The menu button (a [box] square with the glyph in its middle) and the title share one vertical centre:
+ * the title is centred in the row and the button is placed so that its middle (the glyph's middle bar) is on the middle of the title's capitals
+ * (baseline minus half the cap height), the same whatever the font's line metrics are. The glyph's left edge is [CommsStyle.H_PAD_DP] from the start edge,
+ * the title starts at [CommsStyle.TITLE_X_DP]; both mirror in a right-to-left layout.
+ */
 @Composable
-internal fun HamburgerIcon(color: Color) {
-    Canvas(Modifier.size(CommsStyle.MENU_GLYPH_DP.dp)) {
+private fun CommsHeaderPair(modifier: Modifier, box: androidx.compose.ui.unit.Dp, glyphWidth: androidx.compose.ui.unit.Dp, menu: @Composable () -> Unit, title: @Composable () -> Unit) {
+    androidx.compose.ui.layout.Layout({ menu(); title() }, modifier) { measurables, constraints ->
+        val boxPx = box.roundToPx()
+        val menuP = measurables[0].measure(androidx.compose.ui.unit.Constraints.fixed(boxPx, boxPx))
+        val titleX = CommsStyle.TITLE_X_DP.dp.roundToPx()
+        val titleP = measurables[1].measure(androidx.compose.ui.unit.Constraints(maxWidth = (constraints.maxWidth - titleX).coerceAtLeast(0)))
+        val h = if (constraints.hasBoundedHeight) constraints.maxHeight else maxOf(titleP.height, boxPx)
+        val dy = CommsStyle.HEADER_PAIR_DY_DP.dp.roundToPx()
+        val titleY = (h - titleP.height) / 2 + dy
+        val baseline = titleP[androidx.compose.ui.layout.FirstBaseline]
+        val cap = CommsStyle.CAP_HEIGHT_EM * CommsStyle.TITLE_SP.sp.toPx()
+        val capCentre = titleY + (if (baseline == androidx.compose.ui.layout.AlignmentLine.Unspecified) titleP.height / 2f else baseline - cap / 2f)
+        val menuX = (CommsStyle.H_PAD_DP.dp.roundToPx() - (boxPx - glyphWidth.roundToPx()) / 2f).roundToInt()
+        layout(constraints.maxWidth, h) {
+            menuP.placeRelative(menuX, (capCentre - boxPx / 2f).roundToInt())
+            titleP.placeRelative(titleX, titleY)
+        }
+    }
+}
+
+/** The three-line menu icon: [width] by [height] (the title's cap height), three bars of [CommsStyle.MENU_GLYPH_STROKE_DP], the outer two on the glyph's top and bottom edge. */
+@Composable
+internal fun HamburgerIcon(color: Color, width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp) {
+    Canvas(Modifier.size(width, height)) {
         val stroke = CommsStyle.MENU_GLYPH_STROKE_DP.dp.toPx()
         for (i in 0..2) {
             val y = stroke / 2f + (size.height - stroke) * i / 2f

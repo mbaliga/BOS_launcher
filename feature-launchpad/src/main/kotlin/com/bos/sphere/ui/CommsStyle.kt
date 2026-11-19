@@ -30,6 +30,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -81,12 +83,20 @@ internal object CommsStyle {
     // ---- header: the menu glyph and the title ----
     const val HEADER_TOP_DP = 19f
     const val HEADER_ROW_DP = 48f
-    const val MENU_GLYPH_DP = 12.8f
-    const val MENU_GLYPH_STROKE_DP = 1.8f
+    /** Stroke of one bar, in dp (scaled with the Comms size, not with the font). */
+    const val MENU_GLYPH_STROKE_DP = 2f
     const val TITLE_SP = 17f
-    /** Where the title text starts, from the left edge; its cap centre sits 1.6 dp above the menu glyph's centre. */
+    /** Where the title text starts, from the left edge. */
     const val TITLE_X_DP = 57.7f
-    const val TITLE_DY_DP = -1.6f
+    /**
+     * Wave 30 (commsPolish): the menu glyph and the title share one vertical centre. The glyph is as high as the title's cap height (the cap height of the
+     * title font, as a fraction of its size, times [TITLE_SP], so it follows the font scale) and [MENU_GLYPH_ASPECT] times as wide; its middle bar sits on
+     * the middle of the capitals, whatever the line metrics of the font are ([CommsHeaderLayout]).
+     */
+    const val CAP_HEIGHT_EM = 0.711f
+    const val MENU_GLYPH_ASPECT = 1.1f
+    /** The pair (glyph and title) sits this far from the header row's centre (the mock-up's title is 3.5 px above its glyph; both land between). */
+    const val HEADER_PAIR_DY_DP = -0.9f
 
     // ---- clock row ----
     const val CLOCK_ROW_DP = 48f
@@ -176,6 +186,66 @@ internal object CommsStyle {
     val DarkTabDim = Color(0xFF43464E)
     val DarkGlyphDim = Color(0xFF4D4D4D)
     val DarkCount = Color(0xFF343434)
+
+    // ---- wave 30 (commsPolish): read versus unread ----
+    /** An unread headline is the full ink in this weight, a read one is the ink at [READ_TITLE_ALPHA] in the normal weight. */
+    val UNREAD_TITLE_WEIGHT = FontWeight.SemiBold
+    val READ_TITLE_WEIGHT = FontWeight.Normal
+    /** Read text is the ink blended into the page background at these fractions: the headline 60 percent, the second line and the time 45 percent. */
+    const val READ_TITLE_INK = 0.60f
+    const val READ_SUB_INK = 0.45f
+    /** A read row's app icon: this opaque, with its colours at [READ_ICON_SATURATION]. */
+    const val READ_ICON_ALPHA = 0.55f
+    const val READ_ICON_SATURATION = 0.6f
+    /** The unread dot: 8 dp, centred 24 mock px (10.9 dp) from the screen edge inside the 32 dp margin, on the vertical centre of the icon. */
+    const val UNREAD_DOT_DP = 8f
+    const val UNREAD_DOT_CENTRE_X_DP = 10.9f
+    /** The cross-fade when a row flips between unread and read (none with reduced motion). */
+    const val READ_FADE_MS = 150
+    /** WCAG: the read headline and the accent time of an unread row are text and need 4.5; the dimmer read lines are secondary text and need 3 (checked in CommsPolishContrastTest). */
+    const val MIN_CONTRAST_TEXT = 4.5
+}
+
+/** The colours and weights of one Comms row in one read state (see [CommsRowTone.of]); every value comes from the [CommsStyle] tokens and the page palette. */
+internal class CommsRowTone(val unread: Boolean, val title: Color, val titleWeight: FontWeight, val sub: Color, val time: Color, val iconAlpha: Float) {
+    companion object {
+        private fun blend(bg: Color, ink: Color, f: Float): Color = androidx.compose.ui.graphics.lerp(bg, ink, f).copy(alpha = 1f)
+
+        /** The accent as text on [bg]: the shared accent, moved toward white (dark page) or black (light page) until it reads at [CommsStyle.MIN_CONTRAST_TEXT]. */
+        fun accentInk(accent: Color, bg: Color): Color {
+            val toward = if (bg.luminance() < 0.5f) Color.White else Color.Black
+            var f = 0f
+            var c = accent
+            while (f < 1f && com.bos.sphere.core.design.WallpaperPalette.contrast(c.toArgb(), bg.toArgb()) < CommsStyle.MIN_CONTRAST_TEXT) { f += 0.05f; c = androidx.compose.ui.graphics.lerp(accent, toward, f) }
+            return c
+        }
+
+        fun of(unread: Boolean, lp: LpColors, accent: Color, quiet: Boolean = false): CommsRowTone =
+            if (unread) CommsRowTone(true, if (quiet) lp.ink2 else lp.ink, CommsStyle.UNREAD_TITLE_WEIGHT, lp.dim, accentInk(accent, lp.bg), 1f)
+            else CommsRowTone(false, blend(lp.bg, lp.ink, CommsStyle.READ_TITLE_INK), CommsStyle.READ_TITLE_WEIGHT, blend(lp.bg, lp.ink, CommsStyle.READ_SUB_INK), blend(lp.bg, lp.ink, CommsStyle.READ_SUB_INK), CommsStyle.READ_ICON_ALPHA)
+    }
+}
+
+/** The unread dot's colour on [bg]: the same accent ink as the time. */
+internal fun unreadDotColor(lp: LpColors): Color = CommsRowTone.accentInk(BlueLight, lp.bg)
+
+/** A read row's icon colours (saturation 0.6): one filter for all rows, never allocated per frame. */
+internal val ReadIconFilter: androidx.compose.ui.graphics.ColorFilter by lazy {
+    androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(CommsStyle.READ_ICON_SATURATION) })
+}
+
+/** The tone of a row, cross-fading over [CommsStyle.READ_FADE_MS] when [unread] flips (no animation with reduced motion). */
+@Composable
+internal fun rememberRowTone(unread: Boolean, quiet: Boolean = false): CommsRowTone {
+    val lp = LocalLp.current
+    val target = remember(unread, quiet, lp) { CommsRowTone.of(unread, lp, BlueLight, quiet) }
+    val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    val spec = androidx.compose.animation.core.tween<Color>(if (reduced) 0 else CommsStyle.READ_FADE_MS)
+    val title by androidx.compose.animation.animateColorAsState(target.title, spec, label = "rowTitle")
+    val sub by androidx.compose.animation.animateColorAsState(target.sub, spec, label = "rowSub")
+    val time by androidx.compose.animation.animateColorAsState(target.time, spec, label = "rowTime")
+    val icon by androidx.compose.animation.core.animateFloatAsState(target.iconAlpha, androidx.compose.animation.core.tween(if (reduced) 0 else CommsStyle.READ_FADE_MS), label = "rowIcon")
+    return CommsRowTone(target.unread, title, target.titleWeight, sub, time, icon)
 }
 
 /** The scale factor of the enclosing [CommsScaleHost] (1 outside one). */

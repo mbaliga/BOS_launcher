@@ -45,6 +45,7 @@ class W4MotionAuditTest {
             "EditCardGeometry.kt" to 1,
             // W25: the song title's push-down under the notch: a spring of about 250 ms on one offset, snap() under reduced motion (wave 28: the indicator fade moved to GridHome's PageIndicator)
             "GlanceHome.kt" to 1,
+            "CommsStyle.kt" to 4, // wave 30: the Comms row's read/unread cross-fade (three colours and the icon opacity), a 150 ms tween that is 0 ms under reduced motion (rememberRowTone reads the motion prefs)
             "GlanceEdges.kt" to 1, // wave 17: the quiet edge handle fade, tween 0 when reduced (the caller passes rememberMotionPrefs().reduced)
             // press spring already snaps under reduced motion (`still`)
         )

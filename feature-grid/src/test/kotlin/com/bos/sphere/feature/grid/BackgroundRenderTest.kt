@@ -298,9 +298,6 @@ class BackgroundRenderTest {
         set(cfgNone, SignalState.forced(1)); assertEquals(0, diffPixels(without, capture()).size)
     }
 
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-mdpi") fun PAL_24_comicLinesOnlyAtNoSignalPortrait() = comicLinesAppearOnlyWithoutSignalAndOnlyAtTheEdges(true, "port")
-    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-mdpi") fun PAL_24_comicLinesOnlyAtNoSignalLandscape() = comicLinesAppearOnlyWithoutSignalAndOnlyAtTheEdges(true, "land")
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-mdpi") fun PAL_24_comicLinesOnlyAtNoSignalLight() = comicLinesAppearOnlyWithoutSignalAndOnlyAtTheEdges(false, "port-light")
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-mdpi")
     fun HOM_16_noSignalDropsEveryItemToItsDimRestingStateAndShowsTheComicLines() {

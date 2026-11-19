@@ -224,7 +224,7 @@ internal class BackgroundPainter(w: Float, h: Float, density: Float, private val
         val canvas = s.drawContext.canvas.nativeCanvas
         if (cfg.baseFill) s.drawRect(if (cfg.dark) Color.Black else Color(0xFFF3F3F6))
         val state = signal ?: PENDING
-        val wantComic = signal != null && !signal.hasSignal
+        val wantComic = false // W35: the comic lines are the Alert effect now (IndicatorLayer, user-selected); the wallpaper no longer draws them itself
         val shown = comicFade.step(if (wantComic) 1f else 0f, tMs, 400, still)
         params.timeMs = tMs; params.still = still; params.comicShown = shown
         params.level = ease.step(signal?.level, tMs, still)

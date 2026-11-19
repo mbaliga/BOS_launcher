@@ -92,9 +92,7 @@ internal object RadarDim {
 @Composable
 internal fun RadarBackgroundLayer(prefs: LauncherPrefs, wheelZone: () -> Rect?, modifier: Modifier = Modifier) {
     if (prefs.radarBackground == RadarBackground.TrueBlack) {
-        // Wave 34: True black draws no wallpaper, but the spider-sense alert (no connectivity) still shows: only the comic lines, nothing else.
-        SpiderSenseAlert(prefs, modifier.fillMaxSize(), dark = true)
-        return
+        return // W35: the user-selected Alert effect is drawn by the alertLayer slot of the Radar, over this layer
     }
     val reduced = rememberMotionPrefs().reduced
     val fade = remember { Animatable(if (reduced) 1f else 0f) }
@@ -121,9 +119,6 @@ internal fun RadarBackgroundLayer(prefs: LauncherPrefs, wheelZone: () -> Rect?, 
                 }
             },
         )
-        // Wave 34: the alert is above the dim, so it stays visible (a signal wallpaper with items draws its own comic lines under the dim).
-        val g = prefs.wallpaper(WallpaperSurface.Glance)
-        if (g.kind != WallpaperKind.Live || g.live.items.isEmpty()) SpiderSenseAlert(prefs, Modifier.fillMaxSize(), dark = true)
     }
 }
 

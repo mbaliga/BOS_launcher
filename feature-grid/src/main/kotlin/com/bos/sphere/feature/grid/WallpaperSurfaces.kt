@@ -153,7 +153,7 @@ fun HomeSurfaceBackground(
             }
         }
         // Wave 34: the alert over every kind; a signal wallpaper that has items draws it itself, inside its own layers.
-        if (alert && (w.kind != WallpaperKind.Live || w.live.items.isEmpty())) SpiderSenseAlert(prefs, Modifier.fillMaxSize(), dark = dark)
+        // W35: the alert is the user-selected Alert effect, drawn by IndicatorLayer over every wallpaper kind (see Background() in HomeScreen); nothing here.
     }
 }
 

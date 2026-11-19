@@ -204,38 +204,7 @@ class WallpaperPictureRenderTest {
         )
     }
 
-    @Test fun PAL_24_theSpiderSenseAlertShowsOverEveryWallpaperKindWhenThereIsNoSignal() {
-        still()
-        for ((name, w) in kinds()) {
-            rule.mainClock.autoAdvance = true
-            val base = LauncherPrefs().withWallpaper(WallpaperSurface.Glance, w)
-            val calm = surfaceBitmap(base.copy(radarSignalForce = SignalForce.Good))
-            val alert = surfaceBitmap(base.copy(radarSignalForce = SignalForce.NoSignal))
-            shot("alert-$name", alert)
-            assertTrue("$name: the comic lines are drawn with no signal (differing samples ${differing(calm, alert)})", differing(calm, alert) > 60)
-        }
-    }
-
-    @Test fun PAL_24_noAlertWhileThereIsSignalOnTheNonSignalKinds() {
-        still()
-        for ((name, w) in kinds().filter { it.first != "signal" }) {
-            val base = LauncherPrefs().withWallpaper(WallpaperSurface.Glance, w)
-            val good = surfaceBitmap(base.copy(radarSignalForce = SignalForce.Good)); val excellent = surfaceBitmap(base.copy(radarSignalForce = SignalForce.Excellent))
-            assertEquals("$name: nothing differs between good and excellent signal (no lines at all)", 0, differing(good, excellent))
-        }
-    }
-
-    @Test fun PAL_24_theAlertFollowsReducedMotionAsOneStillFrameAndTheMotionClockOtherwise() {
-        // reduced: the lines are the still composition (the same pixels at any time); not reduced: the lines step with the clock
-        still()
-        val p = LauncherPrefs(radarSignalForce = SignalForce.NoSignal).withWallpaper(WallpaperSurface.Glance, Wallpaper(WallpaperKind.Solid, solid = 0xFF204060))
-        setHost { HomeSurfaceBackground(WallpaperSurface.Glance, p, Modifier.fillMaxSize(), announce = false, scrim = false) }
-        rule.waitForIdle(); val a = bitmap(); rule.mainClock.advanceTimeBy(900); val b = bitmap()
-        assertEquals("reduced motion: one still frame", 0, differing(a, b))
-        // the source rule: SpiderSenseAlert reads the same motion prefs and clock as the signal wallpaper
-        val src = File("src/main/kotlin/com/bos/sphere/feature/grid/WallpaperSurfaces.kt").readText()
-        assertTrue(src.contains("rememberMotionPrefs().reduced") && src.contains("rememberRadarClock(active, reduced)") && src.contains("rememberRadarActive()"))
-    }
+    // W35: the alert is the user-selected Alert effect (IndicatorLayer), covered by IndicatorAlertW35UiTest; the wallpaper no longer draws comic lines itself.
 
     private fun radar(p: LauncherPrefs): Bitmap {
         setHost { Box(Modifier.fillMaxSize().androidxBlack()) { CompositionLocalProvider(LocalPictureLoader provides FakeLoader(still = solidBitmap(0xFF304050.toInt()))) { RadarBackgroundLayer(p, { null }) } } }
@@ -243,21 +212,6 @@ class WallpaperPictureRenderTest {
         return if (p.wallpaper(WallpaperSurface.Glance).kind == WallpaperKind.Picture && p.radarBackground == RadarBackground.Dimmed) await { Color.red(it.getPixel(it.width / 2, it.height / 2)) > 0 || Color.blue(it.getPixel(it.width / 2, it.height / 2)) > 0 } else bitmap()
     }
     private fun Modifier.androidxBlack() = this.then(Modifier.background(androidx.compose.ui.graphics.Color.Black))
-
-    @Test fun PAL_24_theAlertShowsOnRadarWithTrueBlackAndWithDimmedOverEveryKind() {
-        still()
-        val black = LauncherPrefs(radarBackground = RadarBackground.TrueBlack)
-        assertTrue("true black: lines on black (${differing(radar(black.copy(radarSignalForce = SignalForce.Good)), radar(black.copy(radarSignalForce = SignalForce.NoSignal)))})",
-            differing(radar(black.copy(radarSignalForce = SignalForce.Good)), radar(black.copy(radarSignalForce = SignalForce.NoSignal))) > 60)
-        assertTrue("with signal, true black is pure black", radar(black.copy(radarSignalForce = SignalForce.Good)).let { b -> (0 until b.height step 7).all { y -> b.getPixel(b.width / 2, y) == Color.BLACK } })
-        for ((name, w) in kinds()) {
-            val dimmed = LauncherPrefs(radarBackground = RadarBackground.Dimmed).withWallpaper(WallpaperSurface.Glance, w)
-            val calm = radar(dimmed.copy(radarSignalForce = SignalForce.Good)); val alert = radar(dimmed.copy(radarSignalForce = SignalForce.NoSignal))
-            shot("radar-dimmed-$name", alert)
-            assertTrue("Radar dimmed over $name shows the alert (${differing(calm, alert)})", differing(calm, alert) > 40)
-        }
-        shot("radar-trueblack", radar(black.copy(radarSignalForce = SignalForce.NoSignal)))
-    }
 
     @Test fun NFR_14_radarDrawsAnAnimatedPictureAsItsStillAndNeverStartsAPlayerThere() {
         still(); file("glance-v.mp4")

@@ -30,6 +30,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Network-aware dot grid -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Wave 34: WifiManager.isWifiEnabled for the Connectivity sheet (normal permission, no prompt). -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Haptic tick when a motion gesture fires -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Silent / vibrate / Do-Not-Disturb actions (user grants access in system settings) -->

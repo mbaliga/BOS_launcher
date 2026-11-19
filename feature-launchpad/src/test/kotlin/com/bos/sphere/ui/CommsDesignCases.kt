@@ -155,13 +155,20 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
     @Test fun STR_02_w27_statusGlyphsOpenTheSystemPanelsAndTheClockTheSoundPopup() {
         render(feed(4), home = false)
         rule.onNodeWithTag("lp.sys.volume").performClick(); rule.onNodeWithTag("lp.sys.battery").performClick()
-        rule.onNodeWithTag("lp.sys.signal").performClick(); rule.onNodeWithTag("lp.sys.wifi").performClick()
         assertEquals(1, soundOpened); soundOpened = 0 // W34: the volume knob opens the Sound and Vibration popup
-        assertEquals(listOf(SystemTileKind.Battery, SystemTileKind.Connectivity, SystemTileKind.Connectivity), opened)
+        assertEquals(listOf(SystemTileKind.Battery), opened) // signal and Wi-Fi open the Connectivity sheet (wave 34, next test)
         rule.onNodeWithTag("lp.clock").performClick()
         assertEquals(1, soundOpened)
         assertEquals("the old four square buttons are gone", 0, rule.onAllNodesWithTag("lp.sys.time").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.sys.sound").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.system").fetchSemanticsNodes().size)
         assertEquals("no jump strip", 0, rule.onAllNodesWithTag("lp.strip").fetchSemanticsNodes().size)
+    }
+
+    @Test fun STR_02_w34_signalAndWifiGlyphsOpenTheConnectivitySheetNotASystemPanel() {
+        render(feed(4), home = false)
+        rule.onNodeWithTag("lp.sys.signal").performClick()
+        rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
+        assertEquals(1, rule.onAllNodesWithTag("cn.sheet", useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals("no system panel was started for it", emptyList<SystemTileKind>(), opened)
     }
 
     // ---- tabs ----

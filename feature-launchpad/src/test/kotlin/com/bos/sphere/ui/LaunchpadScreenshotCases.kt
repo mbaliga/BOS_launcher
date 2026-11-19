@@ -54,8 +54,8 @@ abstract class LaunchpadScreenshotCases(private val orientation: String) : Launc
 
     @Test fun STR_10_systemRowShowsStateWithoutClaimingToToggle() {
         render("system", true) { Body(grouped) }
-        // Wave 27: icon-only glyphs (brightness, battery, signal, Wi-Fi) next to the clock; the state lives in the content descriptions.
-        for (d in listOf("Battery: 82%, charging", "Brightness", "Time: 12:00 PM"))
+        // Wave 27: icon-only glyphs (volume, battery, signal, Wi-Fi) next to the clock; the state lives in the content descriptions.
+        for (d in listOf("Battery: 82%, charging", "Volume", "Time: 12:00 PM"))
             rule.onNodeWithContentDescription(d).assertIsDisplayed()
         assertEquals(2, rule.onAllNodesWithContentDescription("Connectivity: Wi-Fi").fetchSemanticsNodes().size)
         assertTrue(rule.onAllNodesWithText("82%").fetchSemanticsNodes().isEmpty())

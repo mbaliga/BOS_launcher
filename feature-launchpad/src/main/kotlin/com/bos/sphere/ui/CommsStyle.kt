@@ -111,7 +111,7 @@ internal object CommsStyle {
     const val WIFI_H_DP = 16.4f
     const val GLYPH_GAP_DP = 11.7f
     /** The sun's ink sits 1.4 dp higher than the others. */
-    const val SUN_DY_DP = -1.4f
+    const val SUN_DY_DP = 0.4f
 
     // ---- tabs ----
     /** Gap between the clock row and the tab row. */

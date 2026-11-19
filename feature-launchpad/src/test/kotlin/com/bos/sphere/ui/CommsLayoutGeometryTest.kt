@@ -49,7 +49,7 @@ class CommsLayoutGeometryTest : CommsLayoutCases("geo") {
     @Test fun CML_02_statusGlyphsLandOnTheMockUp() {
         val b = screen()
         // centres of the four inks: brightness, battery, signal, Wi-Fi (the sun sits 3 px higher than the rest)
-        val cx = listOf(595, 656, 711, 777); val cy = listOf(198, 201, 201, 201); val names = listOf("brightness", "battery", "signal", "wifi")
+        val cx = listOf(595, 656, 711, 777); val cy = listOf(198, 201, 201, 201); val names = listOf("volume", "battery", "signal", "wifi")
         val regions = listOf(556 to 625, 632 to 684, 686 to 740, 744 to 810)
         for (i in 0 until 4) MockDiff.ink(b, regions[i].first, 165, regions[i].second, 240, pageBg)!!.let {
             near("${names[i]} centre x", cx[i], (it[0] + it[2]) / 2); near("${names[i]} centre y", cy[i], (it[1] + it[3]) / 2)

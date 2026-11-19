@@ -64,7 +64,7 @@ abstract class CommsScaleCases(orientation: String) : CommsLayoutCases(orientati
         render(scale = 75)
         val min = 48f * dpx() - 1f
         val menu = boundsPx("lp.menu"); assertTrue("menu button ${menu.width}x${menu.height}", menu.width >= min && menu.height >= min)
-        for (g in listOf("brightness", "battery", "signal", "wifi")) { val b = boundsPx("lp.sys.$g"); assertTrue("$g target is ${b.height} px high", b.height >= min) }
+        for (g in listOf("volume", "battery", "signal", "wifi")) { val b = boundsPx("lp.sys.$g"); assertTrue("$g target is ${b.height} px high", b.height >= min) }
         val row = boundsPx("lp.row.k0"); assertTrue("a row is ${row.height} px, 70 dp x 0.75 = 52.5 dp", row.height >= min)
     }
 

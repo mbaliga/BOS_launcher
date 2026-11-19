@@ -141,7 +141,7 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
         assertTrue("the title follows the menu glyph (its text starts 57.7 dp from the edge)", title.left.value > menu.left.value + 20f && title.left.value < menu.right.value + 1f)
         assertTrue("the clock row is under the title row", clock.top.value >= menu.bottom.value - 1f)
         assertEquals("the clock is on the left, 32 dp from the edge", 32f, clock.left.value, 1f)
-        val glyphs = listOf("brightness", "battery", "signal", "wifi").map { b("lp.sys.$it") }
+        val glyphs = listOf("volume", "battery", "signal", "wifi").map { b("lp.sys.$it") }
         glyphs.forEach { assertEquals("each glyph is 48 dp high (wave 28: as wide as its ink and the mock-up's gap, the tap target grows to 48 dp)", 48f, it.bottom.value - it.top.value, 0.5f) }
         assertTrue("glyphs are in order left to right", glyphs.zipWithNext().all { (a, c) -> a.right.value <= c.left.value + 0.5f })
         assertTrue("and on the right of the clock", glyphs.first().left.value > clock.right.value)
@@ -154,13 +154,17 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
 
     @Test fun STR_02_w27_statusGlyphsOpenTheSystemPanelsAndTheClockTheSoundPopup() {
         render(feed(4), home = false)
-        rule.onNodeWithTag("lp.sys.volume").performClick(); rule.onNodeWithTag("lp.sys.battery").performClick()
+        rule.onNodeWithTag("lp.sys.battery").performClick(); rule.onNodeWithTag("lp.sys.volume").performClick() // battery first: the Sound sheet covers the row once open
         assertEquals(1, soundOpened); soundOpened = 0 // W34: the volume knob opens the Sound and Vibration popup
         assertEquals(listOf(SystemTileKind.Battery), opened) // signal and Wi-Fi open the Connectivity sheet (wave 34, next test)
-        rule.onNodeWithTag("lp.clock").performClick()
-        assertEquals(1, soundOpened)
         assertEquals("the old four square buttons are gone", 0, rule.onAllNodesWithTag("lp.sys.time").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.sys.sound").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.system").fetchSemanticsNodes().size)
         assertEquals("no jump strip", 0, rule.onAllNodesWithTag("lp.strip").fetchSemanticsNodes().size)
+    }
+
+    @Test fun STR_02_w34_theClockOpensTheSoundPopup() {
+        render(feed(4), home = false)
+        rule.onNodeWithTag("lp.clock").performClick()
+        assertEquals(1, soundOpened)
     }
 
     @Test fun STR_02_w34_signalAndWifiGlyphsOpenTheConnectivitySheetNotASystemPanel() {

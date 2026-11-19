@@ -2,6 +2,7 @@ package com.bos.sphere
 
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -69,9 +70,14 @@ class PageEditorAppTest {
     }
 
     private fun openEditor(@Suppress("UNUSED_PARAMETER") stores: LauncherStores) {
-        // The way in is the long press on empty home space (the quick sheet) and its Edit home row.
-        rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * 0.35f)) }; settle(300)
-        rule.onNodeWithText("Edit home").performScrollTo().performClick(); settle()
+        // W34: the Home sheet no longer has an Edit home row; the way in is the long press on empty home space (the quick sheet), then Ground Control > Home screen > Edit home.
+        for (y in listOf(0.35f, 0.6f, 0.8f)) { // continuous puts items where the paginated home has space: try a few empty spots
+            if (rule.onAllNodesWithTag("quick.groundcontrol", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() || has("Page carousel")) break
+            rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * y)) }; settle(300)
+        }
+        if (has("Page carousel")) return // a long press on an empty spot of a continuous home enters edit mode directly
+        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        rule.onNodeWithText("Edit home", useUnmergedTree = true).performScrollTo().performClick(); settle()
     }
 
     private fun pageKeys(stores: LauncherStores) = stores.layout.layout.value.pages.map { it.keys }

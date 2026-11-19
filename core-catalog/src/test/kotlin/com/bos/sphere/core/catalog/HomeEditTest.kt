@@ -278,4 +278,30 @@ class EditGraveyardTest {
         assertEquals("Renamed", undone.folders.getValue("f").name)
         assertTrue("g" !in undone.folders)
     }
+
+    // ---- wave 30 review: a full home refuses what would have to open a page, and nothing is lost on the way
+
+    private val small: (PageLayout) -> Int = { 2 }
+    private fun fullState(dock: List<String> = emptyList(), folders: Map<String, Folder> = emptyMap()) =
+        HomeState(pages = listOf(HomePage(listOf("a", "b"), id = 1L)), dock = dock, folders = folders)
+
+    @Test
+    fun PGX_review_aDockItemDroppedOnAFullPageStaysInTheDock() {
+        val s = fullState(dock = listOf("c"))
+        assertEquals(s, HomeEdit.move(s, "c", 0, 1, small))
+    }
+
+    @Test
+    fun PGX_review_aFolderItemTakenOutOntoAFullPageStaysInTheFolder() {
+        val f = Folder("f", "F", listOf("c", "d", "e"))
+        val s = fullState(folders = mapOf("f" to f))
+        assertEquals(s, HomeEdit.takeOut(s, "f", "c", 0, 0, small))
+        assertEquals(s, HomeEdit.move(s, "c", 0, 0, small))
+    }
+
+    @Test
+    fun PGX_review_aFolderMadeFromItemsOffTheHomeOnAFullHomeIsNotCreated() {
+        val s = fullState()
+        assertEquals(s, HomeEdit.createFolder(s, listOf("x", "y"), "f", "F", small))
+    }
 }

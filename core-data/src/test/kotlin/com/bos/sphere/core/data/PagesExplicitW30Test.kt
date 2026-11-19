@@ -171,4 +171,63 @@ class PagesExplicitW30Test {
         assertTrue(LegacyHomeBackup.FILE in StateSchema.BACKUP_EXCLUDED_FILES)
         assertEquals("home_layout_legacy.json", LegacyHomeBackup.FILE)
     }
+
+    // ---- adversarial review findings
+
+    @Test fun PGX_review_aDensityChangeSinceTheAutoFillDoesNotHideTheLegacyLayout() {
+        // the auto-fill wrote 5 per page; today's grid holds 6 (or the phone is in landscape): the pages are the fullest they ever were, not "short"
+        val five = filled(14, per = 5)
+        assertEquals(PagesExplicit.Verdict.Reset, PagesExplicit.verdict(five, orders(), cap, false, false))
+        val s = store(); s.replace(HomeLayout(pages = five, seeded = true))
+        assertEquals(PagesMigrationResult.Reset, run(s, backup()))
+    }
+
+    @Test fun PGX_review_aTinyHandBuiltHomeInCatalogOrderIsNotMistakenForTheAutoFill() {
+        val tiny = listOf(page(1, "app01", "app02"), page(2, "app03"))
+        assertEquals(PagesExplicit.Verdict.Keep, PagesExplicit.verdict(tiny, orders(), cap, false, false))
+        val sevenInOrder = listOf(HomePage(apps.take(6), PageLayout(), 1L), HomePage(apps.drop(6).take(1), PageLayout(), 2L))
+        assertEquals(PagesExplicit.Verdict.Keep, PagesExplicit.verdict(sevenInOrder, orders(), cap, false, false))
+    }
+
+    @Test fun PGX_review_aBackupThatCannotBeWrittenNeverWipesTheLayout() {
+        val s = store(); val old = HomeLayout(pages = filled(14), seeded = true); s.replace(old)
+        val blocked = tmp.newFile() // a file where the backup directory should be: mkdirs and writeText fail
+        val b = LegacyHomeBackup(File(blocked, "files"))
+        assertEquals(PagesMigrationResult.Kept, run(s, b))
+        assertEquals(old, s.layout.value); assertFalse(s.noticePending())
+        assertEquals(0, s.pagesExplicitVersion()) // still pending: tried again on the next start
+    }
+
+    @Test fun PGX_review_theResetNoticeIsDroppedWhenItsBackupIsGone() {
+        val s = store(); val b = backup()
+        s.replace(HomeLayout(pages = filled(14), seeded = true)); run(s, b, now = 1_000L)
+        assertTrue(PagesExplicitMigration.noticeStillValid(s, b, 2_000L))
+        // a cloud backup or device transfer carries the pending flag but not the excluded backup file; the 30 days can also run out
+        b.discard()
+        assertFalse(PagesExplicitMigration.noticeStillValid(s, b, 2_000L))
+        assertFalse(s.noticePending())
+        val s2 = store(); val b2 = backup()
+        s2.replace(HomeLayout(pages = filled(14), seeded = true)); run(s2, b2, now = 0L)
+        assertFalse(PagesExplicitMigration.noticeStillValid(s2, b2, LegacyHomeBackup.WINDOW_MS + 1)); assertFalse(s2.noticePending())
+    }
+
+    @Test fun PGX_review_restoreAsksBeforeReplacingPagesTheUserHasBuiltSinceTheReset() {
+        val s = store(); val b = backup()
+        s.replace(HomeLayout(pages = filled(14), seeded = true)); run(s, b)
+        assertFalse(PagesExplicitMigration.restoreReplacesEdits(s)) // still the one empty page
+        s.setPages(listOf(page(1, "app50")))
+        assertTrue(PagesExplicitMigration.restoreReplacesEdits(s))
+        val t = store(); val bt = backup(); t.replace(HomeLayout(pages = filled(14), seeded = true)); run(t, bt)
+        t.setPages(listOf(page(1), page(2))) // two empty pages the user added also count
+        assertTrue(PagesExplicitMigration.restoreReplacesEdits(t))
+    }
+
+    @Test fun PGX_review_aFullHomeRefusesAnAppDroppedOnItAndWritesNothing() {
+        val s = store(); val full = listOf(HomePage(apps.take(6), PageLayout(), 1L))
+        s.replace(HomeLayout(pages = full, removed = setOf("app99"), seeded = true))
+        assertFalse(s.addToHome("app99", full, 0, cap))
+        assertEquals(setOf("app99"), s.layout.value.removed) // not put back on the home, nothing marked
+        assertFalse(s.explicitEdit())
+        assertTrue(s.addToHome("app98", listOf(HomePage(apps.take(3), PageLayout(), 1L)), 0, cap))
+    }
 }

@@ -299,7 +299,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // One-time migration of an auto-filled legacy home (see PagesExplicitMigration): ONE empty page and the old arrangement kept for "Restore previous pages".
     var resetNotice by remember { mutableStateOf(stores.layout.noticePending()) }
     var legacyAvailable by remember { mutableStateOf(false) }
-    LaunchedEffect(layoutEpoch) { legacyAvailable = withContext(kotlinx.coroutines.Dispatchers.IO) { com.bos.sphere.core.data.LegacyHomeBackup(context.filesDir).available(System.currentTimeMillis()) != null } }
+    var confirmRestore by remember { mutableStateOf(false) }
+    LaunchedEffect(layoutEpoch) {
+        legacyAvailable = withContext(kotlinx.coroutines.Dispatchers.IO) { com.bos.sphere.core.data.LegacyHomeBackup(context.filesDir).available(System.currentTimeMillis()) != null }
+        // The pending flag can arrive with a backup or transfer without the (excluded) backup file: then there is nothing to offer.
+        if (resetNotice && !legacyAvailable) { resetNotice = false; stores.layout.setNoticePending(false) }
+    }
     fun restorePreviousPages() {
         scope.launch {
             val ok = withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -676,7 +681,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (com.bos.sphere.core.data.HomePageOps.itemCount(pages, i) == 0) deletePageNow(i, pages, layout, preserve, appsByKey, homeItems, stores) else pendingDelete = i
     }
     com.bos.sphere.feature.grid.HomeDropBinding(onApp = { key ->
-        if (appsByKey[key] != null && pages.none { key in it.keys }) { stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve); homeItems.onPlaced() }
+        if (appsByKey[key] != null && pages.none { key in it.keys }) { if (stores.layout.addToHome(key, pages, gridState.currentPage, capacityOf, preserve)) homeItems.onPlaced() else android.widget.Toast.makeText(context, L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show() }
     }, onItems = { defs -> homeItems.addDropped(defs) }, onTouchDrag = { menuApp = null })
     // HOM-10: folder members and dock pins of packages that are gone are unavailable first, then removed after the grace period.
     LaunchedEffect(allApps) { if (allApps.isNotEmpty()) homeItems.reconcileMembers(allApps.mapTo(HashSet()) { it.key }) }
@@ -1567,7 +1572,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 copyText = { t -> (context.getSystemService(android.content.ClipboardManager::class.java)).setPrimaryClip(android.content.ClipData.newPlainText("Liftoff", t)) },
                 lab = labEntries,
                 addHomePage = { settingsOpen = false; requestAddPage(null) },
-                restorePages = if (legacyAvailable) ({ restorePreviousPages() }) else null,
+                restorePages = if (legacyAvailable) ({ if (com.bos.sphere.core.data.PagesExplicitMigration.restoreReplacesEdits(stores.layout)) { settingsOpen = false; confirmRestore = true } else restorePreviousPages() }) else null,
                 editHomePages = { settingsOpen = false; editHome() },
                 healthAvailable = healthAvailable,
                 appsByKey = appsByKey,
@@ -1638,7 +1643,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 isOnHome = if (prefs.isPaged) pages.any { app.key in it.keys } else null,
                 onToggleHome = {
                     if (pages.any { app.key in it.keys }) stores.layout.removeFromHome(app.key, pages, preserve)
-                    else { stores.layout.addToHome(app.key, pages, gridState.currentPage, capacityOf, preserve); homeItems.onPlaced() } // wave 24: Glance shows the pages it was placed on
+                    else if (stores.layout.addToHome(app.key, pages, gridState.currentPage, capacityOf, preserve)) homeItems.onPlaced() else android.widget.Toast.makeText(context, L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show() // wave 24: Glance shows the pages it was placed on
                     menuApp = null
                 },
             )
@@ -1682,6 +1687,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.data.HomePageOps.itemCount(pages, i),
                 onConfirm = { pendingDelete = null; deletePageNow(i, pages, layout, preserve, appsByKey, homeItems, stores) },
                 onDismiss = { pendingDelete = null },
+            )
+        }
+        if (confirmRestore) {
+            ConfirmDialog(
+                title = L10n.tr("Restore previous pages"),
+                text = L10n.tr("Your current pages will be replaced by the previous ones."),
+                confirm = L10n.tr("Restore previous pages"),
+                dismiss = L10n.tr("Cancel"),
+                onConfirm = { confirmRestore = false; restorePreviousPages() },
+                onDismiss = { confirmRestore = false },
             )
         }
         if (resetNotice) {

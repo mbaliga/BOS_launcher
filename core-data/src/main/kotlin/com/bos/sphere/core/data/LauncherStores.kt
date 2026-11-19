@@ -345,8 +345,12 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
         markExplicit()
     }
 
-    /** Puts [key] back on the home pages. */
-    fun addToHome(key: String, visual: List<HomePage>, preferredPage: Int, capacityOf: (PageLayout) -> Int, preserve: Set<String> = emptySet()) {
+    /**
+     * Puts [key] back on the home pages. Wave 30: false (and nothing written) when no page has a free slot: the caller says "Page full"; a
+     * page is never made for it. The preferred page is tried first, then the others.
+     */
+    fun addToHome(key: String, visual: List<HomePage>, preferredPage: Int, capacityOf: (PageLayout) -> Int, preserve: Set<String> = emptySet()): Boolean {
+        if (!HomeLayoutMath.hasRoom(visual, capacityOf)) return false
         val cur = _layout.value
         write(
             cur.copy(
@@ -356,6 +360,7 @@ class HomeLayoutStore internal constructor(private val sp: SharedPreferences, pr
             ),
         )
         markExplicit()
+        return true
     }
 
     // Wave 30 (pagesExplicit): the markers that keep the one-time legacy-layout migration from ever touching a layout the user edited.

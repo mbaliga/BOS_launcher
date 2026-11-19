@@ -12,6 +12,7 @@ internal val L10nW30pagesExplicitEnglish: Set<String> = setOf(
     "Restore previous pages",
     "Brings back the pages from before the reset (kept for 30 days)",
     "Previous pages restored",
+    "Your current pages will be replaced by the previous ones.",
     "OK",
 )
 
@@ -27,6 +28,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "Restaurar las páginas anteriores",
         "Brings back the pages from before the reset (kept for 30 days)" to "Recupera las páginas de antes del restablecimiento (se guardan 30 días)",
         "Previous pages restored" to "Páginas anteriores restauradas",
+        "Your current pages will be replaced by the previous ones." to "Tus páginas actuales se sustituirán por las anteriores.",
         "OK" to "Aceptar",
     ),
     "fr" to mapOf(
@@ -40,6 +42,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "Restaurer les pages précédentes",
         "Brings back the pages from before the reset (kept for 30 days)" to "Rétablit les pages d'avant la réinitialisation (conservées 30 jours)",
         "Previous pages restored" to "Pages précédentes restaurées",
+        "Your current pages will be replaced by the previous ones." to "Vos pages actuelles seront remplacées par les précédentes.",
         "OK" to "OK",
     ),
     "de" to mapOf(
@@ -53,6 +56,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "Frühere Seiten wiederherstellen",
         "Brings back the pages from before the reset (kept for 30 days)" to "Holt die Seiten von vor dem Zurücksetzen zurück (30 Tage lang gespeichert)",
         "Previous pages restored" to "Frühere Seiten wiederhergestellt",
+        "Your current pages will be replaced by the previous ones." to "Ihre aktuellen Seiten werden durch die früheren ersetzt.",
         "OK" to "OK",
     ),
     "pt" to mapOf(
@@ -66,6 +70,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "Restaurar as páginas anteriores",
         "Brings back the pages from before the reset (kept for 30 days)" to "Traz de volta as páginas de antes da redefinição (guardadas por 30 dias)",
         "Previous pages restored" to "Páginas anteriores restauradas",
+        "Your current pages will be replaced by the previous ones." to "As suas páginas atuais serão substituídas pelas anteriores.",
         "OK" to "OK",
     ),
     "hi" to mapOf(
@@ -79,6 +84,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "पिछले पेज वापस लाएँ",
         "Brings back the pages from before the reset (kept for 30 days)" to "रीसेट से पहले के पेज वापस लाता है (30 दिन तक रखे जाते हैं)",
         "Previous pages restored" to "पिछले पेज वापस आ गए",
+        "Your current pages will be replaced by the previous ones." to "आपके मौजूदा पेज पिछले पेजों से बदल दिए जाएंगे।",
         "OK" to "ठीक है",
     ),
     "zh" to mapOf(
@@ -92,6 +98,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "恢复之前的页面",
         "Brings back the pages from before the reset (kept for 30 days)" to "找回重置前的页面（保留 30 天）",
         "Previous pages restored" to "已恢复之前的页面",
+        "Your current pages will be replaced by the previous ones." to "当前页面将被之前的页面替换。",
         "OK" to "好",
     ),
     "ja" to mapOf(
@@ -105,6 +112,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "以前のページを復元",
         "Brings back the pages from before the reset (kept for 30 days)" to "リセット前のページを戻します（30 日間保存）",
         "Previous pages restored" to "以前のページを復元しました",
+        "Your current pages will be replaced by the previous ones." to "現在のページは以前のページに置き換えられます。",
         "OK" to "OK",
     ),
     "ar" to mapOf(
@@ -118,6 +126,7 @@ internal val L10nW30pagesExplicit: Map<String, Map<String, String>> = mapOf(
         "Restore previous pages" to "استعادة الصفحات السابقة",
         "Brings back the pages from before the reset (kept for 30 days)" to "يعيد الصفحات التي كانت قبل إعادة الضبط (تُحفظ 30 يومًا)",
         "Previous pages restored" to "تمت استعادة الصفحات السابقة",
+        "Your current pages will be replaced by the previous ones." to "سيتم استبدال صفحاتك الحالية بالصفحات السابقة.",
         "OK" to "حسنًا",
     ),
 )

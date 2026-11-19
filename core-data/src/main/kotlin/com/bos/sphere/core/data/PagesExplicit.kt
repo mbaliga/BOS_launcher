@@ -22,6 +22,10 @@ object PagesExplicit {
     const val MIN_PAGES_NO_EDIT = 3
     const val COVERAGE_NO_EDIT = 0.50
 
+    /** A page of fewer than this many items is never evidence of the auto-fill; neither is a home of fewer apps than [MIN_AUTO_APPS] in catalog order. */
+    const val MIN_PAGE_FILL = 4
+    const val MIN_AUTO_APPS = 12
+
     /** What the migration decided. */
     enum class Verdict { Keep, Reset }
 
@@ -47,8 +51,11 @@ object PagesExplicit {
         val appSet = apps.toHashSet()
         // 1. Exactly the apps, nothing else, in one of the automatic orders, every page full but the last.
         val onlyApps = placed.size == apps.size
-        val full = { p: HomePage -> p.keys.size >= capacityOf(p.layout).coerceAtLeast(1) }
-        if (onlyApps && nonEmpty.dropLast(1).all(full) && installedOrders.any { order -> order.filter { it in appSet } == apps }) return Verdict.Reset
+        // "Full" follows the pages as they were stored: a grid density change since (or a landscape start) makes today's capacity larger than
+        // what the auto-fill wrote, so a page counts as full when it holds as many as the fullest page (when that is at most today's capacity).
+        val widest = pages.maxOf { it.keys.size }
+        val full = { p: HomePage -> p.keys.size >= minOf(capacityOf(p.layout).coerceAtLeast(1), widest) && widest >= MIN_PAGE_FILL }
+        if (onlyApps && apps.size >= MIN_AUTO_APPS && nonEmpty.dropLast(1).all(full) && installedOrders.any { order -> order.filter { it in appSet } == apps }) return Verdict.Reset
         // 2. A long run of full pages that between them hold most of what is installed.
         var run = 0; var best = 0; var runKeys = HashSet<String>(); var bestKeys = emptySet<String>()
         for (p in pages) {
@@ -68,13 +75,13 @@ class LegacyHomeBackup(private val dir: File) {
 
     private val file get() = File(dir, FILE)
 
-    fun save(layout: HomeLayout, atMillis: Long) {
-        runCatching {
-            dir.mkdirs()
-            val o = JSONObject().put("at", atMillis).put("pages", HomeLayoutCodec.encode(layout.pages)).put("removed", JSONArray(layout.removed.toList()))
-            file.writeText(o.toString())
-        }
-    }
+    /** True when the backup is on disk and reads back; the migration never wipes a layout it could not keep. */
+    fun save(layout: HomeLayout, atMillis: Long): Boolean = runCatching {
+        dir.mkdirs()
+        val o = JSONObject().put("at", atMillis).put("pages", HomeLayoutCodec.encode(layout.pages)).put("removed", JSONArray(layout.removed.toList()))
+        file.writeText(o.toString())
+        load()?.layout?.pages?.size == layout.pages.size
+    }.getOrDefault(false)
 
     fun load(): Saved? = runCatching {
         if (!file.exists()) return null
@@ -122,12 +129,27 @@ object PagesExplicitMigration {
             store.markPagesExplicitDone()
             return PagesMigrationResult.Kept
         }
-        backup.save(cur, nowMillis)
+        // A backup that could not be written (disk full) leaves the layout as it is and the migration pending for the next start.
+        if (!backup.save(cur, nowMillis)) return PagesMigrationResult.Kept
         store.replace(FreshHome.emptyLayout())
         store.markPagesExplicitDone()
         store.setNoticePending(true)
         return PagesMigrationResult.Reset
     }
+
+    /**
+     * Whether the "Home pages were reset" notice may still be shown: it needs the backup it offers to restore. The pending flag travels with a
+     * cloud backup or a device transfer but the backup file does not, and the 30 days run out; then the notice is dropped for good.
+     */
+    fun noticeStillValid(store: HomeLayoutStore, backup: LegacyHomeBackup, nowMillis: Long): Boolean {
+        if (!store.noticePending()) return false
+        if (backup.available(nowMillis) != null) return true
+        store.setNoticePending(false)
+        return false
+    }
+
+    /** True when restoring would replace pages the user has put something on since the reset (the caller asks first). */
+    fun restoreReplacesEdits(store: HomeLayoutStore): Boolean = store.layout.value.pages.any { it.keys.isNotEmpty() } || store.layout.value.pages.size > 1
 
     /** "Restore previous pages": puts the backed-up arrangement back (a restore is an edit by the user: it is never reset again). */
     fun restore(store: HomeLayoutStore, backup: LegacyHomeBackup, nowMillis: Long): Boolean {

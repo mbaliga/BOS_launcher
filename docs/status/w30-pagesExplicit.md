@@ -20,3 +20,22 @@ Cause of the owner's 14 full pages (reproduced before the change, see decisions/
 ## Device only / not done
 - Touch feel, real widget picking (the flow test stands a tile in for the widget), the dialogs' look, the real upgrade path from the owner's 14 page install (the heuristics are fixture tested, the owner's actual pref and layout files were not available).
 - `PackageRemovedW26SmokeTest` is the known order-dependent flake.
+
+## Adversarial review findings (second pass)
+Each has a test that failed before the fix (core-catalog `EditGraveyardTest.PGX_review_*`, core-data `PagesExplicitW30Test.PGX_review_*`).
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| R1 | The auto-fill heuristic judged "full" by TODAY's capacity: a layout written at a smaller density (or judged in landscape) was never "full", so the owner's 14 pages could be missed and kept for good (the version marker is set on Keep). | A page counts as full when it holds as many as the fullest stored page (when that is at most today's capacity). | `PGX_review_aDensityChangeSinceTheAutoFillDoesNotHideTheLegacyLayout` |
+| R2 | The inverse: a tiny hand-built home in catalog order (7 apps over two pages) matched "apps only, in automatic order, full pages" and was reset. | Rule 1 needs at least 12 apps and pages of at least 4. | `PGX_review_aTinyHandBuiltHomeInCatalogOrderIsNotMistakenForTheAutoFill` |
+| R3 | `LegacyHomeBackup.save` swallowed every error, so with a full disk the migration wiped the layout with no backup (data loss). | `save` returns whether the file reads back; on failure the layout stays and the migration stays pending. | `PGX_review_aBackupThatCannotBeWrittenNeverWipesTheLayout` |
+| R4 | The `resetNoticePending` flag lives in the backed-up layout prefs but the backup file is excluded from backup and transfer (and expires after 30 days), so a restored phone showed "Restore previous pages" with nothing to restore. | `noticeStillValid` drops the notice when the backup is gone; HomeScreen uses it. | `PGX_review_theResetNoticeIsDroppedWhenItsBackupIsGone` |
+| R5 | Restore (notice or Settings row) silently replaced pages the user had built since the reset. | `restoreReplacesEdits` plus a confirmation ("Your current pages will be replaced by the previous ones."), new string in all 8 languages. | `PGX_review_restoreAsksBeforeReplacingPagesTheUserHasBuiltSinceTheReset` |
+| R6 | Dropping an app on the home (or placing it from Glance) with every page full wrote nothing visible, cleared its "removed" mark and gave no feedback. | `HomeLayoutStore.addToHome` returns false and writes nothing; HomeScreen shows "Page full". | `PGX_review_aFullHomeRefusesAnAppDroppedOnItAndWritesNothing` |
+| R7 | An item moved from the dock or taken out of a folder onto a full page (and a folder created from items on no page) was removed from its dock slot or folder, then could not be placed: it vanished (a widget or link was re-added as an extra overflow page by the strays rule). | `HomeEdit.move`, `takeOut` and `createFolder` refuse when the target page has no room; nothing changes. | `PGX_review_aDockItemDroppedOnAFullPage...`, `..._aFolderItemTakenOut...`, `..._aFolderMadeFromItemsOff...` |
+
+Found, not fixed (device or larger scope):
+- The migration judges the ACTIVE window size class only; another class's stored copy that is auto-filled stays if the active class is kept (a reset clears every class).
+- The first non-empty app list decides the migration once; a partial list (work profile not loaded yet) could make a legacy layout look hand-built (legacy "Everything" mode is then switched off anyway, so nothing re-fills).
+- The Settings Delete page row moves the settings page selection before the confirmation answer.
+- Removing a widget from a stack onto a full page is still unguarded (WidgetStacks.removeMember).

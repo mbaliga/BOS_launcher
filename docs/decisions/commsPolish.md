@@ -24,4 +24,4 @@ Owner: "The comms text and three bars are misaligned. In comms, there is no visi
 - Flipping (open, tap, Mark as read) cross-fades colours and icon opacity in 150 ms (instant with reduced motion); the weight and the dot switch at once.
 - Contrast (JVM test `CommsPolishContrastTest`, dark and light): read headline 4.5:1 or more (text); read second line and time 3:1 or more (secondary text, WCAG large/secondary); accent time and dot 4.5 and 3. All values are `CommsStyle` tokens (`CommsRowTone`).
 - Tags: live rows `lp.row.unreadDot.<key>`; history view rows `lp.row.unreadDot.<entry id>`.
-- Not done: the app module's `HubPanel` rows (other stream) were not restyled; device TalkBack and real-display contrast are not verified.
+- Not done: the app module's `HubPanel` rows (other stream) were not restyled (done in wave 33, see [commsDebt.md](commsDebt.md)); device TalkBack and real-display contrast are not verified.

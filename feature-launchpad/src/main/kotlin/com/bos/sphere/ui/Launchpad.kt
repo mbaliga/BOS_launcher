@@ -356,7 +356,8 @@ fun LaunchpadPanel(
         }
 
         // The hub is on when the host supplies the Files and Timeline views (the app does); a bare panel keeps the live grouped list.
-        val hub = remember(panelBody != null) { if (panelBody == null) null else HubState(HubPrefs.of(ctx), com.bos.sphere.core.data.NotificationHistory.init(ctx), true, liveAll = true) }
+        val makeHub = { HubState(HubPrefs.of(ctx), com.bos.sphere.core.data.NotificationHistory.init(ctx), true, liveAll = true) }
+        val hub = if (panelBody == null) null else androidx.compose.runtime.saveable.rememberSaveable(saver = hubStateSaver(makeHub)) { makeHub() } // wave 33: the tab and filter survive process death
         if (hub != null) LaunchedEffect(hub) { LaunchpadHubNav.requests.collect { v -> if (v != null) { hub.select(v); LaunchpadHubNav.take() } } }
         LaunchpadContent(
             hub = hub, hubPanelBody = panelBody ?: {}, haptics = haptics, viewSwitcher = { if (hub != null) HubSwitcher(hub); viewSwitcher() },
@@ -489,9 +490,8 @@ fun LaunchpadContent(
     // Wave 29: ALL is the live list plus the persistent history (one row per key, newest first), so a read notification stays.
     val historyFlow = remember(hub?.store) { hub?.store?.entries ?: MutableStateFlow(emptyList<com.bos.sphere.core.data.HistoryEntry>()) }
     val history by historyFlow.collectAsState()
-    val merged = remember(items, history, readKeys, hub != null) {
-        if (hub != null && hub.liveAll) CommsRead.merge(items, history, readKeys) else CommsRead.Merged(items, readKeys, emptyMap())
-    }
+    // Wave 33: a large merge runs off the main thread (see [rememberCommsMerged]); the previous result stays on screen meanwhile.
+    val merged = rememberCommsMerged(items, history, readKeys, enabled = hub != null && hub.liveAll)
     val effRead = merged.readKeys
     val historyOnly = merged.historyOnly
     var groupFor by remember { mutableStateOf<HubNotification?>(null) }

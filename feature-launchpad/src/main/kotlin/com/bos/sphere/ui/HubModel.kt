@@ -205,6 +205,13 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
     }
     private var filterMap by mutableStateOf(emptyMap<HubView, HubFilters>())
 
+    /** Wave 33 (commsDebt): what survives the process being killed while Comms is open: the tab and the read filter (the list scroll is saved by its own state). */
+    fun savedState(): List<String> = listOf(view.id, readFilter.name)
+    fun restoreState(saved: List<String>) {
+        HubView.fromId(saved.getOrNull(0))?.takeIf { it in views }?.let { view = it }
+        ReadFilter.entries.firstOrNull { it.name == saved.getOrNull(1) }?.let { readFilter = it }
+    }
+
     /** True when the list on screen is the Launchpad's own live grouped list: the All view of a hub whose [liveAll] is set. */
     val listIsLive: Boolean get() = liveAll && view == HubView.All
 
@@ -229,3 +236,9 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
     fun setDefault(v: HubView = view) { defaultView = v; prefs.defaultView = v }
     fun chooseGrouping(g: HubGrouping) { grouping = g; prefs.grouping = g }
 }
+
+/** Wave 33: the saver of [HubState] for `rememberSaveable`; [make] builds a fresh state, which then takes the saved tab and filter. */
+fun hubStateSaver(make: () -> HubState): androidx.compose.runtime.saveable.Saver<HubState, Any> = androidx.compose.runtime.saveable.listSaver(
+    save = { it.savedState() },
+    restore = { make().also { h -> h.restoreState(it.map { v -> v.toString() }) } },
+)

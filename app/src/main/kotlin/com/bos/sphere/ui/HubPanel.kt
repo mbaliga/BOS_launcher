@@ -27,6 +27,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,7 @@ fun HubPanel(fraction: Float, modifier: Modifier = Modifier, onRequestAccess: ()
     if (fraction <= 0.001f) return
     val context = LocalContext.current
     val notifications by NotificationProvider.notifications.collectAsStateWithLifecycle(initialValue = emptyList())
+    val readKeys by com.bos.sphere.core.data.LaunchpadSettings.readKeys.collectAsStateWithLifecycle() // wave 33: read rows are quieter, as in the Comms list
     val hasAccess = SphereNotificationListener.isEnabled(context)
     val scope = rememberCoroutineScope()
 
@@ -102,7 +106,7 @@ fun HubPanel(fraction: Float, modifier: Modifier = Modifier, onRequestAccess: ()
                 else -> {
                     visibleNotes.forEach { note ->
                         HubNotificationRow(
-                            note,
+                            note, unread = note.key !in readKeys,
                             onAction = { act -> scope.launch { runCatching { act() } } },
                             onDismiss = { dismissedKeys += note.key },
                         )
@@ -122,21 +126,27 @@ fun HubPanel(fraction: Float, modifier: Modifier = Modifier, onRequestAccess: ()
 }
 
 @Composable
-private fun HubNotificationRow(notif: HubNotification, onAction: (suspend () -> Unit) -> Unit, onDismiss: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(notif.source, color = HyleColors.InkDim, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-        Text(notif.title, color = HyleColors.InkBright, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (notif.summary.isNotEmpty()) {
-            Text(notif.summary, color = HyleColors.Ink, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            notif.actions.take(2).forEach { action ->
-                HubActionButton(action.label) { onAction(action.action) }
+private fun HubNotificationRow(notif: HubNotification, unread: Boolean, onAction: (suspend () -> Unit) -> Unit, onDismiss: () -> Unit) {
+    // Wave 33: the same read/unread styling as a Comms list row (headline weight and ink, second line, accent meta line and dot; docs/decisions/commsDebt.md).
+    val style = rememberHubShadeRowStyle(unread)
+    val state = L10n.tr(style.stateKey)
+    Box(Modifier.fillMaxWidth().semantics { stateDescription = state }) {
+        if (unread) HubShadeUnreadDot("hub.shade.unreadDot.${notif.key}", Modifier.align(Alignment.TopStart).padding(top = 26.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = HUB_SHADE_DOT_MARGIN_DP.dp, top = 12.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(notif.source, color = style.meta, fontSize = 11.sp, fontWeight = FontWeight.Medium, modifier = Modifier.testTag("hub.shade.source.${notif.key}"))
+            Text(notif.title, color = style.headline, fontSize = 14.sp, fontWeight = style.headlineWeight, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("hub.shade.title.${notif.key}"))
+            if (notif.summary.isNotEmpty()) {
+                Text(notif.summary, color = style.secondLine, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("hub.shade.summary.${notif.key}"))
             }
-            HubActionButton(L10n.tr("Dismiss"), isGhost = true) { onDismiss() }
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                notif.actions.take(2).forEach { action ->
+                    HubActionButton(action.label) { onAction(action.action) }
+                }
+                HubActionButton(L10n.tr("Dismiss"), isGhost = true) { onDismiss() }
+            }
         }
     }
 }

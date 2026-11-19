@@ -154,10 +154,10 @@ abstract class CommsDesignCases(private val orientation: String) : LaunchpadShot
 
     @Test fun STR_02_w27_statusGlyphsOpenTheSystemPanelsAndTheClockTheSoundPopup() {
         render(feed(4), home = false)
-        rule.onNodeWithTag("lp.sys.brightness").performClick(); rule.onNodeWithTag("lp.sys.battery").performClick()
+        rule.onNodeWithTag("lp.sys.volume").performClick(); rule.onNodeWithTag("lp.sys.battery").performClick()
         rule.onNodeWithTag("lp.sys.signal").performClick(); rule.onNodeWithTag("lp.sys.wifi").performClick()
-        assertEquals(listOf(SystemTileKind.Brightness, SystemTileKind.Battery, SystemTileKind.Connectivity, SystemTileKind.Connectivity), opened)
-        assertEquals("android.settings.DISPLAY_SETTINGS", com.bos.sphere.core.data.SystemStateLogic.panelFor(SystemTileKind.Brightness))
+        assertEquals(1, soundOpened); soundOpened = 0 // W34: the volume wheel opens the Sound and Vibration popup
+        assertEquals(listOf(SystemTileKind.Battery, SystemTileKind.Connectivity, SystemTileKind.Connectivity), opened)
         rule.onNodeWithTag("lp.clock").performClick()
         assertEquals(1, soundOpened)
         assertEquals("the old four square buttons are gone", 0, rule.onAllNodesWithTag("lp.sys.time").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.sys.sound").fetchSemanticsNodes().size + rule.onAllNodesWithTag("lp.system").fetchSemanticsNodes().size)

@@ -321,7 +321,7 @@ internal fun CommsClockRow(
         if (snapshot != null) {
             val conn = snapshot.connectivity
             val half = (CommsStyle.GLYPH_GAP_DP / 2)
-            StatusGlyph("lp.sys.brightness", L10n.tr("Brightness"), SystemTileKind.Brightness, onOpenPanel, CommsStyle.SUN_DP, CommsStyle.SUN_DP, CommsStyle.SUN_DY_DP) { c -> BrightnessGlyph(c, lp.bg) }
+            StatusGlyph("lp.sys.volume", L10n.tr("Volume"), SystemTileKind.Sound, { onOpenSound() }, CommsStyle.SUN_DP, CommsStyle.SUN_DP, CommsStyle.SUN_DY_DP) { c -> VolumeWheelGlyph(c, lp.bg) } // W34: this is the volume wheel, not brightness; a tap opens the Sound and Vibration popup
             StatusGlyph("lp.sys.battery", L10n.tr("Battery") + (if (snapshot.batteryPercent in 0..100) ": ${snapshot.batteryPercent}%" else "") + (if (snapshot.charging) ", " + L10n.tr("Charging").lowercase() else ""), SystemTileKind.Battery, onOpenPanel, CommsStyle.BATTERY_W_DP, CommsStyle.BATTERY_H_DP) { c -> BatteryGlyph(c, snapshot.batteryPercent) }
             StatusGlyph("lp.sys.signal", L10n.tr("Connectivity") + ": " + connectivityText(conn), SystemTileKind.Connectivity, onOpenPanel, CommsStyle.SIGNAL_DP, CommsStyle.SIGNAL_DP) { c -> SignalGlyph(if (conn == Connectivity.None) lp.dim else c) }
             StatusGlyph("lp.sys.wifi", L10n.tr("Connectivity") + ": " + connectivityText(conn), SystemTileKind.Connectivity, onOpenPanel, CommsStyle.WIFI_W_DP, CommsStyle.WIFI_H_DP) { c -> WifiGlyph(if (conn == Connectivity.Wifi) c else lp.dim) }
@@ -353,19 +353,23 @@ private fun StatusGlyph(
 
 // ---- the glyphs: plain strokes and fills, no resources; each fills the box it is given ----
 
-@Composable internal fun BrightnessGlyph(color: Color, cut: Color) {
+/** W34: a volume wheel: a knob with its pointer, ringed by volume markers that grow from small to large over a 270 degree sweep. */
+@Composable internal fun VolumeWheelGlyph(color: Color, cut: Color) {
     Canvas(Modifier.size(CommsStyle.SUN_DP.dp)) {
         val k = size.minDimension / 24f
         val c = Offset(12f * k, 12f * k)
-        for (i in 0 until 8) {
-            val a = Math.toRadians(i * 45.0 + 22.5)
+        val n = 9
+        for (i in 0 until n) {
+            val f = i / (n - 1f)
+            val a = Math.toRadians(135.0 + 270.0 * f) // from the lower left, over the top, to the lower right
             val d = Offset(Math.cos(a).toFloat(), Math.sin(a).toFloat())
-            drawLine(color, c + d * (9.4f * k), c + d * (11.6f * k), 2f * k, StrokeCap.Round)
+            val len = 1.4f + 2.2f * f // markers grow with the level
+            drawLine(color, c + d * ((11.8f - len) * k), c + d * (11.8f * k), 1.7f * k, StrokeCap.Round)
         }
-        drawCircle(color, 6.6f * k, c)
-        // the dial's needle, cut out of the disc
-        drawLine(cut, c, Offset(15.5f * k, 8.5f * k), 1.8f * k, StrokeCap.Round)
-        drawCircle(cut, 1.3f * k, c)
+        drawCircle(color, 6.4f * k, c)
+        // the knob's pointer, cut out of the disc (pointing at about 1 o'clock)
+        drawLine(cut, c, Offset(14.6f * k, 8.2f * k), 1.8f * k, StrokeCap.Round)
+        drawCircle(cut, 1.2f * k, c)
     }
 }
 

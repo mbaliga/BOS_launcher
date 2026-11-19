@@ -36,7 +36,8 @@ class WheelLoopW30Test {
         assertFalse(WheelGeometry.loops(ring(1)))
         assertFalse(WheelGeometry.loops(ring(2)))
         assertFalse(WheelGeometry.loops(ring(5)))                 // 100 < 90 + 60
-        assertTrue(WheelGeometry.loops(ring(8)))                  // 160 >= 150
+        assertFalse(WheelGeometry.loops(ring(8)))                 // 160 < 150 + one group (20): a group would be drawn twice
+        assertTrue(WheelGeometry.loops(ring(9)))                  // 180 >= 170
         assertTrue(WheelGeometry.loops(ring(27)))
         assertFalse(WheelGeometry.loops(WheelLayout(emptyList())))
     }
@@ -181,5 +182,36 @@ class WheelLoopW30Test {
         }
         val one = ring(1)
         assertEquals(0, WheelGeometry.focusedSegment(one, WheelGeometry.initialRotation(one, 4f)))
+    }
+
+    // ---- Wave 30 review (adversarial): defects found after the first implementation.
+
+    @Test fun HOM_01_w30r_no_group_is_ever_drawn_twice_at_once() {
+        for (n in 2..60) for (per in 1..4) {
+            val l = ring(n, per)
+            var r = -600f
+            while (r < 600f) {
+                val segs = WheelGeometry.visibleSegments(l, r, margin).map { it.index }
+                assertEquals("n=$n per=$per rotation=$r drew a group twice: $segs", segs.size, segs.toSet().size)
+                val sp = l.segments.flatMap { it.spokeAngles }
+                val spokes = WheelGeometry.visibleSpokes(sp, l.span, WheelGeometry.loops(l), r, margin).map { it.index }
+                assertEquals("n=$n per=$per rotation=$r drew a spoke twice: $spokes", spokes.size, spokes.toSet().size)
+                r += 3.7f
+            }
+        }
+    }
+
+    @Test fun HOM_01_w30r_a_ring_that_does_not_loop_has_no_copy_slots_for_the_section_nodes() {
+        // The accessibility nodes ask for the sections with no margin; a ring narrower than the drawn window is drawn once, so they must
+        // not get a second copy at the other end (a ghost node where nothing is drawn).
+        for (n in 2..8) {
+            val l = ring(n)
+            assertFalse("n=$n must not loop", WheelGeometry.loops(l))
+            var r = -300f
+            while (r < 300f) {
+                assertTrue("n=$n rotation=$r", WheelGeometry.visibleSegments(l, r, 0f).all { it.copy == 0 })
+                r += 5f
+            }
+        }
     }
 }

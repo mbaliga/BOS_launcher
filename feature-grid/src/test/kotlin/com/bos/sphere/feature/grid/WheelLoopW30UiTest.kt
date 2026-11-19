@@ -252,6 +252,53 @@ class WheelLoopW30UiTest {
         shot("w30-mid-fling-portrait-right")
     }
 
+    /** Wave 30 review: a second key press while the ring is still turning steps on from the group it is heading for. */
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun INP_18_w30r_two_quick_Right_presses_move_two_sections_and_a_quick_reversal_comes_back() {
+        show(Corner.BottomRight)
+        fun tap(code: Int) { rule.runOnUiThread { LauncherInput.onKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code)); LauncherInput.onKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code)) } }
+        tap(KeyEvent.KEYCODE_DPAD_RIGHT); rule.mainClock.advanceTimeBy(48)
+        tap(KeyEvent.KEYCODE_DPAD_RIGHT); rule.mainClock.advanceTimeBy(48)
+        settle()
+        assertEquals("C", selected())
+        tap(KeyEvent.KEYCODE_DPAD_LEFT); rule.mainClock.advanceTimeBy(48)
+        tap(KeyEvent.KEYCODE_DPAD_LEFT); rule.mainClock.advanceTimeBy(48)
+        tap(KeyEvent.KEYCODE_DPAD_LEFT); rule.mainClock.advanceTimeBy(48)
+        settle()
+        assertEquals("#", selected())
+    }
+
+    /** Wave 30 review: a ring too narrow to loop is drawn once, so it gets one accessibility node per section (no ghost copies). */
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_01_w30r_a_small_ring_has_one_node_per_section() {
+        show(Corner.BottomRight, letterApps.take(6))
+        val labels = sections().fetchSemanticsNodes().map { labelOf(it.config[SemanticsProperties.ContentDescription].single()) }
+        assertEquals("each section once: $labels", labels.size, labels.toSet().size)
+    }
+
+    /** Wave 30 review: with animations off the ring snaps (no spring in between) across the seam too. */
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_01_w30r_reduced_motion_snaps_across_the_seam_without_a_spring() {
+        com.bos.sphere.core.design.ReducedMotionTesting.force(com.bos.sphere.core.quality.MotionPrefs(0f, 0f, 0f))
+        try {
+            show(Corner.BottomRight)
+            rule.runOnUiThread { LauncherInput.onKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT)) }
+            rule.mainClock.advanceTimeBy(32)
+            assertEquals("a single frame or two is enough: no spring", "#", selected())
+            val a = angles(Corner.BottomRight)
+            assertEquals("the new section is centred at once: $a", 45f, a.getValue("#"), 2f)
+        } finally { com.bos.sphere.core.design.ReducedMotionTesting.force(null) }
+    }
+
+    /** Wave 30 review: a section node is a button for TalkBack (it has a selected state and a click, so it must say what it is). */
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun INP_18_w30r_section_nodes_are_buttons() {
+        show(Corner.BottomRight)
+        val nodes = sections().fetchSemanticsNodes()
+        assertTrue(nodes.isNotEmpty())
+        assertTrue(nodes.all { it.config.getOrNull(SemanticsProperties.Role) == androidx.compose.ui.semantics.Role.Button })
+    }
+
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.performTouchInputDrag() {
         performTouchInput {
             val from = androidx.compose.ui.geometry.Offset(width * 0.85f, height * 0.55f)

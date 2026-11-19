@@ -68,6 +68,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -252,7 +253,8 @@ internal object WheelGeometry {
      * drawn twice at once. A smaller ring (few groups) fits the quadrant, is drawn once and keeps the clamped, centred arrangement.
      */
     fun loops(layout: WheelLayout, marginDeg: Float = LOOP_MARGIN_DEG): Boolean =
-        layout.segments.size >= 2 && layout.span >= windowWidth(marginDeg)
+        // The ring must be wider than the window plus its widest group: otherwise one group's arc meets both ends of the window and is drawn twice.
+        layout.segments.size >= 2 && layout.span >= windowWidth(marginDeg) + (layout.segments.maxOfOrNull { it.width } ?: 0f)
 
     /** Cyclic group index: [i] modulo [n] (any integer, negative included); 0 when there are no groups. */
     fun wrapIndex(i: Int, n: Int): Int = if (n <= 0) 0 else Math.floorMod(i, n)
@@ -303,7 +305,8 @@ internal object WheelGeometry {
      */
     fun visibleSegments(layout: WheelLayout, rotation: Float, marginDeg: Float): List<Slot> {
         val out = ArrayList<Slot>()
-        val copies = if (loops(layout, marginDeg)) copyRange(layout.span, rotation, marginDeg) else 0..0
+        // The loop decision never depends on the caller's margin (the accessibility nodes ask with none): a ring is drawn one way only.
+        val copies = if (loops(layout)) copyRange(layout.span, rotation, marginDeg) else 0..0
         for (k in copies) for ((i, seg) in layout.segments.withIndex()) {
             val rel0 = seg.start + k * layout.span + rotation
             val rel1 = seg.end + k * layout.span + rotation
@@ -714,13 +717,26 @@ private fun WheelContent(
         val currentRotation by rememberUpdatedState(rotation)
         var kbItem by remember(grouping, anchor) { androidx.compose.runtime.mutableIntStateOf(0) }
         val currentKbItem by rememberUpdatedState(kbItem)
-        fun focusedGroup() = WheelGeometry.focusedSegment(currentLayout, currentRotation.value).coerceAtLeast(0)
+        // Wave 30 review: reduced motion turns the ring by snapping (no spring, no inertia).
+        val reducedMotion by rememberUpdatedState(com.bos.sphere.core.design.rememberMotionPrefs().reduced)
+        suspend fun turnTo(target: Float, stiffness: Float) {
+            if (reducedMotion) rotation.snapTo(target)
+            else rotation.animateTo(target, spring(dampingRatio = 0.85f, stiffness = stiffness))
+        }
+        // Wave 30 review: the group a spring is heading for. A second key press (or key repeat) while the ring is still turning steps from
+        // there, not from the group under the middle at that instant (which would swallow the press).
+        var pendingGroup by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+        fun focusedGroup() =
+            if (pendingGroup >= 0 && currentRotation.isRunning) pendingGroup.coerceAtMost(max(0, currentGroups.lastIndex))
+            else WheelGeometry.focusedSegment(currentLayout, currentRotation.value).coerceAtLeast(0)
         fun focusGroup(i: Int) {
             kbItem = 0
+            pendingGroup = i
             scope.launch {
                 val l = currentLayout
                 // The short way round, across the seam when that is nearer.
-                rotation.animateTo(WheelGeometry.rotationToGroup(l, i, rotation.value), spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow))
+                turnTo(WheelGeometry.rotationToGroup(l, i, rotation.value), Spring.StiffnessLow)
+                if (pendingGroup == i) pendingGroup = -1
                 rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
             }
         }
@@ -834,6 +850,7 @@ private fun WheelContent(
                         tracker.addPosition(down.uptimeMillis, down.position)
                         val bounds = WheelGeometry.rotationBounds(currentLayout)
                         val loop = WheelGeometry.loops(currentLayout)
+                        pendingGroup = -1
                         var target = rotation.value
                         var scrubStarted = false
                         var dragging = false
@@ -898,7 +915,7 @@ private fun WheelContent(
                             val i = WheelGeometry.focusedSegment(l, target)
                             scope.launch {
                                 rotation.snapTo(target)
-                                if (i >= 0) rotation.animateTo(WheelGeometry.rotationToGroup(l, i, target), spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium))
+                                if (i >= 0) turnTo(WheelGeometry.rotationToGroup(l, i, target), Spring.StiffnessMedium)
                                 rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
                             }
                         } else if (dragging && release != null) {
@@ -908,7 +925,10 @@ private fun WheelContent(
                             ).coerceIn(-1500f, 1500f)
                             scope.launch {
                                 rotation.snapTo(target)
-                                if (abs(omega) > 20f) rotation.animateDecay(omega, exponentialDecay(frictionMultiplier = 1.4f))
+                                if (reducedMotion) {
+                                    val i = WheelGeometry.focusedSegment(currentLayout, target)
+                                    if (i >= 0) rotation.snapTo(WheelGeometry.rotationToGroup(currentLayout, i, target))
+                                } else if (abs(omega) > 20f) rotation.animateDecay(omega, exponentialDecay(frictionMultiplier = 1.4f))
                                 rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, currentLayout))
                             }
                         } else if (!dragging && release != null && !release.isConsumed) {
@@ -920,10 +940,7 @@ private fun WheelContent(
                                     val wa = WheelGeometry.wheelAngleAt(anchor, polar.angleDeg, rotation.value)
                                     val i = WheelGeometry.segmentAt(l, if (loop) WheelGeometry.wrapAngle(wa, l.span) else wa)
                                     if (i >= 0) scope.launch {
-                                        rotation.animateTo(
-                                            WheelGeometry.rotationToGroup(l, i, rotation.value),
-                                            spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow),
-                                        )
+                                        turnTo(WheelGeometry.rotationToGroup(l, i, rotation.value), Spring.StiffnessLow)
                                         rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
                                     }
                                 }
@@ -1144,7 +1161,8 @@ private fun WheelContent(
                 val bandSlots by remember(layout, rotation) {
                     derivedStateOf { WheelGeometry.visibleSegments(layout, rotation.value, 0f) }
                 }
-                val focusedNow = WheelGeometry.focusedSegment(layout, rotation.value)
+                // Read in the semantics lambda below (not here), so the turning ring does not recompose the whole disc on every frame.
+                val focusedNow by remember(layout, rotation) { derivedStateOf { WheelGeometry.focusedSegment(layout, rotation.value) } }
                 val nodeSize = with(density) { 48.dp.toPx() }
                 for (slot in bandSlots) {
                     val i = slot.index
@@ -1159,6 +1177,7 @@ private fun WheelContent(
                             .size(with(density) { nodeSize.toDp() })
                             .semantics {
                                 contentDescription = L10n.tr("Section %s", groups[i].label)
+                                role = Role.Button
                                 selected = i == focusedNow
                                 onClick { currentFocusGroup(i); true }
                             },

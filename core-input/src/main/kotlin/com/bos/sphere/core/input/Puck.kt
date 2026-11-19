@@ -38,6 +38,8 @@ object PuckKeys {
     fun onKey(s: PuckState, k: PuckKey): PuckEffect? = when (k.keyCode) {
         Keys.DPAD_LEFT -> step(s, -1)
         Keys.DPAD_RIGHT -> step(s, +1)
+        Keys.MOVE_HOME -> if (s.labels.isEmpty() || s.focused == 0) null else PuckEffect.FocusGroup(0)
+        Keys.MOVE_END -> if (s.labels.isEmpty() || s.focused == s.labels.lastIndex) null else PuckEffect.FocusGroup(s.labels.lastIndex)
         Keys.DPAD_UP -> if (s.item > 0) PuckEffect.SelectItem(s.item - 1) else null
         Keys.DPAD_DOWN -> if (s.item < s.itemCount - 1) PuckEffect.SelectItem(s.item + 1) else null
         Keys.TAB -> PuckEffect.SetMode(s.mode.next(k.shift))
@@ -52,19 +54,22 @@ object PuckKeys {
     }
 
     /** Keys the open puck owns, whether or not they change anything, so they never leak to the home underneath. */
-    fun owns(keyCode: Int, ch: Char?): Boolean = keyCode in setOf(Keys.DPAD_LEFT, Keys.DPAD_RIGHT, Keys.DPAD_UP, Keys.DPAD_DOWN, Keys.TAB,
+    fun owns(keyCode: Int, ch: Char?): Boolean = keyCode in setOf(Keys.DPAD_LEFT, Keys.DPAD_RIGHT, Keys.DPAD_UP, Keys.DPAD_DOWN, Keys.TAB, Keys.MOVE_HOME, Keys.MOVE_END,
         Keys.ENTER, Keys.DPAD_CENTER, Keys.NUMPAD_ENTER, Keys.ESCAPE, Keys.BACK, Keys.SLASH) || Keys.isLetter(keyCode) || (ch != null && (ch.isLetterOrDigit()))
 
     private fun step(s: PuckState, d: Int): PuckEffect? {
-        val i = (s.focused + d).coerceIn(0, max(0, s.labels.lastIndex))
-        return if (s.labels.isEmpty() || i == s.focused) null else PuckEffect.FocusGroup(i)
+        // Wave 30 (drawerLoop): the groups are a ring, so right of the last is the first and left of the first is the last.
+        if (s.labels.isEmpty()) return null
+        val i = Math.floorMod(s.focused + d, s.labels.size)
+        return if (i == s.focused) null else PuckEffect.FocusGroup(i)
     }
 
     /** The group a typed letter lands on: the first label starting with it, else the next one after it alphabetically. */
     fun jump(s: PuckState, ch: Char): PuckEffect? {
         val c = ch.uppercaseChar()
         val exact = s.labels.indexOfFirst { it.firstOrNull()?.uppercaseChar() == c }
-        val i = if (exact >= 0) exact else if (s.mode == PuckMode.AZ) s.labels.indexOfFirst { (it.firstOrNull()?.uppercaseChar() ?: ' ') > c } else -1
+        // Past the last letter the jump wraps to the first group: the ring has no end. The rotation takes the short way round.
+        val i = if (exact >= 0) exact else if (s.mode == PuckMode.AZ) s.labels.indexOfFirst { (it.firstOrNull()?.uppercaseChar() ?: ' ') > c }.let { if (it < 0 && s.labels.isNotEmpty()) 0 else it } else -1
         return if (i < 0 || i == s.focused) null else PuckEffect.FocusGroup(i)
     }
 

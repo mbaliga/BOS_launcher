@@ -213,6 +213,30 @@ internal object WheelGeometry {
         if (radialStep <= 0f || maxRadius <= firstRadius) 1
         else floor((maxRadius - firstRadius) / radialStep).toInt() + 1
 
+    /**
+     * Wave 33: the arc distance between two neighbouring spokes of one group. Icons are upright squares, so where the spoke direction is the
+     * 45 degree diagonal two icons [iconPx] wide need a centre distance of at least icon x sqrt(2) not to overlap; the old icon + 10 dp
+     * overlapped by up to ~10 dp there. The icon + 10 dp spacing stays where it is already wider (icons under about 24 dp).
+     */
+    fun spokeArc(iconPx: Float, tenDpPx: Float, onePx: Float): Float = max(iconPx + tenDpPx, iconPx * 1.42f + onePx)
+
+    /** Angle between two spokes whose icons sit [arcPx] apart at [radius] (the chord, not the arc, is what must clear). */
+    fun spokeStepDegrees(arcPx: Float, radius: Float): Float = Math.toDegrees(2.0 * kotlin.math.asin((arcPx / (2f * radius)).coerceAtMost(1f).toDouble())).toFloat()
+
+    /** Size of one section's TalkBack node: [radialPx] deep along the radius, [arcPx] wide along the band. */
+    data class BandNode(val radialPx: Float, val arcPx: Float)
+
+    /**
+     * Wave 33: the node of a band slice [widthDeg] wide whose middle is at [radius]: [radialPx] deep (the radial direction is free, slices share no
+     * radial extent) and as wide along the band as fits inside its own sector, measured at the inner edge where the sector is narrowest, so the
+     * rectangles of neighbours never overlap. The node is that slice, not 48 dp, when the slice is narrower (a 48 dp minimum would reach into the neighbour).
+     */
+    fun bandNode(widthDeg: Float, radius: Float, radialPx: Float): BandNode {
+        val inner = (radius - radialPx / 2f).coerceAtLeast(1f)
+        val half = Math.toRadians(widthDeg / 2.0)
+        return BandNode(radialPx, (2.0 * inner * kotlin.math.tan(half) * 0.99).toFloat()) // 1 percent short of the sector edge: neighbours never even touch
+    }
+
     fun subSpokes(count: Int, perSpoke: Int): Int {
         val per = perSpoke.coerceAtLeast(1)
         return ((count + per - 1) / per).coerceAtLeast(1)
@@ -508,7 +532,7 @@ private fun buildWheelGroups(
 // =============================================================================================
 
 /** Pixel metrics for a wheel on a [width]×[height] px screen. */
-private class WheelMetrics(width: Float, height: Float, density: Density) {
+internal class WheelMetrics(width: Float, height: Float, density: Density) {
     val minSide = min(width, height)
     val iconDp: Dp = with(density) { (minSide.toDp() * 0.11f).coerceIn(40.dp, 52.dp) }
     val iconPx: Float
@@ -537,7 +561,7 @@ private class WheelMetrics(width: Float, height: Float, density: Density) {
             radialStep = max(iconPx + 14.dp.toPx(), iconPx * 1.42f + 1.dp.toPx())
             val maxRadius = minSide - 10.dp.toPx() - iconPx / 2f
             perSpoke = WheelGeometry.spokeCapacity(firstRadius, maxRadius, radialStep)
-            spokeStepDeg = Math.toDegrees(((iconPx + 10.dp.toPx()) / firstRadius).toDouble()).toFloat()
+            spokeStepDeg = WheelGeometry.spokeStepDegrees(WheelGeometry.spokeArc(iconPx, 10.dp.toPx(), 1.dp.toPx()), firstRadius)
             gapDeg = spokeStepDeg * 0.35f
             outerRadius = firstRadius + (perSpoke - 1) * radialStep + iconPx / 2f + 16.dp.toPx()
             chipRadius = hubRadius * 0.8f
@@ -708,7 +732,7 @@ private fun WheelContent(
 
         // INP-19: hub and ring spacing come from the window size, so nothing overlaps or clips when it is small.
         val minSideDp = with(density) { metrics.minSide.toDp().value }
-        val puck = remember(minSideDp) { PuckLayout.compute(minSideDp, 0) }
+        val puck = remember(minSideDp) { PuckLayout.compute(minSideDp) }
 
         // INP-18: keyboard and scroll wheel. The puck owns its keys while open (ahead of the home's shortcuts).
         val currentGroups by rememberUpdatedState(groups)
@@ -1146,18 +1170,22 @@ private fun WheelContent(
                 }
                 // Read in the semantics lambda below (not here), so the turning ring does not recompose the whole disc on every frame.
                 val focusedNow by remember(layout, rotation) { derivedStateOf { WheelGeometry.focusedSegment(layout, rotation.value) } }
-                val nodeSize = with(density) { 48.dp.toPx() }
+                val minNode = with(density) { 48.dp.toPx() }
                 for (slot in bandSlots) {
                     val i = slot.index
                     val seg = layout.segments[i]
                     val turn = slot.copy * layout.span
+                    // Wave 33: the node is the slice's own piece of the band (tangent width = its arc at the band's middle, 48 dp deep radially),
+                    // turned to lie along the band, so a neighbour's touch exploration never lands on it and the slices do not overlap.
+                    val node = WheelGeometry.bandNode(seg.width, metrics.bandMid, minNode)
                     Box(
                         Modifier
                             .centeredAt {
                                 val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.bandMid, qs + seg.center + turn + rotation.value)
                                 Offset(pt.x, pt.y)
                             }
-                            .size(with(density) { nodeSize.toDp() })
+                            .size(width = with(density) { node.radialPx.toDp() }, height = with(density) { node.arcPx.toDp() })
+                            .graphicsLayer { rotationZ = qs + seg.center + turn + rotation.value }
                             .semantics {
                                 contentDescription = L10n.tr("Section %s", groups[i].label)
                                 role = Role.Button

@@ -99,7 +99,7 @@ class PuckSectionsUiTest {
         val inset = 63f * d
         val cx = if (anchor == Corner.TopRight || anchor == Corner.BottomRight) root.width - inset else inset
         val cy = if (anchor == Corner.BottomRight || anchor == Corner.BottomLeft) root.height - inset else inset
-        val hub = com.bos.sphere.core.input.PuckLayout.compute(minOf(root.width, root.height) / d, 0)
+        val hub = com.bos.sphere.core.input.PuckLayout.compute(minOf(root.width, root.height) / d)
         val ring = PuckSectionsGeometry.ring(hub.hubRadiusDp, hub.chipRadiusDp)
         val (gx, gy) = PuckSectionsGeometry.centroid(PuckSectionsGeometry.wedges(anchor, ring)[slot], ring)
         val b = node.fetchSemanticsNode().boundsInRoot
@@ -248,7 +248,7 @@ class PuckSectionsUiTest {
     private fun ringOf(): SectionRing {
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
         val d = rule.activity.resources.displayMetrics.density
-        val hub = com.bos.sphere.core.input.PuckLayout.compute(minOf(root.width, root.height) / d, 0)
+        val hub = com.bos.sphere.core.input.PuckLayout.compute(minOf(root.width, root.height) / d)
         return PuckSectionsGeometry.ring(hub.hubRadiusDp, hub.chipRadiusDp)
     }
     private fun rgb(c: Int) = Triple(android.graphics.Color.red(c), android.graphics.Color.green(c), android.graphics.Color.blue(c))
@@ -268,6 +268,23 @@ class PuckSectionsUiTest {
             assertTrue("divider at $deg is black: ${rgb(pixel(bmp, Corner.BottomLeft, ring.mid + 12f, deg))}", near(pixel(bmp, Corner.BottomLeft, ring.mid + 12f, deg), 0, 40))
         // no outline beyond the ring: just outside the outer edge is the drawer (not white)
         assertFalse("clean outer arc", near(pixel(bmp, Corner.BottomLeft, ring.outer + 3f, w[0].midDeg), 255, 3))
+    }
+
+    @Test fun CFG_15_w33_theRingCarriesOnRoundTheHubPastTheQuadrantEdgesInTheLeftCorner() = ringCarriesOn(Corner.BottomLeft)
+    @Test fun CFG_15_w33_theRingCarriesOnRoundTheHubPastTheQuadrantEdgesInTheRightCorner() = ringCarriesOn(Corner.BottomRight)
+
+    private fun ringCarriesOn(anchor: Corner) {
+        run {
+            show(anchor)
+            val bmp = grab(); val ring = ringOf()
+            val q = PuckSectionsGeometry.quadrantStart(anchor)
+            for (deg in listOf(q - 20f, q - 6f, q + 96f, q + 110f)) {
+                assertTrue("$anchor ring at $deg, mid: ${rgb(pixel(bmp, anchor, ring.mid, deg))}", near(pixel(bmp, anchor, ring.mid, deg), 255))
+                assertTrue("$anchor ring at $deg, just inside the outer edge", near(pixel(bmp, anchor, ring.outer - 2f, deg), 255))
+                assertTrue("$anchor hub at $deg is black", near(pixel(bmp, anchor, ring.backRadius - 3f, deg), 0))
+                assertFalse("$anchor outside the ring at $deg is not white", near(pixel(bmp, anchor, ring.outer + 4f, deg), 255, 3))
+            }
+        }
     }
 
     @Test fun W32_lightThemeDrawsANearBlackRingWithWhiteDividersAndAWhiteHub() {

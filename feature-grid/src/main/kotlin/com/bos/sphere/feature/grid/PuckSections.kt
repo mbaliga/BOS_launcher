@@ -181,6 +181,12 @@ internal fun BoxScope.PuckSectionsLayer(
     var tip by remember { mutableIntStateOf(-1) }
     LaunchedEffect(tip) { if (tip >= 0) { delay(1800); tip = -1 } }
 
+    // Wave 33: the ring carries on round the hub past the quadrant's two edges (inert, same colour), so hub and ring read as one disc that only the
+    // screen edges cut, like the Concepts fan; the window clips it. The four wedges and their taps stay inside the quadrant.
+    Box(Modifier.fillMaxSize().drawBehind {
+        drawCircle(look.ring, radius = ring.mid * d, center = corner, style = Stroke(width = ring.thickness * d))
+    })
+
     wedges.forEach { w ->
         val a = actions.getOrNull(w.slot) ?: PuckAction(L10n.tr("Drawer shortcut %d, empty", w.slot + 1)) {}
         val source = remember { MutableInteractionSource() }

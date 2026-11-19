@@ -247,41 +247,22 @@ class InputStreamTest {
 
     // ---- INP-19 puck sizing
 
-    private val windows = listOf(240f, 280f, 320f, 360f, 411f, 600f, 840f)
-
-    @Test fun INP_19_no_overlap_at_any_window_size_from_compact_up() {
-        for (w in windows) for (n in 0..9) {
-            val l = PuckLayout.compute(w, n)
-            assertTrue("clearance at $w with $n actions was ${PuckLayout.clearance(l)}", PuckLayout.clearance(l) >= 0f)
-        }
-    }
-
-    @Test fun INP_19_nothing_is_clipped_by_the_window() {
-        for (w in windows) for (n in 0..9) {
-            val l = PuckLayout.compute(w, n)
-            assertTrue("clipped at $w with $n actions", PuckLayout.insideWindow(l, w))
-        }
-    }
-
-    @Test fun INP_19_ring_stays_inside_the_hub_and_clear_of_the_group_labels() {
-        for (w in windows) {
-            val l = PuckLayout.compute(w, 9)
-            for (s in l.slots) assertTrue("ring outside labels at $w", s.radiusDp + l.actionSizeDp / 2f <= l.chipRadiusDp - 2f + 0.01f)
-        }
-    }
-
-    @Test fun INP_19_phone_keeps_the_five_default_actions_and_small_windows_cap_the_count() {
-        assertEquals(5, PuckLayout.compute(360f, 5).slots.size)
-        assertTrue(PuckLayout.compute(360f, 5).capacity >= 5)
-        val tiny = PuckLayout.compute(240f, 9)
-        assertEquals(tiny.capacity, tiny.slots.size)
-        assertTrue(tiny.capacity <= PuckLayout.compute(840f, 9).capacity)
-        assertTrue(tiny.actionSizeDp >= PuckLayout.MIN_ACTION)
-    }
-
     @Test fun INP_19_sizes_derive_from_the_window() {
-        assertTrue(PuckLayout.compute(240f, 5).hubRadiusDp < PuckLayout.compute(600f, 5).hubRadiusDp)
+        assertTrue(PuckLayout.compute(240f).hubRadiusDp < PuckLayout.compute(600f).hubRadiusDp)
         assertEquals(190f, PuckLayout.hubRadius(2000f), 0.01f)
+        assertEquals(PuckLayout.hubRadius(411f) - PuckLayout.LABEL_BAND, PuckLayout.compute(411f).chipRadiusDp, 0.001f)
+    }
+
+    @Test fun INP_18_a_letter_past_the_last_letter_goes_to_hash_and_the_ring_goes_z_hash_a() {
+        val s = PuckState(PuckMode.AZ, listOf("A", "C", "M", "#"), focused = 0)
+        assertEquals(PuckEffect.FocusGroup(3), PuckKeys.jump(s, 'z'))      // past M: '#', not the first group
+        assertEquals(PuckEffect.FocusGroup(3), PuckKeys.jump(s.copy(focused = 1), 'Q'))
+        assertEquals(PuckEffect.FocusGroup(1), PuckKeys.jump(s, 'b'))      // between letters still goes to the next one
+        assertEquals(PuckEffect.FocusGroup(0), PuckKeys.jump(PuckState(PuckMode.AZ, listOf("A", "C", "M"), 2), 'z')) // no '#' group: the first
+        assertNull(PuckKeys.jump(s.copy(focused = 3), 'z'))                // already there
+        val last = PuckState(PuckMode.AZ, listOf("A", "M", "#"), focused = 1)
+        assertEquals(PuckEffect.FocusGroup(2), PuckKeys.onKey(last, PuckKey(Keys.DPAD_RIGHT)))        // next past the last letter: '#'
+        assertEquals(PuckEffect.FocusGroup(0), PuckKeys.onKey(last.copy(focused = 2), PuckKey(Keys.DPAD_RIGHT))) // then round to A
     }
 
     // ---- INP-08 system gesture zones

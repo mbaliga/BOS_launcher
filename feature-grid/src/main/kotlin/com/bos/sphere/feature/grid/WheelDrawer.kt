@@ -933,7 +933,7 @@ private fun WheelContent(
                     )
                 }
                 // Wave 30: four wedge sections around a round Back hub (PuckSections.kt), group labels outside.
-                PuckSectionsLayer(anchor, corner, remember(puck) { PuckSectionsGeometry.ring(puck.hubRadiusDp, puck.chipRadiusDp) }, actions, haptics, onDismiss)
+                PuckSectionsLayer(anchor, corner, remember(puck) { PuckSectionsGeometry.ring(puck.hubRadiusDp, puck.chipRadiusDp) }, actions, onDismiss)
             }
 
             // Spokes (only those near the visible quadrant are composed).

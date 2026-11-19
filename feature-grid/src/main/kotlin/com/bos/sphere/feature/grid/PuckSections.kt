@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -115,9 +114,9 @@ internal fun BoxScope.PuckSectionsLayer(
     corner: Offset,
     ring: SectionRing,
     actions: List<PuckAction>,
-    haptics: HapticFeedback,
     onBack: () -> Unit,
 ) {
+    val haptics = rememberLauncherHaptics()
     val density = LocalDensity.current
     val d = density.density
     val wedges = remember(anchor, ring, corner, d) {

@@ -1,32 +1,25 @@
 package com.bos.sphere.core.data
 
-import android.app.ActivityManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.media.AudioManager
 import android.os.BatteryManager
-import android.os.Environment
-import android.os.StatFs
-import java.util.Calendar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /** Live = coloured by value; Idle = solid neutral; Off = dark. */
 enum class ReadingKind { Live, Idle, Off }
 
 /** [value] is 0..1 where 1 means "high". */
-data class IndicatorReading(val kind: ReadingKind, val value: Float, val label: String)
+data class IndicatorReading(val kind: ReadingKind, val value: Float, val label: String, val charging: Boolean = false)
 
 /** Pure colour mapping (no Android types) so it can be unit-tested on the JVM. */
 object IndicatorColors {
@@ -42,6 +35,13 @@ object IndicatorColors {
                 if (v < 0.5f) lerp(low, mid, v / 0.5f) else lerp(mid, high, (v - 0.5f) / 0.5f)
             }
         }
+
+    /** Always this red when the value is lost (wave 35); the palette colours the rest of the alert. */
+    const val URGENT_RED = 0xFFFF2D2DL
+
+    /** The alert colour: the palette's [mid] (amber) while low, easing to its [low] (red) as it worsens; the fixed [URGENT_RED] once urgent. */
+    fun alertArgb(severity: IndicatorSeverity, low: Long, mid: Long): Long =
+        if (severity.urgent) URGENT_RED else lerp(mid, low, severity.level.coerceIn(0f, 1f))
 
     internal fun lerp(a: Long, b: Long, t: Float): Long {
         fun ch(shift: Int): Long {
@@ -65,7 +65,7 @@ class IndicatorSource(context: Context) {
     private val _reading = MutableStateFlow(IndicatorReading(ReadingKind.Idle, 0f, ""))
     val reading: StateFlow<IndicatorReading> = _reading.asStateFlow()
 
-    private var metric: IndicatorMetric = IndicatorMetric.Network
+    private var metric: IndicatorMetric = IndicatorMetric.Signal
     private var running = false
     private var scope: CoroutineScope? = null
     private val jobs = mutableListOf<Job>()
@@ -105,7 +105,7 @@ class IndicatorSource(context: Context) {
         teardown()
         val sc = scope ?: return
         when (metric) {
-            IndicatorMetric.Network -> {
+            IndicatorMetric.Signal -> {
                 network.start(); networkStarted = true
                 jobs += sc.launch {
                     network.status.collect { s ->
@@ -121,26 +121,6 @@ class IndicatorSource(context: Context) {
                 val sticky = register(Intent.ACTION_BATTERY_CHANGED) { publishBattery(it) }
                 publishBattery(sticky)
             }
-            IndicatorMetric.Storage -> publishStorage()
-            IndicatorMetric.Memory -> jobs += sc.launch {
-                while (isActive) { publishMemory(); delay(5_000) }
-            }
-            IndicatorMetric.Notifications -> jobs += sc.launch {
-                NotificationProvider.notifications.collect { list ->
-                    val n = list.size
-                    _reading.value = if (n == 0) IndicatorReading(ReadingKind.Idle, 0f, "0")
-                    else IndicatorReading(ReadingKind.Live, minOf(n / 10f, 1f), n.toString())
-                }
-            }
-            IndicatorMetric.Volume -> {
-                publishVolume()
-                register(VOLUME_ACTION) { publishVolume() }
-            }
-            IndicatorMetric.DayProgress -> {
-                publishDay()
-                register(Intent.ACTION_TIME_TICK) { publishDay() }
-            }
-            IndicatorMetric.Fixed -> _reading.value = IndicatorReading(ReadingKind.Idle, 0f, "")
         }
     }
 
@@ -156,52 +136,12 @@ class IndicatorSource(context: Context) {
         return sticky
     }
 
-    private fun live(value: Float, label: String) {
-        _reading.value = IndicatorReading(ReadingKind.Live, value.coerceIn(0f, 1f), label)
-    }
-
     private fun publishBattery(i: Intent?) {
         val level = i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = i?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
         if (level < 0 || scale <= 0) return
-        val f = level / scale.toFloat()
-        live(f, "${(f * 100).toInt()}%")
-    }
-
-    private fun publishStorage() {
-        runCatching {
-            val st = StatFs(Environment.getDataDirectory().path)
-            val total = st.totalBytes.toFloat()
-            val used = if (total > 0f) (total - st.availableBytes) / total else 0f
-            live(used, "${(used.coerceIn(0f, 1f) * 100).toInt()}%")
-        }.onFailure { _reading.value = IndicatorReading(ReadingKind.Idle, 0f, "") }
-    }
-
-    private fun publishMemory() {
-        val am = ctx.getSystemService(ActivityManager::class.java) ?: return
-        val mi = ActivityManager.MemoryInfo()
-        am.getMemoryInfo(mi)
-        if (mi.totalMem <= 0) return
-        val used = (mi.totalMem - mi.availMem).toFloat() / mi.totalMem
-        live(used, "${(used.coerceIn(0f, 1f) * 100).toInt()}%")
-    }
-
-    private fun publishVolume() {
-        val am = ctx.getSystemService(AudioManager::class.java) ?: return
-        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        if (max <= 0) return
-        val f = am.getStreamVolume(AudioManager.STREAM_MUSIC) / max.toFloat()
-        live(f, "${(f * 100).toInt()}%")
-    }
-
-    private fun publishDay() {
-        val c = Calendar.getInstance()
-        val h = c.get(Calendar.HOUR_OF_DAY)
-        val m = c.get(Calendar.MINUTE)
-        live((h * 60 + m) / 1440f, "%02d:%02d".format(h, m))
-    }
-
-    private companion object {
-        const val VOLUME_ACTION = "android.media.VOLUME_CHANGED_ACTION"
+        val f = (level / scale.toFloat()).coerceIn(0f, 1f)
+        val charging = (i?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
+        _reading.value = IndicatorReading(ReadingKind.Live, f, "${(f * 100).toInt()}%", charging)
     }
 }

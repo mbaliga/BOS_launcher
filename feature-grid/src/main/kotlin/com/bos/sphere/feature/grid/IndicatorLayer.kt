@@ -1,28 +1,25 @@
 package com.bos.sphere.feature.grid
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
-import com.bos.sphere.core.data.IndicatorEffect
+import com.bos.sphere.core.data.AlertEffect
+import com.bos.sphere.core.data.CalmEffect
+import com.bos.sphere.core.data.IndicatorColors
+import com.bos.sphere.core.data.IndicatorMetric
 import com.bos.sphere.core.data.IndicatorReading
+import com.bos.sphere.core.data.IndicatorSeverity
 import com.bos.sphere.core.data.ReadingKind
 import kotlin.math.PI
 import kotlin.math.abs
@@ -62,60 +59,31 @@ internal object IndicatorMath {
 
     fun wrap01(x: Float): Float = x - floor(x)
 
-    fun perimeterLength(w: Float, h: Float, r: Float): Float {
-        val rr = r.coerceIn(0f, minOf(w, h) / 2f)
-        return 2f * (w - 2f * rr) + 2f * (h - 2f * rr) + 2f * PI.toFloat() * rr
+    /** Seconds of one urgent pulse (the owner spec: about 1.2 s). */
+    const val URGENT_PERIOD_S = 1.2f
+
+    /** Brightness factor 0.7..1 of the urgent pulse at clock [t] seconds; steady 1 when not urgent or when motion is reduced (the static frame is full strength). */
+    fun pulse(t: Float, urgent: Boolean, reduced: Boolean): Float =
+        if (!urgent || reduced) 1f else 0.7f + 0.3f * (0.5f + 0.5f * cos(t * TWO_PI / URGENT_PERIOD_S))
+
+    /** Alpha multiplier of an alert effect: urgent is full strength whatever the slider says (unless it is at zero = off); otherwise it scales with the severity. */
+    fun alertStrength(level: Float, urgent: Boolean, intensity: Float): Float {
+        val k = intensity.coerceIn(0f, 1f)
+        if (k <= 0f) return 0f
+        return if (urgent) 1f else (k * (0.35f + 0.65f * level.coerceIn(0f, 1f))).coerceIn(0f, 1f)
     }
 
-    /**
-     * Point at fraction [t] (wrapped to 0..1) along the clockwise perimeter of a w x h rounded
-     * rectangle with corner radius [r], starting at the top edge just after the top-left corner.
-     * Writes x, y into [out].
-     */
-    fun perimeterPoint(t: Float, w: Float, h: Float, r: Float, out: FloatArray) {
-        val rr = r.coerceIn(0f, minOf(w, h) / 2f)
-        val top = w - 2f * rr
-        val side = h - 2f * rr
-        val arc = PI.toFloat() * rr / 2f
-        var s = wrap01(t) * (2f * top + 2f * side + 4f * arc)
-        fun onArc(cx: Float, cy: Float, startDeg: Float) {
-            val a = (startDeg + (if (arc > 0f) s / arc else 0f) * 90f) * (PI.toFloat() / 180f)
-            out[0] = cx + rr * cos(a); out[1] = cy + rr * sin(a)
-        }
-        if (s <= top) { out[0] = rr + s; out[1] = 0f; return }
-        s -= top
-        if (s <= arc) { onArc(w - rr, rr, -90f); return }
-        s -= arc
-        if (s <= side) { out[0] = w; out[1] = rr + s; return }
-        s -= side
-        if (s <= arc) { onArc(w - rr, h - rr, 0f); return }
-        s -= arc
-        if (s <= top) { out[0] = w - rr - s; out[1] = h; return }
-        s -= top
-        if (s <= arc) { onArc(rr, h - rr, 90f); return }
-        s -= arc
-        if (s <= side) { out[0] = 0f; out[1] = h - rr - s; return }
-        s -= side
-        onArc(rr, rr, 180f)
-    }
+    /** Where the vignette's clear centre ends (fraction of the corner radius): the coloured band thickens from 20 percent to 70 percent of the way in as severity rises. */
+    fun vignetteInner(level: Float): Float = 0.80f - 0.50f * level.coerceIn(0f, 1f)
 
-    /** Deterministic hash to 0..1 (no Random object, no state). */
-    fun hash01(i: Int, seed: Int): Float {
-        var x = i * 374761393 + seed * 668265263
-        x = (x xor (x ushr 13)) * 1274126177
-        x = x xor (x ushr 16)
-        return (x and 0xFFFFFF) / 16777216f
-    }
+    /** The share of the comic lines drawn: a few when low, every one when lost. */
+    fun comicFraction(level: Float, urgent: Boolean): Float = if (urgent) 1f else 0.17f + 0.78f * level.coerceIn(0f, 1f)
 
-    /** Distance from the centre to the rectangle edge along [angle] (radians). */
-    fun rayEdgeDistance(angle: Float, halfW: Float, halfH: Float): Float {
-        val c = abs(cos(angle)); val s = abs(sin(angle))
-        val dx = if (c < 1e-6f) Float.MAX_VALUE else halfW / c
-        val dy = if (s < 1e-6f) Float.MAX_VALUE else halfH / s
-        return minOf(dx, dy)
-    }
+    /** Line width multiplier: thin when low, bold when lost. */
+    fun comicWidth(level: Float, urgent: Boolean): Float = if (urgent) 2.2f else 0.8f + 1.0f * level.coerceIn(0f, 1f)
 
     private val SQRT2 = sqrt(2f)
+    private const val TWO_PI = (2.0 * PI).toFloat()
 }
 
 private const val SIZE_BUCKETS = 4
@@ -135,13 +103,12 @@ private class IndicatorCache {
     var bucket = ByteArray(0)
     var level = ByteArray(0)
     var scratch = FloatArray(0)
-    val perim = FloatArray(2)
-    val perim2 = FloatArray(2)
-    val path = Path()
+    val comic = ComicLines()
     var vignette: Brush? = null
     var vigW = -1f
     var vigH = -1f
     var vigColor = 0
+    var vigInner = -1f
     val paint = android.graphics.Paint().apply {
         isAntiAlias = true
         strokeCap = android.graphics.Paint.Cap.ROUND
@@ -175,83 +142,91 @@ private class IndicatorCache {
 }
 
 /**
- * The background indicator: dots, bloom, vignette, comic lines, snake outline and edge meter,
- * all painted in one Canvas. Effects combine freely. [colorArgb] is the already-resolved colour
- * (see IndicatorColors.argb); [reading] supplies kind (Off paints nothing, Idle is steady) and value.
+ * The background indicator (wave 35): a calm effect (Dot bloom or Animated dots, lit while the reading is healthy) and an alert effect
+ * (Coloured vignette or Comic-book lines: the inverse, invisible while healthy, growing as the value falls, urgent when it is lost), painted in one Canvas.
+ * [colorArgb] is the already-resolved ramp colour (see IndicatorColors.argb) for the calm effect; the alert colour comes from [low] / [mid] and the severity
+ * ([IndicatorSeverity.of] for [metric] and [reading]); urgent is always red. Zero cost when healthy: the clock only runs for animated dots or an urgent alert,
+ * and never under reduced motion (then urgent is one static, full-strength frame).
  */
 @Composable
 fun IndicatorLayer(
     reading: IndicatorReading,
-    effects: Set<IndicatorEffect>,
+    calm: CalmEffect?,
+    alert: AlertEffect?,
+    metric: IndicatorMetric,
     colorArgb: Long,
     intensity: Float,
     speed: Float,
     modifier: Modifier = Modifier,
+    low: Long = 0xFFFF4D4D,
+    mid: Long = 0xFFFFB347,
 ) {
     val live = reading.kind == ReadingKind.Live
     // NFR-14: with system animations off the indicators draw one still frame.
     val stillIndicators = com.bos.sphere.core.design.rememberMotionPrefs().reduced
-    val animated = !stillIndicators && reading.kind != ReadingKind.Off && effects.any {
-        when (it) {
-            IndicatorEffect.DotsBreathe -> live
-            IndicatorEffect.DotsBloomCentre, IndicatorEffect.DotsBloomEdges,
-            IndicatorEffect.ComicLines, IndicatorEffect.SnakeOutline -> true
-            else -> false
+    val severity = IndicatorSeverity.of(metric, reading)
+    val alertShown = alert != null && severity.active
+    val dotsMove = calm != null && reading.kind != ReadingKind.Off && when (calm) { CalmEffect.AnimatedDots -> live; CalmEffect.Bloom -> true }
+    val needsClock = !stillIndicators && intensity > 0f && (dotsMove || (alertShown && severity.urgent))
+    val time = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(needsClock) {
+        if (!needsClock) return@LaunchedEffect
+        val start = indicatorFrameNanos()
+        while (true) {
+            // Seconds of animation clock; wraps (invisibly) once an hour.
+            time.floatValue = ((indicatorFrameNanos() - start) / 1_000_000_000.0 % 3600.0).toFloat()
         }
     }
-    val time: State<Float>? = if (animated) {
-        val transition = rememberInfiniteTransition(label = "indicator")
-        // Seconds of animation clock; wraps (invisibly) once an hour.
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 3600f,
-            animationSpec = infiniteRepeatable(tween(3_600_000, easing = LinearEasing), RepeatMode.Restart),
-            label = "t",
-        )
-    } else null
     val cache = remember { IndicatorCache() }
     val color = Color(colorArgb.toInt())
+    val alertColor = Color(IndicatorColors.alertArgb(severity, low, mid).toInt())
 
     Canvas(modifier) {
-        if (reading.kind == ReadingKind.Off) return@Canvas
         val k = intensity.coerceIn(0f, 1f)
         if (k <= 0f) return@Canvas
-        val t = (time?.value ?: 0f) * (0.2f + 1.6f * speed.coerceIn(0f, 1f))
+        val raw = time.floatValue
+        val t = raw * (0.2f + 1.6f * speed.coerceIn(0f, 1f))
         val steady = reading.kind == ReadingKind.Idle
-        val v = if (live) reading.value.coerceIn(0f, 1f) else 0.15f
-
-        if (IndicatorEffect.Vignette in effects) drawVignette(cache, color, k)
-        val dots = IndicatorEffect.DotsBreathe in effects ||
-            IndicatorEffect.DotsBloomCentre in effects || IndicatorEffect.DotsBloomEdges in effects
-        if (dots) drawDots(cache, effects, color, k, t, steady)
-        if (IndicatorEffect.ComicLines in effects) drawComic(cache, color, k, t)
-        if (IndicatorEffect.EdgeMeter in effects) drawEdgeMeter(color, k, if (live) v else 1f, steady)
-        if (IndicatorEffect.SnakeOutline in effects) drawSnake(cache, color, k, t, v)
+        if (calm != null && reading.kind != ReadingKind.Off) drawDots(cache, calm, color, k, t, steady)
+        if (alertShown) {
+            val strength = IndicatorMath.alertStrength(severity.level, severity.urgent, k) * IndicatorMath.pulse(raw, severity.urgent, stillIndicators)
+            when (alert) {
+                AlertEffect.Vignette -> drawVignette(cache, alertColor, severity.level, strength)
+                AlertEffect.ComicLines -> drawComic(cache, alertColor, severity, strength, raw, stillIndicators || !severity.urgent)
+                null -> Unit
+            }
+        }
     }
 }
 
-private fun DrawScope.drawVignette(c: IndicatorCache, color: Color, k: Float) {
+/** The next frame time for an endless animation: the platform's infinite-animation policy decides (none on a device, so this is plain withFrameNanos there; a test that auto-advances its clock ends the loop). */
+private suspend fun indicatorFrameNanos(): Long {
+    val policy = kotlin.coroutines.coroutineContext[androidx.compose.ui.platform.InfiniteAnimationPolicy]
+    return if (policy != null) policy.onInfiniteOperation { androidx.compose.runtime.withFrameNanos { it } } else androidx.compose.runtime.withFrameNanos { it }
+}
+
+private fun DrawScope.drawVignette(c: IndicatorCache, color: Color, level: Float, strength: Float) {
     val argb = color.toArgb()
-    if (c.vignette == null || c.vigW != size.width || c.vigH != size.height || c.vigColor != argb) {
-        c.vigW = size.width; c.vigH = size.height; c.vigColor = argb
+    val inner = (IndicatorMath.vignetteInner(level) * 32f).toInt() / 32f
+    if (c.vignette == null || c.vigW != size.width || c.vigH != size.height || c.vigColor != argb || c.vigInner != inner) {
+        c.vigW = size.width; c.vigH = size.height; c.vigColor = argb; c.vigInner = inner
         c.vignette = Brush.radialGradient(
             0f to Color.Transparent,
-            0.55f to Color.Transparent,
-            1f to color.copy(alpha = 0.55f),
+            inner to Color.Transparent,
+            1f to color.copy(alpha = 0.85f),
             center = Offset(size.width / 2f, size.height / 2f),
             radius = hypot(size.width, size.height) / 2f,
         )
     }
-    drawRect(c.vignette!!, alpha = k, style = Fill)
+    drawRect(c.vignette!!, alpha = strength, style = Fill)
 }
 
 private fun DrawScope.drawDots(
-    c: IndicatorCache, effects: Set<IndicatorEffect>, color: Color, k: Float, t: Float, steady: Boolean,
+    c: IndicatorCache, calm: CalmEffect, color: Color, k: Float, t: Float, steady: Boolean,
 ) {
     c.ensure(size.width, size.height, 22.dp.toPx())
-    val breathe = IndicatorEffect.DotsBreathe in effects
-    val bc = IndicatorEffect.DotsBloomCentre in effects
-    val be = IndicatorEffect.DotsBloomEdges in effects
+    val breathe = calm == CalmEffect.AnimatedDots
+    val bloom = calm == CalmEffect.Bloom
     // ~4 s per breath at default speed; steady for Idle.
     val glow = if (steady) 0.6f else if (breathe) 0.35f + 0.65f * (0.5f - 0.5f * cos(t * TWO_PI / 4f)) else 0.5f
     val width = 0.16f
@@ -260,8 +235,7 @@ private fun DrawScope.drawDots(
     for (i in 0 until n) {
         val w = c.weight[i]
         var a = w * glow
-        if (bc) a += (0.5f + 0.5f * w) * IndicatorMath.ringWave(c.dist[i], centre, width)
-        if (be) a += (0.5f + 0.5f * w) * IndicatorMath.ringWave(1f - c.dist[i], centre, width)
+        if (bloom) a += (0.5f + 0.5f * w) * IndicatorMath.ringWave(c.dist[i], centre, width)
         a = (a * k).coerceIn(0f, 1f)
         c.level[i] = (if (a < 0.02f) -1 else (a * LEVELS).toInt().coerceAtMost(LEVELS - 1)).toByte()
     }
@@ -287,86 +261,22 @@ private fun DrawScope.drawDots(
     }
 }
 
-private fun DrawScope.drawComic(c: IndicatorCache, color: Color, k: Float, t: Float) {
-    val cx = size.width / 2f
-    val cy = size.height / 2f
-    val lines = 40
-    val cycle = t / 6f // bursts re-seeded every ~6 s
-    val epoch = floor(cycle).toInt()
-    val path = c.path
-    for (i in 0 until lines) {
-        val off = IndicatorMath.hash01(i, 17)
-        val local = IndicatorMath.wrap01(cycle * 2f + off) // two bursts per epoch per line
-        if (local > 0.3f) continue
-        val env = sin(local / 0.3f * PI.toFloat())
-        val ang = TWO_PI * (i + IndicatorMath.hash01(i, epoch * 31 + 5) * 0.8f) / lines
-        val edge = IndicatorMath.rayEdgeDistance(ang, cx, cy)
-        val len = edge * (0.10f + 0.2f * IndicatorMath.hash01(i, epoch * 13 + 9))
-        val ca = cos(ang); val sa = sin(ang)
-        val ox = cx + ca * edge; val oy = cy + sa * edge
-        val ix = cx + ca * (edge - len); val iy = cy + sa * (edge - len)
-        val half = 2.2.dp.toPx()
-        path.reset()
-        path.moveTo(ox - sa * half, oy + ca * half)
-        path.lineTo(ox + sa * half, oy - ca * half)
-        path.lineTo(ix, iy)
-        path.close()
-        drawPath(path, color.copy(alpha = (0.55f * env * k).coerceIn(0f, 1f)))
+/** Comic-book lines as the alert: the deterministic [ComicLines] set, thinned to a few thin lines when low and the full bold ring when lost; static unless [still] is false. */
+private fun DrawScope.drawComic(c: IndicatorCache, color: Color, sev: IndicatorSeverity, strength: Float, raw: Float, still: Boolean) {
+    val lines = c.comic
+    lines.fill(size.width, size.height, (raw * 1000f).toLong(), still, IndicatorMath.comicFraction(sev.level, sev.urgent))
+    val paint = c.paint
+    paint.style = android.graphics.Paint.Style.STROKE
+    paint.strokeCap = android.graphics.Paint.Cap.BUTT
+    val widthK = IndicatorMath.comicWidth(sev.level, sev.urgent)
+    val nc = drawContext.canvas.nativeCanvas
+    val base = color.toArgb()
+    for (cls in 0 until ComicLines.CLASSES) {
+        if (lines.counts[cls] == 0) continue
+        paint.strokeWidth = ComicLines.WIDTH_DP[cls].dp.toPx() * widthK
+        val alpha = ((0.55f + 0.45f * cls / (ComicLines.CLASSES - 1)) * strength * 255f).toInt().coerceIn(0, 255)
+        paint.color = (base and 0x00FFFFFF) or (alpha shl 24)
+        nc.drawLines(lines.buffers[cls], 0, lines.counts[cls], paint)
     }
-    // Faint halftone near each corner: dots shrink with distance from the corner.
-    val sp = 10.dp.toPx()
-    val reach = 96.dp.toPx()
-    val steps = (reach / sp).toInt()
-    for (corner in 0 until 4) {
-        val sx = if (corner and 1 == 0) 1f else -1f
-        val sy = if (corner and 2 == 0) 1f else -1f
-        val bx = if (sx > 0) 0f else size.width
-        val by = if (sy > 0) 0f else size.height
-        for (gy in 0..steps) for (gx in 0..steps) {
-            val px = gx * sp; val py = gy * sp
-            val d = hypot(px, py) / reach
-            if (d >= 1f) continue
-            val r = (1f - d) * 2.4.dp.toPx()
-            drawCircle(color.copy(alpha = 0.22f * k), r, Offset(bx + sx * px, by + sy * py))
-        }
-    }
-}
-
-private fun DrawScope.drawSnake(c: IndicatorCache, color: Color, k: Float, t: Float, v: Float) {
-    val corner = 32.dp.toPx()
-    val segs = 28
-    val length = 0.08f + 0.32f * v
-    val head = IndicatorMath.wrap01(t / 8f)
-    val stroke = 3.dp.toPx()
-    IndicatorMath.perimeterPoint(head, size.width, size.height, corner, c.perim)
-    for (s in 1..segs) {
-        val f = s / segs.toFloat()
-        IndicatorMath.perimeterPoint(head - f * length, size.width, size.height, corner, c.perim2)
-        val fade = (1f - f)
-        drawLine(
-            color.copy(alpha = (fade * fade * k).coerceIn(0f, 1f)),
-            Offset(c.perim[0], c.perim[1]), Offset(c.perim2[0], c.perim2[1]),
-            strokeWidth = stroke * (0.5f + 0.5f * fade), cap = StrokeCap.Round,
-        )
-        c.perim[0] = c.perim2[0]; c.perim[1] = c.perim2[1]
-    }
-}
-
-private fun DrawScope.drawEdgeMeter(color: Color, k: Float, v: Float, steady: Boolean) {
-    val inset = 3.dp.toPx()
-    val stroke = 3.dp.toPx()
-    val pad = 24.dp.toPx()
-    val span = size.height - 2f * pad
-    if (span <= 0f) return
-    val xs = floatArrayOf(inset, size.width - inset)
-    for (x in xs) {
-        drawLine(color.copy(alpha = 0.12f * k), Offset(x, pad), Offset(x, pad + span), stroke, StrokeCap.Round)
-        val len = span * (if (steady) 1f else v)
-        if (len > 0f) {
-            drawLine(
-                color.copy(alpha = (if (steady) 0.5f else 0.9f) * k),
-                Offset(x, pad + span), Offset(x, pad + span - len), stroke, StrokeCap.Round,
-            )
-        }
-    }
+    paint.strokeCap = android.graphics.Paint.Cap.ROUND
 }

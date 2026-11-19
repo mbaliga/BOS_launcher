@@ -157,27 +157,10 @@ enum class DrawerSort(val label: String) { Alphabetical("A–Z"), Category("Type
 /** Which screen edge(s) carry the quick-scrub rail. */
 enum class RailSide(val label: String) { Left("Left"), Right("Right"), Both("Both") }
 
-/** The measurement the background indicator shows. */
+/** What the signal effects read out (wave 35): the connectivity level or the battery level; every other old measurement migrates to [Signal]. */
 enum class IndicatorMetric(val label: String) {
-    Network("Signal"),
+    Signal("Signal"),
     Battery("Battery"),
-    Storage("Storage used"),
-    Memory("Memory used"),
-    Notifications("Notifications"),
-    Volume("Volume"),
-    DayProgress("Time of day"),
-    Fixed("Fixed colour"),
-}
-
-/** Visual effects the indicator can paint. Several can be on at once. */
-enum class IndicatorEffect(val label: String) {
-    DotsBreathe("Breathing dots"),
-    DotsBloomCentre("Dot bloom from centre"),
-    DotsBloomEdges("Dot bloom from edges"),
-    Vignette("Vignette"),
-    ComicLines("Comic-book lines"),
-    SnakeOutline("Snake outline"),
-    EdgeMeter("Edge meter"),
 }
 
 /** Launcher UI palette. */
@@ -370,15 +353,15 @@ data class LauncherPrefs(
     val drawerRail: RailSide = RailSide.Right,
 
     // --- indicator (the background dots and effects)
-    val indicatorMetric: IndicatorMetric = IndicatorMetric.Network,
-    val indicatorEffects: Set<IndicatorEffect> = setOf(IndicatorEffect.DotsBreathe),
+    val indicatorMetric: IndicatorMetric = IndicatorMetric.Signal,
+    /** Wave 35: the calm effect (healthy = lit) and the alert effect (inverse: appears when low, urgent when lost); each may be off, so an invalid pair cannot be stored. */
+    val indicatorCalm: CalmEffect? = CalmEffect.AnimatedDots,
+    val indicatorAlert: AlertEffect? = null,
     /** ARGB colours for low / middle / high readings, plus idle (airplane / fixed). */
     val indicatorLow: Long = 0xFFFF4D4D,
     val indicatorMid: Long = 0xFFFFB347,
     val indicatorHigh: Long = 0xFF6BFF8F,
     val indicatorIdle: Long = 0xFF8A8F99,
-    /** true = low readings are the good ones (storage / memory used), flipping the colour ramp. */
-    val indicatorInvert: Boolean = false,
     val indicatorIntensity: Float = 0.6f,
     val indicatorSpeed: Float = 0.5f,
 

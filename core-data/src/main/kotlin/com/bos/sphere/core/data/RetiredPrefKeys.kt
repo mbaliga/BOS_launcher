@@ -15,14 +15,20 @@ import java.io.File
  */
 object RetiredPrefKeys {
     val BY_FILE: Map<String, Set<String>> = mapOf(
-        "launcher_prefs" to (RetiredBackgroundKeys.KEYS - "bgPicture") + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown"),
+        "launcher_prefs" to (RetiredBackgroundKeys.KEYS - "bgPicture") + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert"),
         "palette" to setOf("scopeMapping", "prefixes"),
         "crash_loop" to setOf("rapid"),
         "home_state" to setOf("panel.timeline.depth", "panel.timeline.scheduled"),
     )
 
+    /**
+     * Wave 35: `indEffects` (the old effect set) is retired too, but it is the source of the one-time migration to `indCalm` / `indAlert`; it is only removed once
+     * those exist (the store migrates and removes it itself at start), so a purge that runs first never loses the user's choice.
+     */
+    val AFTER_MIGRATION: Map<String, Map<String, String>> = mapOf("launcher_prefs" to mapOf("indEffects" to "indCalm"))
+
     /** Keys an imported settings file may still carry from those builds; they are dropped, never kept as unknown fields. */
-    val DROPPED_ON_IMPORT: Set<String> = RetiredBackgroundKeys.KEYS + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown")
+    val DROPPED_ON_IMPORT: Set<String> = RetiredBackgroundKeys.KEYS + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert")
 
     /** Removes every retired key present in the files [open] returns; the number of keys removed. Never throws. */
     fun purge(open: (String) -> SharedPreferences?): Int {
@@ -30,7 +36,8 @@ object RetiredPrefKeys {
         for ((file, keys) in BY_FILE) {
             runCatching {
                 val sp = open(file) ?: return@runCatching
-                val present = keys.filter { sp.contains(it) }
+                val after = AFTER_MIGRATION[file].orEmpty()
+                val present = keys.filter { sp.contains(it) } + after.filter { (old, proof) -> sp.contains(old) && sp.contains(proof) }.keys
                 if (present.isEmpty()) return@runCatching
                 sp.edit().also { e -> present.forEach { e.remove(it) } }.apply()
                 removed += present.size
@@ -49,6 +56,6 @@ object RetiredPrefKeys {
 
     fun purgeOnce(context: Context): Int {
         val app = context.applicationContext
-        return purgeOnce(File(app.noBackupFilesDir, "retired_pref_keys_w29b")) { name -> app.getSharedPreferences(name, Context.MODE_PRIVATE) }
+        return purgeOnce(File(app.noBackupFilesDir, "retired_pref_keys_w35")) { name -> app.getSharedPreferences(name, Context.MODE_PRIVATE) }
     }
 }

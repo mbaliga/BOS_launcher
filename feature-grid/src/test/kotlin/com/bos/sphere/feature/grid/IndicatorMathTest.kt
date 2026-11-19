@@ -1,6 +1,5 @@
 package com.bos.sphere.feature.grid
 
-import kotlin.math.hypot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -35,55 +34,38 @@ class IndicatorMathTest {
         assertEquals(1.2f, IndicatorMath.ringCentre(1f, 0.2f), 1e-6f)
     }
 
-    @Test fun perimeterStartsAtTopAfterCorner() {
-        val o = FloatArray(2)
-        IndicatorMath.perimeterPoint(0f, 400f, 800f, 32f, o)
-        assertEquals(32f, o[0], eps); assertEquals(0f, o[1], eps)
+    @Test fun PAL_24_w35_urgentPulseIsAboutOnePointTwoSecondsAndStaysVisible() {
+        assertEquals(1.2f, IndicatorMath.URGENT_PERIOD_S, 0f)
+        assertEquals(IndicatorMath.pulse(0f, true, false), IndicatorMath.pulse(1.2f, true, false), 1e-4f)
+        assertTrue(IndicatorMath.pulse(0.6f, true, false) < IndicatorMath.pulse(0f, true, false))
+        for (i in 0..120) assertTrue(IndicatorMath.pulse(i / 50f, true, false) in 0.69f..1.001f)
+        assertEquals("reduced motion: one static full-strength frame", 1f, IndicatorMath.pulse(0.6f, true, true), 0f)
+        assertEquals("not urgent: no pulse", 1f, IndicatorMath.pulse(0.6f, false, false), 0f)
     }
 
-    @Test fun perimeterHalfwayIsAntipodal() {
-        val o = FloatArray(2)
-        IndicatorMath.perimeterPoint(0.5f, 400f, 800f, 32f, o)
-        assertEquals(368f, o[0], eps); assertEquals(800f, o[1], eps)
+    @Test fun PAL_24_w35_alertStrengthScalesWithSeverityAndUrgentIsFull() {
+        assertTrue(IndicatorMath.alertStrength(0.1f, false, 0.6f) < IndicatorMath.alertStrength(0.5f, false, 0.6f))
+        assertTrue(IndicatorMath.alertStrength(0.5f, false, 0.6f) < IndicatorMath.alertStrength(0.9f, false, 0.6f))
+        assertEquals(1f, IndicatorMath.alertStrength(1f, true, 0.2f), 0f)
+        assertEquals("zero intensity is off", 0f, IndicatorMath.alertStrength(1f, true, 0f), 0f)
     }
 
-    @Test fun perimeterWrapsAndIsContinuousAndOnBoundary() {
-        val w = 400f; val h = 800f; val r = 32f
-        val a = FloatArray(2); val b = FloatArray(2)
-        IndicatorMath.perimeterPoint(1f, w, h, r, a)
-        IndicatorMath.perimeterPoint(0f, w, h, r, b)
-        assertEquals(b[0], a[0], eps); assertEquals(b[1], a[1], eps)
-        val steps = 2000
-        val maxStep = IndicatorMath.perimeterLength(w, h, r) / steps * 1.05f
-        IndicatorMath.perimeterPoint(0f, w, h, r, a)
-        for (i in 1..steps) {
-            IndicatorMath.perimeterPoint(i / steps.toFloat(), w, h, r, b)
-            assertTrue(hypot(b[0] - a[0], b[1] - a[1]) <= maxStep)
-            assertTrue(b[0] >= -eps && b[0] <= w + eps && b[1] >= -eps && b[1] <= h + eps)
-            a[0] = b[0]; a[1] = b[1]
-        }
+    @Test fun PAL_24_w35_vignetteThickensAndComicLinesGetManyAndBoldAsSeverityRises() {
+        assertTrue(IndicatorMath.vignetteInner(1f) < IndicatorMath.vignetteInner(0.2f))
+        assertTrue(IndicatorMath.comicFraction(0.1f, false) < IndicatorMath.comicFraction(0.8f, false))
+        assertEquals(1f, IndicatorMath.comicFraction(1f, true), 0f)
+        assertTrue(IndicatorMath.comicWidth(0.1f, false) < IndicatorMath.comicWidth(0.9f, false))
+        assertTrue(IndicatorMath.comicWidth(0.9f, false) < IndicatorMath.comicWidth(1f, true))
     }
 
-    @Test fun perimeterLengthMatchesFormula() {
-        assertEquals(2 * 336f + 2 * 736f + 2f * Math.PI.toFloat() * 32f, IndicatorMath.perimeterLength(400f, 800f, 32f), eps)
-    }
-
-    @Test fun zeroRadiusIsPlainRectangle() {
-        val o = FloatArray(2)
-        IndicatorMath.perimeterPoint(0.25f, 100f, 100f, 0f, o)
-        assertEquals(100f, o[0], eps); assertEquals(0f, o[1], eps)
-    }
-
-    @Test fun hashIsDeterministicAndInRange() {
-        for (i in 0..100) {
-            val h = IndicatorMath.hash01(i, 7)
-            assertTrue(h >= 0f && h < 1f)
-            assertEquals(h, IndicatorMath.hash01(i, 7), 0f)
-        }
-    }
-
-    @Test fun rayEdgeDistance() {
-        assertEquals(200f, IndicatorMath.rayEdgeDistance(0f, 200f, 400f), eps)
-        assertEquals(400f, IndicatorMath.rayEdgeDistance((Math.PI / 2).toFloat(), 200f, 400f), eps)
+    @Test fun PAL_24_w35_comicLinesFractionThinsTheSameDeterministicRingEvenly() {
+        val full = ComicLines(); val few = ComicLines()
+        full.fill(400f, 800f, 0, true); few.fill(400f, 800f, 0, true, 0.25f)
+        fun n(l: ComicLines) = l.counts.sum() / 4
+        assertEquals(72, n(full)); assertEquals(18, n(few))
+        val again = ComicLines(); again.fill(400f, 800f, 0, true, 0.25f)
+        for (k in 0 until ComicLines.CLASSES) assertTrue(few.buffers[k].contentEquals(again.buffers[k]))
+        val unchanged = ComicLines(); unchanged.fill(400f, 800f, 0, true, 1f)
+        for (k in 0 until ComicLines.CLASSES) assertTrue("fraction 1 is the unchanged PAL-24 set", full.buffers[k].contentEquals(unchanged.buffers[k]))
     }
 }

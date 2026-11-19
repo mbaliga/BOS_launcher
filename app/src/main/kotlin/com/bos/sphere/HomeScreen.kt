@@ -373,7 +373,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     val gridState = rememberGridHomeState()
     // HOM-12: while editing, the home is a card pushed to the start side; the page carousel and the add carousel fill the background.
-    val editCard = rememberEditCardState(homeEdit.active)
+    val editCard = rememberEditCardState(homeEdit.active, continuous = prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous, orderRtl = prefs.homeOrder.rtl) // wave 36: the page editor's strip follows the Pages mode and the page order
     var editFocusAdd by remember { mutableStateOf(false) }
     LaunchedEffect(homeEdit.active) { if (!homeEdit.active) editFocusAdd = false }
     val sounds = remember { UiSounds() }
@@ -1801,6 +1801,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onAddPage = { val r = com.bos.sphere.core.data.HomePageOps.add(pages, gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))); savePages(r.pages); scope.launch { gridState.goToPage(r.focus) } },
                 onDone = { homeEdit.exit() },
             )
+            com.bos.sphere.feature.grid.PageEditorGhost(editCard.drag) // wave 36: the dragged app's icon above the live page
         }
         if (!prefs.onboardingDone) {
             com.bos.sphere.ui.Onboarding(

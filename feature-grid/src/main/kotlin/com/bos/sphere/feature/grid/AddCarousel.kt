@@ -56,6 +56,8 @@ enum class AddTab(val label: String) { Apps("Apps"), Widgets("Widgets"), Folders
 class AddCarouselDrag {
     var app by mutableStateOf<AppEntry?>(null)
     var pos by mutableStateOf(Offset.Zero)
+    /** Wave 36: the page editor sets this; it is told where (window px) a dragged app was let go. Also the seam the tests use to drop without a gesture. */
+    var onDrop: ((AppEntry, Offset) -> Unit)? = null
 }
 
 /**

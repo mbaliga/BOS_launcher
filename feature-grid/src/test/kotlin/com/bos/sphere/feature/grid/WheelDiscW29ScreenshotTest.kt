@@ -28,7 +28,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * HOM-01, INP-18, CFG-15 (wave 29, drawerRevert): the restored wheel disc (hub with its search button and the ring actions, section bands, app spokes)
+ * HOM-01, INP-18, CFG-15 (wave 29, drawerRevert): the restored wheel disc (hub with its Back button and the four sections, section bands, app spokes)
  * renders in portrait and landscape from the left and the right corner. The PNGs in build/screenshots are what the status note judges; the assertions
  * pin that the ring actions and the hub's search button are really on the disc.
  */
@@ -56,7 +56,8 @@ class WheelDiscW29ScreenshotTest {
             }
         }
         rule.mainClock.advanceTimeBy(2_000)
-        assertTrue("the hub's search button is on the disc", rule.onAllNodesWithContentDescription("Search apps").fetchSemanticsNodes().size == 1)
+        assertTrue("the hub's Back button is on the disc", rule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().size == 1)
+        assertEquals("no search glyph on the hub (wave 30)", 0, rule.onAllNodesWithContentDescription("Search apps").fetchSemanticsNodes().size)
         for (a in actions) assertEquals("the ring action ${a.label} is on the disc", 1, rule.onAllNodesWithContentDescription(a.label).fetchSemanticsNodes().size)
         val view = rule.activity.findViewById<android.view.View>(android.R.id.content)
         val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)

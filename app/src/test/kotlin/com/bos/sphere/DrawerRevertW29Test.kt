@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * HOM-01, HOM-23, INP-18, CFG-15 (wave 29, drawerRevert): the apps hotspot opens the restored wheel disc (hub with its search button, ring actions)
+ * HOM-01, HOM-23, INP-18, CFG-15 (wave 29, drawerRevert): the apps hotspot opens the restored wheel disc (hub with its Back button, ring actions)
  * on Glance, on a page and in the right to left order; Back closes it; a ring action still runs. Not a device run.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -31,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 class DrawerRevertW29Test : TourBase() {
     private val stores get() = LauncherStores.get(AppSmokeHarness.app)
     private fun appKeyOf(i: Int) = AppSmokeHarness.appKey("App %02d".format(i))
-    private fun wheelShown() = descShown("Search apps")
+    private fun wheelShown() = descShown("Back")
 
     private fun start(order: HomeOrder = HomeOrder.LeftToRight, pages: HomePages = HomePages.Paginated, glance: Boolean = true) {
         AppSmokeHarness.seedApps(*Array(12) { "App %02d".format(it) })
@@ -45,7 +45,7 @@ class DrawerRevertW29Test : TourBase() {
     @Test fun HOM_01_w29_theAppsHotspotOnGlanceOpensTheWheelDiscAndBackClosesIt() {
         start(); assertTrue(glanceShown())
         appsHotspot().performClick(); settle()
-        assertTrue("the restored disc (hub with its search button) is open", wheelShown())
+        assertTrue("the restored disc (hub with its Back button) is open", wheelShown())
         assertFalse("not the list drawer", drawerShown())
         back(); assertFalse("Back closes the disc", wheelShown())
     }
@@ -66,7 +66,7 @@ class DrawerRevertW29Test : TourBase() {
         assertTrue("one of the bottom hotspots opens the wheel disc in right to left order", opened)
     }
 
-    /** The disc fans out of the corner whose hotspot was tapped (the search button, the hub's centre, sits on that side), in both orders. */
+    /** The disc fans out of the corner whose hotspot was tapped (the Back button, the hub's centre, sits on that side), in both orders. */
     private fun openedFromTheTappedSide(order: HomeOrder) {
         start(order = order); assertTrue(glanceShown())
         val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
@@ -75,7 +75,7 @@ class DrawerRevertW29Test : TourBase() {
             val spotX = spot.fetchSemanticsNode().boundsInRoot.center.x
             spot.performClick(); settle()
             if (!wheelShown()) { if (radarShown()) back(); continue } // the other bottom hotspot holds a different role
-            val hubX = rule.onNodeWithContentDescription("Search apps").fetchSemanticsNode().boundsInRoot.center.x
+            val hubX = rule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot.center.x
             assertEquals("$d ($order): the hub sits on the tapped side", spotX < width / 2, hubX < width / 2)
             back(); return
         }
@@ -96,9 +96,9 @@ class DrawerRevertW29Test : TourBase() {
             back()
         }
         assertTrue("one hotspot opens the disc in landscape", opened); assertFalse(drawerShown())
-        val hub = rule.onNodeWithContentDescription("Search apps").fetchSemanticsNode().boundsInRoot
+        val hub = rule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
-        assertTrue("the hub's search button is fully on screen: $hub in $root", hub.left >= root.left && hub.top >= root.top && hub.right <= root.right && hub.bottom <= root.bottom)
+        assertTrue("the hub's Back button is fully on screen: $hub in $root", hub.left >= root.left && hub.top >= root.top && hub.right <= root.right && hub.bottom <= root.bottom)
         back(); assertFalse(wheelShown())
     }
 
@@ -117,7 +117,7 @@ class DrawerRevertW29Test : TourBase() {
 
     @Test fun CFG_15_w29_aPuckRingActionOnTheRestoredDiscStillRuns() {
         start()
-        PuckActionsStore.get(AppSmokeHarness.app).set(listOf(CornerActionId.OpenRecents)); settle()
+        PuckActionsStore.get(AppSmokeHarness.app).set(0, com.bos.sphere.core.data.PuckSlot.Action(CornerActionId.OpenRecents)); settle()
         appsHotspot().performClick(); settle()
         assertTrue(wheelShown())
         rule.onAllNodesWithContentDescription(CornerActionId.OpenRecents.label).onLast().performClick(); settle() // the wheel is drawn last, over the home's own Recents handle

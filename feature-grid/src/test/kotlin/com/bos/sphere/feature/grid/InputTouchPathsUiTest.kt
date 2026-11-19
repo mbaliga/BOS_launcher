@@ -226,11 +226,12 @@ class InputTouchPathsUiTest {
             }
         }
         rule.mainClock.advanceTimeBy(1200)
-        rule.onNodeWithContentDescription("Search apps").performClick()
-        assertEquals("the puck's centre runs Radar", 1, searched)
+        rule.onNodeWithContentDescription("Back").performClick()
+        assertEquals("the puck's centre is Back, not search (wave 30)", 0, searched)
+        assertEquals("the centre Back button closes the puck", 1, dismissed)
         back()
         rule.mainClock.advanceTimeBy(100)
-        assertEquals("Back closes the puck", 1, dismissed)
+        assertEquals("the system Back closes it too", 2, dismissed)
     }
 
     // ---- INP-11: a finger drags an app after a long press

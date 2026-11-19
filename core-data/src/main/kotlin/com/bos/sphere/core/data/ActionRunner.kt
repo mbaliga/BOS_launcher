@@ -305,6 +305,9 @@ object Torch {
         return cm
     }
 
+    /** Whether this device has a flash to toggle. */
+    fun available(context: Context): Boolean { ensure(context); return cameraId != null }
+
     /** Toggles the torch; returns the new state, or null if there is no usable flash. */
     fun toggle(context: Context): Boolean? {
         val cm = ensure(context) ?: return null

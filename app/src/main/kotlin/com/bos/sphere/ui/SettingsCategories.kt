@@ -140,6 +140,8 @@ class SystemLinks(
  */
 const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
+/** Wave 30: the App drawer category (where the Drawer shortcuts editor lives); the disc's empty sections open it. */
+const val CATEGORY_APP_DRAWER = 900
 
 private const val HOME_SCREEN_TITLE = "Home screen"
 
@@ -148,6 +150,7 @@ fun settingsCategoryIndex(categories: List<SettingCategory>, which: Int): Int {
     val home = categories.indexOfFirst { it.title == x(HOME_SCREEN_TITLE) }.coerceAtLeast(0)
     return when (which) {
         CATEGORY_HOME -> home
+        CATEGORY_APP_DRAWER -> categories.indexOfFirst { it.title == x("App drawer") }.let { if (it < 0) home else it }
         // No page category (a scrolling home): fall through to Home screen.
         CATEGORY_THIS_PAGE -> if (home == 0) 0 else CATEGORY_THIS_PAGE
         // 1000 + n: the category at list index n exactly (a Radar settings result opens its own category).
@@ -433,6 +436,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     note("Pick any installed app — the list isn't limited to what the system suggests.")
                 },
             )
+            add(com.bos.sphere.ui.drawerShortcutsItem(m.appsByKey)) // wave 30: the four sections around the disc's hub
         },
     )
 
@@ -777,7 +781,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     }
     // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
     out += com.bos.sphere.ui.backupCategory()
-    out += com.bos.sphere.ui.puckCategory()
     out += com.bos.sphere.ui.desktopCategory()
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(

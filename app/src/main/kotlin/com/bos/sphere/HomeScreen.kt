@@ -376,7 +376,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val lastTouch = remember { com.bos.sphere.ui.homeLastTouch { rootView } }
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.feature.grid.LauncherInput.registry }
-    val puckActionIds by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).actions }.collectAsStateWithLifecycle()
+    val puckSlots by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).slots }.collectAsStateWithLifecycle()
+    val torchOk = remember(wheelOpen) { !wheelOpen || com.bos.sphere.core.data.Torch.available(context) } // asked only while the disc is open
+    val dndOk = remember(wheelOpen) { !wheelOpen || com.bos.sphere.core.data.PuckAvailability.policyAccess(context) }
     fun launch(app: AppEntry) {
         com.bos.sphere.feature.dock.SessionUse.mark(app.key)
         appLauncher.launch(app, lastTouch.sourceRect())
@@ -1464,11 +1466,27 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },
             onSearch = { wheelOpen = false; searchOpen = true },
-            // CFG-15: the ring shows what the user chose in Ground Control > Puck (default: the shipped five).
-            actions = puckActionIds.map { id ->
-                com.bos.sphere.feature.grid.PuckAction(L10n.tr(id.label), com.bos.sphere.feature.grid.Glyphs.forAction(id)) {
-                    if (id.internal) wheelOpen = false
-                    runner.run(id)
+            // CFG-15 (wave 30): the four sections around the hub show what the user chose in Ground Control > App drawer > Drawer shortcuts.
+            actions = puckSlots.mapIndexed { i, slot ->
+                when (slot) {
+                    com.bos.sphere.core.data.PuckSlot.Empty ->
+                        com.bos.sphere.feature.grid.PuckAction(L10n.tr("Drawer shortcut %d, empty", i + 1), onLongClick = { wheelOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_APP_DRAWER) }) {}
+                    is com.bos.sphere.core.data.PuckSlot.Action -> {
+                        val id = slot.id
+                        com.bos.sphere.feature.grid.PuckAction(
+                            L10n.tr(id.label), com.bos.sphere.feature.grid.Glyphs.forAction(id),
+                            available = com.bos.sphere.core.data.PuckAvailability.of(id, hasFlash = torchOk, hasPolicyAccess = dndOk),
+                        ) {
+                            if (id == CornerActionId.Search) { wheelOpen = false; searchOpen = true }
+                            else { if (id.internal) wheelOpen = false; runner.run(id) }
+                        }
+                    }
+                    is com.bos.sphere.core.data.PuckSlot.App -> {
+                        val app = appsByKey[slot.key]
+                        com.bos.sphere.feature.grid.PuckAction(
+                            app?.label ?: L10n.tr("App not installed"), if (app == null) com.bos.sphere.feature.grid.Glyphs.Apps else null, app, available = app != null,
+                        ) { wheelOpen = false; runner.launchKey(slot.key) }
+                    }
                 }
             },
             onDismiss = { wheelOpen = false },

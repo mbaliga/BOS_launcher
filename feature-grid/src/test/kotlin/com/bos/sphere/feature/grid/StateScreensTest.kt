@@ -19,7 +19,6 @@ import com.bos.sphere.core.data.PuckActions
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ThemeVariant
-import com.bos.sphere.core.input.PuckLayout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -208,15 +207,9 @@ class StateScreensTest {
 
     // ---- CFG-15 -----------------------------------------------------------------------------------------------------
 
-    @Test fun CFG_15_theStoredCeilingEqualsTheLayoutsCeilingAndEveryShippedActionFitsAPhone() {
-        assertEquals(PuckLayout.MAX_ACTION_COUNT, PuckActions.MAX)
-        assertTrue(PuckLayout.compute(360f, PuckActions.MAX).capacity >= PuckActions.DEFAULT.size)
-        // INP-19: the ring never draws more buttons than fit, whatever the list holds.
-        for (side in listOf(240f, 320f, 411f, 800f)) {
-            val r = PuckLayout.compute(side, PuckActions.MAX)
-            assertTrue("$side: ${r.slots.size} <= ${r.capacity}", r.slots.size <= r.capacity)
-            assertTrue("$side clear of overlap", PuckLayout.clearance(r) > 0f || r.slots.isEmpty())
-        }
+    @Test fun CFG_15_theDiscHasExactlyFourSectionsAndTheGeometryHasFourWedges() {
+        assertEquals(PuckActions.SLOTS, PuckSectionsGeometry.COUNT)
+        assertEquals(PuckActions.SLOTS, PuckActions.DEFAULT.size)
     }
 
     @Test fun CFG_15_everyChoosableActionHasAGlyph() {

@@ -87,7 +87,7 @@ class HomeUnifyFlowTest : TourBase() {
         quickSheetOnGlance()
         rule.onNodeWithTag("quick.pages.Paginated").performScrollTo().performClick(); settle()
         assertEquals(HomePages.Paginated, stores.prefs.prefs.value.homePages)
-        rule.onNodeWithTag("quick.edit").performScrollTo().performClick(); settle()
+        quickGoTo("Edit home")
         assertTrue("Edit home goes to the first page in edit mode", editShown()); assertFalse(glanceShown())
         // pick an app from the add carousel
         rule.onNodeWithContentDescription("Add to home: App 03").performClick(); settle()
@@ -95,7 +95,7 @@ class HomeUnifyFlowTest : TourBase() {
         back(); assertFalse("Back leaves edit mode", editShown())
         // a tile (the Files panel) from the quick sheet's "Widgets, folders and icons"
         backward(); assertTrue(glanceShown()); quickSheetOnGlance()
-        rule.onNodeWithText("Widgets, folders and icons").performScrollTo().performClick(); settle()
+        quickGoTo("Widgets, folders and icons")
         rule.onNodeWithText("Files panel").performClick(); settle()
         assertEquals("the tile joins the app on page 1", before + 1, pageKeys().size)
         settle()

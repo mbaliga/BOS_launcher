@@ -93,7 +93,7 @@ class HomeLandingItemsW24Test : TourBase() {
     @Test fun HOM_12_onGlanceEditHomePagesInTheQuickSheetOpensTheEditCardOnSelectedApps() {
         startOnGlance()
         openQuickSheet()
-        rule.onNodeWithText("Edit home").performScrollTo().performClick(); settle()
+        quickGoTo("Edit home")
         assertEquals("Edit home pages moves to the landing that has pages", HomeShown.Pages, landing())
         assertTrue("the edit card with its page carousel is up", editShown())
         check("edit from Glance", TourBase.Surface.Edit)
@@ -103,7 +103,7 @@ class HomeLandingItemsW24Test : TourBase() {
     @Test fun HOM_15_onGlanceAFilesTilePlacedFromTheQuickSheetSwitchesToSelectedAppsWhereItIsShown() {
         startOnGlance()
         openQuickSheet()
-        rule.onNodeWithText("Widgets, folders and icons").performScrollTo().performClick(); settle()
+        quickGoTo("Widgets, folders and icons")
         rule.onNodeWithText("Files panel").performClick(); settle()
         val key = ItemKeys.link(HomePanelLinks.uri(PanelTab.Files))
         assertTrue("the tile is placed on a page", key in pageKeys())
@@ -124,7 +124,7 @@ class HomeLandingItemsW24Test : TourBase() {
         assertEquals(setOf(clockKey, weatherKey, notesKey, stackKey), extras.state.value.items.keys)
 
         openQuickSheet()
-        rule.onNodeWithText("Edit home").performScrollTo().performClick(); settle()
+        quickGoTo("Edit home")
         assertTrue(editShown())
         // HOM-12 / HOM-14: the widget and the stack each carry one remove handle in edit mode (the stack is named after its first member)
         assertTrue(descShown("Remove from home: Clock"))
@@ -151,7 +151,7 @@ class HomeLandingItemsW24Test : TourBase() {
         val wm = com.bos.sphere.feature.dock.WorkspaceRepository.get(AppSmokeHarness.app)
         val other = wm.create("Travel"); settle()
         openQuickSheet()
-        rule.onNodeWithText("Edit home").performScrollTo().performClick(); settle()
+        quickGoTo("Edit home")
         assertTrue(editShown())
         rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).performClick(); settle()
         assertEquals(listOf(stackKey), pageKeys())
@@ -179,10 +179,11 @@ class HomeLandingItemsW24Test : TourBase() {
         back(); check("closed", TourBase.Surface.Home)
     }
 
-    @Test fun HOM_18_onGlanceTheFilesUsageAndTimelinePanelsOpenFromTheQuickSheetAndTheTimelineListsOpens() {
+    @Test fun HOM_18_w34_onGlanceTheFilesAndTimelinePanelsAreInTheCommsHubNotTheQuickSheetAndTheTimelineListsOpens() {
         startOnGlance { TourSeed.history("Alpha", "Bravo") }
         openQuickSheet()
-        rule.onNodeWithText("Files, usage and timeline").performScrollTo().performClick(); settle()
+        assertFalse("wave 34: the quick sheet no longer has the Files row", textShown("Files, usage and timeline"))
+        closeSheet(); swipeFromLeft(); assertTrue("Comms opens from the left edge", launchpadShown())
         // Wave 25 (hubData): the panels are views of the Launchpad hub now (no sheet of their own); its switcher scrolls on a narrow screen.
         assertTrue("the Comms hub has the Files and Timeline panel views (wave 28: Usage is part of Timeline)", textShown("FILES") && textShown("TIMELINE") && !textShown("USAGE"))
         rule.onNodeWithText("TIMELINE", useUnmergedTree = true).performScrollTo().performClick(); settle()
@@ -190,7 +191,7 @@ class HomeLandingItemsW24Test : TourBase() {
         // HOM-17 (wave 28): the usage block above the timeline offers "Allow usage access" without access (and does not crash).
         waitFor("the usage block is in the timeline") { textShown("Allow usage access") || rule.onAllNodesWithTag("usage.block").fetchSemanticsNodes().isNotEmpty() }
         check("panels on Glance")
-        closeSheet(); assertEquals("the landing is untouched by looking at the panels", HomeShown.Glance, landing())
+        back(); assertEquals("the landing is untouched by looking at the panels", HomeShown.Glance, landing())
     }
 
     @Test fun HOM_11_rotatingOnGlanceKeepsTheWidgetsAndTheStackOfTheSelectedAppsPages() {
@@ -224,7 +225,7 @@ class HomeLandingItemsW24Test : TourBase() {
             stores.layout.replace(HomeLayout(pages = s.pages, seeded = true)); extras.set(s)
         }
         openQuickSheet()
-        rule.onNodeWithText("Widgets, folders and icons").performScrollTo().performClick(); settle()
+        quickGoTo("Widgets, folders and icons")
         rule.onNodeWithText("Files panel").performClick(); settle()
         assertEquals("still one tile", 1, pageKeys().count { it == key })
         // Before the second pass the second tap returned early: nothing placed, nothing switched, nothing on screen changed.

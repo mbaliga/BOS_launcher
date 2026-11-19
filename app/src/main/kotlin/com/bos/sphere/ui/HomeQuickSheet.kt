@@ -4,7 +4,14 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +40,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bos.sphere.core.data.ClockPosition
 import com.bos.sphere.core.input.AppMenuEntry
 import com.bos.sphere.core.input.ContextMenus
 import com.bos.sphere.core.input.HomeSheetAction
@@ -41,16 +47,15 @@ import com.bos.sphere.core.input.HomeSheetContext
 import com.bos.sphere.core.input.SheetToggle
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.PageTransition
-import com.bos.sphere.core.data.StripItem
-import com.bos.sphere.core.data.StripZone
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.grid.Glyphs
 
 /**
- * What a long-press on the home screen opens: the things you reach for most, up front — time,
- * weather, battery, media controls — then this page's tools, then a way into Ground Control (all
- * settings). [page] is null on homes without pages.
+ * What a long-press on the home screen opens. Wave 34 (homeSheet): styled like the Sound and Vibration sheet (docs/decisions/homeSheet.md): pure black,
+ * large top radius, centred title, hairlines, 48 dp targets. It carries only the quick choices (Pages, Order, Glance content, Hotspots, this page's
+ * tools) and two plain rows, Wallpaper and Ground Control. Glance on/off, Add page, Edit home, Files and the item picker live in Ground Control, Comms
+ * and the edit-home mode. [page] is null on homes without pages.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,63 +64,73 @@ fun HomeQuickSheet(
     update: ((LauncherPrefs) -> LauncherPrefs) -> Unit,
     page: Int?,
     pageCount: Int,
-    onAddPage: () -> Unit,
     onDeletePage: () -> Unit,
-    onEdit: (() -> Unit)? = null,
-    onPanels: (() -> Unit)? = null,
     onWallpaper: () -> Unit,
     onGroundControl: () -> Unit,
     onDismiss: () -> Unit,
-    /** Widgets, folders, links, icon pack and hidden apps (HOM-02 to HOM-07). */
-    onHomeItems: (() -> Unit)? = null,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = HyleColors.Surface) {
-        // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
-        Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
-            Text(L10n.tr("Home"), color = HyleColors.InkBright, fontSize = 20.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(bottom = 12.dp))
-            // Wave 26: there is no landing selector. The home is Glance (the calm screen) followed by the pages; the user can switch Glance off right here,
-            // and then home shows the first page or the scroll at once (the same setting as Ground Control, Home).
-            Tile(Modifier.fillMaxWidth().testTag("quick.glance"), Glyphs.Home, L10n.tr("Calm home screen (Glance)"), prefs.glanceEnabled) { update { it.copy(glanceEnabled = !it.glanceEnabled) } }
-            // Wave 28: the Pages setting, exactly three values, and the order.
-            Heading(L10n.tr("Pages"))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                for (m in com.bos.sphere.core.data.HomePages.entries) Chip(null, L10n.tr(m.label), prefs.homePages == m, tag = "quick.pages.${m.name}") { update { it.copy(homePages = m) } }
-            }
-            Heading(L10n.tr("Order"))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                for (o in com.bos.sphere.core.data.HomeOrder.entries) Chip(null, L10n.tr(o.label), prefs.homeOrder == o) { update { it.copy(homeOrder = o) } }
-            }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss, containerColor = SheetBlack, dragHandle = null,
+        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp), scrimColor = Color.Black.copy(alpha = 0.62f),
+    ) {
+        HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl)
+    }
+}
 
-            if (prefs.glanceEnabled) {
-                // HOM-23: the Glance quick settings: content, hotspots and the background (Edit home pages below).
-                Heading(L10n.tr("Glance content"))
-                val cur = com.bos.sphere.core.data.GlanceContent.presetOf(prefs.glanceContent)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    for (pr in com.bos.sphere.core.data.GlancePreset.entries.filter { it != com.bos.sphere.core.data.GlancePreset.Custom }) {
-                        Chip(null, L10n.tr(pr.label), cur == pr) { update { it.copy(glanceContent = com.bos.sphere.core.data.GlanceContent.applyPreset(it.glanceContent, pr)) } }
-                    }
-                }
-                Heading(L10n.tr("Hotspots"))
-                val hc = com.bos.sphere.core.data.GlanceHotspots.presetOf(prefs.glanceHotspots)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    for (pr in com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }) {
-                        Chip(null, L10n.tr(pr.label), hc == pr) { update { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(pr) ?: it.glanceHotspots) } }
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                BigButton(Modifier.fillMaxWidth(), Glyphs.Image, L10n.tr("Background"), onWallpaper)
-            }
+private val SheetBlack = Color.Black
+private val InkWhite = Color.White
+private val HairlineWhite = Color(0x33FFFFFF)
+private val OutlineWhite = Color(0x66FFFFFF)
 
-            // HOM-21: the rows come from ContextMenus.forHomeSheet, the model touch, right-click and the Menu key share.
-            val timeOn = prefs.clockPosition != ClockPosition.Hidden
-            val batteryOn = StripItem.Battery in prefs.strip
+/** The sheet's content (separate from the window so screenshots can draw it directly). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun HomeQuickSheetBody(
+    prefs: LauncherPrefs,
+    update: ((LauncherPrefs) -> LauncherPrefs) -> Unit,
+    page: Int?,
+    pageCount: Int,
+    onDeletePage: () -> Unit,
+    onWallpaper: () -> Unit,
+    onGroundControl: () -> Unit,
+) {
+    // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
+    Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp).padding(bottom = 16.dp)) {
+        Text(
+            L10n.tr("Home"), color = InkWhite, fontSize = 22.sp, fontWeight = FontWeight.Light, textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp).testTag("quick.sheet").semantics { heading() },
+        )
+        // Wave 28: the Pages setting, exactly three values, and the order.
+        Heading(L10n.tr("Pages"))
+        ChipRow { for (m in com.bos.sphere.core.data.HomePages.entries) Chip(null, L10n.tr(m.label), prefs.homePages == m, tag = "quick.pages.${m.name}") { update { it.copy(homePages = m) } } }
+        Heading(L10n.tr("Order"))
+        ChipRow { for (o in com.bos.sphere.core.data.HomeOrder.entries) Chip(null, L10n.tr(o.label), prefs.homeOrder == o) { update { it.copy(homeOrder = o) } } }
+
+        if (prefs.glanceEnabled) {
+            // HOM-23: the Glance quick settings: content and hotspots.
+            Heading(L10n.tr("Glance content"))
+            val cur = com.bos.sphere.core.data.GlanceContent.presetOf(prefs.glanceContent)
+            ChipRow {
+                for (pr in com.bos.sphere.core.data.GlancePreset.entries.filter { it != com.bos.sphere.core.data.GlancePreset.Custom }) {
+                    Chip(null, L10n.tr(pr.label), cur == pr) { update { it.copy(glanceContent = com.bos.sphere.core.data.GlanceContent.applyPreset(it.glanceContent, pr)) } }
+                }
+            }
+            Heading(L10n.tr("Hotspots"))
+            val hc = com.bos.sphere.core.data.GlanceHotspots.presetOf(prefs.glanceHotspots)
+            ChipRow {
+                for (pr in com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }) {
+                    Chip(null, L10n.tr(pr.label), hc == pr) { update { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(pr) ?: it.glanceHotspots) } }
+                }
+            }
+        }
+
+        if (page != null) {
+            // HOM-21: this page's rows come from ContextMenus.forHomeSheet, the model touch, right-click and the Menu key share.
             val rows = ContextMenus.forHomeSheet(
                 HomeSheetContext(
-                    timeOn = timeOn, weatherOn = prefs.clockShowWeather, batteryOn = batteryOn,
                     page = page, pageCount = pageCount, alignTop = prefs.gridBias <= 0.05f, alignBottom = prefs.gridBias >= 0.95f,
-                    isHomePage = page != null && prefs.homePage == page,
+                    isHomePage = prefs.homePage == page,
                     transitions = PageTransition.entries.map { it.label to (prefs.pageTransition == it) },
-                    canEdit = onEdit != null, hasPanels = onPanels != null, hasHomeItems = onHomeItems != null,
                 ),
             )
             fun glyphOf(k: SheetToggle) = when (k) {
@@ -123,115 +138,78 @@ fun HomeQuickSheet(
                 SheetToggle.AlignTop -> Glyphs.Up; SheetToggle.AlignBottom -> Glyphs.Down; SheetToggle.MakeHome -> Glyphs.Home
             }
             fun flip(k: SheetToggle) = when (k) {
-                SheetToggle.Time -> update { it.copy(clockPosition = if (timeOn) ClockPosition.Hidden else ClockPosition.Top) }
-                SheetToggle.Weather -> update { it.copy(clockShowWeather = !it.clockShowWeather) }
-                SheetToggle.Battery -> update { it.copy(strip = if (batteryOn) it.strip - StripItem.Battery else it.strip + (StripItem.Battery to StripZone.Right)) }
                 SheetToggle.AlignTop -> update { it.copy(gridBias = 0f) }
                 SheetToggle.AlignBottom -> update { it.copy(gridBias = 1f) }
-                SheetToggle.MakeHome -> update { it.copy(homePage = page ?: it.homePage) }
+                SheetToggle.MakeHome -> update { it.copy(homePage = page) }
+                else -> Unit
             }
-            val switches = rows.filterIsInstance<AppMenuEntry.Toggle>().filter { it.kind in SWITCHES }
-            val tiles: List<@Composable (Modifier) -> Unit> = switches.map { t -> { m -> Tile(m, glyphOf(t.kind), t.label, t.on) { flip(t.kind) } } }
-            val cfg = androidx.compose.ui.platform.LocalConfiguration.current
-            val columns = com.bos.sphere.feature.grid.QuickSheetLayout.tileColumns(cfg.screenWidthDp.toFloat(), cfg.fontScale, tiles.size)
-            com.bos.sphere.feature.grid.QuickSheetLayout.rows(tiles, columns).forEachIndexed { r, rowTiles ->
-                if (r > 0) Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    rowTiles.forEach { t -> t(Modifier.weight(1f)) }
+            Heading(L10n.tr("This page"))
+            ChipRow { rows.filterIsInstance<AppMenuEntry.Toggle>().filter { it.kind !in GONE }.forEach { t -> Chip(glyphOf(t.kind), t.label, t.on) { flip(t.kind) } } }
+            Heading(L10n.tr("Transition"))
+            ChipRow {
+                rows.filterIsInstance<AppMenuEntry.Choice>().forEach { c ->
+                    Chip(null, c.option, c.selected) { PageTransition.entries.firstOrNull { it.label == c.option }?.let { t -> update { it.copy(pageTransition = t) } } }
                 }
             }
-
-            if (page != null) {
-                Heading(L10n.tr("This page"))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    rows.filterIsInstance<AppMenuEntry.Toggle>().filter { it.kind !in SWITCHES }.forEach { t -> Chip(glyphOf(t.kind), t.label, t.on) { flip(t.kind) } }
-                }
-                Heading(L10n.tr("Transition"))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    rows.filterIsInstance<AppMenuEntry.Choice>().forEach { c ->
-                        Chip(null, c.option, c.selected) { PageTransition.entries.firstOrNull { it.label == c.option }?.let { t -> update { it.copy(pageTransition = t) } } }
-                    }
-                }
+            rows.filterIsInstance<AppMenuEntry.Sheet>().firstOrNull { it.action == HomeSheetAction.DeletePage }?.let { r ->
                 Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rows.filterIsInstance<AppMenuEntry.Sheet>().filter { it.action == HomeSheetAction.AddPage || it.action == HomeSheetAction.DeletePage }.forEach { r ->
-                        if (r.action == HomeSheetAction.AddPage) Chip(Glyphs.Plus, r.label, false, onClick = onAddPage)
-                        else Chip(Glyphs.Close, r.label, false, danger = true, onClick = onDeletePage)
-                    }
-                }
-            }
-
-            if (page == null && prefs.homePages == com.bos.sphere.core.data.HomePages.Paginated) {
-                // Wave 26: "Add page" also works from Glance (page is null there). Wave 28: only in Paginated (the Pages setting is the one switch that turns pages on; Continuous is one scroll surface).
-                Spacer(Modifier.height(10.dp))
-                BigButton(Modifier.fillMaxWidth().testTag("quick.addpage"), Glyphs.Plus, L10n.tr("Add page"), onAddPage)
-            }
-            Spacer(Modifier.height(18.dp))
-            val actions = rows.filterIsInstance<AppMenuEntry.Sheet>().map { it.action }
-            if (HomeSheetAction.EditHome in actions) { BigButton(Modifier.fillMaxWidth().testTag("quick.edit"), Glyphs.Apps, L10n.tr("Edit home")) { onEdit?.invoke() }; Spacer(Modifier.height(10.dp)) }
-            if (HomeSheetAction.Panels in actions) { BigButton(Modifier.fillMaxWidth(), Glyphs.Clock, HomeSheetAction.Panels.label) { onPanels?.invoke() }; Spacer(Modifier.height(10.dp)) }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                BigButton(Modifier.weight(1f), Glyphs.Image, HomeSheetAction.Wallpaper.label, onWallpaper)
-                BigButton(Modifier.weight(1f), Glyphs.Gear, HomeSheetAction.GroundControl.label, onGroundControl)
-            }
-            if (HomeSheetAction.HomeItems in actions) {
-                Spacer(Modifier.height(10.dp))
-                BigButton(Modifier.fillMaxWidth(), Glyphs.Plus, HomeSheetAction.HomeItems.label) { onHomeItems?.invoke() }
+                ChipRow { Chip(Glyphs.Close, r.label, false, danger = true, onClick = onDeletePage) }
             }
         }
+
+        // Two plain rows with glyphs, a hairline between (like Share Wifi / Done in Connectivity).
+        Spacer(Modifier.height(22.dp))
+        Hairline()
+        TextRow(Glyphs.Image, HomeSheetAction.Wallpaper.label, "quick.wallpaper", onWallpaper)
+        Hairline()
+        TextRow(Glyphs.Gear, HomeSheetAction.GroundControl.label, "quick.groundcontrol", onGroundControl)
+        Spacer(Modifier.height(8.dp))
     }
 }
 
-private val SWITCHES = setOf(SheetToggle.Time, SheetToggle.Weather, SheetToggle.Battery)
+/** The time, weather and battery toggles left the sheet (wave 34); they stay in Ground Control, Home screen. */
+private val GONE = setOf(SheetToggle.Time, SheetToggle.Weather, SheetToggle.Battery)
 
 @Composable
 private fun Heading(text: String) {
-    Text(text.uppercase(), color = HyleColors.InkDim, fontSize = 11.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+    Text(text.uppercase(), color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 1.6.sp, modifier = Modifier.padding(top = 22.dp, bottom = 10.dp).semantics { heading() })
 }
 
 @Composable
-private fun Tile(modifier: Modifier, glyph: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
-    Column(
-        modifier
-            .clip(shape)
-            .background(if (on) HyleColors.Violet.copy(alpha = 0.22f) else Color(0x12FFFFFF))
-            .border(1.dp, if (on) HyleColors.Violet else HyleColors.Hairline, shape)
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(glyph, null, tint = if (on) HyleColors.InkBright else HyleColors.InkDim, modifier = Modifier.size(24.dp))
-        Text(L10n.tr(label), color = if (on) HyleColors.InkBright else HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp), maxLines = 2)
-        Text(L10n.tr(if (on) "On" else "Off"), color = HyleColors.InkDim, fontSize = 10.sp)
-    }
+private fun Hairline() { Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineWhite)) }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipRow(content: @Composable () -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) { content() }
 }
 
+/** A pill with a thin outline; selected is filled white with black text (the Sound sheet is white on black, it has no accent colour). 48 dp tall. */
 @Composable
 private fun Chip(glyph: ImageVector?, label: String, selected: Boolean, danger: Boolean = false, tag: String? = null, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
-    val tint = if (danger) Color(0xFFFF7A7A) else if (selected) HyleColors.InkBright else HyleColors.Ink
+    val tint = if (selected) Color.Black else if (danger) Color(0xFFFF7A7A) else InkWhite
     Row(
-        Modifier.then(if (tag != null) Modifier.testTag(tag) else Modifier).clip(shape)
-            .background(if (selected) HyleColors.Violet.copy(alpha = 0.25f) else Color(0x12FFFFFF))
-            .border(1.dp, if (selected) HyleColors.Violet else HyleColors.Hairline, shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+        Modifier.then(if (tag != null) Modifier.testTag(tag) else Modifier).heightIn(min = 48.dp).clip(shape)
+            .background(if (selected) InkWhite else Color.Transparent)
+            .border(1.dp, if (selected) InkWhite else OutlineWhite, shape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (glyph != null) { Icon(glyph, null, tint = tint, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(7.dp)) }
-        Text(L10n.tr(label), color = tint, fontSize = 13.sp, maxLines = 1)
+        if (glyph != null) { Icon(glyph, null, tint = tint, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
+        Text(L10n.tr(label), color = tint, fontSize = 16.sp)
     }
 }
 
 @Composable
-private fun BigButton(modifier: Modifier, glyph: ImageVector, label: String, onClick: () -> Unit) {
+private fun TextRow(glyph: ImageVector, label: String, tag: String, onClick: () -> Unit) {
     Row(
-        modifier.clip(RoundedCornerShape(16.dp)).background(Color(0x1AFFFFFF)).clickable(onClick = onClick).padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(tag).clickable(role = Role.Button, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(glyph, null, tint = HyleColors.InkBright, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(L10n.tr(label), color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Icon(glyph, null, tint = InkWhite, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.width(14.dp))
+        Text(L10n.tr(label), color = InkWhite, fontSize = 18.sp)
     }
 }

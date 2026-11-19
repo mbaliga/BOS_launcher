@@ -63,7 +63,7 @@ class HomeUnifyReviewFlowTest : TourBase() {
         start()
         swipeAt(0.75f, 0.25f); assertFalse(glanceShown())
         longPressAt(0.5f, 0.8f); assertTrue("a long press on empty space opens the quick sheet", quickSheetShown())
-        rule.onNodeWithTag("quick.edit").performScrollTo().performClick(); settle(); assertTrue("edit mode is on", editShown())
+        quickGoTo("Edit home"); assertTrue("edit mode is on", editShown())
         swipeAt(0.3f, 0.8f)
         assertTrue("dragging toward the start edge in edit mode does not leave it", editShown()); assertFalse("and does not go to Glance", glanceShown())
     }

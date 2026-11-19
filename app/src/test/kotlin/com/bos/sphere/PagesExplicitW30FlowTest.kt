@@ -90,7 +90,7 @@ class PagesExplicitW30FlowTest : TourBase() {
 
         // Add page adds exactly one more empty page
         openQuickSheet()
-        rule.onNodeWithTag("quick.addpage").performScrollTo().performClick(); settle()
+        quickGoTo("Add page")
         assertEquals("two pages", 2, pages().size); assertTrue("both empty: nothing was auto-filled", pageKeys().isEmpty())
         toGlance(); settle()
         assertEquals("house + 2 dots", 2, dots()); assertTrue(tagShown("pages.glancedot"))
@@ -98,14 +98,14 @@ class PagesExplicitW30FlowTest : TourBase() {
 
         // the user places an app and a tile on page 1
         openQuickSheet()
-        rule.onNodeWithTag("quick.edit").performScrollTo().performClick(); settle()
+        quickGoTo("Edit home")
         assertTrue(editShown())
         rule.onNodeWithContentDescription("Add to home: App 03").performClick(); settle()
         assertEquals(listOf(key(3)), pages()[0].keys); assertTrue(pages()[1].keys.isEmpty())
         shoot("w30-edit-page1-one-app")
         back()
         toGlance(); openQuickSheet()
-        rule.onNodeWithText("Widgets, folders and icons").performScrollTo().performClick(); settle()
+        quickGoTo("Widgets, folders and icons")
         rule.onNodeWithText("Files panel").performClick(); settle()
         assertEquals("the app and the tile are on page 1", 2, pages()[0].keys.size); assertTrue(pages()[1].keys.isEmpty())
 

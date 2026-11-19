@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.longClick
@@ -113,10 +114,11 @@ class GlanceSmokeTest {
         assertTrue(rule.onAllNodesWithTag("recents.panel").fetchSemanticsNodes().isNotEmpty() && rule.onAllNodesWithTag("lp.card").fetchSemanticsNodes().isNotEmpty())
     }
 
-    @Test fun HOM_23_glanceIsOnForNewStateAndTheQuickSheetCanSwitchItOff() {
+    @Test fun HOM_23_glanceIsOnForNewStateAndTheQuickSheetHasNoGlanceTileButAGroundControlRow() {
         startFresh(); settle()
         assertTrue(LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled)
-        longPressEmpty(); rule.onNodeWithTag("quick.glance", useUnmergedTree = true).performClick(); settle()
-        assertFalse("the quick sheet's Glance switch turns it off", LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled)
+        longPressEmpty(); assertTrue("the long press opens the quick sheet", rule.onAllNodesWithTag("quick.sheet", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue("wave 34: the sheet has no Glance tile (the switch is Ground Control, Home screen; see HomeUnifyRowsTest)", rule.onAllNodesWithTag("quick.glance", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).assertExists()
     }
 }

@@ -50,7 +50,7 @@ class HomeUnifyReview2FlowTest : TourBase() {
     @Test fun HOM_01_w28_editHomeFromGlanceWithPagesOffTurnsPagesOnAndOpensTheFirstPageInEditModeThenAnAppCanBeAdded() {
         start(HomePages.Off)
         assertTrue(glanceShown()); longPressAt(0.5f, 0.3f); assertTrue(quickSheetShown())
-        rule.onNodeWithTag("quick.edit").performScrollTo().performClick(); settle()
+        quickGoTo("Edit home")
         assertEquals("Edit home turns Pages on", HomePages.Paginated, stores.prefs.prefs.value.homePages)
         assertTrue("and opens the first page in edit mode", editShown()); assertFalse(glanceShown())
         rule.onNodeWithContentDescription("Add to home: App 04").performClick(); settle()
@@ -72,12 +72,16 @@ class HomeUnifyReview2FlowTest : TourBase() {
     @Test fun HOM_22_w28_addPageIsOfferedOnlyWhenPagesIsPaginatedSoThePagesSettingIsTheOnlySwitch() {
         start(HomePages.Off)
         longPressAt(0.5f, 0.3f); assertTrue(quickSheetShown())
-        assertFalse("with Pages Off the quick sheet has no Add page (the Pages chips turn pages on)", tagShown("quick.addpage"))
-        closeSheet()
+        assertFalse("the quick sheet has no Add page any more (wave 34)", tagShown("quick.addpage"))
+        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        assertFalse("with Pages Off Ground Control has no Add page either (the Pages chips turn pages on)", textShown("Add page"))
+        back(); assertFalse(settingsShown())
         stores.prefs.update { it.copy(homePages = HomePages.Paginated) }; settle()
         backwardToGlance()
         longPressAt(0.5f, 0.3f); assertTrue(quickSheetShown())
-        assertTrue("with Paginated the quick sheet offers Add page on Glance", tagShown("quick.addpage"))
+        assertFalse(tagShown("quick.addpage"))
+        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        assertTrue("with Paginated Ground Control, Home screen offers Add page", textShown("Add page"))
     }
 
     private fun backwardToGlance() { if (!glanceShown()) { rule.onNodeWithTag("home.pager").performTouchInput { val y = height * 0.5f; swipe(Offset(width * 0.25f, y), Offset(width * 0.75f, y), 300) }; settle() } }

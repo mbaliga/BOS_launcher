@@ -6,16 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.assertTextContains
-import org.junit.Assert.assertFalse
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.bos.sphere.core.data.HomeOrder
 import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.LauncherPrefs
@@ -29,8 +26,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * HOM-22, HOM-23 (wave 26): the long-press quick sheet has no landing selector. It carries the "Calm home screen (Glance)" On / Off tile, the
- * "Pages after Glance" Scroll / Paginated and Left to right / Right to left choices, and an "Add page" and an "Edit home pages" action on Glance.
+ * HOM-01, HOM-22, HOM-23 (waves 26, 28, 34): the long-press Home sheet. Wave 34 (homeSheet): it keeps the Pages, Order, Glance content and Hotspots
+ * choices and the Wallpaper and Ground Control rows; the Glance tile, Background, Time / Weather / Battery tiles, Add page, Edit home, Files and
+ * "Widgets, folders and icons" are gone from it (they are in Ground Control, Home screen).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -38,38 +36,26 @@ import org.robolectric.annotation.GraphicsMode
 class HomeQuickSheetGlanceTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private class Seen { var prefs = LauncherPrefs(); var edit = 0; var add = 0 }
+    private class Seen { var prefs = LauncherPrefs(); var wallpaper = 0; var ground = 0; var delete = 0 }
 
-    private fun sheet(start: LauncherPrefs, seen: Seen, page: Int? = null) = rule.setContent {
+    private fun sheet(start: LauncherPrefs, seen: Seen, page: Int? = null, pages: Int = 1) = rule.setContent {
         var p by remember { mutableStateOf(start) }
-        HomeQuickSheet(
-            prefs = p, update = { f -> p = f(p); seen.prefs = p }, page = page, pageCount = 1, onAddPage = { seen.add++ }, onDeletePage = {},
-            onEdit = { seen.edit++ }, onWallpaper = {}, onGroundControl = {}, onDismiss = {},
-        )
+        HomeQuickSheetBody(p, { f -> p = f(p); seen.prefs = p }, page, pages, { seen.delete++ }, { seen.wallpaper++ }, { seen.ground++ })
     }
 
-    @Test fun HOM_22_theQuickSheetHasNoLandingSelectorAndOffersTheGlanceSwitchInItsPlace() {
-        val seen = Seen(); sheet(LauncherPrefs(), seen)
-        assertTrue(rule.onAllNodesWithText("HOME LANDING").fetchSemanticsNodes().isEmpty())
-        for (old in listOf("Recent apps", "All apps", "Selected apps")) assertTrue("$old landing is gone", rule.onAllNodesWithContentDescription(old).fetchSemanticsNodes().isEmpty())
-        rule.onNodeWithText("Calm home screen (Glance)").assertIsDisplayed()
-        rule.onNodeWithTag("quick.glance").assertTextContains("On")
+    private fun gone(vararg texts: String) { for (t in texts) assertTrue("$t is not in the sheet", rule.onAllNodesWithText(t).fetchSemanticsNodes().isEmpty()) }
+
+    @Test fun HOM_22_w34_theSheetNoLongerHasTheGlanceTileBackgroundTimeWeatherBatteryAddPageEditHomeFilesOrItemPicker() {
+        val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Paginated), seen)
+        gone("Calm home screen (Glance)", "Background", "Weather", "Battery %", "Add page", "Edit home", "Files, usage and timeline", "Widgets, folders and icons")
+        assertTrue(rule.onAllNodes(hasTestTag("quick.glance") or hasTestTag("quick.addpage") or hasTestTag("quick.edit")).fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithText("Home").assertIsDisplayed()
     }
 
-    @Test fun HOM_22_theGlanceTileSwitchesItOffAndOnAndTheSettingIsWritten() {
-        val seen = Seen(); sheet(LauncherPrefs(), seen)
-        rule.onNodeWithTag("quick.glance").performClick()
-        assertFalse(seen.prefs.glanceEnabled)
-        rule.onNodeWithTag("quick.glance").assertTextContains("Off")
-        rule.onNodeWithTag("quick.glance").performClick()
-        assertTrue(seen.prefs.glanceEnabled)
-    }
-
-    @Test fun HOM_01_w28_theQuickSheetHasThreePagesChipsOffPaginatedContinuousNextToTheGlanceTileAndTheOrder() {
+    @Test fun HOM_01_w28_theQuickSheetHasThreePagesChipsOffPaginatedContinuousAndTheOrder() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
         rule.onNodeWithText("PAGES").assertExists()
-        for (m in HomePages.entries) rule.onNodeWithTag("quick.pages.${m.name}").assertExists()
-        assertEquals("exactly three Pages chips", 3, rule.onAllNodes(androidx.compose.ui.test.hasTestTag("quick.pages.Off") or androidx.compose.ui.test.hasTestTag("quick.pages.Paginated") or androidx.compose.ui.test.hasTestTag("quick.pages.Continuous")).fetchSemanticsNodes().size)
+        assertEquals("exactly three Pages chips", 3, rule.onAllNodes(hasTestTag("quick.pages.Off") or hasTestTag("quick.pages.Paginated") or hasTestTag("quick.pages.Continuous")).fetchSemanticsNodes().size)
         rule.onNodeWithTag("quick.pages.Continuous").performClick()
         assertEquals(HomePages.Continuous, seen.prefs.homePages)
         rule.onNodeWithTag("quick.pages.Paginated").performClick()
@@ -82,35 +68,35 @@ class HomeQuickSheetGlanceTest {
         assertEquals(HomeOrder.LeftToRight, seen.prefs.homeOrder)
     }
 
-    @Test fun HOM_01_w28_fromGlanceTheSheetHasAddPageWhenPaginatedAndEditHome() {
-        val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Paginated), seen)
-        rule.onNodeWithTag("quick.addpage").performScrollTo().assertExists().performClick()
-        assertEquals(1, seen.add)
-        rule.onNodeWithText("Edit home").performScrollTo().performClick()
-        assertEquals(1, seen.edit)
-    }
-
-    @Test fun HOM_01_w28_withPagesOffOrContinuousTheSheetOffersNoAddPageBecauseThePagesChipsAreTheSwitch() {
-        val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Continuous), seen)
-        rule.onNodeWithTag("quick.addpage").assertDoesNotExist()
-        rule.onNodeWithText("Edit home").performScrollTo().assertExists()
-    }
-
-    @Test fun HOM_23_theGlanceQuickSheetOffersContentHotspotsBackgroundAndEditHomePages() {
+    @Test fun HOM_23_theGlanceQuickSheetKeepsContentAndHotspotsChips() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
         rule.onNodeWithText("GLANCE CONTENT").assertIsDisplayed()
         rule.onNodeWithText("HOTSPOTS").performScrollTo().assertExists()
-        rule.onNodeWithText("Background").performScrollTo().assertExists()
-        rule.onNodeWithText("Edit home").performScrollTo().assertExists()
+        for (t in listOf("Time", "Time + Date", "Date + Weather", "Time + Date + Weather")) rule.onNodeWithText(t).performScrollTo().assertExists()
+        for (t in listOf("Four", "Two (bottom)", "One", "None")) rule.onNodeWithText(t).performScrollTo().assertExists()
         rule.onNodeWithText("Date + Weather").performClick()
         assertEquals(setOf(com.bos.sphere.core.data.GlanceItem.Date, com.bos.sphere.core.data.GlanceItem.Weather, com.bos.sphere.core.data.GlanceItem.NowPlaying), seen.prefs.glanceContent)
         rule.onNodeWithText("Two (bottom)").performScrollTo().performClick()
         assertEquals(setOf(com.bos.sphere.core.data.Corner.BottomLeft, com.bos.sphere.core.data.Corner.BottomRight), seen.prefs.glanceHotspots)
     }
 
-    @Test fun HOM_23_withGlanceOffTheGlanceContentRowsAreHidden() {
+    @Test fun HOM_23_withGlanceOffTheGlanceContentAndHotspotsChipsAreHidden() {
         val seen = Seen(); sheet(LauncherPrefs(glanceEnabled = false), seen)
-        assertTrue(rule.onAllNodesWithText("GLANCE CONTENT").fetchSemanticsNodes().isEmpty())
-        rule.onNodeWithText("Calm home screen (Glance)").assertIsDisplayed(); rule.onNodeWithTag("quick.glance").assertTextContains("Off")
+        gone("GLANCE CONTENT", "HOTSPOTS")
+        rule.onNodeWithText("PAGES").assertExists()
+    }
+
+    @Test fun HOM_16_w34_theTwoBottomRowsAreWallpaperAndGroundControl() {
+        val seen = Seen(); sheet(LauncherPrefs(), seen)
+        rule.onNodeWithTag("quick.wallpaper").performScrollTo().performClick(); assertEquals(1, seen.wallpaper)
+        rule.onNodeWithTag("quick.groundcontrol").performScrollTo().performClick(); assertEquals(1, seen.ground)
+    }
+
+    @Test fun HOM_22_w34_onAPageThePageToolsStayAndDeletePageWorksButThereIsNoAddPage() {
+        val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Paginated), seen, page = 0, pages = 2)
+        rule.onNodeWithText("THIS PAGE").performScrollTo().assertExists()
+        rule.onNodeWithText("TRANSITION").performScrollTo().assertExists()
+        gone("Add page")
+        rule.onNodeWithText("Delete page").performScrollTo().performClick(); assertEquals(1, seen.delete)
     }
 }

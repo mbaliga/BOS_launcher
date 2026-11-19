@@ -122,8 +122,11 @@ class WheelGeometryTest {
         assertEquals(45f - l.firstSpoke!!, b.endInclusive, eps)
         assertEquals(b.endInclusive, WheelGeometry.clampRotation(1e6f, l), eps)
         assertEquals(b.start, WheelGeometry.clampRotation(-1e6f, l), eps)
-        // A long wheel starts just past the leading edge; a short one is centred.
-        assertEquals(4f, WheelGeometry.initialRotation(l, 4f), eps)
+        // Wave 30 (drawerLoop): a long ring loops and starts with its first group in the middle (its predecessor visibly before it);
+        // a ring that is too short to loop but longer than the quadrant starts just past the leading edge; a short one is centred.
+        assertEquals(45f - l.segments.first().center, WheelGeometry.initialRotation(l, 4f), eps)
+        val mid = WheelGeometry.layout(List(5) { 2 }, perSpoke = 4, spokeStep = 15f, gap = 5f)
+        assertEquals(4f, WheelGeometry.initialRotation(mid, 4f), eps)
         val short = WheelGeometry.layout(listOf(1, 1), perSpoke = 4, spokeStep = 15f, gap = 5f)
         assertEquals(45f - short.span / 2f, WheelGeometry.initialRotation(short, 4f), eps)
         assertEquals(0f..0f, WheelGeometry.rotationBounds(WheelLayout(emptyList())))

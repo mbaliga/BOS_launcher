@@ -65,6 +65,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -90,6 +95,7 @@ import com.bos.sphere.core.input.PuckState
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.WheelGrouping
 import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.L10n
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -139,6 +145,8 @@ internal data class WheelLayout(val segments: List<WheelSegment>) {
 internal object WheelGeometry {
     const val QUADRANT = 90f
     const val MID = QUADRANT / 2f
+    /** The drawing margin (each side of the quadrant) the loop is sized for; the drawer culls with the same value. */
+    const val LOOP_MARGIN_DEG = 30f
 
     /** Screen angle where [anchor]'s visible quadrant begins (TopLeft 0, TopRight 90, BottomRight 180, BottomLeft 270). */
     fun quadrantStart(anchor: Corner): Float = anchor.ordinal * QUADRANT
@@ -235,8 +243,100 @@ internal object WheelGeometry {
 
     fun clampRotation(rotation: Float, layout: WheelLayout): Float = rotation.coerceIn(rotationBounds(layout))
 
+    // ---- Wave 30 (drawerLoop): the sections form a ring. The rotation is periodic in the layout's span.
+
+    /** The window (degrees, wheel-relative) in which anything is drawn: the quadrant plus a margin each side. */
+    fun windowWidth(marginDeg: Float): Float = QUADRANT + 2f * marginDeg
+
+    /**
+     * True when the sections loop: at least two groups, and the whole ring is at least as wide as the drawn window, so no group is
+     * drawn twice at once. A smaller ring (few groups) fits the quadrant, is drawn once and keeps the clamped, centred arrangement.
+     */
+    fun loops(layout: WheelLayout, marginDeg: Float = LOOP_MARGIN_DEG): Boolean =
+        // The ring must be wider than the window plus its widest group: otherwise one group's arc meets both ends of the window and is drawn twice.
+        layout.segments.size >= 2 && layout.span >= windowWidth(marginDeg) + (layout.segments.maxOfOrNull { it.width } ?: 0f)
+
+    /** Cyclic group index: [i] modulo [n] (any integer, negative included); 0 when there are no groups. */
+    fun wrapIndex(i: Int, n: Int): Int = if (n <= 0) 0 else Math.floorMod(i, n)
+
+    /** [value] taken into [0, [span]). */
+    fun wrapAngle(value: Float, span: Float): Float {
+        if (span <= 0f) return value
+        val r = value - floor(value / span) * span
+        return if (r >= span) 0f else r
+    }
+
+    /** The rotation with whole turns of the ring removed (the same picture); unchanged when the sections do not loop. */
+    fun wrapRotation(rotation: Float, layout: WheelLayout): Float =
+        if (loops(layout)) wrapAngle(rotation, layout.span) else rotation
+
+    /** Signed number of steps (-n/2 .. n/2, a tie goes forward) from group [from] to group [to] the short way round a ring of [n]. */
+    fun shortestSteps(from: Int, to: Int, n: Int): Int {
+        if (n <= 1) return 0
+        val d = wrapIndex(to - from, n)
+        return if (d * 2 > n) d - n else d
+    }
+
+    /**
+     * Rotation that brings group [index]'s centre to the middle of the quadrant, the winding nearest [from] when the sections loop
+     * (the short way round, across the seam), the clamped one otherwise.
+     */
+    fun rotationToGroup(layout: WheelLayout, index: Int, from: Float): Float {
+        if (!loops(layout)) return rotationToCenter(layout, index)
+        val base = MID - layout.segments[wrapIndex(index, layout.segments.size)].center
+        val span = layout.span
+        val d = wrapAngle(base - from + span / 2f, span) - span / 2f
+        return from + d
+    }
+
+    /** A group, or one spoke's index, drawn at [copy] whole turns of the ring away from its home position. */
+    data class Slot(val index: Int, val copy: Int)
+
+    private fun copyRange(span: Float, rotation: Float, marginDeg: Float): IntRange {
+        // wheel angle a + copy * span + rotation must fall in -margin .. QUADRANT + margin for some a in [0, span)
+        val lo = floor((-marginDeg - rotation) / span).toInt() - 1
+        val hi = floor((QUADRANT + marginDeg - rotation) / span).toInt() + 1
+        return lo..hi
+    }
+
+    /**
+     * The groups drawn at [rotation] with their copy number, in ring order: every group whose arc meets the window, each at most once.
+     * Without a loop it is the plain culling of the single copy.
+     */
+    fun visibleSegments(layout: WheelLayout, rotation: Float, marginDeg: Float): List<Slot> {
+        val out = ArrayList<Slot>()
+        // The loop decision never depends on the caller's margin (the accessibility nodes ask with none): a ring is drawn one way only.
+        val copies = if (loops(layout)) copyRange(layout.span, rotation, marginDeg) else 0..0
+        for (k in copies) for ((i, seg) in layout.segments.withIndex()) {
+            val rel0 = seg.start + k * layout.span + rotation
+            val rel1 = seg.end + k * layout.span + rotation
+            if (rel1 < -marginDeg || rel0 > QUADRANT + marginDeg) continue
+            out += Slot(i, k)
+        }
+        return out
+    }
+
+    /** Spokes ([angles] ascending, ring of [span]) within the window at [rotation], cyclically when [loop]. */
+    fun visibleSpokes(angles: List<Float>, span: Float, loop: Boolean, rotation: Float, marginDeg: Float): List<Slot> {
+        val out = ArrayList<Slot>()
+        val copies = if (loop) copyRange(span, rotation, marginDeg) else 0..0
+        for (k in copies) for (i in angles.indices) {
+            if (inView(angles[i] + k * span, rotation, marginDeg)) out += Slot(i, k)
+        }
+        return out
+    }
+
+    /** Absolute scrub mapping on a looping ring: a finger at [fraction] (0..1) of the quadrant puts the rotation one turn per quadrant, first group centred at 0. */
+    fun scrubRotation(layout: WheelLayout, fraction: Float): Float =
+        MID - layout.segments.first().center - fraction * layout.span
+
+    /** The winding of [value] (modulo the ring) nearest [from]. */
+    fun nearestWinding(value: Float, from: Float, span: Float): Float =
+        if (span <= 0f) value else from + wrapAngle(value - from + span / 2f, span) - span / 2f
+
     /** Centres a wheel that fits in the quadrant; otherwise starts it [insetDeg] past the leading edge. */
     fun initialRotation(layout: WheelLayout, insetDeg: Float): Float {
+        if (loops(layout)) return MID - layout.segments.first().center // the first group in the middle, the last one visibly before it
         val r = if (layout.span <= QUADRANT - 2f * insetDeg) MID - layout.span / 2f else insetDeg
         return clampRotation(r, layout)
     }
@@ -250,7 +350,10 @@ internal object WheelGeometry {
         layout.segments.indexOfFirst { wheelAngle >= it.start && wheelAngle < it.end }
 
     /** Segment under the middle of the quadrant at [rotation], or -1. */
-    fun focusedSegment(layout: WheelLayout, rotation: Float): Int = segmentAt(layout, MID - rotation)
+    fun focusedSegment(layout: WheelLayout, rotation: Float): Int {
+        val a = MID - rotation
+        return segmentAt(layout, if (loops(layout)) wrapAngle(a, layout.span) else a)
+    }
 
     fun inView(wheelAngle: Float, rotation: Float, marginDeg: Float): Boolean =
         (wheelAngle + rotation) in -marginDeg..(QUADRANT + marginDeg)
@@ -351,6 +454,9 @@ object WheelCategoryCache {
     /** Resolves and caches categories for [packages] off the main thread (so search can use them). */
     suspend fun warm(context: Context, packages: Collection<String>) { resolve(context, packages) }
 
+    /** Seeds the cache (tests and previews: the real fill reads the package manager). */
+    internal fun seed(packageName: String, category: Int) { cache[packageName] = category }
+
     /** All of [packages] from the cache, or null if any is missing. */
     internal fun cachedFor(packages: Collection<String>): Map<String, Int>? {
         val out = HashMap<String, Int>(packages.size)
@@ -426,7 +532,9 @@ private class WheelMetrics(width: Float, height: Float, density: Density) {
             bandInner = hubRadius + 3.dp.toPx()
             bandOuter = bandInner + 26.dp.toPx()
             firstRadius = bandOuter + 14.dp.toPx() + iconPx / 2f
-            radialStep = iconPx + 14.dp.toPx()
+            // Wave 30: the selected group now sits at the middle of the quadrant (45 degrees) when the drawer opens, where two icons of one spoke
+            // are diagonal: their centres must be a square's diagonal apart or the icons overlap.
+            radialStep = max(iconPx + 14.dp.toPx(), iconPx * 1.42f + 1.dp.toPx())
             val maxRadius = minSide - 10.dp.toPx() - iconPx / 2f
             perSpoke = WheelGeometry.spokeCapacity(firstRadius, maxRadius, radialStep)
             spokeStepDeg = Math.toDegrees(((iconPx + 10.dp.toPx()) / firstRadius).toDouble()).toFloat()
@@ -445,7 +553,7 @@ private class WheelMetrics(width: Float, height: Float, density: Density) {
 private class Spoke(val angle: Float, val apps: List<AppEntry>)
 
 private const val INSET_DEG = 4f
-private const val CULL_MARGIN_DEG = 30f
+private const val CULL_MARGIN_DEG = WheelGeometry.LOOP_MARGIN_DEG
 // Spread across the hub; chips stay upright (readable) and inset from the screen edges.
 private val ChipAngles = floatArrayOf(13f, 45f, 77f)
 
@@ -574,10 +682,17 @@ private fun WheelContent(
         val rotation = remember(grouping, anchor, groups.size) {
             Animatable(WheelGeometry.initialRotation(layout, INSET_DEG))
         }
+        val looping = WheelGeometry.loops(layout)
         LaunchedEffect(rotation, layout) {
-            val b = WheelGeometry.rotationBounds(layout)
-            rotation.updateBounds(b.start, b.endInclusive)
-            rotation.snapTo(rotation.value) // re-clamp
+            if (WheelGeometry.loops(layout)) {
+                // Wave 30: the ring has no ends; the value is periodic, so it is unbounded and only wrapped silently at rest.
+                rotation.updateBounds(null, null)
+                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, layout))
+            } else {
+                val b = WheelGeometry.rotationBounds(layout)
+                rotation.updateBounds(b.start, b.endInclusive)
+                rotation.snapTo(rotation.value) // re-clamp
+            }
         }
         if (interactive) {
             LaunchedEffect(rotation, layout) {
@@ -602,12 +717,36 @@ private fun WheelContent(
         val currentRotation by rememberUpdatedState(rotation)
         var kbItem by remember(grouping, anchor) { androidx.compose.runtime.mutableIntStateOf(0) }
         val currentKbItem by rememberUpdatedState(kbItem)
-        fun focusedGroup() = WheelGeometry.focusedSegment(currentLayout, currentRotation.value).coerceAtLeast(0)
+        // Wave 30 review: reduced motion turns the ring by snapping (no spring, no inertia).
+        val reducedMotion by rememberUpdatedState(com.bos.sphere.core.design.rememberMotionPrefs().reduced)
+        suspend fun turnTo(target: Float, stiffness: Float) {
+            if (reducedMotion) rotation.snapTo(target)
+            else rotation.animateTo(target, spring(dampingRatio = 0.85f, stiffness = stiffness))
+        }
+        // Wave 30 review: the group a spring is heading for. A second key press (or key repeat) while the ring is still turning steps from
+        // there, not from the group under the middle at that instant (which would swallow the press).
+        var pendingGroup by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+        fun focusedGroup() =
+            if (pendingGroup >= 0 && currentRotation.isRunning) pendingGroup.coerceAtMost(max(0, currentGroups.lastIndex))
+            else WheelGeometry.focusedSegment(currentLayout, currentRotation.value).coerceAtLeast(0)
         fun focusGroup(i: Int) {
             kbItem = 0
-            scope.launch { rotation.animateTo(WheelGeometry.rotationToCenter(currentLayout, i), spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)) }
+            pendingGroup = i
+            scope.launch {
+                val l = currentLayout
+                // The short way round, across the seam when that is nearer.
+                turnTo(WheelGeometry.rotationToGroup(l, i, rotation.value), Spring.StiffnessLow)
+                if (pendingGroup == i) pendingGroup = -1
+                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
+            }
+        }
+        // Next/previous section for the scroll wheel, TalkBack and the keyboard: always cyclic.
+        fun stepGroup(steps: Int) {
+            val n = currentGroups.size
+            if (n > 0) focusGroup(WheelGeometry.wrapIndex(focusedGroup() + steps, n))
         }
         val currentFocusGroup by rememberUpdatedState(::focusGroup)
+        val currentStepGroup by rememberUpdatedState(::stepGroup)
         androidx.compose.runtime.DisposableEffect(interactive) {
             if (!interactive) return@DisposableEffect onDispose { }
             val handler: (android.view.KeyEvent) -> Boolean = h@{ e ->
@@ -652,10 +791,12 @@ private fun WheelContent(
             }
         }
 
-        val visibleSpokes by remember(spokeAngles, rotation) {
+        val visibleSpokes by remember(spokeAngles, rotation, layout) {
             derivedStateOf {
-                WheelGeometry.visibleRange(
+                WheelGeometry.visibleSpokes(
                     spokeAngles,
+                    layout.span,
+                    WheelGeometry.loops(layout),
                     rotation.value + openRotation(progress.value),
                     CULL_MARGIN_DEG,
                 )
@@ -670,6 +811,13 @@ private fun WheelContent(
             Modifier
                 .fillMaxSize()
                 .linearTraversal()
+                .semantics {
+                    // TalkBack: the sections are a ring, so next after the last is the first and previous before the first is the last.
+                    if (interactive) customActions = listOf(
+                        CustomAccessibilityAction(L10n.tr("Next section")) { currentStepGroup(1); true },
+                        CustomAccessibilityAction(L10n.tr("Previous section")) { currentStepGroup(-1); true },
+                    )
+                }
                 .pointerInput(interactive) {
                     // The scroll wheel (or a trackpad) rotates the puck one group per notch.
                     if (!interactive) return@pointerInput
@@ -681,7 +829,7 @@ private fun WheelContent(
                             val (steps, carry) = PuckKeys.wheelSteps(d.y + d.x, wheelCarry)
                             wheelCarry = carry
                             if (steps != 0 && currentGroups.isNotEmpty()) {
-                                currentFocusGroup((focusedGroup() + steps).coerceIn(0, currentGroups.lastIndex))
+                                currentStepGroup(steps)
                             }
                             ev.changes.forEach { it.consume() }
                         }
@@ -701,7 +849,10 @@ private fun WheelContent(
                         val tracker = VelocityTracker()
                         tracker.addPosition(down.uptimeMillis, down.position)
                         val bounds = WheelGeometry.rotationBounds(currentLayout)
+                        val loop = WheelGeometry.loops(currentLayout)
+                        pendingGroup = -1
                         var target = rotation.value
+                        var scrubStarted = false
                         var dragging = false
                         val startPolar = WheelGeometry.screenToPolar(anchor, w, h, down.position.x, down.position.y)
                         var lastAngle = startPolar.angleDeg
@@ -725,17 +876,31 @@ private fun WheelContent(
                                 val polar = WheelGeometry.screenToPolar(anchor, w, h, change.position.x, change.position.y)
                                 var rel = (polar.angleDeg - WheelGeometry.quadrantStart(anchor)) % 360f
                                 if (rel < 0f) rel += 360f
-                                val f = (rel / WheelGeometry.QUADRANT).coerceIn(0f, 1f)
-                                // First group centred at f = 0, last at f = 1.
-                                target = bounds.endInclusive + (bounds.start - bounds.endInclusive) * f
+                                if (loop) {
+                                    // The ring has no ends: the finger's place along the arc picks the group at first touch (the nearest
+                                    // winding, so no jump), then each further sweep of the finger turns the ring on, past the seam and round.
+                                    if (!scrubStarted) {
+                                        scrubStarted = true
+                                        val f0 = (rel / WheelGeometry.QUADRANT).coerceIn(0f, 1f)
+                                        target = WheelGeometry.nearestWinding(WheelGeometry.scrubRotation(currentLayout, f0), target, currentLayout.span)
+                                    } else {
+                                        val dAngle = WheelGeometry.normalize180(polar.angleDeg - lastAngle)
+                                        target -= dAngle / WheelGeometry.QUADRANT * currentLayout.span
+                                    }
+                                    lastAngle = polar.angleDeg
+                                } else {
+                                    val f = (rel / WheelGeometry.QUADRANT).coerceIn(0f, 1f)
+                                    // First group centred at f = 0, last at f = 1.
+                                    target = bounds.endInclusive + (bounds.start - bounds.endInclusive) * f
+                                }
                                 val t = target
                                 scope.launch { rotation.snapTo(t) }
                                 change.consume()
                             } else if (dragging) {
                                 val polar = WheelGeometry.screenToPolar(anchor, w, h, change.position.x, change.position.y)
                                 if (polar.radius > metrics.iconPx * 0.5f) {
-                                    target = (target + WheelGeometry.normalize180(polar.angleDeg - lastAngle))
-                                        .coerceIn(bounds)
+                                    val moved = target + WheelGeometry.normalize180(polar.angleDeg - lastAngle)
+                                    target = if (loop) moved else moved.coerceIn(bounds)
                                     val t = target
                                     scope.launch { rotation.snapTo(t) }
                                 }
@@ -750,7 +915,8 @@ private fun WheelContent(
                             val i = WheelGeometry.focusedSegment(l, target)
                             scope.launch {
                                 rotation.snapTo(target)
-                                if (i >= 0) rotation.animateTo(WheelGeometry.rotationToCenter(l, i), spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium))
+                                if (i >= 0) turnTo(WheelGeometry.rotationToGroup(l, i, target), Spring.StiffnessMedium)
+                                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
                             }
                         } else if (dragging && release != null) {
                             val v = tracker.calculateVelocity()
@@ -759,7 +925,11 @@ private fun WheelContent(
                             ).coerceIn(-1500f, 1500f)
                             scope.launch {
                                 rotation.snapTo(target)
-                                if (abs(omega) > 20f) rotation.animateDecay(omega, exponentialDecay(frictionMultiplier = 1.4f))
+                                if (reducedMotion) {
+                                    val i = WheelGeometry.focusedSegment(currentLayout, target)
+                                    if (i >= 0) rotation.snapTo(WheelGeometry.rotationToGroup(currentLayout, i, target))
+                                } else if (abs(omega) > 20f) rotation.animateDecay(omega, exponentialDecay(frictionMultiplier = 1.4f))
+                                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, currentLayout))
                             }
                         } else if (!dragging && release != null && !release.isConsumed) {
                             release.consume()
@@ -767,14 +937,11 @@ private fun WheelContent(
                             when {
                                 polar.radius in metrics.bandInner..metrics.bandOuter -> {
                                     val l = currentLayout
-                                    val i = WheelGeometry.segmentAt(
-                                        l, WheelGeometry.wheelAngleAt(anchor, polar.angleDeg, rotation.value),
-                                    )
+                                    val wa = WheelGeometry.wheelAngleAt(anchor, polar.angleDeg, rotation.value)
+                                    val i = WheelGeometry.segmentAt(l, if (loop) WheelGeometry.wrapAngle(wa, l.span) else wa)
                                     if (i >= 0) scope.launch {
-                                        rotation.animateTo(
-                                            WheelGeometry.rotationToCenter(l, i),
-                                            spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow),
-                                        )
+                                        turnTo(WheelGeometry.rotationToGroup(l, i, rotation.value), Spring.StiffnessLow)
+                                        rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
                                     }
                                 }
                                 polar.radius > metrics.outerRadius -> currentDismiss()
@@ -824,12 +991,16 @@ private fun WheelContent(
                 val arcSize = Size(mid * 2f, mid * 2f)
                 val focused = WheelGeometry.focusedSegment(layout, rotation.value)
                 val alt = lerp(HyleColors.Surface, HyleColors.Ink, 0.07f)
-                layout.segments.forEachIndexed { i, seg ->
-                    val rel0 = seg.start + rot
-                    val rel1 = seg.end + rot
-                    if (rel1 < -CULL_MARGIN_DEG || rel0 > WheelGeometry.QUADRANT + CULL_MARGIN_DEG) return@forEachIndexed
+                val ringOdd = looping && layout.segments.size % 2 == 1
+                for (slot in WheelGeometry.visibleSegments(layout, rot, CULL_MARGIN_DEG)) {
+                    val i = slot.index
+                    val seg = layout.segments[i]
+                    val turn = slot.copy * layout.span
+                    val rel0 = seg.start + turn + rot
                     val color = when {
                         i == focused -> lerp(HyleColors.Surface, HyleColors.Violet, 0.38f)
+                        // An odd ring would put two equal shades side by side at the seam: its last band takes a third one.
+                        ringOdd && i == layout.segments.lastIndex -> lerp(HyleColors.Surface, HyleColors.Ink, 0.035f)
                         i % 2 == 0 -> HyleColors.Surface
                         else -> alt
                     }
@@ -848,8 +1019,8 @@ private fun WheelContent(
                     val outer = WheelGeometry.polarToScreen(anchor, w, h, mid + thick / 2f, qs + rel0)
                     drawLine(HyleColors.Hairline, Offset(inner.x, inner.y), Offset(outer.x, outer.y), 1.dp.toPx(), alpha = a)
 
-                    val label = bandLabels.getOrNull(i) ?: return@forEachIndexed
-                    val centerAngle = qs + seg.center + rot
+                    val label = bandLabels.getOrNull(i) ?: continue
+                    val centerAngle = qs + seg.center + turn + rot
                     val c = WheelGeometry.polarToScreen(anchor, w, h, mid, centerAngle)
                     val pivot = Offset(c.x, c.y)
                     rotate(WheelGeometry.tangentTextRotation(centerAngle), pivot) {
@@ -938,10 +1109,11 @@ private fun WheelContent(
 
             // Spokes (only those near the visible quadrant are composed).
             val range = visibleSpokes
-            for (si in range) {
-                val spoke = spokes[si]
+            for (slot in range) {
+                val spoke = spokes[slot.index]
+                val turn = slot.copy * layout.span
                 spoke.apps.forEachIndexed { k, app ->
-                    key(app.key) {
+                    key(app.key to slot.copy) {
                         val radius = metrics.firstRadius + k * metrics.radialStep
                         val delay = if (metrics.perSpoke > 1) 0.18f * k / (metrics.perSpoke - 1) else 0f
                         WheelIcon(
@@ -951,7 +1123,7 @@ private fun WheelContent(
                                 val p = progress.value
                                 val pt = WheelGeometry.polarToScreen(
                                     anchor, w, h, radius * openScale(p),
-                                    qs + spoke.angle + rotation.value + openRotation(p),
+                                    qs + spoke.angle + turn + rotation.value + openRotation(p),
                                 )
                                 Offset(pt.x, pt.y)
                             },
@@ -964,6 +1136,35 @@ private fun WheelContent(
                             },
                         )
                     }
+                }
+            }
+
+            // One accessibility node per section on the band (the labels themselves are drawn on the canvas). Touch is handled by the disc.
+            if (interactive) {
+                val bandSlots by remember(layout, rotation) {
+                    derivedStateOf { WheelGeometry.visibleSegments(layout, rotation.value, 0f) }
+                }
+                // Read in the semantics lambda below (not here), so the turning ring does not recompose the whole disc on every frame.
+                val focusedNow by remember(layout, rotation) { derivedStateOf { WheelGeometry.focusedSegment(layout, rotation.value) } }
+                val nodeSize = with(density) { 48.dp.toPx() }
+                for (slot in bandSlots) {
+                    val i = slot.index
+                    val seg = layout.segments[i]
+                    val turn = slot.copy * layout.span
+                    Box(
+                        Modifier
+                            .centeredAt {
+                                val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.bandMid, qs + seg.center + turn + rotation.value)
+                                Offset(pt.x, pt.y)
+                            }
+                            .size(with(density) { nodeSize.toDp() })
+                            .semantics {
+                                contentDescription = L10n.tr("Section %s", groups[i].label)
+                                role = Role.Button
+                                selected = i == focusedNow
+                                onClick { currentFocusGroup(i); true }
+                            },
+                    )
                 }
             }
 

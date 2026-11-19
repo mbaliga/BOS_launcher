@@ -188,11 +188,25 @@ class InputStreamTest {
     private val labels = listOf("A", "B", "C", "M", "S", "Z")
     private fun st(focused: Int = 0, item: Int = 0, count: Int = 3, mode: PuckMode = PuckMode.AZ) = PuckState(mode, labels, focused, item, count)
 
-    @Test fun INP_18_left_right_rotate_and_clamp() {
+    @Test fun INP_18_left_right_rotate_and_wrap() {
         assertEquals(PuckEffect.FocusGroup(1), PuckKeys.onKey(st(0), PuckKey(Keys.DPAD_RIGHT)))
         assertEquals(PuckEffect.FocusGroup(2), PuckKeys.onKey(st(3), PuckKey(Keys.DPAD_LEFT)))
-        assertNull(PuckKeys.onKey(st(0), PuckKey(Keys.DPAD_LEFT)))
-        assertNull(PuckKeys.onKey(st(5), PuckKey(Keys.DPAD_RIGHT)))
+        // Wave 30 (drawerLoop): the groups are a ring, no clamping at either end.
+        assertEquals(PuckEffect.FocusGroup(5), PuckKeys.onKey(st(0), PuckKey(Keys.DPAD_LEFT)))
+        assertEquals(PuckEffect.FocusGroup(0), PuckKeys.onKey(st(5), PuckKey(Keys.DPAD_RIGHT)))
+        // A single group stays put.
+        assertNull(PuckKeys.onKey(PuckState(PuckMode.AZ, listOf("A"), 0), PuckKey(Keys.DPAD_RIGHT)))
+        assertNull(PuckKeys.onKey(PuckState(PuckMode.AZ, listOf("A"), 0), PuckKey(Keys.DPAD_LEFT)))
+    }
+
+    @Test fun INP_18_home_end_and_a_letter_past_the_last_wrap() {
+        assertEquals(PuckEffect.FocusGroup(0), PuckKeys.onKey(st(3), PuckKey(Keys.MOVE_HOME)))
+        assertEquals(PuckEffect.FocusGroup(5), PuckKeys.onKey(st(3), PuckKey(Keys.MOVE_END)))
+        assertNull(PuckKeys.onKey(st(0), PuckKey(Keys.MOVE_HOME)))
+        assertTrue(PuckKeys.owns(Keys.MOVE_HOME, null) && PuckKeys.owns(Keys.MOVE_END, null))
+        // No group at or after 'Y' except Z; with Z gone the jump wraps to the first group instead of doing nothing.
+        val noZ = PuckState(PuckMode.AZ, listOf("A", "B", "M"), 1)
+        assertEquals(PuckEffect.FocusGroup(0), PuckKeys.onKey(noZ, PuckKey(0, ch = 'y')))
     }
 
     @Test fun INP_18_typing_a_letter_jumps_to_that_group() {

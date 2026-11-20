@@ -106,7 +106,7 @@ class DockStackW26SmokeTest {
     private fun glanceCheck(label: String, w: Float, h: Float) {
         startGlance()
         val dock = boundsDp("Dock", false)
-        val indicator = union(boundsDp("Glance home", false), boundsDp("glance.indicator.right.Dock", true))
+        val indicator = union(boundsDp("Glance home", false), boundsDp("glance.indicator.launchpad", true))
         check(label, dock, indicator, h, w)
         shoot("w26-stack-glance-$label")
     }

@@ -34,9 +34,9 @@ import com.bos.sphere.core.data.HomeOrder
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.LauncherPrefs
-import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.ThemeVariant
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -79,7 +79,7 @@ class HomePagesW26ScreenshotTest {
             CompositionLocalProvider(LocalLayoutDirection provides if (order.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                 GlanceHomeForTest(
                     prefs = LauncherPrefs(homeOrder = order), media = null, hotspots = emptyList(), appsByKey = emptyMap(),
-                    rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
+                    hasLaunchpad = true,
                     onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {},
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -114,8 +114,8 @@ class HomePagesW26ScreenshotTest {
         assertTrue("no second set of dots on Glance", rule.onAllNodesWithTagCount("glance.deckdots") == 0)
         val comms = rule.onNodeWithTag("glance.indicator.launchpad", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val house = rule.onNodeWithTag("pages.glancedot", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val recents = rule.onNodeWithTag("glance.indicator.right.Recents", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("the row is the Glance indicator the owner has: Comms glyph, the house, the right-hand dot", comms.left < house.left && house.left < recents.left)
+        assertTrue("the row is the Comms glyph then the house", comms.left < house.left)
+        assertEquals("no trailing dot for the right panel (it read as a page that does not exist)", 0, rule.onAllNodesWithTag("glance.indicator.right.Recents", useUnmergedTree = true).fetchSemanticsNodes().size + rule.onAllNodesWithTag("glance.indicator.right.Dock", useUnmergedTree = true).fetchSemanticsNodes().size)
         shoot("w28-glance-indicator-ltr")
     }
 
@@ -124,8 +124,8 @@ class HomePagesW26ScreenshotTest {
         rule.mainClock.autoAdvance = false
         glance(HomeOrder.RightToLeft, languageRtl = false)
         val comms = rule.onNodeWithTag("glance.indicator.launchpad", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val recents = rule.onNodeWithTag("glance.indicator.right.Recents", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("in right to left order the Comms glyph is at the right", comms.left > recents.left)
+        val house = rule.onNodeWithTag("pages.glancedot", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("in right to left order the Comms glyph is at the right of the house", comms.left > house.left)
         shoot("w28-glance-indicator-rtl-order")
     }
 

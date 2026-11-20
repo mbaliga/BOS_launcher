@@ -100,7 +100,6 @@ import com.bos.sphere.core.data.ControlsPop
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.wallpaper
-import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.rememberMotionPrefs
 import com.bos.sphere.core.input.FocusKind
@@ -136,11 +135,9 @@ object GlanceText {
 @Composable
 fun GlanceSurface(
     prefs: LauncherPrefs,
-    rightDestinations: List<RightDestination>,
     hasLaunchpad: Boolean,
     modifier: Modifier = Modifier,
     onOpenLaunchpad: () -> Unit = {},
-    onOpenRight: () -> Unit = {},
     indicator: Boolean = true,
     /** Called when the user touches the surface: the host wakes the indicator it draws. */
     onAwake: () -> Unit = {},
@@ -175,8 +172,7 @@ fun GlanceSurface(
             PageIndicator(
                 count = 0, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
                 onMenu = if (hasLaunchpad) onOpenLaunchpad else null, menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad",
-                rtl = LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl, onGlance = {}, glanceCurrent = true, right = emptyList(), // W44: no dot for the right panel (it looked like a missing page)
-                     onRight = onOpenRight, quiet = true, awakeNonce = awakeNonce,
+                rtl = LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl, onGlance = {}, glanceCurrent = true, quiet = true, awakeNonce = awakeNonce,
             )
         }
     }

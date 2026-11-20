@@ -30,7 +30,6 @@ import com.bos.sphere.core.data.DefaultCorners
 import com.bos.sphere.core.data.GlanceHotspots
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
-import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ReducedMotionTesting
@@ -80,11 +79,10 @@ class GlanceHomeUiTest {
     private fun glance(
         prefs: LauncherPrefs = LauncherPrefs(), media: MediaInfo? = this.media, spots: List<Hotspot> = hotspots(),
         rtl: Boolean = false, ran: MutableList<Pair<CornerItem, Corner>> = ArrayList(), clicks: IntArray = IntArray(4), dark: Boolean = true,
-        right: List<RightDestination> = listOf(RightDestination.Recents),
     ) = rule.setContent {
         CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             GlanceHomeForTest(
-                prefs = prefs, media = media, hotspots = spots, appsByKey = emptyMap(), rightDestinations = right, hasLaunchpad = true,
+                prefs = prefs, media = media, hotspots = spots, appsByKey = emptyMap(), hasLaunchpad = true,
                 onRun = { i, c -> ran += i to c }, onPrevious = { clicks[1]++ }, onPlayPause = { clicks[2]++ }, onNext = { clicks[3]++ },
                 dark = dark, modifier = Modifier.fillMaxSize(),
             )
@@ -223,7 +221,7 @@ class GlanceHomeUiTest {
         val on = androidx.compose.runtime.mutableStateOf(GlanceHotspots.ALL)
         rule.setContent {
             GlanceHomeForTest(
-                prefs = LauncherPrefs(), media = null, hotspots = hotspots(on.value), appsByKey = emptyMap(), rightDestinations = emptyList(), hasLaunchpad = false,
+                prefs = LauncherPrefs(), media = null, hotspots = hotspots(on.value), appsByKey = emptyMap(), hasLaunchpad = false,
                 onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
             )
         }
@@ -246,47 +244,48 @@ class GlanceHomeUiTest {
 
     // ---- the indicator and the weather
 
-    // Wave 17 (owner bug report on build 48): the indicator's list glyph and right-hand dots are real 48 dp buttons; the current surface is not.
-    // Was: one merged spoken line "Glance home. Launchpad is on the left edge. Recent apps are on the right edge" that nothing could press.
+    // Wave 17 / W44: the indicator's Comms glyph is a real 48 dp button, the current surface (the house) is not. There is NO trailing dot for the right panel
+    // any more (owner bug "A dot is showing where there is no page"): the right panel opens by its edge swipe, handle, shortcut or the Open recents action.
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_theIndicatorButtonsOpenLaunchpadAndTheRightSideAndTheHomeGlyphIsNotInteractive() {
+    fun HOM_23_theIndicatorHasTheCommsButtonAndTheHomeGlyphAndNoDotForTheRightPanel() {
         val on = androidx.compose.runtime.mutableStateOf(true)
         val opened = ArrayList<String>()
         rule.setContent {
             GlanceHomeForTest(
                 prefs = LauncherPrefs(glanceIndicator = on.value), media = null, hotspots = emptyList(), appsByKey = emptyMap(),
-                rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
+                hasLaunchpad = true,
                 onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
-                onOpenLaunchpad = { opened += "launchpad" }, onOpenRight = { opened += "right" },
+                onOpenLaunchpad = { opened += "launchpad" },
             )
         }
-        val lp = tag("glance.indicator.launchpad"); val rt = tag("glance.indicator.right.Recents")
-        lp.assertIsDisplayed(); rt.assertIsDisplayed()
-        for (n in listOf(lp, rt)) { val b = n.fetchSemanticsNode().boundsInRoot; assertTrue("48 dp target", b.width >= 48f * 2f - 1f && b.height >= 48f * 2f - 1f) }
+        val lp = tag("glance.indicator.launchpad")
+        lp.assertIsDisplayed()
+        val b = lp.fetchSemanticsNode().boundsInRoot; assertTrue("48 dp target", b.width >= 48f * 2f - 1f && b.height >= 48f * 2f - 1f)
         assertEquals(1, rule.onAllNodesWithContentDescription("Open Comms").fetchSemanticsNodes().size)
-        assertEquals(1, rule.onAllNodesWithContentDescription("Open recents").fetchSemanticsNodes().size)
         rule.onNodeWithContentDescription("Glance home").assertHasNoClickAction()
-        lp.performClick(); rt.performClick()
-        assertEquals(listOf("launchpad", "right"), opened)
-        assertTrue("both are focus nodes", LauncherInput.focus.nodes().map { it.id }.containsAll(listOf("glance.indicator.launchpad", "glance.indicator.right.Recents")))
+        assertEquals("no right-panel dot", 0, rule.onAllNodesWithTag("glance.indicator.right.Recents", useUnmergedTree = true).fetchSemanticsNodes().size + rule.onAllNodesWithTag("glance.indicator.right.Dock", useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals(0, rule.onAllNodesWithContentDescription("Open recents").fetchSemanticsNodes().size)
+        assertEquals(0, rule.onAllNodesWithContentDescription("Show the dock").fetchSemanticsNodes().size)
+        lp.performClick()
+        assertEquals(listOf("launchpad"), opened)
+        assertTrue("the Comms glyph is a focus node", LauncherInput.focus.nodes().map { it.id }.contains("glance.indicator.launchpad"))
         Snapshot.withMutableSnapshot { on.value = false }
         rule.waitForIdle()
-        assertFalse(visible("Open Comms")); assertFalse(visible("Open recents")); assertFalse(visible("Glance home"))
+        assertFalse(visible("Open Comms")); assertFalse(visible("Glance home"))
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_theDockRailDestinationDotIsAButtonToo() {
-        val opened = ArrayList<String>()
+    fun HOM_23_withCommsOffTheIndicatorIsOnlyTheHomeGlyph() {
         rule.setContent {
             GlanceHomeForTest(
                 prefs = LauncherPrefs(), media = null, hotspots = emptyList(), appsByKey = emptyMap(),
-                rightDestinations = listOf(RightDestination.Dock), hasLaunchpad = false,
-                onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(), onOpenRight = { opened += "right" },
+                hasLaunchpad = false,
+                onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
             )
         }
         assertFalse("Comms off: no Comms glyph", visible("Open Comms"))
-        rule.onNodeWithContentDescription("Show the dock").performClick()
-        assertEquals(listOf("right"), opened)
+        assertTrue(visible("Glance home"))
+        assertEquals(0, rule.onAllNodesWithTag("glance.indicator.right.Dock", useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
     // ---- the quiet edge handles (wave 17)
@@ -295,7 +294,7 @@ class GlanceHomeUiTest {
         CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             Box(Modifier.fillMaxSize()) {
                 GlanceHomeForTest(
-                    prefs = LauncherPrefs(), media = null, hotspots = hotspots(), appsByKey = emptyMap(), rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
+                    prefs = LauncherPrefs(), media = null, hotspots = hotspots(), appsByKey = emptyMap(), hasLaunchpad = true,
                     onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, dark = dark, modifier = Modifier.fillMaxSize(),
                 )
                 val tint = if (dark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black

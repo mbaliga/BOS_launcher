@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -51,6 +52,8 @@ class SettingsPreviewDockUiTest {
         SettingCategory("Look", Glyphs.Apps, listOf(SettingItem.Toggle("Plate", Glyphs.Apps, false) {})),
     )
 
+    private var rtl: Boolean? = null // Robolectric's ldrtl qualifier does not reach Configuration.layoutDirection, so it is injected
+
     private fun show() {
         rule.mainClock.autoAdvance = false
         rule.setContent {
@@ -60,7 +63,7 @@ class SettingsPreviewDockUiTest {
                 SettingsSpace(
                     visible = true, categories = categories(), initialCategory = 0, sounds = null, onClose = {},
                     modifier = Modifier.fillMaxSize(),
-                    previewDock = { SettingsPreviewDock(capture) },
+                    previewDock = { SettingsPreviewDock(capture, rtl = rtl) },
                 )
             }
         }
@@ -88,8 +91,11 @@ class SettingsPreviewDockUiTest {
         assertEquals("dock width follows DockGeometry", box.widthDp, dock.width.value, 1.5f)
         assertEquals("dock height follows DockGeometry", box.heightDp, dock.height.value, 1.5f)
         assertEquals("the dock keeps the home's aspect", homeW.toFloat() / homeH, dock.width.value / dock.height.value, 0.02f)
-        assertEquals("top-end anchor: 12dp from the end", homeW / d - 12f, dock.right.value, 1.5f)
-        assertEquals("64dp under the top", 64f, dock.top.value, 1.5f)
+        // Wave 39: the dock is a floating window; its bar is the top-end anchored part, the picture hangs under the 48dp bar.
+        val bar = rule.onNodeWithTag(PreviewWindowTags.BAR).getUnclippedBoundsInRoot()
+        assertEquals("top-end anchor: the window is 12dp from the end", homeW / d - 12f, bar.right.value, 1.5f)
+        assertEquals("64dp under the top", 64f, bar.top.value, 1.5f)
+        assertEquals("the picture starts under the bar", 64f + PreviewWindowGeometry.BAR_DP, dock.top.value, 1.5f)
         assertTrue("never above the 170dp cap", maxOf(dock.width.value, dock.height.value) <= 170f)
     }
 
@@ -138,9 +144,12 @@ class SettingsPreviewDockUiTest {
         assertEquals("aspect of the home", content.width.toFloat() / content.height, dock.width.value / dock.height.value, 0.03f)
         assertTrue("never above 170dp", maxOf(dock.width.value, dock.height.value) <= 170.5f)
         assertTrue("never below 72dp on its longest side", maxOf(dock.width.value, dock.height.value) >= 71.5f)
-        // SettingsSpace forces a left-to-right layout (line 190 of SettingsSpace.kt), so "end" is the right edge in every locale.
-        assertEquals("12dp from the right edge", content.width / d - 12f, dock.right.value, 1.5f)
-        assertEquals(64f, dock.top.value, 1.5f)
+        // Wave 39: the window (bar + picture) hangs from the default anchor, which mirrors with the locale: top-right, top-left in a right-to-left locale.
+        val bar = rule.onNodeWithTag(PreviewWindowTags.BAR).getUnclippedBoundsInRoot()
+        if (rtl == true) assertEquals("12dp from the left edge in RTL", 12f, bar.left.value, 1.5f)
+        else assertEquals("12dp from the right edge", content.width / d - 12f, bar.right.value, 1.5f)
+        assertEquals(64f, bar.top.value, 1.5f)
+        assertEquals(64f + PreviewWindowGeometry.BAR_DP, dock.top.value, 1.5f)
         assertTrue("inside the window", dock.bottom.value <= content.height / d && dock.left.value >= 0f)
         for (label in listOf("Labels under icons", "Badges")) {
             val row = rule.onNodeWithText(label).getUnclippedBoundsInRoot()
@@ -158,7 +167,7 @@ class SettingsPreviewDockUiTest {
     fun CFG_18_onASmallPhoneTheDockStaysLegibleAndClearOfTheRows() = assertFrameForThisWindow()
 
     @Test @Config(sdk = [34], qualifiers = "ldrtl-w411dp-h891dp-port-xhdpi")
-    fun CFG_18_inARightToLeftLayoutGroundControlStaysLeftToRightSoTheDockStaysOnTheRightEdge() = assertFrameForThisWindow()
+    fun CFG_18_inARightToLeftLocaleTheDefaultAnchorMirrorsToTheLeftEdge() { rtl = true; assertFrameForThisWindow() }
 
     @Test fun CFG_18_theDockIsOneLabelledImageNodeForScreenReadersAndNeverMerged() {
         show()

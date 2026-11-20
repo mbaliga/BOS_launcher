@@ -93,7 +93,7 @@ class HomeUnifyFlowTest : TourBase() {
         openPageEditorFromEdit()
         rule.onNodeWithContentDescription("Add to home: App 03").performClick(); settle()
         assertTrue("the app is on page 1", key(3) in pageKeys()); val before = pageKeys().size
-        back(); assertFalse("Back leaves edit mode", editShown())
+        rule.onNodeWithTag("edit.done", useUnmergedTree = true).performClick(); settle(); assertFalse("Done leaves edit mode keeping the app", editShown()) // W47: Back in the page editor is Cancel (it would ask and undo the app)
         // a tile (the Files panel) from the quick sheet's "Widgets, folders and icons"
         backward(); assertTrue(glanceShown()); quickSheetOnGlance()
         quickGoTo("Widgets, folders and icons")

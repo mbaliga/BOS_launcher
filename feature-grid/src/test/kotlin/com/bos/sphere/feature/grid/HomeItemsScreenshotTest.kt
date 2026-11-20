@@ -71,7 +71,7 @@ class HomeItemsScreenshotTest {
     )
     private fun extras(resizing: String? = null) = HomeExtras(
         state, { k -> listOf(a1, a2).firstOrNull { it.key == k } }, { null },
-        widget = { _, m -> WidgetPlaceholder("Weather", {}, m) }, resizing = resizing,
+        widget = { _, m -> WidgetPlaceholder("Weather", {}, m) }, selection = EditSelectionState().also { s -> resizing?.let { s.select(it) } },
     )
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h300dp-port-xhdpi")

@@ -25,3 +25,6 @@ Owner feedback: "how the home and pages should look like while being edited as w
 
 ## Removed
 `WidgetResizeFrame` (3 handles of 28 dp, the Done pill) and the audit line pinning its "Resize handle" string. Tests updated: `WidgetEditHandleW24Test` (the badge on widgets and stacks became tap-to-select plus the Remove button), `InputW3UiTest` (a widget's Shift+arrow resizes through the rectangle path), `W4MotionAuditTest` (the accessibility pin points at `ItemEditor`).
+
+## Wave 47 (editIntegrate)
+The remove badge on icons, folders and tiles (kept here for the HOM-12 tests) is gone: the action bar is the remove path and the tests moved to it. `HomeExtras.resizing` and the Resize mode of the host are gone; Resize in the bar focuses the always-visible handles. The drag ghost of the handles and of an icon calls `EditGridState.update` so the page's dots brighten. See `editIntegrate.md`.

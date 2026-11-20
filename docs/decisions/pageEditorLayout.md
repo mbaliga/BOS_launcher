@@ -40,3 +40,6 @@ Unchanged behaviour (`editorDebt.md`): a tap selects the page, swings it in and 
 
 ## Where the code is
 `PageEditorGeometry.kt` (layout, reorder maths, swing), `PageEditorHost.kt` (the host, the top bar slot, the tabs and content column), `PageEditorStrip.kt` (new: the strip, cards, overflow menu, drag, keys, actions), `PageEditorTabs.kt` (text tabs, content, page identity), `EditCardWiring.kt` (reorder, swing start scale), `L10nW45pageEditorLayout.kt`.
+
+## Wave 47 (editIntegrate)
+`PageEditorHost(topBar = ...)` is filled with the edit chrome's own bar (`EditTopBar`, title "Editing pages"); the four pills (`HomeEditBar`) are deleted and `BOTTOM_BAR_DP` is 0 (no tray in the page editor). `LIVE_SCALE_WISH` is 0.45 so the live card is at least 0.45 of the window height on 411x891 (the content panel gives way first: about a fifth to a quarter of the window). Cancel, Back and Esc are Cancel; Done keeps. See `editIntegrate.md`.

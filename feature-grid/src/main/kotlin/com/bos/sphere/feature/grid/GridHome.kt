@@ -298,6 +298,8 @@ fun GridHome(
 
     // Wave 45: the selection belongs to edit mode and to an item that is still on a page; its Remove goes through the home's remove path.
     val removeNow by rememberUpdatedState(onRemoveItem)
+    val editGridRef = rememberUpdatedState(LocalEditGrid.current)
+    androidx.compose.runtime.SideEffect { ex?.selection?.moveActive = dragKey != null }
     androidx.compose.runtime.SideEffect { ex?.selection?.onRemove = { removeNow(it) } }
     LaunchedEffect(editMode, pages) {
         val sel = ex?.selection ?: return@LaunchedEffect
@@ -606,6 +608,14 @@ fun GridHome(
                                                     val now = android.os.SystemClock.uptimeMillis()
                                                     if (probe != null && probe.hitKey != dragKey) dropTracker.update(probe.hitKey, probe.dx, probe.dy, probe.cell, now) else dropTracker.reset()
                                                     ontoArmed = dropTracker.armedKey
+                                                    // W47: the page's grid dots brighten round the dragged item (a widget: the cells it would take), in the page grid's px.
+                                                    val gg = (PageGeometry.of(b?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, b?.keys?.size ?: 0, clampedCover(st.coverPos, tpNow, b)) as? PageGeometry.Grid)?.g
+                                                    if (gg != null) {
+                                                        val lc = dragPos - st.contentOffset
+                                                        val sp = dragKey?.let { k -> ex?.takeIf { it.isWidget(k) }?.spanOf(k) } ?: com.bos.sphere.core.catalog.WidgetSpan(1, 1)
+                                                        val hw = sp.cols * gg.pitchX / 2f; val hh = sp.rows * gg.pitchY / 2f
+                                                        editGridRef.value?.update(EdgeRect(lc.x - hw, lc.y - hh, lc.x + hw, lc.y + hh))
+                                                    }
                                                 }
                                                 val edge = EditCardGeometry.pageEdgeZoneDp(editNow).dp.toPx() // HOM-12: wider while the home is a scaled card
                                                 val (along, extent) = if (st.paging == PagingAxis.Horizontal) {
@@ -623,6 +633,7 @@ fun GridHome(
                                             }
                                         }
                                         edgeDir = 0
+                                        editGridRef.value?.clear()
                                         if (dragging) {
                                             val key = dragKey
                                             if (key != null) {
@@ -957,19 +968,17 @@ private fun PageView(
                         },
                 ) {
                     if (app != null) {
-                        if (editing) EditHandleBox(itemDp, app.label, { onRemove(itemKey) }) { BadgedAppIcon(app, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f)) }
-                        else BadgedAppIcon(app, itemDp, Modifier.size(itemDp))
+                        BadgedAppIcon(app, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
                         // Coverflow names only the focused card; the rest would just pile up their labels.
                         if (showLabels && (!cf || kotlin.math.abs(dCover) < 0.5f)) AppLabel(app.label, itemDp)
                     } else if (itemKey == HomeTiles.SETTINGS) {
-                        SettingsTile(itemDp, Modifier.size(itemDp))
+                        SettingsTile(itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
                         if (showLabels) AppLabel(L10n.tr("Settings"), itemDp)
                     } else if (extra != null) {
-                        if (editing) EditHandleBox(itemDp, extraLabel(itemKey, extra), { onRemove(itemKey) }) { ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f)) }
-                        else ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp))
+                        ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
                         if (showLabels && !cf) AppLabel(extraLabel(itemKey, extra), itemDp)
                     } else {
-                        ClockTile(itemDp, Modifier.size(itemDp))
+                        ClockTile(itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
                     }
                 }
                 }

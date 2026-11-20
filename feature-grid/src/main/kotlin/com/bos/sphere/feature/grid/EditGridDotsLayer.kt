@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -29,7 +30,7 @@ internal fun EditGridDotsLayer(g: GridGeometry, modifier: Modifier = Modifier) {
     val fade = remember { Animatable(0f) }
     LaunchedEffect(reduced) { fade.animateTo(1f, tween(if (reduced) 0 else EditChromeGeometry.HINT_FADE_MS)) }
     val corners = remember(g) { EditGridDots.corners(g) }
-    Box(modifier.fillMaxSize().testTag("edit.gridDots").clearAndSetSemantics { }) {
+    Box(modifier.fillMaxSize().testTag("edit.gridDots").clearAndSetSemantics { }.onGloballyPositioned { state?.layer = it }) {
         Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }) {
             val active = state?.active // read here: a drag redraws the dots, it never recomposes the page
             val r = EditChromeGeometry.DOT_DP.dp.toPx() / 2f

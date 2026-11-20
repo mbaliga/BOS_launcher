@@ -4,6 +4,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performScrollTo
@@ -100,8 +101,15 @@ class EditCardAppTest {
         val keys = LauncherStores.get(AppSmokeHarness.app).layout.layout.value.pages.flatMap { it.keys }
         assertEquals(listOf(AppSmokeHarness.appKey("Camera")), keys)
         assertTrue("the placed app leaves the carousel", rule.onAllNodesWithContentDescription("Add to home: Camera").fetchSemanticsNodes().isEmpty())
+        // W47: Back in the page editor is Cancel: something changed, so it asks first; Keep editing stays, Discard restores the snapshot and leaves.
         scenario!!.onActivity { it.onBackPressedDispatcher.onBackPressed() }; settle()
-        assertTrue("the carousel is gone after Back", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
+        assertTrue("Back asks because an app was placed", rule.onAllNodesWithText("Discard changes?").fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithText("Keep editing").performClick(); settle()
+        rule.onNodeWithContentDescription("Page carousel").assertIsDisplayed()
+        scenario!!.onActivity { it.onBackPressedDispatcher.onBackPressed() }; settle()
+        rule.onNodeWithText("Discard").performClick(); settle()
+        assertTrue("the carousel is gone after Back and Discard", rule.onAllNodesWithContentDescription("Page carousel").fetchSemanticsNodes().isEmpty())
+        assertTrue("the snapshot is back: nothing is placed", LauncherStores.get(AppSmokeHarness.app).layout.layout.value.pages.flatMap { it.keys }.isEmpty())
     }
 
     private fun pageKeys(stores: LauncherStores) = stores.layout.layout.value.pages.map { it.keys }

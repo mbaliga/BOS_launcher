@@ -245,43 +245,75 @@ fun HomeEditChrome(
         PageHairline(progress, page)
         // ---- top bar
         Column56(progress) {
-            Row(
-                Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)).height(EditChromeGeometry.TOP_BAR_DP.dp)
-                    .padding(horizontal = 4.dp).testTag(EditChromeTags.BAR)
-                    .semantics { isTraversalGroup = true; traversalIndex = -1f; paneTitle = L10n.tr("Edit toolbar") },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BarText(L10n.tr("Cancel"), EditChromeTags.CANCEL, cancel)
-                Text(
-                    title, color = HyleColors.InkBright, fontSize = EditChromeGeometry.TITLE_SP.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, maxLines = 1,
-                    modifier = Modifier.weight(1f).heightIn(min = EditChromeGeometry.BUTTON_DP.dp).wrapCentre()
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = L10n.tr("Open the page editor")) { onOpenPageEditor() }
-                        .testTag(EditChromeTags.TITLE).semantics { heading(); traversalIndex = -2f },
-                )
-                BarIcon(EditGlyphs.Undo, if (undoCount > 0) L10n.tr("Undo") + " ($undoCount)" else L10n.tr("Undo"), canUndo, EditChromeTags.UNDO, onUndo)
-                BarIcon(EditGlyphs.Redo, if (redoCount > 0) L10n.tr("Redo") + " ($redoCount)" else L10n.tr("Redo"), canRedo, EditChromeTags.REDO, onRedo)
-                Text(
-                    L10n.tr("Done"), color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp).heightIn(min = EditChromeGeometry.BUTTON_DP.dp).defaultMinSize(minWidth = 64.dp)
-                        .clip(RoundedCornerShape(50)).background(HyleColors.Violet.copy(alpha = 0.50f))
-                        .clickable(role = Role.Button) { doneNow() }.padding(horizontal = 20.dp).wrapCentre().testTag(EditChromeTags.DONE), // a clickable is focusable and takes Enter / D-pad centre itself
-                )
-            }
+            EditTopBar(
+                title = title, undoCount = undoCount, redoCount = redoCount, canUndo = canUndo, canRedo = canRedo,
+                onCancel = cancel, onUndo = onUndo, onRedo = onRedo, onDone = { doneNow() }, onTitleClick = onOpenPageEditor,
+            )
         }
         // ---- hint
         HintLine(showHint, touchSignal, reduced, progress)
         // ---- tray
         EditTray(progress, trayBottomDp, showAddPage, onApps, onWidgets, onFolders, onAddPage)
     }
-    if (state.confirming) {
-        ConfirmDialog(
-            title = L10n.tr("Discard changes?"),
-            text = L10n.tr("Everything you changed since you started editing is undone."),
-            confirm = L10n.tr("Discard"), dismiss = L10n.tr("Keep editing"),
-            onConfirm = { state.dismissConfirm(); onCancel() }, onDismiss = { state.dismissConfirm() },
-            destructive = true,
+    EditCancelDialog(state, onCancel)
+}
+
+/**
+ * W47 (editIntegrate): THE bar of every edit step: Cancel, the title, Undo, Redo and the one Done. The single-page edit mode ([HomeEditChrome]) and the page editor
+ * (in [PageEditorHost]'s top bar slot) draw the same bar; only the title differs ("Editing page N of M" / "Editing pages"). [onTitleClick] is null where the title
+ * opens nothing (the page editor is already open). [insets] adds the safe top and side insets (the page editor's slot is already below the status bar).
+ */
+@Composable
+fun EditTopBar(
+    title: String,
+    undoCount: Int,
+    redoCount: Int,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onCancel: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+    onTitleClick: (() -> Unit)? = null,
+    insets: Boolean = true,
+) {
+    Row(
+        modifier.fillMaxWidth().then(if (insets) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier)
+            .height(EditChromeGeometry.TOP_BAR_DP.dp)
+            .padding(horizontal = 4.dp).testTag(EditChromeTags.BAR)
+            .semantics { isTraversalGroup = true; traversalIndex = -1f; paneTitle = L10n.tr("Edit toolbar") },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BarText(L10n.tr("Cancel"), EditChromeTags.CANCEL, onCancel)
+        Text(
+            title, color = HyleColors.InkBright, fontSize = EditChromeGeometry.TITLE_SP.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, maxLines = 1,
+            modifier = Modifier.weight(1f).heightIn(min = EditChromeGeometry.BUTTON_DP.dp).wrapCentre()
+                .then(if (onTitleClick != null) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = L10n.tr("Open the page editor")) { onTitleClick() } else Modifier)
+                .testTag(EditChromeTags.TITLE).semantics { heading(); traversalIndex = -2f },
+        )
+        BarIcon(EditGlyphs.Undo, if (undoCount > 0) L10n.tr("Undo") + " ($undoCount)" else L10n.tr("Undo"), canUndo, EditChromeTags.UNDO, onUndo)
+        BarIcon(EditGlyphs.Redo, if (redoCount > 0) L10n.tr("Redo") + " ($redoCount)" else L10n.tr("Redo"), canRedo, EditChromeTags.REDO, onRedo)
+        Text(
+            L10n.tr("Done"), color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            modifier = Modifier.padding(start = 4.dp, end = 4.dp).heightIn(min = EditChromeGeometry.BUTTON_DP.dp).defaultMinSize(minWidth = 64.dp)
+                .clip(RoundedCornerShape(50)).background(HyleColors.Violet.copy(alpha = 0.50f))
+                .clickable(role = Role.Button) { onDone() }.padding(horizontal = 20.dp).wrapCentre().testTag(EditChromeTags.DONE), // a clickable is focusable and takes Enter / D-pad centre itself
         )
     }
+}
+
+/** The "Discard changes?" confirm of Cancel, Back and Esc: shown while [state] is confirming; Discard runs [onCancel]. Shared by the edit chrome and the page editor. */
+@Composable
+fun EditCancelDialog(state: HomeEditChromeState, onCancel: () -> Unit) {
+    if (!state.confirming) return
+    ConfirmDialog(
+        title = L10n.tr("Discard changes?"),
+        text = L10n.tr("Everything you changed since you started editing is undone."),
+        confirm = L10n.tr("Discard"), dismiss = L10n.tr("Keep editing"),
+        onConfirm = { state.dismissConfirm(); onCancel() }, onDismiss = { state.dismissConfirm() },
+        destructive = true,
+    )
 }
 
 /** A remembered speaker for screen readers: the host view's announcement (no accessibility service involved). */

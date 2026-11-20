@@ -103,6 +103,9 @@ fun EditCardOverlay(
     isLandscape: Boolean,
     focusAdd: Boolean,
     savePages: (List<HomePage>) -> Unit,
+    /** W47: the one edit bar (the home's chrome bar with the title "Editing pages") in the page editor's top slot, and what Esc does there (the Cancel rule). */
+    topBar: (@Composable () -> Unit)? = null,
+    onExit: () -> Unit = { homeEdit.exit() },
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -190,7 +193,7 @@ fun EditCardOverlay(
         onGroup = { homeItems.groupOpen = true },
         onPrefs = { f -> stores.prefs.update(f) },
         notice = notice, onNoticeDone = { notice = null },
-        focusAdd = focusAdd, onExit = { homeEdit.exit() },
+        focusAdd = focusAdd, onExit = onExit, topBar = topBar,
         modifier = modifier,
     )
 }

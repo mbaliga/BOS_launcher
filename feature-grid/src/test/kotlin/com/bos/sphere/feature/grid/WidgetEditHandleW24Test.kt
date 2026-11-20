@@ -54,7 +54,7 @@ class WidgetEditHandleW24Test {
     private val notes = ItemKeys.widget(9)
     private val stack = WidgetStacks.stackKey("s1")
 
-    private val sel = EditSelectionState()
+    private val sel = EditSelectionState().also { it.fallbackBar = false } // W47: the item action bar is the one remove path
 
     private class Probe { val removed = mutableListOf<String>(); var widgetTouches = 0; var longPresses = 0 }
 
@@ -89,12 +89,13 @@ class WidgetEditHandleW24Test {
                 onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {}, onClockTap = {},
                 onTileLongPress = { _, _ -> }, extras = extras, editMode = edit, onRemoveItem = { probe.removed += it },
             )
+            if (edit) ItemActionLayer(sel, null, {}, null, onRemove = { probe.removed += it; sel.clear() }, onSettings = {}, label = { it })
         }
     }
 
     private fun settle() { rule.runOnUiThread { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }; rule.mainClock.advanceTimeBy(300) }
 
-    /** Wave 45 (editHandles): the in-widget remove badge is gone (it sat on the widget's content). A tap selects the widget; Remove is a 48 dp button beside the selection. */
+    /** Wave 45 (editHandles): the in-widget remove badge is gone (it sat on the widget's content). A tap selects the widget; Remove is the action bar's button (wave 47). */
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun HOM_12_aWidgetInEditModeIsSelectedByATapEvenWhenTheHostedViewSwallowsTouchesAndRemovedByTheRemoveButton() {
         rule.mainClock.autoAdvance = false
@@ -106,7 +107,7 @@ class WidgetEditHandleW24Test {
         settle()
         assertEquals(clock, sel.selectedKey)
         assertEquals("the edit-mode shield keeps the touch from the hosted view", 0, probe.widgetTouches)
-        rule.onNodeWithTag("selection-remove").performClick()
+        rule.onNodeWithTag(ItemBarTags.REMOVE).performClick()
         settle()
         assertEquals(listOf(clock), probe.removed)
         assertEquals("no menu opened", 0, probe.longPresses)
@@ -134,11 +135,11 @@ class WidgetEditHandleW24Test {
         rule.onNodeWithTag("hosted.$stack", useUnmergedTree = true).performTouchInput { click(center) }
         settle()
         assertEquals(stack, sel.selectedKey)
-        rule.onNodeWithTag("selection-remove").performClick()
+        rule.onNodeWithTag(ItemBarTags.REMOVE).performClick()
         settle()
         assertEquals("the stack key goes to the host, which removes every member", listOf(stack), probe.removed)
-        // the app beside them keeps its own handle
-        rule.onNodeWithContentDescription("Remove from home: Alpha", useUnmergedTree = true).assertExists()
+        // the app beside them has no remove badge (W47: the action bar replaced it)
+        rule.onNodeWithContentDescription("Remove from home: Alpha", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

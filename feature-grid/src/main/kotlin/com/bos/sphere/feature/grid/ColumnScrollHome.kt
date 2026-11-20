@@ -23,6 +23,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
@@ -31,6 +33,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -73,7 +76,6 @@ fun ColumnScrollHome(
     iconScale: Float = 1f,
     showLabels: Boolean = true,
     editing: Boolean = false,
-    onRemove: (String) -> Unit = {},
     gestures: HomeGestureSpec? = null,
     /** Reports the layout (rows and columns) for tests and the add flow. */
     onLayout: (ColumnFill.Layout) -> Unit = {},
@@ -132,6 +134,8 @@ fun ColumnScrollHome(
                 val row = kotlin.math.floor((p.y / density.density - topBand.value) / cell).toInt()
                 logicalX < sidePad.value || row < 0 || row >= metrics.rows || ColumnFill.keyAt(layout, col, row) == null
             }
+            // W47: the live region that tells a screen reader what an edit did (the page grid has its own overlay; this surface had none)
+            if (editing) extras?.selection?.let { EditSelectionOverlay(it, showBar = false) }
             Box(Modifier.fillMaxSize().homeGestures(gestures, isEmptyAt).horizontalScroll(scroll)) {
                 Box(Modifier.width(contentW.dp).fillMaxHeight()) {
                     for (c in layout.cells) {
@@ -141,10 +145,12 @@ fun ColumnScrollHome(
                         key(c.key) {
                             Box(
                                 Modifier.offset { IntOffset((left * density.density).roundToInt(), (top * density.density).roundToInt()) }
-                                    .size(itemW.dp, (c.span.rows * cell).dp).testTag("scroll.cell.${c.key}"),
+                                    .size(itemW.dp, (c.span.rows * cell).dp).testTag("scroll.cell.${c.key}")
+                                    .then(if (editing) Modifier.childrenOutOfBounds() else Modifier) // W47: the selected widget's handles reach past its cell
+                                    .zIndex(if (editing && extras?.isSelected(c.key) == true) 10f else 0f), // and sit above the cell next to it
                                 contentAlignment = Alignment.Center,
                             ) {
-                                ScrollCellContent(c.key, c.span, cell.dp, iconScale, showLabels, appsByKey[c.key], extras, editing, onLaunch, onAppLongPress, { onRemove(c.key) })
+                                ScrollCellContent(c.key, c.span, cell.dp, iconScale, showLabels, appsByKey[c.key], extras, editing, onLaunch, onAppLongPress)
                             }
                         }
                     }
@@ -158,7 +164,7 @@ fun ColumnScrollHome(
 @Composable
 private fun ScrollCellContent(
     key: String, span: WidgetSpan, cell: Dp, iconScale: Float, showLabels: Boolean, app: AppEntry?, extras: HomeExtras?, editing: Boolean,
-    onLaunch: (AppEntry) -> Unit, onAppLongPress: (AppEntry) -> Unit, onRemove: () -> Unit,
+    onLaunch: (AppEntry) -> Unit, onAppLongPress: (AppEntry) -> Unit,
 ) {
     val extra = extras?.takeIf { it.owns(key) }
     if (extra != null && extra.isWidget(key)) {
@@ -166,14 +172,18 @@ private fun ScrollCellContent(
         val inset = cell * 0.04f
         val px = androidx.compose.ui.platform.LocalDensity.current.density
         Box(Modifier.fillMaxSize().padding(inset).childrenOutOfBounds()) {
-            HomeWidgetCell(key, extra, cell.value * px, cell.value * px, Modifier.fillMaxSize().launcherItem("scroll.$key", onMenu = { extra.onLongPress(key) }), editing = editing)
-            if (editing) EditHandleBox(cell * span.cols, extraLabel(key, extra), onRemove) {}
+            // W47: in edit mode a tap selects the widget (its frame brings the handles), a long press does the same through the host's selection; the action bar has Remove.
+            val select = if (editing) Modifier.combinedClickable(onClick = { extra.selection.toggle(key) }, onLongClick = { extra.onLongPress(key) }) else Modifier
+            HomeWidgetCell(key, extra, cell.value * px, cell.value * px, Modifier.fillMaxSize().launcherItem("scroll.$key", onMenu = { extra.onLongPress(key) }).then(select), editing = editing)
         }
         return
     }
     val icon = cell * 0.62f * iconScale.coerceIn(0.5f, 1.3f)
     val label = app?.label ?: extra?.let { extraLabel(key, it) } ?: if (key == HomeTiles.SETTINGS) L10n.tr("Settings") else L10n.tr("Clock")
-    val activate: () -> Unit = { if (app != null) onLaunch(app) else if (extra != null) extra.onTap(key) }
+    val selection = extras?.selection
+    val selectedNow = editing && selection?.isSelected(key) == true
+    // W47: in edit mode a tap selects the item (again: deselects) instead of opening it; the action bar (Resize, Remove, Settings) is the one remove path.
+    val activate: () -> Unit = { if (editing && selection != null) selection.toggle(key) else if (app != null) onLaunch(app) else if (extra != null) extra.onTap(key) }
     val menu: () -> Unit = { if (app != null) onAppLongPress(app) else if (extra != null) extra.onLongPress(key) }
     Column(
         Modifier.fillMaxSize()
@@ -182,15 +192,14 @@ private fun ScrollCellContent(
             .combinedClickable(onClick = activate, onLongClick = menu),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
-        val face: @Composable () -> Unit = {
-            when {
-                app != null -> BadgedAppIcon(app, icon, Modifier.size(icon))
-                key == HomeTiles.SETTINGS -> SettingsTile(icon, Modifier.size(icon))
-                extra != null -> ExtraItemFace(key, extra, icon, Modifier.size(icon))
-                else -> ClockTile(icon, Modifier.size(icon))
-            }
+        val mark = Modifier.size(icon).selectionOutline(selectedNow, icon * 0.22f)
+            .then(if (selectedNow && selection != null) Modifier.onGloballyPositioned { selection.report(key, it.boundsInRoot()) } else Modifier)
+        when {
+            app != null -> BadgedAppIcon(app, icon, mark)
+            key == HomeTiles.SETTINGS -> SettingsTile(icon, mark)
+            extra != null -> ExtraItemFace(key, extra, icon, mark)
+            else -> ClockTile(icon, mark)
         }
-        if (editing && (app != null || extra != null)) EditHandleBox(icon, label, onRemove) { face() } else face()
         if (showLabels) AppLabel(label, icon)
     }
 }

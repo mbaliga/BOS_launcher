@@ -30,8 +30,8 @@ class EditChromeW45AuditTest {
     }
 
     @Test fun HOM_12_theOldFloatingPillsAndTheToastLikeHintAreGone() {
-        val bar = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditBar.kt")
-        assertFalse(bar.contains("Editing home: drag items to rearrange"))
+        assertFalse("W47: the four-pill bar is deleted, the page editor uses the one edit bar", Repo.file("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditBar.kt").exists())
+        assertFalse(text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditChrome.kt").contains("Editing home: drag items to rearrange"))
         assertFalse("no toast for the hint", text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditChrome.kt").contains("Toast"))
         assertTrue("the single-page chrome replaces the pill bar outside the page editor", home.contains("HomeEditChrome("))
     }

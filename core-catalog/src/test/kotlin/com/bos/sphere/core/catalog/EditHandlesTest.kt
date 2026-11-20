@@ -247,3 +247,29 @@ class EditHandlesTest {
         assertFalse(r.ok); assertEquals(CellEdit.Reason.Blocked, r.reason)
     }
 }
+
+/** W47 (editIntegrate), HOM-07: a size preset of the item sheet stays inside the provider's limits. */
+class PresetClampW47Test {
+    private val limits = CellLimits(minCols = 2, maxCols = 3, minRows = 1, maxRows = 2, horizontal = true, vertical = true)
+
+    @Test fun HOM_07_preset_inside_the_limits_is_kept() {
+        val r = PresetClamp.clamp(limits, 2, 2)
+        assertEquals(2, r.cols); assertEquals(2, r.rows); assertFalse(r.clamped)
+    }
+
+    @Test fun HOM_07_preset_beyond_the_maximum_is_clamped_and_says_so() {
+        val r = PresetClamp.clamp(limits, 4, 2)
+        assertEquals(3, r.cols); assertEquals(2, r.rows); assertTrue(r.clamped)
+    }
+
+    @Test fun HOM_07_preset_below_the_minimum_is_clamped_up() {
+        val r = PresetClamp.clamp(limits, 1, 1)
+        assertEquals(2, r.cols); assertEquals(1, r.rows); assertTrue(r.clamped)
+    }
+
+    @Test fun HOM_07_single_axis_provider_keeps_its_other_axis() {
+        val single = CellLimits(minCols = 2, maxCols = 2, minRows = 1, maxRows = 4, horizontal = false, vertical = true)
+        val r = PresetClamp.clamp(single, 4, 2)
+        assertEquals(2, r.cols); assertEquals(2, r.rows); assertTrue(r.clamped)
+    }
+}

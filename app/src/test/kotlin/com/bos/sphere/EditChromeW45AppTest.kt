@@ -7,6 +7,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import com.bos.sphere.core.data.EditChromeStore
 import com.bos.sphere.core.data.HomeLayout
 import com.bos.sphere.core.data.HomePage
@@ -43,6 +47,12 @@ class EditChromeW45AppTest : TourBase() {
         AppSmokeHarness.app.getSharedPreferences("liftoff_misc", android.content.Context.MODE_PRIVATE).edit().putBoolean("defaultHomeSeeded", true).commit()
         stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(key(0), key(1)), id = 7L), HomePage(keys = listOf(key(2)), id = 8L)), seeded = true))
         launch()
+    }
+
+    /** W47: the remove badge is gone; an icon is selected (long press) and the action bar's Remove takes it away. */
+    private fun removeViaBar(label: String) {
+        rule.onAllNodesWithContentDescription(label, useUnmergedTree = true).onFirst().performTouchInput { longClick(center) }; settle(400)
+        rule.onNodeWithTag("item-bar.remove", useUnmergedTree = true).performClick(); settle()
     }
 
     private fun enterEdit() {
@@ -93,7 +103,7 @@ class EditChromeW45AppTest : TourBase() {
         start()
         val before = pages()
         enterEdit()
-        rule.onNodeWithContentDescription("Remove from home: App 00", useUnmergedTree = true).performClick(); settle()
+        removeViaBar("App 00")
         assertTrue("the removal happened", key(0) !in pages().flatten())
         rule.onNodeWithTag("edit.cancel", useUnmergedTree = true).performClick(); settle()
         assertTrue("Cancel asks when something changed", textShown("Discard changes?")); assertTrue(tagShown("edit.bar"))
@@ -105,7 +115,7 @@ class EditChromeW45AppTest : TourBase() {
         assertEquals("the snapshot taken on entry is back", before, pages())
         // and Done keeps
         enterEdit()
-        rule.onNodeWithContentDescription("Remove from home: App 00", useUnmergedTree = true).performClick(); settle()
+        removeViaBar("App 00")
         rule.onNodeWithTag("edit.done", useUnmergedTree = true).performClick(); settle()
         assertFalse(tagShown("edit.bar")); assertTrue("Done commits", key(0) !in pages().flatten())
     }
@@ -114,7 +124,7 @@ class EditChromeW45AppTest : TourBase() {
         start(); enterEdit()
         back(); assertFalse("nothing changed: Back leaves at once", tagShown("edit.bar"))
         enterEdit()
-        rule.onNodeWithContentDescription("Remove from home: App 00", useUnmergedTree = true).performClick(); settle()
+        removeViaBar("App 00")
         back(); assertTrue("changed: Back asks", textShown("Discard changes?")); assertTrue(tagShown("edit.bar"))
         rule.onNodeWithText("Discard").performClick(); settle()
         assertFalse(tagShown("edit.bar")); assertTrue("restored", key(0) in pages().flatten())
@@ -148,7 +158,10 @@ class EditChromeW45AppTest : TourBase() {
     @Test fun HOM_12_theTitleOpensThePageEditorAndTheOldBarComesBack() {
         start(); enterEdit()
         openPageEditorFromEdit()
-        assertTrue(descShown("Page carousel")); assertFalse("the single-page bar steps aside", tagShown("edit.bar"))
-        assertTrue("the page editor's own Done", textShown("Done"))
+        assertTrue(descShown("Page carousel"))
+        assertTrue("the page editor has the same bar with its own title", tagShown("edit.bar") && textShown("Editing pages"))
+        assertFalse("the single-page title is gone", textShown("Editing page 1 of 2"))
+        assertFalse("and so is the tray", tagShown("edit.tray"))
+        assertEquals("one Done", 1, rule.onAllNodesWithText("Done", useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 }

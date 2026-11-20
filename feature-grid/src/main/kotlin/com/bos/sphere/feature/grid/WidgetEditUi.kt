@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -247,8 +248,24 @@ fun SelectedWidgetFrame(
         }
     }
 
+    // W47: the dots of the page grid brighten round the ghost while a handle is dragged (EditGridState, in the page grid's own px), and are put back on release.
+    val editGrid = LocalEditGrid.current
+    var frameCoords by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+    LaunchedEffect(editGrid) {
+        snapshotFlow { preview?.let { ghostEdges(it, boxSize.width.toFloat(), boxSize.height.toFloat()) } }.collect { g ->
+            val grid = editGrid ?: return@collect
+            val fc = frameCoords; val layer = grid.layer
+            if (g == null || fc == null || layer == null || !fc.isAttached || !layer.isAttached) { grid.clear(); return@collect }
+            val tl = layer.localPositionOf(fc, Offset(g.l, g.t)); val br = layer.localPositionOf(fc, Offset(g.r, g.b))
+            grid.update(EdgeRect(min(tl.x, br.x), min(tl.y, br.y), max(tl.x, br.x), max(tl.y, br.y)))
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(editGrid) { onDispose { editGrid?.clear() } }
+    LaunchedEffect(Unit) { snapshotFlow { active != null }.collect { extrasNow.selection.resizeActive = it } } // the action bar hides while a handle is dragged
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { extrasNow.selection.resizeActive = false } }
+
     val fr = remember { FocusRequester() }
-    LaunchedEffect(key) { runCatching { fr.requestFocus() } }
+    LaunchedEffect(key, extras.selection.resizeFocus) { runCatching { fr.requestFocus() } } // also when the action bar's Resize asks for the handles
 
     fun editor() = ItemEditor(key, extrasNow, ctxNow.pageKeys.ifEmpty { listOf(key) }, ctxNow.pageIndex, ctxNow.gridCols, ctxNow.gridRows, ctxNow.mirror, ctxNow.originMoves, ctxNow.onRemove)
 
@@ -256,7 +273,7 @@ fun SelectedWidgetFrame(
         modifier
             .childrenOutOfBounds()
             .onSizeChanged { boxSize = it }
-            .onGloballyPositioned { extrasNow.selection.report(key, it.boundsInRoot()) }
+            .onGloballyPositioned { frameCoords = it; extrasNow.selection.report(key, it.boundsInRoot()) }
             .semantics { selected = true }
             .focusRequester(fr)
             .onKeyEvent { e ->
@@ -324,7 +341,8 @@ fun SelectedWidgetFrame(
                         val r = (EditChrome.WidgetRadius).toPx()
                         drawRoundRect(col.copy(alpha = 0.15f), cornerRadius = CornerRadius(r))
                         drawRoundRect(col, cornerRadius = CornerRadius(r), style = Stroke(EditChrome.GhostStroke.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 6.dp.toPx()))))
-                        // Grid dots at the cell corners within one cell of the ghost.
+                        // Grid dots at the cell corners within one cell of the ghost: only where the page has no grid dots of its own (W47: the page's dots brighten instead, see EditGridState).
+                        if (editGrid?.layer != null) return@drawBehind
                         val c = ctxNow
                         val x0 = -padX; val y0 = -padY
                         val cw = size.width + 2 * padX; val ch = size.height + 2 * padY
@@ -370,7 +388,8 @@ fun SelectedWidgetFrame(
                                 val ev = awaitPointerEvent()
                                 val c = ev.changes.firstOrNull { it.id == down.id } ?: break
                                 if (!c.pressed) { c.consume(); release(); return@awaitEachGesture }
-                                val d = c.positionChange()
+                                // The raw change, not positionChange(): that one reads zero once an ancestor (the scroll surface's gestures) has consumed the move.
+                                val d = c.position - c.previousPosition
                                 c.consume()
                                 dx += d.x; dy += d.y
                                 val pv = previewOf(handle, dx, dy)

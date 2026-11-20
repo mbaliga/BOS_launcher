@@ -91,6 +91,8 @@ class HomeItems internal constructor(
     private val allApps: () -> List<AppEntry>,
     private val appsByKey: () -> Map<String, AppEntry>,
     private val launchApp: (AppEntry) -> Unit,
+    /** Wave 45 (editHandles), shared in wave 47: THE selection of home edit mode (id, type, bounds): the handles, the outline, the keyboard and the item action bar all read it. */
+    val selection: com.bos.sphere.feature.grid.EditSelectionState = com.bos.sphere.feature.grid.EditSelectionState(),
 ) : HomeEditHooks {
     /** The latest extras (set on every composition by [rememberHomeItems]). */
     var extrasState: HomeState = HomeState()
@@ -100,9 +102,6 @@ class HomeItems internal constructor(
     internal var sheetOpen by mutableStateOf(false)
     internal var openFolder by mutableStateOf<String?>(null)
     internal var itemMenu by mutableStateOf<String?>(null)
-    internal var resizing by mutableStateOf<String?>(null)
-    /** Wave 45 (editHandles): THE selection of home edit mode (id, type, bounds; the item action bar builds on it). */
-    val selection = com.bos.sphere.feature.grid.EditSelectionState()
     internal var linkOpen by mutableStateOf(false)
     internal var shortcutOpen by mutableStateOf(false)
     internal var packOpen by mutableStateOf(false)
@@ -338,7 +337,8 @@ class HomeItems internal constructor(
     /** Set by the home in edit mode: a long press on a non-app item selects it (returns true) instead of opening the old popup menu. */
     var selectHook: ((String) -> Boolean)? = null
     fun openItem(key: String) = tap(key)
-    fun startResize(key: String) { resizing = key }
+    /** The action bar's Resize: the handles of a selected widget are always shown; this focuses them and says so. */
+    fun startResize(key: String) { selection.select(key); selection.focusResize() }
     fun canReconfigure(key: String): Boolean = ItemKeys.widgetId(key)?.let { host.providerInfo(it)?.configure != null } == true && WidgetStacks.stackAt(extrasState, key) == null
     fun reconfigureItem(key: String) = reconfigure(key)
     fun resizeTo(key: String, cols: Int, rows: Int) {
@@ -347,6 +347,11 @@ class HomeItems internal constructor(
         edit { HomeEdit.resizeWidget(it, key, cols - cur.cols, rows - cur.rows, max = com.bos.sphere.core.catalog.WidgetSpan(gc, gr), gridCols = gc, gridRows = gr) }
     }
     fun gridSize(): Pair<Int, Int> = gridDims()
+    /** W47: the provider's resize limits in cells (the handles' limits), for the sheet's size presets; null: free within the grid. */
+    fun widgetLimits(key: String): com.bos.sphere.core.catalog.CellLimits {
+        val (gc, gr) = gridDims()
+        return com.bos.sphere.core.catalog.ProviderLimitsMath.toCells(providerLimits(key), selection.pitchDpX, selection.pitchDpY, gc, gr, extrasState.spanOf(key))
+    }
     fun dissolveFolder(key: String) { ItemKeys.folderId(key)?.let { id -> edit { HomeEdit.dissolve(it, id) } } }
     fun editFolder(key: String) { openFolder = ItemKeys.folderId(key) }
     fun labelOf(key: String): String = extrasState.items[key]?.label ?: extrasState.folders[ItemKeys.folderId(key)]?.name ?: key
@@ -525,12 +530,6 @@ class HomeItems internal constructor(
             ) { member -> HostedBody(member, Modifier.fillMaxSize()) }
             else HostedBody(key, modifier)
         },
-        resizing = resizing,
-        onResize = { key, dc, dr ->
-            val (cols, rows) = gridDims()
-            edit { HomeEdit.resizeWidget(it, key, dc, dr, max = com.bos.sphere.core.catalog.WidgetSpan(cols, rows), gridCols = cols, gridRows = rows) }
-        },
-        onResizeDone = { resizing = null },
         selection = selection,
         limitsOf = ::providerLimits,
         gridDims = gridDims,
@@ -720,6 +719,7 @@ fun rememberHomeItems(
     launchApp: (AppEntry) -> Unit,
     accentArgb: Int,
     gridDims: () -> Pair<Int, Int>,
+    selection: com.bos.sphere.feature.grid.EditSelectionState = remember { com.bos.sphere.feature.grid.EditSelectionState() },
 ): HomeItems {
     val context = LocalContext.current
     val state by store.state.collectAsStateWithLifecycle()
@@ -731,7 +731,7 @@ fun rememberHomeItems(
     val byKey by rememberUpdatedState(appsByKey)
     val launch by rememberUpdatedState(launchApp)
     val dims by rememberUpdatedState(gridDims)
-    val items = remember { HomeItems(context, store, { dims() }, { pagesNow }, { save(it) }, { cap(it) }, { cur() }, host, { all }, { byKey }, { launch(it) }) }
+    val items = remember { HomeItems(context, store, { dims() }, { pagesNow }, { save(it) }, { cap(it) }, { cur() }, host, { all }, { byKey }, { launch(it) }, selection) }
     items.extrasState = state
     // WSP-05: keep the group tiles in step with the dock panel's groups.
     val groupManager = remember { com.bos.sphere.feature.dock.WorkspaceRepository.get(context) }

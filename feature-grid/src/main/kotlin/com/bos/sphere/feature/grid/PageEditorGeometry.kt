@@ -27,10 +27,10 @@ object PageEditorGeometry {
     /** The slot the edit chrome's top bar (w45-editChrome) fills, below the status bar inset. */
     const val TOP_BAR_DP = 56f
     /**
-     * The room the edit chrome's bottom tray / the page editor's own bar takes at the foot of the window. INTEGRATION POINT: until the chrome's top bar replaces
-     * the bar's four pills this stays at the pills' height; set it to 0 when they are gone and the live card grows by that much.
+     * The room taken at the foot of the window. W47: 0. The page editor has the one edit bar at the top (the four old pills are deleted) and shows no tray (its tabs
+     * already hold Apps, Widgets and Folders; the "New page" card replaces "+ Page"), so the live card reaches its designed size.
      */
-    const val BOTTOM_BAR_DP = 68f
+    const val BOTTOM_BAR_DP = 0f
     const val TAB_ROW_DP = 48f
     /** The tab row grows with the font scale up to this factor (the tabs scroll sideways beyond it). */
     const val TAB_FONT_MAX = 1.5f
@@ -40,7 +40,7 @@ object PageEditorGeometry {
     const val CONTENT_FLOOR_DP = 80f
     const val LIVE_SCALE_MAX = 0.88f
     /** The live card should not drop below this share of the window (the content panel gives way first), unless the window is tiny. */
-    const val LIVE_SCALE_WISH = 0.38f
+    const val LIVE_SCALE_WISH = 0.45f
     const val LIVE_SCALE_FLOOR = 0.2f
     const val SIDE_MIN_DP = 600f
     const val SIDE_LIVE_SHARE = 0.45f

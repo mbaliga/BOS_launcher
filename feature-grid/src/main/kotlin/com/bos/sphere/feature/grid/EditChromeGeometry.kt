@@ -43,6 +43,13 @@ object EditChromeGeometry {
     /** The bottom of the top bar in window px: the safe top inset plus 56 dp. */
     fun barBottomPx(safeTopPx: Float, density: Float): Float = safeTopPx + TOP_BAR_DP * density
 
+    /**
+     * W47 (editIntegrate): the room the item action bar must leave to the chrome, in dp, as (top, bottom): the top bar (the safe inset plus 56 dp) and the hint line
+     * under it while it shows, and the tray (72 dp above [trayBottomDp], the dock's or the page dots' room). [tray] false (the page editor, which has no tray) leaves only the safe top.
+     */
+    fun actionBarReserveDp(safeTopDp: Float, hint: Boolean, trayBottomDp: Float, tray: Boolean = true): Pair<Float, Float> =
+        (safeTopDp + TOP_BAR_DP + if (hint) HINT_DP else 0f) to (if (tray) trayBottomDp + TRAY_DP else 0f)
+
     /** The top of the tray in window px, when its bottom edge is [bottomOffsetPx] above the window's bottom (the safe inset, or the dock's top). */
     fun trayTopPx(heightPx: Float, bottomOffsetPx: Float, density: Float): Float = heightPx - bottomOffsetPx - TRAY_DP * density
 
@@ -107,6 +114,9 @@ class EditGridState {
         private set
     fun update(rect: EdgeRect?) { active = rect }
     fun clear() { active = null }
+
+    /** W47: the dots layer's own coordinates (set by the layer), so a ghost can convert its box to the page grid's px whatever the page's scale. */
+    @Volatile var layer: androidx.compose.ui.layout.LayoutCoordinates? = null
 }
 
 /** The grid state of the page being edited; null outside edit mode (no dots). Provided by the home screen. */

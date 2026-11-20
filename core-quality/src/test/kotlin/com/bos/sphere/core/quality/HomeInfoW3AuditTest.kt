@@ -13,7 +13,7 @@ class HomeInfoW3AuditTest {
         state,
         "core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/AppPresentation.kt",
         "core-catalog/src/main/kotlin/com/bos/sphere/core/catalog/HomePanelModel.kt",
-        "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditHandle.kt",
+        "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditChrome.kt",
         panels,
     )
 
@@ -40,7 +40,7 @@ class HomeInfoW3AuditTest {
     }
 
     @Test fun HOM_12_editModeUsesNoSystemGestureExclusionAndNoLegacyBack() {
-        val s = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/GridHome.kt") + text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditHandle.kt")
+        val s = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/GridHome.kt") + text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/HomeEditChrome.kt")
         assertFalse(s.contains("systemGestureExclusion"))
         assertFalse(s.contains("onBackPressed"))
     }

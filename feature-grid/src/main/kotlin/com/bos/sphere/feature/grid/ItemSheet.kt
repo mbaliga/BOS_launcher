@@ -4,7 +4,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.focusable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bos.sphere.core.catalog.CellLimits
+import com.bos.sphere.core.catalog.PresetClamp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.Box
@@ -36,10 +46,13 @@ class ItemSheetActions(
     val gridCols: Int = 4,
     val gridRows: Int = 6,
     val onWidgetSize: (cols: Int, rows: Int) -> Unit = { _, _ -> },
+    /** W47: the provider's resize limits in cells (null: free within the grid). A preset outside them is clamped, buzzes and shows a note. */
+    val widgetLimits: CellLimits? = null,
 )
 
 object ItemSheetTags {
     const val SHEET = "item-sheet"
+    const val PRESET_NOTE = "item-sheet.presetNote"
     fun row(o: SheetOption) = "item-sheet.${o.name}"
 }
 
@@ -90,7 +103,22 @@ private fun Row(o: SheetOption, clock: ClockTileOptions, a: ItemSheetActions, cl
         SheetOption.WidgetReconfigure -> item("Reconfigure", Glyphs.Sliders, summary = "Opens the widget's own settings", chevron = true, run = a.onReconfigure)()
         SheetOption.WidgetSize -> {
             val presets = WidgetSizePresets.forGrid(a.gridCols, a.gridRows)
-            Box(tag) { OneUiSegmentedRow(L10n.tr("Size"), presets.map { WidgetSizePresets.label(it) }, presets.indexOf(a.widgetSpan), { i -> presets[i].let { a.onWidgetSize(it.first, it.second) } }) }
+            val haptics = rememberLauncherHaptics()
+            var unavailable by remember { mutableStateOf(false) }
+            Column(tag) {
+                OneUiSegmentedRow(L10n.tr("Size"), presets.map { WidgetSizePresets.label(it) }, presets.indexOf(a.widgetSpan), { i ->
+                    val (c, r) = presets[i]
+                    val limits = a.widgetLimits
+                    val res = if (limits == null) null else PresetClamp.clamp(limits, c, r)
+                    if (res != null && res.clamped) {
+                        // W47: the provider's limits are the handles' limits too; outside them the preset clamps, buzzes and says so.
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        unavailable = true
+                        if (res.cols to res.rows != a.widgetSpan) a.onWidgetSize(res.cols, res.rows)
+                    } else { unavailable = false; a.onWidgetSize(c, r) }
+                })
+                if (unavailable) Text(L10n.tr("Not available for this widget"), color = Color(0xFFE5484D), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp).testTag(ItemSheetTags.PRESET_NOTE))
+            }
         }
         SheetOption.OpenItem -> item("Open", Glyphs.Apps, run = a.onOpen)()
     }

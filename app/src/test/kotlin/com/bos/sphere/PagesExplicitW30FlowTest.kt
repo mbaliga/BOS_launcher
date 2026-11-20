@@ -103,7 +103,7 @@ class PagesExplicitW30FlowTest : TourBase() {
         rule.onNodeWithContentDescription("Add to home: App 03").performClick(); settle()
         assertEquals(listOf(key(3)), pages()[0].keys); assertTrue(pages()[1].keys.isEmpty())
         shoot("w30-edit-page1-one-app")
-        back()
+        rule.onNodeWithTag("edit.done", useUnmergedTree = true).performClick(); settle() // W47: Back in the page editor is Cancel (asks, undoes); Done keeps the app
         toGlance(); openQuickSheet()
         quickGoTo("Widgets, folders and icons")
         rule.onNodeWithText("Files panel").performClick(); settle()

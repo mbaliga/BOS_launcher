@@ -88,8 +88,8 @@ class ItemEditUiTest {
     private val itemBounds = Rect(300f, 500f, 480f, 680f)
 
     /** A page with a few fake tiles, the action layer, and (optionally) the sheet rows as the sheet would hold them. */
-    private fun host(key: String, bounds: Rect? = itemBounds, withNotice: Boolean = false, content: @androidx.compose.runtime.Composable () -> Unit = {}): HomeItemSelection {
-        val sel = HomeItemSelection()
+    private fun host(key: String, bounds: Rect? = itemBounds, withNotice: Boolean = false, content: @androidx.compose.runtime.Composable () -> Unit = {}): EditSelectionState {
+        val sel = EditSelectionState()
         var notice by mutableStateOf<RemovedNotice?>(null)
         rule.setContent {
             Box(Modifier.fillMaxSize().background(Color(0xFF0A0B12))) {
@@ -103,7 +103,7 @@ class ItemEditUiTest {
                 )
             }
         }
-        rule.runOnUiThread { sel.select(key, bounds) }
+        rule.runOnUiThread { sel.select(key); bounds?.let { sel.report(key, it) } }
         rule.waitForIdle()
         return sel
     }
@@ -178,6 +178,29 @@ class ItemEditUiTest {
         rule.mainClock.advanceTimeBy(1500); rule.waitForIdle()
     }
 
+    @Test fun HOM_07_w47_aSizePresetOutsideTheProviderLimitsIsClampedAndTheSheetSaysSo() {
+        val applied = mutableListOf<Pair<Int, Int>>()
+        val limits = com.bos.sphere.core.catalog.CellLimits(minCols = 1, maxCols = 2, minRows = 1, maxRows = 2, horizontal = true, vertical = true)
+        sheet(SheetKind.Widget, caps = SheetCaps(), actions = ItemSheetActions(widgetSpan = 2 to 1, gridCols = 4, gridRows = 6, widgetLimits = limits, onWidgetSize = { c, r -> applied += c to r }))
+        rule.onNodeWithTag(ItemSheetTags.PRESET_NOTE).assertDoesNotExist()
+        rule.onNodeWithText("2 × 2").performClick(); rule.waitForIdle()
+        assertEquals("inside the limits: applied as asked", listOf(2 to 2), applied)
+        rule.onNodeWithTag(ItemSheetTags.PRESET_NOTE).assertDoesNotExist()
+        rule.onNodeWithText("4 × 2").performClick(); rule.waitForIdle()
+        assertEquals("outside: clamped to the provider's maximum, never past it", listOf(2 to 2, 2 to 2), applied)
+        rule.onNodeWithTag(ItemSheetTags.PRESET_NOTE).assertExists()
+        rule.onNodeWithText("Not available for this widget").assertExists()
+    }
+
+    @Test fun HOM_07_w47_aPresetThatClampsToTheCurrentSizeChangesNothing() {
+        val applied = mutableListOf<Pair<Int, Int>>()
+        val limits = com.bos.sphere.core.catalog.CellLimits(minCols = 2, maxCols = 2, minRows = 1, maxRows = 1, horizontal = false, vertical = false)
+        sheet(SheetKind.Widget, actions = ItemSheetActions(widgetSpan = 2 to 1, gridCols = 4, gridRows = 6, widgetLimits = limits, onWidgetSize = { c, r -> applied += c to r }))
+        rule.onNodeWithText("4 × 2").performClick(); rule.waitForIdle()
+        assertTrue("a widget that cannot resize stays as it is", applied.isEmpty())
+        rule.onNodeWithTag(ItemSheetTags.PRESET_NOTE).assertExists()
+    }
+
     @Test fun HOM_12_sheet_10_theClockSheetChangesTheTile() {
         var clock by mutableStateOf(ClockTileOptions())
         rule.setContent {
@@ -243,7 +266,7 @@ class ItemEditUiTest {
 
     @Test fun HOM_12_shot_01_clockTileSelectedWithTheBarAndTheSheetOpen() {
         var clock by mutableStateOf(ClockTileOptions())
-        val sel = HomeItemSelection()
+        val sel = EditSelectionState()
         rule.setContent {
             Box(Modifier.fillMaxSize().background(Color(0xFF0A0B12))) {
                 for (i in 0 until 4) Box(Modifier.offset((24 + i * 92).dp, 90.dp).size(64.dp).background(Color(0x33FFFFFF), RoundedCornerShape(14.dp)))
@@ -252,7 +275,7 @@ class ItemEditUiTest {
             }
             ItemSheet(SheetKind.Clock, "Clock tile", clock, SheetCaps(), ItemSheetActions(onClock = { clock = it }), {})
         }
-        rule.runOnUiThread { sel.select(HomeTiles.CLOCK, Rect(116f * px, 200f * px, 188f * px, 272f * px)) }
+        rule.runOnUiThread { sel.select(HomeTiles.CLOCK); sel.report(HomeTiles.CLOCK, Rect(116f * px, 200f * px, 188f * px, 272f * px)) }
         shoot("w45-clock-tile-bar-and-sheet-dark")
     }
 

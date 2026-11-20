@@ -248,19 +248,23 @@ class PageEditorAppTest {
         rule.onNodeWithTag("pe.page.0").assertIsSelected()
     }
 
-    @Test fun HOM_12_ed12_theEditBarAddPageButtonTakesTheStripPathPaginated() {
+    @Test fun HOM_12_ed12_theBottomAddPagePillIsGoneAndTheNewPageCardAppendsAfterTheLastPagePaginated() {
         val stores = start(); openEditor(stores)
         rule.onNodeWithTag("pe.page.0").assertIsSelected()
-        rule.onNodeWithText("Add page").performClick(); settle(700)
-        assertEquals("one empty page, after the LAST page (the old button added after the current one)", 4, stores.layout.layout.value.pages.size)
+        assertFalse("W47: the four-pill bar is gone, the bar is the edit chrome's", rule.onAllNodesWithText("Add page").fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithTag("page-editor-strip").performScrollToNode(androidx.compose.ui.test.hasTestTag("pe.add")); settle(300)
+        rule.onNodeWithTag("pe.add").performClick(); settle(700)
+        assertEquals("one empty page, after the LAST page", 4, stores.layout.layout.value.pages.size)
         assertTrue(pageKeys(stores)[3].isEmpty())
         rule.onNodeWithTag("pe.page.3").assertIsSelected()
     }
 
-    @Test fun HOM_12_ed13_theEditBarAddPageButtonTakesTheStripPathContinuous() {
+    @Test fun HOM_12_ed13_theNewPageCardAppendsAfterTheLastPageNotTheSelectedOneContinuous() {
         val stores = start(HomePages.Continuous); openEditor(stores)
         rule.onNodeWithTag("pe.page.1").performClick(); settle(700)
-        rule.onNodeWithText("Add page").performClick(); settle(700)
+        assertFalse(rule.onAllNodesWithText("Add page").fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithTag("page-editor-strip").performScrollToNode(androidx.compose.ui.test.hasTestTag("pe.add")); settle(300)
+        rule.onNodeWithTag("pe.add").performClick(); settle(700)
         assertEquals(4, stores.layout.layout.value.pages.size)
         assertTrue("appended after the last page, not after the selected one", pageKeys(stores)[3].isEmpty())
         rule.onNodeWithTag("pe.page.3").assertIsSelected() // the editor's own selection, not the pager index

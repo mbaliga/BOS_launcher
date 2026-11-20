@@ -359,7 +359,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var menuApp by remember { mutableStateOf<AppEntry?>(null) }
     var editCorner by remember { mutableStateOf<Corner?>(null) }
     var editGesture by remember { mutableStateOf<HomeGesture?>(null) }
-    val itemEdit = rememberItemEditState() // wave 45 (editSheet): the selected item's action bar and sheet replace the old full-screen tile menu
+    val editSelection = remember { com.bos.sphere.feature.grid.EditSelectionState().also { it.fallbackBar = false } } // W47: THE selection of edit mode; the item action bar exists, so the 48 dp fallback Remove button is off
+    val itemEdit = rememberItemEditState(editSelection) // wave 45 (editSheet): the selected item's action bar and sheet replace the old full-screen tile menu
     var expandedWidget by remember { mutableStateOf<Corner?>(null) }
 
     val gridState = rememberGridHomeState()
@@ -683,6 +684,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         store = extrasStore, pages = pages, savePages = ::savePages, capacityOf = capacityOf, currentPage = { gridState.currentPage },
         host = widgetHost, allApps = allApps, appsByKey = appsByKey, launchApp = ::launch, accentArgb = prefs.accentColor.toInt(),
         gridDims = { pages.getOrNull(gridState.currentPage)?.layout?.gridFor(isLandscape, prefs)?.let { it.columns to it.rows } ?: (prefs.gridFor(isLandscape).let { it.columns to it.rows }) },
+        selection = editSelection,
     )
     androidx.compose.runtime.SideEffect { homeEdit.hooks = homeItems }
     // Wave 30 (pagesExplicit): "Delete page" really removes the page and what the user put on it. A page that holds something asks first
@@ -985,7 +987,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     }
     CompositionLocalProvider(com.bos.sphere.feature.grid.LocalEditGrid provides (if (homeEdit.active) editGrid else null), LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail, com.bos.sphere.feature.grid.LocalItemSettingsOpener provides remember(itemEdit, homeEdit) { { k: String -> if (homeEdit.active) itemEdit.openSheet(k) } }, com.bos.sphere.feature.grid.LocalClockTileOptions provides remember(prefs.clockTileAnalog, prefs.clockTileFormat, prefs.clockTileDate) { com.bos.sphere.feature.grid.ClockTileOptions.of(prefs) }) {
     Box(
-        modifier = Modifier.fillMaxSize().onSizeChanged { homeSizePx = it }.onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { if (pageEditorOn) homeEdit.exit() else chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() }; true } else false }.trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
+        modifier = Modifier.fillMaxSize().onSizeChanged { homeSizePx = it }.onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() }; true } else false }.trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
             .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !rightOpen && !homeEdit.active, revealSlideDp, mirrored = launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
             .launchpadEdgeDrag(rightReveal, recentsEnabled && !leftOpen && !homeEdit.active, rightSlideDp, mirrored = !launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
@@ -1002,6 +1004,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             capacityOf = capacityOf, gridState = gridState, appsByKey = appsByKey, apps = apps,
             folderKeys = remember(extrasState) { extrasState.folders.values.flatMapTo(HashSet()) { it.keys } },
             prefs = prefs, isLandscape = isLandscape, focusAdd = editFocusAdd, savePages = { savePages(it) },
+            // W47: the page editor uses the same bar as the single-page edit mode; Esc and Back there are Cancel (the confirm only when something changed).
+            onExit = { chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() } },
+            topBar = {
+                val say = com.bos.sphere.feature.grid.rememberAnnouncer()
+                com.bos.sphere.feature.grid.EditTopBar(
+                    title = L10n.tr("Editing pages"), undoCount = homeEdit.undoDepth, redoCount = homeEdit.redoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
+                    onCancel = { chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() } }, onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
+                    onDone = { say(L10n.tr("Saved")); homeEdit.exit() }, insets = false,
+                )
+            },
         )
         // The left page lies UNDER the home: the home slides right, casting a shadow onto it.
         val leftProgress = reveal.progress
@@ -1128,7 +1140,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             keys = pages.flatMap { it.keys }, appsByKey = appsByKey, extras = homeItems.homeExtras, order = homeOrder,
                             topBand = scrollTop, bottomBand = scrollBottom, onLaunch = ::launch, onAppLongPress = { if (!selectItem(it.key)) menuApp = it },
                             iconScale = prefs.iconScale, showLabels = prefs.showLabels, editing = homeEdit.active,
-                            onRemove = { key -> val a = appsByKey[key]; if (a != null) stores.layout.removeFromHome(a.key, pages, preserve) else homeItems.removeFromHome(key) },
                             gestures = homeGestureSpec,
                             onAtStart = { scrollAtStart = it },
                             pageKeys = pages.map { it.keys }, pageScroll = editCard.pageScroll.value,
@@ -1240,7 +1251,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 )
             }
             // HOM-08: widgets and the item strip live in a band on the scrolling homes, never over their tiles.
-            if (HomeShownRules.hasPages(landing) && (prefs.homeStyle != HomeStyle.Grid || prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous)) {
+            if (HomeShownRules.hasPages(landing) && prefs.homeStyle != HomeStyle.Grid) { // W47: the Grid style with Pages Continuous is the column scroll surface, whose widgets are its own cells (the band drew every widget a second time, with a second frame and a second set of handles in edit mode)
                 homeItems.Band(layout.pages, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), prefs.homeStyle)
             }
 
@@ -1759,15 +1770,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.feature.grid.WorkPauseChip(workPaused, onToggle = { com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, workPaused != true) })
             }
         }
+        val editDensity = androidx.compose.ui.platform.LocalDensity.current
+        val safeTopDp = with(editDensity) { androidx.compose.foundation.layout.WindowInsets.safeDrawing.getTop(this).toDp().value }
+        val editTrayBottomDp = maxOf(if (bottomPlan.railTopDp > 0f) bottomPlan.railTopDp + 8f else 8f, if (indicatorShown) 60f else 8f)
         if (homeEdit.active) {
             if (pageEditorOn) {
-                BackHandler { homeEdit.exit() } // as before W45: Back leaves the page editor with its changes kept (Cancel with a restore is the single-page edit mode's)
-                com.bos.sphere.feature.grid.HomeEditBar(
-                    undoDepth = homeEdit.undoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
-                    onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
-                    onAddPage = { editCard.addPage() }, // wave 37: the strip's "+" card path, in both modes
-                    onDone = { homeEdit.exit() },
-                )
+                BackHandler { chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() } } // W47: Back in the page editor is Cancel, as in the single-page edit mode
+                com.bos.sphere.feature.grid.EditCancelDialog(chromeState) { homeEdit.cancel() }
             } else {
                 com.bos.sphere.feature.grid.EditFixedChromeShield(chromePage)
             }
@@ -1792,12 +1801,22 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     canReconfigure = { homeItems.canReconfigure(it) },
                     reconfigure = { homeItems.reconfigureItem(it) },
                     resizeTo = { k, c, r -> homeItems.resizeTo(k, c, r) },
+                    widgetLimits = { homeItems.widgetLimits(it) },
                     spanOf = { k -> extrasState.spanOf(k).let { it.cols to it.rows } },
                     grid = { homeItems.gridSize() },
                     dissolveFolder = { homeItems.dissolveFolder(it) },
                     editFolder = { homeItems.editFolder(it) },
                 ),
-                reserveTop = 64.dp, reserveBottom = dockReserve.bottom.dp + 72.dp,
+                // W47: the room the bar may use is what the chrome leaves: below the top bar (and the hint), above the tray (which sits above the dock), clear of a side dock.
+                reserveTop = com.bos.sphere.feature.grid.EditChromeGeometry.actionBarReserveDp(safeTopDp, showEditHint && !pageEditorOn, editTrayBottomDp, tray = !pageEditorOn).first.dp,
+                reserveBottom = com.bos.sphere.feature.grid.EditChromeGeometry.actionBarReserveDp(safeTopDp, showEditHint && !pageEditorOn, editTrayBottomDp, tray = !pageEditorOn).second.dp,
+                avoid = remember(dockReserve.start, dockReserve.end, homeSizePx) {
+                    val dd = editDensity.density
+                    buildList {
+                        if (dockReserve.start > 0f) add(androidx.compose.ui.geometry.Rect(0f, 0f, dockReserve.start * dd, homeSizePx.height.toFloat()))
+                        if (dockReserve.end > 0f) add(androidx.compose.ui.geometry.Rect(homeSizePx.width - dockReserve.end * dd, 0f, homeSizePx.width.toFloat(), homeSizePx.height.toFloat()))
+                    }
+                },
             )
         }
         // W45 (editChrome): the single-page edit mode's top bar, hint and tray. Composed only while editing the page itself.
@@ -1809,7 +1828,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             undoCount = homeEdit.undoDepth, redoCount = homeEdit.redoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
             hasChanges = homeEdit.hasChanges, showHint = showEditHint,
             showAddPage = prefs.homePages != com.bos.sphere.core.data.HomePages.Off,
-            trayBottomDp = maxOf(if (bottomPlan.railTopDp > 0f) bottomPlan.railTopDp + 8f else 8f, if (indicatorShown) 60f else 8f), // above the dock, and above the page dots when there is no dock
+            trayBottomDp = editTrayBottomDp, // above the dock, and above the page dots when there is no dock
             state = chromeState,
             onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
             onDone = { homeEdit.exit() }, onCancel = { homeEdit.cancel() },

@@ -15,3 +15,6 @@ Owner feedback: the home and page editing "is bonkers". Diagnosis item 9 of `doc
 ## Merging with editHandles / editChrome
 
 `ItemActionLayer(showOutline = false)` when the handles stream draws the outline. Setting its `EditSelectionState.fallbackBar = false` retires their minimal Remove button. The layer takes `reserveTop` / `reserveBottom` for the chrome stream's top bar and tray.
+
+## Wave 47 (editIntegrate)
+The seam is joined: `HomeItemSelection` is deleted, `ItemSelectionSource` is implemented by `EditSelectionState`, `showOutline` is false by default, the fallback Remove button is off and the bar's room comes from the measured chrome (top bar, hint, tray, dock) instead of the fixed 64 dp and dock + 72 dp. Resize no longer starts a mode: it focuses the handles of the selected widget. Size presets are clamped to the provider limits. See `editIntegrate.md`.

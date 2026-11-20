@@ -33,7 +33,7 @@ class PageEditorGeometryTest {
     }
 
     @Test fun HOM_12_pe01b_theLiveCardIsNeverCroppedOnAnyPhoneSizeOrFontScale() {
-        for ((w, h) in phones) for (font in listOf(1f, 1.3f, 2f)) for (bar in listOf(PageEditorGeometry.BOTTOM_BAR_DP, 0f)) {
+        for ((w, h) in phones) for (font in listOf(1f, 1.3f, 2f)) for (bar in listOf(PageEditorGeometry.BOTTOM_BAR_DP, 68f)) {
             val l = lay(w, h, font = font, bottomBar = bar)
             val c = l.card
             val tag = "${w}x$h font $font bar $bar"
@@ -47,15 +47,17 @@ class PageEditorGeometryTest {
         }
     }
 
-    @Test fun HOM_12_pe01c_theContentPanelIsAboutThirtyPercentWhenTheLiveCardKeepsItsShareAndNeverBelowItsFloor() {
-        // 30 percent of the window, unless the live card would then drop below 0.38: the panel gives way first.
+    @Test fun HOM_12_pe01c_theLiveCardIsAtLeastFortyFivePercentOfTheWindowAndThePanelGivesWayFirst() {
+        // W47: the one edit bar is at the top and no bar or tray takes the foot of the window (BOTTOM_BAR_DP = 0), so the live card reaches its designed size.
+        assertEquals(0f, PageEditorGeometry.BOTTOM_BAR_DP, 0f)
         val l = lay(411f, 891f)
-        assertTrue("with the bottom bar's room reserved the panel is about a fifth", l.content.height / d in 150f..200f)
-        assertTrue("the live card keeps at least 0.38 where the panel can give way", l.target.scale >= 0.37f)
-        val free = lay(411f, 891f, bottomBar = 0f)
-        assertTrue("without the bar (the chrome's own top bar replaces it) the panel is about 30 percent", free.content.height >= 0.27f * 891 * d)
-        assertTrue(free.target.scale >= 0.37f)
-        assertEquals("a window tall enough gets the full 30 percent", 0.30f * 1400 * d, lay(500f, 1400f, bottomBar = 0f).content.height, 1f)
+        assertTrue("the live card is at least 0.45 of the window height on 411x891 (with 24 dp system bars)", l.card.height >= 0.449f * 891 * d)
+        assertTrue("the live card is at least 0.45 of the window's scale", l.target.scale >= 0.449f)
+        assertTrue("the panel gave way from 30 percent but is still a fifth of the window or more", l.content.height >= 0.20f * 891 * d)
+        val bare = lay(411f, 891f, top = 0f, bottom = 0f)
+        assertTrue("without system bars the panel is about a quarter of the window", bare.content.height >= 0.25f * 891 * d)
+        assertTrue(bare.target.scale >= 0.449f)
+        assertEquals("a window tall enough gets the full 30 percent", 0.30f * 1400 * d, lay(500f, 1400f).content.height, 1f)
         for ((w, h) in phones) assertTrue("$w x $h", lay(w, h).content.height >= PageEditorGeometry.CONTENT_FLOOR_DP * d - 0.5f)
         assertTrue("the font grows the tab row", lay(411f, 891f, font = 1.3f).tabRow.height >= 1.3f * 48 * d - 0.5f)
         assertEquals("up to 1.5 times", 1.5f * 48 * d, lay(411f, 891f, font = 2f).tabRow.height, 0.5f)

@@ -85,6 +85,20 @@ object ProviderLimitsMath {
     private const val EPS = 0.001f
 }
 
+/**
+ * W47 (editIntegrate): a size preset of the item sheet (2 x 1, 2 x 2, 4 x 2) against the provider's limits in cells, the same limits the handles use:
+ * the wanted size is clamped into them and says whether it had to be.
+ */
+object PresetClamp {
+    data class Result(val cols: Int, val rows: Int, val clamped: Boolean)
+
+    fun clamp(limits: CellLimits, cols: Int, rows: Int): Result {
+        val c = cols.coerceIn(limits.minCols, limits.maxCols.coerceAtLeast(limits.minCols))
+        val r = rows.coerceIn(limits.minRows, limits.maxRows.coerceAtLeast(limits.minRows))
+        return Result(c, r, c != cols || r != rows)
+    }
+}
+
 /** The eight resize handles; `west`/`north` ones move the origin of the widget. */
 enum class ResizeHandle(val west: Boolean, val east: Boolean, val north: Boolean, val south: Boolean) {
     NorthWest(true, false, true, false), North(false, false, true, false), NorthEast(false, true, true, false),

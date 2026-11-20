@@ -11,25 +11,17 @@ import com.bos.sphere.core.data.LauncherPrefs
 
 /**
  * Wave 45 (editSheet), HOM-07 / HOM-12: the single, small seam between "an item is selected in edit mode" and the item action bar plus
- * item sheet. The handles stream's selection holder implements this (it already has [selectedKey], [bounds] and a clear); until it lands the
- * home feeds a [HomeItemSelection] from the existing long-press events. Nothing here knows how selection is made.
+ * item sheet. [EditSelectionState] (the handles stream's selection, the one selection of home edit mode) implements it: a tap, a long press and the
+ * keyboard all select through it, and the bar and the sheet only read it. Nothing here knows how selection is made.
  */
 interface ItemSelectionSource {
     /** The selected item's key (an app key, `tile:clock`, a folder / widget / shortcut / link key), or null. */
     val selectedKey: String?
     /** The item's bounds in window pixels, or null while unknown. */
     val bounds: Rect?
+    /** True while the item is being dragged or resized: the action bar steps out of the way (a ghost runs under it). */
+    val dragging: Boolean get() = false
     fun clear()
-}
-
-/** The default [ItemSelectionSource]: plain snapshot state the home sets from its long-press events. Write it only from composition or event handlers. */
-class HomeItemSelection : ItemSelectionSource {
-    override var selectedKey: String? by androidx.compose.runtime.mutableStateOf<String?>(null)
-        private set
-    override var bounds: Rect? by androidx.compose.runtime.mutableStateOf<Rect?>(null)
-        private set
-    fun select(key: String, rect: Rect?) { selectedKey = key; bounds = rect }
-    override fun clear() { selectedKey = null; bounds = null }
 }
 
 /** What kind of item the sheet is for. */

@@ -55,7 +55,7 @@ class EditHandlesUiTest {
             widgets = mapOf(w to span),
         ),
         { null }, { null }, widget = { _, m -> Box(m.testTag("widget-content")) },
-        resizing = if (resizing) w else null, selection = sel,
+        selection = sel.also { if (resizing) it.select(w) },
         limitsOf = { limits }, onResizeTo = { k, r, m -> resized += Triple(k, r, m) }, onAction = { actions += it },
     )
 
@@ -262,6 +262,77 @@ class EditHandlesUiTest {
         node.performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Delete) }
         rule.waitForIdle()
         assertEquals(listOf(w), removed)
+    }
+
+    // ---- wave 47 (editIntegrate)
+    @Test
+    fun HOM_07_w47_aHandleDragBrightensTheGridDotsRoundTheGhostAndReleaseClearsThem() {
+        val grid = EditGridState()
+        val e = extras()
+        rule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(LocalEditGrid provides grid) {
+                Box(Modifier.fillMaxSize()) {
+                    EditGridDotsLayer(GridGeometry(4, 6, pitch, pitch, pitch, 0f, 0f))
+                    Frame(e, ctx())
+                }
+            }
+        }
+        rule.waitForIdle()
+        assertEquals(null, grid.active)
+        press("SouthEast", pitch + 5f, pitch + 5f)
+        val a = grid.active
+        assertNotNull("the dots follow the ghost", a)
+        assertTrue("the active rectangle is the snapped 3 x 3 cells, in the page grid's px", a!!.width > 2.5f * pitch && a.height > 2.5f * pitch)
+        assertEquals("the rectangle is in the dots layer's px: the widget's own left edge (48 dp in)", 48f * rule.activity.resources.displayMetrics.density, a.left, 2f)
+        release("SouthEast")
+        assertEquals("cleared on release", null, grid.active)
+    }
+
+    @Test
+    fun HOM_12_w47_theActionBarStepsOutOfTheWayWhileAHandleIsDraggedAndComesBack() {
+        val e = extras()
+        rule.setContent {
+            Box(Modifier.fillMaxSize()) {
+                Frame(e, ctx())
+                ItemActionLayer(sel, null, {}, {}, onRemove = {}, onSettings = {}, label = { "Weather" })
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag(ItemBarTags.BAR).assertExists()
+        press("SouthEast", pitch + 5f, pitch + 5f)
+        rule.onNodeWithTag(ItemBarTags.BAR).assertDoesNotExist()
+        release("SouthEast")
+        rule.onNodeWithTag(ItemBarTags.BAR).assertExists()
+    }
+
+    @Test
+    fun HOM_12_w47_theActionBarsResizeFocusesTheHandlesOfTheSelectedWidgetAndSaysSo() {
+        val e = extras()
+        rule.setContent { Frame(e, ctx()) }
+        rule.waitForIdle()
+        handle("SouthEast").assertExists() // the handles are shown whenever the widget is selected: Resize only focuses them
+        val before = sel.resizeFocus
+        Snapshot.withMutableSnapshot { sel.focusResize() }
+        rule.waitForIdle()
+        assertEquals(before + 1, sel.resizeFocus)
+        assertEquals("Resize handles active", sel.announcement.removeSuffix("\u200B"))
+        handle("SouthEast").assertExists()
+        rule.onNodeWithText("Done").assertDoesNotExist() // and there is no in-widget Done to leave it with
+    }
+
+    @Test fun HOM_12_w47_theSelectionStateIsTheSourceTheActionBarReads() {
+        val s: ItemSelectionSource = EditSelectionState()
+        Snapshot.withMutableSnapshot { (s as EditSelectionState).select("k") }
+        assertEquals("k", s.selectedKey)
+        Snapshot.withMutableSnapshot { s.clear() }
+        assertEquals(null, s.selectedKey)
+    }
+
+    @Test fun HOM_12_w47_chromeReserveForTheActionBarIsTheTopBarAndTheTray() {
+        val (top, bottom) = EditChromeGeometry.actionBarReserveDp(safeTopDp = 24f, hint = false, trayBottomDp = 60f)
+        assertEquals(24f + 56f, top, 0f); assertEquals(60f + 72f, bottom, 0f)
+        assertEquals("the hint line sits under the bar while it shows", 24f + 56f + 32f, EditChromeGeometry.actionBarReserveDp(24f, true, 60f).first, 0f)
+        assertEquals("the page editor has no tray", 0f, EditChromeGeometry.actionBarReserveDp(24f, false, 60f, tray = false).second, 0f)
     }
 
     // ---- the selection model

@@ -68,7 +68,7 @@ class RemovedNotice(val message: String, val onUndo: () -> Unit, val id: Long = 
  * and of [avoid] (the dock). Settings opens the item sheet; Remove runs [onRemove] and offers a 6 s Undo.
  *
  * [onResize] is null for items that cannot be resized (the Resize button is then left out rather than dead). The handles stream draws its own outline:
- * it passes [showOutline] = false.
+ * it is the default now: [showOutline] = true only for hosts without the handles' outline.
  */
 @Composable
 fun ItemActionLayer(
@@ -81,7 +81,7 @@ fun ItemActionLayer(
     label: (key: String) -> String,
     modifier: Modifier = Modifier,
     avoid: List<Rect> = emptyList(),
-    showOutline: Boolean = true,
+    showOutline: Boolean = false,
     reserveTop: androidx.compose.ui.unit.Dp = 0.dp,
     reserveBottom: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
@@ -113,7 +113,7 @@ fun ItemActionLayer(
                 item, w, h, areaRect, avoid.map { Rect(it.left - origin.x, it.top - origin.y, it.right - origin.x, it.bottom - origin.y) },
                 gap = with(density) { 8.dp.toPx() }, handleReach = with(density) { 30.dp.toPx() },
             )
-            Row(
+            if (!source.dragging) Row(
                 Modifier.offset { IntOffset(p.x.toInt(), p.y.toInt()) }
                     .onSizeChanged { barSize = it }
                     .shadow(8.dp, RoundedCornerShape(24.dp))

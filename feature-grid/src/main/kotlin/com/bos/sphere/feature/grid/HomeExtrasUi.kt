@@ -57,9 +57,6 @@ class HomeExtras(
     val resolveApp: (String) -> AppEntry?,
     val shortcutIcon: (ItemDef) -> Drawable?,
     val widget: @Composable (key: String, modifier: Modifier) -> Unit,
-    val resizing: String? = null,
-    val onResize: (key: String, dCols: Int, dRows: Int) -> Unit = { _, _, _ -> },
-    val onResizeDone: () -> Unit = {},
     val onTap: (String) -> Unit = {},
     val onLongPress: (String) -> Unit = {},
     val onDropOnto: (drag: String, target: String) -> Unit = { _, _ -> },
@@ -84,8 +81,8 @@ class HomeExtras(
     fun owns(key: String) = key in owned
     fun spanOf(key: String): WidgetSpan = state.spanOf(key)
     fun isWidget(key: String) = ItemKeys.kind(key) == ItemKind.Widget
-    /** The item with the handles: the selection (edit mode), or the widget the host's old Resize entry named. */
-    fun isSelected(key: String) = selection.isSelected(key) || resizing == key
+    /** The item with the outline (and the handles, for a widget): the selection of edit mode. */
+    fun isSelected(key: String) = selection.isSelected(key)
 }
 
 /** One non-app item drawn as a grid tile: folder, shortcut, link or file. Widgets are [HomeWidgetCell]. */

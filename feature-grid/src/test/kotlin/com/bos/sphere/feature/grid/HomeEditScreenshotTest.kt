@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -44,10 +45,10 @@ class HomeEditScreenshotTest {
         rule.mainClock.autoAdvance = false
         var undos = 0; var done = 0
         rule.setContent {
-            HomeEditBar(undoDepth = 3, canUndo = true, canRedo = false, onUndo = { undos++ }, onRedo = {}, onAddPage = {}, onDone = { done++ }, modifier = Modifier.fillMaxSize())
+            EditTopBar(title = "Editing pages", undoCount = 3, redoCount = 0, canUndo = true, canRedo = false, onCancel = {}, onUndo = { undos++ }, onRedo = {}, onDone = { done++ })
         }
-        rule.onNodeWithText("Undo (3)").assertIsEnabled().performClick()
-        rule.onNodeWithText("Redo").assertIsNotEnabled()
+        rule.onNodeWithContentDescription("Undo (3)").assertIsEnabled().performClick()
+        rule.onNodeWithContentDescription("Redo").assertIsNotEnabled()
         rule.onNodeWithText("Done").performClick()
         assertEquals(1, undos); assertEquals(1, done)
         shoot("home_edit_bar")

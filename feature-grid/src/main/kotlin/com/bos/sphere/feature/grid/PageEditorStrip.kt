@@ -53,7 +53,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -107,7 +106,7 @@ internal fun PageStrip(
     val base = LocalDensity.current
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr, LocalDensity provides androidx.compose.ui.unit.Density(base.density, base.fontScale.coerceAtMost(1.15f))) {
         val d = LocalDensity.current
-        val haptic = LocalHapticFeedback.current
+        val haptic = rememberLauncherHaptics() // W47: the one place haptics come from (strength setting; pinned by LauncherHapticsRoutingTest)
         val focusManager = LocalFocusManager.current
         val horizontal = layout.axis == PageEditorGeometry.Axis.Horizontal
         val entries = remember(glanceOn, pages.size) { PageEditorGeometry.entries(glanceOn, pages.size) }

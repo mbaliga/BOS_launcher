@@ -7,6 +7,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import com.bos.sphere.core.catalog.HomeState
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -43,6 +48,9 @@ class HomeEditModeTest {
         AppEntry("demo.e$i", ComponentName("demo.e$i", "demo.e$i.Main"), n, Process.myUserHandle()) { ColorDrawable(0xFF3355AA.toInt() + i * 0x101010) }
     }
     private val byKey = apps.associateBy { it.key }
+    private val sel = EditSelectionState().also { it.fallbackBar = false }
+
+    private fun settle() { rule.runOnUiThread { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }; rule.mainClock.advanceTimeBy(300) }
 
     private class Probe {
         var changes = 0
@@ -55,6 +63,7 @@ class HomeEditModeTest {
     private fun Scene(edit: Boolean, probe: Probe) {
         val prefs = LauncherPrefs()
         val state = rememberGridHomeState()
+        val extras = remember { HomeExtras(HomeState(), { byKey[it] }, { null }, widget = { _, m -> Box(m) }, selection = sel) }
         val pages = HomeLayoutMath.visualPages(com.bos.sphere.core.data.HomeLayout(pages = listOf(com.bos.sphere.core.data.HomePage(apps.map { it.key }, id = 1L)), seeded = true), apps.map { it.key }, capacityOf = { it.capacity(false, prefs) })
         Box(Modifier.fillMaxSize()) {
             GridHome(
@@ -63,22 +72,41 @@ class HomeEditModeTest {
                 onLaunch = {}, onAppLongPress = { probe.longPresses++ },
                 onPagesChange = { probe.changes++; probe.lastPages = it },
                 onEmptyLongPress = {}, onGesture = {}, onClockTap = {}, onTileLongPress = { _, _ -> },
-                editMode = edit, onRemoveItem = { probe.removed += it },
+                editMode = edit, onRemoveItem = { probe.removed += it }, extras = extras,
             )
+            if (edit) ItemActionLayer(sel, null, {}, null, onRemove = { probe.removed += it; sel.clear() }, onSettings = {}, label = { it })
         }
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_12_editModeDrawsARemoveHandleOnEveryAppAndTapRemovesIt() {
+    fun HOM_12_editModeHasNoRemoveBadgeATapSelectsAnAppAndTheActionBarRemovesIt() {
         rule.mainClock.autoAdvance = false
         val probe = Probe()
         rule.setContent { Scene(true, probe) }
         rule.mainClock.advanceTimeBy(500)
-        rule.onNodeWithContentDescription("Remove from home: Charlie", useUnmergedTree = true).assertExists().performClick()
-        rule.mainClock.advanceTimeBy(100)
+        labels.forEach { rule.onNodeWithContentDescription("Remove from home: $it", useUnmergedTree = true).assertDoesNotExist() } // W47: the badges are gone
+        rule.onNodeWithTag(ItemBarTags.BAR).assertDoesNotExist()
+        rule.onNodeWithContentDescription("Charlie").performTouchInput { click(center) }
+        settle()
+        assertEquals("one selected item", apps[2].key, sel.selectedKey)
+        rule.onNodeWithTag(ItemBarTags.BAR).assertExists()
+        rule.onNodeWithTag(ItemBarTags.RESIZE).assertDoesNotExist() // an icon has no size
+        rule.onNodeWithTag(ItemBarTags.REMOVE).performClick()
+        settle()
         assertEquals(listOf(apps[2].key), probe.removed)
-        assertEquals(0, probe.longPresses) // the handle took the touch: no menu opened
-        labels.forEach { rule.onNodeWithContentDescription("Remove from home: $it", useUnmergedTree = true).assertExists() }
+        assertEquals(0, probe.longPresses)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_aSecondTapSelectsAnotherItemAndOnlyOneIsSelectedAtATime() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent { Scene(true, Probe()) }
+        rule.mainClock.advanceTimeBy(500)
+        rule.onNodeWithContentDescription("Alpha").performTouchInput { click(center) }; settle()
+        assertEquals(apps[0].key, sel.selectedKey)
+        rule.onNodeWithContentDescription("Bravo").performTouchInput { click(center) }; settle()
+        assertEquals(apps[1].key, sel.selectedKey)
+        assertEquals("one action bar", 1, rule.onAllNodesWithTag(ItemBarTags.BAR).fetchSemanticsNodes().size)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

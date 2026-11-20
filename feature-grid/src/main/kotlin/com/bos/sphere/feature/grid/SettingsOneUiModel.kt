@@ -148,6 +148,35 @@ object OneUiModel {
     /** The height of the large-title area: the upper third of the window, never less than 172 dp, so the floating preview window at its default anchor sits in the empty band beside the title or more than 260 dp. */
     fun headerDp(windowHeightDp: Float): Float = (windowHeightDp / 3f).coerceIn(172f, 260f)
 
+    /**
+     * Wave 46: the top of a block [contentPx] tall that sits in the vertical centre of a band [bandPx] tall (the large title between the
+     * app bar and the first row). Never negative: a block taller than the band starts at the top.
+     */
+    fun centredTop(bandPx: Float, contentPx: Float): Float = ((bandPx - contentPx) / 2f).coerceAtLeast(0f)
+
+    // ---- how a row offers its options (wave 46) ---------------------------------------------------------------------------------
+
+    /**
+     * Wave 46: the one way each kind of row presents its options, never two. [Rail]: a choice with preview cards shows them inline and has no
+     * chevron and no page. [Page]: a choice without cards shows its value in grey with a chevron and opens a full page of radio rows (no dialog).
+     * [Segmented]: two or three short options sit inline in a segmented control, no chevron. [Switch], [Slider], [Stepper] are inline controls.
+     * [Link]: an action (a confirmation dialog first when it is destructive). [Pane]: a pane opens as a page of its own.
+     */
+    enum class Presentation(val inline: Boolean, val chevron: Boolean, val opensPage: Boolean) {
+        Switch(true, false, false), Slider(true, false, false), Stepper(true, false, false),
+        Rail(true, false, false), Segmented(true, false, false),
+        Page(false, true, true), Pane(false, true, true), Link(false, false, false), LinkChevron(false, true, false),
+    }
+
+    fun presentation(i: SettingItem): Presentation = when (i) {
+        is SettingItem.Toggle -> Presentation.Switch
+        is SettingItem.Slider -> Presentation.Slider
+        is SettingItem.Stepper -> Presentation.Stepper
+        is SettingItem.Choice<*> -> if (i.preview != null) Presentation.Rail else Presentation.Page
+        is SettingItem.Action -> if (i.navigates) Presentation.LinkChevron else Presentation.Link
+        is SettingItem.Pane -> Presentation.Pane
+    }
+
     // ---- navigation ---------------------------------------------------------------------------------------------------------------
 
     /** Where the user is: the root list ([category] -1), a category page, or a page of one of its rows ([sub] >= 0). */

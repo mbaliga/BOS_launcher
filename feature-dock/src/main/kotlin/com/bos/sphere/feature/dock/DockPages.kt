@@ -43,7 +43,7 @@ import com.bos.sphere.core.launch.SessionRestorer
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.OneUiBadge
 import com.bos.sphere.feature.grid.OneUiCaption
-import com.bos.sphere.feature.grid.OneUiCheckDialog
+import com.bos.sphere.feature.grid.OneUiCheckPage
 import com.bos.sphere.feature.grid.OneUiConfirmDialog
 import com.bos.sphere.feature.grid.OneUiDialog
 import com.bos.sphere.feature.grid.OneUiGap
@@ -55,7 +55,7 @@ import com.bos.sphere.feature.grid.OneUiListRow
 import com.bos.sphere.feature.grid.OneUiMenuEntry
 import com.bos.sphere.feature.grid.OneUiMoreButton
 import com.bos.sphere.feature.grid.OneUiPrimaryButton
-import com.bos.sphere.feature.grid.OneUiRadioDialog
+import com.bos.sphere.feature.grid.OneUiRadioPage
 import com.bos.sphere.feature.grid.OneUiRowDivider
 import com.bos.sphere.feature.grid.OneUiSegmented
 import com.bos.sphere.feature.grid.OneUiSegmentedRow
@@ -145,7 +145,7 @@ fun DockSettingsContent(
         OneUiGap()
         OneUiGroup(1) { OneUiListRow(L10n.tr("Use the default for this device"), onClick = { manager.setDock { it.copy(enabled = null) } }, modifier = Modifier.testTag("dock.useDefault")) }
     }
-    if (pickingMode) OneUiRadioDialog(
+    if (pickingMode) OneUiRadioPage(
         L10n.tr("Dock mode"), DockMode.entries, state.dock.mode, { L10n.tr(it.label) }, { m -> manager.setDock { it.copy(mode = m) } }, { pickingMode = false },
         detail = { m -> L10n.tr(if (m == DockMode.Collapsed) "A thin band that opens when you touch it" else "Your pinned apps, then the ones you used last") },
     )
@@ -245,7 +245,7 @@ fun WorkspacesContent(manager: WorkspaceManager, apps: List<PanelApp>, paletteAc
     }
     if (calmOpen) {
         val opts = buildList { add(CalmChoice.All); add(CalmChoice.Chosen); if (state.groups.isNotEmpty()) add(CalmChoice.Group) }
-        OneUiRadioDialog(
+        OneUiRadioPage(
             L10n.tr("What the calm centre shows"), opts, if (active.notificationApps == null) CalmChoice.All else CalmChoice.Chosen, { L10n.tr(it.label) },
             onSelect = { c ->
                 when (c) {
@@ -263,12 +263,12 @@ fun WorkspacesContent(manager: WorkspaceManager, apps: List<PanelApp>, paletteAc
         L10n.tr("Apps shown in the calm centre"), apps, active.notificationApps ?: emptySet(), max = Int.MAX_VALUE, min = 0,
         onDone = { picked -> manager.setNotificationApps(active.id, picked); pickingApps = false }, onDismiss = { pickingApps = false },
     )
-    if (pickingGroup) OneUiRadioDialog(
+    if (pickingGroup) OneUiRadioPage(
         L10n.tr("Apps of which group?"), state.groups, null, { "${it.name} · ${it.members.size}" },
         onSelect = { g -> manager.setNotificationApps(active.id, g.members.map { it.target.packageName }.toSet()) }, onDismiss = { pickingGroup = false },
         body = L10n.tr("The group's apps are copied now. Later changes to the group do not follow."),
     )
-    if (actionsOpen) OneUiCheckDialog(
+    if (actionsOpen) OneUiCheckPage(
         L10n.tr("Radar actions"), paletteActionChoices.map { it.first }, active.paletteActions.toSet(), { id -> L10n.tr(paletteActionChoices.first { it.first == id }.second) },
         onDone = { picked -> manager.setPaletteActions(active.id, paletteActionChoices.map { it.first }.filter { it in picked }); actionsOpen = false },
         onDismiss = { actionsOpen = false },
@@ -412,7 +412,7 @@ fun AppPicker(title: String, apps: List<PanelApp>, selected: Set<String>, max: I
     val idOf = { a: PanelApp -> if (wide) a.packageName else a.key }
     val start = apps.filter { it.key in selected || it.packageName in selected }.toSet()
     DockPagesScope {
-        OneUiCheckDialog(
+        OneUiCheckPage(
             title, apps, start, { it.label }, onDone = { picked -> onDone(picked.map(idOf).toSet()) }, onDismiss = onDismiss, min = min, max = max,
         )
     }

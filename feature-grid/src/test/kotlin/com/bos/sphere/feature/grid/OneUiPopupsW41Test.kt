@@ -143,21 +143,24 @@ class OneUiPopupsW41Test {
 
     // ---- radio and check ----------------------------------------------------------------------------------------------------
 
-    @Test fun CFG_21_popups_07_aRadioDialogHasBigRowsMarksTheSelectionAndAppliesOnTap() {
+    @Test fun CFG_21_popups_07_aRadioPageHasBigRowsMarksTheSelectionAppliesOnTapAndIsNotADialog() {
         var open by mutableStateOf(true)
-        rule.setContent { if (open) OneUiRadioDialog("Dock mode", listOf("Band", "Pinned", "Both"), "Pinned", { it }, { log += "pick $it" }, { open = false }) }
+        rule.setContent { if (open) OneUiRadioPage("Dock mode", listOf("Band", "Pinned", "Both"), "Pinned", { it }, { log += "pick $it" }, { open = false }) }
         rule.waitForIdle()
+        rule.onAllNodesWithTag(OneUiDialogTags.PAGE).assertCountEquals(1)
+        rule.onAllNodesWithTag(OneUiDialogTags.DIALOG).assertCountEquals(0)
+        rule.onNodeWithTag(OneUiTags.TITLE_LARGE).assertIsDisplayed()
         (0..2).forEach { i -> assertTrue(rule.onNodeWithTag(OneUiDialogTags.option(i)).getUnclippedBoundsInRoot().let { it.bottom - it.top } >= 56.dp) }
         assertEquals(true, rule.onNodeWithTag(OneUiDialogTags.option(1)).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
         assertEquals(false, rule.onNodeWithTag(OneUiDialogTags.option(0)).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
         rule.onNodeWithTag(OneUiDialogTags.option(2)).performClick(); rule.waitForIdle()
         assertEquals(listOf("pick Both"), log)
-        rule.onAllNodesWithTag(OneUiDialogTags.DIALOG).assertCountEquals(0)
+        rule.onAllNodesWithTag(OneUiDialogTags.PAGE).assertCountEquals(0)
     }
 
-    @Test fun CFG_21_popups_08_aCheckDialogKeepsToItsLimitsAndReturnsTheSet() {
+    @Test fun CFG_21_popups_08_aCheckPageKeepsToItsLimitsAndReturnsTheSet() {
         var got: Set<String>? = null
-        rule.setContent { OneUiCheckDialog("Apps", listOf("A", "B", "C"), setOf("A"), { it }, { got = it }, {}, min = 1, max = 2) }
+        rule.setContent { OneUiCheckPage("Apps", listOf("A", "B", "C"), setOf("A"), { it }, { got = it }, {}, min = 1, max = 2) }
         rule.waitForIdle()
         rule.onNodeWithTag(OneUiDialogTags.option(1)).performClick()
         rule.onNodeWithTag(OneUiDialogTags.option(2)).performClick() // a third is refused at max 2
@@ -165,8 +168,8 @@ class OneUiPopupsW41Test {
         assertEquals(setOf("A", "B"), got)
     }
 
-    @Test fun CFG_21_popups_09_aCheckDialogCannotBeDoneBelowItsMinimum() {
-        rule.setContent { OneUiCheckDialog("Apps", listOf("A", "B"), setOf("A"), { it }, { log += "done" }, {}, min = 1) }
+    @Test fun CFG_21_popups_09_aCheckPageCannotBeDoneBelowItsMinimum() {
+        rule.setContent { OneUiCheckPage("Apps", listOf("A", "B"), setOf("A"), { it }, { log += "done" }, {}, min = 1) }
         rule.waitForIdle()
         rule.onNodeWithTag(OneUiDialogTags.option(0)).performClick()
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).assertIsNotEnabled()

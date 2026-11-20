@@ -30,7 +30,7 @@ import com.bos.sphere.feature.grid.OneUiCaption
 import com.bos.sphere.feature.grid.OneUiGroup
 import com.bos.sphere.feature.grid.OneUiGroupTitle
 import com.bos.sphere.feature.grid.OneUiInfoCard
-import com.bos.sphere.feature.grid.OneUiRadioDialog
+import com.bos.sphere.feature.grid.OneUiRadioPage
 import com.bos.sphere.feature.grid.OneUiRowDivider
 import com.bos.sphere.feature.grid.OneUiValueRow
 import com.bos.sphere.feature.grid.SettingCategory
@@ -93,8 +93,8 @@ fun ColumnScope.DesktopPane() {
             DisplayProfileEditor(com.bos.sphere.feature.desktop.DisplayIdentity.label(id), profile, { p -> profile = p; controller.profiles.save(id, p) }, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
         }
     }
-    if (offerOpen) OneUiRadioDialog(L10n.tr("When a display that can host apps connects"), OfferSetting.entries, offer, { L10n.tr(DesktopSettingsText.offer(it)) }, { offer = it; controller.offerSetting = it }, { offerOpen = false })
-    if (unplugOpen) OneUiRadioDialog(L10n.tr("When that display is unplugged"), listOf(false, true), migrate, { L10n.tr(DesktopSettingsText.disconnect(it)) }, { migrate = it; controller.migrateOnDisconnect = it }, { unplugOpen = false })
+    if (offerOpen) OneUiRadioPage(L10n.tr("When a display that can host apps connects"), OfferSetting.entries, offer, { L10n.tr(DesktopSettingsText.offer(it)) }, { offer = it; controller.offerSetting = it }, { offerOpen = false })
+    if (unplugOpen) OneUiRadioPage(L10n.tr("When that display is unplugged"), listOf(false, true), migrate, { L10n.tr(DesktopSettingsText.disconnect(it)) }, { migrate = it; controller.migrateOnDisconnect = it }, { unplugOpen = false })
 }
 
 enum class DockPaneKind { Dock, Workspaces, Groups }

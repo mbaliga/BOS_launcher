@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -74,6 +73,8 @@ object OneUiDialogTags {
     const val CANCEL = "oneui.dialog.cancel"
     const val CONFIRM = "oneui.dialog.confirm"
     const val FIELD = "oneui.dialog.field"
+    /** Wave 46: the full page a radio or checkbox picker opens (it is not a dialog card). */
+    const val PAGE = "oneui.picker.page"
     fun option(i: Int) = "oneui.dialog.option.$i"
 }
 
@@ -235,52 +236,6 @@ private fun OneUiChoiceLine(label: String, detail: String?, selected: Boolean, r
         Column(Modifier.weight(1f)) {
             Text(label, color = HyleColors.InkBright, fontSize = 17.sp)
             if (!detail.isNullOrEmpty()) Text(detail, color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
-        }
-    }
-}
-
-/** Single choice: big rows with One UI radio buttons; picking one applies it and closes. Cancel stays at the bottom. */
-@Composable
-fun <T> OneUiRadioDialog(
-    title: String,
-    options: List<T>,
-    selected: T?,
-    label: (T) -> String,
-    onSelect: (T) -> Unit,
-    onDismiss: () -> Unit,
-    detail: (T) -> String? = { null },
-    body: String? = null,
-) = OneUiDialog(title, onDismiss, body = body) {
-    Column(Modifier.selectableGroup()) {
-        options.forEachIndexed { i, o ->
-            OneUiChoiceLine(label(o), detail(o), o == selected, Role.RadioButton, OneUiDialogTags.option(i), { OneUiRadioMark(o == selected) }) { onSelect(o); onDismiss() }
-        }
-    }
-}
-
-/** Multiple choice: checkbox rows; Cancel | Done. [min] and [max] bound the count; Done is off outside them. */
-@Composable
-fun <T> OneUiCheckDialog(
-    title: String,
-    options: List<T>,
-    selected: Set<T>,
-    label: (T) -> String,
-    onDone: (Set<T>) -> Unit,
-    onDismiss: () -> Unit,
-    min: Int = 0,
-    max: Int = Int.MAX_VALUE,
-    doneLabel: String = L10n.tr("Done"),
-    body: String? = null,
-) {
-    var picked by remember { mutableStateOf(selected) }
-    OneUiDialog(title, onDismiss, body = body, confirmLabel = doneLabel, onConfirm = { onDone(picked) }, confirmEnabled = picked.size in min..max) {
-        Column {
-            options.forEachIndexed { i, o ->
-                val on = o in picked
-                OneUiChoiceLine(label(o), null, on, Role.Checkbox, OneUiDialogTags.option(i), { OneUiCheckMark(on) }) {
-                    picked = if (on) picked - o else if (picked.size < max) picked + o else picked
-                }
-            }
         }
     }
 }

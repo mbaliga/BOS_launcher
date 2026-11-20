@@ -81,10 +81,10 @@ class ReducedMotionUiTest {
         }
         open = true
         rule.mainClock.advanceTimeBy(400)
-        rule.onNodeWithText("Reduced").assertIsDisplayed()
+        rule.onNodeWithText("Probe row").assertIsDisplayed()
         open = false
         rule.mainClock.advanceTimeBy(400)
-        rule.onNodeWithText("Reduced").assertDoesNotExist()
+        rule.onNodeWithText("Probe row").assertDoesNotExist()
     }
 
     @Test fun NFR_14_drawerPaintsAtFullSizeOnTheFirstFramesWhenMotionIsReduced() {

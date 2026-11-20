@@ -50,7 +50,7 @@ class W4MotionAuditTest {
             "PuckSections.kt" to 1, // wave 32: a wedge's pressed fill, a 90 ms tween that is snap() under reduced motion (reads rememberMotionPrefs().reduced)
             // press spring already snaps under reduced motion (`still`)
         )
-        val gatedFiles = setOf("ContinuousHome.kt", "SettingsSpace.kt", "HomeScreen.kt", "FilesUi.kt") // W31: FilesUi fades a loaded thumbnail in through rememberMotionPrefs().gate(tween(180))
+        val gatedFiles = setOf("ContinuousHome.kt", "HomeScreen.kt", "FilesUi.kt") // W31: FilesUi fades a loaded thumbnail in through rememberMotionPrefs().gate(tween(180))
         val counts = HashMap<String, Int>()
         Repo.mainSources().forEach { f ->
             val n = f.readLines().count { Regex("""\banimate(Float|Color|Dp|Int|Offset|Size|IntOffset|Rect)AsState\(""").containsMatchIn(it) }
@@ -63,7 +63,8 @@ class W4MotionAuditTest {
             assertTrue("$name must gate its animations", src.contains(".gate(") || src.contains("MorphPolicy") || src.contains("still"))
         }
         assertTrue(text("$grid/ContinuousHome.kt").contains("barMotion.gate(tween(250))"))
-        assertTrue(text("$grid/SettingsSpace.kt").contains("tabMotion.gate("))
+        // wave 40: the tab strip is gone; the One UI settings animate through Animatable (switch) and one-shot transitions that read rememberMotionPrefs().reduced
+        assertTrue(text("$grid/SettingsOneUi.kt").contains("rememberMotionPrefs()") && text("$grid/SettingsOneUiParts.kt").contains("rememberMotionPrefs()"))
         assertTrue(text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt").contains("rememberMotionPrefs().gate("))
     }
 
@@ -108,7 +109,7 @@ class W4MotionAuditTest {
     @Test fun NFR_19_everyOverlaySurfaceHandlesBack() {
         val backTokens = listOf("BackHandler", "rememberPredictiveBackProgress(")
         val overlays = listOf(
-            "$grid/SearchOverlay.kt", "$grid/WheelDrawer.kt", "$grid/Corners.kt", "$grid/SettingsSpace.kt",
+            "$grid/SearchOverlay.kt", "$grid/WheelDrawer.kt", "$grid/Corners.kt", "$grid/SettingsOneUi.kt",
             "$grid/WidgetHosting.kt", "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/Launchpad.kt", "app/src/main/kotlin/com/bos/sphere/HomeScreen.kt",
         )
         overlays.forEach { p -> assertTrue("$p has no back handling", backTokens.any { text(p).contains(it) }) }

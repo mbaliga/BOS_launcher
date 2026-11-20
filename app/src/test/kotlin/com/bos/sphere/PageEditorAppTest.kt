@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -74,12 +75,16 @@ class PageEditorAppTest {
 
     private fun openEditor(@Suppress("UNUSED_PARAMETER") stores: LauncherStores) {
         // W34: the Home sheet no longer has an Edit home row; the way in is the long press on empty home space (the quick sheet), then Ground Control > Home screen > Edit home.
+        // Wave 40: on a continuous home the same long press opens Ground Control itself (its root list), which now covers the home and takes the next touch like any screen.
+        fun settingsOpen() = rule.onAllNodesWithContentDescription("Close settings", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         for (y in listOf(0.35f, 0.6f, 0.8f)) { // continuous puts items where the paginated home has space: try a few empty spots
-            if (rule.onAllNodesWithTag("quick.groundcontrol", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() || has("Page carousel")) break
+            if (rule.onAllNodesWithTag("quick.groundcontrol", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() || has("Page carousel") || settingsOpen()) break
             rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * y)) }; settle(300)
         }
         if (has("Page carousel")) return // a long press on an empty spot of a continuous home enters edit mode directly
-        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        if (!settingsOpen()) rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick().also { settle() }
+        // wave 40: Ground Control opens on the root list (the sheet's row) or, from a long press on a continuous home, on the Home screen page itself
+        if (rule.onAllNodesWithText("Edit home", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) { rule.onNodeWithTag("oneui.row.Home screen", useUnmergedTree = true).performScrollTo().performClick(); settle() }
         rule.onNodeWithText("Edit home", useUnmergedTree = true).performScrollTo().performClick(); settle()
     }
 

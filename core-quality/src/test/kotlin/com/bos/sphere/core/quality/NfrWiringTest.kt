@@ -30,7 +30,7 @@ class NfrWiringTest {
     @Test fun NFR_14_surfaceMorphsAskTheMotionPreference() {
         val users = listOf(
             "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/WheelDrawer.kt",
-            "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/SettingsSpace.kt",
+            "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/SettingsOneUi.kt",
             "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/LaunchpadReveal.kt",
             "app/src/main/kotlin/com/bos/sphere/HomeScreen.kt",
         )

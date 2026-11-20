@@ -23,7 +23,7 @@ object PreviewWindowGeometry {
     /** At least this much of the bar stays inside the window when the preview is bigger than the window it floats over. */
     const val REACH = 48f
     const val MARGIN = 12f
-    /** The default anchor sits this far under the top: below the Ground Control header, as the fixed dock did. */
+    /** The default anchor sits this far under the top (wave 40: the One UI host passes its own, below the app bar, through [LocalPreviewTop]). */
     const val TOP_DEFAULT = 64f
     /** Arrow keys move, and Shift+arrows resize, by this much. */
     const val KEY_STEP = 16f
@@ -59,7 +59,7 @@ object PreviewWindowGeometry {
     }
 
     /** Top-end under the header; mirrored to top-start in a right-to-left locale. */
-    fun defaultPos(areaW: Float, w: Float, rtl: Boolean): Pos = Pos(if (rtl) MARGIN else areaW - w - MARGIN, TOP_DEFAULT)
+    fun defaultPos(areaW: Float, w: Float, rtl: Boolean, top: Float = TOP_DEFAULT): Pos = Pos(if (rtl) MARGIN else areaW - w - MARGIN, top)
 
     private fun lo(area: Float, size: Float) = if (size <= area) 0f else -(size - REACH)
     private fun hi(area: Float, size: Float) = if (size <= area) area - size else area - REACH

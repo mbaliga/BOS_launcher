@@ -154,6 +154,9 @@ class InputTouchPathsUiTest {
             SettingsSpace(visible = true, categories = listOf(SettingCategory("Home", Glyphs.Apps, listOf(keyboardShortcutsRow()))), initialCategory = 0, sounds = null, onClose = { closed++ }, modifier = Modifier.fillMaxSize())
         }
         rule.mainClock.advanceTimeBy(600)
+        back() // wave 40: the page opened on a category (a deep link); Back first returns to the root list
+        rule.mainClock.advanceTimeBy(400)
+        assertEquals(0, closed)
         back()
         rule.mainClock.advanceTimeBy(100)
         assertEquals(1, closed)

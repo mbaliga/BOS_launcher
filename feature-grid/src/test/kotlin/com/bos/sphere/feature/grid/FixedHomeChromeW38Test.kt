@@ -92,7 +92,7 @@ class FixedHomeChromeW38UiTest {
                 if (page == 0) GlanceSurface(LauncherPrefs(), listOf(com.bos.sphere.core.data.RightDestination.Recents), true, indicator = false, dark = true)
                 else Box(Modifier.fillMaxSize().background(if (page == 1) Color(0xFF203050) else Color(0xFF502030)).testTag("page$page"))
             }
-            FixedHomeChrome(m, true, 4, {}, {}, {}, dark = true, accent = Color(0xFF8E7BFF), corners = { MinimalHotspotLayer(hotspots(), emptyMap(), showHints = false, onRun = { _, _ -> }, showIcons = true) })
+            FixedHomeChrome(m, true, 4, {}, {}, {}, dark = true, corners = { MinimalHotspotLayer(hotspots(), emptyMap(), showHints = false, onRun = { _, _ -> }, showIcons = true) })
             PageIndicator(count = 2, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter), onMenu = null, menuLabel = "", menuTag = "x", rtl = false, onGlance = {}, glanceCurrent = true, right = emptyList(), onRight = {}, quiet = false, awakeNonce = 0)
         }
     }
@@ -105,14 +105,14 @@ class FixedHomeChromeW38UiTest {
         File(outDir, "fixed_chrome_$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    private fun rects() = LauncherInput.focus.nodes().filter { it.id.startsWith("minimal.corner.") || it.id == "glance.nowplaying" || it.id == "glance.clock" }.associate { it.id to it.rect }
+    private fun rects() = LauncherInput.focus.nodes().filter { it.id.startsWith("minimal.corner.") || it.id == "glance.nowplaying" }.associate { it.id to it.rect }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun GFX_38_theFourHotspotsAndTheMusicLineStayAtTheSameScreenPositionOnGlanceMidSwipeAndOnPage2() {
         host()
         rule.waitForIdle()
         val onGlance = rects()
-        assertEquals(6, onGlance.size) // four hotspots, the clock, the music line
+        assertEquals(5, onGlance.size) // four hotspots and the music line (wave 41: the clock is page content, not chrome)
         // mid-swipe: drag the pager part of the way and hold the finger down
         rule.onNodeWithTag("pager").performTouchInput { down(center); moveBy(androidx.compose.ui.geometry.Offset(-width * 0.4f, 0f)) }
         rule.mainClock.advanceTimeBy(100)
@@ -132,15 +132,18 @@ class FixedHomeChromeW38UiTest {
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun GFX_38_theClockAndTheMusicLineAreBothOnAPageNotJustOnGlance() {
-        host(); rule.runOnUiThread { goTo(1) }; rule.waitForIdle()
-        rule.onNodeWithTag("page1").assertExists()
-        assertEquals(1, rule.onAllNodesWithTag("glance.clock.analog", useUnmergedTree = true).fetchSemanticsNodes().size)
-        assertEquals(1, rule.onAllNodesWithContentDescription("Now playing: Someday Out of The Blue · Artist").fetchSemanticsNodes().size)
-        for (t in listOf("glance.time", "glance.date", "glance.weather")) assertEquals(t, 0, rule.onAllNodesWithTag(t, useUnmergedTree = true).fetchSemanticsNodes().size)
-        val clock = rule.onNodeWithTag("glance.clock.analog", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+    fun GFX_41_theClockIsNotInTheFixedChromeItIsOnGlanceOnlyAndTheMusicLineIsTheTopLine() {
+        host()
+        rule.waitForIdle()
+        assertEquals("the clock is on the Glance page", 1, rule.onAllNodesWithTag("glance.clock", useUnmergedTree = true).fetchSemanticsNodes().size)
         val music = rule.onNodeWithContentDescription("Now playing: Someday Out of The Blue · Artist").fetchSemanticsNode().boundsInRoot
-        assertTrue("no overlap: the music line is under the clock", music.top >= clock.bottom - 1f)
+        val clock = rule.onNodeWithTag("glance.clock", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("the music line is the top line, above the big clock", music.bottom <= clock.top + 1f)
+        rule.runOnUiThread { goTo(1) }; rule.waitForIdle()
+        rule.onNodeWithTag("page1").assertExists()
+        assertEquals("no clock on a page", 0, rule.onAllNodesWithTag("glance.clock", useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals("the music line stays", 1, rule.onAllNodesWithContentDescription("Now playing: Someday Out of The Blue · Artist").fetchSemanticsNodes().size)
+        for (t in listOf("glance.time", "glance.date", "glance.weather")) assertEquals(t, 0, rule.onAllNodesWithTag(t, useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -155,7 +158,7 @@ class FixedHomeChromeW38UiTest {
     fun GFX_38_noMediaMeansNoMusicLine() {
         host(null); rule.waitForIdle()
         assertEquals(0, rule.onAllNodesWithContentDescription("Now playing", substring = true).fetchSemanticsNodes().size)
-        assertEquals("four hotspots and the clock", 5, rects().size)
+        assertEquals("four hotspots", 4, rects().size)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

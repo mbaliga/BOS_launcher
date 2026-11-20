@@ -114,6 +114,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
             .putString("clockStyle", next.clockStyle.name)
             .putString("clockFormat", next.clockFormat.name)
+            .putBoolean("glanceClockDate", next.glanceClockDate).putBoolean("glanceClockAccent", next.glanceClockAccent).putString("glanceClockSize", next.glanceClockSize.name)
             .putBoolean("badgesOn", next.badgesOn).putBoolean("badgeCount", next.badgeCount)
             .putBoolean("adaptiveGrid", next.adaptiveGrid).putFloat("gridDensity", next.gridDensity)
             .putFloat("cornerIconSize", next.cornerIconSize)
@@ -251,8 +252,11 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             // An install that already has settings saved is not a first run.
             onboardingDone = sp.getBoolean("onboardingDone", sp.contains("style") || sp.contains("pCols")),
             alwaysKeyboard = sp.getBoolean("alwaysKeyboard", d.alwaysKeyboard),
-            clockStyle = enumOr(sp.getString("clockStyle", null), d.clockStyle),
+            clockStyle = ClockStyle.fromStored(runCatching { sp.getString("clockStyle", null) }.getOrNull()) ?: d.clockStyle,
             clockFormat = enumOr(sp.getString("clockFormat", null), d.clockFormat),
+            glanceClockDate = sp.getBoolean("glanceClockDate", d.glanceClockDate),
+            glanceClockAccent = sp.getBoolean("glanceClockAccent", d.glanceClockAccent),
+            glanceClockSize = enumOr(sp.getString("glanceClockSize", null), d.glanceClockSize),
             badgesOn = sp.getBoolean("badgesOn", d.badgesOn),
             badgeCount = sp.getBoolean("badgeCount", d.badgeCount),
             adaptiveGrid = sp.getBoolean("adaptiveGrid", d.adaptiveGrid),

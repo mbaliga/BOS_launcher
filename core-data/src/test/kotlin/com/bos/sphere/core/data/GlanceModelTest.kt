@@ -152,14 +152,30 @@ class GlanceModelTest {
         assertTrue("suggestion" in RetiredPrefKeys.BY_FILE.getValue("launcher_prefs")); assertTrue("suggestion" in RetiredPrefKeys.DROPPED_ON_IMPORT)
     }
 
-    @Test fun GFX_38_theClockSettingsAreOneStyleAndTheKeptTwelveOrTwentyFourHourChoice() {
+    @Test fun GFX_41_theClockStylesHaveBigDigitalAsTheDefaultAndRoundTripWithTheOtherClockPrefs() {
         val d = LauncherPrefs()
-        assertEquals("analog is the default face", ClockStyle.Analog, d.clockStyle); assertEquals("the default follows the device", ClockFormat.System, d.clockFormat)
+        assertEquals(ClockStyle.BigDigital, d.clockStyle); assertEquals(ClockFormat.System, d.clockFormat)
+        assertFalse("the date is off by default", d.glanceClockDate); assertFalse(d.glanceClockAccent); assertEquals(ClockSize.Large, d.glanceClockSize)
         val sp = MapSharedPreferences()
-        LauncherPrefsStore(sp).update { it.copy(clockStyle = ClockStyle.Analog, clockFormat = ClockFormat.Hour12) }
+        LauncherPrefsStore(sp).update { it.copy(clockStyle = ClockStyle.Word, clockFormat = ClockFormat.Hour12, glanceClockDate = true, glanceClockAccent = true, glanceClockSize = ClockSize.Small) }
         val back = LauncherPrefsStore(sp).prefs.value
-        assertEquals(ClockStyle.Analog, back.clockStyle); assertEquals(ClockFormat.Hour12, back.clockFormat)
-        assertEquals(ClockStyle.Analog, LauncherPrefsStore(MapSharedPreferences(mapOf("clockStyle" to "Hologram"))).prefs.value.clockStyle)
+        assertEquals(ClockStyle.Word, back.clockStyle); assertEquals(ClockFormat.Hour12, back.clockFormat)
+        assertTrue(back.glanceClockDate); assertTrue(back.glanceClockAccent); assertEquals(ClockSize.Small, back.glanceClockSize)
+        assertEquals(ClockStyle.BigDigital, LauncherPrefsStore(MapSharedPreferences(mapOf("clockStyle" to "Hologram", "glanceClockSize" to "Huge"))).prefs.value.clockStyle)
+        assertEquals(ClockSize.Large, LauncherPrefsStore(MapSharedPreferences(mapOf("glanceClockSize" to "Huge"))).prefs.value.glanceClockSize)
+        assertEquals(ClockStyle.Off, LauncherPrefsStore(MapSharedPreferences(mapOf("clockStyle" to "Off"))).prefs.value.clockStyle)
+    }
+
+    @Test fun GFX_41_theWaveThirtyEightClockChoicesMigrateKeepingTheTwelveOrTwentyFourHourValue() {
+        val analog = LauncherPrefsStore(MapSharedPreferences(mapOf("clockStyle" to "Analog", "clockFormat" to "Hour24"))).prefs.value
+        assertEquals(ClockStyle.AnalogClassic, analog.clockStyle); assertEquals(ClockFormat.Hour24, analog.clockFormat)
+        val digital = LauncherPrefsStore(MapSharedPreferences(mapOf("clockStyle" to "Digital", "clockFormat" to "Hour12"))).prefs.value
+        assertEquals(ClockStyle.BigDigital, digital.clockStyle); assertEquals(ClockFormat.Hour12, digital.clockFormat)
+        // the migrated value is written under the new name on the next save
+        val sp = MapSharedPreferences(mapOf("clockStyle" to "Analog"))
+        LauncherPrefsStore(sp).update { it.copy(glanceControlsSeconds = 5) }
+        assertEquals("AnalogClassic", sp.getString("clockStyle", null))
+        assertEquals(ClockStyle.fromStored("Digital"), ClockStyle.BigDigital); assertEquals(null, ClockStyle.fromStored(null))
     }
 
     @Test fun GFX_38_theOldClockKeysAreRetiredButTheUsersFormatSurvives() {
@@ -173,6 +189,6 @@ class GlanceModelTest {
         for (k in ClockRetired.KEYS) { assertFalse("$k is deleted on the first save", old.contains(k)); assertTrue("$k is retired", k in RetiredPrefKeys.BY_FILE.getValue("launcher_prefs")); assertTrue(k in RetiredPrefKeys.DROPPED_ON_IMPORT) }
         assertEquals(ClockFormat.Hour12, LauncherPrefsStore(old).prefs.value.clockFormat)
         // garbage of any shape starts normally
-        assertEquals(ClockStyle.Analog, LauncherPrefsStore(MapSharedPreferences(mapOf("clockPosition" to 7, "strip" to "x:y:z,,", "clockSize" to "big"))).prefs.value.clockStyle)
+        assertEquals(ClockStyle.BigDigital, LauncherPrefsStore(MapSharedPreferences(mapOf("clockPosition" to 7, "strip" to "x:y:z,,", "clockSize" to "big"))).prefs.value.clockStyle)
     }
 }

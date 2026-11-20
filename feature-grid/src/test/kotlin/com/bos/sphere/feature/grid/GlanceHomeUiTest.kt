@@ -97,7 +97,7 @@ class GlanceHomeUiTest {
     /** Wave 38: the Glance has the one clock (analog by default) and no date, weather or battery node. */
     private fun assertNoClockDateWeather() {
         for (t in listOf("glance.time", "glance.date", "glance.weather", "glance.battery")) assertEquals(t, 0, rule.onAllNodesWithTag(t, useUnmergedTree = true).fetchSemanticsNodes().size)
-        assertEquals(1, rule.onAllNodesWithTag("glance.clock.analog", useUnmergedTree = true).fetchSemanticsNodes().size) // the default face
+        assertEquals(1, rule.onAllNodesWithTag("glance.clock.hours", useUnmergedTree = true).fetchSemanticsNodes().size) // wave 41: the default face is the big digital clock
     }
 
     // ---- the centre

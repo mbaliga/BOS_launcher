@@ -89,7 +89,8 @@ class HomeUnifyFlowTest : TourBase() {
         assertEquals(HomePages.Paginated, stores.prefs.prefs.value.homePages)
         quickGoTo("Edit home")
         assertTrue("Edit home goes to the first page in edit mode", editShown()); assertFalse(glanceShown())
-        // pick an app from the add carousel
+        // pick an app from the add carousel (wave 45: the carousel is in the page editor, one tap on the edit bar's title)
+        openPageEditorFromEdit()
         rule.onNodeWithContentDescription("Add to home: App 03").performClick(); settle()
         assertTrue("the app is on page 1", key(3) in pageKeys()); val before = pageKeys().size
         back(); assertFalse("Back leaves edit mode", editShown())

@@ -30,8 +30,8 @@ import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 
 /**
- * HOM-12: the explicit edit-mode chrome. A banner at the top says what edit mode is for; the bar
- * at the bottom carries Undo, Redo (with the depth of the 20-change history), Add page and Done.
+ * HOM-12: the bar of the PAGE EDITOR (the card with the strip of pages): Undo, Redo (with the depth of the 20-change history), Add page and Done. Wave 45: the
+ * single-page edit mode has its own chrome ([HomeEditChrome]: top bar, hint, tray), and the toast-like banner that used to sit above this bar is gone.
  * The home itself is a card beside the page carousel while this is shown. Nothing here changes the arrangement
  * itself: the drag, remove and page actions of the home already do that and the session records
  * them.
@@ -49,13 +49,6 @@ fun HomeEditBar(
 ) {
     // The card itself shows that edit mode is on (the home shrinks, see EditCardGeometry); no outline around the whole screen any more.
     Box(modifier.fillMaxSize()) {
-        Text(
-            L10n.tr("Editing home: drag items to rearrange, long-press for more"),
-            color = HyleColors.InkBright, fontSize = 12.sp,
-            modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 6.dp)
-                .background(Color(0xCC101426), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 6.dp)
-                .semantics { contentDescription = "Edit mode" },
-        )
         Row(
             Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(bottom = 10.dp, start = 12.dp, end = 12.dp)
                 .background(Color(0xE6101426), RoundedCornerShape(24.dp)).padding(horizontal = 8.dp, vertical = 6.dp),

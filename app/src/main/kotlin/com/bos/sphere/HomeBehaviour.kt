@@ -67,6 +67,9 @@ class HomeEditState internal constructor(private val layoutStore: HomeLayoutStor
     val canUndo: Boolean get() { rev; return session?.canUndo == true }
     val canRedo: Boolean get() { rev; return session?.canRedo == true }
     val undoDepth: Int get() { rev; return session?.undoDepth ?: 0 }
+    val redoDepth: Int get() { rev; return session?.redoDepth ?: 0 }
+    /** W45 (editChrome): something differs from what the session started with (the Cancel confirm asks only then). */
+    val hasChanges: Boolean get() { rev; return session?.hasChanges == true }
 
     /** Set by the screen once the item host exists. */
     var hooks: HomeEditHooks? = null
@@ -75,6 +78,15 @@ class HomeEditState internal constructor(private val layoutStore: HomeLayoutStor
     fun exit() {
         if (session != null) hooks?.end(layoutStore.layout.value.pages)
         session?.exit(); session = null; rev++
+    }
+    /** W45 (editChrome): Cancel. Puts the arrangement and the rail back to what they were on entry, then ends the session. */
+    fun cancel() {
+        val s = session ?: return
+        val was = layoutStore.layout.value.pages
+        val r = s.cancel()
+        write(was, r)
+        hooks?.end(layoutStore.layout.value.pages)
+        session = null; rev++
     }
     private fun write(was: List<com.bos.sphere.core.data.HomePage>, r: EditRestore?) {
         r ?: return

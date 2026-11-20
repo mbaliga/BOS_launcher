@@ -99,7 +99,7 @@ class PagesExplicitW30FlowTest : TourBase() {
         // the user places an app and a tile on page 1
         openQuickSheet()
         quickGoTo("Edit home")
-        assertTrue(editShown())
+        assertTrue(editShown()); openPageEditorFromEdit() // wave 45: the add carousel lives in the page editor, one tap on the edit bar's title
         rule.onNodeWithContentDescription("Add to home: App 03").performClick(); settle()
         assertEquals(listOf(key(3)), pages()[0].keys); assertTrue(pages()[1].keys.isEmpty())
         shoot("w30-edit-page1-one-app")

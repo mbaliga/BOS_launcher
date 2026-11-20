@@ -58,6 +58,10 @@ class LayoutDockEditSession(
         val pinsChanged get() = pinsBefore != null
     }
 
+    // W45 (editChrome): what the home and the rail were when the session began (or were last rebased to); Cancel puts exactly this back, however many changes
+    // were made (the undo stack holds only the last 20).
+    private var snapshotLayout = initial
+    private var snapshotPins = initialPins
     private val past = ArrayDeque<Entry>()
     private val future = ArrayDeque<Entry>()
     private var layout = initial
@@ -70,6 +74,24 @@ class LayoutDockEditSession(
     val canUndo: Boolean get() = past.isNotEmpty()
     val canRedo: Boolean get() = future.isNotEmpty()
     val undoDepth: Int get() = past.size
+    val redoDepth: Int get() = future.size
+
+    /** W45: true when the arrangement or the rail differs from the snapshot taken on entry: Cancel asks only then. */
+    val hasChanges: Boolean get() = layout != snapshotLayout || (pins.workspaceId == snapshotPins.workspaceId && pins.pins != snapshotPins.pins)
+
+    /**
+     * W45: Cancel. Returns what to write back to return to the entry snapshot (the rail only when it is the same workspace and it changed), or null when nothing
+     * changed. The session ends either way.
+     */
+    fun cancel(): EditRestore? {
+        val r = if (active && hasChanges) {
+            val samePins = pins.workspaceId == snapshotPins.workspaceId && pins.pins != snapshotPins.pins
+            EditRestore(snapshotLayout, if (samePins) snapshotPins.workspaceId else null, if (samePins) snapshotPins.pins else null)
+        } else null
+        if (r != null) { layout = snapshotLayout; if (r.pins != null) pins = snapshotPins }
+        exit()
+        return r
+    }
 
     fun exit() { active = false; past.clear(); future.clear() }
 
@@ -83,6 +105,7 @@ class LayoutDockEditSession(
         past.clear(); future.clear()
         this.layout = layout
         this.pins = pins
+        snapshotLayout = layout; snapshotPins = pins // a window size class swap is not part of the session: Cancel cannot cross it
     }
 
     private fun push(e: Entry) { past.addLast(e); while (past.size > limit) past.removeFirst(); future.clear() }

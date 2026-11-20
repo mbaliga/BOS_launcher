@@ -115,7 +115,7 @@ class EditCardAppTest {
         stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
         assertEquals(listOf(listOf(camera), listOf(alpha)), pageKeys(stores))
         rule.onNodeWithTag("pe.page.1").performClick(); settle(700) // wave 36: the page editor's rail acts on the page being edited, so the card is tapped first
-        rule.onNodeWithContentDescription("Delete page 2").performClick(); settle()
+        rule.onNodeWithTag("pe.more.1").performClick(); settle(200); rule.onNodeWithTag("pe.menu.delete.1").performClick(); settle()
         rule.onNodeWithText("1 item will be removed from this page. It stays in the drawer.").assertIsDisplayed() // wave 30: it asks first
         confirmDelete()
         assertEquals("wave 30: the deleted page's items leave the home, none joins the previous page", listOf(listOf(camera)), pageKeys(stores))
@@ -130,7 +130,7 @@ class EditCardAppTest {
         val camera = AppSmokeHarness.appKey("Camera"); val alpha = AppSmokeHarness.appKey("Alpha"); val bravo = AppSmokeHarness.appKey("Bravo")
         stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(camera), id = 7L), HomePage(keys = listOf(alpha), id = 8L)), seeded = true)); settle()
         rule.onNodeWithTag("pe.page.1").performClick(); settle(700) // wave 36: select the page, then the rail's Delete
-        rule.onNodeWithContentDescription("Delete page 2").performClick(); settle(300); confirmDelete()
+        rule.onNodeWithTag("pe.more.1").performClick(); settle(200); rule.onNodeWithTag("pe.menu.delete.1").performClick(); settle(300); confirmDelete()
         rule.onNodeWithContentDescription("Add to home: Bravo").performClick(); settle(300) // the notice lasts six seconds
         val afterAdd = pageKeys(stores)
         assertTrue(bravo in afterAdd.flatten())
@@ -143,7 +143,7 @@ class EditCardAppTest {
         val stores = startFresh()
         rule.onNodeWithText("Long press to add apps").performClick(); settle()
         rule.onNodeWithContentDescription("Add to home: Camera").performClick(); settle()
-        rule.onNodeWithContentDescription("Delete page 1").performClick(); settle(); confirmDelete()
+        rule.onNodeWithTag("pe.more.0").performClick(); settle(200); rule.onNodeWithTag("pe.menu.delete.0").performClick(); settle(); confirmDelete()
         assertEquals(1, stores.layout.layout.value.pages.size)
         assertTrue(stores.layout.layout.value.pages[0].keys.isEmpty())
         rule.onNodeWithContentDescription("Add to home: Camera").assertIsDisplayed() // back in the carousel

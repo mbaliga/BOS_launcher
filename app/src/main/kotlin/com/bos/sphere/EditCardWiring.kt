@@ -31,7 +31,6 @@ import com.bos.sphere.feature.grid.EditCardGeometry
 import com.bos.sphere.feature.grid.PageEditorGeometry
 import com.bos.sphere.feature.grid.PageScrollRequest
 import com.bos.sphere.feature.grid.PageEditorHost
-import com.bos.sphere.feature.grid.PageEditorMenu
 import com.bos.sphere.feature.grid.rememberPageEditorLayout
 import com.bos.sphere.feature.grid.GridHomeState
 import com.bos.sphere.feature.grid.UndoNotice
@@ -60,7 +59,7 @@ class EditCardState(val progress: State<Float>, val layout: PageEditorGeometry.L
     var addPageAction: (() -> Unit)? = null
     fun addPage() { addPageAction?.invoke() }
 
-    fun swing(): PageEditorGeometry.Swing = PageEditorGeometry.swing(swingProgress.floatValue, swingDx.floatValue, swingDy.floatValue, reduced)
+    fun swing(): PageEditorGeometry.Swing = PageEditorGeometry.swing(swingProgress.floatValue, swingDx.floatValue, swingDy.floatValue, reduced, layout.swingFrom)
 
     /** The card frame of the live page, with the swing added. Read only inside the home layer's graphicsLayer. */
     fun frame(): EditCardGeometry.Frame {
@@ -178,6 +177,7 @@ fun EditCardOverlay(
         onAddPage = { dx, dy -> addOnePage(dx, dy) },
         onDelete = { i -> if (HomePageOps.itemCount(pages, i) == 0) deleteNow(i) else confirmDelete = i },
         onMove = { i, d -> HomePageOps.move(pages, i, d)?.let(::apply) },
+        onReorder = { from, to -> HomePageOps.moveTo(pages, from, to)?.let(::apply) },
         onAddApp = { app -> if (addAppTo(app, current)) goto = current },
         onDropApp = { app, page ->
             if (addAppTo(app, page) && page != current) android.widget.Toast.makeText(homeItems.context(), L10n.tr("Added to page %d", page + 1), android.widget.Toast.LENGTH_SHORT).show()
@@ -192,10 +192,6 @@ fun EditCardOverlay(
         notice = notice, onNoticeDone = { notice = null },
         focusAdd = focusAdd, onExit = { homeEdit.exit() },
         modifier = modifier,
-        menu = PageEditorMenu(
-            canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo, onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
-            onAddPage = { card.addPage() }, onDone = { homeEdit.exit() },
-        ),
     )
 }
 

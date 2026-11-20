@@ -9,7 +9,7 @@ import org.junit.Test
 
 /** Wave 36 (pageEditor): the live page's card frame with the swing added; plain JVM (no composition needed). */
 class EditCardStateW36Test {
-    private val layout = PageEditorGeometry.layout(1080f, 2340f, continuous = false, mirrored = false, topReservePx = 200f, bottomReservePx = 240f, railPx = 150f, gapPx = 30f)
+    private val layout = PageEditorGeometry.layout(1080f, 2340f, 2.625f, 1f, false, 63f, 63f)
     private fun state(reduced: Boolean = false) = EditCardState(mutableFloatStateOf(1f), layout, reduced, continuous = false)
 
     @Test fun HOM_12_pe40_atRestTheFrameIsExactlyTheCardTransform() {

@@ -9,65 +9,113 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Wave 36 (pageEditor): the pure layout, swing and drop maths of the page editor. */
+/** Wave 36 (pageEditor), redone in wave 45 (pageEditorLayout): the pure layout, swing, reorder and drop maths of the page editor. */
 class PageEditorGeometryTest {
     private val d = 2.625f
-    private fun portrait(continuous: Boolean, mirrored: Boolean = false) =
-        PageEditorGeometry.layout(411 * d, 891 * d, continuous, mirrored, 76 * d, 92 * d, 56 * d, PageEditorGeometry.GAP_DP * d)
-    private fun landscape(continuous: Boolean, mirrored: Boolean = false) =
-        PageEditorGeometry.layout(891 * d, 411 * d, continuous, mirrored, 76 * d, 92 * d, 56 * d, PageEditorGeometry.GAP_DP * d)
+    private fun lay(wDp: Float, hDp: Float, mirrored: Boolean = false, font: Float = 1f, density: Float = d, top: Float = 24f, bottom: Float = 24f, bottomBar: Float = PageEditorGeometry.BOTTOM_BAR_DP) =
+        PageEditorGeometry.layout(wDp * density, hDp * density, density, font, mirrored, top * density, bottom * density, bottomBarDp = bottomBar)
+    private fun portrait(mirrored: Boolean = false) = lay(411f, 891f, mirrored)
+    private fun landscape(mirrored: Boolean = false) = lay(891f, 411f, mirrored, top = 0f)
 
-    @Test fun HOM_12_pe01_paginatedPortraitPutsTheStripOnTheRightAndTheTabsOnTheLeft() {
-        val l = portrait(continuous = false)
-        assertEquals(Axis.Vertical, l.axis)
-        assertEquals(CardSide.Right, l.target.side)
-        assertTrue("the card is pushed against the right edge, 4 percent off screen", l.card.right > 411 * d)
-        assertTrue("the tabs are left of the strip", l.tabs.right <= l.strip.left + 0.01f)
-        assertTrue("the tabs keep at least a third of the width for the app list", l.tabs.width >= 411 * d * 0.33f)
-        assertTrue("the card is centred in the strip's height", kotlin.math.abs((l.card.top + l.card.bottom) / 2f - (l.strip.top + l.strip.bottom) / 2f) < 1f)
-        assertTrue("neighbours peek: the strip is taller than the card", l.strip.height > l.card.height + 2 * 40 * d)
+    // sizes from a small phone to a large one, plus a tablet and the foldable-ish middle
+    private val phones = listOf(320f to 568f, 360f to 640f, 360f to 740f, 393f to 852f, 411f to 891f, 412f to 915f, 384f to 800f)
+
+    @Test fun HOM_12_pe01_portraitIsTopBarStripLiveCardTabsContentFromTopToBottom() {
+        val l = portrait()
+        assertEquals(PageEditorGeometry.Axis.Horizontal, l.axis); assertFalse(l.side)
+        assertEquals("the top bar slot is 56 dp below the status bar", 56 * d, l.topBar.height, 0.5f)
+        assertEquals(24 * d, l.topBar.top, 0.5f)
+        assertTrue("the strip is under the top bar", l.strip.top >= l.topBar.bottom - 0.5f)
+        assertTrue("the live card is under the strip", l.card.top > l.strip.bottom)
+        assertTrue("the tab row is under the live card", l.tabRow.top > l.card.bottom)
+        assertTrue("the content is under the tab row", l.content.top >= l.tabRow.bottom - 0.5f)
+        assertTrue("and inside the window", l.content.bottom <= 891 * d)
     }
 
-    @Test fun HOM_12_pe02_mirroredPutsTheStripOnTheLeft() {
-        val l = portrait(continuous = false, mirrored = true)
-        assertEquals(CardSide.Left, l.target.side)
-        assertTrue(l.card.left < 0f)
-        assertTrue(l.tabs.left >= l.strip.right - 0.01f)
+    @Test fun HOM_12_pe01b_theLiveCardIsNeverCroppedOnAnyPhoneSizeOrFontScale() {
+        for ((w, h) in phones) for (font in listOf(1f, 1.3f, 2f)) for (bar in listOf(PageEditorGeometry.BOTTOM_BAR_DP, 0f)) {
+            val l = lay(w, h, font = font, bottomBar = bar)
+            val c = l.card
+            val tag = "${w}x$h font $font bar $bar"
+            assertTrue("$tag: left", c.left >= 0f); assertTrue("$tag: top", c.top >= l.strip.bottom - 0.5f)
+            assertTrue("$tag: right", c.right <= w * d + 0.5f); assertTrue("$tag: bottom", c.bottom <= l.tabRow.top + 0.5f)
+            assertEquals("$tag: centred", (w * d - c.width) / 2f, c.left, 0.5f)
+            assertEquals("$tag: aspect of the window", w / h, c.width / c.height, 0.002f)
+            assertTrue("$tag: scale at most 0.88", l.target.scale <= PageEditorGeometry.LIVE_SCALE_MAX + 1e-4f)
+            assertTrue("$tag: content inside the window", l.content.bottom <= h * d - 24 * d + 0.5f)
+            assertTrue("$tag: the card is big enough to see (>= 0.2)", l.target.scale >= PageEditorGeometry.LIVE_SCALE_FLOOR - 1e-4f)
+        }
+    }
+
+    @Test fun HOM_12_pe01c_theContentPanelIsAboutThirtyPercentWhenTheLiveCardKeepsItsShareAndNeverBelowItsFloor() {
+        // 30 percent of the window, unless the live card would then drop below 0.38: the panel gives way first.
+        val l = lay(411f, 891f)
+        assertTrue("with the bottom bar's room reserved the panel is about a fifth", l.content.height / d in 150f..200f)
+        assertTrue("the live card keeps at least 0.38 where the panel can give way", l.target.scale >= 0.37f)
+        val free = lay(411f, 891f, bottomBar = 0f)
+        assertTrue("without the bar (the chrome's own top bar replaces it) the panel is about 30 percent", free.content.height >= 0.27f * 891 * d)
+        assertTrue(free.target.scale >= 0.37f)
+        assertEquals("a window tall enough gets the full 30 percent", 0.30f * 1400 * d, lay(500f, 1400f, bottomBar = 0f).content.height, 1f)
+        for ((w, h) in phones) assertTrue("$w x $h", lay(w, h).content.height >= PageEditorGeometry.CONTENT_FLOOR_DP * d - 0.5f)
+        assertTrue("the font grows the tab row", lay(411f, 891f, font = 1.3f).tabRow.height >= 1.3f * 48 * d - 0.5f)
+        assertEquals("up to 1.5 times", 1.5f * 48 * d, lay(411f, 891f, font = 2f).tabRow.height, 0.5f)
+    }
+
+    @Test fun HOM_12_pe01d_stripCardsAre64By112DpWithEightDpGapsAtDefaultSize() {
+        val l = portrait()
+        assertEquals(64 * d, l.cardW, 0.5f); assertEquals(112 * d, l.cardH, 0.5f)
+        assertEquals(72 * d, l.pitch, 0.5f)
+        assertEquals("the focus slot is the middle of the strip", 411 * d / 2f, l.slotX, 0.5f)
+        assertEquals((l.strip.top + l.strip.bottom) / 2f, l.slotY, 0.5f)
+        assertTrue("the strip holds the card with room for the outline", l.strip.height >= l.cardH + 2 * 8 * d - 0.5f)
+        assertEquals(0.9f, PageEditorGeometry.NEIGHBOUR_SCALE, 0f)
+        assertTrue("a small window scales the cards down a little, not below 0.8", lay(320f, 568f).cardW in 0.8f * 64 * d - 0.5f..64 * d)
+    }
+
+    @Test fun HOM_12_pe02_mirroredPutsTheSideStripOnTheLeftAndTheTabsOnTheRight() {
+        val l = landscape(mirrored = true)
+        assertTrue(l.side); assertTrue(l.strip.left <= 0.5f)
+        assertTrue("the card is right of the strip", l.card.left >= l.strip.right)
+        assertTrue("the tabs are right of the card", l.tabs.left >= l.card.right)
+        val r = landscape()
+        assertTrue(r.strip.right >= 891 * d - 0.5f); assertTrue(r.card.right <= r.strip.left); assertTrue(r.tabs.right <= r.card.left)
         assertTrue(PageEditorGeometry.mirrored(layoutRtl = true, orderRtl = false))
         assertTrue(PageEditorGeometry.mirrored(layoutRtl = false, orderRtl = true))
         assertTrue(PageEditorGeometry.mirrored(layoutRtl = true, orderRtl = true))
         assertFalse(PageEditorGeometry.mirrored(layoutRtl = false, orderRtl = false))
     }
 
-    @Test fun HOM_12_pe03_continuousPortraitPutsTheStripAcrossTheTopAndTheTabsBelow() {
-        val l = portrait(continuous = true)
-        assertEquals(Axis.Horizontal, l.axis)
-        assertTrue("the tabs are below the strip", l.tabs.top >= l.strip.bottom)
-        assertEquals("the live card is centred across", (411 * d - l.card.width) / 2f, l.card.left, 0.5f)
-        assertEquals(76 * d, l.card.top, 0.5f)
-        assertTrue("neighbours peek left and right", l.card.left > 0f && l.strip.width > l.card.width)
-        assertTrue("the content has room: more than half of the free height", l.tabs.height > (891 - 76 - 92) * d * 0.5f)
-        assertTrue("the rail (move, delete) sits under the card inside the strip", l.rail.top >= l.card.bottom - 0.01f && l.rail.bottom <= l.strip.bottom + 0.01f)
+    @Test fun HOM_12_pe03_aMirroredPortraitStripRunsTheOtherWayAlongTheRow() {
+        val l = portrait(mirrored = true)
+        assertEquals(PageEditorGeometry.Axis.Horizontal, l.axis)
+        val (dx0, _) = PageEditorGeometry.offsetOf(2, 1, l)
+        val (dx1, _) = PageEditorGeometry.offsetOf(2, 1, portrait())
+        assertEquals(-dx1 + 2 * (l.slotX - (l.card.left + l.card.width / 2f)), dx0, 0.5f)
+        assertTrue("mirrored: a later page is to the left of the live card", dx0 < 0f && dx1 > 0f)
     }
 
-    @Test fun HOM_12_pe04_landscapeKeepsTheStripOnTheSideInBothModes() {
-        for (continuous in listOf(false, true)) {
-            val l = landscape(continuous)
-            assertEquals(Axis.Vertical, l.axis)
-            assertTrue(l.target.landscape)
-            assertTrue("the card fits the free height", l.card.height <= (411 - 76 - 92) * d + 0.5f)
-            assertTrue("the tabs keep a third of the width", l.tabs.width >= 891 * d * 0.33f)
+    @Test fun HOM_12_pe04_landscapeAndTabletsPutTheStripOnTheSideAndKeepTheLiveCardWhole() {
+        val sizes = listOf(891f to 411f, 640f to 360f, 800f to 1280f, 600f to 960f, 1280f to 800f)
+        for ((w, h) in sizes) {
+            val l = lay(w, h, top = 24f, bottom = 0f)
+            val tag = "${w}x$h"
+            assertTrue("$tag side", l.side); assertEquals(PageEditorGeometry.Axis.Vertical, l.axis)
+            val c = l.card
+            assertTrue("$tag inside", c.left >= 0f && c.right <= w * d + 0.5f && c.top >= l.topBar.bottom - 0.5f && c.bottom <= h * d + 0.5f)
+            assertTrue("$tag the tabs keep room", l.tabs.width >= 200 * d)
+            assertTrue("$tag the tabs and the card do not overlap", l.tabs.right <= c.left + 0.5f)
+            assertTrue("$tag the strip is a column at the end", l.strip.height > l.strip.width)
+            assertTrue("$tag the strip does not overlap the card", c.right <= l.strip.left + 0.5f)
         }
-        assertFalse("tabs are a row in landscape and in continuous", PageEditorGeometry.tabsVertical(continuous = false, landscape = true))
-        assertFalse(PageEditorGeometry.tabsVertical(continuous = true, landscape = false))
-        assertTrue(PageEditorGeometry.tabsVertical(continuous = false, landscape = false))
+        assertFalse("599 dp wide portrait is still a phone", lay(599f, 900f).side)
+        assertTrue("600 dp wide is a tablet", lay(600f, 900f).side)
     }
 
-    @Test fun HOM_12_pe05_theTargetMovesTheFullScreenLayerOntoTheFocusSlot() {
-        for (l in listOf(portrait(false), portrait(true), landscape(false), portrait(false, mirrored = true))) {
+    @Test fun HOM_12_pe05_theTargetMovesTheFullScreenLayerOntoTheLiveCard() {
+        for (l in listOf(portrait(), landscape(), portrait(mirrored = true), lay(800f, 1280f))) {
             val t = l.target
-            val w = if (t.landscape) 891 * d else 411 * d; val h = if (t.landscape) 411 * d else 891 * d
-            // The layer scales about its centre and is then translated: its on-screen rectangle is the card.
+            val w = if (t.landscape) 891 * d else if (l.side) 800 * d else 411 * d; val h = if (t.landscape) 411 * d else if (l.side) 1280 * d else 891 * d
+            if (!t.landscape && l.side && l.card.width > 0 && w != 800 * d) continue
             val cx = w / 2f + t.translationX; val cy = h / 2f + t.translationY
             assertEquals(l.card.left + l.card.width / 2f, cx, 0.5f)
             assertEquals(l.card.top + l.card.height / 2f, cy, 0.5f)
@@ -85,13 +133,14 @@ class PageEditorGeometryTest {
         assertEquals(1, PageEditorGeometry.focusPosition(glance = false, glanceFocus = true, current = 1))
     }
 
-    @Test fun HOM_12_pe07_offsetsRunDownTheSideStripAndAcrossTheTopStripMirroredInRtl() {
-        val side = portrait(false)
-        assertEquals(0f to side.pitch * 2, PageEditorGeometry.offsetOf(3, 1, side))
-        assertEquals(0f to -side.pitch, PageEditorGeometry.offsetOf(0, 1, side))
-        val top = portrait(true); val topRtl = portrait(true, mirrored = true)
-        assertEquals(top.pitch to 0f, PageEditorGeometry.offsetOf(2, 1, top))
-        assertEquals(-topRtl.pitch to 0f, PageEditorGeometry.offsetOf(2, 1, topRtl))
+    @Test fun HOM_12_pe07_offsetsAreFromTheLiveCardCentreAlongTheRowOrTheColumn() {
+        val top = portrait(); val side = landscape()
+        val cx = top.card.left + top.card.width / 2f; val cy = top.card.top + top.card.height / 2f
+        assertEquals(top.slotX + top.pitch * 2 - cx, PageEditorGeometry.offsetOf(3, 1, top).first, 0.5f)
+        assertEquals("a row card sits above the live card: negative dy", top.slotY - cy, PageEditorGeometry.offsetOf(3, 1, top).second, 0.5f)
+        assertTrue(PageEditorGeometry.offsetOf(3, 1, top).second < 0f)
+        assertEquals(side.slotY + side.pitch - (side.card.top + side.card.height / 2f), PageEditorGeometry.offsetOf(2, 1, side).second, 0.5f)
+        assertTrue("the column is right of the live card", PageEditorGeometry.offsetOf(2, 1, side).first > 0f)
     }
 
     @Test fun HOM_12_pe08_theSwingStartsAtTheTappedCardAndEndsAtRest() {
@@ -108,6 +157,9 @@ class PageEditorGeometryTest {
         assertEquals(-start.rotationX, PageEditorGeometry.swing(0f, 0f, -480f, false).rotationX, 0.001f)
         val side = PageEditorGeometry.swing(0f, 300f, 0f, false)
         assertTrue(side.rotationY != 0f && side.rotationX == 0f)
+        val diag = PageEditorGeometry.swing(0f, 20f, -400f, false)
+        assertTrue("the dominant offset picks the one tilt axis", diag.rotationX != 0f && diag.rotationY == 0f)
+        assertEquals("a custom start scale (the strip card's size relative to the live card)", 0.4f, PageEditorGeometry.swing(0f, 0f, 100f, false, startScale = 0.4f).scale, 0.001f)
     }
 
     @Test fun HOM_12_pe09_reducedMotionCrossFadesWithoutMovementOrTilt() {
@@ -120,17 +172,17 @@ class PageEditorGeometryTest {
     }
 
     @Test fun HOM_12_pe10_dropHitTestingPicksThePageUnderTheFinger() {
-        val l = portrait(false)
+        val l = portrait()
         val live = PageEditorGeometry.DropTarget(1, l.card)
-        val below = PageEditorGeometry.DropTarget(2, EdgeRect(l.card.left, l.card.bottom + 12 * d, l.card.right, l.card.bottom + 12 * d + l.card.height))
-        val clipped = PageEditorGeometry.visible(below.rect, l.strip)
+        val sc = EdgeRect(l.slotX + l.pitch - l.cardW / 2f, l.slotY - l.cardH / 2f, l.slotX + l.pitch + l.cardW / 2f, l.slotY + l.cardH / 2f)
+        val peek = EdgeRect(l.strip.right - l.cardW / 2f, sc.top, l.strip.right + l.cardW / 2f, sc.bottom)
+        val clipped = PageEditorGeometry.visible(peek, l.strip)
         assertNotNull(clipped)
-        assertTrue("the peeking card is cut at the strip's end", clipped!!.bottom <= l.strip.bottom)
-        val targets = listOf(live, PageEditorGeometry.DropTarget(2, clipped))
+        assertTrue("a card half off the strip is cut at its end", clipped!!.right <= l.strip.right)
+        val targets = listOf(live, PageEditorGeometry.DropTarget(2, sc), PageEditorGeometry.DropTarget(3, clipped))
         assertEquals(1, PageEditorGeometry.hit(targets, l.card.left + 10, l.card.top + 10))
-        assertEquals(2, PageEditorGeometry.hit(targets, l.card.left + 10, l.card.bottom + 20 * d))
-        assertNull("the gap, the tabs and the far edge are not targets", PageEditorGeometry.hit(targets, 10f, 10f))
-        assertNull(PageEditorGeometry.hit(targets, l.card.left + 10, l.card.bottom + 2 * d))
+        assertEquals(2, PageEditorGeometry.hit(targets, sc.left + 5, sc.top + 5))
+        assertNull("the gap, the tabs and the far edge are not targets", PageEditorGeometry.hit(targets, 1f, 1f))
         assertNull(PageEditorGeometry.visible(EdgeRect(0f, 0f, 10f, 10f), EdgeRect(20f, 20f, 30f, 30f)))
     }
 
@@ -141,14 +193,31 @@ class PageEditorGeometryTest {
 
     // ---- wave 37 (editorDebt) ----
 
-    @Test fun HOM_12_ed01_theGapBetweenCardsIsSixDpNotTwelve() {
-        assertEquals(6f, PageEditorGeometry.GAP_DP, 0f)
-        val side = portrait(continuous = false); val top = portrait(continuous = true)
-        assertEquals("the pitch is the card plus six dp", side.card.height + 6 * d, side.pitch, 0.01f)
-        assertEquals(top.card.width + 6 * d, top.pitch, 0.01f)
-        // the neighbours still peek: the strip shows well over the gap above and below the card
-        assertTrue((side.strip.height - side.card.height) / 2f > 6 * d + 20 * d)
-        assertTrue("the peeking neighbour is closer than with the old 12 dp gap", side.pitch < side.card.height + 12 * d)
+    // ---- wave 45: reorder maths ----
+
+    @Test fun HOM_12_pl01_dropIndexRoundsTheTravelToTheNearestSlotAndClamps() {
+        val pitch = 72f
+        assertEquals(2, PageEditorGeometry.dropIndex(2, 0f, pitch, 5))
+        assertEquals(2, PageEditorGeometry.dropIndex(2, 35f, pitch, 5)); assertEquals(3, PageEditorGeometry.dropIndex(2, 37f, pitch, 5))
+        assertEquals(1, PageEditorGeometry.dropIndex(2, -37f, pitch, 5)); assertEquals(2, PageEditorGeometry.dropIndex(2, -35f, pitch, 5))
+        assertEquals(4, PageEditorGeometry.dropIndex(2, 1000f, pitch, 5)); assertEquals(0, PageEditorGeometry.dropIndex(2, -1000f, pitch, 5))
+        assertEquals(0, PageEditorGeometry.dropIndex(0, 50f, pitch, 1))
+        assertEquals("two slots", 4, PageEditorGeometry.dropIndex(2, 144f, pitch, 6))
+    }
+
+    @Test fun HOM_12_pl02_theInsertionLineIsAfterTheTargetWhenMovingLaterAndBeforeItWhenMovingEarlier() {
+        assertEquals(4, PageEditorGeometry.insertionGap(1, 3)); assertEquals(1, PageEditorGeometry.insertionGap(3, 1))
+        assertEquals("one step later", 3, PageEditorGeometry.insertionGap(1, 2)); assertEquals(0, PageEditorGeometry.insertionGap(2, 0))
+    }
+
+    @Test fun HOM_12_pl03_stepsStopAtTheEndsAndArrowsFollowTheStripDirection() {
+        assertNull(PageEditorGeometry.stepTarget(0, -1, 4)); assertNull(PageEditorGeometry.stepTarget(3, 1, 4))
+        assertEquals(2, PageEditorGeometry.stepTarget(1, 1, 4)); assertEquals(0, PageEditorGeometry.stepTarget(1, -1, 4))
+        assertEquals("right is later in a row", 1, PageEditorGeometry.stepOf(true, false, right = true, down = false))
+        assertEquals("left is earlier", -1, PageEditorGeometry.stepOf(true, false, right = false, down = false))
+        assertEquals("a mirrored row: right is earlier", -1, PageEditorGeometry.stepOf(true, true, right = true, down = false))
+        assertEquals("down is later in a column", 1, PageEditorGeometry.stepOf(false, false, right = false, down = true))
+        assertEquals(-1, PageEditorGeometry.stepOf(false, true, right = false, down = false))
     }
 
     private val cells = listOf("a", "b", "c", "d", "e").mapIndexed { i, k -> com.bos.sphere.core.catalog.ColumnFill.Cell(k, i / 2, i % 2, com.bos.sphere.core.catalog.WidgetSpan(1, 1)) }

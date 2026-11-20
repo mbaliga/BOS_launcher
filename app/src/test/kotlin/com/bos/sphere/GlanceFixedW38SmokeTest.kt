@@ -48,7 +48,7 @@ class GlanceFixedW38SmokeTest : TourBase() {
         launch()
     }
 
-    private fun rects() = LauncherInput.focus.nodes().filter { it.id.startsWith("corner.") || it.id == "glance.clock" }.associate { it.id to it.rect }
+    private fun rects() = LauncherInput.focus.nodes().filter { it.id.startsWith("corner.") }.associate { it.id to it.rect }
     private fun swipe(forward: Boolean) { rule.onNodeWithTag("home.pager").performTouchInput { val y = height * 0.5f; val a = width * 0.75f; val b = width * 0.25f; swipe(Offset(if (forward) a else b, y), Offset(if (forward) b else a, y), 300) }; settle() }
 
     private fun shoot(name: String) {
@@ -67,7 +67,7 @@ class GlanceFixedW38SmokeTest : TourBase() {
     @Test fun GFX_38_theFourHotspotsStayAtTheSameScreenPositionOnGlanceMidSwipeAndOnTheNextPage() {
         start()
         assertTrue(glanceShown())
-        val onGlance = rects(); assertEquals("four hotspots and the clock", 5, onGlance.size)
+        val onGlance = rects(); assertEquals("four hotspots", 4, onGlance.size)
         rule.onNodeWithTag("home.pager").performTouchInput { down(Offset(width * 0.75f, height * 0.5f)); moveBy(Offset(-width * 0.3f, 0f)) }
         rule.mainClock.advanceTimeBy(100)
         val mid = rects()
@@ -93,23 +93,19 @@ class GlanceFixedW38SmokeTest : TourBase() {
 
     private fun onNodeShown(desc: String) { rule.onNodeWithContentDescription(desc).assertIsDisplayed() }
 
-    @Test fun GFX_38_theClockIsOnGlanceAndOnAPageAndThereIsNoDateOrWeatherAnywhere() {
+    @Test fun GFX_41_theBigClockIsOnTheGlancePageOnlyAndScrollsAwayWithItWhileTheMusicLineStays() {
         start()
         MediaNow.publishForTest(track); settle()
         assertTrue(glanceShown())
-        assertTrue("the default face is analog", tagShown("glance.clock.analog"))
+        assertTrue("the default style is the big digital clock", tagShown("glance.clock.hours"))
         onNodeShown("Now playing: Someday Out of The Blue · Artist")
         for (t in listOf("glance.time", "glance.date", "glance.weather")) assertFalse(t, tagShown(t))
-        shoot("w38_glance_dark")
+        shoot("w41_glance_dark")
         swipe(true)
         assertFalse(glanceShown())
-        assertTrue("the clock is on the page too", tagShown("glance.clock.analog"))
+        assertFalse("no clock on a page", tagShown("glance.clock"))
         onNodeShown("Now playing: Someday Out of The Blue · Artist")
-        for (t in listOf("glance.time", "glance.date", "glance.weather")) assertFalse(t, tagShown(t))
-        val clock = rule.onNodeWithTag("glance.clock.analog", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val music = rule.onNodeWithContentDescription("Now playing: Someday Out of The Blue · Artist").fetchSemanticsNode().boundsInRoot
-        assertTrue("the music line is under the clock", music.top >= clock.bottom - 1f)
-        shoot("w38_page_clock_music_dark")
+        shoot("w41_page_no_clock_dark")
     }
 
     @Test fun GFX_38_theChosenCornerStyleAppliesToTheHotspotsOnEveryPageLive() {
@@ -124,11 +120,14 @@ class GlanceFixedW38SmokeTest : TourBase() {
         assertEquals("back to Holo, live", glyph, rects().getValue("corner.BottomLeft"))
     }
 
-    @Test fun GFX_38_theClockSettingIsAnalogOrDigitalWithTwelveOrTwentyFourHourForDigital() {
-        val a = com.bos.sphere.ui.glanceSettings(LauncherPrefs()) { }
-        assertTrue("Clock" in a.map { it.title }); assertFalse("Clock format" in a.map { it.title })
-        val d = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.Digital)) { }
-        assertTrue("Clock format" in d.map { it.title })
+    @Test fun GFX_41_theClockSettingsAreStyleFormatDateColourAndSizeAndNothingWhenOff() {
+        val a = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.AnalogClassic)) { }.map { it.title }
+        assertTrue("Clock style" in a); assertFalse("Clock format" in a)
+        for (t in listOf("Show date under the clock", "Clock colour", "Clock size")) assertTrue(t, t in a)
+        val d = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.BigDigitalLine)) { }.map { it.title }
+        assertTrue("Clock format" in d)
+        val off = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.Off)) { }.map { it.title }
+        assertTrue("Clock style" in off); for (t in listOf("Clock format", "Show date under the clock", "Clock colour", "Clock size")) assertFalse(t, t in off)
     }
 
     @Test fun GFX_38_theMusicToggleHidesTheLineOnEveryPage() {

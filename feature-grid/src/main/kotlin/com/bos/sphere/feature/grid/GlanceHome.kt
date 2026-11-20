@@ -125,7 +125,7 @@ object GlanceText {
 
 /**
  * Wave 38 (glanceFixed): the Glance page is the CALM page: only the wallpaper (the [underlay] and its scrim) and the home gestures. The time, the date and the
- * weather are gone with their settings; the four hotspots, the clock, the music line and the page dots are the fixed chrome the home draws above its pager
+ * weather are gone with their settings (wave 41 brings back ONE big wallpaper clock, drawn in this page); the four hotspots, the music line and the page dots are the fixed chrome the home draws above its pager
  * ([FixedHomeChrome], the dots by the home), so they do not move while this page scrolls away. A standalone surface (tests, previews) may still draw its
  * own one-stop indicator ([indicator] true); the home passes false.
  */
@@ -144,6 +144,9 @@ fun GlanceSurface(
     gestures: HomeGestureSpec? = null,
     dark: Boolean = isDarkSurface(),
     underlay: @Composable () -> Unit = {},
+    /** Wave 41: a tap on the wallpaper clock (the home opens the clock app) and its accent colour. */
+    onClockTap: () -> Unit = {},
+    clockAccent: Color = com.bos.sphere.core.design.HyleColors.Violet,
 ) {
     var awakeNonce by remember { mutableIntStateOf(0) }
     // Wave 34: with the system live wallpaper chosen the surface has no base colour at all, so the wallpaper behind the window shows through.
@@ -157,6 +160,10 @@ fun GlanceSurface(
                 // decoration for accessibility: the surface has no content of its own
                 .clearAndSetSemantics { },
         )
+        // Wave 41: the big wallpaper clock is part of this page (it scrolls away with it); position fixed at the upper-middle.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            GlanceWallpaperClock(prefs.clockStyle, prefs.clockFormat, prefs.glanceClockSize, prefs.glanceClockDate, prefs.glanceClockAccent, dark, clockAccent, onClockTap)
+        }
         if (indicator && prefs.glanceIndicator) Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             PageIndicator(
                 count = 0, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),

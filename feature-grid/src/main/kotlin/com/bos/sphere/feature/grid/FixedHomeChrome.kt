@@ -46,9 +46,6 @@ object FixedHomeChrome {
     /** The media listener only needs to run while the music line can show. */
     fun listensToMedia(showMusic: Boolean): Boolean = showMusic
 
-    /** The clock row above the music line (the clock's 48 dp touch target). */
-    const val CLOCK_ROW_DP = 48f
-
     /** A hotspot's reserved touch area (dp): at least the 48 dp minimum, so it always wins its corner over the pager. */
     const val HOTSPOT_TOUCH_DP = 64f
 
@@ -61,7 +58,7 @@ object FixedHomeChrome {
 }
 
 /**
- * The fixed chrome above the home pager: the clock at the top centre, the music line with its pop-in controls notch at the top and the four (or fewer) hotspots in the corners.
+ * The fixed chrome above the home pager (wave 41: no clock any more, the clock is part of the Glance page): the music line with its pop-in controls notch at the top and the four (or fewer) hotspots in the corners.
  * It fills the window and has no scroll or pager offset of its own, so it stays exactly in place on every page and during a swipe. The music line is
  * the one from the old Glance notch (same text, 14 sp, marquee, pop-in controls), now shown whenever [media] is active and [showMusic] is on.
  * Layers bottom to top: the music line, the controls notch, the hotspots. Composition order is the TalkBack order (now playing, controls, hotspots).
@@ -76,10 +73,6 @@ fun FixedHomeChrome(
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
     onAwake: () -> Unit = {},
-    clockStyle: com.bos.sphere.core.data.ClockStyle = com.bos.sphere.core.data.ClockStyle.Analog,
-    clockFormat: com.bos.sphere.core.data.ClockFormat = com.bos.sphere.core.data.ClockFormat.System,
-    accent: Color = com.bos.sphere.core.design.HyleColors.Violet,
-    onClockTap: () -> Unit = {},
     /** The four (or fewer) hotspots, drawn above the music line: the home passes its corner layer, so the chosen corner style (Holo, Sony discs, bubbles) applies. */
     corners: @Composable () -> Unit = {},
     dark: Boolean = isDarkSurface(),
@@ -114,8 +107,7 @@ fun FixedHomeChrome(
                 if (playing && pop.visible) GlanceNotch.TITLE_PUSH_DP.dp else 0.dp,
                 if (reduced) snap() else spring(dampingRatio = 0.8f, stiffness = 420f), label = "chromeTitlePush",
             )
-            GlanceClock(clockStyle, clockFormat, inkDim, accent, hidden = pop.visible, onTap = onClockTap, modifier = Modifier.align(Alignment.TopCenter).padding(top = GlanceNotch.TITLE_TOP_DP.dp))
-            Box(Modifier.align(Alignment.TopCenter).padding(top = (GlanceNotch.TITLE_TOP_DP + FixedHomeChrome.CLOCK_ROW_DP).dp).offset { IntOffset(0, push.roundToPx()) }.height(40.dp).testTag("glance.title.slot")) {
+            Box(Modifier.align(Alignment.TopCenter).padding(top = GlanceNotch.TITLE_TOP_DP.dp).offset { IntOffset(0, push.roundToPx()) }.height(40.dp).testTag("glance.title.slot")) {
                 if (playing && media != null) {
                     NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = (w - 2 * GlanceNotch.TITLE_SIDE_DP).coerceIn(120f, 280f).dp, edge = if (dark) Color.Black else Color(0xFFF3F3F6))
                 }

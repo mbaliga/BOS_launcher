@@ -109,8 +109,27 @@ enum class WebEngine(val label: String, private val template: String) {
 /** Clock number format. */
 enum class ClockFormat(val label: String) { System("System"), Hour12("12-hour"), Hour24("24-hour") }
 
-/** Wave 38: the clock on every page (the fixed chrome): an analog dial (default) or a digital time in the music text's size. */
-enum class ClockStyle(val label: String) { Analog("Analog"), Digital("Digital") }
+/**
+ * Wave 41 (glanceClock): the styles of the big wallpaper clock on the Glance page (it replaces the small wave 38 clock of the fixed chrome). The stored name of
+ * an older install ("Analog", "Digital") is mapped by [fromStored]: Analog -> AnalogClassic, Digital -> BigDigital.
+ */
+enum class ClockStyle(val label: String) {
+    BigDigital("Big digital"), BigDigitalLine("Big digital, one line"), AnalogClassic("Analog classic"), AnalogMinimal("Analog minimal"), Word("Word clock"), Off("Off");
+
+    val digital: Boolean get() = this == BigDigital || this == BigDigitalLine
+
+    companion object {
+        fun fromStored(name: String?): ClockStyle? = when (name) {
+            null -> null
+            "Analog" -> AnalogClassic
+            "Digital" -> BigDigital
+            else -> entries.firstOrNull { it.name == name }
+        }
+    }
+}
+
+/** Wave 41: the size of the Glance clock; Large is the default. [factor] scales the style's largest size. */
+enum class ClockSize(val label: String, val factor: Float) { Small("Small", 0.6f), Medium("Medium", 0.8f), Large("Large", 1f) }
 
 /** Whether corner actions show a drawn glyph or the real icon of the app they open. */
 enum class CornerIconMode(val label: String) { Glyph("Glyph"), AppIcon("App icon") }
@@ -274,8 +293,12 @@ data class LauncherPrefs(
     val iconSpacing: Float = 0f,
 
     // --- clock (wave 38: one clock, on the Glance page only: Analog or Digital, and for Digital 12 or 24 hour; System follows the device)
-    val clockStyle: ClockStyle = ClockStyle.Analog,
+    val clockStyle: ClockStyle = ClockStyle.BigDigital,
     val clockFormat: ClockFormat = ClockFormat.System,
+    /** Wave 41: the date under the Glance clock (small, locale format; default off), the accent colour instead of the legibility ink, and the size. */
+    val glanceClockDate: Boolean = false,
+    val glanceClockAccent: Boolean = false,
+    val glanceClockSize: ClockSize = ClockSize.Large,
 
     // --- badges and adaptive grid (HOM-09, HOM-11)
     val badgesOn: Boolean = true,

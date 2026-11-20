@@ -1068,6 +1068,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             rightDestinations = com.bos.sphere.core.data.RightSideDestinations.of(prefs.rightSide),
                             hasLaunchpad = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off,
                             gestures = glanceGestureSpec,
+                            onClockTap = { runner.run(CornerActionId.Clock) },
                             onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true },
                             onOpenRight = { openRecents() },
                             indicator = false, onAwake = { indicatorAwake++ }, // wave 28: the one page indicator is drawn by the home, above the pager
@@ -1180,7 +1181,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     media = mediaInfo, showMusic = prefs.showMusic, controlsSeconds = prefs.glanceControlsSeconds,
                     onPrevious = { com.bos.sphere.core.data.MediaNow.previous() }, onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() }, onNext = { com.bos.sphere.core.data.MediaNow.next() },
                     onAwake = { indicatorAwake++ },
-                    clockStyle = prefs.clockStyle, clockFormat = prefs.clockFormat, accent = com.bos.sphere.core.design.HyleColors.Violet, onClockTap = { runner.run(CornerActionId.Clock) },
                     corners = { Corners() },
                 )
             }

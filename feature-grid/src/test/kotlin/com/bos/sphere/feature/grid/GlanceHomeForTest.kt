@@ -36,10 +36,11 @@ fun GlanceHomeForTest(
     onOpenRight: () -> Unit = {},
     indicator: Boolean = true,
     dark: Boolean = isDarkSurface(),
+    onClockTap: () -> Unit = {},
 ) {
     var awake by remember { mutableIntStateOf(0) }
     Box(modifier.fillMaxSize()) {
-        GlanceSurface(prefs, rightDestinations, hasLaunchpad, Modifier.fillMaxSize(), onOpenLaunchpad, onOpenRight, indicator, onAwake = { awake++ }, dark = dark)
-        FixedHomeChrome(media, prefs.showMusic, prefs.glanceControlsSeconds, onPrevious, onPlayPause, onNext, dark = dark, clockStyle = prefs.clockStyle, clockFormat = prefs.clockFormat, corners = { MinimalHotspotLayer(hotspots, appsByKey, showHints = false, onRun = onRun, showIcons = true, iconTint = GlanceInk.secondary(dark)) })
+        GlanceSurface(prefs, rightDestinations, hasLaunchpad, Modifier.fillMaxSize(), onOpenLaunchpad, onOpenRight, indicator, onAwake = { awake++ }, dark = dark, onClockTap = onClockTap)
+        FixedHomeChrome(media, prefs.showMusic, prefs.glanceControlsSeconds, onPrevious, onPlayPause, onNext, dark = dark, corners = { MinimalHotspotLayer(hotspots, appsByKey, showHints = false, onRun = onRun, showIcons = true, iconTint = GlanceInk.secondary(dark)) })
     }
 }

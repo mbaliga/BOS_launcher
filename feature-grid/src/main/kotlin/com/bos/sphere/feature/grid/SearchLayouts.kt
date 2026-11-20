@@ -564,7 +564,13 @@ private sealed interface FRow {
     data class Sugg(val item: SuggItem, val index: Int) : FRow { override val key get() = "s:$index" }
     data class Item(val tile: Tile) : FRow { override val key get() = "i:${tile.key}" }
     data class Note(val text: String) : FRow { override val key get() = "n:$text" }
+    /** Wave 38: the quiet row at the end that offers the hidden apps matching the query. */
+    data class HiddenToggle(val count: Int, val open: Boolean) : FRow { override val key get() = "hid:toggle" }
+    data class HiddenApp(val app: com.bos.sphere.core.data.AppEntry) : FRow { override val key get() = "hid:${app.key}" }
 }
+
+/** Wave 38: whether the scope (null = everything) includes apps, so the hidden-apps row has a place. */
+internal fun scopeShowsApps(scope: SearchCategory?): Boolean = scope == null || scope == SearchCategory.Apps
 
 /**
  * The plain list: refinement suggestions on top, then Applications / Actions / Contacts / Files /
@@ -588,8 +594,13 @@ internal fun FlatResults(
     onPreview: (Tile) -> Unit = {},
     /** Wave 29: the list's own padding (the room under the field and above the mic): rows scroll through it instead of being cut by a clipped box. */
     contentPadding: PaddingValues = PaddingValues(bottom = 8.dp),
+    /** Wave 38 (popupsHidden): hidden apps whose name matches the query; never mixed into the results unless the user taps the row at the end. */
+    hiddenMatches: List<com.bos.sphere.core.data.AppEntry> = emptyList(),
+    onLaunchHidden: (com.bos.sphere.core.data.AppEntry) -> Unit = {},
+    onUnhideHidden: (com.bos.sphere.core.data.AppEntry) -> Unit = {},
 ) {
-    val rows = remember(data, scope, suggestions) {
+    var hiddenOpen by remember(data.query) { mutableStateOf(false) }
+    val rows = remember(data, scope, suggestions, hiddenMatches, hiddenOpen) {
         buildList<FRow> {
             var si = 0
             fun addSuggestions() { suggestions.forEach { g -> add(FRow.Header(g.header)); g.items.forEach { add(FRow.Sugg(it, si++)) } } }
@@ -608,6 +619,10 @@ internal fun FlatResults(
                 if (note != null) add(FRow.Note(note))
             }
             if (plain) addSuggestions()
+            if (hiddenMatches.isNotEmpty()) {
+                add(FRow.HiddenToggle(hiddenMatches.size, hiddenOpen))
+                if (hiddenOpen) hiddenMatches.forEach { add(FRow.HiddenApp(it)) }
+            }
         }
     }
     if (rows.isEmpty()) {
@@ -660,6 +675,22 @@ internal fun FlatResults(
                         )
                     }
                     if (rows.getOrNull(idx + 1) is FRow.Sugg) Divider()
+                }
+                is FRow.HiddenToggle -> Text(
+                    if (row.open) L10n.tr("Hide the hidden apps") else if (row.count == 1) L10n.tr("1 hidden app matches: Show") else L10n.tr("%d hidden apps match: Show", row.count),
+                    color = Color(0x80FFFFFF), fontSize = (14 * z).sp,
+                    modifier = Modifier.fillMaxWidth().testTag("radar.hidden.toggle").clickable(role = androidx.compose.ui.semantics.Role.Button) { hiddenOpen = !hiddenOpen }.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                is FRow.HiddenApp -> Row(Modifier.fillMaxWidth().testTag("radar.hidden.${row.app.key}").padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AppIcon(row.app, 36.dp * z)
+                    Text(
+                        row.app.label, color = Color(0xB3FFFFFF), fontSize = (17 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLaunchHidden(row.app) }.padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                    )
+                    Text(
+                        L10n.tr("Unhide"), color = Color.White, fontSize = (13 * z).sp,
+                        modifier = Modifier.testTag("radar.unhide.${row.app.key}").semantics { contentDescription = L10n.tr("Unhide %s", row.app.label) }.clip(RoundedCornerShape(10.dp)).background(Color(0x33B9A8FF)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onUnhideHidden(row.app) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
                 }
                 is FRow.Item -> {
                     FlatTileRow(row.tile, data.query, onTileTap, onPreview, onOpenIntent, onQueryChange)

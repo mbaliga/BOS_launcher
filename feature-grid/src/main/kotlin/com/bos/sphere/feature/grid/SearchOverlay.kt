@@ -177,6 +177,9 @@ fun SearchOverlay(
     launchHistory: List<com.bos.sphere.core.data.LaunchEvent> = emptyList(),
     /** Wave 35: the signal alert (vignette / comic lines) drawn above Radar's background, also with True black, which composes no SignalBackground. */
     alertLayer: @Composable () -> Unit = {},
+    /** Wave 38 (popupsHidden): the hidden apps (never in the results) and the way to bring one back; a quiet "N hidden apps match: Show" row at the end offers them. */
+    hiddenApps: List<AppEntry> = emptyList(),
+    onUnhideApp: (AppEntry) -> Unit = {},
 ) {
     val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier.predictiveBackLayer(backProgress)) {
@@ -188,7 +191,7 @@ fun SearchOverlay(
             onRequestFilePermission = onRequestFilePermission, sounds = sounds, settingsSource = settingsSource,
             initialQuery = initialQuery, initialCategory = initialCategory, onRunCommand = onRunCommand,
             onRunAppAction = onRunAppAction, adjacentSupported = adjacentSupported, onAppActionChoices = onAppActionChoices,
-            launchHistory = launchHistory, alertLayer = alertLayer,
+            launchHistory = launchHistory, alertLayer = alertLayer, hiddenApps = hiddenApps, onUnhideApp = onUnhideApp,
         )
     }
 }
@@ -255,6 +258,8 @@ internal fun SearchScreen(
     voiceAvailable: Boolean? = null,
     /** Wave 35: the signal alert drawn above the background (see [SearchOverlay]). */
     alertLayer: @Composable () -> Unit = {},
+    hiddenApps: List<AppEntry> = emptyList(),
+    onUnhideApp: (AppEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
     val voiceOn = remember(context, voiceAvailable) { voiceAvailable ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
@@ -552,6 +557,8 @@ internal fun SearchScreen(
                     onPickSuggestion = pickSuggestion, onTileTap = { tap(it) }, onLongPressApp = onLongPressApp,
                     onOpenIntent = onOpenIntent, onQueryChange = { setQuery(it) }, onTouch = { touched = true },
                     plain = true, onPreview = onPreview,
+                    hiddenMatches = if (scopeShowsApps(userCat)) com.bos.sphere.core.data.HiddenAppsModel.radarMatches(hiddenApps.map { com.bos.sphere.core.data.HideCandidate(it.key, it.packageName, it.label) }, hiddenApps.map { it.key }.toSet(), trimmed).mapNotNull { c -> hiddenApps.firstOrNull { it.key == c.key } } else emptyList(),
+                    onLaunchHidden = onLaunch, onUnhideHidden = onUnhideApp,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = 16.dp + bars.calculateStartPadding(dir), end = 16.dp + bars.calculateEndPadding(dir),

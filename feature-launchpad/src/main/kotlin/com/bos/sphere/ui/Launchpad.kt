@@ -298,6 +298,8 @@ fun LaunchpadPanel(
     panelBody: (@Composable (HubView) -> Unit)? = null,
     /** Wave 29 (commsRead): the launcher's strength-aware haptics (the host's rememberLauncherHaptics()); the read-filter pinch ticks through it. Null: no haptic. */
     haptics: androidx.compose.ui.hapticfeedback.HapticFeedback? = null,
+    /** Wave 38 (popupsHidden): where the Sound and Connectivity sheets are drawn (a full-window layer above the home card); null = inside this panel. */
+    sheetHost: PopupSheetHost? = null,
 ) {
     rememberLaunchpadInit()
     val dark = when (theme) {
@@ -375,7 +377,7 @@ fun LaunchpadPanel(
             runAction = { a -> ReplyLogic.run(a) },
             sendReply = { a, text -> ReplyLogic.send(ctx, a, text) },
             onClose = onDismiss,
-            menu = menu, onOpenSound = onOpenSound,
+            menu = menu, onOpenSound = onOpenSound, sheetHost = sheetHost,
             onOpenItem = { n -> openThrough(ctx, n, launchApp, onOpenApp) },
             openItem = { n -> openThrough(ctx, n, launchApp, onOpenApp).ok },
             openApp = { pkg ->
@@ -472,6 +474,8 @@ fun LaunchpadContent(
     commsScalePercent: Int = rememberCommsScalePercent(),
     /** Wave 29 (commsRead): the tick performed on each read-filter step (null: none). */
     haptics: androidx.compose.ui.hapticfeedback.HapticFeedback? = null,
+    /** Wave 38: see [LaunchpadPanel]. */
+    sheetHost: PopupSheetHost? = null,
 ) {
     val ctx = LocalContext.current
     val rtlLayout = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
@@ -900,8 +904,18 @@ fun LaunchpadContent(
     // The manager is a screen of buttons, so it stays clear of the card's 48 dp return zone (the list behind runs to the card's edge).
     LaunchedEffect(Unit) { LaunchpadHubNav.groups.collect { if (it) { LaunchpadHubNav.takeGroups(); menu.open = false; groupsOpen = true } } } // wave 29: Ground Control's "Groups and rules" opens the manager here
     LaunchpadGroupsOverlay(groupsOpen, items, endInset = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
-    if (soundSheet.open) SoundVibrationSheet(onDismiss = { soundSheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp))
-    if (connectivitySheet.open) ConnectivitySheet(onDismiss = { connectivitySheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp))
+    // Wave 38 (popupsHidden): with a host the sheets are drawn in the full-window layer above the home card (full width, scrim over the whole screen);
+    // the state stays here. Without one they are drawn in place, as before.
+    val sheetEnd = if (sheetHost != null) 0.dp else if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp
+    val sheets: @Composable () -> Unit = {
+        if (soundSheet.open) SoundVibrationSheet(onDismiss = { soundSheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = sheetEnd))
+        if (connectivitySheet.open) ConnectivitySheet(onDismiss = { connectivitySheet.open = false; runCatching { rootReq.requestFocus() } }, modifier = Modifier.padding(end = sheetEnd))
+    }
+    if (sheetHost == null) sheets()
+    else androidx.compose.runtime.DisposableEffect(sheetHost, soundSheet, connectivitySheet, sheetEnd) {
+        sheetHost.content = sheets
+        onDispose { if (sheetHost.content === sheets) sheetHost.content = null }
+    }
     groupFor?.let { n ->
         GroupAssignSheet(
             n, groups, contacts, items,

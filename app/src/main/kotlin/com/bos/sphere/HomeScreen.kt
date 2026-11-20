@@ -999,6 +999,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val revealSlideDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * launchpadGeometry.dragTravelFraction
     // Wave 25 (STR-01): Launchpad's menu is a side panel; while it is open the home card slides fully out of view (and back with it).
     val lpMenu = com.bos.sphere.ui.rememberLaunchpadMenu()
+    val popupSheetHost = com.bos.sphere.ui.rememberPopupSheetHost() // wave 38: Comms' Sound and Connectivity sheets are drawn full width above the home card
     LaunchedEffect(leftOpen) { if (!leftOpen) lpMenu.open = false }
     // STR-14: the Recents panel reuses the same geometry, card layer, scrim and settle with the opposite edge (not a fork).
     val rightReveal = com.bos.sphere.ui.rememberLaunchpadReveal(rightOpen) { rightOpen = it }
@@ -1059,7 +1060,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onOpenApp = { pkg -> apps.firstOrNull { it.packageName == pkg }?.let(::launch) ?: appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))) },
             modifier = Modifier.fillMaxSize(), theme = prefs.launchpadTheme,
             launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
-            panelBody = hubPanelBody, haptics = com.bos.sphere.feature.grid.rememberLauncherHaptics(),
+            panelBody = hubPanelBody, haptics = com.bos.sphere.feature.grid.rememberLauncherHaptics(), sheetHost = popupSheetHost,
         )
         when (prefs.leftPage) {
             com.bos.sphere.core.data.LeftPage.Launchpad -> if (leftActive) com.bos.sphere.ui.LaunchpadPanel(
@@ -1076,7 +1077,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 // STR-02: reports whether the app started, so a failed open keeps Launchpad up with a message.
                 launchApp = { pkg -> appLauncher.launch(com.bos.sphere.core.launch.LaunchRequest(com.bos.sphere.core.launch.LaunchTarget(pkg))).started },
                 menu = lpMenu,
-                panelBody = hubPanelBody, haptics = com.bos.sphere.feature.grid.rememberLauncherHaptics(),
+                panelBody = hubPanelBody, haptics = com.bos.sphere.feature.grid.rememberLauncherHaptics(), sheetHost = popupSheetHost,
             )
             com.bos.sphere.core.data.LeftPage.Widget -> if (leftActive && prefs.leftWidgetId >= 0 && !com.bos.sphere.core.data.CrashLoopGuard.safeMode) LeftWidgetPage(true, widgetHost, prefs.leftWidgetId) { leftOpen = false }
             else -> Unit
@@ -1442,6 +1443,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val recentApps = remember(history, appsByKey) { history.asReversed().map { it.key }.distinct().mapNotNull(appsByKey::get) }
         SearchOverlay(
             visible = searchOpen,
+            hiddenApps = remember(allApps, hidden) { allApps.filter { it.key in hidden } }, // wave 38: the quiet "N hidden apps match: Show" row
+            onUnhideApp = { a ->
+                hiddenStore.setHidden(a.key, false)
+                com.bos.sphere.core.data.HiddenAppsModel.rulesToClear(a.packageName, com.bos.sphere.core.data.LaunchpadSettings.rules.value).forEach { com.bos.sphere.core.data.LaunchpadSettings.removeRule(it.id) }
+            },
             apps = apps,
             recent = recentApps,
             prefs = prefs,
@@ -1561,9 +1567,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         remember(context) { com.bos.sphere.core.data.CommsScaleSettings.init(context); com.bos.sphere.ui.CommsOptions.init(context); true }
         val commsDefaultView by com.bos.sphere.ui.CommsOptions.defaultView.collectAsState() // wave 29: the Default view row shows the live value
         val commsScalePct by com.bos.sphere.core.data.CommsScaleSettings.percent.collectAsState() // wave 28: the Comms size row shows the live value
-        val categories = remember(prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, legacyAvailable) {
+        remember(context) { com.bos.sphere.core.data.LaunchpadSettings.init(context); true }
+        val commsHideRules by com.bos.sphere.core.data.LaunchpadSettings.rules.collectAsState() // wave 38: Hidden apps also lists the Comms Hide rules
+        val hiddenAppsAccess = remember(allApps, hidden, commsHideRules) {
+            com.bos.sphere.ui.HiddenAppsAccess(
+                count = com.bos.sphere.core.data.HiddenAppsModel.rows(com.bos.sphere.ui.candidates(allApps), hidden, commsHideRules).size,
+                hiddenKeys = hiddenStore.hidden, allApps = allApps, setHidden = hiddenStore::setHidden,
+            )
+        }
+        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, legacyAvailable) {
             buildSettingsCategories(
             SettingsModel(
+                hiddenApps = hiddenAppsAccess,
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
                 pickAppFor = { id -> pickFor = id },
                 pickLeftWidget = { pickingLeft = true; widgetPicker.launch() },
@@ -1820,6 +1835,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onDone = { stores.prefs.update { it.copy(onboardingDone = true) } },
             )
         }
+        popupSheetHost.Layer() // wave 38: above the sliding Comms underlay and the shrunken home card, across the whole window
         homeItems.Overlays(hiddenStore, hidden)
         tileMenu?.let { key ->
             TileMenuDialog(

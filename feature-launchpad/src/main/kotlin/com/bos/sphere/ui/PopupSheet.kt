@@ -112,7 +112,7 @@ internal fun PopupSheet(
                     .background(Color.Black, RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp))
                     .navigationBarsPadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 28.dp),
+                    .padding(horizontal = 32.dp),
             ) {
                 Text(
                     title, color = Color.White, fontSize = 22.sp, textAlign = TextAlign.Center,

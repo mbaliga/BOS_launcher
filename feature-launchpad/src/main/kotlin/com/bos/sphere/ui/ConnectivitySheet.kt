@@ -117,8 +117,8 @@ internal fun ConnectivityContent(state: ConnectivityState, onDismiss: () -> Unit
             Box(
                 Modifier.padding(start = 12.dp).heightIn(min = RowMin).widthIn(min = 72.dp).testTag("cn.done")
                     .clip(RoundedCornerShape(12.dp)).semantics(mergeDescendants = true) { role = Role.Button }.clickable(onClick = onDismiss),
-                Alignment.Center,
-            ) { Text(L10n.tr("Done"), color = Ink, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(horizontal = 8.dp)) }
+                Alignment.CenterEnd, // wave 38: flush with the right margin, like the switches above (the mock-up's Done ends where the switch ends)
+            ) { Text(L10n.tr("Done"), color = Ink, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(start = 8.dp)) }
         }
         Spacer(Modifier.height(if (compact) 8.dp else 24.dp))
     }
@@ -173,10 +173,10 @@ private fun NetworkRow(index: Int, n: WifiNetworkRow, dimmed: Boolean, actions: 
                 Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).testTag("cn.tune")
                     .semantics { role = Role.Button; contentDescription = L10n.tr("Network settings") }
                     .clickable(onClick = actions::openWifiSettings),
-                Alignment.Center,
+                Alignment.CenterEnd, // wave 38: the glyph ends at the right margin
             ) { TuneIcon() }
         } else if (n.secured) {
-            Box(Modifier.size(48.dp).testTag("cn.lock.$index"), Alignment.Center) { LockIcon() }
+            Box(Modifier.size(48.dp).testTag("cn.lock.$index"), Alignment.CenterEnd) { LockIcon() }
         }
     }
 }

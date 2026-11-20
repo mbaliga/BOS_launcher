@@ -165,20 +165,6 @@ class HomeLandingItemsW24Test : TourBase() {
         assertEquals(listOf(stackKey), pageKeys())
     }
 
-    @Test fun HOM_06_onGlanceTheWorkProfilePauseIsReachableFromTheDrawersWorkTab() {
-        var added = false
-        startOnGlance { added = runCatching { TourSeed.workApp() }.isSuccess }
-        assertTrue("the work-profile seed was added", added)
-        // Glance draws no banner by design (HomeChromeRules); the drawer's Work tab is the way to the pause on this landing.
-        assertFalse(textShown("Pause work apps"))
-        key(android.view.KeyEvent.KEYCODE_D, ctrl = true); check("drawer", TourBase.Surface.Drawer)
-        rule.onNodeWithText("Work", useUnmergedTree = true).performClick(); settle()
-        waitFor("the pause chip on the Work tab") { textShown("Pause work apps") }
-        rule.onNodeWithText("Pause work apps", useUnmergedTree = true).performClick(); settle()
-        waitFor("the chip follows the paused state") { textShown("Resume work apps") }
-        back(); check("closed", TourBase.Surface.Home)
-    }
-
     @Test fun HOM_18_w34_onGlanceTheFilesAndTimelinePanelsAreInTheCommsHubNotTheQuickSheetAndTheTimelineListsOpens() {
         startOnGlance { TourSeed.history("Alpha", "Bravo") }
         openQuickSheet()
@@ -201,21 +187,6 @@ class HomeLandingItemsW24Test : TourBase() {
         assertEquals("the portrait arrangement is the one that was seeded", listOf(clockKey, stackKey), pageKeys())
         assertEquals(listOf(weatherKey, notesKey), WidgetStacks.stackAt(extras.state.value, stackKey)?.keys)
         check("Selected after the rotation", TourBase.Surface.Home)
-    }
-
-    @Test fun HOM_02_onGlanceAddToHomeInTheDrawersAppMenuSwitchesToSelectedAppsWhereTheAppIsShown() {
-        startOnGlance {
-            // Delta is installed but not on the pages, so its menu offers "Add to home".
-            stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = emptyList(), id = 1L)), seeded = true))
-        }
-        val delta = AppSmokeHarness.appKey("Delta")
-        assertFalse(delta in pageKeys())
-        key(android.view.KeyEvent.KEYCODE_D, ctrl = true); check("drawer", TourBase.Surface.Drawer)
-        rule.onAllNodesWithText("Delta", useUnmergedTree = true).onFirst().performTouchInput { longClick() }; settle()
-        rule.onNodeWithText("Add to home", useUnmergedTree = true).performClick(); settle()
-        assertTrue("the app is placed on a page", delta in pageKeys())
-        // Before the second pass the app went onto the hidden Selected apps pages and Glance stayed the landing.
-        assertEquals("placing from a landing without pages shows the landing that has them", HomeShown.Pages, landing())
     }
 
     @Test fun HOM_15_onGlanceAFilesTileThatIsAlreadyOnThePagesIsShownWhenItIsAddedAgain() {

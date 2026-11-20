@@ -54,6 +54,16 @@ object PuckKeys {
     fun owns(keyCode: Int, ch: Char?): Boolean = keyCode in setOf(Keys.DPAD_LEFT, Keys.DPAD_RIGHT, Keys.DPAD_UP, Keys.DPAD_DOWN, Keys.TAB, Keys.MOVE_HOME, Keys.MOVE_END,
         Keys.ENTER, Keys.DPAD_CENTER, Keys.NUMPAD_ENTER, Keys.ESCAPE, Keys.BACK, Keys.SLASH) || Keys.isLetter(keyCode) || (ch != null && (ch.isLetterOrDigit()))
 
+    /**
+     * Wave 38: the rotation of the white shortcut ring by keyboard. Shift+Left/Right always turn it; plain Left/Right turn it only while a
+     * ring segment or the hub has keyboard focus (otherwise they turn the group labels as before). Returns -1, +1 or 0 (not for the ring).
+     * Right is +1, the next segment.
+     */
+    fun ringStep(keyCode: Int, shift: Boolean, ringFocused: Boolean): Int {
+        if (!shift && !ringFocused) return 0
+        return when (keyCode) { Keys.DPAD_LEFT -> -1; Keys.DPAD_RIGHT -> +1; else -> 0 }
+    }
+
     private fun step(s: PuckState, d: Int): PuckEffect? {
         // Wave 30 (drawerLoop): the groups are a ring, so right of the last is the first and left of the first is the last.
         if (s.labels.isEmpty()) return null
@@ -96,7 +106,14 @@ object PuckLayout {
     /** Labels sit on an arc this far inside the hub's edge. */
     const val LABEL_BAND = 14f
 
-    fun hubRadius(minSideDp: Float) = min(minSideDp * 0.34f, 190f)
+    /**
+     * Wave 38 (drawerRing): the Back hub now reaches the screen edge (about 59 dp) and the shortcut ring wraps it, so the labels and the band
+     * need room for a hub of 59 dp plus a ring [MIN_RING_DEPTH] deep, plus the label clearance: below [MIN_HUB] (on windows of 300 dp and more) a small window would let the
+     * ring touch the labels, so the radius never goes under it.
+     */
+    const val MIN_HUB = 59f + 40f + LABEL_BAND + 7f
+
+    fun hubRadius(minSideDp: Float): Float = min(minSideDp * 0.34f, 190f).let { if (minSideDp >= 300f) it.coerceAtLeast(MIN_HUB) else it }
 
     fun compute(minSideDp: Float): PuckLayoutResult {
         val hub = hubRadius(minSideDp)

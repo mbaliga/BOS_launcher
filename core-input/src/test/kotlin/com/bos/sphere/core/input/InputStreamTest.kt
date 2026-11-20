@@ -248,9 +248,21 @@ class InputStreamTest {
     // ---- INP-19 puck sizing
 
     @Test fun INP_19_sizes_derive_from_the_window() {
-        assertTrue(PuckLayout.compute(240f).hubRadiusDp < PuckLayout.compute(600f).hubRadiusDp)
+        assertTrue(PuckLayout.compute(240f).hubRadiusDp <= PuckLayout.compute(600f).hubRadiusDp)
+        // Wave 38 (drawerRing): a small window (300 dp and up) keeps room for the 59 dp Back hub, a 40 dp ring and the labels
+        assertEquals(PuckLayout.MIN_HUB, PuckLayout.hubRadius(310f), 0.001f)
+        assertTrue(PuckLayout.MIN_HUB >= 59f + 40f + PuckLayout.LABEL_BAND)
         assertEquals(190f, PuckLayout.hubRadius(2000f), 0.01f)
         assertEquals(PuckLayout.hubRadius(411f) - PuckLayout.LABEL_BAND, PuckLayout.compute(411f).chipRadiusDp, 0.001f)
+    }
+
+    @Test fun INP_18_w38_shift_left_right_always_turn_the_shortcut_ring_and_plain_left_right_only_while_it_has_focus() {
+        assertEquals(1, PuckKeys.ringStep(Keys.DPAD_RIGHT, shift = true, ringFocused = false))
+        assertEquals(-1, PuckKeys.ringStep(Keys.DPAD_LEFT, shift = true, ringFocused = false))
+        assertEquals(1, PuckKeys.ringStep(Keys.DPAD_RIGHT, shift = false, ringFocused = true))
+        assertEquals(-1, PuckKeys.ringStep(Keys.DPAD_LEFT, shift = false, ringFocused = true))
+        assertEquals("plain Left/Right still turn the group labels", 0, PuckKeys.ringStep(Keys.DPAD_LEFT, shift = false, ringFocused = false))
+        assertEquals(0, PuckKeys.ringStep(Keys.DPAD_UP, shift = true, ringFocused = true))
     }
 
     @Test fun INP_18_a_letter_past_the_last_letter_goes_to_hash_and_the_ring_goes_z_hash_a() {

@@ -28,9 +28,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.AppEntry
-import com.bos.sphere.core.data.RailSide
-import com.bos.sphere.core.data.DrawerSort
-import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.IndicatorColors
 import com.bos.sphere.core.data.CalmEffect
 import com.bos.sphere.core.data.IndicatorMetric
@@ -340,34 +337,6 @@ class ScreenshotTest {
             )
         }
         shoot("08-big-clock-effects", settleMs = 2_000)
-    }
-
-    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun drawerSpace() {
-        rule.mainClock.autoAdvance = false
-        rule.setContent {
-            AppDrawerSpace(
-                visible = true, apps = apps, usage = emptyMap(),
-                view = DrawerView.Details, sort = DrawerSort.Alphabetical, rail = RailSide.Right,
-                onViewChange = {}, onSortChange = {}, onLaunch = {}, onLongPress = {}, onDismiss = {},
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        shoot("09-drawer-details")
-    }
-
-    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun drawerGrid() {
-        rule.mainClock.autoAdvance = false
-        rule.setContent {
-            AppDrawerSpace(
-                visible = true, apps = apps, usage = emptyMap(),
-                view = DrawerView.Grid, sort = DrawerSort.Alphabetical, rail = RailSide.Right,
-                onViewChange = {}, onSortChange = {}, onLaunch = {}, onLongPress = {}, onDismiss = {},
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        shoot("09b-drawer-grid")
     }
 
     private val fakeHub = object : com.bos.sphere.core.data.SearchHub {

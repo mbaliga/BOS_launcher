@@ -144,39 +144,6 @@ class InputW3UiTest {
 
     private fun app(i: Int) = AppEntry("p$i", ComponentName("p$i", "M"), "App ${'A' + i}", Process.myUserHandle()) { null }
 
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h700dp-port-xhdpi")
-    fun INP_01_drawer_rows_are_reached_by_arrow_and_tab_and_enter_launches_the_focused_one() {
-        val rows = (0 until 6).map { DrawerRow.App(app(it)) }
-        val launched = mutableListOf<String>()
-        rule.setContent {
-            androidx.compose.ui.platform.LocalInputModeManager.current.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
-            InputModeProvider {
-                // A home item below the drawer: the drawer layer keeps arrows away from it.
-                Box(Modifier.fillMaxSize()) {
-                    Box(Modifier.size(40.dp).launcherItem("grid.under", FocusKind.Item))
-                    FocusLayer(DRAWER_FOCUS_LAYER) {
-                        DrawerGrid(androidx.compose.foundation.lazy.grid.rememberLazyGridState(), rows, androidx.compose.foundation.layout.PaddingValues(0.dp), onLaunch = { launched += it.packageName }, onLongPress = {})
-                    }
-                }
-            }
-        }
-        rule.waitForIdle()
-        val ids = LauncherInput.focus.nodes().map { it.id }.filter { it.startsWith("drawer.") }
-        assertEquals(6, ids.size)
-        LauncherInput.focus.request(ids.first()); rule.waitForIdle()
-        assertEquals(ids.first(), LauncherInput.focus.currentId)
-        assertTrue(LauncherInput.focus.move(com.bos.sphere.core.input.FocusDir.Right)); rule.waitForIdle()
-        val second = LauncherInput.focus.currentId
-        assertTrue("arrow stays inside the drawer: $second", second != null && second.startsWith("drawer.") && second != ids.first())
-        assertTrue(LauncherInput.focus.tab(false)); rule.waitForIdle()
-        assertTrue(LauncherInput.focus.currentId!!.startsWith("drawer."))
-        val focused = LauncherInput.focus.currentId!!.removePrefix("drawer.")
-        rule.onAllNodes(androidx.compose.ui.test.hasClickAction())[ids.indexOf("drawer.$focused").coerceAtLeast(0)]
-            .performKeyInput { keyDown(androidx.compose.ui.input.key.Key.Enter); keyUp(androidx.compose.ui.input.key.Key.Enter) }
-        rule.waitForIdle()
-        assertEquals("one app launched by Enter", 1, launched.size)
-    }
-
     @Test @Config(sdk = [35], qualifiers = "w411dp-h2000dp-port-xhdpi")
     fun INP_07_every_corner_action_is_a_row_the_corner_editor_offers_and_choosing_it_assigns_that_action() {
         val picked = mutableListOf<CornerSlot>()

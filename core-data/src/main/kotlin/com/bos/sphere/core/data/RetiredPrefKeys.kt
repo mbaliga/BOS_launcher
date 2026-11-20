@@ -15,7 +15,7 @@ import java.io.File
  */
 object RetiredPrefKeys {
     val BY_FILE: Map<String, Set<String>> = mapOf(
-        "launcher_prefs" to (RetiredBackgroundKeys.KEYS - "bgPicture") + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert", "glanceWeather", "suggestion") + ClockRetired.KEYS,
+        "launcher_prefs" to (RetiredBackgroundKeys.KEYS - "bgPicture") + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert", "glanceWeather", "suggestion", "drawerStyle", "drawerView", "drawerSort", "drawerRail", "drawerRailVisible", "drawerViewSwitch") + ClockRetired.KEYS,
         "palette" to setOf("scopeMapping", "prefixes"),
         "crash_loop" to setOf("rapid"),
         "home_state" to setOf("panel.timeline.depth", "panel.timeline.scheduled"),
@@ -28,7 +28,7 @@ object RetiredPrefKeys {
     val AFTER_MIGRATION: Map<String, Map<String, String>> = mapOf("launcher_prefs" to mapOf("indEffects" to "indCalm", "glanceContent" to "showMusic"))
 
     /** Keys an imported settings file may still carry from those builds; they are dropped, never kept as unknown fields. */
-    val DROPPED_ON_IMPORT: Set<String> = RetiredBackgroundKeys.KEYS + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert", "glanceWeather", "suggestion") + ClockRetired.KEYS
+    val DROPPED_ON_IMPORT: Set<String> = RetiredBackgroundKeys.KEYS + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert", "glanceWeather", "suggestion", "drawerStyle", "drawerView", "drawerSort", "drawerRail", "drawerRailVisible", "drawerViewSwitch") + ClockRetired.KEYS
 
     /** Removes every retired key present in the files [open] returns; the number of keys removed. Never throws. */
     fun purge(open: (String) -> SharedPreferences?): Int {

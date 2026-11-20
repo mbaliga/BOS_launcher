@@ -78,7 +78,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         forceWrite = false
         _prefs.value = next
         sp.edit()
-            .putString("style", next.homeStyle.name).putString("homePages", next.homePages.name).putBoolean("drawerRailVisible", next.drawerRailVisible).putString("drawerViewSwitch", next.drawerViewSwitch.name).putString("scrollAxis", next.scrollAxis.name).putInt("contCols", next.continuousColumns)
+            .putString("style", next.homeStyle.name).putString("homePages", next.homePages.name).putString("scrollAxis", next.scrollAxis.name).putInt("contCols", next.continuousColumns)
             .putInt("pCols", next.portraitGrid.columns).putInt("pRows", next.portraitGrid.rows)
             .putInt("lCols", next.landscapeGrid.columns).putInt("lRows", next.landscapeGrid.rows)
             .putFloat("iconScale", next.iconScale)
@@ -90,7 +90,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("motionBg", next.motionInBackground)
             .putFloat("motionSens", next.motionSensitivity)
             .putString("cornerStyle", next.cornerStyle.name)
-            .putString("drawerStyle", next.drawerStyle.name)
             .putBoolean("uiSounds", next.uiSounds)
             .putFloat("uiSoundVolume", next.uiSoundVolume)
             .putFloat("iconSpacing", next.iconSpacing)
@@ -123,9 +122,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("restoreSurfaces", next.restoreOpenSurfaces)
             .putString("appsOnHome", next.appsOnHome.name)
             .putString("pageMode", next.pageMode.name)
-            .putString("drawerView", next.drawerView.name)
-            .putString("drawerSort", next.drawerSort.name)
-            .putString("drawerRail", next.drawerRail.name)
             .putString("indMetric", next.indicatorMetric.name)
             .putString("indCalm", IndicatorMigration.store(next.indicatorCalm)).putString("indAlert", IndicatorMigration.store(next.indicatorAlert))
             .putLong("indLow", next.indicatorLow).putLong("indMid", next.indicatorMid)
@@ -209,8 +205,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             glanceSystemDim = WallpaperPictureKeys.readDim(sp, "wpGlance"), pagesSystemDim = WallpaperPictureKeys.readDim(sp, "wpPages"),
             homeStyle = enumOr(sp.getString("style", null), d.homeStyle),
             homePages = pagesMode,
-            drawerRailVisible = sp.getBoolean("drawerRailVisible", d.drawerRailVisible),
-            drawerViewSwitch = enumOr(sp.getString("drawerViewSwitch", null), d.drawerViewSwitch),
             scrollAxis = enumOr(sp.getString("scrollAxis", null), d.scrollAxis),
             continuousColumns = sp.getInt("contCols", d.continuousColumns),
             portraitGrid = GridSpec(sp.getInt("pCols", d.portraitGrid.columns), sp.getInt("pRows", d.portraitGrid.rows)).coerced(),
@@ -225,7 +219,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             motionInBackground = sp.getBoolean("motionBg", d.motionInBackground),
             motionSensitivity = sp.getFloat("motionSens", d.motionSensitivity).coerceIn(0f, 1f),
             cornerStyle = enumOr(sp.getString("cornerStyle", null), d.cornerStyle),
-            drawerStyle = enumOr(sp.getString("drawerStyle", null), d.drawerStyle),
             uiSounds = sp.getBoolean("uiSounds", d.uiSounds),
             uiSoundVolume = sp.getFloat("uiSoundVolume", d.uiSoundVolume).coerceIn(0f, 1f),
             iconSpacing = sp.getFloat("iconSpacing", d.iconSpacing).coerceIn(0f, 1f),
@@ -271,9 +264,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             // New installs keep the home nearly empty (the drawer has everything); existing ones keep All apps.
             appsOnHome = enumOr(sp.getString("appsOnHome", null), if (sp.contains("style") || sp.contains("pCols")) AppsOnHome.Everything else AppsOnHome.PinnedOnly),
             pageMode = enumOr(sp.getString("pageMode", null), d.pageMode),
-            drawerView = enumOr(sp.getString("drawerView", null), d.drawerView),
-            drawerSort = enumOr(sp.getString("drawerSort", null), d.drawerSort),
-            drawerRail = enumOr(sp.getString("drawerRail", null), d.drawerRail),
             indicatorMetric = enumOr(sp.getString("indMetric", null), d.indicatorMetric),
             indicatorCalm = effects.calm, indicatorAlert = effects.alert,
             indicatorLow = sp.getLong("indLow", d.indicatorLow), indicatorMid = sp.getLong("indMid", d.indicatorMid),

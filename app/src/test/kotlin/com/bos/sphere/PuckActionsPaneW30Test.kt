@@ -25,7 +25,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** CFG-15 (wave 30, puckSections): the Drawer shortcuts editor, four slot rows with an action list, an app picker and Empty. */
+/** CFG-15 (wave 30, puckSections; wave 38 drawerRing: eight slots, N rows shown): the Drawer shortcuts editor, slot rows with an action list, an app picker and Empty. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -40,8 +40,8 @@ class PuckActionsPaneW30Test {
         rule.setContent { Column { PuckActionsPane(mapOf(app.key to app)) } }
     }
 
-    @Test fun CFG_15_w30_theEditorListsFourSlotsWithTheDefaultsInThem() {
-        for (i in 1..4) rule.onNodeWithText("$i.", substring = true).assertExists()
+    @Test fun CFG_15_w30_theEditorListsOneRowPerSegmentWithTheDefaultsInThem() {
+        for (i in 1..8) rule.onNodeWithText("$i.", substring = true).assertExists()
         rule.onNodeWithText("1. Flashlight").assertExists()
         rule.onNodeWithText("4. Do not disturb").assertExists()
     }

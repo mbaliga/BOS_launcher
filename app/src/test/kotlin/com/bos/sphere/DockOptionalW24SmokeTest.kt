@@ -57,7 +57,7 @@ class DockOptionalW24SmokeTest {
 
     private fun key(sc: ActivityScenario<*>, code: Int, ctrl: Boolean = false): Boolean = AppSmokeHarness.press(sc, code, ctrl = ctrl).also { rule.waitForIdle() }
     private fun radarOpen() = rule.onAllNodesWithContentDescription("Speak to search").fetchSemanticsNodes().isNotEmpty()
-    private fun drawerOpen() = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.") }
+    private fun drawerOpen() = LauncherInput.focus.nodes().any { it.id == "puck.back" }
 
     // ---- the rule
 

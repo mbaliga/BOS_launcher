@@ -1,150 +1,254 @@
 package com.bos.sphere.feature.grid
 
 import com.bos.sphere.core.data.Corner
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import com.bos.sphere.core.input.PuckLayout
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
-/** CFG-15, INP-19 (wave 30, puckSections): pure geometry of the four sections around the hub. */
+/**
+ * CFG-15, INP-19, NFR-13 (wave 38, drawerRing): the pure geometry of the rotatable shortcut ring (N segments around a Back hub that reaches the
+ * window edge), on the phone the owner uses (411 x 891 dp) and on smaller windows.
+ */
 class PuckSectionsGeometryTest {
-    private val ring = PuckSectionsGeometry.ring(hubDp = 122f, chipDp = 108f) // a 360 dp wide phone
+    private val corners = Corner.entries
+    private fun ringFor(minSide: Float): SectionRing { val h = PuckLayout.compute(minSide); return PuckSectionsGeometry.ring(h.hubRadiusDp, h.chipRadiusDp) }
+    private val phone get() = ringFor(411f)
+    private fun window(anchor: Corner, w: Float = 411f, h: Float = 891f) = RingWindow.of(anchor, w, h)
+    private fun norm(a: Float) = ((a % 360f) + 360f) % 360f
+    private fun angDiff(a: Float, b: Float): Float = abs(((a - b + 540f) % 360f + 360f) % 360f - 180f)
 
-    @Test fun CFG_15_thereAreFourEqualWedgesFillingTheQuadrantInOrderAndTouching() {
-        for (c in Corner.entries) {
-            val q = PuckSectionsGeometry.quadrantStart(c)
-            val w = PuckSectionsGeometry.wedges(c, ring).sortedBy { it.startDeg }
-            assertEquals(4, w.size)
-            assertEquals("$c starts at the quadrant edge", q, w.first().startDeg, 0.001f)
-            assertEquals("$c ends at the other edge", q + 90f, w.last().endDeg, 0.001f)
-            for (i in 0 until 3) assertEquals("no gap between wedges $i and ${i + 1}", w[i].endDeg, w[i + 1].startDeg, 0.0001f)
-            w.forEach { assertEquals(22.5f, it.sweep, 0.0001f) }
+    // ---- hub
+
+    @Test fun CFG_15_w38_theBackHubReachesToWithin8dpOfTheNearestWindowEdge() {
+        val r = phone
+        assertTrue("hub ${r.backRadius}", r.backRadius >= PuckSectionsGeometry.EDGE_DP - 8f && r.backRadius <= PuckSectionsGeometry.EDGE_DP)
+        assertEquals(59f, r.backRadius, 0.01f)
+        assertEquals("the ring wraps the hub with no gap", r.backRadius, r.inner, 0f)
+    }
+
+    @Test fun CFG_15_w38_theHubIsAtLeast44dpOnASmallWindowAndNeverTouchesTheLabelsOrTheRingsEdge() {
+        assertEquals(44f, PuckSectionsGeometry.ring(60f, 46f).backRadius, 0f)
+        for (min in listOf(300f, 320f, 360f, 411f, 600f, 900f)) {
+            val r = ringFor(min); val h = PuckLayout.compute(min)
+            assertTrue("$min: hub ${r.backRadius}", r.backRadius >= 44f && r.backRadius <= 63f)
+            assertTrue("$min: ring depth ${r.thickness}", r.thickness >= PuckSectionsGeometry.MIN_RING_DEPTH_DP - 0.01f)
+            assertTrue("$min: the ring ends clear of the group labels (${r.outer} vs ${h.chipRadiusDp})", r.outer <= h.chipRadiusDp - 6.9f)
         }
     }
 
-    @Test fun W32_theRingFillsFromTheHubToTheOuterRadiusWithNoGapAndIsDeeperThanTheReference() {
-        for (side in listOf(320f, 360f, 411f, 600f, 800f)) {
-            val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
-            val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
-            assertEquals("$side: the ring starts exactly at the hub", r.backRadius, r.inner, 0f)
-            assertTrue("$side: the ring is at least 0.9 x the hub radius deep (${r.thickness} vs ${r.backRadius})", r.thickness >= 0.9f * r.backRadius)
-            // every radius from the hub edge to the outer edge hits a slot (a point in the quadrant), none of it is None
-            for (f in listOf(0f, 0.05f, 0.25f, 0.5f, 0.99f, 1f)) {
-                val rad = r.inner + (r.outer - r.inner) * f
-                if (f == 0f) continue
-                assertTrue("$side f=$f", PuckSectionsGeometry.hit(Corner.BottomLeft, r, rad * 0.97f, -rad * 0.2f) is PuckSectionsGeometry.Hit.Slot)
+    @Test fun CFG_15_w38_theHubIsWholeInsideTheWindowSoTheArrowIsCentredAndAHubTheWindowCutsHasItsArrowOnWhatShows() {
+        for (a in corners) assertEquals(0f to 0f, PuckSectionsGeometry.hubArrowOffset(phone, window(a)))
+        // a hub cut by the left edge (centre 30 dp in, radius 59): the visible part runs from the edge to the hub's right side
+        val cut = RingWindow(30f, 400f, 411f, 891f)
+        val (dx, dy) = PuckSectionsGeometry.hubArrowOffset(phone, cut)
+        assertEquals((0f + 89f) / 2f - 30f, dx, 0.01f); assertEquals(0f, dy, 0.01f)
+    }
+
+    // ---- segments
+
+    @Test fun CFG_15_w38_theRingIsCutIntoNEqualSegmentsByNDividersAroundTheWholeCircle() {
+        for (n in 6..8) for (a in corners) {
+            val d = PuckSectionsGeometry.dividerAngles(a, n, 1f)
+            assertEquals(n, d.size)
+            val sorted = d.sorted()
+            for (i in sorted.indices) assertEquals("$a n=$n", 360f / n, norm(sorted[(i + 1) % n] - sorted[i]), 0.01f)
+            // every divider is half a segment from the neighbouring centres
+            for (i in 0 until n) assertEquals(360f / n / 2f, angDiff(PuckSectionsGeometry.centerAngle(a, n, 1f, i), d[i]), 0.01f)
+        }
+    }
+
+    @Test fun CFG_15_w38_segmentAtFindsTheSegmentHoldingAnAngleAtEveryPositionAndSize() {
+        for (n in 6..8) for (a in corners) for (p in listOf(0f, 1f, 2.4f, 5.5f, -1f)) for (i in 0 until n) {
+            val c = PuckSectionsGeometry.centerAngle(a, n, p, i)
+            assertEquals("$a n=$n p=$p slot $i", i, PuckSectionsGeometry.segmentAt(a, n, p, c))
+            assertEquals(i, PuckSectionsGeometry.segmentAt(a, n, p, c + 360f / n * 0.45f))
+            assertEquals(i, PuckSectionsGeometry.segmentAt(a, n, p, c - 360f / n * 0.45f))
+        }
+    }
+
+    @Test fun CFG_15_w38_atRestSegmentOneIsCentredInTheQuadrantAndSlotZeroSitsOnTheThumbsSide() {
+        // BottomLeft: the horizontal edge is the bottom; slot 0 is the one nearest the right (the quadrant's 0 degrees end)
+        val bl = PuckSectionsGeometry.centerAngle(Corner.BottomLeft, 8, 1f, 1)
+        assertEquals(315f, bl, 0.01f)
+        assertEquals(0f, norm(PuckSectionsGeometry.centerAngle(Corner.BottomLeft, 8, 1f, 0)), 0.01f)
+        assertEquals(270f, norm(PuckSectionsGeometry.centerAngle(Corner.BottomLeft, 8, 1f, 2)), 0.01f)
+        // BottomRight is the exact mirror: slot 0 on the far side of the quadrant from the vertical edge
+        assertEquals(180f, norm(PuckSectionsGeometry.centerAngle(Corner.BottomRight, 8, 1f, 0)), 0.01f)
+        assertEquals(270f, norm(PuckSectionsGeometry.centerAngle(Corner.BottomRight, 8, 1f, 2)), 0.01f)
+    }
+
+    @Test fun CFG_15_w38_theOtherCornerIsTheExactMirrorOfTheLeftHandOne() {
+        for (n in 6..8) for (p in listOf(0f, 1f, 3.3f)) for (i in 0 until n) {
+            val l = PuckSectionsGeometry.centerAngle(Corner.BottomLeft, n, p, i)
+            val r = PuckSectionsGeometry.centerAngle(Corner.BottomRight, n, p, i)
+            assertEquals("n=$n p=$p slot $i", 0f, angDiff(180f - l, r), 0.01f)
+            val tl = PuckSectionsGeometry.centerAngle(Corner.TopLeft, n, p, i)
+            val tr = PuckSectionsGeometry.centerAngle(Corner.TopRight, n, p, i)
+            assertEquals(0f, angDiff(180f - tl, tr), 0.01f)
+            // top is the bottom flipped vertically
+            assertEquals(0f, angDiff(-l, tl), 0.01f)
+        }
+    }
+
+    // ---- visible segments
+
+    @Test fun CFG_15_w38_aboutHalfOfTheSegmentsShowAtOnceAtEightAndTheOnesAtTheHubSideOfTheQuadrantAreWhole() {
+        val a = Corner.BottomLeft; val w = window(a); val r = phone
+        val v = PuckSectionsGeometry.visibleSegments(a, 8, 1f, r, w).map { it.index }.toSet()
+        assertEquals("slots 7, 0, 1, 2 and the edge of 3", setOf(7, 0, 1, 2, 3), v)
+        for (i in listOf(0, 1, 2)) {
+            val seg = PuckSectionsGeometry.visibleSegment(a, 8, 1f, i, r, w)!!
+            assertEquals("whole at the mid radius", PuckSectionsGeometry.arcAt(8, r.mid), seg.arcDp, 1.5f)
+        }
+        assertTrue("two slots look at the screen edge only partly", PuckSectionsGeometry.visibleSegment(a, 8, 1f, 3, r, w)!!.arcDp < PuckSectionsGeometry.arcAt(8, r.mid) * 0.5f)
+    }
+
+    @Test fun CFG_15_w38_aSegmentThatTheWindowHidesAtTheMidRadiusIsNotVisibleAndItsSliverByTheHubIsNoTarget() {
+        val a = Corner.BottomLeft; val w = window(a); val r = phone
+        assertNull(PuckSectionsGeometry.visibleSegment(a, 8, 1f, 5, r, w))
+        // slot 4 points at the left edge: only a 4 dp rim of it shows beside the hub
+        assertNull(PuckSectionsGeometry.visibleSegment(a, 8, 1f, 4, r, w))
+        val c = PuckSectionsGeometry.centerAngle(a, 8, 1f, 4)
+        val rad = Math.toRadians(c.toDouble()); val rr = r.backRadius + 2f
+        assertEquals(PuckSectionsGeometry.Hit.None, PuckSectionsGeometry.hit(a, 8, 1f, r, (rr * cos(rad)).toFloat(), (rr * sin(rad)).toFloat(), w))
+    }
+
+    @Test fun CFG_15_w38_turningTheRingBringsOtherSegmentsIntoView() {
+        val a = Corner.BottomLeft; val w = window(a); val r = phone
+        val before = PuckSectionsGeometry.visibleSegments(a, 8, 1f, r, w).map { it.index }.toSet()
+        val after = PuckSectionsGeometry.visibleSegments(a, 8, 4f, r, w).map { it.index }.toSet()
+        assertTrue("slot 4 (hidden before) shows after a turn of three", 4 in after && 4 !in before)
+        assertEquals("front slot", 4, PuckSectionsGeometry.frontSlot(8, 4f))
+        for (n in 6..8) for (anchor in corners) {
+            val vis = PuckSectionsGeometry.visibleSegments(anchor, n, 1f, r, window(anchor)).size
+            assertTrue("$anchor n=$n shows $vis of $n", vis in 3..n - 1)
+        }
+    }
+
+    @Test fun CFG_15_w38_theGlyphOfASegmentIsCentredOnTheMiddleOfItsVisibleRun() {
+        val a = Corner.BottomLeft; val w = window(a); val r = phone
+        val whole = PuckSectionsGeometry.visibleSegment(a, 8, 1f, 1, r, w)!!
+        assertEquals("a whole segment's glyph is on its own centre line", PuckSectionsGeometry.centerAngle(a, 8, 1f, 1), whole.midAngleDeg, 1.01f)
+        val cut = PuckSectionsGeometry.visibleSegment(a, 8, 1f, 3, r, w)!!
+        // slot 3 spans 202.5..247.5 and the mid radius only shows it from 225 on: the glyph is at about 236
+        assertEquals(236f, cut.midAngleDeg, 1.6f)
+        val (gx, gy) = PuckSectionsGeometry.glyphOffset(cut.midAngleDeg, r)
+        assertTrue("the glyph point is inside the window", w.contains(w.cx + gx, w.cy + gy))
+    }
+
+    @Test fun CFG_15_w38_aGlyphIsAlwaysWholeInsideTheWindowAndASegmentTheEdgeCutsCarriesItOnThePartThatShows() {
+        val r = phone
+        for (a in corners) for (n in 6..8) for (front in 0 until n) {
+            val w = window(a)
+            for (v in PuckSectionsGeometry.visibleSegments(a, n, front.toFloat(), r, w)) {
+                val g = PuckSectionsGeometry.glyphPlacement(a, n, front.toFloat(), v.index, r, w, 30f) ?: continue
+                assertTrue("$a n=$n slot ${v.index}: glyph at $g is inside the window", w.contains(w.cx + g.first - 15f, w.cy + g.second - 15f) && w.contains(w.cx + g.first + 15f, w.cy + g.second + 15f))
+                assertEquals("inside its own segment", v.index, PuckSectionsGeometry.segmentAt(a, n, front.toFloat(), Math.toDegrees(kotlin.math.atan2(g.second.toDouble(), g.first.toDouble())).toFloat()))
+            }
+        }
+        val a = Corner.BottomLeft; val w = window(a)
+        for (i in listOf(0, 1, 2)) {
+            val g = PuckSectionsGeometry.glyphPlacement(a, 8, 1f, i, r, w, 30f)!!
+            val nominal = PuckSectionsGeometry.glyphOffset(PuckSectionsGeometry.centerAngle(a, 8, 1f, i), r)
+            assertEquals("a whole segment keeps its glyph on its centre line", 0f, kotlin.math.hypot(g.first - nominal.first, g.second - nominal.second), 4f)
+        }
+        // slot 7 is cut by the bottom edge and slot 3 by the left edge: both still carry a whole glyph, moved onto the part that shows
+        assertNotNull(PuckSectionsGeometry.glyphPlacement(a, 8, 1f, 7, r, w, 30f))
+        assertNotNull(PuckSectionsGeometry.glyphPlacement(a, 8, 1f, 3, r, w, 30f))
+    }
+
+    // ---- rotation, snap
+
+    @Test fun CFG_15_w38_theRingFollowsAFingerInEveryCorner() {
+        for (a in corners) for (n in 6..8) {
+            val p0 = 1f
+            val p1 = p0 + PuckSectionsGeometry.positionDelta(a, n, 17f)
+            for (i in 0 until n) {
+                val moved = PuckSectionsGeometry.centerAngle(a, n, p1, i) - PuckSectionsGeometry.centerAngle(a, n, p0, i)
+                assertEquals("$a n=$n slot $i follows the finger 17 degrees clockwise", 17f, ((moved + 540f) % 360f + 360f) % 360f - 180f, 0.01f)
             }
         }
     }
 
-    @Test fun W32_dividersAreThreeHairlinesOnTheSharedEdgesOnly() {
-        assertTrue("hairline: at most 2 dp", PuckSectionsGeometry.DIVIDER_DP in 1.5f..2f)
-        for (c in Corner.entries) {
-            val d = PuckSectionsGeometry.dividerAngles(c)
-            val w = PuckSectionsGeometry.wedges(c, ring).sortedBy { it.startDeg }
-            assertEquals(3, d.size)
-            for (i in 0 until 3) assertEquals("$c divider $i sits on the shared edge", w[i].endDeg, d[i], 0.0001f)
+    @Test fun CFG_15_w38_releaseSnapsToAWholeSegmentPositionSoASegmentSitsCentred() {
+        assertEquals(2f, PuckSectionsGeometry.settleTarget(1.6f, 0f), 0f)
+        assertEquals(1f, PuckSectionsGeometry.settleTarget(1.4f, 0f), 0f)
+        assertEquals(-1f, PuckSectionsGeometry.settleTarget(-0.6f, 0f), 0f)
+        // a fling carries it on by what 0.18 s of velocity covers, at most three segments
+        assertEquals(3f, PuckSectionsGeometry.settleTarget(1.2f, 8f), 0f)
+        assertEquals(4f, PuckSectionsGeometry.settleTarget(1.2f, 400f), 0f)
+        assertEquals(-2f, PuckSectionsGeometry.settleTarget(1.2f, -400f), 0f)
+        // no inertia (reduced motion): the nearest segment, the velocity ignored
+        assertEquals(1f, PuckSectionsGeometry.settleTarget(1.2f, 400f, projectSec = 0f), 0f)
+        for (n in 6..8) assertEquals(PuckSectionsGeometry.wrap(-1f, n), (n - 1).toFloat(), 0f)
+    }
+
+    // ---- touch ownership and hit testing
+
+    @Test fun CFG_15_w38_aTouchOnTheHubIsBackOnTheRingIsASegmentAndOutsideItBelongsToTheOuterWheel() {
+        val a = Corner.BottomLeft; val r = phone; val w = window(a)
+        assertEquals(PuckSectionsGeometry.Hit.Back, PuckSectionsGeometry.hit(a, 8, 1f, r, 0f, 0f, w))
+        assertEquals(PuckSectionsGeometry.Hit.Back, PuckSectionsGeometry.hit(a, 8, 1f, r, r.backRadius - 1f, 0f, w))
+        val mid = r.mid
+        assertEquals(PuckSectionsGeometry.Hit.Slot(1), PuckSectionsGeometry.hit(a, 8, 1f, r, 0f - 0f + (mid * cos(Math.toRadians(315.0))).toFloat(), (mid * sin(Math.toRadians(315.0))).toFloat(), w))
+        assertEquals(PuckSectionsGeometry.Hit.None, PuckSectionsGeometry.hit(a, 8, 1f, r, r.outer + 1f, 0f, w))
+        for (deg in 0 until 360 step 7) {
+            val rad = Math.toRadians(deg.toDouble())
+            val inside = PuckSectionsGeometry.ownsTouch(r, ((r.outer - 0.5f) * cos(rad)).toFloat(), ((r.outer - 0.5f) * sin(rad)).toFloat())
+            val outside = PuckSectionsGeometry.ownsTouch(r, ((r.outer + 0.5f) * cos(rad)).toFloat(), ((r.outer + 0.5f) * sin(rad)).toFloat())
+            assertTrue("$deg inside is the ring's", inside); assertFalse("$deg outside is the outer wheel's", outside)
         }
     }
 
-    @Test fun W32_theGlyphIsCentredOnTheMidRadiusAndMidAngleOfItsWedge() {
-        for (c in Corner.entries) for (w in PuckSectionsGeometry.wedges(c, ring)) {
-            val (x, y) = PuckSectionsGeometry.centroid(w, ring)
-            assertEquals(ring.mid, kotlin.math.hypot(x, y), 0.01f)
-            val ang = (Math.toDegrees(kotlin.math.atan2(y, x).toDouble()).toFloat() + 360f) % 360f
-            assertEquals(w.midDeg % 360f, ang, 0.01f)
+    @Test fun CFG_15_w38_theRingsAndTheGroupBandNeverShareATouchAtAnyWindowSize() {
+        for (min in listOf(300f, 360f, 411f, 600f)) {
+            val r = ringFor(min); val h = PuckLayout.compute(min)
+            // the group labels start (their ink) at the label radius minus a few dp; the ring ends before that
+            assertTrue("$min: ring ${r.outer} < labels ${h.chipRadiusDp}", r.outer < h.chipRadiusDp)
+            // and the outer wheel's band starts at the hub's edge plus 3 dp (WheelMetrics.bandInner)
+            assertTrue("$min: ring ${r.outer} < band ${h.hubRadiusDp + 3f}", r.outer < h.hubRadiusDp + 3f)
         }
     }
 
-    @Test fun W32_anAppIconIsSixtyPercentOfTheWedgesSmallerDimensionAndTheWedgeIsAsWideAsTheGeometryAllows() {
-        val w = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)[0]
-        val smaller = minOf(PuckSectionsGeometry.arcWidth(w, ring), ring.thickness)
-        assertEquals(0.6f * smaller, PuckSectionsGeometry.glyphSize(w, ring, PuckSectionsGeometry.APP_ICON_SHARE), 0.001f)
-        // across the arc a wedge is under 48 dp at mid radius but 36 to 47 dp at its outer edge: the best four wedges in a quarter turn allow
-        val outerArc = Math.toRadians(w.sweep.toDouble()).toFloat() * ring.outer
-        assertTrue("outer arc $outerArc", outerArc >= 36f)
-        assertTrue("the ring is deeper than 48 dp", PuckSectionsGeometry.deepEnough(ring))
+    // ---- tap area sizes
+
+    @Test fun NFR_13_w38_aWholeSegmentIsAtLeast44dpAcrossTheArcEverywhereAtEightAndWiderAtSixAndSeven() {
+        val r = phone
+        for (n in 6..8) {
+            assertTrue("n=$n inner ${PuckSectionsGeometry.arcAt(n, r.inner)}", PuckSectionsGeometry.arcAt(n, r.inner) >= PuckSectionsGeometry.MIN_ARC_DP)
+            assertTrue(PuckSectionsGeometry.arcAt(n, r.mid) >= PuckSectionsGeometry.MIN_ARC_DP)
+            assertTrue(PuckSectionsGeometry.arcAt(n, r.outer) >= PuckSectionsGeometry.MIN_ARC_DP)
+        }
+        // the numbers quoted in the decision note
+        assertEquals(46.3f, PuckSectionsGeometry.arcAt(8, r.inner), 0.2f)
+        assertEquals(93.3f, PuckSectionsGeometry.arcAt(8, r.outer), 0.3f)
+        assertTrue("radially it is thumb sized", r.thickness >= 48f)
     }
 
-    @Test fun CFG_15_theRightHandCornerIsTheExactMirrorOfTheLeftHandOne() {
-        val left = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring)
-        val right = PuckSectionsGeometry.wedges(Corner.BottomRight, ring)
-        for (i in 0 until 4) {
-            val l = PuckSectionsGeometry.centroid(left[i], ring); val r = PuckSectionsGeometry.centroid(right[i], ring)
-            assertEquals("slot $i mirrored in x", -l.first, r.first, 0.01f)
-            assertEquals("slot $i same y", l.second, r.second, 0.01f)
+    @Test fun NFR_13_w38_theSegmentsAtTheMiddleOfTheQuadrantKeepTheirFullTapAreaWhateverThePositionAtRest() {
+        for (a in corners) for (n in 6..8) for (front in 0 until n) {
+            val r = phone; val w = window(a)
+            val v = PuckSectionsGeometry.visibleSegment(a, n, front.toFloat(), front, r, w)
+            assertNotNull("$a n=$n front=$front", v)
+            assertEquals("$a n=$n: the centred segment is whole at the mid radius", PuckSectionsGeometry.arcAt(n, r.mid), v!!.arcDp, 1.5f)
+            assertTrue("$a n=$n: tap box is ${v.bounds.width} x ${v.bounds.height}", v.bounds.width >= 44f && v.bounds.height >= 44f)
         }
     }
 
-    @Test fun CFG_15_slotOneIsNextToTheHorizontalEdgeInEveryCorner() {
-        for (c in Corner.entries) {
-            val (x, y) = PuckSectionsGeometry.centroid(PuckSectionsGeometry.wedges(c, ring)[0], ring)
-            assertTrue("$c slot 1 hugs the horizontal edge: $x,$y", kotlin.math.abs(y) < kotlin.math.abs(x))
-            val (x3, y3) = PuckSectionsGeometry.centroid(PuckSectionsGeometry.wedges(c, ring)[3], ring)
-            assertTrue("$c slot 4 hugs the vertical edge: $x3,$y3", kotlin.math.abs(x3) < kotlin.math.abs(y3))
-        }
-    }
-
-    @Test fun CFG_15_everyPointOfAWedgeHitsItsSlotAndASharedEdgeBelongsToANeighbourNotToNothing() {
-        for (c in Corner.entries) for (w in PuckSectionsGeometry.wedges(c, ring)) {
-            for (f in listOf(0.1f, 0.5f, 0.9f)) {
-                val a = Math.toRadians((w.startDeg + (w.endDeg - w.startDeg) * f).toDouble())
-                val r = ring.inner + ring.thickness * 0.5f
-                val hit = PuckSectionsGeometry.hit(c, ring, (r * cos(a)).toFloat(), (r * sin(a)).toFloat())
-                assertEquals("$c slot ${w.slot} at $f", PuckSectionsGeometry.Hit.Slot(w.slot), hit)
+    @Test fun NFR_13_w38_everyVisibleSegmentAtRestHasABoxInsideTheWindowAndATapAreaOfAtLeast44dpOnSomeSideForAllCornersAndSizes() {
+        for (a in corners) for (n in 6..8) for (front in 0 until n) for ((w0, h0) in listOf(411f to 891f, 891f to 411f, 360f to 640f)) {
+            val r = ringFor(minOf(w0, h0)); val w = window(a, w0, h0)
+            for (v in PuckSectionsGeometry.visibleSegments(a, n, front.toFloat(), r, w)) {
+                assertTrue("inside window", v.bounds.left >= -0.01f && v.bounds.top >= -0.01f && v.bounds.right <= w0 + 0.01f && v.bounds.bottom <= h0 + 0.01f)
+                assertTrue("$a n=$n slot ${v.index}: ${v.bounds.width} x ${v.bounds.height}", maxOf(v.bounds.width, v.bounds.height) >= 20f)
             }
-        }
-        val w = PuckSectionsGeometry.wedges(Corner.BottomLeft, ring).sortedBy { it.startDeg }
-        val gapAngle = Math.toRadians(((w[0].endDeg + w[1].startDeg) / 2f).toDouble())
-        val hit = PuckSectionsGeometry.hit(Corner.BottomLeft, ring, (ring.mid * cos(gapAngle)).toFloat(), (ring.mid * sin(gapAngle)).toFloat())
-        assertTrue("the gap still hits a wedge: $hit", hit is PuckSectionsGeometry.Hit.Slot)
-    }
-
-    @Test fun CFG_15_theCentreIsBackAndOutsideTheRingOrTheQuadrantIsNothing() {
-        assertEquals(PuckSectionsGeometry.Hit.Back, PuckSectionsGeometry.hit(Corner.BottomLeft, ring, 0f, 0f))
-        assertEquals(PuckSectionsGeometry.Hit.Back, PuckSectionsGeometry.hit(Corner.BottomLeft, ring, ring.backRadius - 1f, 0f))
-        assertEquals(PuckSectionsGeometry.Hit.None, PuckSectionsGeometry.hit(Corner.BottomLeft, ring, ring.outer + 5f, -1f))
-        // BottomLeft's visible quadrant is up and to the right; a point down-left of the centre is off screen
-        assertEquals(PuckSectionsGeometry.Hit.None, PuckSectionsGeometry.hit(Corner.BottomLeft, ring, -ring.mid, ring.mid))
-    }
-
-    @Test fun INP_19_theRingIsDeepEnoughForA48dpTouchOnAPhoneAndItsRadiiAreOrdered() {
-        for (side in listOf(320f, 360f, 411f, 600f, 800f)) {
-            val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
-            val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
-            assertTrue("$side: back < inner < outer", r.backRadius <= r.inner && r.inner < r.outer)
-            assertTrue("$side: the Back button is at least 48 dp across", r.backRadius * 2f >= 48f)
-            assertTrue("$side: the ring is ${r.thickness} dp deep, at least 48", PuckSectionsGeometry.deepEnough(r))
-            assertTrue("$side: the labels clear the ring", r.outer <= hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
-        }
-    }
-
-    @Test fun INP_19_theBoundingBoxHoldsEveryCornerOfTheWedge() {
-        for (c in Corner.entries) for (w in PuckSectionsGeometry.wedges(c, ring)) {
-            val b = PuckSectionsGeometry.bounds(w, ring)
-            for (a in listOf(w.startDeg, w.endDeg)) for (rad in listOf(ring.inner, ring.outer)) {
-                val x = rad * cos(Math.toRadians(a.toDouble())).toFloat(); val y = rad * sin(Math.toRadians(a.toDouble())).toFloat()
-                assertTrue("$c ${w.slot}: ($x,$y) in $b", x >= b.left - 0.01f && x <= b.right + 0.01f && y >= b.top - 0.01f && y <= b.bottom + 0.01f)
-            }
-        }
-    }
-
-    @Test fun CFG_15_w33_the_hub_is_44dp_on_a_phone_and_the_outer_edge_of_every_wedge_is_at_least_44dp_across() {
-        for (side in listOf(411f, 480f, 600f, 840f)) {
-            val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
-            val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
-            assertEquals("$side hub", 44f, r.backRadius, 0.001f)
-            val outerArc = Math.toRadians(22.5) * r.outer
-            assertTrue("$side: outer arc $outerArc", outerArc >= PuckSectionsGeometry.OUTER_ARC_DP - 0.01)
-            assertEquals("no gap between hub and ring", r.backRadius, r.inner, 0f)
-        }
-        // smaller windows shrink the hub but never below 24 dp, and the ring is never thinner than 20 dp
-        for (side in listOf(240f, 280f, 320f, 360f)) {
-            val hub = com.bos.sphere.core.input.PuckLayout.hubRadius(side)
-            val r = PuckSectionsGeometry.ring(hub, hub - com.bos.sphere.core.input.PuckLayout.LABEL_BAND)
-            assertTrue("$side hub ${r.backRadius}", r.backRadius in 24f..44f)
-            assertTrue("$side thickness ${r.thickness}", r.thickness >= 20f)
         }
     }
 }

@@ -69,7 +69,6 @@ import com.bos.sphere.core.data.UsageStats
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ThemeVariant
-import com.bos.sphere.feature.grid.AppDrawerSpace
 import com.bos.sphere.feature.grid.ColorPicker
 import com.bos.sphere.feature.grid.ConfirmDialog
 import com.bos.sphere.feature.grid.GlassDialog
@@ -123,7 +122,6 @@ import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.CornerItem
 import com.bos.sphere.core.data.CornerSlot
-import com.bos.sphere.core.data.DrawerStyle
 import com.bos.sphere.core.data.HiddenAppsStore
 import com.bos.sphere.core.data.HomeGesture
 import com.bos.sphere.core.data.HomeLayoutMath
@@ -343,14 +341,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // NFR-11: opt-in restore of the surface that was open before a restart (off by default; never in safe mode).
     val openSurfaces = remember { com.bos.sphere.core.data.OpenSurfaceStore.get(context) }
     val restoredSurface = remember { openSurfaces.takeRestore(prefs.restoreOpenSurfaces, com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
-    var drawerOpen by remember { mutableStateOf(restoredSurface == com.bos.sphere.core.data.OpenSurface.Drawer) }
     var searchOpen by remember { mutableStateOf(restoredSurface == com.bos.sphere.core.data.OpenSurface.Search) }
-    LaunchedEffect(drawerOpen, searchOpen) {
-        openSurfaces.record(if (drawerOpen) com.bos.sphere.core.data.OpenSurface.Drawer else if (searchOpen) com.bos.sphere.core.data.OpenSurface.Search else null)
+    var wheelOpen by remember { mutableStateOf(restoredSurface == com.bos.sphere.core.data.OpenSurface.Drawer) } // wave 38: the app drawer is the disc, a restored "drawer" reopens it
+    LaunchedEffect(wheelOpen, searchOpen) {
+        openSurfaces.record(if (wheelOpen) com.bos.sphere.core.data.OpenSurface.Drawer else if (searchOpen) com.bos.sphere.core.data.OpenSurface.Search else null)
     }
     var colorApp by remember { mutableStateOf<AppEntry?>(null) }
     var fillPrompt by remember { mutableStateOf(false) }
-    var wheelOpen by remember { mutableStateOf(false) }
     var wheelAnchor by remember { mutableStateOf(Corner.BottomLeft) }
     var hubOpen by remember { mutableStateOf(false) }
     var leftOpen by rememberCommsOpen(homeSignal) // wave 33: saved with the activity state, so Comms (which stays open under an opened app) survives the process being killed; a Home press closes it
@@ -383,13 +380,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val dockController = remember { com.bos.sphere.feature.dock.DockController() }
     val shortcutRegistry = remember { com.bos.sphere.feature.grid.LauncherInput.registry }
     val puckSlots by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).slots }.collectAsStateWithLifecycle()
+    val puckSegments by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).segments }.collectAsStateWithLifecycle()
+    val puckLabels by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).showLabels }.collectAsStateWithLifecycle()
     val torchOk = remember(wheelOpen) { !wheelOpen || com.bos.sphere.core.data.Torch.available(context) } // asked only while the disc is open
     val dndOk = remember(wheelOpen) { !wheelOpen || com.bos.sphere.core.data.PuckAvailability.policyAccess(context) }
     fun launch(app: AppEntry) {
         com.bos.sphere.feature.dock.SessionUse.mark(app.key)
         appLauncher.launch(app, lastTouch.sourceRect())
         stores.history.record(app.key)
-        drawerOpen = false
         wheelOpen = false
         searchOpen = false
     }
@@ -449,17 +447,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val hotspotPlacements = remember(placements, glanceOn) { placements.filter { it.screen in glanceOn } } // wave 38: the Hotspots chips pick which corners draw, on every page
 
     fun openAllApps(anchor: Corner?) {
-        if (com.bos.sphere.feature.grid.AllAppsOpening.surfaceFor(prefs.drawerStyle) == com.bos.sphere.feature.grid.AllAppsSurface.Puck) {
-            wheelAnchor = anchor
-                ?: placements.firstOrNull { p ->
-                    val s = p.slot
-                    s is CornerSlot.Single && (s.item as? CornerItem.Action)?.id == CornerActionId.AllApps
-                }?.screen
-                ?: Corner.BottomLeft
-            wheelOpen = true
-        } else {
-            drawerOpen = true
-        }
+        // Wave 38: the app drawer is always the disc.
+        wheelAnchor = anchor
+            ?: placements.firstOrNull { p ->
+                val s = p.slot
+                s is CornerSlot.Single && (s.item as? CornerItem.Action)?.id == CornerActionId.AllApps
+            }?.screen
+            ?: Corner.BottomLeft
+        wheelOpen = true
     }
 
     // Pinch (or any bound gesture) steps the grid denser / sparser: the current page's own density
@@ -518,8 +513,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // INP-05, STR-14 (wave 24): "Focus the dock" (Ctrl+H) and "Open recents" with Right side = Dock rail. Whatever hides the rail
     // (DockLayer's visible flags, the Recents panel included) is closed first, unless no rail can appear: then nothing closes and a toast says why.
     fun focusDockFromHome(c: com.bos.sphere.core.input.LauncherCommand): Boolean = com.bos.sphere.ui.FocusDockRouting.focusDock(
-        c, overlayOpen = searchOpen || drawerOpen || wheelOpen || leftOpen || rightOpen || settingsOpen,
-        closeOverlays = { searchOpen = false; drawerOpen = false; wheelOpen = false; leftOpen = false; rightOpen = false; settingsOpen = false },
+        c, overlayOpen = searchOpen || wheelOpen || leftOpen || rightOpen || settingsOpen,
+        closeOverlays = { searchOpen = false; wheelOpen = false; leftOpen = false; rightOpen = false; settingsOpen = false },
         dock = dockController::handle,
         noDock = com.bos.sphere.ui.FocusDockRouting.noDock(
             landing, com.bos.sphere.core.data.ChromeSettings.of(prefs),
@@ -547,7 +542,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         when (id) {
             CornerActionId.GridDenser -> changeDensity(+1)
             CornerActionId.GridSparser -> changeDensity(-1)
-            CornerActionId.Search -> { wheelOpen = false; drawerOpen = false; searchOpen = true }
+            CornerActionId.Search -> { wheelOpen = false; searchOpen = true }
             CornerActionId.AllApps -> openAllApps(anchor)
             CornerActionId.Notifications -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true
             CornerActionId.LauncherSettings -> openSettings(CATEGORY_HOME)
@@ -618,12 +613,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // INP-11: an app dragged out of the drawer with a mouse and dropped on the home is added to the current page.
     // ---- keyboard, pointer and controller (INP-04, INP-05, INP-16, HOM-21): shortcuts go to the same openers the touch paths use
     com.bos.sphere.feature.grid.LauncherInputWiring(
-        overlayOpen = settingsOpen || drawerOpen || searchOpen || hubOpen || hubStandalone || leftOpen || rightOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
+        overlayOpen = settingsOpen || searchOpen || hubOpen || hubStandalone || leftOpen || rightOpen || menuApp != null || quickOpen || editCorner != null || editGesture != null,
         onCommand = { c ->
             when (c) {
                 com.bos.sphere.core.input.LauncherCommand.OpenPalette -> { internal(CornerActionId.Search, null); true }
-                com.bos.sphere.core.input.LauncherCommand.OpenDrawer -> { wheelOpen = false; drawerOpen = true; true }
-                com.bos.sphere.core.input.LauncherCommand.OpenPuck -> { drawerOpen = false; wheelAnchor = Corner.BottomLeft; wheelOpen = true; true }
+                com.bos.sphere.core.input.LauncherCommand.OpenDrawer -> { wheelAnchor = Corner.BottomLeft; wheelOpen = true; true } // wave 38: the drawer is the disc
+                com.bos.sphere.core.input.LauncherCommand.OpenPuck -> { wheelAnchor = Corner.BottomLeft; wheelOpen = true; true }
                 com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
                 com.bos.sphere.core.input.LauncherCommand.OpenRecents -> openRecents()
@@ -636,7 +631,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
         },
         onEmptyMenu = { quickPage = gridState.currentPage; quickOpen = true },
-        surfaceOpen = searchOpen || drawerOpen,
+        surfaceOpen = searchOpen,
         raiseKeyboard = prefs.keyboardOnOpen(isLandscape),
         hotCornerDwellMs = if (prefs.hotCornersOn) prefs.hotCornerDwellMs.toLong() else 0L,
         cornerLabel = { hot ->
@@ -807,7 +802,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // ---- Home press: collapse everything, back to the first page.
     LaunchedEffect(homeSignal) {
         if (homeSignal > 0) {
-            settingsOpen = false; drawerOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false; leftOpen = false; rightOpen = false
+            settingsOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false; leftOpen = false; rightOpen = false
             menuApp = null; editCorner = null; editGesture = null; tileMenu = null; expandedWidget = null
             // Wave 26: the Home button returns to what home starts on: Glance when it is on, else the first page.
             showStop(0) // stop 0 is Glance when it is on, else the first page
@@ -1231,7 +1226,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
-            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.Dock, chromeSettings), // HOM-12, HOM-23: no dock on Glance unless the right side is the dock rail: the dock steps aside while the home is a card
+            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !wheelOpen && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.Dock, chromeSettings), // HOM-12, HOM-23: no dock on Glance unless the right side is the dock rail: the dock steps aside while the home is a card
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,
@@ -1242,7 +1237,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
-            visible = landing == HomeShown.Glance && prefs.showMusic && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen,
+            visible = landing == HomeShown.Glance && prefs.showMusic && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !wheelOpen,
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         )
 
@@ -1311,7 +1306,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
 
         // Old-school mode: an always-open keyboard that searches as you type.
-        if (prefs.alwaysKeyboard && !settingsOpen && !searchOpen && !drawerOpen && !wheelOpen) {
+        if (prefs.alwaysKeyboard && !settingsOpen && !searchOpen && !wheelOpen) {
             val kbDensity = androidx.compose.ui.platform.LocalDensity.current
             SearchKeyboard(
                 apps = apps,
@@ -1347,23 +1342,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         val usage = remember(history) { UsageStats.of(history) }
         androidx.compose.runtime.SideEffect { com.bos.sphere.feature.search.AppSearch.usage = usage }
-        AppDrawerSpace(
-            visible = drawerOpen,
-            apps = apps,
-            usage = usage,
-            view = prefs.drawerView,
-            sort = prefs.drawerSort,
-            rail = prefs.drawerRail,
-            railVisible = prefs.drawerRailVisible,
-            viewSwitch = prefs.drawerViewSwitch,
-            onViewChange = { v -> stores.prefs.update { it.copy(drawerView = v) } },
-            onSortChange = { v -> stores.prefs.update { it.copy(drawerSort = v) } },
-            onLaunch = ::launch,
-            onLongPress = { menuApp = it },
-            onDismiss = { drawerOpen = false },
-            sounds = sounds,
-            modifier = Modifier.fillMaxSize(),
-        )
 
         // CFG-05: every Ground Control setting is also a Radar result; the list is filled once the categories are built below.
         val settingsForRadar = remember { androidx.compose.runtime.mutableStateOf(emptyList<com.bos.sphere.feature.grid.SettingCategory>()) }
@@ -1427,8 +1405,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onLaunch = ::launch,
             onLongPressApp = { menuApp = it },
             onSearch = { wheelOpen = false; searchOpen = true },
-            // CFG-15 (wave 30): the four sections around the hub show what the user chose in Ground Control > App drawer > Drawer shortcuts.
-            actions = puckSlots.mapIndexed { i, slot ->
+            // CFG-15 (waves 30, 38): the segments of the white ring around the hub (6 to 8) show what the user chose in Ground Control > App drawer > Drawer shortcuts.
+            ringSegments = puckSegments,
+            showRingLabels = puckLabels,
+            actions = puckSlots.take(puckSegments).mapIndexed { i, slot ->
                 when (slot) {
                     com.bos.sphere.core.data.PuckSlot.Empty ->
                         com.bos.sphere.feature.grid.PuckAction(L10n.tr("Drawer shortcut %d, empty", i + 1), onLongClick = { wheelOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_APP_DRAWER) }) {}
@@ -1502,10 +1482,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 hiddenKeys = hiddenStore.hidden, allApps = allApps, setHidden = hiddenStore::setHidden,
             )
         }
-        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, legacyAvailable) {
+        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, legacyAvailable, puckSegments, puckLabels) {
             buildSettingsCategories(
             SettingsModel(
                 hiddenApps = hiddenAppsAccess,
+                puckSegments = puckSegments,
+                setPuckSegments = { n -> com.bos.sphere.core.data.PuckActionsStore.get(context).setSegments(n) },
+                puckLabels = puckLabels,
+                setPuckLabels = { v -> com.bos.sphere.core.data.PuckActionsStore.get(context).setShowLabels(v) },
                 chosenApp = { id -> actionAppsRev.let { ActionPrefs.get(context, id)?.let(appsByKey::get)?.label } },
                 pickAppFor = { id -> pickFor = id },
                 pickLeftWidget = { pickingLeft = true; widgetPicker.launch() },

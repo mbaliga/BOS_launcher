@@ -215,6 +215,7 @@ internal fun BoxScope.PuckSectionsLayer(
     actions: List<PuckAction>,
     interactive: Boolean = true,
     onBack: () -> Unit,
+    iconScale: Float = 1f,
 ) {
     val haptics = rememberLauncherHaptics()
     val density = LocalDensity.current
@@ -291,13 +292,13 @@ internal fun BoxScope.PuckSectionsLayer(
     })
 
     // The segments that have any part inside the window are the nodes (they join and leave as the ring turns).
-    val visible by remember(anchor, n, ring, window) {
-        derivedStateOf { PuckSectionsGeometry.visibleSegments(anchor, n, state.p, ring, window).map { it.index } }
+    // Wave 43: one fixed glyph size (only the user's icon-size factor scales it, never the geometry), always square.
+    val glyphDp = PuckSectionsGeometry.GLYPH_DP * iconScale
+    val appDp = PuckSectionsGeometry.APP_ICON_DP * iconScale
+    val tapGlyphDp = minOf(glyphDp, appDp)
+    val visible by remember(anchor, n, ring, window, tapGlyphDp) {
+        derivedStateOf { PuckSectionsGeometry.visibleSegments(anchor, n, state.p, ring, window, tapGlyphDp).map { it.index } }
     }
-    val arcMid = PuckSectionsGeometry.arcAt(n, ring.mid)
-    val minDim = minOf(arcMid, ring.thickness)
-    val glyphDp = (PuckSectionsGeometry.APP_ICON_SHARE * 0.7f * minDim).coerceIn(PuckSectionsGeometry.MIN_GLYPH_DP, 32f)
-    val appDp = (PuckSectionsGeometry.APP_ICON_SHARE * minDim).coerceIn(PuckSectionsGeometry.MIN_GLYPH_DP, 40f)
     for (i in visible) {
         val a = actions.getOrNull(i) ?: PuckAction(L10n.tr("Drawer shortcut %d, empty", i + 1)) {}
         val empty = a.empty
@@ -305,7 +306,7 @@ internal fun BoxScope.PuckSectionsLayer(
         Box(
             Modifier
                 .layout { m, _ ->
-                    val v = PuckSectionsGeometry.visibleSegment(anchor, n, state.p, i, ring, window)
+                    val v = PuckSectionsGeometry.visibleSegment(anchor, n, state.p, i, ring, window, tapGlyphDp)
                     val bw = if (v == null) 1 else (v.bounds.width * d).roundToInt().coerceAtLeast(1)
                     val bh = if (v == null) 1 else (v.bounds.height * d).roundToInt().coerceAtLeast(1)
                     val pl = m.measure(Constraints.fixed(bw, bh))
@@ -329,16 +330,15 @@ internal fun BoxScope.PuckSectionsLayer(
             val alpha = when { empty -> PuckLook.EMPTY_ALPHA; !a.available -> PuckLook.UNAVAILABLE_ALPHA; else -> 1f }
             val boxDp = if (a.app != null) appDp else glyphDp
             val glyphPx = boxDp * d
-            val labelShift = if (showLabels) 7f * d else 0f
-            val v0 = { PuckSectionsGeometry.visibleSegment(anchor, n, state.p, i, ring, window) }
-            // Glyph and label sit on the part of the segment that shows, whole inside the window; one with no room for them shows only its (tappable) area.
-            val placed = { PuckSectionsGeometry.glyphPlacement(anchor, n, state.p, i, ring, window, boxDp + if (showLabels) 14f else 0f) }
+            val v0 = { PuckSectionsGeometry.visibleSegment(anchor, n, state.p, i, ring, window, tapGlyphDp) }
+            // Wave 43: the glyph sits on its segment's own centre at its one fixed size; it is drawn only when its whole box is inside the window.
+            val placed = { PuckSectionsGeometry.glyphPlacement(anchor, n, state.p, i, ring, window, boxDp) }
             Box(
                 Modifier
                     .offset {
                         val v = v0() ?: return@offset IntOffset.Zero
-                        val g = placed() ?: return@offset IntOffset.Zero
-                        IntOffset((window.cx * d + g.first * d - v.bounds.left * d - glyphPx / 2f).roundToInt(), (window.cy * d + g.second * d - v.bounds.top * d - glyphPx / 2f - labelShift).roundToInt())
+                        val g = PuckSectionsGeometry.glyphCentre(anchor, n, state.p, i, ring)
+                        IntOffset((window.cx * d + g.first * d - v.bounds.left * d - glyphPx / 2f).roundToInt(), (window.cy * d + g.second * d - v.bounds.top * d - glyphPx / 2f).roundToInt())
                     }
                     .size(boxDp.dp)
                     .graphicsLayer { this.alpha = if (placed() != null) 1f else 0f },
@@ -352,15 +352,20 @@ internal fun BoxScope.PuckSectionsLayer(
                 }
             }
             if (showLabels && !empty) {
+                // The label: a fixed offset under the glyph, shown only when it fits wholly inside the window.
+                val labelShown = { PuckSectionsGeometry.labelVisible(window, PuckSectionsGeometry.glyphCentre(anchor, n, state.p, i, ring), boxDp) }
                 Box(
                     Modifier
                         .offset {
                             val v = v0() ?: return@offset IntOffset.Zero
-                            val g = placed() ?: return@offset IntOffset.Zero
-                            IntOffset((window.cx * d + g.first * d - v.bounds.left * d - 28f * d).roundToInt(), (window.cy * d + g.second * d - v.bounds.top * d + glyphPx / 2f - labelShift + 1f * d).roundToInt())
+                            val g = PuckSectionsGeometry.glyphCentre(anchor, n, state.p, i, ring)
+                            IntOffset(
+                                (window.cx * d + g.first * d - v.bounds.left * d - PuckSectionsGeometry.LABEL_WIDTH_DP * d / 2f).roundToInt(),
+                                (window.cy * d + g.second * d - v.bounds.top * d + glyphPx / 2f + PuckSectionsGeometry.LABEL_GAP_DP * d).roundToInt(),
+                            )
                         }
-                        .width(56.dp)
-                        .graphicsLayer { this.alpha = if (placed() != null) alpha else 0f },
+                        .width(PuckSectionsGeometry.LABEL_WIDTH_DP.dp)
+                        .graphicsLayer { this.alpha = if (labelShown()) alpha else 0f },
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Text(a.label, color = look.glyph, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -423,13 +428,13 @@ internal fun BoxScope.PuckSectionsLayer(
             .offset { IntOffset((corner.x - outerPx).roundToInt(), (corner.y - outerPx).roundToInt()) }
             .size((ring.outer * 2f).dp)
             .clip(CircleShape)
-            .pointerInput(anchor, n, ring, window, interactive) {
+            .pointerInput(anchor, n, ring, window, interactive, tapGlyphDp) {
                 if (!interactive) return@pointerInput
                 val centre = Offset(outerPx, outerPx)
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val rel0 = (down.position - centre) / d
-                    val startHit = PuckSectionsGeometry.hit(anchor, n, state.p, ring, rel0.x, rel0.y, window)
+                    val startHit = PuckSectionsGeometry.hit(anchor, n, state.p, ring, rel0.x, rel0.y, window, tapGlyphDp)
                     if (startHit is PuckSectionsGeometry.Hit.None) return@awaitEachGesture
                     down.consume()
                     state.stop()
@@ -487,7 +492,7 @@ internal fun BoxScope.PuckSectionsLayer(
                     } else if (up != null && !longFired) {
                         up.consume()
                         val rel = (up.position - centre) / d
-                        when (val h = PuckSectionsGeometry.hit(anchor, n, state.p, ring, rel.x, rel.y, window)) {
+                        when (val h = PuckSectionsGeometry.hit(anchor, n, state.p, ring, rel.x, rel.y, window, tapGlyphDp)) {
                             is PuckSectionsGeometry.Hit.Back -> { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); currentOnBack() }
                             is PuckSectionsGeometry.Hit.Slot -> tap(h.index)
                             else -> Unit

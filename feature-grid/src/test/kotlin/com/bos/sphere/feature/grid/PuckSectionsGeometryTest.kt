@@ -132,36 +132,103 @@ class PuckSectionsGeometryTest {
         }
     }
 
-    @Test fun CFG_15_w38_theGlyphOfASegmentIsCentredOnTheMiddleOfItsVisibleRun() {
+    @Test fun CFG_15_w38_theVisibleRunMidAngleOfACutSegmentIsInsideTheWindow() {
+        // Still used for the long-press name pill: the middle of the longest visible run (not the glyph, wave 43).
         val a = Corner.BottomLeft; val w = window(a); val r = phone
         val whole = PuckSectionsGeometry.visibleSegment(a, 8, 1f, 1, r, w)!!
-        assertEquals("a whole segment's glyph is on its own centre line", PuckSectionsGeometry.centerAngle(a, 8, 1f, 1), whole.midAngleDeg, 1.01f)
+        assertEquals(PuckSectionsGeometry.centerAngle(a, 8, 1f, 1), whole.midAngleDeg, 1.01f)
         val cut = PuckSectionsGeometry.visibleSegment(a, 8, 1f, 3, r, w)!!
-        // slot 3 spans 202.5..247.5 and the mid radius only shows it from 225 on: the glyph is at about 236
         assertEquals(236f, cut.midAngleDeg, 1.6f)
         val (gx, gy) = PuckSectionsGeometry.glyphOffset(cut.midAngleDeg, r)
-        assertTrue("the glyph point is inside the window", w.contains(w.cx + gx, w.cy + gy))
+        assertTrue(w.contains(w.cx + gx, w.cy + gy))
     }
 
-    @Test fun CFG_15_w38_aGlyphIsAlwaysWholeInsideTheWindowAndASegmentTheEdgeCutsCarriesItOnThePartThatShows() {
+    private val g = PuckSectionsGeometry.GLYPH_DP
+    private fun angleOf(p: Pair<Float, Float>) = norm(Math.toDegrees(kotlin.math.atan2(p.second.toDouble(), p.first.toDouble())).toFloat())
+
+    @Test fun INP_19_w43_theGlyphCentreIsTheSegmentMidPointForEveryRotationCornerAndCount() {
         val r = phone
-        for (a in corners) for (n in 6..8) for (front in 0 until n) {
-            val w = window(a)
-            for (v in PuckSectionsGeometry.visibleSegments(a, n, front.toFloat(), r, w)) {
-                val g = PuckSectionsGeometry.glyphPlacement(a, n, front.toFloat(), v.index, r, w, 30f) ?: continue
-                assertTrue("$a n=$n slot ${v.index}: glyph at $g is inside the window", w.contains(w.cx + g.first - 15f, w.cy + g.second - 15f) && w.contains(w.cx + g.first + 15f, w.cy + g.second + 15f))
-                assertEquals("inside its own segment", v.index, PuckSectionsGeometry.segmentAt(a, n, front.toFloat(), Math.toDegrees(kotlin.math.atan2(g.second.toDouble(), g.first.toDouble())).toFloat()))
+        for (a in corners) for (n in 6..8) for (step in 0..(4 * n)) {
+            val p = step / 4f // whole and in-between rotations
+            for (i in 0 until n) {
+                val c = PuckSectionsGeometry.glyphCentre(a, n, p, i, r)
+                assertEquals("$a n=$n p=$p slot $i: mid radius", r.mid, kotlin.math.hypot(c.first, c.second), 0.01f)
+                assertEquals("$a n=$n p=$p slot $i: mid angle", 0f, angDiff(angleOf(c), PuckSectionsGeometry.centerAngle(a, n, p, i)), 0.01f)
+                // and when it is drawn, it is drawn exactly there (no shift)
+                val placed = PuckSectionsGeometry.glyphPlacement(a, n, p, i, r, window(a), g)
+                if (placed != null) assertEquals(c, placed)
             }
         }
-        val a = Corner.BottomLeft; val w = window(a)
-        for (i in listOf(0, 1, 2)) {
-            val g = PuckSectionsGeometry.glyphPlacement(a, 8, 1f, i, r, w, 30f)!!
-            val nominal = PuckSectionsGeometry.glyphOffset(PuckSectionsGeometry.centerAngle(a, 8, 1f, i), r)
-            assertEquals("a whole segment keeps its glyph on its centre line", 0f, kotlin.math.hypot(g.first - nominal.first, g.second - nominal.second), 4f)
+    }
+
+    @Test fun INP_19_w43_aGlyphIsNeverMovedOrResizedWhateverTheWindowAndTheOneBoxIsAlwaysSquare() {
+        val r = phone
+        val windows = listOf(411f to 891f, 360f to 640f, 891f to 411f, 600f to 960f)
+        for ((ww, hh) in windows) for (a in corners) for (p in 0 until 8) for (i in 0 until 8) {
+            val w = window(a, ww, hh)
+            val c = PuckSectionsGeometry.glyphCentre(a, 8, p.toFloat(), i, r)
+            val placed = PuckSectionsGeometry.glyphPlacement(a, 8, p.toFloat(), i, r, w, g)
+            assertTrue("$ww x $hh $a p=$p slot $i: either not drawn or at the exact segment centre", placed == null || placed == c)
         }
-        // slot 7 is cut by the bottom edge and slot 3 by the left edge: both still carry a whole glyph, moved onto the part that shows
-        assertNotNull(PuckSectionsGeometry.glyphPlacement(a, 8, 1f, 7, r, w, 30f))
-        assertNotNull(PuckSectionsGeometry.glyphPlacement(a, 8, 1f, 3, r, w, 30f))
+        assertEquals(24f, PuckSectionsGeometry.GLYPH_DP, 0f)
+        // the fixed size does not depend on the segment count or the ring (it used to be derived from the segment)
+        for (n in 6..8) assertEquals(24f, PuckSectionsGeometry.GLYPH_DP, 0f)
+    }
+
+    @Test fun INP_19_w43_noDrawnGlyphBoxCrossesTheWindowEdgeAndACutOneIsSkippedNotSqueezed() {
+        val r = phone
+        var skipped = 0; var drawn = 0
+        for ((ww, hh) in listOf(411f to 891f, 891f to 411f, 360f to 640f)) for (a in corners) for (n in 6..8) for (p in 0 until n) for (i in 0 until n) {
+            val w = window(a, ww, hh)
+            val c = PuckSectionsGeometry.glyphCentre(a, n, p.toFloat(), i, r)
+            val cx = w.cx + c.first; val cy = w.cy + c.second
+            val inside = cx - g / 2f >= 2f && cx + g / 2f <= w.width - 2f && cy - g / 2f >= 2f && cy + g / 2f <= w.height - 2f
+            val placed = PuckSectionsGeometry.glyphPlacement(a, n, p.toFloat(), i, r, w, g)
+            assertEquals("$ww x $hh $a n=$n p=$p slot $i", inside, placed != null)
+            if (placed == null) skipped++ else drawn++
+        }
+        assertTrue("some glyphs are skipped at an edge ($skipped) and some are drawn ($drawn)", skipped > 0 && drawn > 0)
+    }
+
+    @Test fun INP_19_w43_turningTheRingBringsAHiddenGlyphFullyIntoView() {
+        val a = Corner.BottomLeft; val w = window(a); val r = phone
+        // slot 7 sits on the bottom edge at rest (position 1): its box is cut, so it is not drawn
+        assertNull(PuckSectionsGeometry.glyphPlacement(a, 8, 1f, 7, r, w, g))
+        // its segment is still there as a tap target
+        assertNotNull(PuckSectionsGeometry.visibleSegment(a, 8, 1f, 7, r, w, g))
+        // turning the ring brings it to the thumb side, where it shows whole at its exact centre
+        val front = (0..7).first { p -> PuckSectionsGeometry.glyphPlacement(a, 8, p.toFloat(), 7, r, w, g) != null }
+        val placed = PuckSectionsGeometry.glyphPlacement(a, 8, front.toFloat(), 7, r, w, g)!!
+        assertEquals(PuckSectionsGeometry.glyphCentre(a, 8, front.toFloat(), 7, r), placed)
+        // and every slot is whole in view for some rotation
+        for (i in 0 until 8) assertTrue("slot $i", (0 until 8).any { p -> PuckSectionsGeometry.glyphPlacement(a, 8, p.toFloat(), i, r, w, g) != null })
+    }
+
+    @Test fun INP_19_w43_aSegmentIsATapTargetWhenItsGlyphBoxShowsOrAtLeast10dpOfItShowsAtTheMidRadius() {
+        val r = phone
+        for (a in corners) for (p in 0 until 8) for (i in 0 until 8) {
+            val w = window(a)
+            val withGlyph = PuckSectionsGeometry.visibleSegment(a, 8, p.toFloat(), i, r, w, g)
+            val without = PuckSectionsGeometry.visibleSegment(a, 8, p.toFloat(), i, r, w)
+            if (without != null) assertNotNull("$a p=$p slot $i: the 10 dp rule still holds", withGlyph)
+            if (PuckSectionsGeometry.glyphPlacement(a, 8, p.toFloat(), i, r, w, g) != null) assertNotNull("$a p=$p slot $i: a drawn glyph is on a target", withGlyph)
+        }
+    }
+
+    @Test fun INP_19_w43_theLabelSitsAtAFixedOffsetUnderTheGlyphAndShowsOnlyWhenItFitsWhole() {
+        val r = phone
+        val w = window(Corner.BottomLeft)
+        val c = PuckSectionsGeometry.glyphCentre(Corner.BottomLeft, 8, 1f, 1, r)
+        assertTrue(PuckSectionsGeometry.labelVisible(w, c, g))
+        // the label's box is the glyph's bottom + 1 dp, 56 x 12 dp: fits inside this window
+        val px = w.cx + c.first; val top = w.cy + c.second + g / 2f + PuckSectionsGeometry.LABEL_GAP_DP
+        assertTrue(px - 28f >= 2f && top + 12f <= w.height - 2f)
+        // a glyph that shows whole but whose label would cross the bottom edge shows no label
+        val low = RingWindow(w.cx, w.cy, w.width, w.cy + c.second + g / 2f + 6f)
+        assertTrue(PuckSectionsGeometry.glyphVisible(low, c, g)); assertFalse(PuckSectionsGeometry.labelVisible(low, c, g))
+        // a label never shows without its glyph
+        val edge = RingWindow(0f, 0f, 400f, 800f)
+        assertFalse(PuckSectionsGeometry.labelVisible(edge, 3f to 3f, g))
     }
 
     // ---- rotation, snap

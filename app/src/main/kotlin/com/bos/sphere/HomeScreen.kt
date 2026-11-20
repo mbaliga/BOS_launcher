@@ -550,7 +550,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             CornerActionId.Search -> { wheelOpen = false; drawerOpen = false; searchOpen = true }
             CornerActionId.AllApps -> openAllApps(anchor)
             CornerActionId.Notifications -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true
-            CornerActionId.LauncherSettings -> openSettings(CATEGORY_HOME)
+            CornerActionId.LauncherSettings -> openSettings(com.bos.sphere.ui.CATEGORY_ROOT)
             CornerActionId.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true // Launchpad off: the Minimal top-right hotspot (and a corner) opens the notification hub like "Notifications" does, never nothing
             CornerActionId.OpenRecents -> openRecents()
             else -> Unit
@@ -624,7 +624,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 com.bos.sphere.core.input.LauncherCommand.OpenPalette -> { internal(CornerActionId.Search, null); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenDrawer -> { wheelOpen = false; drawerOpen = true; true }
                 com.bos.sphere.core.input.LauncherCommand.OpenPuck -> { drawerOpen = false; wheelAnchor = Corner.BottomLeft; wheelOpen = true; true }
-                com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(CATEGORY_HOME); true }
+                com.bos.sphere.core.input.LauncherCommand.OpenSettings -> { openSettings(com.bos.sphere.ui.CATEGORY_ROOT); true }
                 com.bos.sphere.core.input.LauncherCommand.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) { leftOpen = true; true } else false
                 com.bos.sphere.core.input.LauncherCommand.OpenRecents -> openRecents()
                 com.bos.sphere.core.input.LauncherCommand.Dismiss -> if (rightOpen) { rightOpen = false; true } else dockController.handle(c)
@@ -1122,7 +1122,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onEmptyLongPress = { page -> if (!homeEdit.active && com.bos.sphere.core.data.FreshHome.isEmpty(pages)) { editFocusAdd = true; homeEdit.enter() } else if (HomeGesture.LongPress in gestures) onGesture(HomeGesture.LongPress) else { quickPage = page; quickOpen = true } },
                             onGesture = ::onGesture,
                             onClockTap = { runner.run(CornerActionId.Clock) },
-                            onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },
+                            onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(com.bos.sphere.ui.CATEGORY_ROOT) },
                             onTileLongPress = { key, _ -> tileMenu = key },
                             extras = homeItems.homeExtras,
                             editMode = homeEdit.active,
@@ -1576,6 +1576,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
             previewDock = { SettingsPreviewDock(homeCapture) },
+            summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories),
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {
@@ -1605,7 +1606,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         L10n.tr("Clear recents") to { stores.recentsState.clear(); menuApp = null },
                     ) else emptyList()),
                 onHomeSettings = if (!prefs.isPaged) {
-                    { menuApp = null; openSettings(CATEGORY_HOME) }
+                    { menuApp = null; openSettings(com.bos.sphere.ui.CATEGORY_ROOT) }
                 } else null,
                 // Only the paged home has pages to add to; the scrolling homes show every app.
                 isOnHome = if (prefs.isPaged) pages.any { app.key in it.keys } else null,
@@ -1706,7 +1707,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 pageCount = pages.size,
                 onDeletePage = { requestDeletePage(quickPage ?: 0); quickOpen = false },
                 onWallpaper = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) }, // HOM-16 (wave 26): the wallpaper rows are in Home screen
-                onGroundControl = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) },
+                onGroundControl = { quickOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_ROOT) }, // wave 40: the root list of every category
                 onDismiss = { quickOpen = false },
             )
         }

@@ -138,7 +138,7 @@ class TourFreshSmokeTest : TourBase() {
     @Test fun CFG_09_tourGroundControlOpensRotatesAndCloses() {
         startFresh()
         key(KeyEvent.KEYCODE_COMMA, ctrl = true); check("ground control", Surface.Settings); rotateAndCheck("ground control")
-        // every category by the Right key (the category bar owns focus)
+        // wave 40: the category strip is gone; the arrow keys now only move the focus through the list
         repeat(30) { key(KeyEvent.KEYCODE_DPAD_RIGHT) }
         check("walked right", Surface.Settings)
         repeat(30) { key(KeyEvent.KEYCODE_DPAD_LEFT) }

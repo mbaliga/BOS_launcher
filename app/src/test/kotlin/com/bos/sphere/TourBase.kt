@@ -70,8 +70,13 @@ abstract class TourBase {
     protected fun quickSheetShown() = tagShown("quick.sheet")
     /** Wave 34: the long-press Home sheet no longer has Edit home, Add page, the Glance switch or the item picker; they are rows in Ground Control, Home screen, one tap from the sheet's Ground Control row. */
     protected fun quickGoTo(row: String) {
-        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        openGroundControlHome()
         rule.onNodeWithText(row, useUnmergedTree = true).performScrollTo().performClick(); settle()
+    }
+    /** Wave 40: the sheet's Ground Control row opens the root list of every category; the Home screen row opens that category's page. */
+    protected fun openGroundControlHome() {
+        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        rule.onNodeWithTag("oneui.row.Home screen", useUnmergedTree = true).performScrollTo().performClick(); settle()
     }
     /** Wave 26: Glance is the surface on screen (its deck dots are drawn only there); otherwise the pages are. */
     /** Glance is on screen when its title slot is inside the window: the one pager may keep a neighbouring stop composed off screen (wave 28). */

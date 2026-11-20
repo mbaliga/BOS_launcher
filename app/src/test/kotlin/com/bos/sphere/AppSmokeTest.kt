@@ -413,7 +413,7 @@ class AppSmokeTest {
         setGlance(true)
         rule.onNodeWithContentDescription("Camera", substring = true).assertIsDisplayed()
         AppSmokeHarness.press(sc, KeyEvent.KEYCODE_COMMA, ctrl = true); settle()
-        rule.onNodeWithContentDescription("Home screen").performClick(); settle()
+        rule.onNodeWithText("Home screen").performClick(); settle() // wave 40: Settings opens the root list; Home screen is its first-card row
         assertTrue("the Home category has the Glance switch", rule.onAllNodesWithText("Calm home screen (Glance)").fetchSemanticsNodes().isNotEmpty())
         assertTrue("and an Add page action", rule.onAllNodesWithText("Add page").fetchSemanticsNodes().isNotEmpty())
         assertTrue("and the order", rule.onAllNodesWithText("Order").fetchSemanticsNodes().isNotEmpty())

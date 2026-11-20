@@ -29,7 +29,7 @@ class CompatibilityAuditTest {
      */
     @Test fun NFR_19_backHandlersAreEnabledOnlyWhileTheirSurfaceIsOpen() {
         // Launchpad.kt left this list in wave 4: its handler is now gated on `visible` (off from the first frame of the exit).
-        val modalOnly = mapOf("Corners.kt" to 1, "SettingsSpace.kt" to 1)
+        val modalOnly = mapOf("Corners.kt" to 1) // wave 40: SettingsSpace.kt left this list; the One UI host (SettingsOneUi.kt) uses a PredictiveBackHandler gated by `enabled =`
         val bare = HashMap<String, Int>()
         Repo.mainSources().forEach { f ->
             f.readLines().filter { it.contains("BackHandler") && !it.contains("import") }.forEach { l ->

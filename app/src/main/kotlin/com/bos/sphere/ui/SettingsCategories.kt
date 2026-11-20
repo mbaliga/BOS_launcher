@@ -142,6 +142,8 @@ const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
 /** Wave 30: the App drawer category (where the Drawer shortcuts editor lives); the disc's empty sections open it. */
 const val CATEGORY_APP_DRAWER = 900
+/** Wave 40: the root list of every category (what the Home sheet's Ground Control button opens). */
+const val CATEGORY_ROOT = -1
 
 private const val HOME_SCREEN_TITLE = "Home screen"
 
@@ -149,6 +151,7 @@ private const val HOME_SCREEN_TITLE = "Home screen"
 fun settingsCategoryIndex(categories: List<SettingCategory>, which: Int): Int {
     val home = categories.indexOfFirst { it.title == x(HOME_SCREEN_TITLE) }.coerceAtLeast(0)
     return when (which) {
+        CATEGORY_ROOT -> -1
         CATEGORY_HOME -> home
         CATEGORY_APP_DRAWER -> categories.indexOfFirst { it.title == x("App drawer") }.let { if (it < 0) home else it }
         // No page category (a scrolling home): fall through to Home screen.

@@ -73,14 +73,14 @@ class HomeUnifyReview2FlowTest : TourBase() {
         start(HomePages.Off)
         longPressAt(0.5f, 0.3f); assertTrue(quickSheetShown())
         assertFalse("the quick sheet has no Add page any more (wave 34)", tagShown("quick.addpage"))
-        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        openGroundControlHome()
         assertFalse("with Pages Off Ground Control has no Add page either (the Pages chips turn pages on)", textShown("Add page"))
-        back(); assertFalse(settingsShown())
+        back(); back(); assertFalse(settingsShown()) // wave 40: the page goes back to the root list first
         stores.prefs.update { it.copy(homePages = HomePages.Paginated) }; settle()
         backwardToGlance()
         longPressAt(0.5f, 0.3f); assertTrue(quickSheetShown())
         assertFalse(tagShown("quick.addpage"))
-        rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        openGroundControlHome()
         assertTrue("with Paginated Ground Control, Home screen offers Add page", textShown("Add page"))
     }
 

@@ -16,6 +16,7 @@ import android.os.Process
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -424,7 +425,7 @@ class ScreenshotTest {
     fun detailVisualHomeStyle() {
         rule.mainClock.autoAdvance = false
         rule.setContent {
-            DetailScreen(listOf("Settings", "Home", "Style"), {}) {
+            androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().then(Modifier.padding(20.dp))) { // wave 40: the breadcrumb page is gone; the picker itself is what this shot is of
                 VisualChoice(com.bos.sphere.core.data.HomeStyle.entries, com.bos.sphere.core.data.HomeStyle.Grid, {}, { it.name }, previewHeight = 140.dp) { HomeStylePreview(it) }
             }
         }

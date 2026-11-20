@@ -171,11 +171,10 @@ sealed interface SettingItem {
 data class SettingCategory(val title: String, val glyph: ImageVector, val items: List<SettingItem>)
 
 /**
- * The dedicated settings space ("Ground Control"): a header, a strip of category tabs (every one
- * shows its icon and its name), and a full-width list whose rows carry their own controls —
- * switches, sliders, value steppers — so most things change without leaving the list. Swipe
- * sideways on the list for the next category. Every change clicks with Orrery's console tones
- * ([UiSounds]) and a haptic tick.
+ * The settings space ("Ground Control"), wave 40: laid out as One UI lays out its settings. A plain root list of every category
+ * (see [OneUiSettingsHost]), a full page per category that slides in from the end, and a two-pane layout on wide landscape windows.
+ * Every change still clicks with the console tones ([UiSounds]) and a haptic tick. [initialCategory] below zero opens the root list;
+ * a category index opens that page (Back then returns to the root). [summaries] are the grey lines under the category titles, by title.
  */
 @Composable
 fun SettingsSpace(
@@ -187,12 +186,14 @@ fun SettingsSpace(
     modifier: Modifier = Modifier,
     /** Bump to reset the selection to [initialCategory] for a fresh visit. */
     session: Int = 0,
-    /** What sits behind Settings (the dimmed wallpaper, or black). Null = the built-in violet gradient and waves. */
+    /** What sits behind Settings (the dimmed wallpaper, or black). Null = the plain One UI background. */
     backdrop: (@Composable () -> Unit)? = null,
     /** CFG-18: the always-visible live preview of the home (see [SettingsPreviewDock]). */
     previewDock: (@Composable androidx.compose.foundation.layout.BoxScope.() -> Unit)? = null,
+    /** CFG-21: the live grey line under each category on the root list, by category title; missing ones are derived from the category's rows. */
+    summaries: Map<String, String> = emptyMap(),
 ) {
-    // NFR-14: the scale morph becomes a plain cross-fade when animations are off.
+    // NFR-14: the fade becomes quicker when animations are off.
     val reducedMotion = com.bos.sphere.core.design.rememberMotionPrefs().reduced
     AnimatedVisibility(
         visible = visible,
@@ -200,324 +201,15 @@ fun SettingsSpace(
         exit = if (reducedMotion) fadeOut(tween(90)) else fadeOut(tween(180)) + scaleOut(targetScale = 1.04f, animationSpec = tween(180)),
         modifier = modifier,
     ) {
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
-            LocalSettingsBackdrop provides backdrop,
-        ) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalSettingsBackdrop provides backdrop) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                androidx.compose.runtime.key(session) { SettingsSpaceContent(categories, initialCategory, sounds, onClose) }
+                androidx.compose.runtime.key(session) { OneUiSettingsHost(categories, summaries, initialCategory, sounds, onClose) }
                 previewDock?.invoke(this)
             }
         }
     }
 }
 
-/** The full-screen page a row opens, if it has one. */
-private fun SettingItem.detail(): (@Composable ColumnScope.() -> Unit)? = when (this) {
-    is SettingItem.Pane -> content
-    is SettingItem.Choice<*> -> preview
-    else -> null
-}
-
-@Composable
-private fun SettingsSpaceContent(
-    categories: List<SettingCategory>,
-    initialCategory: Int,
-    sounds: UiSounds?,
-    onClose: () -> Unit,
-) {
-    val haptics = rememberLauncherHaptics()
-    var cat by remember { mutableIntStateOf(initialCategory.coerceIn(0, (categories.size - 1).coerceAtLeast(0))) }
-    var confirming by remember { mutableStateOf<SettingItem.Action?>(null) } // wave 29: the destructive action waiting for its confirmation
-    var paneOpen by remember { mutableIntStateOf(-1) } // index (in the displayed list) of the item whose page is open
-    var searching by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    val latestCategories by rememberUpdatedState(categories)
-    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
-    val rootFocus = remember { androidx.compose.ui.focus.FocusRequester() }
-    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
-    // CFG-13: the keyboard / controller cursor. -1 = on the category bar. The ring only shows once a key has been used.
-    var kbItem by remember { mutableIntStateOf(-1) }
-    var kbEditing by remember { mutableStateOf(false) }
-    var kbMode by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) { sounds?.play(UiSound.Open) }
-
-    /** What is listed: the category's options, or — while searching — matches across every category. */
-    class Shown(val item: SettingItem, val origin: String?)
-    fun shown(): List<Shown> {
-        val q = query.trim()
-        if (!searching || q.isEmpty()) return latestCategories.getOrNull(cat)?.items.orEmpty().map { Shown(it, null) }
-        // CFG-14: the same index Radar queries, by name and description.
-        return SettingsIndex.fromCategories(latestCategories).search(q).map { e -> Shown(latestCategories[e.categoryIndex].items[e.itemIndex], e.category) }
-    }
-
-    fun moveCategory(to: Int) {
-        val next = to.coerceIn(0, latestCategories.lastIndex)
-        if (next == cat) { sounds?.play(UiSound.Nope); return }
-        cat = next
-        paneOpen = -1
-        kbEditing = false
-        sounds?.play(UiSound.Move)
-        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-    }
-
-    fun openDetail(index: Int) { paneOpen = index; sounds?.play(UiSound.Select) }
-    fun tick() { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-
-    fun closeSearch() { searching = false; query = ""; paneOpen = -1; kbItem = -1; keyboard?.hide(); runCatching { rootFocus.requestFocus() } }
-
-    BackHandler {
-        when {
-            confirming != null -> { confirming = null; sounds?.play(UiSound.Back) } // wave 29: Back answers the confirmation with "no"
-            paneOpen >= 0 -> { paneOpen = -1; sounds?.play(UiSound.Back) }
-            searching -> { closeSearch(); sounds?.play(UiSound.Back) }
-            else -> { sounds?.play(UiSound.Close); onClose() }
-        }
-    }
-
-    // CFG-13: one handler for keyboard, D-pad and controller buttons; touch and pointer reach the same actions through the rows themselves.
-    val onGcKey: (androidx.compose.ui.input.key.KeyEvent) -> Boolean = handler@{ ev ->
-        if (ev.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && RadarKeyMap.hardware(ev)) kbMode = true
-        val key = RadarKeyMap.groundKey(ev) ?: return@handler false
-        // A page owns its own controls; only Esc leaves it. The search field keeps Left/Right for its caret.
-        if (paneOpen >= 0 && key != GKey.Escape) return@handler false
-        if (searching && (key == GKey.Left || key == GKey.Right)) return@handler false
-        kbMode = true
-        val list = shown()
-        val st = GState(cat, kbItem, kbEditing, paneOpen >= 0, searching)
-        val r = GroundControlNav.reduce(st, key, latestCategories.size, list.size) { i -> GroundControlNav.kindOf(list[i].item) }
-        kbItem = r.state.item
-        kbEditing = r.state.editing
-        if (r.state.category != cat) moveCategory(r.state.category)
-        when (val e = r.effect) {
-            GEffect.Close -> { sounds?.play(UiSound.Close); onClose() }
-            GEffect.Rejected -> sounds?.play(UiSound.Nope)
-            GEffect.ClosePane -> { paneOpen = -1; sounds?.play(UiSound.Back) }
-            GEffect.CloseSearch -> { closeSearch(); sounds?.play(UiSound.Back) }
-            is GEffect.Flip -> list.getOrNull(e.item)?.item?.let { GroundControlNav.adjust(it, 1); sounds?.play(UiSound.Tick); tick() }
-            is GEffect.Adjust -> list.getOrNull(e.item)?.item?.let { if (GroundControlNav.adjust(it, e.delta)) { sounds?.play(UiSound.Tick); tick() } else sounds?.play(UiSound.Nope) }
-            is GEffect.Activate -> list.getOrNull(e.item)?.item?.let { item ->
-                when (item) {
-                    is SettingItem.Action -> { sounds?.play(UiSound.Select); if (item.confirm != null) confirming = item else item.onClick() }
-                    else -> if (item.detail() != null) openDetail(e.item)
-                }
-            }
-            else -> Unit
-        }
-        true
-    }
-
-    val customBackdrop = LocalSettingsBackdrop.current
-    LaunchedEffect(Unit) { runCatching { rootFocus.requestFocus() } }
-    BoxWithConstraints(
-        Modifier
-            .fillMaxSize()
-            .onPreviewKeyEvent(onGcKey)
-            .focusRequester(rootFocus)
-            .focusable()
-            .pointerInput(Unit) { awaitPointerEventScope { while (true) { val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial); if (e.changes.any { it.pressed }) kbMode = false } } }
-            .then(if (customBackdrop == null) Modifier.background(Brush.verticalGradient(listOf(Color(0xFF07080D), Color(0xFF0E0C22), Color(0xFF071622)))) else Modifier),
-    ) {
-        val boxW = maxWidth
-        val boxH = maxHeight
-        if (customBackdrop != null) customBackdrop()
-        if (customBackdrop == null) WaveField(Modifier.fillMaxSize())
-        val list = shown()
-        val detailItem = list.getOrNull(paneOpen)?.item
-        val detail = detailItem?.detail()
-
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            // Header: title (or the search field), search, close.
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp).fillMaxWidth()) {
-                if (searching) {
-                    LaunchedEffect(Unit) { runCatching { focus.requestFocus(); keyboard?.show() } }
-                    Box(Modifier.weight(1f).padding(end = 8.dp)) {
-                        if (query.isEmpty()) Text(com.bos.sphere.core.design.L10n.tr("Search settings"), color = HyleColors.InkDim, fontSize = 15.sp)
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = query,
-                            onValueChange = { query = it; paneOpen = -1; kbItem = -1 },
-                            singleLine = true,
-                            textStyle = androidx.compose.ui.text.TextStyle(color = HyleColors.InkBright, fontSize = 15.sp),
-                            cursorBrush = androidx.compose.ui.graphics.SolidColor(HyleColors.Violet),
-                            modifier = Modifier.fillMaxWidth().focusRequester(focus),
-                        )
-                    }
-                } else {
-                    Text(com.bos.sphere.core.design.L10n.tr("GROUND CONTROL"), color = HyleColors.InkBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp, modifier = Modifier.weight(1f).semantics { heading() })
-                }
-                Icon(
-                    Glyphs.Search,
-                    contentDescription = com.bos.sphere.core.design.L10n.tr("Search settings"),
-                    tint = if (searching) HyleColors.Violet else HyleColors.Ink,
-                    // Wave 23 (NFR-13): a 48 dp button with a role and a click action (it was a 40 dp pointer-only target, nothing for TalkBack to activate).
-                    modifier = Modifier
-                        .size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { if (searching) closeSearch() else { searching = true; paneOpen = -1 } }
-                        .padding(12.dp),
-                )
-                Icon(
-                    Glyphs.Close,
-                    contentDescription = com.bos.sphere.core.design.L10n.tr("Close settings"),
-                    tint = HyleColors.Ink,
-                    modifier = Modifier
-                        .size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { sounds?.play(UiSound.Close); onClose() }
-                        .padding(12.dp),
-                )
-            }
-
-            val landscape = boxW > boxH
-            val anchorX = boxW * (if (landscape) 0.24f else 0.3f)
-            if (!searching) {
-                // The category bar sits a fifth of the way down (a little lower in landscape), the lit
-                // category on the anchor line and its neighbours 104dp apart on either side.
-                val barTop = (boxH * (if (landscape) 0.24f else 0.2f) - 44.dp - 56.dp).coerceAtLeast(0.dp)
-                Spacer(Modifier.height(barTop))
-                CategoryTabs(categories, cat, anchorX, ::moveCategory)
-            }
-
-            // The list: full width, swipe sideways for the neighbouring category.
-            val listState = rememberLazyListState()
-            LaunchedEffect(cat, query, searching) { listState.scrollToItem(0) }
-            // CFG-05: arriving from a Radar settings result lands on the exact row.
-            LaunchedEffect(Unit) {
-                val want = SettingsFocus.take()
-                val count = latestCategories.getOrNull(cat)?.items?.size ?: 0
-                if (want in 0 until count) { kbItem = want; kbMode = true; listState.scrollToItem(want) }
-            }
-            var dragAcc by remember { mutableFloatStateOf(0f) }
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .pointerInput(cat, searching) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { dragAcc = 0f },
-                            onDragEnd = { dragAcc = 0f },
-                            onDragCancel = { dragAcc = 0f },
-                        ) { change, d ->
-                            change.consume()
-                            if (searching) return@detectHorizontalDragGestures
-                            dragAcc += d
-                            val step = 96.dp.toPx()
-                            if (dragAcc <= -step) { dragAcc = 0f; moveCategory(cat + 1) }
-                            else if (dragAcc >= step) { dragAcc = 0f; moveCategory(cat - 1) }
-                        }
-                    },
-            ) {
-                // The original placement: the list hangs under the lit category (about 30% in on a phone held
-                // upright, a little less in landscape), with the labels flowing to its right.
-                val anchor = anchorX - 24.dp
-                LazyColumn(
-                    state = listState,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 0.dp, end = 0.dp, top = if (landscape) 40.dp else 80.dp, bottom = 32.dp),
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(0.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    itemsIndexed(list, key = { i, s -> "${s.origin}|$i|${s.item.title}" }) { i, s ->
-                        val isRail = (s.item as? SettingItem.Choice<*>)?.preview != null
-                        val inset = anchor.coerceAtLeast(14.dp)
-                        androidx.compose.runtime.CompositionLocalProvider(LocalRailInset provides inset) {
-                        val onCursor = kbMode && kbItem == i
-                        Column(
-                            Modifier.padding(start = if (isRail) 0.dp else inset, end = if (isRail) 0.dp else 20.dp)
-                                .then(if (onCursor) Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = if (kbEditing) 0.30f else 0.16f)).border(1.5.dp, HyleColors.VioletSoft.copy(alpha = 0.8f), RoundedCornerShape(14.dp)) else Modifier)
-                                .semantics { if (onCursor) selected = true },
-                        ) {
-                            if (s.origin != null) Text(s.origin.uppercase(), color = HyleColors.InkDim, fontSize = 10.sp, letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 4.dp, bottom = 3.dp))
-                            when (val it = s.item) {
-                                is SettingItem.Toggle -> ToggleSettingRow(it) { v -> it.onChange(v); sounds?.play(UiSound.Tick); tick() }
-                                is SettingItem.Slider -> SliderSettingRow(it, ::tick)
-                                is SettingItem.Stepper -> StepperSettingRow(it) { sounds?.play(UiSound.Tick); tick() }
-                                is SettingItem.Choice<*> -> {
-                                    @Suppress("UNCHECKED_CAST")
-                                    ChoiceSettingRow(it as SettingItem.Choice<Any?>, { sounds?.play(UiSound.Tick); tick() }, { openDetail(i) })
-                                }
-                                is SettingItem.Action -> NavigationSettingRow(it, chevron = it.navigates, highlighted = false, hint = it.hint, onClick = { sounds?.play(UiSound.Select); if (it.confirm != null) confirming = it else it.onClick() })
-                                is SettingItem.Pane -> NavigationSettingRow(it, chevron = true, highlighted = i == paneOpen, onClick = { openDetail(i) })
-                            }
-                        }
-                        }
-                    }
-                }
-                if (searching && query.isNotBlank() && list.isEmpty()) {
-                    Text(
-                        com.bos.sphere.core.design.L10n.tr("No settings match “%s”", query),
-                        color = HyleColors.InkDim,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(start = 22.dp, top = 24.dp),
-                    )
-                }
-            }
-        }
-
-        confirming?.let { a ->
-            GlassDialog(title = com.bos.sphere.core.design.L10n.tr(a.title), onDismiss = { confirming = null }, footer = {
-                Row(Modifier.padding(16.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
-                    TextButtonPill(com.bos.sphere.core.design.L10n.tr("Cancel"), onClick = { confirming = null })
-                    TextButtonPill(com.bos.sphere.core.design.L10n.tr(a.confirmLabel), primary = true, onClick = { confirming = null; a.onClick() })
-                }
-            }) {
-                Text(com.bos.sphere.core.design.L10n.tr(a.confirm ?: ""), color = HyleColors.Ink, fontSize = 16.sp, modifier = Modifier.padding(22.dp).testTag("gc.confirm.text"))
-            }
-        }
-
-        // Option page: full screen, breadcrumbs on top.
-        androidx.compose.animation.AnimatedVisibility(
-            visible = detail != null,
-            enter = fadeIn(tween(180)) + slideInHorizontally(tween(220)) { it / 6 },
-            exit = fadeOut(tween(140)) + slideOutHorizontally(tween(160)) { it / 6 },
-        ) {
-            val current = detail ?: return@AnimatedVisibility
-            DetailScreen(
-                crumbs = listOf(com.bos.sphere.core.design.L10n.tr("Ground Control"), categories.getOrNull(cat)?.title ?: "", detailItem?.title ?: ""),
-                onCrumb = { i -> sounds?.play(UiSound.Back); if (i == 0) onClose() else paneOpen = -1 },
-            ) { current(this) }
-        }
-    }
-}
-
-/** Horizontally scrolling category tabs: every one shows its icon and its name; the selected one is lit and underlined. */
-@Composable
-private fun CategoryTabs(categories: List<SettingCategory>, selected: Int, anchorX: androidx.compose.ui.unit.Dp, onSelect: (Int) -> Unit) {
-    val tabMotion = com.bos.sphere.core.design.rememberMotionPrefs()
-    val pos by androidx.compose.animation.core.animateFloatAsState(selected.toFloat(), tabMotion.gate(androidx.compose.animation.core.tween(260)), label = "catpos")
-    val pitch = 104.dp
-    val itemW = 96.dp
-    Box(Modifier.fillMaxWidth().height(88.dp)) {
-        categories.forEachIndexed { i, c ->
-            val sel = i == selected
-            val dist = kotlin.math.abs(i - pos)
-            if (dist > 4.2f) return@forEachIndexed
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .offset { androidx.compose.ui.unit.IntOffset((anchorX + pitch * (i - pos) - itemW / 2).roundToPx(), 0) }
-                    .width(itemW)
-                    .alpha((1f - dist * 0.16f).coerceIn(0.2f, 1f))
-                    .clickable(indication = null, role = androidx.compose.ui.semantics.Role.Tab, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) { onSelect(i) }
-                    .drawBehind {
-                        // The soft glow behind the lit category (as in the original bar).
-                        if (sel) drawCircle(Brush.radialGradient(listOf(HyleColors.Violet.copy(alpha = 0.38f), Color.Transparent), center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f), radius = size.width * 0.5f), radius = size.width * 0.5f, center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.34f))
-                    }
-                    .semantics { contentDescription = c.title; this.selected = sel }
-                    .padding(vertical = 8.dp),
-            ) {
-                Icon(c.glyph, null, tint = if (sel) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.72f), modifier = Modifier.size(if (sel) 30.dp else 26.dp))
-                Text(
-                    c.title,
-                    color = if (sel) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.72f),
-                    fontSize = 11.5.sp,
-                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
-    }
-}
 
 /** The Settings backdrop slot, shared with the full-screen option pages. */
 internal val LocalSettingsBackdrop = androidx.compose.runtime.compositionLocalOf<(@Composable () -> Unit)?> { null }

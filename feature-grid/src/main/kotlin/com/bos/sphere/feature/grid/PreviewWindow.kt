@@ -86,7 +86,7 @@ object PreviewWindowTags {
 }
 
 /** What the window needs to know about the area it floats over; refreshed on every composition. */
-private data class PreviewEnv(val areaW: Float, val areaH: Float, val aspect: Float, val defaultLong: Float, val rtl: Boolean, val reduced: Boolean)
+private data class PreviewEnv(val areaW: Float, val areaH: Float, val aspect: Float, val defaultLong: Float, val rtl: Boolean, val reduced: Boolean, val top: Float = PreviewWindowGeometry.TOP_DEFAULT)
 
 /**
  * All the window's moves in one place, used by touch, keys and the screen reader actions alike. Everything is in dp; the
@@ -105,7 +105,7 @@ private class PreviewController(val model: PreviewWindowModel, private val env: 
     fun pos(): PreviewWindowGeometry.Pos {
         val e = env()
         val w = win()
-        val raw = if (model.x.isNaN() || model.y.isNaN()) PreviewWindowGeometry.defaultPos(e.areaW, w.w, e.rtl) else PreviewWindowGeometry.Pos(model.x, model.y)
+        val raw = if (model.x.isNaN() || model.y.isNaN()) PreviewWindowGeometry.defaultPos(e.areaW, w.w, e.rtl, e.top) else PreviewWindowGeometry.Pos(model.x, model.y)
         return PreviewWindowGeometry.clamp(raw.x, raw.y, w.w, w.h, e.areaW, e.areaH)
     }
 
@@ -184,7 +184,7 @@ internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, 
         val model = remember(store, landscape) { PreviewWindowModel(store, landscape) }
         val hw = capture.size.width
         val hh = capture.size.height
-        val env = PreviewEnv(areaW, areaH, hw.toFloat() / hh, PreviewWindowGeometry.defaultLong(conf.screenWidthDp.toFloat(), conf.screenHeightDp.toFloat(), hw, hh), rtl, reduced)
+        val env = PreviewEnv(areaW, areaH, hw.toFloat() / hh, PreviewWindowGeometry.defaultLong(conf.screenWidthDp.toFloat(), conf.screenHeightDp.toFloat(), hw, hh), rtl, reduced, LocalPreviewTop.current)
         val envState = rememberUpdatedState(env)
         val ctl = remember(model) { PreviewController(model, { envState.value }, scope) }
         val win = ctl.win()

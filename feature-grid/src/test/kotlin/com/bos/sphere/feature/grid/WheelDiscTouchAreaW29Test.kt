@@ -57,7 +57,11 @@ class WheelDiscTouchAreaW29Test {
         val chipRects = WheelGrouping.entries.map { it.label }.map { it to rule.onNodeWithContentDescription(it).fetchSemanticsNode().boundsInRoot }
         for ((n, r) in chipRects + rects) assertTrue("$n $r is inside the window $root", r.left >= root.left - 0.5f && r.top >= root.top - 0.5f && r.right <= root.right + 0.5f && r.bottom <= root.bottom + 0.5f)
         for (i in chipRects.indices) for (j in i + 1 until chipRects.size) assertTrue("chips ${chipRects[i].first} and ${chipRects[j].first} overlap", !chipRects[i].second.overlaps(chipRects[j].second))
-        for ((n, r) in chipRects) assertTrue("chip $n does not cover the Back button", !r.overlaps(back))
+        for ((n, r) in chipRects) {
+            // the hub is a round button (its node box is the circle's square): the chip must stay clear of the circle itself
+            val c = back.center; val nx = c.x.coerceIn(r.left, r.right); val ny = c.y.coerceIn(r.top, r.bottom)
+            assertTrue("chip $n does not cover the Back button", kotlin.math.hypot(nx - c.x, ny - c.y) >= back.width / 2f - 0.5f)
+        }
         val d = rule.activity.resources.displayMetrics.density
         assertTrue("the Back button is at least 48 dp: ${back.width / d}", back.width / d >= 48f - 0.5f && back.height / d >= 48f - 0.5f)
     }

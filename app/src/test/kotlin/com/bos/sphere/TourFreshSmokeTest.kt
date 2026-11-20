@@ -121,16 +121,11 @@ class TourFreshSmokeTest : TourBase() {
         check("closed", Surface.Home)
     }
 
-    @Test fun HOM_01_tourDrawerOpensFiltersAndLaunchesAnApp() {
+    @Test fun HOM_01_tourDrawerOpensRotatesAndCloses() {
+        // Wave 38: the app drawer is the disc (the list drawer and its filter are gone).
         startFresh()
         key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer); rotateAndCheck("drawer")
-        rule.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("cam"); settle(); check("filter", Surface.Drawer)
-        assertTrue("the filter keeps the match", LauncherInput.focus.nodes().any { it.id.startsWith("drawer.app.camera") })
-        assertFalse("and drops the others", LauncherInput.focus.nodes().any { it.id.startsWith("drawer.app.alpha") })
-        rule.onNodeWithText("Camera", useUnmergedTree = true).performClick(); settle(); check("launch")
-        assertTrue("the launch is recorded in the history", stores.history.events.value.any { it.key == AppSmokeHarness.appKey("Camera") })
-        if (drawerShown()) back()
-        check("closed", Surface.Home)
+        back(); check("closed", Surface.Home)
     }
 
     @Test fun CFG_09_tourGroundControlOpensRotatesAndCloses() {
@@ -207,6 +202,8 @@ class TourFreshSmokeTest : TourBase() {
             // so a second edge tap is a real edge tap on Home and is not part of this check.
             if (name == "radar") { assertFalse("radar: the edge tap closes Radar without opening Recents", recentsShown()); assertEquals("radar closed by the empty-space tap", setOf(Surface.Home), open().toSet()); continue }
             tapAt(0.98f, 0.5f); check("$name, right edge tapped"); assertFalse("$name: Recents opened by an edge tap", recentsShown())
+            // Wave 38: the app drawer is the disc: a tap beyond its fan (here the far right edge) closes it, like Radar, without opening Recents.
+            if (name == "drawer") { assertEquals("the disc closed by the empty-space tap", setOf(Surface.Home), open().toSet()); continue }
             assertEquals("$name stays open", shown, open())
             back(); key(ESC); check("$name closed", Surface.Home)
         }

@@ -49,7 +49,7 @@ class DockDeskReviewW24SmokeTest {
     }
 
     private fun key(sc: ActivityScenario<*>, code: Int, ctrl: Boolean = false): Boolean = AppSmokeHarness.press(sc, code, ctrl = ctrl).also { rule.waitForIdle() }
-    private fun drawerOpen() = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.") }
+    private fun drawerOpen() = LauncherInput.focus.nodes().any { it.id == "puck.back" }
     private fun railFocused() = LauncherInput.focus.currentId?.startsWith("dock.") == true
 
     @Test fun STR_14_withRightSideDockRailOpenRecentsFromTheDrawerClosesItAndTheRailTakesFocus() {

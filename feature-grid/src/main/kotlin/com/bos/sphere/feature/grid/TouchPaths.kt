@@ -18,7 +18,7 @@ object TouchPaths {
         LauncherCommand.OpenSettings -> "Long-press empty home, then Ground Control; or the Home settings tile"
         LauncherCommand.EditMode -> "Long-press an icon on the paged home, then drag"
         LauncherCommand.OpenLaunchpad -> "Swipe right from the left edge, or the unread rail"
-        LauncherCommand.OpenPuck -> "The All apps corner when the drawer style is Wheel"
+        LauncherCommand.OpenPuck -> "The All apps corner"
         LauncherCommand.ShortcutSheet -> "Ground Control, Home, Keyboard shortcuts"
         LauncherCommand.NextWorkspace, LauncherCommand.PreviousWorkspace -> "Swipe the workspace chip on the dock, or tap it and pick a workspace"
         LauncherCommand.FocusDock -> "Tap a dock item, or the collapsed dock band to open it"
@@ -26,7 +26,7 @@ object TouchPaths {
         LauncherCommand.Dock6, LauncherCommand.Dock7, LauncherCommand.Dock8, LauncherCommand.Dock9 -> "Tap the dock item"
         LauncherCommand.CornerTopLeft, LauncherCommand.CornerTopRight, LauncherCommand.CornerBottomLeft, LauncherCommand.CornerBottomRight -> "Tap the corner"
         LauncherCommand.OpenRecents -> "Swipe left from the right edge, or the Open recents corner or gesture"
-        LauncherCommand.Dismiss -> "Tap the close button of Radar, the drawer or Ground Control, or the system Back gesture"
+        LauncherCommand.Dismiss -> "Tap the close button of Radar or Ground Control, or Back on the disc, or the system Back gesture"
     }
 
     /**
@@ -58,7 +58,7 @@ object TouchPaths {
             RenderedBy("feature-launchpad", "LaunchpadTouchPathTest", "INP_07_tapping_the_unread_rail_opens_launchpad"),
             RenderedBy("feature-launchpad", "LaunchpadInteractionTest", "STR_01_longDragFromTheEdgeOpens"),
         ))
-        put(LauncherCommand.OpenPuck, listOf(grid("INP_07_the_all_apps_corner_opens_the_puck_for_the_wheel_style_and_the_puck_is_operable_by_touch")))
+        put(LauncherCommand.OpenPuck, listOf(grid("INP_07_the_all_apps_corner_opens_the_disc_and_the_disc_is_operable_by_touch")))
         put(LauncherCommand.ShortcutSheet, listOf(grid("INP_07_the_keyboard_shortcuts_row_in_home_settings_opens_the_shortcut_sheet")))
         for (c in listOf(LauncherCommand.NextWorkspace, LauncherCommand.PreviousWorkspace)) put(c, listOf(dock("INP_07_theWorkspaceChipSwitchesWorkspaceBySwipeAndGoesHomeOnTap")))
         put(LauncherCommand.FocusDock, listOf(dock("INP_07_theCollapsedBandExpandsOnTapSoFocusDockHasATouchPath"), dock("INP_07_tappingADockItemLaunchesItAndItsNumberIsItsPosition")))
@@ -66,7 +66,6 @@ object TouchPaths {
         for (c in listOf(LauncherCommand.CornerTopLeft, LauncherCommand.CornerTopRight, LauncherCommand.CornerBottomLeft, LauncherCommand.CornerBottomRight)) put(c, listOf(grid("INP_07_tapping_each_corner_runs_what_it_holds")))
         put(LauncherCommand.Dismiss, listOf(
             grid("INP_07_the_close_button_and_back_dismiss_radar"),
-            grid("INP_07_the_close_button_and_back_dismiss_the_drawer"),
             grid("INP_07_back_dismisses_ground_control"),
         ))
     }

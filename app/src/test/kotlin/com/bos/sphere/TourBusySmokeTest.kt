@@ -89,28 +89,12 @@ class TourBusySmokeTest : TourBase() {
         assertTrue("the launch is recorded in the history", stores.history.events.value.any { it.key == AppSmokeHarness.appKey("Tour 007") })
     }
 
-    @Test fun HOM_01_busyTourDrawerFiltersAndLaunches() {
+    @Test fun HOM_01_busyTourDrawerOpensRotatesAndCloses() {
+        // Wave 38: the app drawer is the disc (the list drawer, its filter and its Work tab are gone).
         startBusy()
         key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer); rotateAndCheck("busy drawer")
-        // the type-to-filter field is a text field: typed through its own input action (a key event does not reach it without the soft keyboard setting)
-        rule.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("tour 007"); settle(); check("filter", Surface.Drawer)
-        assertTrue("the filter keeps the match", drawerHas("tour007")); assertFalse("and drops the others", drawerHas("tour008"))
-        rule.onNodeWithText("Tour 007", useUnmergedTree = true).performClick(); settle(); check("launch")
-        assertTrue("the launch is recorded in the history", stores.history.events.value.any { it.key == AppSmokeHarness.appKey("Tour 007") })
-        if (drawerShown()) { back(); check("closed", Surface.Home) }
-    }
-
-    /** Review: the seeded work-profile app was never looked for (and was not even a profile of the UserManager), so a broken seed passed silently. The drawer shows it under its Work tab. */
-    @Test fun HOM_06_busyTourTheWorkProfileAppIsOnTheDrawersWorkTab() {
-        startBusy(); assertTrue("the work-profile seed was added", workAppAdded)
-        key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer)
-        assertFalse("the work app is not on the Personal tab", drawerHas("workchat"))
-        rule.onNodeWithText("Work", useUnmergedTree = true).performClick(); settle(); check("work tab", Surface.Drawer)
-        assertTrue("the work-profile app is listed on the Work tab (${LauncherInput.focus.nodes().map { it.id }.filter { it.startsWith("drawer.") }.take(10)})", drawerHas("workchat"))
-        rotateAndCheck("work tab")
         back(); check("closed", Surface.Home)
     }
-    private fun drawerHas(pkg: String) = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.app.$pkg") }
 
     @Test fun CFG_09_busyTourGroundControlWalksEveryCategoryAndGlanceOnAndOffRenderOnABusyState() {
         startBusy(glanceOff = true)

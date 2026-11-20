@@ -30,14 +30,10 @@ import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.CornerItem
 import com.bos.sphere.core.data.CornerSlot
 import com.bos.sphere.core.data.CornerStyle
-import com.bos.sphere.core.data.DrawerSort
-import com.bos.sphere.core.data.DrawerStyle
-import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.HomeGesture
 import com.bos.sphere.core.data.HomeLayoutMath
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.LauncherPrefs
-import com.bos.sphere.core.data.RailSide
 import com.bos.sphere.core.data.WheelGrouping
 import com.bos.sphere.core.input.LauncherCommand
 import org.junit.After
@@ -151,24 +147,6 @@ class InputTouchPathsUiTest {
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun INP_07_the_close_button_and_back_dismiss_the_drawer() {
-        rule.mainClock.autoAdvance = false
-        var dismissed = 0
-        rule.setContent {
-            AppDrawerSpace(
-                visible = true, apps = apps, usage = emptyMap(), view = DrawerView.Grid, sort = DrawerSort.Alphabetical, rail = RailSide.Right,
-                onViewChange = {}, onSortChange = {}, onLaunch = {}, onLongPress = {}, onDismiss = { dismissed++ }, modifier = Modifier.fillMaxSize(),
-            )
-        }
-        rule.mainClock.advanceTimeBy(600)
-        rule.onNodeWithContentDescription("Close apps").performClick()
-        assertEquals(1, dismissed)
-        back()
-        rule.mainClock.advanceTimeBy(100)
-        assertEquals(2, dismissed)
-    }
-
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun INP_07_back_dismisses_ground_control() {
         rule.mainClock.autoAdvance = false
         var closed = 0
@@ -205,14 +183,8 @@ class InputTouchPathsUiTest {
 
     // ---- Puck
 
-    @Test @Config(sdk = [35]) fun INP_07_the_drawer_style_decides_between_the_puck_and_the_drawer_for_all_apps() {
-        assertEquals(AllAppsSurface.Puck, AllAppsOpening.surfaceFor(DrawerStyle.Wheel))
-        for (s in DrawerStyle.entries.filter { it != DrawerStyle.Wheel }) assertEquals(AllAppsSurface.Drawer, AllAppsOpening.surfaceFor(s))
-    }
-
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi")
-    fun INP_07_the_all_apps_corner_opens_the_puck_for_the_wheel_style_and_the_puck_is_operable_by_touch() {
-        assertEquals(AllAppsSurface.Puck, AllAppsOpening.surfaceFor(LauncherPrefs().drawerStyle)) // the shipped default
+    fun INP_07_the_all_apps_corner_opens_the_disc_and_the_disc_is_operable_by_touch() {
         assertEquals(com.bos.sphere.core.data.Corner.entries.size, 4)
         rule.mainClock.autoAdvance = false
         var searched = 0; var dismissed = 0

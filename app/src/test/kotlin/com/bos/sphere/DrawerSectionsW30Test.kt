@@ -50,9 +50,10 @@ class DrawerSectionsW30Test : TourBase() {
 
     private fun onDisc(label: String): SemanticsNodeInteraction = rule.onAllNodesWithContentDescription(label).onLast()
 
-    @Test fun CFG_15_w30_aFreshInstallShowsFlashlightAlarmBellAndDoNotDisturbAsTheFourSections() {
+    @Test fun CFG_15_w30_aFreshInstallShowsFlashlightAlarmBellAndDoNotDisturbOnTheRing() {
         start(); openDisc()
-        for (id in PuckActions.DEFAULT_IDS) assertTrue("${id.label} is a section", descShown(id.label))
+        // wave 38: eight segments, the first four (and slot 7, which the corner shows) are in view at rest; the rest turn into view
+        for (id in PuckActions.DEFAULT_IDS.take(4)) assertTrue("${id.label} is a section", descShown(id.label))
         assertFalse("no search glyph on the hub", descShown("Search apps"))
     }
 
@@ -97,7 +98,7 @@ class DrawerSectionsW30Test : TourBase() {
         onDisc("Drawer shortcut 3, empty").performSemanticsAction(SemanticsActions.OnLongClick); settle()
         assertFalse(wheelShown())
         assertTrue("Ground Control opened", settingsShown())
-        assertTrue("on the App drawer category (Drawer shortcuts is its last row)", textShown("View switcher shows"))
+        assertTrue("on the App drawer category (it holds the Drawer shortcuts and labels rows)", textShown("Show labels under glyphs") || textShown("Drawer shortcuts"))
     }
 
     @Test fun CFG_15_w30_theWave29RingSelectionIsMigratedOnTheFirstStart() {
@@ -106,7 +107,8 @@ class DrawerSectionsW30Test : TourBase() {
         sp.edit().clear().putString("actions", "Phone,Messages,Maps,Camera,Email").commit()
         AppSmokeHarness.resetProcess()
         val migrated = PuckActionsStore.get(AppSmokeHarness.app).slots.value
-        assertEquals(listOf(CornerActionId.Phone, CornerActionId.Messages, CornerActionId.Maps, CornerActionId.Camera).map { PuckSlot.Action(it) }, migrated)
+        assertEquals(listOf(CornerActionId.Phone, CornerActionId.Messages, CornerActionId.Maps, CornerActionId.Camera).map { PuckSlot.Action(it) }, migrated.take(4))
+        assertEquals("wave 38: the other four slots are filled", 8, migrated.size)
         assertFalse(sp.contains("actions"))
     }
 }

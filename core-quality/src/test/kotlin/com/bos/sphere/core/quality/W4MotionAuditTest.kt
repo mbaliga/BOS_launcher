@@ -94,7 +94,7 @@ class W4MotionAuditTest {
     }
 
     @Test fun NFR_19_animatedOverlaySurfacesFollowThePredictiveBackGesture() {
-        val surfaces = listOf("$grid/SearchOverlay.kt", "$grid/AppDrawerSpace.kt", "$grid/WheelDrawer.kt", "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/Launchpad.kt")
+        val surfaces = listOf("$grid/SearchOverlay.kt", "$grid/WheelDrawer.kt", "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/Launchpad.kt")
         surfaces.forEach {
             val t = text(it)
             assertTrue("$it uses the predictive back progress", t.contains("rememberPredictiveBackProgress(visible, onDismiss)"))
@@ -108,7 +108,7 @@ class W4MotionAuditTest {
     @Test fun NFR_19_everyOverlaySurfaceHandlesBack() {
         val backTokens = listOf("BackHandler", "rememberPredictiveBackProgress(")
         val overlays = listOf(
-            "$grid/SearchOverlay.kt", "$grid/WheelDrawer.kt", "$grid/AppDrawerSpace.kt", "$grid/Corners.kt", "$grid/SettingsSpace.kt",
+            "$grid/SearchOverlay.kt", "$grid/WheelDrawer.kt", "$grid/Corners.kt", "$grid/SettingsSpace.kt",
             "$grid/WidgetHosting.kt", "feature-launchpad/src/main/kotlin/com/bos/sphere/ui/Launchpad.kt", "app/src/main/kotlin/com/bos/sphere/HomeScreen.kt",
         )
         overlays.forEach { p -> assertTrue("$p has no back handling", backTokens.any { text(p).contains(it) }) }

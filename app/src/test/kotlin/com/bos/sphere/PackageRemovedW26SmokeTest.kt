@@ -24,10 +24,9 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [34], qualifiers = "w360dp-h720dp-xhdpi")
 class PackageRemovedW26SmokeTest : TourBase() {
     private val alpha get() = AppSmokeHarness.appKey("Alpha")
-    private fun drawerHasAlpha() = LauncherInput.focus.nodes().any { it.id == "drawer.$alpha" }
     private fun dockHasAlpha() = LauncherInput.focus.nodes().any { it.id.startsWith("dock.") && it.id.contains(alpha) } || tagShown("dock.item.$alpha")
 
-    @Test fun UNI_05_aRemovedPackageLeavesTheDrawerTheDockRadarAndTheHomeLayout() {
+    @Test fun UNI_05_aRemovedPackageLeavesTheDockRadarAndTheHomeLayout() {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
         AppSmokeHarness.configure { it.copy(rightSide = RightSide.DockRail) }
         WorkspaceRepository.get(AppSmokeHarness.app).setDock { it.copy(enabled = true) }
@@ -38,13 +37,9 @@ class PackageRemovedW26SmokeTest : TourBase() {
 
         key(KeyEvent.KEYCODE_H, ctrl = true)
         assertTrue("the dock draws Alpha before the uninstall: ${LauncherInput.focus.nodes().map { it.id }}", dockHasAlpha())
-        key(KeyEvent.KEYCODE_D, ctrl = true); check("drawer", Surface.Drawer)
-        assertTrue("the drawer lists Alpha before the uninstall", drawerHasAlpha())
 
         AppSmokeHarness.removeApp("Alpha")
-        waitFor("the drawer drops the removed app", 8000) { !drawerHasAlpha() }
-        assertTrue("another app stays", LauncherInput.focus.nodes().any { it.id == "drawer.${AppSmokeHarness.appKey("Bravo")}" })
-        back()
+        settle(600)
 
         // the home layout forgets it as well
         val homeAfter = alpha in stores.layout.layout.value.toString()

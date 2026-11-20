@@ -129,14 +129,13 @@ class UpgradeSmokeTest {
         sc.close(); scenario = null
     }
 
-    @Test fun CFG_03_build40_removedHomeStylesAndDrawerViewsFallBackToTheirDefaults() {
+    @Test fun CFG_03_build40_removedHomeStylesFallBackToTheirDefaults() {
         for ((style, view) in listOf("Sphere" to "Bubbles", "Bubbles" to "Details", "Nonsense" to "")) {
             AppSmokeHarness.resetProcess()
             prefs("launcher_prefs") { clear() }
             prefs("launcher_prefs", build40LauncherPrefs(style = style, drawerView = view, bgKind = "Live"))
             val p = LauncherStores.get(app).prefs.prefs.value
             assertEquals("style $style", HomeStyle.Grid, p.homeStyle)
-            assertTrue(p.drawerView.name != "Bubbles")
         }
     }
 

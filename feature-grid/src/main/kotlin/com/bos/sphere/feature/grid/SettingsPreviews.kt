@@ -57,7 +57,6 @@ import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.ClockPosition
 import com.bos.sphere.core.data.CornerStyle
-import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.HomeStyle
 import com.bos.sphere.core.data.IconShape
 import com.bos.sphere.core.data.IconTint
@@ -325,17 +324,6 @@ fun CornerStylePreview(style: CornerStyle) {
                 }
                 Box(Modifier.padding(5.dp).size(9.dp).background(HyleColors.InkBright, CircleShape))
             }
-        }
-    }
-}
-
-@Composable
-fun DrawerViewPreview(view: DrawerView) {
-    ComposeCanvas(Modifier.fillMaxSize().padding(6.dp)) {
-        when (view) {
-            DrawerView.Grid -> for (r in 0 until 4) for (c in 0 until 3) { val s = size.width / 3.6f; drawRoundRect(SampleApps.color(r * 3 + c), Offset(c * (s + 6f), r * (s + 6f)), Size(s, s), CornerRadius(s * 0.25f)) }
-            DrawerView.List -> for (r in 0 until 5) { val h = size.height / 6f; drawRoundRect(SampleApps.color(r), Offset(0f, r * (h + 4f)), Size(h, h), CornerRadius(h * 0.25f)); drawRoundRect(Color.White.copy(alpha = 0.5f), Offset(h + 8f, r * (h + 4f) + h * 0.3f), Size(size.width * 0.5f, h * 0.35f), CornerRadius(4f)) }
-            DrawerView.Details -> for (r in 0 until 4) { val h = size.height / 5f; drawRoundRect(SampleApps.color(r), Offset(0f, r * (h + 5f)), Size(h, h), CornerRadius(h * 0.25f)); drawRoundRect(Color.White.copy(alpha = 0.6f), Offset(h + 8f, r * (h + 5f) + h * 0.12f), Size(size.width * 0.5f, h * 0.28f), CornerRadius(4f)); drawRoundRect(Color.White.copy(alpha = 0.25f), Offset(h + 8f, r * (h + 5f) + h * 0.55f), Size(size.width * 0.38f, h * 0.22f), CornerRadius(4f)) }
         }
     }
 }

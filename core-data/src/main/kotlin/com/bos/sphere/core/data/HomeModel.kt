@@ -117,9 +117,6 @@ enum class SignalForce(val label: String, val level: Int) {
 /** How pages change when you swipe between them. */
 enum class PageTransition(val label: String) { Slide("Slide"), Fade("Fade"), Zoom("Zoom"), Cube("Cube"), Flip("Flip"), Stack("Stack") }
 
-/** How a small segmented switcher labels its options. */
-enum class SwitchStyle(val label: String) { IconText("Icons + text"), TextOnly("Text only"), IconsOnly("Icons only") }
-
 /** Light or dark Launchpad (System follows the phone). */
 enum class LaunchpadTheme(val label: String) { Dark("Dark"), Light("Light"), System("Follow the phone") }
 
@@ -147,15 +144,6 @@ enum class AppsOnHome(val label: String) { Everything("All apps"), PinnedOnly("O
 
 /** One page or many. */
 enum class PageMode(val label: String) { Multiple("Multiple pages"), Single("One page") }
-
-/** App drawer presentation. */
-enum class DrawerView(val label: String) { Grid("Grid"), List("List"), Details("Details") }
-
-/** App drawer ordering. */
-enum class DrawerSort(val label: String) { Alphabetical("A–Z"), Category("Type"), Recent("Recent"), Frequent("Most used") }
-
-/** Which screen edge(s) carry the quick-scrub rail. */
-enum class RailSide(val label: String) { Left("Left"), Right("Right"), Both("Both") }
 
 /** What the signal effects read out (wave 35): the connectivity level or the battery level; every other old measurement migrates to [Signal]. */
 enum class IndicatorMetric(val label: String) {
@@ -189,10 +177,6 @@ enum class UiLanguage(val code: String, val label: String) {
 data class LauncherPrefs(
     val homeStyle: HomeStyle = HomeStyle.Grid,
     val homePages: HomePages = HomePages.Off,
-    /** Show the A–Z letters of the drawer's quick-scrub strip (it still works when hidden). */
-    val drawerRailVisible: Boolean = true,
-    /** Grid / List / Details switcher in the app drawer. */
-    val drawerViewSwitch: SwitchStyle = SwitchStyle.IconText,
     val scrollAxis: ScrollAxis = ScrollAxis.Long,
     /** Icons across the short side in the Continuous / DSi homes. */
     val continuousColumns: Int = 4,
@@ -215,7 +199,6 @@ data class LauncherPrefs(
     val motionSensitivity: Float = 0.5f,
     /** How the four corners are drawn. */
     val cornerStyle: CornerStyle = CornerStyle.Glyph,
-    val drawerStyle: DrawerStyle = DrawerStyle.Wheel,
     val clockPosition: ClockPosition = ClockPosition.Top,
     /** Console-style interface tones in the settings space. */
     val uiSounds: Boolean = true,
@@ -353,9 +336,6 @@ data class LauncherPrefs(
     // --- apps and pages
     val appsOnHome: AppsOnHome = AppsOnHome.Everything,
     val pageMode: PageMode = PageMode.Multiple,
-    val drawerView: DrawerView = DrawerView.Grid,
-    val drawerSort: DrawerSort = DrawerSort.Alphabetical,
-    val drawerRail: RailSide = RailSide.Right,
 
     // --- indicator (the background dots and effects)
     val indicatorMetric: IndicatorMetric = IndicatorMetric.Signal,
@@ -512,14 +492,6 @@ enum class ComplicationKind(val label: String, val action: CornerActionId?) {
     Flashlight("Flashlight", CornerActionId.Flashlight),
     Storage("Storage", null),
     Notifications("Notifications", CornerActionId.Notifications),
-}
-
-/** How "All apps" opens. */
-enum class DrawerStyle(val label: String) {
-    /** A Concepts-style wheel of app spokes fanned out around the corner it was opened from. */
-    Wheel("Wheel"),
-    /** The separate app-drawer space (grid / list / details, sortable, with edge scrubbing). */
-    List("Drawer"),
 }
 
 /** How the wheel drawer groups apps into spokes. */

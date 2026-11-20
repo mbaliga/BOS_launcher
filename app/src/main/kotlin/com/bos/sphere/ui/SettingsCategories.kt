@@ -20,15 +20,12 @@ import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.ClockFormat
 import com.bos.sphere.core.data.CornerIconMode
-import com.bos.sphere.core.data.DrawerSort
-import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.IconShape
 import com.bos.sphere.core.data.IconTint
 import com.bos.sphere.core.data.AlertEffect
 import com.bos.sphere.core.data.CalmEffect
 import com.bos.sphere.core.data.IndicatorMetric
 import com.bos.sphere.core.data.PageMode
-import com.bos.sphere.core.data.RailSide
 import com.bos.sphere.core.data.ThemeMode
 import com.bos.sphere.core.data.UiLanguage
 import com.bos.sphere.core.design.L10n
@@ -48,7 +45,6 @@ import com.bos.sphere.core.data.StripZone
 import com.bos.sphere.core.data.CornerSlot
 import com.bos.sphere.core.data.CornerStyle
 import com.bos.sphere.core.data.DensityPreset
-import com.bos.sphere.core.data.DrawerStyle
 import com.bos.sphere.core.data.GestureKind
 import com.bos.sphere.core.data.GridSpec
 import com.bos.sphere.core.data.HomeGesture
@@ -66,7 +62,6 @@ import com.bos.sphere.feature.grid.VisualChoice
 import com.bos.sphere.feature.grid.HomeStylePreview
 import com.bos.sphere.feature.grid.PageShapePreview
 import com.bos.sphere.feature.grid.PagingPreview
-import com.bos.sphere.feature.grid.DrawerViewPreview
 import com.bos.sphere.feature.grid.StripPositionPreview
 import com.bos.sphere.feature.grid.CornerStylePreview
 import com.bos.sphere.feature.grid.ThemeModePreview
@@ -125,6 +120,11 @@ class SettingsModel(
     val restorePages: (() -> Unit)? = null,
     /** Wave 29: bring Comms up (on a hub view and/or with the Groups and rules manager open), closing settings; the app wires it to the Comms surface. */
     val openComms: (com.bos.sphere.ui.HubView?, Boolean) -> Unit = { v, g -> com.bos.sphere.ui.LaunchpadHubNav.openComms(v, g) },
+    /** Wave 38 (drawerRing): the shortcut ring's size (6 to 8) and labels toggle, kept in the puck store rather than the prefs, with their setters. */
+    val puckSegments: Int = com.bos.sphere.core.data.PuckActions.DEFAULT_SEGMENTS,
+    val setPuckSegments: (Int) -> Unit = {},
+    val puckLabels: Boolean = false,
+    val setPuckLabels: (Boolean) -> Unit = {},
 )
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
@@ -414,19 +414,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Apps"),
         Glyphs.Widget,
         buildList {
-            // Open-the-drawer settings first, then what lives on the home screen.
-            add(SettingItem.Choice(x("All apps opens as"), Glyphs.Apps, DrawerStyle.entries, p.drawerStyle, { x(it.label) }, hint = x("The wheel fans out around the corner you open it from.")) { v -> upd { it.copy(drawerStyle = v) } })
+            // Wave 38: the white shortcut ring (segments, editor, labels) leads the App drawer, then the open-the-drawer settings, then what lives on the home screen.
+            addAll(com.bos.sphere.ui.drawerRingItems(m))
             add(SettingItem.Choice(x("Wheel groups"), Glyphs.Dial, WheelGrouping.entries, p.wheelGrouping, { x(it.label) }, hint = x("How the wheel groups apps into spokes.")) { g -> upd { it.copy(wheelGrouping = g) } })
-            add(SettingItem.Choice(x("View switcher shows"), Glyphs.Apps, com.bos.sphere.core.data.SwitchStyle.entries, p.drawerViewSwitch, { x(it.label) }) { v -> upd { it.copy(drawerViewSwitch = v) } })
-            add(
-                SettingItem.Choice(
-                    x("Drawer view"), Glyphs.ViewList, DrawerView.entries, p.drawerView, { x(it.label) },
-                    preview = { VisualChoice(DrawerView.entries, p.drawerView, { v -> upd { it.copy(drawerView = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { DrawerViewPreview(it) } },
-                ) { v -> upd { it.copy(drawerView = v) } },
-            )
-            add(SettingItem.Choice(x("Sort by"), Glyphs.Menu, DrawerSort.entries, p.drawerSort, { x(it.label) }) { v -> upd { it.copy(drawerSort = v) } })
-            add(SettingItem.Choice(x("Quick scrub side"), Glyphs.Swipe, RailSide.entries, p.drawerRail, { x(it.label) }, hint = x("Run a finger down the edge to jump through the list.")) { v -> upd { it.copy(drawerRail = v) } })
-            add(SettingItem.Toggle(x("Show the A–Z letters"), Glyphs.Message, p.drawerRailVisible, x("Off hides the letters; the strip still scrubs")) { v -> upd { it.copy(drawerRailVisible = v) } })
             // Only the paged home has pages to curate; the scrolling homes always show every app.
             if (paged) add(SettingItem.Choice(x("Pages"), Glyphs.Swipe, PageMode.entries, p.pageMode, { x(it.label) }, hint = x("One page shows just the first page; the rest stay in the drawer.")) { v -> upd { it.copy(pageMode = v) } })
             add(
@@ -442,7 +432,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     note("Pick any installed app — the list isn't limited to what the system suggests.")
                 },
             )
-            add(com.bos.sphere.ui.drawerShortcutsItem(m.appsByKey)) // wave 30: the four sections around the disc's hub
         },
     )
 

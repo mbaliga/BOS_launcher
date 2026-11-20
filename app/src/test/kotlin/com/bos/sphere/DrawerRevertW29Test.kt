@@ -46,14 +46,13 @@ class DrawerRevertW29Test : TourBase() {
         start(); assertTrue(glanceShown())
         appsHotspot().performClick(); settle()
         assertTrue("the restored disc (hub with its Back button) is open", wheelShown())
-        assertFalse("not the list drawer", drawerShown())
         back(); assertFalse("Back closes the disc", wheelShown())
     }
 
     @Test fun HOM_01_w29_theAppsHotspotOnAPageOpensTheWheelDisc() {
         start(glance = false); assertFalse(glanceShown())
         rule.onNodeWithContentDescription(CornerActionId.AllApps.label, substring = true).performClick(); settle()
-        assertTrue(wheelShown()); assertFalse(drawerShown())
+        assertTrue(wheelShown())
         back(); assertFalse(wheelShown())
     }
 
@@ -95,7 +94,7 @@ class DrawerRevertW29Test : TourBase() {
             if (wheelShown()) { opened = true; break }
             back()
         }
-        assertTrue("one hotspot opens the disc in landscape", opened); assertFalse(drawerShown())
+        assertTrue("one hotspot opens the disc in landscape", opened)
         val hub = rule.onNodeWithContentDescription("Back").fetchSemanticsNode().boundsInRoot
         val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
         assertTrue("the hub's Back button is fully on screen: $hub in $root", hub.left >= root.left && hub.top >= root.top && hub.right <= root.right && hub.bottom <= root.bottom)
@@ -109,10 +108,10 @@ class DrawerRevertW29Test : TourBase() {
         key(ESC); settle(); assertFalse("Esc closes it", wheelShown())
     }
 
-    @Test fun INP_18_w29_theOpenDrawerChordStillOpensTheListNotTheDisc() {
+    @Test fun INP_18_w38_theOpenDrawerChordOpensTheDisc() {
         start(); assertTrue(glanceShown())
         key(android.view.KeyEvent.KEYCODE_D, ctrl = true)
-        assertTrue("Ctrl+D opens the list drawer", drawerShown()); assertFalse(wheelShown())
+        assertTrue("Ctrl+D opens the disc (the app drawer is always the disc, wave 38)", wheelShown())
     }
 
     @Test fun CFG_15_w29_aPuckRingActionOnTheRestoredDiscStillRuns() {

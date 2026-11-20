@@ -88,7 +88,7 @@ class AppSmokeTest {
     private fun radarField() = rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().firstOrNull()
         ?.config?.let { c -> if (c.contains(SemanticsProperties.EditableText)) c[SemanticsProperties.EditableText].text else null }
 
-    private fun drawerOpen() = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.") }
+    private fun drawerOpen() = LauncherInput.focus.nodes().any { it.id == "puck.back" }
 
     private fun key(sc: ActivityScenario<*>, code: Int, ctrl: Boolean = false): Boolean =
         AppSmokeHarness.press(sc, code, ctrl = ctrl).also { rule.waitForIdle() }
@@ -195,7 +195,7 @@ class AppSmokeTest {
         assertTrue("corners on the graph", ids.any { it.startsWith("corner.") })
         assertTrue(LauncherInput.focus.nodes().filter { it.id.startsWith("dock.") || it.id.startsWith("corner.") }.all { it.layer == 0 })
         key(sc, KeyEvent.KEYCODE_D, ctrl = true)
-        assertTrue("the drawer's items sit above the home", LauncherInput.focus.nodes().filter { it.id.startsWith("drawer.") }.all { it.layer == 2 })
+        assertTrue("the drawer's items sit above the home", LauncherInput.focus.nodes().filter { it.id == "puck.back" }.let { n -> n.isNotEmpty() && n.all { it.layer == 3 } })
         assertTrue(LauncherInput.focus.anyLayerActive)
     }
 

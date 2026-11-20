@@ -552,7 +552,7 @@ internal class WheelMetrics(width: Float, height: Float, density: Density) {
     init {
         with(density) {
             iconPx = iconDp.toPx()
-            hubRadius = (minSide * 0.34f).coerceAtMost(190.dp.toPx())
+            hubRadius = PuckLayout.hubRadius(minSide / density.density).dp.toPx()
             bandInner = hubRadius + 3.dp.toPx()
             bandOuter = bandInner + 26.dp.toPx()
             firstRadius = bandOuter + 14.dp.toPx() + iconPx / 2f
@@ -615,6 +615,9 @@ fun WheelDrawer(
     modifier: Modifier = Modifier,
     /** More buttons for the hub, like the tool puck in Concepts. */
     actions: List<PuckAction> = emptyList(),
+    /** Wave 38: how many segments the white shortcut ring has (6 to 8) and whether the visible ones show a label under their glyph. */
+    ringSegments: Int = com.bos.sphere.core.data.PuckActions.DEFAULT_SEGMENTS,
+    showRingLabels: Boolean = false,
 ) {
     // NFR-14: with animations off the wheel does not unfold; it cross-fades in place.
     val motion = com.bos.sphere.core.design.rememberMotionPrefs()
@@ -647,6 +650,8 @@ fun WheelDrawer(
         onLongPressApp = onLongPressApp,
         onSearch = onSearch,
         actions = actions,
+        ringSegments = com.bos.sphere.core.data.PuckActions.clampSegments(ringSegments),
+        showRingLabels = showRingLabels,
         onDismiss = onDismiss,
         interactive = visible,
         progress = if (motion.reduced) geometry else progress,
@@ -667,6 +672,8 @@ private fun WheelContent(
     onLongPressApp: (AppEntry) -> Unit,
     onSearch: () -> Unit,
     actions: List<PuckAction>,
+    ringSegments: Int,
+    showRingLabels: Boolean,
     onDismiss: () -> Unit,
     interactive: Boolean,
     progress: State<Float>,
@@ -733,6 +740,10 @@ private fun WheelContent(
         // INP-19: hub and ring spacing come from the window size, so nothing overlaps or clips when it is small.
         val minSideDp = with(density) { metrics.minSide.toDp().value }
         val puck = remember(minSideDp) { PuckLayout.compute(minSideDp) }
+        // Wave 38 (drawerRing): the white shortcut ring (6 to 8 segments) around the Back hub, and its turning state.
+        val ring = remember(puck) { PuckSectionsGeometry.ring(puck.hubRadiusDp, puck.chipRadiusDp) }
+        val ringState = remember { PuckRingState() }
+        val density1 = density.density
 
         // INP-18: keyboard and scroll wheel. The puck owns its keys while open (ahead of the home's shortcuts).
         val currentGroups by rememberUpdatedState(groups)
@@ -777,6 +788,9 @@ private fun WheelContent(
                 if (e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@h false
                 val ch = e.unicodeChar.takeIf { it > 0 }?.toChar()
                 if (!PuckKeys.owns(e.keyCode, ch)) return@h false
+                // Wave 38: Shift+Left/Right (or plain Left/Right while a ring segment or the hub has keyboard focus) turn the white ring one segment.
+                val ringStep = PuckKeys.ringStep(e.keyCode, e.isShiftPressed, ringState.ringFocused)
+                if (ringStep != 0) { ringState.turnBy(scope, ringStep, ringSegments, reducedMotion); return@h true }
                 val g = currentGroups.getOrNull(focusedGroup())
                 val state = PuckState(PuckMode.entries[currentGrouping.ordinal], currentGroups.map { it.label }, focusedGroup(), currentKbItem, g?.apps?.size ?: 0)
                 when (val eff = PuckKeys.onKey(state, PuckKey(e.keyCode, e.isShiftPressed, ch))) {
@@ -859,7 +873,7 @@ private fun WheelContent(
                         }
                     }
                 }
-                .pointerInput(anchor, metrics, rotation, interactive) {
+                .pointerInput(anchor, metrics, rotation, interactive, ring) {
                     if (!interactive) {
                         // Closing: swallow touches so nothing underneath fires mid-animation.
                         awaitEachGesture {
@@ -869,6 +883,9 @@ private fun WheelContent(
                     }
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
+                        // Wave 38: a touch that starts on the hub or the white shortcut ring belongs to the ring's own overlay (it turns the ring);
+                        // only touches outside it turn this wheel.
+                        if (PuckSectionsGeometry.ownsTouch(ring, (down.position.x - corner.x) / density1, (down.position.y - corner.y) / density1)) return@awaitEachGesture
                         scope.launch { rotation.stop() }
                         val tracker = VelocityTracker()
                         tracker.addPosition(down.uptimeMillis, down.position)
@@ -1119,7 +1136,7 @@ private fun WheelContent(
                         Modifier
                             .centeredAt { Offset(pt.x, pt.y) }
                             .size(width = with(density) { chipBoxes[i].first.toDp() }, height = with(density) { chipBoxes[i].second.toDp() })
-                            .semantics { contentDescription = g.label }
+                            .semantics { contentDescription = g.label; selected = g == grouping }
                             .clickable(
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                                 indication = null,
@@ -1128,7 +1145,10 @@ private fun WheelContent(
                     )
                 }
                 // Wave 30: four wedge sections around a round Back hub (PuckSections.kt), group labels outside.
-                PuckSectionsLayer(anchor, corner, remember(puck) { PuckSectionsGeometry.ring(puck.hubRadiusDp, puck.chipRadiusDp) }, actions, onDismiss)
+                PuckSectionsLayer(
+                    anchor, corner, ring, RingWindow(corner.x / density1, corner.y / density1, w / density1, h / density1), ringSegments, ringState,
+                    showRingLabels, actions, interactive, onDismiss,
+                )
             }
 
             // Spokes (only those near the visible quadrant are composed).

@@ -31,9 +31,21 @@ import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.SettingItem
 import com.bos.sphere.feature.grid.TextButtonPill
 
-/** CFG-15 (wave 30): Ground Control > Home screen > App drawer > Drawer shortcuts, the four sections around the all-apps disc's hub. */
-fun drawerShortcutsItem(appsByKey: Map<String, AppEntry>): SettingItem =
-    SettingItem.Pane(L10n.tr("Drawer shortcuts"), Glyphs.Dial, L10n.tr("What the four sections around the disc's hub do")) { PuckActionsPane(appsByKey) }
+/**
+ * CFG-15 (wave 38, drawerRing): the Ground Control > App drawer rows for the white shortcut ring around the Back hub: how many segments it has
+ * (6, 7 or 8), the editor with one row per segment, and the labels toggle. The size and the toggle live in the puck store ([SettingsModel] carries
+ * the current values and the setters), so the list rebuilds when they change.
+ */
+fun drawerRingItems(m: SettingsModel): List<SettingItem> = listOf(
+    SettingItem.Choice(
+        L10n.tr("Ring segments"), Glyphs.Dial, PuckActions.SEGMENT_CHOICES, m.puckSegments, { it.toString() },
+        hint = L10n.tr("How many segments the white ring around the Back button has. Turn the ring with a finger to reach the others."),
+    ) { m.setPuckSegments(it) },
+    SettingItem.Pane(L10n.tr("Drawer shortcuts"), Glyphs.Dial, L10n.tr("%d segments", m.puckSegments)) { PuckActionsPane(m.appsByKey) },
+    SettingItem.Toggle(
+        L10n.tr("Show labels under glyphs"), Glyphs.Message, m.puckLabels, L10n.tr("A small name under each shortcut in the visible segments"),
+    ) { m.setPuckLabels(it) },
+)
 
 /** The words for one slot, as the editor rows and the disc's labels show them. */
 internal fun slotLabel(slot: PuckSlot, appsByKey: Map<String, AppEntry>): String = when (slot) {
@@ -47,15 +59,16 @@ fun ColumnScope.PuckActionsPane(appsByKey: Map<String, AppEntry>) {
     val context = LocalContext.current
     val store = remember { PuckActionsStore.get(context) }
     val slots by store.slots.collectAsState()
+    val count by store.segments.collectAsState()
     var editing by remember { mutableIntStateOf(-1) }
     var pickingApp by remember { mutableStateOf(false) }
 
     Column(Modifier.padding(horizontal = 4.dp)) {
         Text(
-            L10n.tr("The four sections around the hub of the all-apps disc. Each one runs a shortcut: an action, Radar, an app, or nothing."),
+            L10n.tr("Each segment of the ring around the hub of the all-apps disc runs a shortcut: an action, Radar, an app, or nothing."),
             color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(vertical = 6.dp),
         )
-        slots.forEachIndexed { i, slot ->
+        slots.take(count).forEachIndexed { i, slot ->
             val app = (slot as? PuckSlot.App)?.let { appsByKey[it.key] }
             ActionRow(
                 label = "${i + 1}. ${slotLabel(slot, appsByKey)}",
@@ -68,7 +81,7 @@ fun ColumnScope.PuckActionsPane(appsByKey: Map<String, AppEntry>) {
         Row(Modifier.padding(top = 10.dp)) { TextButtonPill(L10n.tr("Reset to default")) { store.reset() } }
     }
 
-    if (editing in 0 until PuckActions.SLOTS && !pickingApp) {
+    if (editing in 0 until count && !pickingApp) {
         val i = editing
         GlassDialog(title = L10n.tr("Drawer shortcut %d", i + 1), onDismiss = { editing = -1 }) {
             ActionRow(L10n.tr("Empty"), null, null, selected = slots[i] == PuckSlot.Empty) { store.set(i, PuckSlot.Empty); editing = -1 }
@@ -79,7 +92,7 @@ fun ColumnScope.PuckActionsPane(appsByKey: Map<String, AppEntry>) {
             }
         }
     }
-    if (editing in 0 until PuckActions.SLOTS && pickingApp) {
+    if (editing in 0 until count && pickingApp) {
         val i = editing
         AppPickerDialog(
             title = L10n.tr("Drawer shortcut %d", i + 1),

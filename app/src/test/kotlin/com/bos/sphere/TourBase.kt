@@ -65,7 +65,7 @@ abstract class TourBase {
     protected fun launchpadShown() = tagShown("lp.card") && tagShown("lp.root")
     protected fun recentsShown() = tagShown("recents.panel")
     protected fun radarShown() = descShown("Speak to search")
-    protected fun drawerShown() = LauncherInput.focus.nodes().any { it.id.startsWith("drawer.") }
+    protected fun drawerShown() = LauncherInput.focus.nodes().any { it.id == "puck.back" }
     protected fun settingsShown() = descShown("Close settings")
     protected fun quickSheetShown() = tagShown("quick.sheet")
     /** Wave 34: the long-press Home sheet no longer has Edit home, Add page, the Glance switch or the item picker; they are rows in Ground Control, Home screen, one tap from the sheet's Ground Control row. */

@@ -123,6 +123,24 @@
             android:exported="false"
             android:theme="@style/Theme.SphereLauncher" />
 
+        <!-- Wave 39 (dockThemes): a .liftofftheme file opened from elsewhere lands on the theme preview; nothing is applied until Apply is tapped. -->
+        <activity
+            android:name=".ThemeImportActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.SphereLauncher">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/x-liftofftheme" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.liftofftheme" />
+            </intent-filter>
+        </activity>
+
         <!-- Android 14+: Health Connect's "view permission usage" entry point -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"

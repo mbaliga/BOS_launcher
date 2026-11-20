@@ -14,3 +14,5 @@ Nothing in our code was called Internet. The signal and Wi-Fi glyphs of the Comm
 - **One permission added**: `ACCESS_WIFI_STATE` (normal, no prompt) for `WifiManager.isWifiEnabled`. `DeviceKitAuditTest` permission set updated.
 - **Tune and Share**: the tune icon opens the system Wi-Fi settings. There is no public Wi-Fi share action, so "Share Wi-Fi" also opens the Wi-Fi settings, where the network's Share button is.
 - Strings: `L10nW34connectivity.kt` (es, fr, de, pt, hi, zh, ja, ar). The label is "Wi-Fi" and "Share Wi-Fi" (the app's spelling) where the mock-up says "WiFi" and "Share Wifi".
+
+Wave 37: the visible labels are now exactly "WiFi" and "Share Wifi" ([specSync.md](specSync.md)); the title is 28 sp.

@@ -4,7 +4,6 @@ package com.bos.sphere.core.design
 internal val L10nW34connectivityEnglish: Set<String> = setOf(
     "Close Connectivity",
     "See all",
-    "Share Wi-Fi",
     "Connected network",
     "Secured",
     "Network settings",
@@ -17,7 +16,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "es" to mapOf(
         "Close Connectivity" to "Cerrar Conectividad",
         "See all" to "Ver todo",
-        "Share Wi-Fi" to "Compartir Wi-Fi",
         "Connected network" to "Red conectada",
         "Secured" to "Protegida",
         "Network settings" to "Ajustes de la red",
@@ -28,7 +26,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "fr" to mapOf(
         "Close Connectivity" to "Fermer Connectivité",
         "See all" to "Tout afficher",
-        "Share Wi-Fi" to "Partager le Wi-Fi",
         "Connected network" to "Réseau connecté",
         "Secured" to "Sécurisé",
         "Network settings" to "Paramètres du réseau",
@@ -39,7 +36,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "de" to mapOf(
         "Close Connectivity" to "Konnektivität schließen",
         "See all" to "Alle anzeigen",
-        "Share Wi-Fi" to "WLAN teilen",
         "Connected network" to "Verbundenes Netzwerk",
         "Secured" to "Gesichert",
         "Network settings" to "Netzwerkeinstellungen",
@@ -50,7 +46,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "pt" to mapOf(
         "Close Connectivity" to "Fechar Conectividade",
         "See all" to "Ver tudo",
-        "Share Wi-Fi" to "Partilhar Wi-Fi",
         "Connected network" to "Rede ligada",
         "Secured" to "Protegida",
         "Network settings" to "Definições da rede",
@@ -61,7 +56,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "hi" to mapOf(
         "Close Connectivity" to "कनेक्टिविटी बंद करें",
         "See all" to "सभी देखें",
-        "Share Wi-Fi" to "Wi-Fi साझा करें",
         "Connected network" to "जुड़ा हुआ नेटवर्क",
         "Secured" to "सुरक्षित",
         "Network settings" to "नेटवर्क सेटिंग",
@@ -72,7 +66,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "zh" to mapOf(
         "Close Connectivity" to "关闭网络连接",
         "See all" to "查看全部",
-        "Share Wi-Fi" to "分享 Wi-Fi",
         "Connected network" to "已连接的网络",
         "Secured" to "已加密",
         "Network settings" to "网络设置",
@@ -83,7 +76,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "ja" to mapOf(
         "Close Connectivity" to "接続を閉じる",
         "See all" to "すべて表示",
-        "Share Wi-Fi" to "Wi-Fi を共有",
         "Connected network" to "接続中のネットワーク",
         "Secured" to "保護あり",
         "Network settings" to "ネットワーク設定",
@@ -94,7 +86,6 @@ internal val L10nW34connectivity: Map<String, Map<String, String>> = mapOf(
     "ar" to mapOf(
         "Close Connectivity" to "إغلاق الاتصال",
         "See all" to "عرض الكل",
-        "Share Wi-Fi" to "مشاركة Wi-Fi",
         "Connected network" to "الشبكة المتصلة",
         "Secured" to "مؤمّنة",
         "Network settings" to "إعدادات الشبكة",

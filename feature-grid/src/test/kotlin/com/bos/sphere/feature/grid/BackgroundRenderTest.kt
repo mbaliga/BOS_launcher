@@ -282,23 +282,6 @@ class BackgroundRenderTest {
         }
     }
 
-    // -------------------------------------------------------------------------------- comic lines (no signal only)
-
-    private fun comicLinesAppearOnlyWithoutSignalAndOnlyAtTheEdges(dark: Boolean, tag: String) {
-        show()
-        val cfgNone = BackgroundConfig(BackgroundChoice(BgItem.None, BgItem.None), dark = dark, baseFill = true)
-        set(cfgNone, null); val without = capture()          // signal not known yet: calm, no comic lines
-        set(cfgNone, SignalState.NoSignal); val with = capture("comic-$tag")
-        val d = diffPixels(without, with)
-        assertTrue("comic lines drawn (${d.size} pixels)", d.size > 300)
-        val cx = with.width / 2.0; val cy = with.height / 2.0
-        val inner = d.count { (x, y) -> Math.hypot((x - cx) / cx, (y - cy) / cy) < 0.5 }
-        assertEquals("comic pixels inside the calm middle", 0, inner)
-        set(cfgNone, SignalState.forced(3)); assertEquals("no comic lines with signal", 0, diffPixels(without, capture()).size)
-        set(cfgNone, SignalState.forced(1)); assertEquals(0, diffPixels(without, capture()).size)
-    }
-
-
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-mdpi")
     fun HOM_16_noSignalDropsEveryItemToItsDimRestingStateAndShowsTheComicLines() {
         show()

@@ -54,6 +54,16 @@ abstract class SoundVibrationSheetCases(private val orientation: String) : Launc
 
     private fun tag(t: String) = rule.onNodeWithTag(t, useUnmergedTree = true)
 
+    @Test fun SND_30_w37_theTitleUsesTheSharedPopupTitleTokenOf28spLightCentred() {
+        show()
+        val out = ArrayList<androidx.compose.ui.text.TextLayoutResult>()
+        tag("snd.title").fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!.invoke(out)
+        val st = out[0].layoutInput.style
+        assertEquals(com.bos.sphere.core.design.PopupTokens.TitleSize, st.fontSize); assertEquals(28f, st.fontSize.value, 0f)
+        assertEquals(androidx.compose.ui.text.font.FontWeight.Light, st.fontWeight)
+        assertEquals(androidx.compose.ui.text.style.TextAlign.Center, st.textAlign)
+    }
+
     @Test fun SND_20_theSheetSitsAtTheBottomWithTheTitleAndFourSlidersOf48dp() {
         show()
         rule.onNodeWithText("Sound and Vibration").assertIsDisplayed()

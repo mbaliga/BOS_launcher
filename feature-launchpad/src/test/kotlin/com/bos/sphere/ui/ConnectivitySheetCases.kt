@@ -55,12 +55,32 @@ abstract class ConnectivitySheetCases(private val orientation: String) : Launchp
         show()
         rule.onNodeWithText("Connectivity").assertIsDisplayed()
         rule.onNodeWithText("Airtel").assertIsDisplayed()
-        rule.onNodeWithText("Wi-Fi").assertIsDisplayed()
+        rule.onNodeWithText("WiFi").assertIsDisplayed()
         for (n in ConnectivityFixtures.coffee) rule.onNodeWithText(n.name!!).assertIsDisplayed()
         for (t in listOf("cn.seeall", "cn.share", "cn.done")) tag(t).performScrollTo().assertIsDisplayed()
         val root = rule.onRoot().getUnclippedBoundsInRoot(); val sheet = tag("cn.sheet").getUnclippedBoundsInRoot()
         assertTrue("sheet sits at the bottom", (root.bottom - sheet.bottom).value < 56f)
         shoot("connectivity-$orientation-dark")
+    }
+
+    @Test fun CON_30_w37_theLabelsAreSpelledAsTheMockUpWiFiAndShareWifiAndTheContentDescriptionsFollow() {
+        show()
+        rule.onNodeWithText("WiFi").assertIsDisplayed()
+        tag("cn.share").performScrollTo(); rule.onNodeWithText("Share Wifi").assertIsDisplayed()
+        assertTrue("no Share Wi-Fi", rule.onAllNodes(androidx.compose.ui.test.hasText("Share Wi-Fi")).fetchSemanticsNodes().isEmpty())
+        val wifi = rule.onNodeWithTag("cn.wifi").fetchSemanticsNode().config
+        assertTrue("the row reads WiFi: ${wifi}", wifi.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }?.contains("WiFi") == true)
+        val share = rule.onNodeWithTag("cn.share").fetchSemanticsNode().config
+        assertTrue("the share button reads Share Wifi", share.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } == "Share Wifi" || share.getOrNull(SemanticsProperties.ContentDescription)?.joinToString() == "Share Wifi")
+    }
+
+    @Test fun CON_31_w37_theTitleUsesTheSharedPopupTitleTokenOf28spLightCentred() {
+        show()
+        val out = ArrayList<androidx.compose.ui.text.TextLayoutResult>()
+        tag("cn.title").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!.invoke(out)
+        val st = out[0].layoutInput.style
+        assertEquals(28f, st.fontSize.value, 0f); assertEquals(androidx.compose.ui.text.font.FontWeight.Light, st.fontWeight)
+        assertEquals(androidx.compose.ui.text.style.TextAlign.Center, st.textAlign)
     }
 
     @Test fun CON_21_theTogglesShowTheRealStateAndAreSwitchesForTalkBack() {

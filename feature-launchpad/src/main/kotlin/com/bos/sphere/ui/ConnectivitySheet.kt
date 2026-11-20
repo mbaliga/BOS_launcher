@@ -102,7 +102,7 @@ internal fun ConnectivityContent(state: ConnectivityState, onDismiss: () -> Unit
             ToggleRow("cn.mobile", if (state.snapshot.carrier.isNullOrBlank()) L10n.tr(state.mobileLabel) else state.mobileLabel, state.mobileOn, { SignalIcon(Ink) }, actions::openMobilePanel)
             Spacer(Modifier.height(gap))
         }
-        ToggleRow("cn.wifi", L10n.tr("Wi-Fi"), state.wifiOn, null, actions::openWifiPanel)
+        ToggleRow("cn.wifi", L10n.tr("WiFi"), state.wifiOn, null, actions::openWifiPanel)
         Spacer(Modifier.height(gap))
         Column(Modifier.fillMaxWidth().graphicsLayer { alpha = if (state.listDimmed) 0.7f else 1f }.testTag("cn.list")) {
             state.visibleNetworks.forEachIndexed { i, n -> NetworkRow(i, n, state.listDimmed, actions) }
@@ -113,7 +113,7 @@ internal fun ConnectivityContent(state: ConnectivityState, onDismiss: () -> Unit
         ActionRow("cn.seeall", L10n.tr("See all"), actions::openWifiPanel) { ChevronIcon() }
         Spacer(Modifier.height(if (compact) 4.dp else 20.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            ActionRow("cn.share", L10n.tr("Share Wi-Fi"), actions::shareWifi, Modifier.weight(1f)) { ShareIcon() }
+            ActionRow("cn.share", L10n.tr("Share Wifi"), actions::shareWifi, Modifier.weight(1f)) { ShareIcon() }
             Box(
                 Modifier.padding(start = 12.dp).heightIn(min = RowMin).widthIn(min = 72.dp).testTag("cn.done")
                     .clip(RoundedCornerShape(12.dp)).semantics(mergeDescendants = true) { role = Role.Button }.clickable(onClick = onDismiss),

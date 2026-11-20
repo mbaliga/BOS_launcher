@@ -79,23 +79,6 @@ internal fun SystemWallpaperLayer(w: Wallpaper, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize().clearAndSetSemantics { }.testTag(SYSTEM_WALLPAPER_TAG).drawBehind { if (dim > 0) drawRect(Color.Black.copy(alpha = dim / 100f)) })
 }
 internal const val SYSTEM_WALLPAPER_TAG = "system-wallpaper-layer"
-internal const val SPIDER_SENSE_TAG = "spider-sense-alert"
-
-/**
- * The spider-sense alert (owner: "the comic-book lines alert appears when there is an issue, like lack of connectivity"): the comic speed lines of
- * [ComicPainter], drawn alone, over any wallpaper that does not already draw them (everything but a signal wallpaper with items, which draws them itself).
- * It follows the same motion policy as the signal wallpaper: one shared clock only while the app is resumed and focused, a still frame under reduced motion.
- * It paints nothing while there is signal (or the signal is not known yet), and collects the signal only while composed and started.
- */
-@Composable
-fun SpiderSenseAlert(prefs: LauncherPrefs, modifier: Modifier = Modifier, dark: Boolean = isDarkSurface()) {
-    val reduced = rememberMotionPrefs().reduced
-    val active = rememberRadarActive()
-    val clock = rememberRadarClock(active, reduced)
-    val cfg = remember(prefs.radarIntensity, dark) { BackgroundConfig(BackgroundChoice(com.bos.sphere.core.data.BgItem.None, com.bos.sphere.core.data.BgItem.None), prefs.radarIntensity, dark, baseFill = false) }
-    val signal = rememberRadarSignal(prefs.radarSignalForce, wanted = true)
-    SignalBackgroundCanvas(cfg, signal, clock, reduced, modifier.testTag(SPIDER_SENSE_TAG))
-}
 
 /** The legibility scrim for a solid or gradient wallpaper (live wallpapers sample their painters, see [rememberHomeScrim]). */
 @Composable

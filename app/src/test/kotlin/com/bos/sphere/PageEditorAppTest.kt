@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
@@ -98,23 +99,24 @@ class PageEditorAppTest {
         rule.onNodeWithTag("pe.page.0").assertIsSelected()
         rule.onNodeWithTag("pe.page.1").performClick(); settle(700); rule.onNodeWithTag("pe.page.2").performClick(); settle(700) // the swing is about 350 ms; this is its end state
         rule.onNodeWithTag("pe.page.2").assertIsSelected()
-        assertTrue("the rail now acts on page 3", has("Delete page 3"))
-        assertFalse(has("Delete page 1"))
+        assertTrue("the page 3 card says it is selected", has("Page 3 of 3, selected"))
+        assertFalse(has("Page 1 of 3, selected"))
     }
 
     @Test fun HOM_12_pe45_addPageCardAppendsOneEmptyPageAndFocusesIt() {
         val stores = start(); openEditor(stores)
         rule.onNodeWithTag("pe.page.1").performClick(); settle(700); rule.onNodeWithTag("pe.page.2").performClick(); settle(700)
+        rule.onNodeWithTag("page-editor-strip").performScrollToNode(androidx.compose.ui.test.hasTestTag("pe.add")); settle(300) // the card at the end of the strip scrolls into view
         rule.onNodeWithTag("pe.add").performClick(); settle(700)
         assertEquals(4, stores.layout.layout.value.pages.size)
         assertTrue(pageKeys(stores)[3].isEmpty())
         rule.onNodeWithTag("pe.page.3").assertIsSelected()
     }
 
-    @Test fun HOM_12_pe46_deleteOnTheRailAsksThenRemovesThePageAndUndoBringsItBack() {
+    @Test fun HOM_12_pe46_deleteInTheCardsOverflowMenuAsksThenRemovesThePageAndUndoBringsItBack() {
         val stores = start(); openEditor(stores)
         val before = pageKeys(stores)
-        rule.onNodeWithContentDescription("Delete page 1").performClick(); settle(300)
+        rule.onNodeWithTag("pe.more.0").performClick(); settle(200); rule.onNodeWithTag("pe.menu.delete.0").performClick(); settle(300)
         rule.onNodeWithText("1 item will be removed from this page. It stays in the drawer.").assertIsDisplayed()
         rule.onNode(androidx.compose.ui.test.hasText("Delete page") and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.isDialog()), useUnmergedTree = true).performClick(); settle(300)
         assertEquals(2, stores.layout.layout.value.pages.size)
@@ -126,16 +128,16 @@ class PageEditorAppTest {
         val stores = start(HomePages.Continuous); openEditor(stores)
         val p1 = rule.onNodeWithTag("pe.page.0").getUnclippedBoundsInRoot()
         val p2 = rule.onNodeWithTag("pe.page.1").getUnclippedBoundsInRoot()
-        assertTrue("side by side along the top", p2.left > p1.left && kotlin.math.abs(p2.top.value - p1.top.value) < 1f)
+        assertTrue("side by side in a row above the live card (the focused card is a little larger)", p2.left > p1.left && kotlin.math.abs(p2.top.value - p1.top.value) < 10f)
         rule.onNodeWithTag("pe.page.1").performClick(); settle(700)
         rule.onNodeWithTag("pe.page.1").assertIsSelected()
-        assertTrue(has("Delete page 2"))
+        assertTrue(has("Page 2 of 3, selected"))
     }
 
-    @Test fun HOM_12_pe48_theRightToLeftPageOrderMirrorsTheStripToTheLeft() {
+    @Test fun HOM_12_pe48_theRightToLeftPageOrderMirrorsTheRow() {
         val stores = start(order = HomeOrder.RightToLeft); openEditor(stores)
-        val strip = rule.onNodeWithContentDescription("Page carousel").getUnclippedBoundsInRoot()
-        assertTrue("strip on the left half", strip.right.value < 360f * 0.75f)
+        val p1 = rule.onNodeWithTag("pe.page.0").getUnclippedBoundsInRoot(); val p2 = rule.onNodeWithTag("pe.page.1").getUnclippedBoundsInRoot()
+        assertTrue("page 1 is to the right of page 2 in the mirrored row", p1.left > p2.left)
     }
 
     @Test fun HOM_12_pe49_reducedMotionSelectsWithoutTheSwing() {
@@ -150,10 +152,46 @@ class PageEditorAppTest {
         rule.onNodeWithTag("pe.glance").performClick(); settle(700)
         rule.onNodeWithTag("pe.glance").assertIsSelected()
         rule.onNodeWithText("Hotspots").assertIsDisplayed()
-        assertFalse("no page actions on the Glance", has("Delete page 1"))
+        assertFalse("the Glance card has no move or delete actions", rule.onNodeWithTag("pe.glance").fetchSemanticsNode().config.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
         rule.onNodeWithTag("pe.page.0").performClick(); settle(700)
         rule.onNodeWithTag("pe.page.0").assertIsSelected()
-        assertTrue(has("Delete page 1"))
+        assertTrue(has("Actions for page 1"))
+    }
+
+    // ---- wave 45 (pageEditorLayout) ----
+
+    @Test fun HOM_12_pl10_moveLaterInTheCardsOverflowMenuReordersTheStoredPagesAndFocusesTheMovedPage() {
+        val stores = start(); openEditor(stores)
+        val before = pageKeys(stores)
+        rule.onNodeWithTag("pe.more.0").performClick(); settle(200)
+        rule.onNodeWithTag("pe.menu.later.0").performClick(); settle(700)
+        assertEquals(listOf(before[1], before[0], before[2]), pageKeys(stores))
+        rule.onNodeWithTag("pe.page.1").assertIsSelected()
+    }
+
+    @Test fun HOM_12_pl11_dragReorderOfACardMovesThePageInTheStore() {
+        val stores = start(); openEditor(stores)
+        val before = pageKeys(stores)
+        val pitch = 72f * 2f // dp to px at the xhdpi-ish test density is not needed: the drag is by travelled px; two slots right
+        val bounds = rule.onNodeWithTag("pe.page.0").getUnclippedBoundsInRoot()
+        val slot = (rule.onNodeWithTag("pe.page.1").getUnclippedBoundsInRoot().left - bounds.left).value
+        rule.onNodeWithTag("pe.page.0").performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(900)
+        rule.onNodeWithTag("pe.page.0").performTouchInput { moveBy(Offset(slot * density * 2f + 4f, 0f)) }
+        rule.onNodeWithTag("pe.page.0").performTouchInput { up() }
+        settle(700)
+        assertEquals("page 1 went to the end", listOf(before[1], before[2], before[0]), pageKeys(stores))
+        assertTrue(pitch > 0f)
+    }
+
+    @Test fun HOM_12_pl12_noRailNoHamburgerNoDuplicateDeleteOrAddInTheEditor() {
+        val stores = start(); openEditor(stores)
+        assertFalse(has("Move page 1 later")); assertFalse(has("Move page 1 earlier")); assertFalse(has("Delete page 1"))
+        assertFalse(has("Page editor menu"))
+        rule.onNodeWithText("Settings").performClick(); settle(300)
+        assertTrue("the Settings tab names the page", rule.onAllNodesWithText("Page 1").fetchSemanticsNodes().isNotEmpty())
+        assertFalse("no Delete page button in Settings", rule.onAllNodesWithText("Delete page").fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithText("All pages").assertIsDisplayed()
     }
 
     // ---- wave 37 (editorDebt) ----
@@ -203,7 +241,7 @@ class PageEditorAppTest {
         scrollSurfaceBy(max); settle(700)
         assertEquals("at the far end", max, surfaceScroll().first, 2f)
         rule.onNodeWithTag("pe.page.2").assertIsSelected()
-        assertTrue("the rail now acts on page 3", has("Delete page 3"))
+        assertTrue("the strip says page 3 is selected", has("Page 3 of 3, selected"))
         scrollSurfaceBy(-max); settle(700)
         rule.onNodeWithTag("pe.page.0").assertIsSelected()
     }
@@ -224,17 +262,17 @@ class PageEditorAppTest {
         assertEquals(4, stores.layout.layout.value.pages.size)
         assertTrue("appended after the last page, not after the selected one", pageKeys(stores)[3].isEmpty())
         rule.onNodeWithTag("pe.page.3").assertIsSelected() // the editor's own selection, not the pager index
-        assertTrue(has("Delete page 4"))
+        assertTrue(has("Page 4 of 4, empty, selected"))
     }
 
-    @Test fun HOM_12_ed14_theHamburgerMenuReachesUndoRedoAddPageAndDone() {
+    @Test fun HOM_12_ed14_theHamburgerIsGoneAndTheNewPageCardAndTheBarStillAddAndLeave() {
         val stores = start(); openEditor(stores)
-        rule.onNodeWithTag("pe.menu").performClick(); settle(300)
-        rule.onNodeWithTag("pe.menu.add").performClick(); settle(700)
+        assertFalse("no hamburger menu any more", rule.onAllNodesWithTag("pe.menu").fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithTag("page-editor-strip").performScrollToNode(androidx.compose.ui.test.hasTestTag("pe.add")); settle(300) // the card at the end of the strip scrolls into view
+        rule.onNodeWithTag("pe.add").performClick(); settle(700)
         assertEquals(4, stores.layout.layout.value.pages.size)
         rule.onNodeWithTag("pe.page.3").assertIsSelected()
-        rule.onNodeWithTag("pe.menu").performClick(); settle(300)
-        rule.onNodeWithTag("pe.menu.done").performClick(); settle(700)
+        rule.onNodeWithText("Done").performClick(); settle(700)
         assertFalse("Done left the editor", has("Page carousel"))
     }
 
@@ -243,8 +281,7 @@ class PageEditorAppTest {
         assertEquals("the home's own dots announce page 2 of 3", 1, rule.onAllNodesWithContentDescription("Page 2 of 3").fetchSemanticsNodes().size)
         openEditor(stores)
         assertEquals("the strip card is the only one", 1, rule.onAllNodesWithContentDescription("Page 2 of 3").fetchSemanticsNodes().size)
-        rule.onNodeWithTag("pe.menu").performClick(); settle(300)
-        rule.onNodeWithTag("pe.menu.done").performClick(); settle(900)
+        rule.onNodeWithText("Done").performClick(); settle(900)
         assertEquals("the dots are announced again after Done", 1, rule.onAllNodesWithContentDescription("Page 2 of 3").fetchSemanticsNodes().size)
     }
 }

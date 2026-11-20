@@ -1,5 +1,7 @@
 # Decision: the page editor, pages on the side and tabs with their content (wave 36, owner request)
 
+> **Wave 45 supersedes the portrait arrangement below** (a vertical strip on the end side, the card cropped off the edge, the rail, the tabs stacked on the left): see `pageEditorLayout.md`. In portrait the strip is a horizontal row above the live card with the tabs and content below it; the side strip remains only for landscape and windows 600 dp wide or more. The swing, the Glance card, the Add card, drop on a card and the page operations below still hold.
+
 **Status: built (JVM and Robolectric tested; nothing is device verified).** Affects HOM-01, HOM-12, HOM-04, HOM-05, HOM-23 in `docs/Spec.md`. Supersedes the arrangement of `editCard.md` (card on the start side, carousel on the other, add carousel in a band under the card); the card itself, its shrink transition, drag, drop, resize handles and undo are unchanged.
 
 ## What the owner asked

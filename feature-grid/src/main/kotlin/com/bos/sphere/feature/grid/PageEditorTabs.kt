@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.testTag
@@ -60,64 +62,35 @@ import com.bos.sphere.core.design.L10n
 enum class EditorTab(val label: String) { Apps("Apps"), Widgets("Widgets"), Folders("Folders"), Settings("Settings") }
 
 /**
- * The tab titles drawn like the reference: the selected one large and in full ink, the others small and dim. [vertical] stacks them (portrait,
- * paginated); otherwise they are one row that scrolls sideways when the titles are wider than the room (large font). Real tabs: role Tab
- * with the selected state, at least 48 dp tall.
+ * Wave 45 (pageEditorLayout): the tab titles as text tabs in one row: the selected one bold, full ink and underlined with the accent, the others
+ * regular and dim. The row scrolls sideways when the titles are wider than the room (large font). Real tabs: role Tab with the selected state,
+ * at least 48 dp tall.
  */
 @Composable
-fun PageEditorTabRow(selected: EditorTab, onSelect: (EditorTab) -> Unit, vertical: Boolean, modifier: Modifier = Modifier) {
-    @Composable fun Title(t: EditorTab) {
-        val on = t == selected
-        Text(
-            L10n.tr(t.label), fontSize = if (on) 24.sp else 15.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (on) HyleColors.InkBright else HyleColors.InkDim, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.defaultMinSize(minHeight = 48.dp, minWidth = 48.dp)
-                .clickable(role = Role.Tab, onClickLabel = L10n.tr(t.label)) { onSelect(t) }
-                .padding(horizontal = if (vertical) 0.dp else 10.dp, vertical = 8.dp)
-                .semantics { role = Role.Tab; this.selected = on; contentDescription = L10n.tr(t.label) },
-        )
-    }
-    if (vertical) Column(modifier.semantics { contentDescription = L10n.tr("Page editor tabs") }) { EditorTab.entries.forEach { Title(it) } }
-    else Row(modifier.horizontalScroll(rememberScrollState()).semantics { contentDescription = L10n.tr("Page editor tabs") }, verticalAlignment = Alignment.CenterVertically) { EditorTab.entries.forEach { Title(it) } }
-}
-
-/** Wave 37 (editorDebt): what the hamburger menu at the top of the left column offers: the edit bar's actions. */
-class PageEditorMenu(
-    val canUndo: Boolean,
-    val canRedo: Boolean,
-    val onUndo: () -> Unit,
-    val onRedo: () -> Unit,
-    val onAddPage: () -> Unit,
-    val onDone: () -> Unit,
-)
-
-/** The hamburger glyph of the mock-up: a 48 dp button that opens a small menu with Done, Undo, Redo and Add page. */
-@Composable
-fun PageEditorMenuButton(menu: PageEditorMenu, modifier: Modifier = Modifier) {
-    var open by rememberSaveable { mutableStateOf(false) }
-    Box(modifier) {
-        Box(
-            Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).testTag("pe.menu")
-                .clickable(role = Role.Button) { open = true }
-                .semantics { role = Role.Button; contentDescription = L10n.tr("Page editor menu") },
-            contentAlignment = Alignment.Center,
-        ) { androidx.compose.material3.Icon(Glyphs.Menu, null, tint = HyleColors.InkBright, modifier = Modifier.size(24.dp)) }
-        OneUiMenu(
-            open, { open = false },
-            listOf(
-                OneUiMenuEntry(L10n.tr("Done"), tag = "pe.menu.done", run = menu.onDone),
-                OneUiMenuEntry(L10n.tr("Undo"), enabled = menu.canUndo, tag = "pe.menu.undo", run = menu.onUndo),
-                OneUiMenuEntry(L10n.tr("Redo"), enabled = menu.canRedo, tag = "pe.menu.redo", run = menu.onRedo),
-                OneUiMenuEntry(L10n.tr("Add page"), tag = "pe.menu.add", run = menu.onAddPage),
-            ),
-        )
+fun PageEditorTabRow(selected: EditorTab, onSelect: (EditorTab) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.horizontalScroll(rememberScrollState()).semantics { contentDescription = L10n.tr("Page editor tabs") }, verticalAlignment = Alignment.CenterVertically) {
+        EditorTab.entries.forEach { t ->
+            val on = t == selected
+            Column(
+                Modifier.defaultMinSize(minHeight = 48.dp, minWidth = 48.dp).testTag("pe.tab.${t.name}")
+                    .clickable(role = Role.Tab, onClickLabel = L10n.tr(t.label)) { onSelect(t) }
+                    .padding(horizontal = 12.dp)
+                    .semantics { role = Role.Tab; this.selected = on; contentDescription = L10n.tr(t.label) },
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    L10n.tr(t.label), fontSize = 15.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                    color = if (on) HyleColors.InkBright else HyleColors.InkDim, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Box(Modifier.padding(top = 4.dp).height(2.dp).fillMaxWidth().background(if (on) HyleColors.Violet else Color.Transparent))
+            }
+        }
     }
 }
 
-/** What the Settings tab can change, as one callback: the page's wallpaper switch and the Glance's content and hotspots. */
+/** What the Settings tab can change, as one callback: the pages' wallpaper switch and the Glance's content and hotspots. Deleting a page lives in its card's menu only. */
 class PageEditorSettingsActions(
     val onPrefs: ((LauncherPrefs) -> LauncherPrefs) -> Unit,
-    val onDeletePage: (Int) -> Unit,
 )
 
 /** The content under the tabs. [page] is the page being edited (null while the Glance card is the focus). */
@@ -150,7 +123,7 @@ fun PageEditorContent(
         }
         when (tab) {
             EditorTab.Apps -> AppsContent(apps, onHome, hasWork, isWork, drag, focusRequester, onAddApp)
-            EditorTab.Widgets -> Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            EditorTab.Widgets -> Column(Modifier.padding(horizontal = 12.dp).verticalScrollable(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(L10n.tr("Widgets go on the page being edited."), color = HyleColors.InkDim, fontSize = 13.sp)
                 ActionTile(L10n.tr("Choose a widget"), onWidget)
             }
@@ -247,12 +220,15 @@ private fun EditorAppTile(app: AppEntry, onAdd: (AppEntry) -> Unit, drag: AddCar
 private fun SettingsContent(page: Int?, pageCount: Int, prefs: LauncherPrefs, actions: PageEditorSettingsActions) {
     Column(Modifier.padding(horizontal = 12.dp).verticalScrollable(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (page != null) {
-            Text(L10n.tr("Page %d of %d", page + 1, pageCount), color = HyleColors.InkBright, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            // Page identity: which page this is. Its name is its number (pages have no names of their own).
+            Text(L10n.tr("Page %d", page + 1), color = HyleColors.InkBright, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("pe.settings.name"))
+            Text(L10n.tr("Page %d of %d", page + 1, pageCount), color = HyleColors.InkDim, fontSize = 12.sp)
+            // The wallpaper switch is global: it is shown as such, under its own heading, not as a setting of this page.
+            Text(L10n.tr("All pages"), color = HyleColors.InkDim, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 8.dp).testTag("pe.settings.global"))
             ToggleRow(
                 L10n.tr("Pages use the same wallpaper as Glance"), prefs.pagesSameAsGlance, { v -> actions.onPrefs { it.copy(pagesSameAsGlance = v) } },
-                hint = L10n.tr("Applies to the pages and the scroll alike"),
+                hint = L10n.tr("Applies to every page and the scroll, not only this one"),
             )
-            ActionTile(L10n.tr("Delete page %d", page + 1), { actions.onDeletePage(page) })
         } else {
             Text(L10n.tr("Glance"), color = HyleColors.InkBright, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             ToggleRow(L10n.tr("Show music"), prefs.showMusic, { v -> actions.onPrefs { it.copy(showMusic = v) } }) // wave 38: the clock, date and weather are gone; the music line is the one toggle

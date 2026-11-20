@@ -2,10 +2,12 @@ package com.bos.sphere.feature.grid
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.MediaNow
 
@@ -19,6 +21,10 @@ fun rememberMediaInfo(enabled: Boolean): State<MediaInfo?> {
     DisposableEffect(enabled) {
         if (enabled) MediaNow.start(context)
         onDispose { if (enabled) MediaNow.stop() }
+    }
+    // W42: when every route of a command failed, say so once ("Can't control <app>") instead of doing nothing.
+    LaunchedEffect(enabled) {
+        if (enabled) MediaNow.failures.collect { app -> Toast.makeText(context, com.bos.sphere.core.design.L10n.tr("Can't control %s", app), Toast.LENGTH_SHORT).show() }
     }
     val flow = remember { MediaNow.info }
     val state = flow.collectAsState()

@@ -3,6 +3,7 @@ package com.bos.sphere.core.design
 /** Wave 40 (settingsOneUI): the root list summaries and the section titles of the One UI style settings. */
 internal val L10nW40settingsOneUIEnglish: Set<String> = setOf(
     "%d settings",
+    "%s shortcut segments",
     "%s icons",
     "Glance only",
     "1 page",
@@ -34,6 +35,7 @@ internal val L10nW40settingsOneUIEnglish: Set<String> = setOf(
 
 internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
     "es" to mapOf(
+        "%s shortcut segments" to "%s segmentos de atajos",
         "%d settings" to "%d ajustes",
         "%s icons" to "Iconos %s",
         "Glance only" to "Solo Glance",
@@ -64,6 +66,7 @@ internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
         "Sources" to "Fuentes",
     ),
     "fr" to mapOf(
+        "%s shortcut segments" to "%s segments de raccourcis",
         "%d settings" to "%d réglages",
         "%s icons" to "Icônes %s",
         "Glance only" to "Glance seul",
@@ -94,6 +97,7 @@ internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
         "Sources" to "Sources",
     ),
     "de" to mapOf(
+        "%s shortcut segments" to "%s Verknüpfungssegmente",
         "%d settings" to "%d Einstellungen",
         "%s icons" to "%s-Symbole",
         "Glance only" to "Nur Glance",
@@ -124,6 +128,7 @@ internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
         "Sources" to "Quellen",
     ),
     "pt" to mapOf(
+        "%s shortcut segments" to "%s segmentos de atalhos",
         "%d settings" to "%d configurações",
         "%s icons" to "Ícones %s",
         "Glance only" to "Só Glance",
@@ -154,6 +159,7 @@ internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
         "Sources" to "Fontes",
     ),
     "hi" to mapOf(
+        "%s shortcut segments" to "%s शॉर्टकट खंड",
         "%d settings" to "%d सेटिंग",
         "%s icons" to "%s आइकन",
         "Glance only" to "केवल Glance",
@@ -184,6 +190,7 @@ internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
         "Sources" to "स्रोत",
     ),
     "zh" to mapOf(
+        "%s shortcut segments" to "%s 个快捷方式分区",
         "%d settings" to "%d 项设置",
         "%s icons" to "%s图标",
         "Glance only" to "仅 Glance",
@@ -214,6 +221,7 @@ internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
         "Sources" to "来源",
     ),
     "ja" to mapOf(
+        "%s shortcut segments" to "ショートカット %s 区画",
         "%d settings" to "%d 件の設定",
         "%s icons" to "%sアイコン",
         "Glance only" to "Glance のみ",
@@ -244,6 +252,7 @@ internal val L10nW40settingsOneUI: Map<String, Map<String, String>> = mapOf(
         "Sources" to "ソース",
     ),
     "ar" to mapOf(
+        "%s shortcut segments" to "%s أقسام للاختصارات",
         "%d settings" to "%d إعدادات",
         "%s icons" to "أيقونات %s",
         "Glance only" to "Glance فقط",

@@ -68,7 +68,7 @@ import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import kotlinx.coroutines.delay
 
-private const val GAP_DP = 12f
+private const val GAP_DP = PageEditorGeometry.GAP_DP
 private const val RAIL_DP = 56f
 private val CARD_CORNER = EditCardGeometry.CORNER_DP.dp
 
@@ -134,6 +134,8 @@ fun PageEditorHost(
     focusAdd: Boolean,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Wave 37 (editorDebt): the hamburger menu above the tabs (null: no menu button). */
+    menu: PageEditorMenu? = null,
 ) {
     fun alphaNow() = EditCardGeometry.frame(layout.target, progress.value, reduced).carouselAlpha
     val d = LocalDensity.current
@@ -185,6 +187,7 @@ fun PageEditorHost(
                 CompositionLocalProvider(LocalLayoutDirection provides dir) {
                     // ---- tabs and their content ----
                     Column(Modifier.place(layout.tabs).testTag("page-editor-tabs"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (menu != null) PageEditorMenuButton(menu, Modifier.padding(start = 8.dp))
                         PageEditorTabRow(tab, { tab = it }, vertical = tabsVertical, modifier = Modifier.padding(start = 16.dp, end = 8.dp))
                         PageEditorContent(
                             tab = tab, page = if (glanceFocus) null else current, pageCount = pages.size, prefs = prefs, apps = apps, onHome = onHome, hasWork = hasWork, isWork = isWork,

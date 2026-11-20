@@ -52,6 +52,9 @@ import kotlin.math.roundToInt
  * [HomeOrder.RightToLeft] the columns fill from the right edge and the scroll starts there. Physical coordinates throughout: the app
  * language direction does not change anything (the host layout direction is forced left to right here).
  */
+/** One request to scroll the continuous surface to [page]'s first column; each request is a new instance, so asking twice scrolls twice. */
+class PageScrollRequest(val page: Int)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ColumnScrollHome(
@@ -76,6 +79,13 @@ fun ColumnScrollHome(
     onLayout: (ColumnFill.Layout) -> Unit = {},
     /** True while the scroll sits at its start edge (the left edge, or the right edge in right to left): a swipe back from there leaves the scroll. */
     onAtStart: (Boolean) -> Unit = {},
+    /** Wave 37 (editorDebt): the items of each page, so the surface knows where a page starts (the page editor's tap on a card scrolls there). */
+    pageKeys: List<List<String>> = emptyList(),
+    /** A request to bring a page's first column to the start edge; each request is a new instance. */
+    pageScroll: PageScrollRequest? = null,
+    /** The page the editor has selected (-1: no editor). While the user scrolls the surface, [onPageInView] reports the page now at the start edge. */
+    selectedPage: Int = -1,
+    onPageInView: (Int) -> Unit = {},
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         val density = LocalDensity.current
@@ -94,6 +104,26 @@ fun ColumnScrollHome(
                 if (order.rtl) withTimeoutOrNull(600) { snapshotFlow { scroll.maxValue }.first { it > 0 } }?.let { scroll.scrollTo(order.initialScroll(it)) }
             }
             LaunchedEffect(order, scroll) { snapshotFlow { scroll.value == order.initialScroll(scroll.maxValue) }.collect { onAtStart(it) } }
+            // Wave 37 (editorDebt): the page editor scrolls the surface to a page's first column, and follows the surface when the user scrolls it.
+            val starts = remember(pageKeys, layout) { PageEditorGeometry.pageStartColumns(pageKeys, layout.cells, layout.columns) }
+            val cellPx = cell * density.density
+            val latestSelected by rememberUpdatedState(selectedPage)
+            val latestInView by rememberUpdatedState(onPageInView)
+            LaunchedEffect(pageScroll) {
+                val r = pageScroll ?: return@LaunchedEffect
+                starts.getOrNull(r.page)?.let { scroll.scrollTo(PageEditorGeometry.scrollForColumn(it, cellPx, scroll.maxValue, order.rtl)) }
+            }
+            LaunchedEffect(scroll, starts, order, cellPx) {
+                var was = false
+                snapshotFlow { scroll.value to scroll.isScrollInProgress }.collect { (v, moving) ->
+                    val sel = latestSelected
+                    if (sel >= 0 && (moving || was)) {
+                        val now = PageEditorGeometry.pageInView(starts, v, scroll.maxValue, cellPx, order.rtl, sel)
+                        if (now != sel) latestInView(now)
+                    }
+                    was = moving
+                }
+            }
             // A position is empty when no item covers its cell: the long press on empty space opens the quick sheet / edit mode.
             val isEmptyAt: (androidx.compose.ui.geometry.Offset) -> Boolean = { p ->
                 val x = (p.x + scroll.value) / density.density

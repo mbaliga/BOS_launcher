@@ -29,7 +29,9 @@ import com.bos.sphere.core.design.rememberMotionPrefs
 import com.bos.sphere.feature.grid.AddCarouselDrag
 import com.bos.sphere.feature.grid.EditCardGeometry
 import com.bos.sphere.feature.grid.PageEditorGeometry
+import com.bos.sphere.feature.grid.PageScrollRequest
 import com.bos.sphere.feature.grid.PageEditorHost
+import com.bos.sphere.feature.grid.PageEditorMenu
 import com.bos.sphere.feature.grid.rememberPageEditorLayout
 import com.bos.sphere.feature.grid.GridHomeState
 import com.bos.sphere.feature.grid.UndoNotice
@@ -50,6 +52,13 @@ class EditCardState(val progress: State<Float>, val layout: PageEditorGeometry.L
     val glanceFocus = mutableStateOf(false)
     /** The app being dragged out of the Apps tab (the home draws its ghost above everything: [com.bos.sphere.feature.grid.PageEditorGhost]). */
     val drag = AddCarouselDrag()
+    /** Wave 37 (editorDebt): Continuous has no pager, so the editor keeps the selected page; the scroll surface follows it (and it follows the surface when the user scrolls). */
+    val contSel = mutableIntStateOf(0)
+    /** The latest request to bring a page's first column to the start edge of the Continuous surface. */
+    val pageScroll = mutableStateOf<PageScrollRequest?>(null)
+    /** The overlay registers the one add-an-empty-page path here, so the edit bar's Add page button takes the same path as the strip's "+" card. */
+    var addPageAction: (() -> Unit)? = null
+    fun addPage() { addPageAction?.invoke() }
 
     fun swing(): PageEditorGeometry.Swing = PageEditorGeometry.swing(swingProgress.floatValue, swingDx.floatValue, swingDy.floatValue, reduced)
 
@@ -101,9 +110,9 @@ fun EditCardOverlay(
     var notice by remember { mutableStateOf<UndoNotice?>(null) }
     var goto by remember { mutableIntStateOf(-1) }
     // Paginated: the page being edited is the home pager's page. Continuous has no pager, so the editor keeps the selected page itself.
-    var contSel by remember { mutableIntStateOf(0) }
-    val current = (if (card.continuous) contSel else gridState.currentPage).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
-    fun showPage(i: Int) { if (card.continuous) contSel = i else scope.launch { gridState.goToPage(i, animate = false) } }
+    val current = (if (card.continuous) card.contSel.intValue else gridState.currentPage).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    // Continuous: the selected page changes and the scroll surface moves to that page's first column (the swing is drawn over it).
+    fun showPage(i: Int) { if (card.continuous) { card.contSel.intValue = i; card.pageScroll.value = PageScrollRequest(i) } else scope.launch { gridState.goToPage(i, animate = false) } }
     LaunchedEffect(goto, pages.size) {
         if (goto >= 0) { val t = goto.coerceAtMost(pages.size - 1).coerceAtLeast(0); goto = -1; card.glanceFocus.value = false; showPage(t) }
     }
@@ -119,6 +128,15 @@ fun EditCardOverlay(
         }
     }
     fun apply(r: HomePageOps.Result) { savePages(r.pages); goto = r.focus }
+    // The one add-an-empty-page path: after the last page, focus the new page. The strip's "+" card passes where it really is; the edit bar has no card, so the swing starts from where the card is when the strip is not scrolled.
+    fun addOnePage(dx: Float, dy: Float) { startSwing(dx, dy); apply(HomePageOps.add(pages, pages.size - 1)) }
+    val latestAdd by androidx.compose.runtime.rememberUpdatedState {
+        val entries = PageEditorGeometry.entries(prefs.glanceEnabled, pages.size)
+        val focus = PageEditorGeometry.focusPosition(prefs.glanceEnabled, card.glanceFocus.value, current)
+        val (dx, dy) = PageEditorGeometry.offsetOf(entries.lastIndex, focus, card.layout)
+        addOnePage(dx, dy)
+    }
+    androidx.compose.runtime.DisposableEffect(card) { card.addPageAction = { latestAdd() }; onDispose { card.addPageAction = null } }
     val me = remember { Process.myUserHandle() }
     var confirmDelete by remember { mutableStateOf<Int?>(null) }
     fun deleteNow(i: Int) {
@@ -157,7 +175,7 @@ fun EditCardOverlay(
         drag = card.drag,
         onSelectPage = { i, dx, dy -> if (card.glanceFocus.value || i != current) { startSwing(dx, dy); card.glanceFocus.value = false; showPage(i) } },
         onSelectGlance = { dx, dy -> if (!card.glanceFocus.value) { startSwing(dx, dy); card.glanceFocus.value = true } },
-        onAddPage = { dx, dy -> startSwing(dx, dy); apply(HomePageOps.add(pages, pages.size - 1)) },
+        onAddPage = { dx, dy -> addOnePage(dx, dy) },
         onDelete = { i -> if (HomePageOps.itemCount(pages, i) == 0) deleteNow(i) else confirmDelete = i },
         onMove = { i, d -> HomePageOps.move(pages, i, d)?.let(::apply) },
         onAddApp = { app -> if (addAppTo(app, current)) goto = current },
@@ -174,6 +192,10 @@ fun EditCardOverlay(
         notice = notice, onNoticeDone = { notice = null },
         focusAdd = focusAdd, onExit = { homeEdit.exit() },
         modifier = modifier,
+        menu = PageEditorMenu(
+            canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo, onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
+            onAddPage = { card.addPage() }, onDone = { homeEdit.exit() },
+        ),
     )
 }
 

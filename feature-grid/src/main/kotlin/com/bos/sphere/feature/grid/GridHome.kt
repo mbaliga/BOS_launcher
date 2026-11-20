@@ -33,6 +33,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.bos.sphere.core.design.L10n
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.Text
@@ -1052,6 +1053,8 @@ fun PageIndicator(
     /** The row dims after a few quiet seconds ([awakeNonce] wakes it); false keeps it fully lit. */
     quiet: Boolean = false,
     awakeNonce: Int = 0,
+    /** Wave 37 (editorDebt): true while the page editor is open: its strip cards announce "Page N of M", so the dots leave the accessibility tree (they stay drawn and tappable). */
+    hiddenFromAccessibility: Boolean = false,
 ) {
     if (count <= 1 && onGlance == null && onMenu == null && right.isEmpty()) return
     val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
@@ -1107,10 +1110,10 @@ fun PageIndicator(
         }
     }
     if (vertical) {
-        Column(modifier.graphicsLayer { alpha = fade }.testTag("page.indicator"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { content() }
+        Column(modifier.graphicsLayer { alpha = fade }.then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier).testTag("page.indicator"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { content() }
     } else {
         androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-            Row(modifier.graphicsLayer { alpha = fade }.testTag("page.indicator"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) { content() }
+            Row(modifier.graphicsLayer { alpha = fade }.then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier).testTag("page.indicator"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) { content() }
         }
     }
 }

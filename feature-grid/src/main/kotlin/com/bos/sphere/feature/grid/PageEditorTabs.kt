@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -78,6 +80,42 @@ fun PageEditorTabRow(selected: EditorTab, onSelect: (EditorTab) -> Unit, vertica
     }
     if (vertical) Column(modifier.semantics { contentDescription = L10n.tr("Page editor tabs") }) { EditorTab.entries.forEach { Title(it) } }
     else Row(modifier.horizontalScroll(rememberScrollState()).semantics { contentDescription = L10n.tr("Page editor tabs") }, verticalAlignment = Alignment.CenterVertically) { EditorTab.entries.forEach { Title(it) } }
+}
+
+/** Wave 37 (editorDebt): what the hamburger menu at the top of the left column offers: the edit bar's actions. */
+class PageEditorMenu(
+    val canUndo: Boolean,
+    val canRedo: Boolean,
+    val onUndo: () -> Unit,
+    val onRedo: () -> Unit,
+    val onAddPage: () -> Unit,
+    val onDone: () -> Unit,
+)
+
+/** The hamburger glyph of the mock-up: a 48 dp button that opens a small menu with Done, Undo, Redo and Add page. */
+@Composable
+fun PageEditorMenuButton(menu: PageEditorMenu, modifier: Modifier = Modifier) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box(modifier) {
+        Box(
+            Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).testTag("pe.menu")
+                .clickable(role = Role.Button) { open = true }
+                .semantics { role = Role.Button; contentDescription = L10n.tr("Page editor menu") },
+            contentAlignment = Alignment.Center,
+        ) { androidx.compose.material3.Icon(Glyphs.Menu, null, tint = HyleColors.InkBright, modifier = Modifier.size(24.dp)) }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            @Composable fun Item(label: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(label) }, enabled = enabled, onClick = { open = false; onClick() },
+                    modifier = Modifier.testTag(tag).semantics { contentDescription = label },
+                )
+            }
+            Item(L10n.tr("Done"), "pe.menu.done", onClick = menu.onDone)
+            Item(L10n.tr("Undo"), "pe.menu.undo", menu.canUndo, menu.onUndo)
+            Item(L10n.tr("Redo"), "pe.menu.redo", menu.canRedo, menu.onRedo)
+            Item(L10n.tr("Add page"), "pe.menu.add", onClick = menu.onAddPage)
+        }
+    }
 }
 
 /** What the Settings tab can change, as one callback: the page's wallpaper switch and the Glance's content and hotspots. */

@@ -1167,6 +1167,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onRemove = { key -> val a = appsByKey[key]; if (a != null) stores.layout.removeFromHome(a.key, pages, preserve) else homeItems.removeFromHome(key) },
                             gestures = homeGestureSpec,
                             onAtStart = { scrollAtStart = it },
+                            pageKeys = pages.map { it.keys }, pageScroll = editCard.pageScroll.value,
+                            selectedPage = if (homeEdit.active) editCard.contSel.intValue else -1, onPageInView = { editCard.contSel.intValue = it },
                         )
                     }
                     StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
@@ -1274,6 +1276,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     onGlance = if (prefs.glanceEnabled) ({ showSurface(HomeShown.Glance) }) else null, glanceCurrent = landing == HomeShown.Glance,
                     right = com.bos.sphere.core.data.RightSideDestinations.of(prefs.rightSide), onRight = { openRecents() },
                     quiet = landing == HomeShown.Glance, awakeNonce = indicatorAwake + homePager.currentPage,
+                    hiddenFromAccessibility = homeEdit.active, // wave 37: the editor's strip cards already say "Page N of M"
                 )
             }
             // HOM-01: an empty home says how to fill it; the hint opens edit mode with the add carousel focused.
@@ -1804,7 +1807,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             com.bos.sphere.feature.grid.HomeEditBar(
                 undoDepth = homeEdit.undoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
                 onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
-                onAddPage = { val r = com.bos.sphere.core.data.HomePageOps.add(pages, gridState.currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))); savePages(r.pages); scope.launch { gridState.goToPage(r.focus) } },
+                onAddPage = { editCard.addPage() }, // wave 37: the strip's "+" card path, in both modes
                 onDone = { homeEdit.exit() },
             )
             com.bos.sphere.feature.grid.PageEditorGhost(editCard.drag) // wave 36: the dragged app's icon above the live page

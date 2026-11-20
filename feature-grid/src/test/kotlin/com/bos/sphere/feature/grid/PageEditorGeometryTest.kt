@@ -13,9 +13,9 @@ import org.junit.Test
 class PageEditorGeometryTest {
     private val d = 2.625f
     private fun portrait(continuous: Boolean, mirrored: Boolean = false) =
-        PageEditorGeometry.layout(411 * d, 891 * d, continuous, mirrored, 76 * d, 92 * d, 56 * d, 12 * d)
+        PageEditorGeometry.layout(411 * d, 891 * d, continuous, mirrored, 76 * d, 92 * d, 56 * d, PageEditorGeometry.GAP_DP * d)
     private fun landscape(continuous: Boolean, mirrored: Boolean = false) =
-        PageEditorGeometry.layout(891 * d, 411 * d, continuous, mirrored, 76 * d, 92 * d, 56 * d, 12 * d)
+        PageEditorGeometry.layout(891 * d, 411 * d, continuous, mirrored, 76 * d, 92 * d, 56 * d, PageEditorGeometry.GAP_DP * d)
 
     @Test fun HOM_12_pe01_paginatedPortraitPutsTheStripOnTheRightAndTheTabsOnTheLeft() {
         val l = portrait(continuous = false)
@@ -137,5 +137,51 @@ class PageEditorGeometryTest {
     @Test fun HOM_12_pe11_everyPageHasAHue() {
         assertEquals(PageEditorGeometry.hue(0), PageEditorGeometry.hue(6), 0f)
         assertTrue(PageEditorGeometry.hue(0) != PageEditorGeometry.hue(1))
+    }
+
+    // ---- wave 37 (editorDebt) ----
+
+    @Test fun HOM_12_ed01_theGapBetweenCardsIsSixDpNotTwelve() {
+        assertEquals(6f, PageEditorGeometry.GAP_DP, 0f)
+        val side = portrait(continuous = false); val top = portrait(continuous = true)
+        assertEquals("the pitch is the card plus six dp", side.card.height + 6 * d, side.pitch, 0.01f)
+        assertEquals(top.card.width + 6 * d, top.pitch, 0.01f)
+        // the neighbours still peek: the strip shows well over the gap above and below the card
+        assertTrue((side.strip.height - side.card.height) / 2f > 6 * d + 20 * d)
+        assertTrue("the peeking neighbour is closer than with the old 12 dp gap", side.pitch < side.card.height + 12 * d)
+    }
+
+    private val cells = listOf("a", "b", "c", "d", "e").mapIndexed { i, k -> com.bos.sphere.core.catalog.ColumnFill.Cell(k, i / 2, i % 2, com.bos.sphere.core.catalog.WidgetSpan(1, 1)) }
+
+    @Test fun HOM_12_ed02_aPageStartsAtTheColumnOfItsFirstItemAndEmptyPagesShareTheNextStart() {
+        // columns: a,b = 0; c,d = 1; e = 2
+        assertEquals(listOf(0, 1, 2), PageEditorGeometry.pageStartColumns(listOf(listOf("a", "b"), listOf("c", "d"), listOf("e")), cells, 3))
+        assertEquals("an empty page starts where the next page with items does, trailing ones at the last column", listOf(0, 1, 1, 2, 2),
+            PageEditorGeometry.pageStartColumns(listOf(listOf("a", "b"), listOf(), listOf("c", "d", "zz"), listOf("e"), listOf()), cells, 3))
+        assertEquals(listOf(0), PageEditorGeometry.pageStartColumns(listOf(listOf()), emptyList(), 0))
+    }
+
+    @Test fun HOM_12_ed03_theScrollOffsetPutsTheColumnAtTheStartEdgeAndClampsAtTheEnd() {
+        assertEquals(0, PageEditorGeometry.scrollForColumn(0, 100f, 500, rtl = false))
+        assertEquals(200, PageEditorGeometry.scrollForColumn(2, 100f, 500, rtl = false))
+        assertEquals("clamped at the end of the scroll", 500, PageEditorGeometry.scrollForColumn(9, 100f, 500, rtl = false))
+        assertEquals("right to left: the start edge is the right edge", 500, PageEditorGeometry.scrollForColumn(0, 100f, 500, rtl = true))
+        assertEquals(300, PageEditorGeometry.scrollForColumn(2, 100f, 500, rtl = true))
+        assertEquals(0, PageEditorGeometry.scrollForColumn(3, 100f, 0, rtl = false))
+    }
+
+    @Test fun HOM_12_ed04_scrollingTheSurfaceSelectsThePageAtTheStartEdge() {
+        val starts = listOf(0, 3, 3, 6)
+        fun at(px: Int, sel: Int, rtl: Boolean = false, max: Int = 1000) = PageEditorGeometry.pageInView(starts, px, max, 100f, rtl, sel)
+        assertEquals(0, at(0, 2)); assertEquals(0, at(120, 0))
+        assertEquals("column 3 is where page 1 and 2 start: the selected one of the two stays", 2, at(300, 2))
+        assertEquals("else the first of them", 1, at(300, 0))
+        assertEquals(3, at(610, 0))
+        assertEquals("the selected page near the end that cannot reach the start edge stays selected", 3, at(450, 3, max = 450))
+        assertEquals("right to left reads from the right edge", 1, at(700, 0, rtl = true))
+        assertEquals(0, PageEditorGeometry.pageInView(emptyList(), 10, 100, 100f, false, 0))
+        // the round trip: scrolling to the start of a page with its own column selects that page
+        assertEquals(3, at(PageEditorGeometry.scrollForColumn(6, 100f, 1000, false), 0))
+        assertEquals(3, at(PageEditorGeometry.scrollForColumn(6, 100f, 1000, true), 0, rtl = true))
     }
 }

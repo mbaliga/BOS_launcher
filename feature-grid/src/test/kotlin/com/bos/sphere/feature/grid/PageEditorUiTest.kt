@@ -91,6 +91,7 @@ class PageEditorUiTest {
         val selected = ArrayList<Triple<Int, Float, Float>>(); val glance = ArrayList<Pair<Float, Float>>(); val added = ArrayList<Pair<Float, Float>>()
         val deleted = ArrayList<Int>(); val moved = ArrayList<Pair<Int, Int>>(); val addedApps = ArrayList<String>(); val dropped = ArrayList<Pair<String, Int>>()
         var widget = 0; var folder = 0; var group = 0; var exit = 0
+        var undo = 0; var redo = 0; var menuAdd = 0; var canUndo = true; var canRedo = false
         var prefs = LauncherPrefs()
     }
 
@@ -116,6 +117,7 @@ class PageEditorUiTest {
                         onDelete = { c.deleted += it }, onMove = { i, d -> c.moved += i to d }, onAddApp = { c.addedApps += it.label }, onDropApp = { a, p -> c.dropped += a.label to p },
                         onWidget = { c.widget++ }, onFolder = { c.folder++ }, onShortcut = {}, onLink = {}, onFile = {}, onGroup = { c.group++ },
                         onPrefs = { f -> c.prefs = f(c.prefs) }, notice = null, onNoticeDone = {}, focusAdd = false, onExit = { c.exit++ },
+                        menu = PageEditorMenu(c.canUndo, c.canRedo, { c.undo++ }, { c.redo++ }, { c.menuAdd++ }, { c.exit++ }),
                     )
                     // The live page, in the focus slot (the real home does this with the same frame).
                     if (!glanceFocus) Box(Modifier.fillMaxSize().editCardLayer { EditCardGeometry.frame(layout.target, state.value, false) }.background(Color(0xFF30406A))) { Text("LIVE", color = Color.White) }
@@ -349,5 +351,45 @@ class PageEditorUiTest {
     fun HOM_12_pe36b_glanceAndAddCardsAreButtonsToo() {
         val c = Calls(); host(c, fourPages, current = 0)
         card("Glance").assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+    }
+
+    // ---- wave 37 (editorDebt) ----
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_ed05_cardsAreSixDpApartAndTheNeighboursStillPeek() {
+        val c = Calls(); host(c, fourPages, current = 1)
+        val p1 = bounds("Page 1 of 4"); val p2 = bounds("Page 2 of 4"); val p3 = bounds("Page 3 of 4, empty")
+        assertEquals("six dp between two cards", 6f, p2.top.value - p1.bottom.value, 0.6f)
+        assertEquals(6f, p3.top.value - p2.bottom.value, 0.6f)
+        rule.onNodeWithContentDescription("Page carousel").getUnclippedBoundsInRoot().let { strip ->
+            assertTrue("the card above peeks into the strip", p1.bottom > strip.top && p3.top < strip.bottom)
+        }
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_ed06_theHamburgerIs48dpAboveTheTabsAndOpensDoneUndoRedoAddPage() {
+        val c = Calls(); host(c, fourPages)
+        val m = rule.onNodeWithTag("pe.menu")
+        m.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button)).assert(hasContentDescription("Page editor menu"))
+        val b = m.getUnclippedBoundsInRoot()
+        assertTrue("48 dp square", b.width >= 48.dp && b.height >= 48.dp)
+        assertTrue("above the tabs", b.bottom <= rule.onNodeWithText("Apps").getUnclippedBoundsInRoot().top + 1.dp)
+        assertTrue("on the left, in the tabs column", b.left < 411.dp / 3)
+        rule.onNodeWithTag("pe.menu.done").assertDoesNotExist()
+        m.performClick(); rule.waitForIdle()
+        for (t in listOf("pe.menu.done", "pe.menu.undo", "pe.menu.redo", "pe.menu.add")) rule.onNodeWithTag(t).assertIsDisplayed()
+        rule.onNodeWithTag("pe.menu.done").assert(hasContentDescription("Done"))
+        rule.onNodeWithTag("pe.menu.undo").assert(hasContentDescription("Undo"))
+        rule.onNodeWithTag("pe.menu.redo").assert(hasContentDescription("Redo")).assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Disabled)) // nothing to redo
+        rule.onNodeWithTag("pe.menu.undo").performClick(); assertEquals(1, c.undo)
+        m.performClick(); rule.waitForIdle(); rule.onNodeWithTag("pe.menu.add").performClick(); assertEquals(1, c.menuAdd)
+        m.performClick(); rule.waitForIdle(); rule.onNodeWithTag("pe.menu.done").performClick(); assertEquals(1, c.exit)
+        shoot("menu_closed")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_ed07_theHamburgerIsThereInContinuousAndLandscapeToo() {
+        val c = Calls(); host(c, fourPages, continuous = true)
+        rule.onNodeWithTag("pe.menu").assertIsDisplayed()
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.geometry.Offset
@@ -57,8 +58,10 @@ class PageEditorAppTest {
 
     private fun settle(ms: Long = 1500) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Snapshot.sendApplyNotifications(); rule.mainClock.advanceTimeBy(ms); org.robolectric.shadows.ShadowLooper.idleMainLooper(); rule.mainClock.advanceTimeBy(ms) }
 
-    private fun start(mode: HomePages = HomePages.Paginated, glance: Boolean = false, order: HomeOrder = HomeOrder.LeftToRight): LauncherStores {
-        AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
+    private val many = (10..49).map { "App$it" }
+
+    private fun start(mode: HomePages = HomePages.Paginated, glance: Boolean = false, order: HomeOrder = HomeOrder.LeftToRight, manyApps: Boolean = false): LauncherStores {
+        AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta", *(if (manyApps) many.toTypedArray() else emptyArray()))
         scenario = AppSmokeHarness.launch(); rule.waitForIdle()
         val stores = LauncherStores.get(AppSmokeHarness.app)
         settle()
@@ -146,5 +149,97 @@ class PageEditorAppTest {
         rule.onNodeWithTag("pe.page.0").performClick(); settle(700)
         rule.onNodeWithTag("pe.page.0").assertIsSelected()
         assertTrue(has("Delete page 1"))
+    }
+
+    // ---- wave 37 (editorDebt) ----
+
+    /** Three pages that each fill a few columns of the Continuous surface (replaced while the editor is open, so entering it still finds empty space to long press). */
+    private fun fillPages(stores: LauncherStores): List<List<String>> {
+        val keys = many.map { AppSmokeHarness.appKey(it) }
+        val groups = listOf(keys.subList(0, 14), keys.subList(14, 27), keys.subList(27, 40))
+        stores.layout.replace(HomeLayout(pages = groups.mapIndexed { i, g -> HomePage(keys = g, id = 7L + i) }, seeded = true)); settle()
+        return groups
+    }
+
+    private fun surfaceScroll(): Pair<Float, Float> {
+        val n = rule.onNode(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.HorizontalScrollAxisRange) and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("scrollhome")))
+            .fetchSemanticsNode()
+        val r = n.config[androidx.compose.ui.semantics.SemanticsProperties.HorizontalScrollAxisRange]
+        return r.value() to r.maxValue()
+    }
+
+    private fun scrollSurfaceBy(px: Float) {
+        rule.onNode(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.HorizontalScrollAxisRange) and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("scrollhome")))
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy) { it(px, 0f) }
+        settle(300)
+    }
+
+    @Test fun HOM_12_ed10_continuousTapOnACardScrollsTheSurfaceToThatPagesFirstColumn() {
+        val stores = start(HomePages.Continuous, manyApps = true); openEditor(stores); fillPages(stores)
+        val (v0, max) = surfaceScroll()
+        assertTrue("the three pages need a scroll", max > 100f)
+        assertEquals(0f, v0, 1f)
+        rule.onNodeWithTag("pe.page.1").performClick(); settle(700)
+        val (v1, _) = surfaceScroll()
+        assertTrue("page 2 starts to the right of the start: the surface moved ($v1)", v1 > 50f)
+        rule.onNodeWithTag("pe.page.1").assertIsSelected()
+        rule.onNodeWithTag("pe.page.2").performClick(); settle(700)
+        val (v2, _) = surfaceScroll()
+        assertTrue("page 3 is further on ($v2 after $v1)", v2 > v1)
+        rule.onNodeWithTag("pe.page.0").performClick(); settle(700)
+        assertEquals("page 1 is the start", 0f, surfaceScroll().first, 1f)
+        rule.onNodeWithTag("pe.page.0").assertIsSelected()
+    }
+
+    @Test fun HOM_12_ed11_scrollingTheContinuousSurfaceMovesTheStripSelection() {
+        val stores = start(HomePages.Continuous, manyApps = true); openEditor(stores); fillPages(stores)
+        rule.onNodeWithTag("pe.page.0").assertIsSelected()
+        val (_, max) = surfaceScroll()
+        scrollSurfaceBy(max); settle(700)
+        assertEquals("at the far end", max, surfaceScroll().first, 2f)
+        rule.onNodeWithTag("pe.page.2").assertIsSelected()
+        assertTrue("the rail now acts on page 3", has("Delete page 3"))
+        scrollSurfaceBy(-max); settle(700)
+        rule.onNodeWithTag("pe.page.0").assertIsSelected()
+    }
+
+    @Test fun HOM_12_ed12_theEditBarAddPageButtonTakesTheStripPathPaginated() {
+        val stores = start(); openEditor(stores)
+        rule.onNodeWithTag("pe.page.0").assertIsSelected()
+        rule.onNodeWithText("Add page").performClick(); settle(700)
+        assertEquals("one empty page, after the LAST page (the old button added after the current one)", 4, stores.layout.layout.value.pages.size)
+        assertTrue(pageKeys(stores)[3].isEmpty())
+        rule.onNodeWithTag("pe.page.3").assertIsSelected()
+    }
+
+    @Test fun HOM_12_ed13_theEditBarAddPageButtonTakesTheStripPathContinuous() {
+        val stores = start(HomePages.Continuous); openEditor(stores)
+        rule.onNodeWithTag("pe.page.1").performClick(); settle(700)
+        rule.onNodeWithText("Add page").performClick(); settle(700)
+        assertEquals(4, stores.layout.layout.value.pages.size)
+        assertTrue("appended after the last page, not after the selected one", pageKeys(stores)[3].isEmpty())
+        rule.onNodeWithTag("pe.page.3").assertIsSelected() // the editor's own selection, not the pager index
+        assertTrue(has("Delete page 4"))
+    }
+
+    @Test fun HOM_12_ed14_theHamburgerMenuReachesUndoRedoAddPageAndDone() {
+        val stores = start(); openEditor(stores)
+        rule.onNodeWithTag("pe.menu").performClick(); settle(300)
+        rule.onNodeWithTag("pe.menu.add").performClick(); settle(700)
+        assertEquals(4, stores.layout.layout.value.pages.size)
+        rule.onNodeWithTag("pe.page.3").assertIsSelected()
+        rule.onNodeWithTag("pe.menu").performClick(); settle(300)
+        rule.onNodeWithTag("pe.menu.done").performClick(); settle(700)
+        assertFalse("Done left the editor", has("Page carousel"))
+    }
+
+    @Test fun HOM_12_ed15_whileTheEditorIsOpenOnlyTheStripAnnouncesPageNOfM() {
+        val stores = start()
+        assertEquals("the home's own dots announce page 2 of 3", 1, rule.onAllNodesWithContentDescription("Page 2 of 3").fetchSemanticsNodes().size)
+        openEditor(stores)
+        assertEquals("the strip card is the only one", 1, rule.onAllNodesWithContentDescription("Page 2 of 3").fetchSemanticsNodes().size)
+        rule.onNodeWithTag("pe.menu").performClick(); settle(300)
+        rule.onNodeWithTag("pe.menu.done").performClick(); settle(900)
+        assertEquals("the dots are announced again after Done", 1, rule.onAllNodesWithContentDescription("Page 2 of 3").fetchSemanticsNodes().size)
     }
 }

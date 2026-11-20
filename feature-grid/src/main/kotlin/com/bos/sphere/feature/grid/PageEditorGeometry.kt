@@ -14,6 +14,8 @@ import kotlin.math.sign
  *  - Landscape (both modes): the strip stays on the side. DECISION: a horizontal strip would take half of a 360 dp high window.
  */
 object PageEditorGeometry {
+    /** Wave 37 (editorDebt): the gap between two cards of the strip, nearly edge to edge like the mock-up (was 12 dp). */
+    const val GAP_DP = 6f
     const val CAMERA_DISTANCE_DP = 14f
     const val SWING_MS = 350
     const val SWING_REDUCED_MS = 160
@@ -155,4 +157,43 @@ object PageEditorGeometry {
     /** A soft tint per page (hue degrees), so the cards read as distinct pages. */
     fun hue(index: Int): Float = HUES[abs(index) % HUES.size]
     private val HUES = floatArrayOf(350f, 18f, 150f, 205f, 265f, 40f)
+
+    // ---- Continuous: scroll the surface to a page (wave 37, editorDebt) ----
+
+    /**
+     * The first column of every page in the packed scroll surface (columns fill page after page, so a page starts at the column of its first
+     * item that is on the surface). A page with nothing on the surface (empty, or only items that are gone) starts where the next page with
+     * items does; trailing empty pages start at the last column.
+     */
+    fun pageStartColumns(pageKeys: List<List<String>>, cells: List<com.bos.sphere.core.catalog.ColumnFill.Cell>, columns: Int): List<Int> {
+        val colOf = HashMap<String, Int>(); cells.forEach { colOf.putIfAbsent(it.key, it.col) }
+        val own = pageKeys.map { ks -> ks.mapNotNull { colOf[it] }.minOrNull() }
+        val last = (columns - 1).coerceAtLeast(0)
+        val out = IntArray(pageKeys.size)
+        var next = last
+        for (i in pageKeys.indices.reversed()) { next = own[i] ?: next; out[i] = next }
+        return out.toList()
+    }
+
+    /** The scroll offset (px) that puts column [col] at the start edge of a surface that scrolls [maxPx]; the right edge when [rtl] (columns fill from the right). */
+    fun scrollForColumn(col: Int, cellPx: Float, maxPx: Int, rtl: Boolean): Int {
+        val o = (col * cellPx).toInt().coerceIn(0, maxPx.coerceAtLeast(0))
+        return if (rtl) (maxPx - o).coerceIn(0, maxPx.coerceAtLeast(0)) else o
+    }
+
+    /**
+     * The page the surface shows after the user scrolled it: the last page that starts at or before the column at the start edge. The selected
+     * page is kept when the surface is where it would put it (including the clamped position of pages near the end that cannot reach the start
+     * edge, and pages that share a column with the next one).
+     */
+    fun pageInView(starts: List<Int>, scrollPx: Int, maxPx: Int, cellPx: Float, rtl: Boolean, selected: Int): Int {
+        if (starts.isEmpty()) return 0
+        val sel = selected.coerceIn(0, starts.lastIndex)
+        if (kotlin.math.abs(scrollPx - scrollForColumn(starts[sel], cellPx, maxPx, rtl)) < cellPx / 2f) return sel
+        val offset = if (rtl) maxPx - scrollPx else scrollPx
+        val col = kotlin.math.floor(offset / cellPx.coerceAtLeast(1f) + 0.5f).toInt()
+        val at = starts.indexOfLast { it <= col }.coerceAtLeast(0)
+        // pages sharing that column: the one the user was on if it is one of them, else the first of them
+        return if (starts[sel] == starts[at]) sel else starts.indexOfFirst { it == starts[at] }
+    }
 }

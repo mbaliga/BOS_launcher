@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onFirst
@@ -133,13 +134,13 @@ class HomeLandingItemsW24Test : TourBase() {
 
         rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).performClick(); settle()
         assertEquals(listOf(stackKey), pageKeys())
-        rule.onAllNodesWithText("Undo", substring = true, useUnmergedTree = true).onFirst().performClick(); settle()
+        rule.onNodeWithTag("edit.undo", useUnmergedTree = true).performClick(); settle() // wave 45: Undo is an icon button in the edit bar
         assertEquals("one undo brings the widget back to its slot", listOf(clockKey, stackKey), pageKeys())
         assertTrue("and its definition with it", clockKey in extras.state.value.items)
 
         rule.onNodeWithContentDescription("Remove from home: Weather", useUnmergedTree = true).performClick(); settle()
         assertEquals(listOf(clockKey), pageKeys())
-        rule.onAllNodesWithText("Undo", substring = true, useUnmergedTree = true).onFirst().performClick(); settle()
+        rule.onNodeWithTag("edit.undo", useUnmergedTree = true).performClick(); settle() // wave 45: Undo is an icon button in the edit bar
         assertEquals("the whole stack comes back", listOf(clockKey, stackKey), pageKeys())
         assertEquals(listOf(weatherKey, notesKey), WidgetStacks.stackAt(extras.state.value, stackKey)?.keys)
         check("edit with widgets", TourBase.Surface.Edit)

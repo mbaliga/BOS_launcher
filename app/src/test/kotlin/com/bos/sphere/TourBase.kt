@@ -84,7 +84,12 @@ abstract class TourBase {
         val w = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
         return rule.onAllNodesWithTag("glance.surface", useUnmergedTree = true).fetchSemanticsNodes().any { it.boundsInRoot.let { b -> b.right > 0f && b.left < w } }
     }
-    protected fun editShown() = descShown("Page carousel")
+    /** Wave 45: edit mode is on when the single-page edit bar or the page editor's carousel is up. */
+    protected fun editShown() = descShown("Page carousel") || tagShown("edit.bar")
+    /** Wave 45: from the single-page edit mode, the title opens the page editor (the strip and the tabs). */
+    protected fun openPageEditorFromEdit() {
+        if (!descShown("Page carousel") && tagShown("edit.title")) { rule.onNodeWithTag("edit.title", useUnmergedTree = true).performClick(); settle() }
+    }
     /** Wave 30: deleting a page that holds items asks first; this answers the dialog's Delete page. */
     protected fun confirmDeletePage() { rule.onNode(androidx.compose.ui.test.hasText("Delete page") and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.isDialog()), useUnmergedTree = true).performClick(); settle(300) }
     protected fun controlsShown() = descShown("Next")

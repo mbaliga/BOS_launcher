@@ -21,6 +21,7 @@
         <exclude domain="sharedpref" path="launchpad_groups.xml" />
         <exclude domain="sharedpref" path="launchpad_hub.xml" />
         <exclude domain="sharedpref" path="preview_window.xml" />
+        <exclude domain="sharedpref" path="edit_chrome.xml" />
         <exclude domain="file" path="palette-files.idx" />
         <exclude domain="file" path="crash-reports" />
         <exclude domain="file" path="crash_recovery_report.txt" />
@@ -52,6 +53,7 @@
         <exclude domain="sharedpref" path="launchpad_groups.xml" />
         <exclude domain="sharedpref" path="launchpad_hub.xml" />
         <exclude domain="sharedpref" path="preview_window.xml" />
+        <exclude domain="sharedpref" path="edit_chrome.xml" />
         <exclude domain="file" path="palette-files.idx" />
         <exclude domain="file" path="crash-reports" />
         <exclude domain="file" path="crash_recovery_report.txt" />

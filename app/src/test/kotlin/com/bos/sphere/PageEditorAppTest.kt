@@ -86,6 +86,8 @@ class PageEditorAppTest {
         // wave 40: Ground Control opens on the root list (the sheet's row) or, from a long press on a continuous home, on the Home screen page itself
         if (rule.onAllNodesWithText("Edit home", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) { rule.onNodeWithTag("oneui.row.Home screen", useUnmergedTree = true).performScrollTo().performClick(); settle() }
         rule.onNodeWithText("Edit home", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        // wave 45: Edit home opens the single-page edit mode; its title opens the page editor these tests are about
+        if (!has("Page carousel") && rule.onAllNodesWithTag("edit.title", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) { rule.onNodeWithTag("edit.title", useUnmergedTree = true).performClick(); settle() }
     }
 
     private fun pageKeys(stores: LauncherStores) = stores.layout.layout.value.pages.map { it.keys }

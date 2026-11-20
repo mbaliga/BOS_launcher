@@ -43,7 +43,7 @@ class W13CrossAuditTest {
         val exported = setOf("launcher_prefs", "home_layout", "hidden_apps", "shortcuts", "launchpad_rules", "home_state", "home_tags", "home_icons", "home_badges",
             "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", "theming", "launcher_haptics", "comms_scale")
         val excluded = setOf("launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "palette", "liftoff_spikes", "desktop_surface",
-            "liftoff_misc", "device_bound", "launchpad_groups", "device_checks", "preview_window")
+            "liftoff_misc", "device_bound", "launchpad_groups", "device_checks", "preview_window", "edit_chrome")
         val benign = setOf("grant_history") // when each permission was asked for, nothing about contacts or messages
         val opened = Regex("""getSharedPreferences\(\s*"([A-Za-z0-9_]+)"|\bFILE = "([A-Za-z0-9_]+)"""")
         val found = Repo.mainSources().flatMap { f -> opened.findAll(f.readText()).map { it.groupValues[1].ifEmpty { it.groupValues[2] } }.toList() }.toSet()

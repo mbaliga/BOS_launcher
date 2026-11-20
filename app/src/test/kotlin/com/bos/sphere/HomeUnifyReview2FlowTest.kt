@@ -53,6 +53,7 @@ class HomeUnifyReview2FlowTest : TourBase() {
         quickGoTo("Edit home")
         assertEquals("Edit home turns Pages on", HomePages.Paginated, stores.prefs.prefs.value.homePages)
         assertTrue("and opens the first page in edit mode", editShown()); assertFalse(glanceShown())
+        openPageEditorFromEdit() // wave 45: the add carousel is in the page editor
         rule.onNodeWithContentDescription("Add to home: App 04").performClick(); settle()
         assertTrue("the picked app is on the first page", key(4) in pageKeys())
     }

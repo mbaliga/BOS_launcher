@@ -365,9 +365,25 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     val gridState = rememberGridHomeState()
     // HOM-12: while editing, the home is a card pushed to the start side; the page carousel and the add carousel fill the background.
-    val editCard = rememberEditCardState(homeEdit.active, continuous = prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous, orderRtl = prefs.homeOrder.rtl) // wave 36: the page editor's strip follows the Pages mode and the page order
+    // W45 (editChrome): edit mode is the single-page home (the page scaled to 0.88 with the top bar and the tray); the page editor (strip, tabs) is a step inside it, opened from the title or by the empty home.
+    var pageEditorOn by remember { mutableStateOf(false) }
+    LaunchedEffect(homeEdit.active) { if (!homeEdit.active) pageEditorOn = false }
+    val editCard = rememberEditCardState(homeEdit.active && pageEditorOn, continuous = prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous, orderRtl = prefs.homeOrder.rtl) // wave 36: the page editor's strip follows the Pages mode and the page order
     var editFocusAdd by remember { mutableStateOf(false) }
     LaunchedEffect(homeEdit.active) { if (!homeEdit.active) editFocusAdd = false }
+    val chromeProgress = com.bos.sphere.feature.grid.rememberEditChromeProgress(homeEdit.active)
+    var homeSizePx by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) } // the home's real size (the scaled page's rectangle is derived from it)
+    val chromePage = com.bos.sphere.feature.grid.rememberEditChromePage(homeSizePx)
+    val editChromeLive by remember { androidx.compose.runtime.derivedStateOf { chromeProgress.value > 0.001f } } // flips twice per edit: not a per-frame recomposition
+    val chromeMotion = com.bos.sphere.core.design.rememberMotionPrefs()
+    val chromeState = remember { com.bos.sphere.feature.grid.HomeEditChromeState() }
+    LaunchedEffect(homeEdit.active) { if (!homeEdit.active) chromeState.dismissConfirm() }
+    val editGrid = remember { com.bos.sphere.feature.grid.EditGridState() }
+    val editHintStore = remember(context) { com.bos.sphere.core.data.EditChromeStore(com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, com.bos.sphere.core.data.EditChromeStore.FILE)) }
+    var showEditHint by remember { mutableStateOf(false) }
+    LaunchedEffect(homeEdit.active) { showEditHint = if (homeEdit.active) editHintStore.registerEntry() else false } // the counter is written on entry (a handler), never in composition
+    LaunchedEffect(pageEditorOn) { if (pageEditorOn) showEditHint = false }
+    var addAppOpen by remember { mutableStateOf(false) }
     val sounds = remember { UiSounds() }
     DisposableEffect(Unit) { onDispose { sounds.release() } }
     sounds.enabled = prefs.uiSounds
@@ -519,7 +535,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         noDock = com.bos.sphere.ui.FocusDockRouting.noDock(
             landing, com.bos.sphere.core.data.ChromeSettings.of(prefs),
             com.bos.sphere.feature.dock.WorkspaceRepository.get(context).current.dock.isEnabled(com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs())),
-            editing = homeEdit.active, // the rail is hidden while the home is edited (DockLayer's visible flag)
+            editing = false, // W45: the rail stays (dimmed) while the single-page home is edited
         ),
         onNoDock = { why -> android.widget.Toast.makeText(context, L10n.tr(why.message), android.widget.Toast.LENGTH_SHORT).show() },
     )
@@ -962,15 +978,20 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             it.requestId = { id -> com.bos.sphere.feature.grid.LauncherInput.focus.request(id) }
         }
     }
-    CompositionLocalProvider(LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail) {
+    CompositionLocalProvider(com.bos.sphere.feature.grid.LocalEditGrid provides (if (homeEdit.active) editGrid else null), LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail) {
     Box(
-        modifier = Modifier.fillMaxSize().onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { homeEdit.exit(); true } else false }.trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
+        modifier = Modifier.fillMaxSize().onSizeChanged { homeSizePx = it }.onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { if (pageEditorOn) homeEdit.exit() else chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() }; true } else false }.trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
-            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !rightOpen, revealSlideDp, mirrored = launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
-            .launchpadEdgeDrag(rightReveal, recentsEnabled && !leftOpen, rightSlideDp, mirrored = !launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
+            .launchpadEdgeDrag(reveal, prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !rightOpen && !homeEdit.active, revealSlideDp, mirrored = launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
+            .launchpadEdgeDrag(rightReveal, recentsEnabled && !leftOpen && !homeEdit.active, rightSlideDp, mirrored = !launchpadRtl, edgeDp = HomeChromeRules.edgeZoneDp(landing))
             .glanceWakeOnTouch { glanceWake.intValue++ }
-            .rightEdgeSwipe(prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail && !leftOpen, rtl = launchpadRtl) { openRecents() },
+            .rightEdgeSwipe(prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail && !leftOpen && !homeEdit.active, rtl = launchpadRtl) { openRecents() },
     ) {
+        // W45: the scrim and the backdrop round the scaled page (nothing while the page editor's card is up: it draws its own background).
+        run {
+            val backdrop = remember { androidx.compose.runtime.derivedStateOf { chromeProgress.value * (1f - editCard.progress.value) } }
+            com.bos.sphere.feature.grid.EditChromeBackdrop(backdrop, chromePage)
+        }
         EditCardOverlay(
             card = editCard, homeEdit = homeEdit, stores = stores, homeItems = homeItems, pages = pages, layout = layout, preserve = preserve,
             capacityOf = capacityOf, gridState = gridState, appsByKey = appsByKey, apps = apps,
@@ -1037,8 +1058,25 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val backSwipeAccepts: (Float) -> Boolean = { dx -> homeOrder.isTowardsLaunchpad(dx) }
         val backSwipeAction: () -> Unit = { showStop(0) }
         val indicatorShown = com.bos.sphere.core.data.HomeDeck.indicatorShown(prefs.glanceEnabled, prefs.glanceIndicator, prefs.homePages, pages.size)
+        val dotsOutside = editChromeLive && !pageEditorOn
+        val pageDots: @Composable (Modifier) -> Unit = { modifier ->
+            val dots = com.bos.sphere.core.data.HomeDeck.stops(prefs.glanceEnabled, prefs.homePages, pages.size) - (if (prefs.glanceEnabled) 1 else 0)
+            com.bos.sphere.feature.grid.PageIndicator(
+                count = dots, current = gridState.currentPage.coerceIn(0, (dots - 1).coerceAtLeast(0)), vertical = false,
+                onSelect = { page -> showDot(page + (if (prefs.glanceEnabled) 1 else 0)) }, // the indicator reports the page; the dot index counts Glance as 0 (W45: while editing, a dot is the page switcher)
+                modifier = modifier
+                    .graphicsLayer { alpha = 1f - (1f - com.bos.sphere.feature.grid.EditChromeGeometry.FIXED_DIM) * chromeProgress.value }, // W45: dimmed to 40% while editing, still the page switcher
+                onMenu = if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) ({ if (!homeEdit.active) leftOpen = true }) else null,
+                menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad", rtl = homeOrder.rtl,
+                homeIndex = prefs.homePage.coerceIn(0, (dots - 1).coerceAtLeast(0)),
+                onGlance = if (prefs.glanceEnabled) ({ if (!homeEdit.active) showSurface(HomeShown.Glance) }) else null, glanceCurrent = landing == HomeShown.Glance,
+                right = emptyList(), onRight = { openRecents() }, // W44: the trailing dot for the right panel looked like a page that does not exist
+                quiet = landing == HomeShown.Glance, awakeNonce = indicatorAwake + homePager.currentPage,
+                hiddenFromAccessibility = homeEdit.active && pageEditorOn, // wave 37: the editor's strip cards already say "Page N of M"
+            )
+        }
         Box(
-            Modifier.fillMaxSize().launchpadMenuAside(lpMenu, launchpadGeometry.widthPx, launchpadRtl).editCardLayer { editCard.frame() }.homeCardLayer(launchpadGeometry) { reveal.progress }
+            Modifier.fillMaxSize().launchpadMenuAside(lpMenu, launchpadGeometry.widthPx, launchpadRtl).editCardLayer { com.bos.sphere.feature.grid.EditChromeGeometry.blend(com.bos.sphere.feature.grid.EditChromeGeometry.frame(chromePage, chromeProgress.value, chromeMotion.reduced), editCard.frame(), editCard.progress.value) }.homeCardLayer(launchpadGeometry) { reveal.progress }
                 .homeCardLayer(recentsGeometry) { if (recentsEnabled) rightReveal.progress else 0f }
                 // Behind the card the home is inert for accessibility services; the card overlay below is the one control.
                 .then(if (leftOpen || rightOpen) Modifier.clearAndSetSemantics { } else Modifier)
@@ -1115,7 +1153,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onLaunch = ::launch,
                             onAppLongPress = { menuApp = it },
                             onPagesChange = { savePages(it) },
-                            onEmptyLongPress = { page -> if (!homeEdit.active && com.bos.sphere.core.data.FreshHome.isEmpty(pages)) { editFocusAdd = true; homeEdit.enter() } else if (HomeGesture.LongPress in gestures) onGesture(HomeGesture.LongPress) else { quickPage = page; quickOpen = true } },
+                            onEmptyLongPress = { page -> if (!homeEdit.active && com.bos.sphere.core.data.FreshHome.isEmpty(pages)) { editFocusAdd = true; pageEditorOn = true; homeEdit.enter() } else if (HomeGesture.LongPress in gestures) onGesture(HomeGesture.LongPress) else { quickPage = page; quickOpen = true } },
                             onGesture = ::onGesture,
                             onClockTap = { runner.run(CornerActionId.Clock) },
                             onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(com.bos.sphere.ui.CATEGORY_ROOT) },
@@ -1176,7 +1214,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 }
             }
             // Wave 38 (glanceFixed): the FIXED chrome above the pager: the four hotspots and the music line stay exactly in place on every page and during a swipe.
-            Box(Modifier.fillMaxSize().padding(bottom = bottomClear)) {
+            Box(
+                Modifier.fillMaxSize().padding(bottom = bottomClear)
+                    .graphicsLayer { alpha = 1f - (1f - com.bos.sphere.feature.grid.EditChromeGeometry.FIXED_DIM) * chromeProgress.value } // W45: the hotspots and the music line dim to 40% while editing (inert: see EditFixedChromeShield)
+                    .then(if (homeEdit.active) Modifier.clearAndSetSemantics { } else Modifier),
+            ) {
                 com.bos.sphere.feature.grid.FixedHomeChrome(
                     media = mediaInfo, showMusic = prefs.showMusic, controlsSeconds = prefs.glanceControlsSeconds,
                     onPrevious = { com.bos.sphere.core.data.MediaNow.previous() }, onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() }, onNext = { com.bos.sphere.core.data.MediaNow.next() },
@@ -1185,27 +1227,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 )
             }
             // Wave 28: the ONE page indicator, at one fixed place above the pager: Glance is its first stop, the pages (or the scroll) follow.
-            if (indicatorShown) {
-                val dots = com.bos.sphere.core.data.HomeDeck.stops(prefs.glanceEnabled, prefs.homePages, pages.size) - (if (prefs.glanceEnabled) 1 else 0)
-                com.bos.sphere.feature.grid.PageIndicator(
-                    count = dots, current = gridState.currentPage.coerceIn(0, (dots - 1).coerceAtLeast(0)), vertical = false,
-                    onSelect = { page -> showDot(page + (if (prefs.glanceEnabled) 1 else 0)) }, // the indicator reports the page; the dot index counts Glance as 0
-                    modifier = Modifier.align(Alignment.BottomCenter).then(Modifier.windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.Companion.safeDrawing)).padding(bottom = 4.dp),
-                    onMenu = if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) ({ leftOpen = true }) else null,
-                    menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad", rtl = homeOrder.rtl,
-                    homeIndex = prefs.homePage.coerceIn(0, (dots - 1).coerceAtLeast(0)),
-                    onGlance = if (prefs.glanceEnabled) ({ showSurface(HomeShown.Glance) }) else null, glanceCurrent = landing == HomeShown.Glance,
-                    right = emptyList(), onRight = { openRecents() }, // W44: the trailing dot for the right panel looked like a page that does not exist
-                    quiet = landing == HomeShown.Glance, awakeNonce = indicatorAwake + homePager.currentPage,
-                    hiddenFromAccessibility = homeEdit.active, // wave 37: the editor's strip cards already say "Page N of M"
-                )
-            }
+            // W45: while the single-page edit mode is up it is drawn OUTSIDE the scaled, clipped page (see the call after this layer), where the dock already leaves room for it.
+            if (indicatorShown && !dotsOutside) pageDots(Modifier.align(Alignment.BottomCenter).then(Modifier.windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.Companion.safeDrawing)).padding(bottom = 4.dp))
             // HOM-01: an empty home says how to fill it; the hint opens edit mode with the add carousel focused.
             if (prefs.homeStyle == HomeStyle.Grid && !homeEdit.active && !leftActive && // wave 28: the empty Continuous scroll says how to start too
                 HomeShownRules.showsEmptyHomeHint(landing, com.bos.sphere.core.data.FreshHome.isEmpty(pages))
             ) {
                 com.bos.sphere.feature.grid.EmptyHomeHint(
-                    onOpen = { editFocusAdd = true; homeEdit.enter() }, modifier = Modifier.align(Alignment.Center),
+                    onOpen = { editFocusAdd = true; pageEditorOn = true; homeEdit.enter() }, modifier = Modifier.align(Alignment.Center),
                 )
             }
             // HOM-08: widgets and the item strip live in a band on the scrolling homes, never over their tiles.
@@ -1214,6 +1243,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
 
         }
+        if (indicatorShown && dotsOutside) pageDots(Modifier.align(Alignment.BottomCenter).then(Modifier.windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.Companion.safeDrawing)).padding(bottom = 4.dp))
         // The card of home still showing: tap it, press Enter on it, or drag it back, to bring the home back.
         if (leftOpen) {
             LaunchpadCardOverlay(launchpadGeometry, reveal, onReturn = { leftOpen = false }, slideDp = revealSlideDp, modifier = Modifier.launchpadMenuAside(lpMenu, launchpadGeometry.widthPx, launchpadRtl))
@@ -1224,9 +1254,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
 
         // Dock rail (DCK-01 to DCK-08): off by default on phones, on by default on large windows and desktop setups.
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - (1f - com.bos.sphere.feature.grid.EditChromeGeometry.DOCK_DIM) * chromeProgress.value }) { // W45: the dock stays while editing (a drop target), dimmed to 70%
         DockLayer(
             apps = apps, launcher = appLauncher, controller = dockController, homeSignal = homeSignal,
-            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !wheelOpen && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.Dock, chromeSettings), // HOM-12, HOM-23: no dock on Glance unless the right side is the dock rail: the dock steps aside while the home is a card
+            visible = !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !wheelOpen && !(homeEdit.active && pageEditorOn) && HomeChromeRules.shows(landing, ChromeElement.Dock, chromeSettings), // HOM-12, HOM-23: no dock on Glance unless the right side is the dock rail; W45: it steps aside only for the page editor's card
             keyboardMode = appLauncher.inputs().hasKeyboard, onLaunch = ::launch,
             homeExtras = homeItems.homeExtras,
             unavailableApps = homeItems.unavailableKeys,
@@ -1234,6 +1265,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             alwaysShown = HomeChromeRules.forcesDock(landing, chromeSettings),
             onGoHome = { scope.launch { gridState.goToPage(prefs.homePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))) } }, // W26: the Home glyph goes home; the dock panel is the long-press menu's
         )
+        }
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
@@ -1252,7 +1284,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val quietLeft = HomeChromeRules.quiet(landing, ChromeElement.LeftHandle)
         val glanceMotionReduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
         // Wave 22 (tour): also not while the Recents panel is open: the pushed-aside home card's sliver sits on the left edge, and the handle drawn over it opened Launchpad instead of returning home.
-        if (!leftOpen && !rightOpen && HomeChromeRules.shows(landing, ChromeElement.LeftHandle, chromeSettings)) {
+        if (!leftOpen && !rightOpen && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.LeftHandle, chromeSettings)) { // W45: the left notification tray (and the handles) are hidden while editing
             if (HomeChromeRules.shows(landing, ChromeElement.Rail, chromeSettings)) {
                 com.bos.sphere.ui.LaunchpadRail(onOpen = { leftOpen = true }, modifier = Modifier.align(leftEdge))
             }
@@ -1285,7 +1317,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
 
         // STR-14: the right-hand handle (a slim bar, tap it or swipe in from the right edge). Physical right edge; the left in right-to-left.
-        if (!rightOpen && !leftOpen && HomeChromeRules.shows(landing, ChromeElement.RightHandle, chromeSettings)) {
+        if (!rightOpen && !leftOpen && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.RightHandle, chromeSettings)) {
             val rightEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) -1f else 1f, 0f)
             if (HomeChromeRules.quiet(landing, ChromeElement.RightHandle)) {
                 com.bos.sphere.feature.grid.GlanceEdgeHandle(
@@ -1726,14 +1758,52 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             }
         }
         if (homeEdit.active) {
-            BackHandler { homeEdit.exit() }
-            com.bos.sphere.feature.grid.HomeEditBar(
-                undoDepth = homeEdit.undoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
-                onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
-                onAddPage = { editCard.addPage() }, // wave 37: the strip's "+" card path, in both modes
-                onDone = { homeEdit.exit() },
-            )
+            if (pageEditorOn) {
+                BackHandler { homeEdit.exit() } // as before W45: Back leaves the page editor with its changes kept (Cancel with a restore is the single-page edit mode's)
+                com.bos.sphere.feature.grid.HomeEditBar(
+                    undoDepth = homeEdit.undoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
+                    onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
+                    onAddPage = { editCard.addPage() }, // wave 37: the strip's "+" card path, in both modes
+                    onDone = { homeEdit.exit() },
+                )
+            } else {
+                com.bos.sphere.feature.grid.EditFixedChromeShield(chromePage)
+            }
             com.bos.sphere.feature.grid.PageEditorGhost(editCard.drag) // wave 36: the dragged app's icon above the live page
+        }
+        // W45 (editChrome): the single-page edit mode's top bar, hint and tray. Composed only while editing the page itself.
+        com.bos.sphere.feature.grid.HomeEditChrome(
+            visible = homeEdit.active && !pageEditorOn,
+            progress = chromeProgress, page = chromePage,
+            pageIndex = if (prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous) editCard.contSel.intValue else gridState.currentPage,
+            pageCount = pages.size,
+            undoCount = homeEdit.undoDepth, redoCount = homeEdit.redoDepth, canUndo = homeEdit.canUndo, canRedo = homeEdit.canRedo,
+            hasChanges = homeEdit.hasChanges, showHint = showEditHint,
+            showAddPage = prefs.homePages != com.bos.sphere.core.data.HomePages.Off,
+            trayBottomDp = maxOf(if (bottomPlan.railTopDp > 0f) bottomPlan.railTopDp + 8f else 8f, if (indicatorShown) 60f else 8f), // above the dock, and above the page dots when there is no dock
+            state = chromeState,
+            onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
+            onDone = { homeEdit.exit() }, onCancel = { homeEdit.cancel() },
+            onApps = { addAppOpen = true }, onWidgets = { homeItems.widgetRequest++ }, onFolders = { homeItems.folderOpen = true },
+            onAddPage = { editCard.addPage() },
+            onOpenPageEditor = { pageEditorOn = true },
+            touchSignal = glanceWake.intValue,
+        )
+        if (addAppOpen) {
+            com.bos.sphere.feature.grid.AppPickerDialog(
+                title = L10n.tr("Add an app"), apps = apps, suggested = emptySet(),
+                onPick = { app ->
+                    addAppOpen = false
+                    val at = (if (prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous) editCard.contSel.intValue else gridState.currentPage).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+                    val placed = com.bos.sphere.core.data.AddCarouselModel.place(pages, app.key, at, capacityOf)
+                    if (placed == null) android.widget.Toast.makeText(context, L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show()
+                    else {
+                        stores.layout.replace(layout.copy(pages = com.bos.sphere.core.data.HomeLayoutMath.toStored(placed, layout.pages, preserve), removed = layout.removed - app.key, seeded = true))
+                        stores.layout.markExplicit()
+                    }
+                },
+                onDismiss = { addAppOpen = false },
+            )
         }
         if (!prefs.onboardingDone) {
             com.bos.sphere.ui.Onboarding(

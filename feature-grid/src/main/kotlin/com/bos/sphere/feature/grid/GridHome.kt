@@ -800,6 +800,7 @@ private fun PageView(
                 }
             }
         }
+        if (editing && geometry is PageGeometry.Grid) EditGridDotsLayer(geometry.g) // W45 (editChrome): the real grid, one Canvas, behind the items
         page.keys.forEachIndexed { index, itemKey ->
             val extra = extras?.takeIf { it.owns(itemKey) }
             val place = packed?.placed?.firstOrNull { it.key == itemKey }

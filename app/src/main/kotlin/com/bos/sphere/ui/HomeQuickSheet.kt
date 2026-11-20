@@ -97,7 +97,7 @@ internal fun HomeQuickSheetBody(
     // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
     Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp).padding(bottom = 16.dp)) {
         Text(
-            L10n.tr("Home"), color = InkWhite, fontSize = 22.sp, fontWeight = FontWeight.Light, textAlign = TextAlign.Center,
+            L10n.tr("Home"), color = InkWhite, fontSize = com.bos.sphere.core.design.PopupTokens.TitleSize, fontWeight = com.bos.sphere.core.design.PopupTokens.TitleWeight, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp).testTag("quick.sheet").semantics { heading() },
         )
         // Wave 28: the Pages setting, exactly three values, and the order.

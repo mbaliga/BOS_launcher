@@ -35,3 +35,5 @@ Look > Indicator: "Calm effect" (Off / Dot bloom / Animated dots), "Alert effect
 - No device run: severity thresholds, the pulse feel and the vignette strength are judged from Robolectric stills only.
 - Old English/translated strings of removed effects stay in the L10n tables (harmless, unused).
 - `docs/Spec.md` PAL-24 and HOM-16 rows still describe comic lines as "no connectivity only"; not edited here to avoid conflicts with the wallpaper stream.
+
+Wave 37: the Spec.md PAL-24 and HOM-16 rows now describe this ([specSync.md](specSync.md)).

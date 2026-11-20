@@ -30,3 +30,5 @@ Before: the comic speed lines were drawn only by `SignalBackground`, only when t
 
 ## Not done / limits
 Playing a real GIF, WebP or video, the Photo Picker, `WallpaperManager` and the look of the system wallpaper through the window are device-only. Robolectric has no `ImageDecoder` and no video decoder, so stills are imported through a test decoder and video through a fake engine.
+
+Wave 37: `SpiderSenseAlert` was removed; since wave 35 the Alert effect draws the comic lines (see [signalEffects.md](signalEffects.md), [specSync.md](specSync.md)).

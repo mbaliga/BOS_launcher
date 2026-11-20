@@ -52,6 +52,16 @@ class HomeQuickSheetGlanceTest {
         rule.onNodeWithText("Home").assertIsDisplayed()
     }
 
+    @Test fun HOM_21_w37_theTitleUsesTheSharedPopupTitleTokenOf28spLightCentred() {
+        sheet(LauncherPrefs(), Seen())
+        val out = ArrayList<androidx.compose.ui.text.TextLayoutResult>()
+        rule.onNodeWithTag("quick.sheet").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!.invoke(out)
+        val st = out[0].layoutInput.style
+        assertEquals(com.bos.sphere.core.design.PopupTokens.TitleSize, st.fontSize); assertEquals(28f, st.fontSize.value, 0f)
+        assertEquals(androidx.compose.ui.text.font.FontWeight.Light, st.fontWeight)
+        assertEquals(androidx.compose.ui.text.style.TextAlign.Center, st.textAlign)
+    }
+
     @Test fun HOM_01_w28_theQuickSheetHasThreePagesChipsOffPaginatedContinuousAndTheOrder() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
         rule.onNodeWithText("PAGES").assertExists()

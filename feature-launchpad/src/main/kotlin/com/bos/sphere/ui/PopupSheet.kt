@@ -115,7 +115,7 @@ internal fun PopupSheet(
                     .padding(horizontal = 28.dp),
             ) {
                 Text(
-                    title, color = Color.White, fontSize = 22.sp, textAlign = TextAlign.Center,
+                    title, color = Color.White, fontSize = com.bos.sphere.core.design.PopupTokens.TitleSize, fontWeight = com.bos.sphere.core.design.PopupTokens.TitleWeight, textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(top = if (compact) 18.dp else 36.dp, bottom = if (compact) 8.dp else 22.dp).testTag("$tagPrefix.title").semantics { heading() },
                 )
                 content(compact)

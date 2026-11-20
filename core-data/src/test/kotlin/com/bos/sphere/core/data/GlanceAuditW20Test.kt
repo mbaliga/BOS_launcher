@@ -65,16 +65,6 @@ class GlanceAuditW20Test {
         walk(emptyList(), 5)
     }
 
-    // ---- weather
-    @Test fun HOM_23_noWeatherMeansNoLayerAndAnUnknownCodeIsClouds() {
-        assertNull(GlanceWeather.effectOf(null, true))
-        assertEquals(GlanceWeatherEffect.Clouds, GlanceWeather.effectOf(WeatherInfo(10f, 1234, 0L), true))
-        assertEquals(GlanceWeatherEffect.ClearNight, GlanceWeather.effectOf(WeatherInfo(10f, 0, 0L), false))
-        assertFalse(GlanceWeather.animates(reducedMotion = true, screenOn = true, surfaceVisible = true))
-        assertFalse(GlanceWeather.animates(reducedMotion = false, screenOn = false, surfaceVisible = true))
-        assertTrue(GlanceWeather.animates(reducedMotion = false, screenOn = true, surfaceVisible = true))
-    }
-
     // ---- the Dock rail setting on Glance
     @Test fun HOM_23_theDockRailSettingForcesTheDockOnGlanceOnly() {
         val dockRail = ChromeSettings(rightSide = RightSide.DockRail)

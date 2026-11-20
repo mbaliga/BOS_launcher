@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
@@ -476,6 +477,7 @@ private fun CornerSlotView(
                     .size(iconSize + 26.dp)
                     .semantics {
                         contentDescription = "${slot.name} palette"
+                        role = androidx.compose.ui.semantics.Role.Button
                         onLongClick { onEdit(); true }
                     }
                     .launcherItem(
@@ -547,6 +549,7 @@ private fun CornerSlotView(
                     .size(iconSize + 26.dp)
                     .semantics {
                         contentDescription = itemLabel(slot.item, appsByKey)
+                        role = androidx.compose.ui.semantics.Role.Button // wave 38: the corners are the fixed hotspots on every page, so they carry a role (the a11y sweep)
                         onClick { onTap(slot.item); true }
                         onLongClick { onEdit(); true }
                     }

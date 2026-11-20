@@ -44,7 +44,7 @@ class W4MotionAuditTest {
             // the edit card (HOM-12): one progress value read inside graphicsLayer; under reduced motion the card jumps and only the carousel cross-fades (160 ms)
             "EditCardGeometry.kt" to 1,
             // W25: the song title's push-down under the notch: a spring of about 250 ms on one offset, snap() under reduced motion (wave 28: the indicator fade moved to GridHome's PageIndicator)
-            "GlanceHome.kt" to 1,
+            "FixedHomeChrome.kt" to 1, "ClockBlock.kt" to 1, // wave 38: the title push under the notch and the clock fade, both snap() under reduced motion
             "CommsStyle.kt" to 4, // wave 30: the Comms row's read/unread cross-fade (three colours and the icon opacity), a 150 ms tween that is 0 ms under reduced motion (rememberRowTone reads the motion prefs)
             "GlanceEdges.kt" to 1, // wave 17: the quiet edge handle fade, tween 0 when reduced (the caller passes rememberMotionPrefs().reduced)
             "PuckSections.kt" to 1, // wave 32: a wedge's pressed fill, a 90 ms tween that is snap() under reduced motion (reads rememberMotionPrefs().reduced)
@@ -194,14 +194,12 @@ class W4MotionAuditTest {
         "java.net.http", "HttpClient", "URLConnection", "WebView", "DownloadManager", "retrofit", "io.ktor", "cronet", "com.android.volley",
     )
 
-    @Test fun NFR_17_noNetworkClassOutsideTheWeatherModule() {
-        val hits = Repo.mainSources().filter { it.name != "Weather.kt" }.flatMap { f ->
+    @Test fun NFR_17_noNetworkClassAnywhere() { // wave 38: the weather module is gone, so the allowed set is empty
+        val hits = Repo.mainSources().flatMap { f ->
             f.readLines().withIndex().filter { (_, l) -> !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*") && networkTokens.any { l.contains(it) } }
                 .map { "${f.name}:${it.index + 1}" }
         }
-        assertTrue("network classes outside Weather.kt: $hits", hits.isEmpty())
-        // The weather client itself uses one of them (the audit would be vacuous otherwise).
-        assertTrue(networkTokens.any { text("core-data/src/main/kotlin/com/bos/sphere/core/data/Weather.kt").contains(it) })
+        assertTrue("network classes: $hits", hits.isEmpty())
     }
 
     @Test fun NFR_17_noNetworkLibraryInAnyBuildFile() {
@@ -211,14 +209,11 @@ class W4MotionAuditTest {
         listOf("okhttp", "retrofit", "ktor", "volley", "cronet", "coil-network", "glide", "apache.http").forEach { assertFalse(it, builds.contains(it)) }
     }
 
-    @Test fun NFR_17_weatherIsTheOnlyInternetUser() {
+    @Test fun NFR_17_noManifestDeclaresInternet() {
         val manifests = Repo.root.walkTopDown().onEnter { it.name != "build" && it.name != ".git" && it.name != ".gradle" }
             .filter { it.name == "AndroidManifest.xml" }.filter { !it.path.contains("/build/") }.toList()
         val internet = manifests.filter { it.readText().contains("android.permission.INTERNET") }.map { it.relativeTo(Repo.root).path }
-        assertEquals(listOf("app/src/main/AndroidManifest.xml"), internet)
-        // Everything that could reach the network is the weather file; the permission rationale names it.
-        val w = text("core-data/src/main/kotlin/com/bos/sphere/core/data/Weather.kt")
-        assertTrue(w.contains("openConnection") || w.contains("HttpURLConnection"))
+        assertEquals(emptyList<String>(), internet)
         val manifest = text("app/src/main/AndroidManifest.xml")
         assertFalse("no cleartext opt-in", manifest.contains("usesCleartextTraffic=\"true\""))
         assertNotNull(Repo.file("docs/decisions/NFR-16.md").takeIf { it.exists() })

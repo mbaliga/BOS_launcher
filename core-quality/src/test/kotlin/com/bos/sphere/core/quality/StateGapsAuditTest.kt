@@ -33,15 +33,14 @@ class StateGapsAuditTest {
         assertFalse(text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt").contains("background_"))
     }
 
-    @Test fun CFG_07_stepCountingAndWeatherStayOutsideTheGrantScreenBecauseTheSpecListsFourGrants() {
+    @Test fun CFG_07_stepCountingStaysOutsideTheGrantScreenBecauseTheSpecListsFourGrants() {
         val spec = text("docs/Spec.md")
         val row = spec.lines().first { it.startsWith("| CFG-07 ") }
         assertTrue("the spec's grants are notification access, usage access, contacts and folder access", row.contains("Notification access, usage access, contacts and folder access"))
         assertFalse("activity recognition and location are not on that list", row.contains("activity", ignoreCase = true) || row.contains("location", ignoreCase = true))
         // They remain direct runtime prompts, requested only when the user first uses the feature (the home's step and weather effects).
         val home = text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt")
-        assertTrue(home.contains("stepsPermission.launch(android.Manifest.permission.ACTIVITY_RECOGNITION)"))
-        assertTrue(home.contains("locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)"))
+        assertFalse("wave 38: the status strip (steps) and the weather are gone from the home", home.contains("ACCESS_COARSE_LOCATION") || home.contains("stepsPermission"))
     }
 
     @Test fun NFR_11_openSurfaceRestoreIsOptInOffByDefaultAndSkippedInSafeMode() {

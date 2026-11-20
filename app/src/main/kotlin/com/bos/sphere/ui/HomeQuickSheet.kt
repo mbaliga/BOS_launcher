@@ -53,7 +53,7 @@ import com.bos.sphere.feature.grid.Glyphs
 
 /**
  * What a long-press on the home screen opens. Wave 34 (homeSheet): styled like the Sound and Vibration sheet (docs/decisions/homeSheet.md): pure black,
- * large top radius, centred title, hairlines, 48 dp targets. It carries only the quick choices (Pages, Order, Glance content, Hotspots, this page's
+ * large top radius, centred title, hairlines, 48 dp targets. It carries only the quick choices (Pages, Order, Hotspots, this page's
  * tools) and two plain rows, Wallpaper and Ground Control. Glance on/off, Add page, Edit home, Files and the item picker live in Ground Control, Comms
  * and the edit-home mode. [page] is null on homes without pages.
  */
@@ -106,15 +106,8 @@ internal fun HomeQuickSheetBody(
         Heading(L10n.tr("Order"))
         ChipRow { for (o in com.bos.sphere.core.data.HomeOrder.entries) Chip(null, L10n.tr(o.label), prefs.homeOrder == o) { update { it.copy(homeOrder = o) } } }
 
-        if (prefs.glanceEnabled) {
-            // HOM-23: the Glance quick settings: content and hotspots.
-            Heading(L10n.tr("Glance content"))
-            val cur = com.bos.sphere.core.data.GlanceContent.presetOf(prefs.glanceContent)
-            ChipRow {
-                for (pr in com.bos.sphere.core.data.GlancePreset.entries.filter { it != com.bos.sphere.core.data.GlancePreset.Custom }) {
-                    Chip(null, L10n.tr(pr.label), cur == pr) { update { it.copy(glanceContent = com.bos.sphere.core.data.GlanceContent.applyPreset(it.glanceContent, pr)) } }
-                }
-            }
+        run {
+            // W38: the hotspots are fixed chrome on every page, so their chips are always here.
             Heading(L10n.tr("Hotspots"))
             val hc = com.bos.sphere.core.data.GlanceHotspots.presetOf(prefs.glanceHotspots)
             ChipRow {

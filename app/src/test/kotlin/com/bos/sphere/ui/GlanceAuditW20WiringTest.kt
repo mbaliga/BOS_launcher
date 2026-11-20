@@ -2,6 +2,7 @@ package com.bos.sphere.ui
 
 import java.io.File
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /** Wave 20 audit wiring checks (source level, like RadarSignalLabWiringTest): the pieces exist and are connected to a screen. */
@@ -25,7 +26,7 @@ class GlanceAuditW20WiringTest {
         assertTrue(text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/SignalBackground.kt").contains("SignalForceGate.effective(requestedForce)"))
     }
 
-    @Test fun HOM_23_theWeatherLayerClockFollowsTheOneAnimationRule() {
-        assertTrue(text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/GlanceWeatherLayer.kt").contains("GlanceWeather.animates("))
+    @Test fun GFX_38_theWeatherLayerAndItsAnimationAreGone() {
+        assertFalse(java.io.File(System.getProperty("user.dir")).resolve("../feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/GlanceWeatherLayer.kt").exists())
     }
 }

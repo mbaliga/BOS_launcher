@@ -56,7 +56,7 @@ class A11ySweepTourTest : TourBase() {
     @Test fun NFR_13_theWholeAppSweepEveryClickableHasALabelARoleAnd48dpAndThePanelsAnnounceThemselves() {
         start()
         MediaNow.publishForTest(track); settle()
-        tapAt(0.5f, 0.72f); assertTrue(controlsShown()); sweep("glance")
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300); assertTrue(controlsShown()); sweep("glance")
         waitFor("controls out", 12_000) { !controlsShown() }
         swipeFromLeft(); check("launchpad", Surface.Launchpad); sweep("launchpad", pane = "Comms"); back()
         key(KeyEvent.KEYCODE_R, ctrl = true); check("recents", Surface.Recents); sweep("recents", headings = true, pane = "Recent apps"); back()

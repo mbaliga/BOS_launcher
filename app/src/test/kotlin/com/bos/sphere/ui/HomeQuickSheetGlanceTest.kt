@@ -78,21 +78,20 @@ class HomeQuickSheetGlanceTest {
         assertEquals(HomeOrder.LeftToRight, seen.prefs.homeOrder)
     }
 
-    @Test fun HOM_23_theGlanceQuickSheetKeepsContentAndHotspotsChips() {
+    @Test fun HOM_23_theQuickSheetHasHotspotsChipsButNoGlanceContentChips() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
-        rule.onNodeWithText("GLANCE CONTENT").assertIsDisplayed()
+        gone("GLANCE CONTENT")
+        for (t in listOf("Time", "Time + Date", "Date + Weather", "Time + Date + Weather")) gone(t)
         rule.onNodeWithText("HOTSPOTS").performScrollTo().assertExists()
-        for (t in listOf("Time", "Time + Date", "Date + Weather", "Time + Date + Weather")) rule.onNodeWithText(t).performScrollTo().assertExists()
         for (t in listOf("Four", "Two (bottom)", "One", "None")) rule.onNodeWithText(t).performScrollTo().assertExists()
-        rule.onNodeWithText("Date + Weather").performClick()
-        assertEquals(setOf(com.bos.sphere.core.data.GlanceItem.Date, com.bos.sphere.core.data.GlanceItem.Weather, com.bos.sphere.core.data.GlanceItem.NowPlaying), seen.prefs.glanceContent)
         rule.onNodeWithText("Two (bottom)").performScrollTo().performClick()
         assertEquals(setOf(com.bos.sphere.core.data.Corner.BottomLeft, com.bos.sphere.core.data.Corner.BottomRight), seen.prefs.glanceHotspots)
     }
 
-    @Test fun HOM_23_withGlanceOffTheGlanceContentAndHotspotsChipsAreHidden() {
+    @Test fun GFX_38_theHotspotsChipsStayWithGlanceOffBecauseTheHotspotsAreOnEveryPage() {
         val seen = Seen(); sheet(LauncherPrefs(glanceEnabled = false), seen)
-        gone("GLANCE CONTENT", "HOTSPOTS")
+        gone("GLANCE CONTENT")
+        rule.onNodeWithText("HOTSPOTS").performScrollTo().assertExists()
         rule.onNodeWithText("PAGES").assertExists()
     }
 

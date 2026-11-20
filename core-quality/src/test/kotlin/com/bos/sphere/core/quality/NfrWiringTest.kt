@@ -112,7 +112,7 @@ class NfrWiringTest {
     }
 
     @Test fun NFR_12_noBlockingCallsInTheHomeComposablesOfFeatureGrid() {
-        val files = listOf("GridHome", "ContinuousHome", "XmbHome", "ListHome", "HomeFrame", "StatusStrip", "ClockBlock", "IconTheme", "HomeBadges", "FolderUi", "MediaSource", "IndicatorLayer")
+        val files = listOf("GridHome", "ContinuousHome", "XmbHome", "ListHome", "HomeFrame", "ClockBlock", "FixedHomeChrome", "IconTheme", "HomeBadges", "FolderUi", "MediaSource", "IndicatorLayer")
         val blocking = listOf("runBlocking", "Thread.sleep", ".commit()", "getInstalledPackages", "queryIntentActivities", "contentResolver.query(", "getInstalledApplications", "BitmapFactory.decode", "getPackageInfo", "loadLabel(")
         val hits = files.flatMap { n ->
             val f = Repo.file("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/$n.kt")

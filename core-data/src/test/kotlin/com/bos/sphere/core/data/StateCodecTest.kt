@@ -53,7 +53,7 @@ class StateCodecTest {
         v is Enum<*> -> type.enumConstants.filter { it != v }
         v is PictureSpec -> listOf(v.copy(fit = PictureFit.Fit, dim = 25, gif = GifMode.Once)) // wave 34: the file and what describes it are device-bound on purpose (StateSchema.WALLPAPER_PICTURE_KEYS); fit, dim and mode travel
         v is GridSpec -> listOf(GridSpec(v.columns + 1, v.rows + 1), GridSpec(v.columns - 1, v.rows - 1))
-        v is Map<*, *> -> listOf(emptyMap<Any, Any>(), mapOf(StripItem.entries.first() to StripZone.entries.last()))
+        v is Map<*, *> -> listOf(emptyMap<Any, Any>()) // wave 38: the status strip map is gone
         v is Set<*> -> listOf(emptySet<Any>(), setOf("a", "b"))
         v is List<*> -> listOf(listOf("a/M#0", "b/M#0"))
         else -> error("no test variant for ${type.name}")

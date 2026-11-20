@@ -58,7 +58,7 @@ class WallpaperRowsW26Test {
     private fun model(p: LauncherPrefs, pages: Int) = SettingsModel(
         prefs = p, updatePrefs = { f -> prefs = f(prefs) }, pageIndex = 0, pages = List(pages) { HomePage(keys = emptyList(), id = it + 1L) },
         setPageLayout = { _, _ -> }, addPageAfter = {}, deletePage = {}, setClockTile = { _, _ -> }, corners = emptyMap(), gestures = emptyMap(), setGesture = { _, _ -> },
-        requestHealth = {}, about = listOf("Version" to "test"), healthAvailable = false, appsByKey = emptyMap(), isLandscape = false, chosenApp = { null },
+        about = listOf("Version" to "test"), appsByKey = emptyMap(), isLandscape = false, chosenApp = { null },
         pickLeftWidget = {}, leftWidgetLabel = null, pickAppFor = {}, motionAvailable = false, editCorner = {}, editGesture = {},
         system = SystemLinks({}, {}, {}, {}), lab = listOf(LabEntry("x", "Spike", "result", {})),
     )

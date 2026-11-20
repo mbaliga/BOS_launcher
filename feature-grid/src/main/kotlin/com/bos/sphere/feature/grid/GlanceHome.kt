@@ -94,15 +94,10 @@ import com.bos.sphere.core.data.ClockFormat
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerItem
 import com.bos.sphere.core.data.ControlsPop
-import com.bos.sphere.core.data.GlanceContent
-import com.bos.sphere.core.data.GlanceItem
-import com.bos.sphere.core.data.GlanceWeather
 import com.bos.sphere.core.data.LauncherPrefs
-import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.data.MediaInfo
+import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.data.RightDestination
-import com.bos.sphere.core.data.WeatherCodes
-import com.bos.sphere.core.data.WeatherInfo
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.rememberMotionPrefs
 import com.bos.sphere.core.input.FocusKind
@@ -113,23 +108,10 @@ import java.util.Locale
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Pure text rules of the Glance centre (testable). */
+/** Pure text rules of the music line (testable). */
 object GlanceText {
-    /** The time pattern: 12 or 24 hour by the setting or the system, never seconds. */
-    fun timePattern(format: ClockFormat, system24: Boolean): String = ClockText.timePattern(format, system24)
-
-    /** The clock size in dp for a window of [w] x [h] dp at [fontScale]: it scales with the font but never outgrows the window. */
-    fun clockSizeDp(w: Float, h: Float, fontScale: Float): Float {
-        val base = minOf(w * 0.26f, h * 0.30f, 124f)
-        // W20 audit: and never wider than the room between the two 48 dp edge handles ("88:88" is about 2.6 em wide, tabular digits).
-        val room = ((w - 2f * CLOCK_SIDE_CLEAR_DP) / CLOCK_EM_WIDTH).coerceAtLeast(24f)
-        return (base * fontScale.coerceIn(1f, 2f)).coerceAtMost(w * 0.28f).coerceAtMost(h * 0.42f).coerceAtMost(room)
-    }
-
-    /** Clear space on each side of the clock: the 48 dp edge handle plus a margin. */
-    const val CLOCK_SIDE_CLEAR_DP = 56f
-    /** The widest "HH:mm" in tabular digits, in em (four digits, the colon and the negative letter spacing), with a little air. */
-    const val CLOCK_EM_WIDTH = 2.7f
+    /** The music line's text size in sp; the Glance clock is the same size (owner rule). */
+    const val MUSIC_SP = 14f
 
     /** The one-line music text: "Title · Artist", or the title alone. */
     fun nowPlayingLine(title: String, artist: String) = if (artist.isBlank()) title else "$title · $artist"
@@ -142,106 +124,41 @@ object GlanceText {
 }
 
 /**
- * HOM-23 (wave 16, owner request): the Glance home. A near-empty, quiet surface: the clock and date centred, the music that is
- * playing at the top (a tap pops the controls in, inactivity pops them out), an optional weather ambience behind the clock, up
- * to four hotspots in the corners and a small surface indicator at the bottom. One composition that rotates with the display.
- *
- * Layers, bottom to top: the base, the weather ambience, [underlay] (the two-slot signal background and its scrim, so the glow
- * lines and the dot grid stay readable over the weather), the gesture and tap layer, the centre, the music line, the controls,
- * the hotspots, the indicator. The composition order is the TalkBack order (clock, date, weather, now playing, controls, hotspots).
+ * Wave 38 (glanceFixed): the Glance page is the CALM page: only the wallpaper (the [underlay] and its scrim) and the home gestures. The time, the date and the
+ * weather are gone with their settings; the four hotspots, the clock, the music line and the page dots are the fixed chrome the home draws above its pager
+ * ([FixedHomeChrome], the dots by the home), so they do not move while this page scrolls away. A standalone surface (tests, previews) may still draw its
+ * own one-stop indicator ([indicator] true); the home passes false.
  */
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GlanceSurface(
     prefs: LauncherPrefs,
-    weather: WeatherInfo?,
-    media: MediaInfo?,
-    hotspots: List<Hotspot>,
-    appsByKey: Map<String, AppEntry>,
     rightDestinations: List<RightDestination>,
     hasLaunchpad: Boolean,
-    onRun: (CornerItem, Corner) -> Unit,
-    onClockTap: () -> Unit,
-    onPrevious: () -> Unit,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
     modifier: Modifier = Modifier,
-    /** Wave 17: the indicator's Launchpad glyph and its right-hand dots are real buttons. */
     onOpenLaunchpad: () -> Unit = {},
     onOpenRight: () -> Unit = {},
-    /** Wave 28: the home hosts the ONE page indicator above its pager (it counts Glance as the first stop); false: this surface draws none. True (default): a standalone Glance draws the indicator with the one stop. */
     indicator: Boolean = true,
-    /** Called when the user touches the surface (a tap, a control): the host wakes the indicator it draws. */
+    /** Called when the user touches the surface: the host wakes the indicator it draws. */
     onAwake: () -> Unit = {},
     gestures: HomeGestureSpec? = null,
     dark: Boolean = isDarkSurface(),
     underlay: @Composable () -> Unit = {},
 ) {
-    val items = prefs.glanceContent
-    val motion = rememberMotionPrefs()
-    val reduced = motion.reduced
-    val context = LocalContext.current
-    val active = rememberRadarActive()
-    val hideMs = GlanceControlsMs.of(prefs.glanceControlsSeconds)
-    val ink = GlanceInk.clock(dark)
-    val inkDim = GlanceInk.secondary(dark)
-
-    // The pop-in controls: one pure state value (see ControlsPop), a timer that fires at its hideAt.
-    var pop by remember { mutableStateOf(ControlsPop()) }
-    val playing = media != null && GlanceItem.NowPlaying in items
-    LaunchedEffect(playing, active) { if (!playing || !active) pop = pop.dismiss() }
-    LaunchedEffect(pop) {
-        if (pop.visible && !pop.fingerDown && pop.hideAt != ControlsPop.NEVER) {
-            delay((pop.hideAt - SystemClock.uptimeMillis()).coerceAtLeast(0L))
-            pop = pop.expired(pop.hideAt)
-        }
-    }
     var awakeNonce by remember { mutableIntStateOf(0) }
-    fun interact() { pop = pop.interact(SystemClock.uptimeMillis(), hideMs); awakeNonce++; onAwake() }
-    fun tapSurface() { pop = pop.tapSurface(SystemClock.uptimeMillis(), playing, hideMs); awakeNonce++; onAwake() }
-
-    val effect = if (GlanceContent.showsWeather(items)) GlanceWeather.effectOf(weather, GlanceWeather.isDaylight(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))) else null
-
     // Wave 34: with the system live wallpaper chosen the surface has no base colour at all, so the wallpaper behind the window shows through.
     val systemWallpaper = prefs.wallpaper(com.bos.sphere.core.data.WallpaperSurface.Glance).kind == com.bos.sphere.core.data.WallpaperKind.System
     BoxWithConstraints(modifier.fillMaxSize().background(if (systemWallpaper) Color.Transparent else if (dark) Color.Black else Color(0xFFF3F3F6)).testTag("glance.surface")) {
-        val w = maxWidth.value; val h = maxHeight.value
-        GlanceWeatherLayer(effect, prefs.glanceWeatherIntensity, dark)
         underlay()
-        // The tap layer: a tap on empty surface pops the controls in (or out); the home gestures (swipes, long press) share it.
+        // The tap layer: the home gestures (swipes, long press) share it; a tap only wakes the indicator.
         Box(
             Modifier.fillMaxSize().homeGestures(gestures) { true }
-                .pointerInput(Unit) { detectTapGestures(onTap = { tapSurface() }) }
-                // decoration for accessibility: the keyboard and TalkBack way to the controls is the music line (a button)
+                .pointerInput(Unit) { detectTapGestures(onTap = { awakeNonce++; onAwake() }) }
+                // decoration for accessibility: the surface has no content of its own
                 .clearAndSetSemantics { },
         )
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        val cutoutTop = with(density) { WindowInsets.displayCutout.getTop(density).toDp() }
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            GlanceCentre(prefs, weather, items, w, h, ink, inkDim, onClockTap, Modifier.align(Alignment.Center))
-            // Music at the top: a stable slot (its height is reserved), the line only while something plays. W22: the line always sits below
-            // the notch's bottom edge (the notch hangs over the top of the screen), so it never moves and the notch never covers it.
-            // W25: the title keeps its own place (fixed padding under the status area) while the controls are away; when they come in it is pushed down
-            // by the notch body (spring, snap with reduced motion) and moves back when they leave, so it is never behind or touching the notch.
-            val push by animateDpAsState(
-                if (playing && pop.visible) GlanceNotch.TITLE_PUSH_DP.dp else 0.dp,
-                if (reduced) snap() else spring(dampingRatio = 0.8f, stiffness = 420f), label = "glanceTitlePush",
-            )
-            Box(Modifier.align(Alignment.TopCenter).padding(top = GlanceNotch.TITLE_TOP_DP.dp).offset { IntOffset(0, push.roundToPx()) }.height(40.dp).testTag("glance.title.slot")) {
-                if (playing && media != null) {
-                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapSurface() }, maxWidth = (w - 2 * GlanceNotch.TITLE_SIDE_DP).coerceIn(120f, 280f).dp, edge = if (dark) Color.Black else Color(0xFFF3F3F6))
-                }
-            }
-        }
-        // The notch is drawn from y = 0 of the window (behind the status bar and the cutout), outside the safe area.
-        if (playing && media != null) {
-            ControlsNotch(pop.visible, reduced, media, w, cutoutTop, Modifier.align(Alignment.TopCenter),
-                onFingerDown = { pop = pop.fingerDown() }, onFingerUp = { pop = pop.fingerUp(SystemClock.uptimeMillis(), hideMs) },
-                onPrevious = { interact(); onPrevious() }, onPlayPause = { interact(); onPlayPause() }, onNext = { interact(); onNext() })
-        }
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            GlanceHotspotLayer(hotspots, appsByKey, onRun, tint = inkDim)
-            if (indicator && prefs.glanceIndicator) PageIndicator(
+        if (indicator && prefs.glanceIndicator) Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            PageIndicator(
                 count = 0, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
                 onMenu = if (hasLaunchpad) onOpenLaunchpad else null, menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad",
                 rtl = LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl, onGlance = {}, glanceCurrent = true, right = rightDestinations, onRight = onOpenRight, quiet = true, awakeNonce = awakeNonce,
@@ -262,64 +179,6 @@ object GlanceInk {
 /** The controls timeout in milliseconds (setting seconds, clamped). */
 object GlanceControlsMs { fun of(seconds: Int): Long = com.bos.sphere.core.data.GlanceControls.clampSeconds(seconds) * 1000L }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun GlanceCentre(
-    prefs: LauncherPrefs, weather: WeatherInfo?, items: Set<GlanceItem>, w: Float, h: Float,
-    ink: Color, inkDim: Color, onClockTap: () -> Unit, modifier: Modifier,
-) {
-    val context = LocalContext.current
-    val fontScale = LocalConfiguration.current.fontScale
-    val now = rememberNow()
-    val is24 = DateFormat.is24HourFormat(context)
-    val locale = Locale.getDefault()
-    val showTime = GlanceItem.Time in items
-    val showDate = GlanceItem.Date in items
-    val showWeather = GlanceItem.Weather in items && weather != null
-    val showBattery = GlanceItem.Battery in items
-    if (!showTime && !showDate && !showWeather && !showBattery) return
-    val time = remember(now, prefs.clockFormat, is24) { SimpleDateFormat(GlanceText.timePattern(prefs.clockFormat, is24), locale).format(now) }
-    val date = remember(now) { SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, "EEEdMMM"), locale).format(now) }
-    val sizeDp = GlanceText.clockSizeDp(w, h, fontScale)
-    val dateSp = (sizeDp * 0.2f).coerceIn(15f, 26f)
-    val tapLabel = L10n.tr("Open clock")
-    // The clock is not mirrored in right-to-left: digits keep their order.
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Column(
-            modifier.padding(horizontal = GlanceText.CLOCK_SIDE_CLEAR_DP.dp).clip(RoundedCornerShape(24.dp))
-                .launcherItem("glance.clock", focusable = true, onActivate = onClockTap, ringRadiusDp = 24f)
-                .clickable(onClickLabel = tapLabel, role = Role.Button, onClick = onClockTap),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (showTime) {
-                // W20 audit: the estimate above can be a little off for a font with wide digits: if the text still overflows its box it shrinks
-                // by a tenth until it fits (a state write from the text layout callback, the documented pattern), so it is never clipped.
-                var fit by remember(sizeDp) { mutableFloatStateOf(1f) }
-                Text(
-                    time, color = ink, modifier = Modifier.semantics { testTag = "glance.time" }, maxLines = 1, softWrap = false, textAlign = TextAlign.Center,
-                    onTextLayout = { if (it.hasVisualOverflow && fit > 0.3f) fit *= 0.9f },
-                    style = TextStyle(fontSize = with(androidx.compose.ui.platform.LocalDensity.current) { (sizeDp * fit).dp.toSp() }, fontWeight = FontWeight.ExtraLight, fontFeatureSettings = "tnum", letterSpacing = (-1).sp),
-                )
-            }
-            if (showDate || showWeather) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.Center) {
-                    if (showDate) Text(date, modifier = Modifier.semantics { testTag = "glance.date" }, color = inkDim, fontSize = (if (showTime) dateSp else dateSp * 1.8f).sp, textAlign = TextAlign.Center)
-                    if (showWeather && weather != null) {
-                        Text(
-                            (if (showDate) "· " else "") + weather.temperature(prefs.weatherFahrenheit), color = inkDim, fontSize = (if (showTime) dateSp else dateSp * 1.8f).sp,
-                            modifier = Modifier.semantics { contentDescription = L10n.tr(WeatherCodes.description(weather.code)) + ", " + weather.temperature(prefs.weatherFahrenheit) },
-                        )
-                    }
-                }
-            }
-            if (showBattery) {
-                val pct = rememberBatteryPercent()
-                if (pct >= 0) Text(L10n.tr("Battery %d%%", pct), color = inkDim, fontSize = (dateSp * 0.8f).sp, modifier = Modifier.padding(top = 6.dp))
-            }
-        }
-    }
-}
-
 /**
  * The song title (W25): one line, centred when it fits; when it is wider than its slot it scrolls as a marquee with both edges faded.
  * With reduced motion it does not scroll: it shows the beginning with an ellipsis. The text carries the test tag "glance.title.marquee"
@@ -327,13 +186,13 @@ private fun GlanceCentre(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit, maxWidth: Dp = 280.dp, edge: Color = Color.Black) {
+internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit, maxWidth: Dp = 280.dp, edge: Color = Color.Black) {
     val line = GlanceText.nowPlayingLine(media.title, media.artist)
     val display = GlanceText.nowPlayingDisplay(media.title, media.artist)
     val spoken = L10n.tr("Now playing: %s", line)
     val showLabel = L10n.tr("Show playback controls")
     val measurer = androidx.compose.ui.text.rememberTextMeasurer()
-    val style = androidx.compose.ui.text.TextStyle(color = tint, fontSize = 14.sp)
+    val style = androidx.compose.ui.text.TextStyle(color = tint, fontSize = GlanceText.MUSIC_SP.sp)
     val density = androidx.compose.ui.platform.LocalDensity.current
     // The text's room: the slot minus the 16 dp note glyph, its 8 dp gap and the 12 dp padding on each side.
     val room = with(density) { (maxWidth - 16.dp - 8.dp - 24.dp).roundToPx() }
@@ -351,7 +210,7 @@ private fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onAc
     ) {
         Icon(Glyphs.Music, null, tint = tint, modifier = Modifier.size(16.dp))
         Text(
-            display, color = tint, fontSize = 14.sp, maxLines = 1, softWrap = false,
+            display, color = tint, fontSize = GlanceText.MUSIC_SP.sp, maxLines = 1, softWrap = false,
             overflow = if (scrolling) TextOverflow.Clip else TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false).testTag(if (scrolling) "glance.title.marquee" else "glance.title.static")
                 .then(
@@ -465,21 +324,4 @@ internal fun IndicatorButton(tag: String, label: String, onClick: () -> Unit, gl
 @Composable
 internal fun GlanceHotspotLayer(hotspots: List<Hotspot>, appsByKey: Map<String, AppEntry>, onRun: (CornerItem, Corner) -> Unit, tint: Color) {
     MinimalHotspotLayer(hotspots = hotspots, appsByKey = appsByKey, showHints = false, onRun = onRun, showIcons = true, iconTint = tint)
-}
-
-@Composable
-internal fun rememberBatteryPercent(): Int {
-    val context = LocalContext.current
-    var pct by remember { mutableIntStateOf(-1) }
-    DisposableEffect(context) {
-        fun read(i: Intent?) {
-            val level = i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-            val scale = i?.getIntExtra(BatteryManager.EXTRA_SCALE, 100)?.takeIf { it > 0 } ?: 100
-            pct = if (level < 0) -1 else (level * 100f / scale).roundToInt().coerceIn(0, 100)
-        }
-        val receiver = object : BroadcastReceiver() { override fun onReceive(c: Context?, i: Intent?) = read(i) }
-        read(runCatching { context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_NOT_EXPORTED) }.getOrNull())
-        onDispose { runCatching { context.unregisterReceiver(receiver) } }
-    }
-    return pct
 }

@@ -9,11 +9,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.TextLayoutResult
-import com.bos.sphere.core.data.ClockFormat
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.DefaultCorners
 import com.bos.sphere.core.data.GlanceHotspots
-import com.bos.sphere.core.data.GlanceItem
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.RightDestination
@@ -40,8 +38,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Wave 20 audit of HOM-23 (Glance): the clock fits its window on small phones, in landscape on a small window and at 200 percent font,
- * and never lands on a hotspot or an edge handle. Robolectric, not a device.
+ * Wave 20 audit of HOM-23 (Glance): the music line and the inks (wave 38: the clock tests went with the clock). Robolectric, not a device.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -57,55 +54,6 @@ class GlanceAuditW20UiTest {
 
     private val media = MediaInfo("Title", "Artist", "pkg.music", playing = true, canPrev = true, canNext = true)
     private fun hotspots() = DefaultCorners.map { (c, slot) -> Hotspot(c, GlanceHotspots.itemOf(slot)!!) }
-
-    private fun show(prefs: LauncherPrefs) = rule.setContent {
-        GlanceSurface(
-            prefs = prefs, weather = null, media = media, hotspots = hotspots(), appsByKey = emptyMap(), rightDestinations = listOf(RightDestination.Recents),
-            hasLaunchpad = true, onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, dark = true, modifier = Modifier.fillMaxSize(),
-        )
-    }
-
-    private fun assertClockFits(label: String) {
-        val node = rule.onNodeWithTag("glance.time", useUnmergedTree = true).fetchSemanticsNode()
-        val results = ArrayList<TextLayoutResult>()
-        node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
-        val layout = results.firstOrNull()
-        assertTrue("$label: the time has a text layout", layout != null)
-        assertFalse("$label: the clock text is not clipped by its own box", layout!!.hasVisualOverflow)
-        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
-        val t = node.boundsInRoot
-        assertTrue("$label: inside the window", t.left >= 0f && t.right <= root.right && t.top >= 0f && t.bottom <= root.bottom)
-        // the 48 dp edge handles (Launchpad on the left, Recents on the right) sit at the vertical centre: the clock stays clear of them
-        val handle = 48f * rule.activity.resources.displayMetrics.density
-        assertTrue("$label: clear of the left handle", t.left >= handle)
-        assertTrue("$label: clear of the right handle", t.right <= root.right - handle)
-        for (c in LauncherInput.focus.nodes().filter { it.id.startsWith("minimal.corner.") }.map { it.rect })
-            assertFalse("$label: the clock does not overlap a hotspot", t.left < c.right && t.right > c.left && t.top < c.bottom && t.bottom > c.top)
-    }
-
-    @Test @Config(sdk = [35], qualifiers = "w320dp-h568dp-port-xhdpi", fontScale = 2f)
-    fun HOM_23_theClockIsNotClippedOnASmallPhoneAt200PercentFont() {
-        show(LauncherPrefs(clockFormat = ClockFormat.Hour24, glanceContent = setOf(GlanceItem.Time, GlanceItem.Date, GlanceItem.NowPlaying)))
-        assertClockFits("320x568 font 200")
-    }
-
-    @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-xhdpi")
-    fun HOM_23_theClockIsNotClippedOnACommon360DpPhone() {
-        show(LauncherPrefs(clockFormat = ClockFormat.Hour24))
-        assertClockFits("360x640")
-    }
-
-    @Test @Config(sdk = [35], qualifiers = "w568dp-h320dp-land-xhdpi", fontScale = 2f)
-    fun HOM_23_theClockInLandscapeOnASmallWindowAt200PercentStaysClearOfTheCorners() {
-        show(LauncherPrefs(clockFormat = ClockFormat.Hour24))
-        assertClockFits("568x320 land font 200")
-    }
-
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_theClockOnATypicalPhoneKeepsItsSizeAndFits() {
-        show(LauncherPrefs(clockFormat = ClockFormat.Hour12))
-        assertClockFits("411x891")
-    }
 
     @Test @Config(sdk = [35]) fun HOM_23_theMusicLineIsolatesEachPartSoARightToLeftTitleKeepsItsOrderAndNoArtistIsTheTitleAlone() {
         assertEquals("عنوان", GlanceText.nowPlayingDisplay("عنوان", ""))
@@ -124,7 +72,7 @@ class GlanceAuditW20UiTest {
         }
     }
 
-    @Test @Config(sdk = [35]) fun NFR_15_theClockAndTheDateReachAaOverEveryBackgroundAtEveryLevelWithTheHomeScrim() {
+    @Test @Config(sdk = [35]) fun NFR_15_theMusicInksReachAaOverEveryBackgroundAtEveryLevelWithTheHomeScrim() {
         val choices = BgItem.entries.map { BackgroundChoice(it, BgItem.None) } + BackgroundChoice.DEFAULT +
             listOf(BackgroundChoice(BgItem.Beam, BgItem.RadarSweep), BackgroundChoice(BgItem.Halo, BgItem.BottomGlow), BackgroundChoice(BgItem.GlowLines, BgItem.BreathingDots))
         for (dark in listOf(true, false)) for (intensity in RadarIntensity.entries) for (choice in choices) {

@@ -88,19 +88,19 @@ class HomeUnifyScreenshotTest {
                 HorizontalPager(state = pager, reverseLayout = order.rtl, modifier = Modifier.fillMaxSize().testTag("home.pager")) { stop ->
                     if (HomeDeck.surfaceAt(glanceOn, stop) == com.bos.sphere.core.data.HomeShown.Glance) {
                         CompositionLocalProvider(LocalLayoutDirection provides if (order.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-                            GlanceSurface(
-                                prefs = prefs, weather = null, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
+                            GlanceHomeForTest(
+                                prefs = prefs, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
                                 rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
-                                onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, indicator = false, modifier = Modifier.fillMaxSize(),
+                                onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, indicator = false, modifier = Modifier.fillMaxSize(),
                             )
                         }
                     } else if (prefs.homePages == HomePages.Continuous) {
                         ColumnScrollHome(keys = apps.map { it.key }, appsByKey = byKey, extras = null, order = order, topBand = 56.dp, bottomBand = 84.dp, onLaunch = {}, onAppLongPress = {})
                     } else {
                         GridHome(
-                            pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = grid, suggestion = null, gesturesBound = emptySet(),
-                            capacityOf = { it.capacity(false, prefs) }, onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {},
-                            onClockTap = {}, onTileLongPress = { _, _ -> }, drawIndicator = false,
+                            pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = grid, gesturesBound = emptySet(),
+                            capacityOf = { it.capacity(false, prefs) }, onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {}, onClockTap = {},
+                            onTileLongPress = { _, _ -> }, drawIndicator = false,
                         )
                     }
                 }

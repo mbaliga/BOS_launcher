@@ -221,7 +221,7 @@ class HomeModelTest {
         assertNull(ShortcutCodec.decodeItem("action:NoSuchThing"))
     }
 
-    // --- gestures / suggestion ------------------------------------------------------------
+    // --- gestures ------------------------------------------------------------
 
     @Test
     fun `swipes along the paging axis are reserved for paging`() {
@@ -229,24 +229,6 @@ class HomeModelTest {
         assertTrue(!HomeGesture.SwipeUp.usableWith(PagingAxis.Vertical))
         assertTrue(HomeGesture.SwipeLeft.usableWith(PagingAxis.Vertical))
         assertTrue(HomeGesture.PinchIn.usableWith(PagingAxis.Vertical))
-    }
-
-    @Test
-    fun `suggester favours same-hour recent launches and respects exclusions`() {
-        val day = 86_400_000L
-        val now = 100 * day
-        val events = listOf(
-            LaunchEvent("morning", now - 1 * day, 8),
-            LaunchEvent("morning", now - 2 * day, 8),
-            LaunchEvent("evening", now - 1 * day, 20),
-            LaunchEvent("evening", now - 2 * day, 20),
-            LaunchEvent("evening", now - 3 * day, 21),
-        )
-        val all = setOf("morning", "evening")
-        assertEquals("morning", AppSuggester.suggest(events, now, 8, all, emptySet()))
-        assertEquals("evening", AppSuggester.suggest(events, now, 20, all, emptySet()))
-        assertEquals("evening", AppSuggester.suggest(events, now, 8, all, setOf("morning")))
-        assertNull(AppSuggester.suggest(events, now, 8, setOf("other"), emptySet()))
     }
 }
 

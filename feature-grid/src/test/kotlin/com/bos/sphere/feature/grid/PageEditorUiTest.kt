@@ -204,7 +204,7 @@ class PageEditorUiTest {
         val c = Calls(); host(c, fourPages, current = 0, glanceFocus = true)
         card("Glance").assertIsSelected()
         rule.onAllNodesWithContentDescription("Delete page 1").assertCountEquals(0)
-        rule.onNodeWithText("Hotspots").assertIsDisplayed(); rule.onNodeWithText("Time").assertIsDisplayed()
+        rule.onNodeWithText("Hotspots").assertIsDisplayed(); rule.onNodeWithText("Show music").assertIsDisplayed()
         rule.onNodeWithText("Top left").performClick()
         assertTrue("a hotspot toggled", com.bos.sphere.core.data.Corner.TopLeft !in c.prefs.glanceHotspots)
         shoot("glance_focus")

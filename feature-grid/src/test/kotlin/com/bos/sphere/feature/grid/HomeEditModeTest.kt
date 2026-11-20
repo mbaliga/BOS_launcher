@@ -58,7 +58,7 @@ class HomeEditModeTest {
         val pages = HomeLayoutMath.visualPages(com.bos.sphere.core.data.HomeLayout(pages = listOf(com.bos.sphere.core.data.HomePage(apps.map { it.key }, id = 1L)), seeded = true), apps.map { it.key }, capacityOf = { it.capacity(false, prefs) })
         Box(Modifier.fillMaxSize()) {
             GridHome(
-                pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = state, suggestion = null,
+                pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = state,
                 gesturesBound = setOf(HomeGesture.PinchIn), capacityOf = { it.capacity(false, prefs) },
                 onLaunch = {}, onAppLongPress = { probe.longPresses++ },
                 onPagesChange = { probe.changes++; probe.lastPages = it },

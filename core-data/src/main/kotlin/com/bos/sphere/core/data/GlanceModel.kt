@@ -1,51 +1,20 @@
 package com.bos.sphere.core.data
 
 /**
- * HOM-23 (wave 16): the pure model of the Glance home: what it shows, which hotspots are on, the pop-in controls timer and the
- * weather-to-effect mapping. No Android types, so every rule here is a plain unit test.
+ * HOM-23 (wave 16): the pure model of the Glance home: which hotspots are on and the pop-in controls timer. No Android types, so every rule here is a plain unit test.
  */
 
-/** One thing the Glance centre or top can show. */
-enum class GlanceItem(val label: String) {
-    Time("Time"), Date("Date"), Weather("Weather"), NowPlaying("Now playing"), Battery("Battery"),
-}
+/**
+ * Wave 38 (glanceFixed): the Glance page shows no time, date or weather any more, so its content set (`glanceContent`: Time, Date, Weather, Now playing,
+ * Battery) and the weather ambience strength (`glanceWeather`) are retired. The one thing that survived is the music line, now the plain `showMusic` toggle:
+ * a stored `showMusic` wins; otherwise it follows the old content set (Now playing in it, or no old set at all, means on).
+ */
+object GlanceMusic {
+    /** The retired keys: read as migration input on every load (so an import accounts for them), deleted on the next save. */
+    val RETIRED_KEYS = listOf("glanceContent", "glanceWeather")
 
-/** The presets of the "Glance content" setting. Custom is any other combination of the free toggles. */
-enum class GlancePreset(val label: String, val clockPart: Set<GlanceItem>?) {
-    Time("Time", setOf(GlanceItem.Time)),
-    TimeDate("Time + Date", setOf(GlanceItem.Time, GlanceItem.Date)),
-    DateWeather("Date + Weather", setOf(GlanceItem.Date, GlanceItem.Weather)),
-    TimeDateWeather("Time + Date + Weather", setOf(GlanceItem.Time, GlanceItem.Date, GlanceItem.Weather)),
-    Custom("Custom", null),
-}
-
-object GlanceContent {
-    /** Time + Date, and the music line (it only shows while something plays). */
-    val DEFAULT: Set<GlanceItem> = setOf(GlanceItem.Time, GlanceItem.Date, GlanceItem.NowPlaying)
-
-    private val CLOCK_PART = setOf(GlanceItem.Time, GlanceItem.Date, GlanceItem.Weather)
-
-    /** A preset replaces the time, date and weather part and leaves Now playing and Battery as the user had them. */
-    fun applyPreset(current: Set<GlanceItem>, preset: GlancePreset): Set<GlanceItem> {
-        val part = preset.clockPart ?: return current
-        return (current - CLOCK_PART) + part
-    }
-
-    fun presetOf(items: Set<GlanceItem>): GlancePreset {
-        val part = items.filterTo(HashSet()) { it in CLOCK_PART }
-        return GlancePreset.entries.firstOrNull { it.clockPart == part } ?: GlancePreset.Custom
-    }
-
-    fun toggle(items: Set<GlanceItem>, item: GlanceItem): Set<GlanceItem> = if (item in items) items - item else items + item
-
-    fun encode(items: Set<GlanceItem>): String = GlanceItem.entries.filter { it in items }.joinToString(",") { it.name }
-
-    /** A missing value is the default; an empty stored string is a valid "nothing" (a user may turn everything off). */
-    fun decode(stored: String?): Set<GlanceItem> =
-        if (stored == null) DEFAULT else stored.split(',').mapNotNullTo(LinkedHashSet()) { n -> GlanceItem.entries.firstOrNull { it.name == n } }
-
-    /** Whether the temperature belongs next to the date, and whether the weather layer draws. */
-    fun showsWeather(items: Set<GlanceItem>) = GlanceItem.Weather in items
+    fun resolve(storedShowMusic: Boolean?, legacyGlanceContent: String?): Boolean =
+        storedShowMusic ?: (legacyGlanceContent == null || legacyGlanceContent.split(',').any { it.trim() == "NowPlaying" })
 }
 
 /** Presets of the hotspot count. */
@@ -128,55 +97,6 @@ data class ControlsPop(val visible: Boolean = false, val hideAt: Long = NEVER, v
     companion object { const val NEVER = Long.MAX_VALUE }
 }
 
-/** The ambient effects of the weather layer. */
-enum class GlanceWeatherEffect { ClearDay, ClearNight, Clouds, Rain, Snow, Fog, Thunder }
-
-object GlanceWeather {
-    /** WMO code and daylight to effect. Null when there is no weather: the layer is absent. */
-    fun effectOf(info: WeatherInfo?, daylight: Boolean): GlanceWeatherEffect? {
-        if (info == null) return null
-        return when (info.code) {
-            0, 1 -> if (daylight) GlanceWeatherEffect.ClearDay else GlanceWeatherEffect.ClearNight
-            2, 3 -> GlanceWeatherEffect.Clouds
-            45, 48 -> GlanceWeatherEffect.Fog
-            in 51..67, in 80..82 -> GlanceWeatherEffect.Rain
-            in 71..77, 85, 86 -> GlanceWeatherEffect.Snow
-            in 95..99 -> GlanceWeatherEffect.Thunder
-            else -> GlanceWeatherEffect.Clouds
-        }
-    }
-
-    /** Daylight from the hour of day: a plain rule (06:00 to 19:59); no location or sun maths, nothing leaves the device. */
-    fun isDaylight(hourOfDay: Int) = hourOfDay in 6..19
-
-    /** Thunder flashes: at most one per 20 s and never above 3 Hz (a flash is one pulse, so 3 Hz is far above the cap). */
-    const val FLASH_MIN_GAP_MS = 20_000L
-    const val FLASH_MAX_HZ = 3
-
-    /** True when a flash may start at [now] given the last one's start. */
-    fun mayFlash(now: Long, lastFlashAt: Long) = lastFlashAt < 0 || now - lastFlashAt >= FLASH_MIN_GAP_MS
-
-    /** One flash per period (23 s, above the 20 s floor) lasting 900 ms: a single smooth pulse, about 1 Hz, well under 3 Hz. */
-    const val FLASH_PERIOD_MS = 23_000L
-    const val FLASH_LENGTH_MS = 900L
-    const val FLASH_PEAK = 0.10f
-
-    /** The very soft thunder flash at [tMs] of the shared clock, 0..[FLASH_PEAK]. The first flash comes after 6 s, never at start. */
-    fun flashAlpha(tMs: Long): Float {
-        val phase = Math.floorMod(tMs - 6_000L, FLASH_PERIOD_MS)
-        if (phase >= FLASH_LENGTH_MS) return 0f
-        val x = phase.toFloat() / FLASH_LENGTH_MS
-        val s = kotlin.math.sin(Math.PI * x).toFloat()
-        return FLASH_PEAK * s * s
-    }
-
-    /** Whether the layer animates: never under reduced motion, while the screen is off or the surface is hidden. */
-    fun animates(reducedMotion: Boolean, screenOn: Boolean, surfaceVisible: Boolean) = !reducedMotion && screenOn && surfaceVisible
-
-    /** Strength of the layer, 0..1, from the setting. */
-    fun strength(i: RadarIntensity) = if (i == RadarIntensity.Subtle) 0.55f else 1f
-}
-
 /**
  * Wave 26: the one-time reading of the removed home-landing setting. Every old landing value (Glance, "Minimal", Recents, AllApps, Selected,
  * missing or unknown) maps to Glance ON: the user's pages, folders and widgets are never touched (they live in the layout, not in the landing),
@@ -207,4 +127,13 @@ object HomeModelMigration {
 
     /** True when the home layout holds anything the user built: more than one page, or an item on the first. */
     fun hasBuiltPages(pages: List<HomePage>): Boolean = pages.size > 1 || pages.any { it.keys.isNotEmpty() }
+}
+
+/**
+ * Wave 38: the Clock and status settings are gone (the clock lives on the Glance page, Analog or Digital, 12 or 24 hour). The stored keys of the removed
+ * settings: clock position, layout, size, date, day, weather, the temperature unit, the status strip and the Health Connect source that only fed it.
+ * `clockFormat` is KEPT (the user's 12 or 24 hour choice; System, the default, follows the device's own setting).
+ */
+object ClockRetired {
+    val KEYS = listOf("clockPosition", "clockLayout", "clockSize", "clockDate", "clockDay", "clockWeather", "weatherF", "strip", "healthSource")
 }

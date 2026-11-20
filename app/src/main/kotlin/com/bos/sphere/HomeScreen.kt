@@ -61,13 +61,11 @@ import com.bos.sphere.feature.grid.editCardLayer
 import kotlinx.coroutines.withContext
 import com.bos.sphere.core.data.GridSpec
 import com.bos.sphere.core.data.PageShape
-import com.bos.sphere.core.data.StripItem
 import com.bos.sphere.core.data.IndicatorColors
 import com.bos.sphere.core.data.IndicatorSource
 import com.bos.sphere.core.data.PageMode
 import com.bos.sphere.core.data.ThemeMode
 import com.bos.sphere.core.data.UsageStats
-import com.bos.sphere.core.data.WeatherSource
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ThemeVariant
@@ -79,7 +77,6 @@ import com.bos.sphere.feature.grid.IconTheme
 import com.bos.sphere.feature.grid.IndicatorLayer
 import com.bos.sphere.feature.grid.LocalIconTheme
 import com.bos.sphere.feature.grid.SearchOverlay
-import com.bos.sphere.feature.grid.StripHost
 import com.bos.sphere.feature.grid.TextButtonPill
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -122,7 +119,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bos.sphere.core.data.ActionRunner
 import com.bos.sphere.core.data.AppEntry
-import com.bos.sphere.core.data.AppSuggester
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.CornerItem
@@ -450,7 +446,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // HOM-23: the screen corners whose hotspot is on (the physical corner under each decides; a disabled hotspot draws nothing and does nothing).
     val glanceOn = remember(prefs.glanceHotspots, rotation, prefs.cornersFollowDevice) { com.bos.sphere.core.data.GlanceHotspots.enabledOnScreen(prefs.glanceHotspots, rotation, prefs.cornersFollowDevice) }
-    val glanceHotspotItems = remember(placements, glanceOn) { placements.filter { it.screen in glanceOn }.mapNotNull { p -> com.bos.sphere.core.data.GlanceHotspots.itemOf(p.slot)?.let { com.bos.sphere.feature.grid.Hotspot(homeOrder.corner(p.screen), it) } } } // wave 26: in right to left the left and right hotspot roles swap
+    val hotspotPlacements = remember(placements, glanceOn) { placements.filter { it.screen in glanceOn } } // wave 38: the Hotspots chips pick which corners draw, on every page
 
     fun openAllApps(anchor: Corner?) {
         if (com.bos.sphere.feature.grid.AllAppsOpening.surfaceFor(prefs.drawerStyle) == com.bos.sphere.feature.grid.AllAppsSurface.Puck) {
@@ -645,13 +641,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         hotCornerDwellMs = if (prefs.hotCornersOn) prefs.hotCornerDwellMs.toLong() else 0L,
         cornerLabel = { hot ->
             val slot = placements.firstOrNull { it.screen == hot.toCorner() }?.slot
-            if (landing == HomeShown.Glance) slot?.takeIf { hot.toCorner() in glanceOn }?.let(MinimalHotspots::itemOf)?.let { com.bos.sphere.feature.grid.itemLabel(it, appsByKey) }
-            else slot?.takeIf { it is CornerSlot.Single }?.let { slotSummary(it, appsByKey) }
+            slot?.takeIf { hot.toCorner() in glanceOn }?.let(MinimalHotspots::itemOf)?.let { com.bos.sphere.feature.grid.itemLabel(it, appsByKey) } // W38: the hotspots are the same on every page
         },
         onCornerActivate = { hot ->
             placements.firstOrNull { it.screen == hot.toCorner() }?.let { p ->
-                if (landing == HomeShown.Glance) { if (p.screen in glanceOn) MinimalHotspots.itemOf(p.slot)?.let { runItem(it, p.screen) } }
-                else (p.slot as? CornerSlot.Single)?.let { runItem(it.item, p.screen) }
+                if (p.screen in glanceOn) MinimalHotspots.itemOf(p.slot)?.let { runItem(it, p.screen) }
             }
         },
     )
@@ -757,26 +751,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val indicatorTarget = IndicatorColors.argb(reading, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, false)
     val indicatorColor by androidx.compose.animation.animateColorAsState(Color(indicatorTarget.toInt()), com.bos.sphere.core.design.rememberMotionPrefs().gate(androidx.compose.animation.core.tween(800)), label = "indicator")
 
-    val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo((landing == HomeShown.Glance && com.bos.sphere.core.data.GlanceItem.NowPlaying in prefs.glanceContent)) // STR-06, HOM-23: W25: the media controls and title live only in the Glance notch, no strip and nothing in the dock
+    val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(com.bos.sphere.feature.grid.FixedHomeChrome.listensToMedia(prefs.showMusic)) // STR-06, HOM-23: W38: the media line and its controls are part of the fixed chrome on every page, no strip and nothing in the dock
 
-    // ---- weather (opt-in; needs approximate location)
-    val weatherSource = remember { WeatherSource(context) }
-    val weather by weatherSource.weather.collectAsStateWithLifecycle()
-    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) weatherSource.refresh(force = true)
-    }
-    val weatherWanted = prefs.clockShowWeather || (landing == HomeShown.Glance && com.bos.sphere.core.data.GlanceItem.Weather in prefs.glanceContent) // HOM-23: Glance weather is the one network user too
-    LaunchedEffect(weatherWanted) {
-        if (weatherWanted) {
-            if (weatherSource.hasPermission()) weatherSource.refresh() else locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-        }
-    }
-    val weatherWantedNow = androidx.compose.runtime.rememberUpdatedState(weatherWanted) // wave 23 sweep: the observer below lives as long as the owner, so it must read the CURRENT setting
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, e ->
             if (e == Lifecycle.Event.ON_START) {
                 indicator.start()
-                if (weatherWantedNow.value) weatherSource.refresh()
             }
             if (e == Lifecycle.Event.ON_STOP) indicator.stop()
         }
@@ -796,32 +776,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (prefs.hideStatusBar) controller.hide(WindowInsetsCompat.Type.statusBars()) else controller.show(WindowInsetsCompat.Type.statusBars())
     }
 
-    // ---- Health Connect: steps, floors, elevation, distance, calories
-    val healthSource = remember { com.bos.sphere.core.data.HealthSource(context) }
-    val health by healthSource.today.collectAsStateWithLifecycle()
-    val healthPermission = rememberLauncherForActivityResult(
-        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract(),
-    ) { healthSource.refresh() }
-    val stripNeedsHealth = prefs.strip.keys.any { it in setOf(StripItem.Floors, StripItem.Elevation, StripItem.Distance, StripItem.Calories) }
-    val wantsHealth = prefs.healthSource == com.bos.sphere.core.data.HealthSourcePref.HealthConnect || stripNeedsHealth
-    fun requestHealth() {
-        if (healthSource.available()) healthPermission.launch(com.bos.sphere.core.data.HealthSource.PERMISSIONS)
-        else runCatching {
-            context.startActivity(
-                Intent(androidx.health.connect.client.HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        }
-    }
-    LaunchedEffect(wantsHealth) {
-        if (wantsHealth && healthSource.available() && !healthSource.hasAllPermissions()) requestHealth()
-    }
-    LaunchedEffect(wantsHealth, lifecycleOwner) {
-        if (!wantsHealth) return@LaunchedEffect
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) { healthSource.refresh(); kotlinx.coroutines.delay(60_000) }
-        }
-    }
-
     // WSP-05: a group placed on the page grid runs like the dock's group item.
     homeItems.runGroup = { g -> scope.launch { appLauncher.runGroup(g) } }
     // Wave 24: an item placed from Glance, Recents or All apps lands on pages; show the landing that draws them.
@@ -837,14 +791,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         r.data?.data?.let { runCatching { com.bos.sphere.feature.search.palette.FileGrants.persist(appCtx, it) } }
     }
     val contactsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    // ---- steps need the activity-recognition permission
-    val stepsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    LaunchedEffect(StripItem.Steps in prefs.strip) {
-        if (StripItem.Steps in prefs.strip &&
-            context.checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) stepsPermission.launch(android.Manifest.permission.ACTIVITY_RECOGNITION)
-    }
-
     // ---- density change: offer to fill the gaps it leaves
     var capSignature by remember { mutableStateOf<List<Int>?>(null) }
     LaunchedEffect(settingsOpen) {
@@ -856,18 +802,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             capSignature = null
             if (before != null && before != sig && HomeLayoutMath.hasGaps(pages, capacityOf)) fillPrompt = true
         }
-    }
-
-    // ---- suggestion
-    val suggestion = remember(history, pages.firstOrNull(), appsByKey) {
-        val cal = Calendar.getInstance()
-        AppSuggester.suggest(
-            events = history,
-            nowMillis = cal.timeInMillis,
-            nowHour = cal.get(Calendar.HOUR_OF_DAY),
-            candidates = appsByKey.keys,
-            exclude = pages.firstOrNull()?.keys?.toSet().orEmpty(),
-        )?.let(appsByKey::get)
     }
 
     // ---- Home press: collapse everything, back to the first page.
@@ -886,10 +820,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val kbHeight = remember { mutableStateOf(0.dp) }
     val bottomClear = if (prefs.alwaysKeyboard) kbHeight.value else 0.dp
     @Composable
-    fun Corners(alpha: Float = 1f) {
+    fun Corners(alpha: Float = 1f) { // wave 38: ONE corner layer for every page, drawn above the pager with the chosen corner style; only the enabled hotspots
         Box(Modifier.fillMaxSize().padding(bottom = bottomClear).graphicsLayer { this.alpha = alpha }) {
             CornerLayer(
-                placements = placements,
+                placements = hotspotPlacements,
                 style = prefs.cornerStyle,
                 iconSize = prefs.cornerIconSize.dp,
                 iconMode = prefs.cornerIconMode,
@@ -949,8 +883,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     // the corner icons, clock and page dots sit in the margin band around it.
     val frame = com.bos.sphere.feature.grid.HomeFrame.band(cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()).dp
     val sideGap = frame + (cfg.screenWidthDp * prefs.gridInsetX).dp
-    val stripH = com.bos.sphere.feature.grid.stripHeight(prefs)
-    val scrollTop = if (prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Top) maxOf(frame, stripH + 14.dp) else frame
+    val scrollTop = frame // wave 38: no clock or status strip on the pages
     // HOM-19: where the dock rail is thicker than the frame band, the app area gives up the difference.
     val dockState by com.bos.sphere.feature.dock.WorkspaceRepository.get(context).state.collectAsState()
     val dockTier = remember(cfg.screenWidthDp) { com.bos.sphere.core.capabilities.CapabilityEvaluator.tier(appLauncher.inputs()) }
@@ -965,7 +898,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         lowerStackDp = com.bos.sphere.feature.dock.HomeBottomStack.lowerStackDp(
             stackDp = com.bos.sphere.feature.grid.bottomStackDp(prefs, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat()),
             glance = landing == HomeShown.Glance, glanceIndicator = prefs.glanceIndicator || pageDotsAtBottom, // the one indicator is drawn on Glance whenever there are several stops, whatever the Glance indicator preference
-            pageDotsAtBottom = pageDotsAtBottom, clockAtBottom = prefs.clockPosition == com.bos.sphere.core.data.ClockPosition.Bottom,
+            pageDotsAtBottom = pageDotsAtBottom, clockAtBottom = false,
         ),
         shelfShown = com.bos.sphere.feature.dock.GroupShelfModel.visible(dockState.groups, dockState.dock.groupShelf).isNotEmpty(),
     )
@@ -980,7 +913,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     fun BoxScope.SettingsHoldBand() {
         Box(
             Modifier.align(Alignment.TopCenter).fillMaxWidth()
-                .height(stripH + 44.dp)
+                .height(44.dp)
                 .pointerInput(Unit) { detectTapGestures(onLongPress = { quickPage = null; quickOpen = true }) },
         )
     }
@@ -1127,24 +1060,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     modifier = Modifier.fillMaxSize().testTag("home.pager"),
                 ) { stop ->
                     // Only the stop on screen (or moving into view) is composed: a pager prefetches its neighbour while idle, and a prefetched
-                    // Glance or grid would register its keyboard focus nodes and run its effects (weather, media) while it is not shown.
+                    // Glance or grid would register its keyboard focus nodes and run its effects (media) while it is not shown.
                     val stopLive = stop == homePager.currentPage || homePager.isScrollInProgress || homePager.currentPageOffsetFraction != 0f
                     if (!stopLive) Box(Modifier.fillMaxSize()) else
                     androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides pagerHostDir) {
                         if (com.bos.sphere.core.data.HomeDeck.surfaceAt(prefs.glanceEnabled, stop) == HomeShown.Glance) {
                 androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides if (homeOrder.rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr) {
                     Box(Modifier.fillMaxSize()) {
-                        // HOM-23: the Glance home: clock and date, the music line with pop-in controls, the weather ambience, the hotspots and the surface indicator.
+                        // W38: the Glance is the calm page: the wallpaper only; the hotspots and the music line are the fixed chrome below.
                         com.bos.sphere.feature.grid.GlanceSurface(
-                            prefs = prefs, weather = weather, media = mediaInfo,
-                            hotspots = glanceHotspotItems, appsByKey = appsByKey,
+                            prefs = prefs,
                             rightDestinations = com.bos.sphere.core.data.RightSideDestinations.of(prefs.rightSide),
                             hasLaunchpad = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off,
-                            onRun = { item, screen -> runItem(item, screen) },
-                            onClockTap = { runner.run(CornerActionId.Clock) },
-                            onPrevious = { com.bos.sphere.core.data.MediaNow.previous() },
-                            onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() },
-                            onNext = { com.bos.sphere.core.data.MediaNow.next() },
                             gestures = glanceGestureSpec,
                             onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true },
                             onOpenRight = { openRecents() },
@@ -1172,8 +1099,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             selectedPage = if (homeEdit.active) editCard.contSel.intValue else -1, onPageInView = { editCard.contSel.intValue = it },
                         )
                     }
-                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                    Corners()
                 } else {
                     Background()
                     Box(
@@ -1189,7 +1114,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             isLandscape = isLandscape,
                             reserveStart = dockReserve.start.dp, reserveEnd = dockReserve.end.dp, reserveBottom = dockReserve.bottom.dp, // W26: only the app area gives up the dock's room; the dots stay in the band
                             state = gridState,
-                            suggestion = suggestion,
                             gesturesBound = gestures.keys,
                             capacityOf = capacityOf,
                             onLaunch = ::launch,
@@ -1200,8 +1124,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onClockTap = { runner.run(CornerActionId.Clock) },
                             onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(CATEGORY_HOME) },
                             onTileLongPress = { key, _ -> tileMenu = key },
-                            weather = weather,
-                            health = health,
                             extras = homeItems.homeExtras,
                             editMode = homeEdit.active,
                             onRemoveItem = { key ->
@@ -1211,7 +1133,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             drawIndicator = false, // wave 28: the home draws the one page indicator above its pager
                         )
                     }
-                    Corners()
                 }
 
                 HomeStyle.Psp -> {
@@ -1228,8 +1149,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
                     )
                     SettingsHoldBand()
-                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                    Corners()
                 }
                 HomeStyle.Dsi -> {
                     Background()
@@ -1242,8 +1161,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages), topLevel = layout.pages.flatMap { it.keys },
                     )
-                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                    Corners()
                 }
                 HomeStyle.List -> {
                     Background()
@@ -1255,14 +1172,22 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         gestures = homeGestureSpec,
                         extras = homeItems.homeExtras, extraKeys = homeItems.interleavedKeys(layout.pages),
                     )
-                    StripHost(prefs, weather, health) { runner.run(CornerActionId.Clock) }
-                    Corners()
                 }
             }
                             }
                         }
                     }
                 }
+            }
+            // Wave 38 (glanceFixed): the FIXED chrome above the pager: the four hotspots and the music line stay exactly in place on every page and during a swipe.
+            Box(Modifier.fillMaxSize().padding(bottom = bottomClear)) {
+                com.bos.sphere.feature.grid.FixedHomeChrome(
+                    media = mediaInfo, showMusic = prefs.showMusic, controlsSeconds = prefs.glanceControlsSeconds,
+                    onPrevious = { com.bos.sphere.core.data.MediaNow.previous() }, onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() }, onNext = { com.bos.sphere.core.data.MediaNow.next() },
+                    onAwake = { indicatorAwake++ },
+                    clockStyle = prefs.clockStyle, clockFormat = prefs.clockFormat, accent = com.bos.sphere.core.design.HyleColors.Violet, onClockTap = { runner.run(CornerActionId.Clock) },
+                    corners = { Corners() },
+                )
             }
             // Wave 28: the ONE page indicator, at one fixed place above the pager: Glance is its first stop, the pages (or the scroll) follow.
             if (indicatorShown) {
@@ -1317,7 +1242,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
         // Without notification access the media strip cannot exist: say so and offer the grant (STR-05).
         com.bos.sphere.ui.MediaStripGrantPrompt(
-            visible = landing == HomeShown.Glance && com.bos.sphere.core.data.GlanceItem.NowPlaying in prefs.glanceContent && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen,
+            visible = landing == HomeShown.Glance && prefs.showMusic && !leftOpen && !rightOpen && !settingsOpen && !searchOpen && !drawerOpen,
             modifier = Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = bottomPlan.mediaBottomDp.dp + bottomClear),
         )
 
@@ -1549,7 +1474,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val leftWidgetName = remember(leftWidgetLabel, prefs.leftWidgetId) {
             leftWidgetLabel ?: prefs.leftWidgetId.takeIf { it >= 0 }?.let { widgetHost.providerInfo(it)?.loadLabel(context.packageManager)?.toString() }
         }
-        val healthAvailable = remember(settingsOpen) { healthSource.available() }
         val about = remember {
             val pi = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
             listOf(
@@ -1578,7 +1502,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 hiddenKeys = hiddenStore.hidden, allApps = allApps, setHidden = hiddenStore::setHidden,
             )
         }
-        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, healthAvailable, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, legacyAvailable) {
+        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, legacyAvailable) {
             buildSettingsCategories(
             SettingsModel(
                 hiddenApps = hiddenAppsAccess,
@@ -1611,7 +1535,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 corners = corners,
                 gestures = gestures,
                 setGesture = { g, item -> stores.shortcuts.setGesture(g, item) },
-                requestHealth = { requestHealth() },
                 about = about,
                 capabilities = capabilityRows,
                 copyText = { t -> (context.getSystemService(android.content.ClipboardManager::class.java)).setPrimaryClip(android.content.ClipData.newPlainText("Liftoff", t)) },
@@ -1620,7 +1543,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 restorePages = if (legacyAvailable) ({ if (com.bos.sphere.core.data.PagesExplicitMigration.restoreReplacesEdits(stores.layout)) { settingsOpen = false; confirmRestore = true } else restorePreviousPages() }) else null,
                 editHomePages = { settingsOpen = false; editHome() },
                 addHomeItems = { settingsOpen = false; homeItems.openSheet() }, // wave 34: the item picker left the long-press sheet
-                healthAvailable = healthAvailable,
                 appsByKey = appsByKey,
                 isLandscape = isLandscape,
                 motionAvailable = motion.available,

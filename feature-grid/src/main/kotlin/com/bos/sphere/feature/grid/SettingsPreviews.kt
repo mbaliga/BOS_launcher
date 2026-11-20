@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AppEntry
-import com.bos.sphere.core.data.ClockPosition
 import com.bos.sphere.core.data.CornerStyle
 import com.bos.sphere.core.data.DrawerView
 import com.bos.sphere.core.data.HomeStyle
@@ -290,22 +289,6 @@ fun PagingPreview(axis: PagingAxis) {
             drawLine(col, Offset(c.x, c.y + len), Offset(c.x - 8f, c.y + len - 8f), 3f); drawLine(col, Offset(c.x, c.y + len), Offset(c.x + 8f, c.y + len - 8f), 3f)
             for (i in -1..1) drawCircle(col.copy(alpha = if (i == 0) 0.9f else 0.3f), 3f, Offset(c.x - len * 0.7f, c.y + i * 12f))
         }
-    }
-}
-
-/** Where the strip sits on a mini screen. */
-@Composable
-fun StripPositionPreview(position: ClockPosition) {
-    MiniPhone(Modifier.fillMaxSize()) {
-        if (position != ClockPosition.Hidden) {
-            Text(
-                "12:41",
-                color = HyleColors.InkBright,
-                fontSize = 13.sp,
-                modifier = Modifier.align(if (position == ClockPosition.Top) Alignment.TopCenter else Alignment.BottomCenter).padding(vertical = 6.dp),
-            )
-        }
-        Box(Modifier.align(Alignment.Center).size(width = 30.dp, height = 36.dp).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp)))
     }
 }
 

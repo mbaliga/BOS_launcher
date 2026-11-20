@@ -15,6 +15,7 @@ import androidx.compose.ui.test.down
 import androidx.compose.ui.test.up
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
@@ -66,10 +67,10 @@ class GlanceTitleW25UiTest {
     private fun glance(title: String, fontScale: Float = 1f) = rule.setContent {
         val d = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
-            GlanceSurface(
-                prefs = LauncherPrefs(), weather = null, media = media(title), hotspots = hotspots(), appsByKey = emptyMap(),
+            GlanceHomeForTest(
+                prefs = LauncherPrefs(), media = media(title), hotspots = hotspots(), appsByKey = emptyMap(),
                 rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
-                onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {},
+                onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -85,7 +86,7 @@ class GlanceTitleW25UiTest {
 
     private fun tapIn() {
         rule.mainClock.advanceTimeBy(300)
-        rule.onRoot().performTouchInput { down(Offset(width * 0.5f, height * 0.75f)); up() }
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick()
         rule.mainClock.advanceTimeBy(900)
     }
     private fun title(): Rect = rule.onNodeWithContentDescription("Now playing", substring = true).fetchSemanticsNode().boundsInRoot

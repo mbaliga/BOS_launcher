@@ -82,7 +82,7 @@ class WidgetEditHandleW24Test {
         val pages = listOf(HomePage(keys = listOf(clock, stack, app.key), id = 1L))
         Box(Modifier.fillMaxSize()) {
             GridHome(
-                pages = pages, appsByKey = mapOf(app.key to app), prefs = prefs, isLandscape = false, state = rememberGridHomeState(), suggestion = null,
+                pages = pages, appsByKey = mapOf(app.key to app), prefs = prefs, isLandscape = false, state = rememberGridHomeState(),
                 gesturesBound = setOf(HomeGesture.PinchIn), capacityOf = { it.capacity(false, prefs) },
                 onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {}, onClockTap = {},
                 onTileLongPress = { _, _ -> }, extras = extras, editMode = edit, onRemoveItem = { probe.removed += it },

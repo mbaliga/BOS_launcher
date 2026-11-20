@@ -96,7 +96,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putFloat("uiSoundVolume", next.uiSoundVolume)
             .putFloat("iconSpacing", next.iconSpacing)
             .putString("webEngine", next.webEngine.name)
-            .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
+            .putBoolean("searchWeb", next.searchWeb).putBoolean("webSuggestions", next.webSuggestions).putBoolean("searchContacts", next.searchContacts)
             .putString("leftPage", next.leftPage.name).putBoolean("launchpadRail", next.launchpadRail).putString("lpTheme", next.launchpadTheme.name)
             .putString("settingsBackdrop", next.settingsBackdrop.name).putFloat("settingsDim", next.settingsDim)
             .putFloat("spacingV", next.spacingV).putFloat("gridBias", next.gridBias).putFloat("gridInsetX", next.gridInsetX).putFloat("gridInsetTop", next.gridInsetTop)
@@ -227,6 +227,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             iconSpacing = sp.getFloat("iconSpacing", d.iconSpacing).coerceIn(0f, 1f),
             webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
             searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
+            webSuggestions = sp.getBoolean("webSuggestions", d.webSuggestions),
             searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
             backgroundSlot1 = bg.slot1, backgroundSlot2 = bg.slot2,
             leftPage = runCatching { LeftPage.valueOf(sp.getString("leftPage", null) ?: "") }.getOrDefault(d.leftPage),

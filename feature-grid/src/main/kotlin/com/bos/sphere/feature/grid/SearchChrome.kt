@@ -363,6 +363,9 @@ internal fun hitGlyph(hit: SearchHit): ImageVector = hit.actionId?.let { Glyphs.
     HitKind.Archive -> Glyphs.Storage
     HitKind.Folder -> FolderGlyph
     HitKind.Web -> Glyphs.Globe
+    HitKind.WebSuggestion -> Glyphs.Search
+    HitKind.WebAnswer -> Glyphs.Globe
+    HitKind.PlayStore -> PlayGlyph
     HitKind.Other -> DocGlyph
 }
 
@@ -387,7 +390,7 @@ internal fun HitFace(hit: SearchHit, size: Dp, modifier: Modifier = Modifier, ra
     }
     val shape = RoundedCornerShape(radius)
     Box(
-        modifier.size(size).clip(shape).background(if (hit.actionId != null || hit.kind == HitKind.Action) Color(0xFF2A2350) else Color(0xFF20232D)),
+        modifier.size(size).clip(shape).background(if (hit.actionId != null || hit.kind == HitKind.Action) Color(0xFF2A2350) else if (hit.kind == HitKind.PlayStore) Color(0xFF16301F) else Color(0xFF20232D)),
         contentAlignment = Alignment.Center,
     ) {
         val b = bmp
@@ -397,7 +400,7 @@ internal fun HitFace(hit: SearchHit, size: Dp, modifier: Modifier = Modifier, ra
             // Wave 25 (owner item 6): an app shortcut shows its own icon (else its app's), at a larger size than a glyph.
             HitLeadingIcon(hit, size * 0.62f, HyleColors.VioletSoft)
         } else {
-            Icon(hitGlyph(hit), null, tint = if (hit.actionId != null || hit.kind == HitKind.Action) HyleColors.VioletSoft else Color(0xFFE7E9F0), modifier = Modifier.size(size * 0.46f))
+            Icon(hitGlyph(hit), null, tint = if (hit.actionId != null || hit.kind == HitKind.Action) HyleColors.VioletSoft else if (hit.kind == HitKind.PlayStore) Color(0xFF7BE0A4) else Color(0xFFE7E9F0), modifier = Modifier.size(size * 0.46f))
         }
         sourceBadge(hit.sourcePackage)?.let { s ->
             Text(
@@ -437,9 +440,10 @@ internal fun ContactFace(c: ContactRow, size: Dp, modifier: Modifier = Modifier)
 }
 
 @Composable
-internal fun WebFace(glyph: ImageVector, size: Dp, modifier: Modifier = Modifier) {
-    Box(modifier.size(size).clip(RoundedCornerShape(size * 0.26f)).background(Color(0xFF1D2A3E)), contentAlignment = Alignment.Center) {
-        Icon(glyph, null, tint = Color(0xFF9CC4FF), modifier = Modifier.size(size * 0.46f))
+internal fun WebFace(glyph: ImageVector, size: Dp, modifier: Modifier = Modifier, store: Boolean = false) {
+    // Wave 43: a Play Store result (not installed) is green and wears the Play glyph, so it is never mistaken for an installed app.
+    Box(modifier.size(size).clip(RoundedCornerShape(size * 0.26f)).background(if (store) Color(0xFF16301F) else Color(0xFF1D2A3E)), contentAlignment = Alignment.Center) {
+        Icon(glyph, null, tint = if (store) Color(0xFF7BE0A4) else Color(0xFF9CC4FF), modifier = Modifier.size(size * 0.46f))
     }
 }
 
@@ -453,10 +457,10 @@ internal fun TileFace(tile: Tile, size: Dp, modifier: Modifier = Modifier) {
         is Tile.Web -> WebFace(
             when (tile.row) {
                 is WebRow.Open -> Glyphs.Globe
-                is WebRow.PlayStore -> Glyphs.Apps
+                is WebRow.PlayStore -> PlayGlyph
                 else -> Glyphs.Search
             },
-            size, modifier,
+            size, modifier, store = tile.row is WebRow.PlayStore,
         )
         is Tile.Allow -> WebFace(if (tile.files) FolderGlyph else Glyphs.Person, size, modifier)
         is Tile.Setting -> WebFace(Glyphs.Sliders, size, modifier)
@@ -479,6 +483,8 @@ internal val DocGlyph = sglyph("doc") {
     moveTo(14f, 3f); lineTo(14f, 8f); lineTo(19f, 8f)
     moveTo(9f, 13f); lineTo(16f, 13f); moveTo(9f, 17f); lineTo(16f, 17f)
 }
+/** Wave 43: the Play Store's triangle, in the outline style of the other glyphs. */
+internal val PlayGlyph = sglyph("play") { moveTo(7f, 4f); lineTo(19f, 12f); lineTo(7f, 20f); close(); moveTo(7f, 4f); lineTo(14.5f, 12f); lineTo(7f, 20f) }
 internal val FolderGlyph = sglyph("folder") {
     moveTo(3f, 7f); lineTo(3f, 19f); lineTo(21f, 19f); lineTo(21f, 9f); lineTo(11f, 9f); lineTo(9f, 6f); lineTo(4f, 6f); close()
 }

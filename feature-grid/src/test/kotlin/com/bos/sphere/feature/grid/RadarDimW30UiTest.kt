@@ -154,7 +154,8 @@ class RadarDimW30UiTest {
     }
 
     private fun everyLayoutAndQuery(m: RadarBackground) {
-        set { prefs = LauncherPrefs(searchMotion = false, searchLayoutPinned = true, radarBackground = m, radarSignalForce = SignalForce.Excellent) }
+        // Wave 43: no web rows here (searchWeb = false): this test is about the wheel's background, and the Play Store row (a coloured ring tile) now exists for every query.
+        set { prefs = LauncherPrefs(searchMotion = false, searchLayoutPinned = true, radarBackground = m, radarSignalForce = SignalForce.Excellent, searchWeb = false) }
         open()
         for (l in SearchLayout.entries) for (q in listOf("", "jdk")) {
             set { query = q; prefs = prefs.copy(searchLayout = l) }

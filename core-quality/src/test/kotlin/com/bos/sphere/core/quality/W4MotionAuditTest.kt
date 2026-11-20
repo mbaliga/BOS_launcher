@@ -195,8 +195,11 @@ class W4MotionAuditTest {
         "java.net.http", "HttpClient", "URLConnection", "WebView", "DownloadManager", "retrofit", "io.ktor", "cronet", "com.android.volley",
     )
 
-    @Test fun NFR_17_noNetworkClassAnywhere() { // wave 38: the weather module is gone, so the allowed set is empty
-        val hits = Repo.mainSources().flatMap { f ->
+    /** Wave 43 (radarWeb): the single file that may hold a network class: the Radar suggestion client. */
+    private val networkAllowed = setOf("WebSuggestHttp.kt")
+
+    @Test fun NFR_17_noNetworkClassAnywhere() { // wave 38: the weather module is gone; wave 43: the allowed set is the one suggestion client file
+        val hits = Repo.mainSources().filter { it.name !in networkAllowed }.flatMap { f ->
             f.readLines().withIndex().filter { (_, l) -> !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*") && networkTokens.any { l.contains(it) } }
                 .map { "${f.name}:${it.index + 1}" }
         }
@@ -210,11 +213,11 @@ class W4MotionAuditTest {
         listOf("okhttp", "retrofit", "ktor", "volley", "cronet", "coil-network", "glide", "apache.http").forEach { assertFalse(it, builds.contains(it)) }
     }
 
-    @Test fun NFR_17_noManifestDeclaresInternet() {
+    @Test fun NFR_17_onlyTheAppManifestDeclaresInternet() {
         val manifests = Repo.root.walkTopDown().onEnter { it.name != "build" && it.name != ".git" && it.name != ".gradle" }
             .filter { it.name == "AndroidManifest.xml" }.filter { !it.path.contains("/build/") }.toList()
         val internet = manifests.filter { it.readText().contains("android.permission.INTERNET") }.map { it.relativeTo(Repo.root).path }
-        assertEquals(emptyList<String>(), internet)
+        assertEquals(listOf("app/src/main/AndroidManifest.xml"), internet) // wave 43: the app manifest only, for Radar's web suggestions
         val manifest = text("app/src/main/AndroidManifest.xml")
         assertFalse("no cleartext opt-in", manifest.contains("usesCleartextTraffic=\"true\""))
         assertNotNull(Repo.file("docs/decisions/NFR-16.md").takeIf { it.exists() })

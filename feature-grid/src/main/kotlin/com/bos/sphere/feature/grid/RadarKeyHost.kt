@@ -81,7 +81,7 @@ internal object RadarKeyMap {
 internal fun tileKind(t: Tile): ResultKind = when (t) {
     is Tile.App -> ResultKind.App
     is Tile.Person -> ResultKind.Person
-    is Tile.Hit -> if (t.hit.actionId != null) ResultKind.Action else ResultKind.File
+    is Tile.Hit -> if (t.hit.actionId != null) ResultKind.Action else if (isLiveWebHit(t.hit)) ResultKind.Web else ResultKind.File
     is Tile.Web -> ResultKind.Web
     is Tile.Setting -> ResultKind.Setting
     else -> ResultKind.Other

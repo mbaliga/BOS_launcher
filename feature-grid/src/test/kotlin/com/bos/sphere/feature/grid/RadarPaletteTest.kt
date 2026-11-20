@@ -21,7 +21,7 @@ class RadarPaletteTest {
     private val webRows = listOf(
         WebRow.Open("Open example.com", "https://example.com"),
         WebRow.Search("Search DuckDuckGo for “x”", "https://duckduckgo.com/?q=x"),
-        WebRow.PlayStore("Search Play Store for “x”", "https://play.google.com/store/search?q=x", "market://search?q=x"),
+        WebRow.PlayStore("Search the Play Store for “x”", "https://play.google.com/store/search?q=x", "market://search?q=x"),
     )
 
     private fun data(q: String = "x", web: List<WebRow> = webRows, webFirst: Boolean = false, hits: Map<SearchCategory, List<SearchHit>> = emptyMap(), askContacts: Boolean = false) =
@@ -54,11 +54,11 @@ class RadarPaletteTest {
         assertTrue(e.row is WebRow.Open)
     }
 
-    @Test fun PAL_15_theStoreLookupSitsJustBeforeTheBrowserHandOff() {
-        val web = data().tiles(SearchCategory.Web).filterIsInstance<Tile.Web>()
-        val i = web.indexOfFirst { it.row is WebRow.PlayStore }
-        assertTrue(i >= 0 && i < web.lastIndex)
-        assertTrue(web.last().row !is WebRow.PlayStore)
+    @Test fun PAL_15_theStoreLookupIsInTheAppsResultsNotInTheWebOnes() {
+        // Wave 43 (radarWeb): it used to sit first among the web rows, so Enter on the Web scope opened the store. Now: Web has the hand-off only, Apps ends with the store row.
+        assertTrue(data().tiles(SearchCategory.Web).filterIsInstance<Tile.Web>().none { it.row is WebRow.PlayStore })
+        assertTrue((data("xy").tiles(SearchCategory.Apps).last() as Tile.Web).row is WebRow.PlayStore)
+        assertTrue(data("xy").tiles(SearchCategory.Apps).isNotEmpty() && data("").tiles(SearchCategory.Apps).isEmpty())
     }
 
     @Test fun PAL_10_withoutContactsPermissionTheCategoryIsOneEnableRowAndNothingElse() {

@@ -546,7 +546,7 @@ private fun StripGlyph(t: Tile) {
     val d = ShortcutForm.GLYPH_DP.dp
     when (t) {
         is Tile.Hit -> HitLeadingIcon(t.hit, d, Color.White)
-        is Tile.Web -> KindIcon(when (t.row) { is WebRow.Open -> ActionKind.OpenInBrowser; is WebRow.Search -> ActionKind.SearchWeb; is WebRow.PlayStore -> ActionKind.RefineApps }, d, Color.White)
+        is Tile.Web -> KindIcon(when (t.row) { is WebRow.Open -> ActionKind.OpenInBrowser; is WebRow.Search -> ActionKind.SearchWeb; is WebRow.PlayStore -> ActionKind.RefineApps }, d, Color.White) // the Play Store row is no strip circle (wave 43: it is on the rings)
         is Tile.Setting -> KindIcon(ActionKind.OpenSettingsPage, d, Color.White)
         else -> TileFace(t, d)
     }
@@ -608,14 +608,19 @@ internal fun FlatResults(
             for ((cat, title) in flatSections(data)) {
                 if (scope != null && scope != cat) continue
                 if (!restingShows(data, scope, cat)) continue
-                val tiles = data.tiles(cat)
+                val tiles = data.tiles(cat, limited = scope == null) // wave 43: in Everything only the top 3 live web suggestions
                 val note = data.footnote(cat)
                 if (tiles.isEmpty() && note == null) continue
                 // Suggestion headers already say "Contacts"/"Web": the results get their own header below.
                 // Wave 18: at rest the list is what you open most, most used first.
                 if (data.blank && cat == SearchCategory.Apps) add(FRow.Header(L10n.tr("Most used") + "​"))
                 else if (!(plain && cat == SearchCategory.Apps)) add(FRow.Header((if (plain && cat == SearchCategory.Web) L10n.tr("Web Suggestions") else title) + "​"))
-                tiles.forEach { add(FRow.Item(it)) }
+                var playHeader = false
+                tiles.forEach {
+                    // Wave 43: the Play Store results (not installed) come after the installed apps under their own header.
+                    if (cat == SearchCategory.Apps && !playHeader && isPlayTile(it)) { playHeader = true; add(FRow.Header(L10n.tr("Play Store") + "​")) }
+                    add(FRow.Item(it))
+                }
                 if (note != null) add(FRow.Note(note))
             }
             if (plain) addSuggestions()
@@ -710,7 +715,10 @@ internal fun flatSections(data: SearchData): List<Pair<SearchCategory, String>> 
 
 /** The results the keyboard walks in the flat list (PAL-07), top to bottom as they are drawn. */
 internal fun flatTiles(data: SearchData, scope: SearchCategory?): List<Tile> =
-    flatSections(data).filter { (scope == null || scope == it.first) && restingShows(data, scope, it.first) }.flatMap { data.tiles(it.first) }
+    flatSections(data).filter { (scope == null || scope == it.first) && restingShows(data, scope, it.first) }.flatMap { data.tiles(it.first, limited = scope == null) }
+
+/** Wave 43: a Play Store result (the "Search the Play Store" row or one of the store's app suggestions). */
+internal fun isPlayTile(t: Tile): Boolean = (t is Tile.Web && t.row is WebRow.PlayStore) || (t is Tile.Hit && t.hit.kind == com.bos.sphere.core.data.HitKind.PlayStore)
 
 /** Before anything is typed, "Everything" lists only what you really use: apps and people (the same rule as [SearchData.tiles]). */
 internal fun restingShows(data: SearchData, scope: SearchCategory?, cat: SearchCategory): Boolean =

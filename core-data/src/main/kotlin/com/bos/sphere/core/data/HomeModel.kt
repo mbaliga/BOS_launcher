@@ -95,15 +95,25 @@ enum class LaunchpadTheme(val label: String) { Dark("Dark"), Light("Light"), Sys
 
 enum class SettingsBackdrop(val label: String) { Wallpaper("Background, dimmed"), Black("Pitch black") }
 
-enum class WebEngine(val label: String, private val template: String) {
-    DuckDuckGo("DuckDuckGo", "https://duckduckgo.com/?q=%s"),
-    Google("Google", "https://www.google.com/search?q=%s"),
-    Brave("Brave", "https://search.brave.com/search?q=%s"),
-    Bing("Bing", "https://www.bing.com/search?q=%s"),
+/**
+ * The engines the "Web engine" setting offers. [template] is the results page; [suggest] is the engine's public suggestion endpoint (wave 43,
+ * docs/decisions/radarWebSuggest.md), null where none is known (Startpage, Ecosia): those engines show only the single "Search <engine> for ..." row.
+ */
+enum class WebEngine(val label: String, private val template: String, private val suggest: String? = null) {
+    Google("Google", "https://www.google.com/search?q=%s", "https://suggestqueries.google.com/complete/search?client=firefox&q=%s"),
+    DuckDuckGo("DuckDuckGo", "https://duckduckgo.com/?q=%s", "https://duckduckgo.com/ac/?q=%s&type=list"),
+    Bing("Bing", "https://www.bing.com/search?q=%s", "https://api.bing.com/osjson.aspx?query=%s"),
+    Brave("Brave", "https://search.brave.com/search?q=%s", "https://search.brave.com/api/suggest?q=%s"),
+    Ecosia("Ecosia", "https://www.ecosia.org/search?q=%s"),
     Startpage("Startpage", "https://www.startpage.com/do/search?q=%s");
 
     /** The results URL for [query] (URL-encoded). The text is sent as typed. */
     fun url(query: String): String = template.replace("%s", java.net.URLEncoder.encode(query.trim(), "UTF-8"))
+
+    /** The suggestion request for [query] (HTTPS, only the typed text in it), or null when this engine has no known public endpoint. */
+    fun suggestUrl(query: String): String? = suggest?.replace("%s", java.net.URLEncoder.encode(query.trim(), "UTF-8"))
+
+    val hasSuggestions: Boolean get() = suggest != null
 }
 
 /** Clock number format. */
@@ -247,8 +257,10 @@ data class LauncherPrefs(
     val pagesSystemDim: Int = 0,
 
     // --- search
-    val webEngine: WebEngine = WebEngine.DuckDuckGo,
+    val webEngine: WebEngine = WebEngine.Google,
     val searchWeb: Boolean = true,
+    /** Wave 43 (radarWeb): send what is typed in Radar's Web scope (and Apps for the Play Store) to the engine to show suggestions; Off = no network at all. */
+    val webSuggestions: Boolean = true,
     val searchContacts: Boolean = true,
     val leftPage: LeftPage = LeftPage.Launchpad,
     /** Appwidget id hosted full-screen on the left page when [leftPage] is [LeftPage.Widget]; -1 = none. */

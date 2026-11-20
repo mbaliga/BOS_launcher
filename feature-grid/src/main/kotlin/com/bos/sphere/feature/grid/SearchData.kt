@@ -16,8 +16,10 @@ import androidx.compose.ui.text.withStyle
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.Channel
 import com.bos.sphere.core.data.ContactHit
+import com.bos.sphere.core.data.HitKind
 import com.bos.sphere.core.data.SearchCategory
 import com.bos.sphere.core.data.SearchHit
+import com.bos.sphere.core.data.WebHits
 import com.bos.sphere.core.data.WebSearch
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.Suggestion
@@ -35,6 +37,12 @@ import kotlinx.coroutines.withContext
 @Suppress("UNUSED_PARAMETER")
 fun openHitIntent(context: Context, hit: SearchHit): Intent? {
     if (hit.actionId != null) return null
+    // Wave 43 (radarWeb): a live web result opens the engine's page in the browser; a Play Store suggestion opens the store app (the store's web page when none is visible to us).
+    if (hit.kind == HitKind.WebSuggestion || hit.kind == HitKind.WebAnswer) return hit.uri?.let { WebSearch.intentFor(it) }
+    if (hit.kind == HitKind.PlayStore) {
+        val market = hit.uri?.let { Intent(Intent.ACTION_VIEW, Uri.parse(it)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+        return market?.takeIf { it.resolveActivity(context.packageManager) != null } ?: hit.extras["https"]?.let { WebSearch.intentFor(it) }
+    }
     hit.intentUri?.let { raw ->
         val parsed = runCatching { Intent.parseUri(raw, Intent.URI_INTENT_SCHEME) }.getOrNull()
         if (parsed != null) return parsed.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -62,10 +70,13 @@ internal sealed interface Tile {
 
 /** Wave 25: an action, a web hand-off or a setting: results that are not an app, a person or a file, so they sit on the strip, never on the rings. */
 internal fun isStripTile(t: Tile): Boolean = when (t) {
-    is Tile.Web, is Tile.Setting -> true
-    is Tile.Hit -> t.hit.category == SearchCategory.Actions || t.hit.category == SearchCategory.Web
+    is Tile.Web, is Tile.Setting -> true // wave 43: the Play Store row stays on the strip (always reachable, a ring has no slot left when many apps match); its suggestions are ring hits
+    is Tile.Hit -> t.hit.category == SearchCategory.Actions || (t.hit.category == SearchCategory.Web && !isLiveWebHit(t.hit))
     is Tile.App, is Tile.Person, is Tile.Allow -> false
 }
+
+/** Wave 43: a live result (engine suggestion, instant answer, Play Store app suggestion); it sits on the rings like any hit and is never learned. */
+internal fun isLiveWebHit(h: SearchHit): Boolean = h.kind == HitKind.WebSuggestion || h.kind == HitKind.WebAnswer || h.kind == HitKind.PlayStore
 
 /** The key Radar learns selections under (PaletteHost.learn), so a tile finds its use in [SearchData.habit]. */
 internal fun Tile.habitKey(): String = when (this) {
@@ -83,9 +94,20 @@ internal fun Tile.caption(): String = when (this) {
         is WebRow.Open -> row.label
         is WebRow.Search -> row.label
         is WebRow.PlayStore -> row.label
-    }
+    }.let { webCaption(this, it) }
     is Tile.Allow -> if (files) L10n.tr("Allow file access") else L10n.tr("Allow contacts to find people")
     is Tile.Setting -> entry.title
+}
+
+/** Wave 43: the web rows' captions in the app language ("Search {engine} for “{query}”", "Search the Play Store for “%s”"); the model keeps them in English. */
+private fun webCaption(t: Tile, english: String): String {
+    val row = (t as? Tile.Web)?.row ?: return english
+    val m = Regex("^Search (.+) for “(.*)”$").find(english)
+    return when {
+        row is WebRow.PlayStore -> L10n.tr("Search the Play Store for “%s”", english.removePrefix("Search the Play Store for “").removeSuffix("”"))
+        row is WebRow.Search && m != null -> L10n.tr("Search {engine} for “{query}”").replace("{engine}", m.groupValues[1]).replace("{query}", m.groupValues[2])
+        else -> english
+    }
 }
 
 /** Everything the three layouts draw, computed once per query/result change. */
@@ -103,6 +125,11 @@ internal class SearchData(
     val settings: List<SettingEntry> = emptyList(),
     /** Wave 18: decayed use per usage key (see [RadarHabits]); orders "Everything" before anything is typed. */
     val habit: Map<String, Double> = emptyMap(),
+    /** Wave 43 (radarWeb): the live results of the chosen engine (suggestions, answer) and the Play Store's app suggestions; see [com.bos.sphere.core.data.WebHits]. */
+    val liveWeb: List<SearchHit> = emptyList(),
+    val livePlay: List<SearchHit> = emptyList(),
+    /** Wave 43: the one-time "Suggestions come from <engine>" line, shown under the Web results. */
+    val webNote: String? = null,
 ) {
     val blank = query.isBlank()
 
@@ -116,7 +143,7 @@ internal class SearchData(
     fun count(cat: SearchCategory): Int = when (cat) {
         SearchCategory.Apps -> apps.size
         SearchCategory.Contacts -> contacts.size
-        SearchCategory.Web -> web.size + (hits[cat]?.size ?: 0)
+        SearchCategory.Web -> web.count { it !is WebRow.PlayStore } + (hits[cat]?.size ?: 0) + liveWeb.size
         SearchCategory.Actions -> actionHits.size + settings.size
         else -> hits[cat]?.size ?: 0
     }
@@ -130,8 +157,8 @@ internal class SearchData(
     }
 
     /** "Everything": a mix, best matches first — apps, people, actions, files, web (web first for URLs). */
-    fun tiles(cat: SearchCategory?): List<Tile> {
-        if (cat != null) return tilesFor(cat)
+    fun tiles(cat: SearchCategory?, limited: Boolean = false): List<Tile> {
+        if (cat != null) return if (limited) tilesFor(cat, true) else tilesFor(cat)
         // PAL-06: the web hand-off is always the last result, URL queries included (Enter still reaches it first, see webFirst).
         val order = listOf(SearchCategory.Apps, SearchCategory.Contacts, SearchCategory.Actions, SearchCategory.Files, SearchCategory.Web)
         // Round-robin so every kind of result shows up near the centre, not just the first kind.
@@ -141,35 +168,49 @@ internal class SearchData(
         // Wave 18: at rest the apps and people you use most come first (apps before people when equally used); the Orbit
         // lays them out ring by ring in this order.
         if (blank) return usable.flatMap { tilesFor(it).filter { t -> t !is Tile.Allow } }.sortedByDescending { habit[it.habitKey()] ?: 0.0 }
-        val mixed = usable.filter { it != SearchCategory.Web }.map { tilesFor(it).filter { t -> t !is Tile.Allow } }
+        val mixed = usable.filter { it != SearchCategory.Web }.map { if (it == SearchCategory.Apps) installedApps() else tilesFor(it).filter { t -> t !is Tile.Allow } }
         val out = ArrayList<Tile>()
         answer?.let { out += Tile.Hit(it) }
         var i = 0
         while (out.size < 40 && mixed.any { i < it.size }) { mixed.forEach { l -> l.getOrNull(i)?.let { t -> if (out.none { o -> o.key == t.key }) out.add(t) } }; i++ }
-        if (SearchCategory.Web in usable) out += tilesFor(SearchCategory.Web).filter { t -> t !is Tile.Allow }
+        // Wave 43: the web hand-off first (Enter reaches it when no app matched), a few live suggestions after it, then the not-installed matches from the Play Store.
+        if (SearchCategory.Web in usable) out += tilesFor(SearchCategory.Web, true).filter { t -> t !is Tile.Allow }
+        out += playTiles(true)
         return out
     }
 
     /**
      * Wave 25 (shortcutForm): the typed Orbit's ring results: [tiles] without what belongs on the strip ([isStripTile]), so the rings hold only apps, people and files.
      */
-    fun ringTiles(cat: SearchCategory?): List<Tile> = tiles(cat).filter { !isStripTile(it) }
+    fun ringTiles(cat: SearchCategory?): List<Tile> = if (cat == SearchCategory.Web) tiles(cat) else tiles(cat).filter { !isStripTile(it) } // wave 43: in the Web scope the search row and the live results fill the rings
 
     /**
      * Wave 25: the typed Orbit's strip: the web hand-off rows ("Search <engine> for ...", the page of a URL, the Play Store row), then every action that is not tied
      * to an app (an inline answer, a launcher command, a settings page, a shortcut whose app did not match). The web rows come first, the URL's own row before the
      * engine, then the app store, because those are the taps people want.
      */
-    fun stripTiles(): List<Tile> {
-        if (blank) return emptyList()
-        val rows = tilesFor(SearchCategory.Web).filterIsInstance<Tile.Web>()
+    fun stripTiles(cat: SearchCategory? = null): List<Tile> {
+        if (blank || cat == SearchCategory.Web) return emptyList()
+        val rows = tilesFor(SearchCategory.Web).filterIsInstance<Tile.Web>() + (if (cat == SearchCategory.Actions) emptyList() else playTiles(true).filterIsInstance<Tile.Web>())
         val web = rows.sortedBy { when (it.row) { is WebRow.Open -> 0; is WebRow.Search -> 1; is WebRow.PlayStore -> 2 } }
-        val webHits = tilesFor(SearchCategory.Web).filterIsInstance<Tile.Hit>()
+        val webHits = tilesFor(SearchCategory.Web).filterIsInstance<Tile.Hit>().filter { !isLiveWebHit(it.hit) }
         return web + webHits + tilesFor(SearchCategory.Actions)
     }
 
-    private fun tilesFor(cat: SearchCategory): List<Tile> = when (cat) {
-        SearchCategory.Apps -> apps.map { Tile.App(it, nesting.byApp[it.key].orEmpty()) }
+    private fun installedApps(): List<Tile> = apps.map { Tile.App(it, nesting.byApp[it.key].orEmpty()) }
+
+    /**
+     * Wave 43 (radarWeb): the Play Store group, after every installed match: always the one "Search the Play Store" row (2+ characters, no network), then the store's
+     * app suggestions when the endpoint answered. Not-installed matches never replace installed ones and carry the Play glyph and the "Play Store" label.
+     */
+    private fun playTiles(limited: Boolean): List<Tile> {
+        if (query.trim().length < 2) return emptyList()
+        val row = web.withIndex().firstOrNull { it.value is WebRow.PlayStore } ?: return emptyList()
+        return listOf<Tile>(Tile.Web(row.value, row.index)) + livePlay.take(if (limited) 2 else WebHits.MAX_SHOWN).map { Tile.Hit(it) }
+    }
+
+    private fun tilesFor(cat: SearchCategory, limited: Boolean = false): List<Tile> = when (cat) {
+        SearchCategory.Apps -> installedApps() + playTiles(limited)
         SearchCategory.Contacts -> buildList {
             contacts.forEach { add(Tile.Person(it)) }
             if (askContacts) add(Tile.Allow(files = false))
@@ -178,11 +219,13 @@ internal class SearchData(
             if (askFiles) add(Tile.Allow(files = true))
             hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
         }
-        // PAL-06 / PAL-15: any hits first, then the app-store lookup, and the hand-off to the browser last.
+        // Wave 43 (radarWeb): the hand-off to the engine is the top row (Enter runs it; a URL's own row before it), then the instant answer, the live suggestions, any other hits.
+        // The Play Store lookup is not a web row any more: it sits under the Apps results (see [playTiles]). Before this wave it came first here and Enter opened the Play Store.
         SearchCategory.Web -> buildList {
-            hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
-            web.withIndex().filter { it.value is WebRow.PlayStore }.forEach { add(Tile.Web(it.value, it.index)) }
             web.withIndex().filter { it.value !is WebRow.PlayStore }.forEach { add(Tile.Web(it.value, it.index)) }
+            val live = if (limited) liveWeb.filter { it.kind != HitKind.WebAnswer }.take(WebHits.EVERYTHING_SHOWN) else liveWeb
+            live.forEach { add(Tile.Hit(it)) }
+            hits[cat].orEmpty().forEach { add(Tile.Hit(it)) }
         }
         SearchCategory.Actions -> actionHits.sortedByDescending { it.copyText != null }.map<SearchHit, Tile> { Tile.Hit(it) } + settings.map { Tile.Setting(it) }
     }
@@ -195,12 +238,15 @@ internal class SearchData(
         if (webFirst && (cat == null || cat == SearchCategory.Web)) {
             tilesFor(SearchCategory.Web).firstOrNull { it is Tile.Web && it.row is WebRow.Open }?.let { return it }
         }
+        // Wave 43: in the Web scope Enter is always the engine's search row (or a URL's page), never a suggestion, an answer or the Play Store.
+        if (cat == SearchCategory.Web) return tilesFor(SearchCategory.Web).firstOrNull { it is Tile.Web }
         return tiles(cat).firstOrNull()
     }
 
     /** A quiet hint under the Files results when no deep-search app is installed. */
     fun footnote(cat: SearchCategory?): String? =
-        if (cat == SearchCategory.Files && deepHint && !blank && count(SearchCategory.Files) > 0) L10n.tr("Install Fylz or Fotoz for deeper results") else null
+        if (cat == SearchCategory.Web && webNote != null && liveWeb.isNotEmpty()) webNote
+        else if (cat == SearchCategory.Files && deepHint && !blank && count(SearchCategory.Files) > 0) L10n.tr("Install Fylz or Fotoz for deeper results") else null
 }
 
 // ---- refinement suggestions (macOS Spotlight menu) ----

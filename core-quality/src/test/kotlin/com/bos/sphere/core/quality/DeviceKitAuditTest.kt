@@ -53,6 +53,8 @@ class DeviceKitAuditTest {
             "android.permission.READ_CONTACTS", "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VIDEO", "android.permission.READ_MEDIA_AUDIO",
             "android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE", "android.permission.VIBRATE", "android.permission.ACCESS_NOTIFICATION_POLICY",
             "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE", "android.permission.POST_NOTIFICATIONS",
+            // Wave 43 (radarWeb): the one deliberate addition, for Radar's live web suggestions (docs/decisions/radarWebSuggest.md); not a side effect of the device checks.
+            "android.permission.INTERNET",
         ).toSortedSet()
         assertEquals(expected, declared)
     }

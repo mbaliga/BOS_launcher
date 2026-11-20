@@ -185,8 +185,10 @@ class W4MotionAuditTest {
         assertTrue(text("$grid/ColorPicker.kt").contains("""L10n.tr("Colour hue")"""))
         assertTrue(text("$grid/ColorPicker.kt").contains("""L10n.tr("Saturation and brightness")"""))
         assertTrue(text("$grid/Tactile.kt").contains("progressBarRangeInfo = ProgressBarRangeInfo(fraction"))
-        assertTrue(text("$grid/WidgetEditUi.kt").contains("""L10n.tr("Resize handle")"""))
-        assertTrue(text("$grid/WidgetEditUi.kt").contains("customActions"))
+        // Wave 45 (editHandles): the knobs are no longer nodes of their own (they would double the item's); every item node carries the actions.
+        assertTrue(text("$grid/ItemEditor.kt").contains("""L10n.tr("Make wider")"""))
+        assertTrue(text("$grid/ItemEditor.kt").contains("CustomAccessibilityAction"))
+        assertTrue(text("$grid/GridHome.kt").contains("customActions = a11y"))
     }
 
     // ------------------------------------------------------------------ NFR-17

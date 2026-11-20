@@ -77,6 +77,21 @@ class HomeLandingItemsW24Test : TourBase() {
         extras.set(s)
     }
 
+    /** Wave 45 (editHandles): in edit mode a widget item node carries the accessibility actions (widgets alone have "Make wider"); these are the item nodes, in page order. */
+    private fun widgetItemNodes() = rule.onAllNodes(
+        androidx.compose.ui.test.SemanticsMatcher("a widget item in edit mode") { n ->
+            androidx.compose.ui.semantics.SemanticsActions.CustomActions in n.config &&
+                n.config[androidx.compose.ui.semantics.SemanticsActions.CustomActions].any { it.label == "Make wider" }
+        },
+        useUnmergedTree = true,
+    ).fetchSemanticsNodes()
+
+    private fun removeWidgetItem(index: Int) {
+        val node = widgetItemNodes()[index]
+        rule.runOnUiThread { node.config[androidx.compose.ui.semantics.SemanticsActions.CustomActions].first { it.label == "Remove" }.action() }
+        settle()
+    }
+
     private fun startOnGlance(seed: () -> Unit = {}) {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
         AppSmokeHarness.configureFresh()
@@ -126,18 +141,16 @@ class HomeLandingItemsW24Test : TourBase() {
         openQuickSheet()
         quickGoTo("Edit home")
         assertTrue(editShown())
-        // HOM-12 / HOM-14: the widget and the stack each carry one remove handle in edit mode (the stack is named after its first member)
-        assertTrue(descShown("Remove from home: Clock"))
-        assertTrue(descShown("Remove from home: Weather"))
-        assertFalse("a stacked member has no handle of its own", descShown("Remove from home: Notes"))
+        // HOM-12 / HOM-14 (wave 45): the widget and the stack are each ONE item node with the edit actions (no handle on their content); a stacked member has none of its own
+        assertEquals(2, widgetItemNodes().size)
 
-        rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).performClick(); settle()
+        removeWidgetItem(0); settle()
         assertEquals(listOf(stackKey), pageKeys())
         rule.onAllNodesWithText("Undo", substring = true, useUnmergedTree = true).onFirst().performClick(); settle()
         assertEquals("one undo brings the widget back to its slot", listOf(clockKey, stackKey), pageKeys())
         assertTrue("and its definition with it", clockKey in extras.state.value.items)
 
-        rule.onNodeWithContentDescription("Remove from home: Weather", useUnmergedTree = true).performClick(); settle()
+        removeWidgetItem(1); settle()
         assertEquals(listOf(clockKey), pageKeys())
         rule.onAllNodesWithText("Undo", substring = true, useUnmergedTree = true).onFirst().performClick(); settle()
         assertEquals("the whole stack comes back", listOf(clockKey, stackKey), pageKeys())
@@ -153,7 +166,7 @@ class HomeLandingItemsW24Test : TourBase() {
         openQuickSheet()
         quickGoTo("Edit home")
         assertTrue(editShown())
-        rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).performClick(); settle()
+        removeWidgetItem(0); settle()
         assertEquals(listOf(stackKey), pageKeys())
         rule.runOnUiThread { wm.switchTo(other) }; settle()
         // The switch replaces the whole arrangement: it is not an edit, so the session ends (as leaving Selected apps ends it).

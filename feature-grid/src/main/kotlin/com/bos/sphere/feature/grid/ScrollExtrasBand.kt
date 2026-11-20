@@ -108,9 +108,11 @@ fun ScrollExtrasBand(extras: HomeExtras, items: List<String>, widgets: List<Stri
             }
         }
         widgets.zip(r.widgets).forEach { (k, b) ->
+            val sp = extras.spanOf(k)
+            val px = androidx.compose.ui.platform.LocalDensity.current.density
             HomeWidgetCell(
-                k, extras, b.width, b.height,
-                Modifier.offset(x(b).dp, y(b).dp).size(b.width.dp, b.height.dp)
+                k, extras, b.width * px / sp.cols, b.height * px / sp.rows,
+                Modifier.offset(x(b).dp, y(b).dp).size(b.width.dp, b.height.dp).childrenOutOfBounds()
                     .launcherItem("band.$k", onMenu = { extras.onLongPress(k) }),
             )
         }

@@ -2,6 +2,7 @@ package com.bos.sphere
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -100,6 +101,8 @@ class HomeItems internal constructor(
     internal var openFolder by mutableStateOf<String?>(null)
     internal var itemMenu by mutableStateOf<String?>(null)
     internal var resizing by mutableStateOf<String?>(null)
+    /** Wave 45 (editHandles): THE selection of home edit mode (id, type, bounds; the item action bar builds on it). */
+    val selection = com.bos.sphere.feature.grid.EditSelectionState()
     internal var linkOpen by mutableStateOf(false)
     internal var shortcutOpen by mutableStateOf(false)
     internal var packOpen by mutableStateOf(false)
@@ -404,7 +407,7 @@ class HomeItems internal constructor(
                     }
                 }
                 if (stackCandidates(key).isNotEmpty() && (stack == null || stack.keys.size < 6)) add(entry(L10n.tr("Stack with another widget")) { stackPick = key })
-                add(entry(L10n.tr("Resize")) { resizing = key })
+                add(entry(L10n.tr("Resize")) { selection.select(key) })
                 add(entry(L10n.tr("Move earlier")) { edit { s -> HomeEdit.reorderOnPage(s, key, (HomeLayoutIndex.indexOf(s, key) - 1).coerceAtLeast(0), capacityOf) } })
                 add(entry(L10n.tr("Move later")) { edit { s -> HomeEdit.reorderOnPage(s, key, HomeLayoutIndex.indexOf(s, key) + 1, capacityOf) } })
                 val info = ItemKeys.widgetId(key)?.let { host.providerInfo(it) }
@@ -474,6 +477,25 @@ class HomeItems internal constructor(
         else WidgetPlaceholder(extrasState.items[key]?.label.orEmpty(), onRestore = { restoreRev++ }, modifier = modifier)
     }
 
+    /**
+     * Wave 45 (HOM-07): the provider's resize rules for the handles (`resizeMode`, `minResize*`, `maxResize*`, `targetCell*`, its own
+     * minimum), in dp; the desktop surface reads the same fields in [com.bos.sphere.ui.DesktopWidgetProvider]. Null for a stack (free).
+     */
+    internal fun providerLimits(key: String): com.bos.sphere.core.catalog.ProviderLimits? {
+        if (com.bos.sphere.core.catalog.WidgetStacks.stackAt(extrasState, key) != null) return null
+        val id = ItemKeys.widgetId(key) ?: return null
+        val info = host.providerInfo(id) ?: return null
+        val d = context.resources.displayMetrics.density.coerceAtLeast(0.5f)
+        return com.bos.sphere.core.catalog.ProviderLimits(
+            minResizeWidthDp = info.minResizeWidth / d, minResizeHeightDp = info.minResizeHeight / d,
+            maxResizeWidthDp = info.maxResizeWidth / d, maxResizeHeightDp = info.maxResizeHeight / d,
+            targetCellWidth = info.targetCellWidth, targetCellHeight = info.targetCellHeight,
+            horizontal = info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0,
+            vertical = info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0,
+            minWidthDp = info.minWidth / d, minHeightDp = info.minHeight / d,
+        )
+    }
+
     /** What the surfaces render. */
     val homeExtras: HomeExtras get() = HomeExtras(
         state = extrasState,
@@ -492,6 +514,13 @@ class HomeItems internal constructor(
             edit { HomeEdit.resizeWidget(it, key, dc, dr, max = com.bos.sphere.core.catalog.WidgetSpan(cols, rows), gridCols = cols, gridRows = rows) }
         },
         onResizeDone = { resizing = null },
+        selection = selection,
+        limitsOf = ::providerLimits,
+        gridDims = gridDims,
+        onResizeTo = { key, rect, moveOrigin ->
+            val (cols, rows) = gridDims()
+            edit { com.bos.sphere.core.catalog.EditHandlesApply.resizeTo(it, key, rect, moveOrigin, cols, rows, capacityOf) }
+        },
         onTap = ::tap,
         onLongPress = { itemMenu = it },
         onAction = ::applyKeyboardAction,

@@ -71,11 +71,21 @@ class HomeExtras(
     val usageSlices: List<com.bos.sphere.core.catalog.UsageSlice> = emptyList(),
     /** HOM-15: the first few recent files for the Files tile (thumbnail or just the name); empty draws the plain glyph. */
     val fileCells: List<FileTileCell> = emptyList(),
+    /** Wave 45 (editHandles): the one selection of home edit mode (a stable object the host owns, not rebuilt with these extras). */
+    val selection: EditSelectionState = EditSelectionState(),
+    /** The provider's resize rules for a widget (null: free within the grid, e.g. a stack or no provider info). */
+    val limitsOf: (String) -> com.bos.sphere.core.catalog.ProviderLimits? = { null },
+    /** A resize result from the handles, the keyboard or an accessibility action: the new size, and whether the origin moved too. */
+    val onResizeTo: (key: String, rect: com.bos.sphere.core.catalog.CellRect, moveOrigin: Boolean) -> Unit = { _, _, _ -> },
+    /** The grid size (columns, rows) for surfaces that do not report their own. */
+    val gridDims: () -> Pair<Int, Int> = { 4 to 6 },
 ) {
     private val owned: Set<String> = state.nonAppKeys().toSet()
     fun owns(key: String) = key in owned
     fun spanOf(key: String): WidgetSpan = state.spanOf(key)
     fun isWidget(key: String) = ItemKeys.kind(key) == ItemKind.Widget
+    /** The item with the handles: the selection (edit mode), or the widget the host's old Resize entry named. */
+    fun isSelected(key: String) = selection.isSelected(key) || resizing == key
 }
 
 /** One non-app item drawn as a grid tile: folder, shortcut, link or file. Widgets are [HomeWidgetCell]. */
@@ -135,29 +145,22 @@ fun UsageTileBarView(segments: List<com.bos.sphere.core.catalog.UsageTileBar.Seg
 }
 
 /**
- * A hosted widget filling its span box. While [HomeExtras.resizing] is this key it gains the resize
- * frame (handles and Shift+arrows) and a Done button; an unavailable widget shows a placeholder.
+ * A hosted widget filling its span box. While it is the selected item it gains the selection frame (outline, handles, live resize,
+ * ghost, size chip, see [SelectedWidgetFrame]); there is no Done pill any more (the top bar's Done is the only one).
+ * [ctx] tells the frame where the widget sits on the grid; surfaces whose items flow pass none and get the east / south handles.
  */
 @Composable
-fun HomeWidgetCell(key: String, extras: HomeExtras, cellWpx: Float, cellHpx: Float, modifier: Modifier = Modifier) {
+fun HomeWidgetCell(key: String, extras: HomeExtras, cellWpx: Float, cellHpx: Float, modifier: Modifier = Modifier, ctx: ResizeContext? = null, editing: Boolean = false) {
     val shape = RoundedCornerShape(16.dp)
-    val editing = extras.resizing == key
-    Box(modifier.clip(shape)) {
-        if (editing) {
-            val fr = remember { FocusRequester() }
-            LaunchedEffect(key) { runCatching { fr.requestFocus() } }
-            WidgetResizeFrame(cellWpx, cellHpx, onResize = { dc, dr -> extras.onResize(key, dc, dr) }, modifier = Modifier.focusRequester(fr)) {
-                extras.widget(key, Modifier.fillMaxSize())
-            }
-            Text(
-                L10n.tr("Done"), color = HyleColors.InkBright, fontSize = 12.sp,
-                modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(10.dp))
-                    .background(HyleColors.VioletSoft.copy(alpha = 0.9f)).clickable { extras.onResizeDone() }.padding(horizontal = 10.dp, vertical = 4.dp),
-            )
-        } else extras.widget(key, Modifier.fillMaxSize())
+    if (extras.isSelected(key)) {
+        SelectedWidgetFrame(key, extras, ctx ?: ResizeContext.flowing(extras.spanOf(key), extras.gridDims(), cellWpx, cellHpx), modifier) {
+            extras.widget(key, Modifier.fillMaxSize())
+        }
+    } else Box(modifier.clip(shape)) {
+        extras.widget(key, Modifier.fillMaxSize())
+        if (editing) Box(Modifier.fillMaxSize().editTouchShield())
     }
 }
-
 
 /** The placeholder a widget slot shows while its provider is missing or the id is unbound. */
 @Composable

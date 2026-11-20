@@ -22,7 +22,7 @@ class WebSuggestW43Test {
 
     // ---- engines and URL builders
     @Test fun PAL_06_everyEngineBuildsAnEscapedHttpsSearchUrlAndGoogleIsTheDefault() {
-        assertEquals(WebEngine.Google, LauncherPrefs().webEngine)
+        assertEquals(WebEngine.DuckDuckGo, LauncherPrefs().webEngine)
         assertEquals(listOf("Google", "DuckDuckGo", "Bing", "Brave", "Ecosia", "Startpage"), WebEngine.entries.map { it.label })
         for (e in WebEngine.entries) assertTrue(e.name, e.url("a b&c=d/é").startsWith("https://"))
         assertEquals("https://www.google.com/search?q=spider+man%26x%3D1", WebEngine.Google.url(" spider man&x=1 "))

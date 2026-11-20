@@ -8,7 +8,7 @@ Owner report (verbatim): "If I search the web, I should start seeing search resu
 
 Fix: the Play Store row is no longer a web row. It belongs to the Apps results (see 3). In the Web scope Enter is always the first `Tile.Web` that is not the store (the engine's search row, or a URL's own "Open" row), and never a suggestion, an answer or a store row. Regression tests per scope: `RadarWebW43UiTest` (`enterTile` for Web, Everything with and without an app match, Apps with and without a match, a URL, Web results off; and the real IME Go on Web, Everything and Apps).
 
-Default engine: new installs default to Google (it was DuckDuckGo); an install that already stored DuckDuckGo keeps it. Ecosia added (results page only, no suggestion endpoint). Startpage has none either. There is no "Custom URL" engine in the app, so none was added.
+Default engine: DuckDuckGo (wave 44: the owner requires it; build 68 had briefly defaulted to Google); a stored choice is kept. Ecosia added (results page only, no suggestion endpoint). Startpage has none either. There is no "Custom URL" engine in the app, so none was added.
 
 ## 2. Live web results (the only network use of the launcher)
 
@@ -26,7 +26,7 @@ The Apps scope and Everything list the installed matches first, then a "Play Sto
 
 ## Privacy, stated plainly
 
-With Web suggestions on, text typed in Radar's Web scope goes to the chosen search engine (Google by default) while you type, after a pause, before you press anything; text typed in the Apps scope goes to Google Play's suggestion service; Everything does both unless a contact matches. The engines see your IP address and the text (and whatever their own servers log); the app sends no identifier, cookie, locale or history. Off means no network at all from the launcher. Apps and people you search for by name in Everything or Apps are sent to Google Play's suggestion service when typed: turn the switch off if that is not acceptable.
+With Web suggestions on, text typed in Radar's Web scope goes to the chosen search engine (DuckDuckGo by default) while you type, after a pause, before you press anything; text typed in the Apps scope goes to Google Play's suggestion service; Everything does both unless a contact matches. The engines see your IP address and the text (and whatever their own servers log); the app sends no identifier, cookie, locale or history. Off means no network at all from the launcher. Apps and people you search for by name in Everything or Apps are sent to Google Play's suggestion service when typed: turn the switch off if that is not acceptable.
 
 ## Not verified here
 

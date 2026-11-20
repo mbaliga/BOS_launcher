@@ -111,7 +111,7 @@ class RadarSearchW18UiTest {
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun PAL_06_aLeadingLetterAndSpaceIsPlainTextAndTheWebRowsStay() {
         open(SearchLayout.Flat, "w bows of denmark")
-        rule.onNodeWithText("Search Google for “w bows of denmark”", substring = false).assertExists()
+        rule.onNodeWithText("Search DuckDuckGo for “w bows of denmark”", substring = false).assertExists()
         rule.onNodeWithText("Search the Play Store for “w bows of denmark”", substring = false).assertExists()
         for (gone in listOf("!g", "Google Images", "!yt", "YouTube", "Wikipedia", "Try")) {
             assertEquals("no '$gone' chip", 0, rule.onAllNodesWithText(gone, substring = true).fetchSemanticsNodes().size)

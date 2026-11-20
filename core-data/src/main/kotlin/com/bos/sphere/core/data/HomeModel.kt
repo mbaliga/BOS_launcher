@@ -257,7 +257,7 @@ data class LauncherPrefs(
     val pagesSystemDim: Int = 0,
 
     // --- search
-    val webEngine: WebEngine = WebEngine.Google,
+    val webEngine: WebEngine = WebEngine.DuckDuckGo,
     val searchWeb: Boolean = true,
     /** Wave 43 (radarWeb): send what is typed in Radar's Web scope (and Apps for the Play Store) to the engine to show suggestions; Off = no network at all. */
     val webSuggestions: Boolean = true,

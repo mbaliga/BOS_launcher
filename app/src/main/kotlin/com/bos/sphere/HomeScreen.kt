@@ -1195,7 +1195,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad", rtl = homeOrder.rtl,
                     homeIndex = prefs.homePage.coerceIn(0, (dots - 1).coerceAtLeast(0)),
                     onGlance = if (prefs.glanceEnabled) ({ showSurface(HomeShown.Glance) }) else null, glanceCurrent = landing == HomeShown.Glance,
-                    right = com.bos.sphere.core.data.RightSideDestinations.of(prefs.rightSide), onRight = { openRecents() },
+                    right = emptyList(), onRight = { openRecents() }, // W44: the trailing dot for the right panel looked like a page that does not exist
                     quiet = landing == HomeShown.Glance, awakeNonce = indicatorAwake + homePager.currentPage,
                     hiddenFromAccessibility = homeEdit.active, // wave 37: the editor's strip cards already say "Page N of M"
                 )

@@ -8,12 +8,12 @@
 | PAL-06 first-use note | built | Shown once (`radar_ui` flag), tested both ways. |
 | PAL-15 Play Store rows | built, not device-verified | Apps scope and Everything: "Search the Play Store for ..." (2+ chars, no network) plus store suggestions; green Play tile and "Play Store" label; installed matches first. In the typed Orbit the store row is a strip circle (always reachable), suggestions are ring tiles. |
 | NFR-16 / NFR-17 audits | changed on purpose | INTERNET declared again; audits now pin exactly one connection-opening file (`WebSuggestHttp.kt`), HTTPS only, one manifest, no other network-like permission, no location. `NFR_16_internetIsNotDeclared...` became `NFR_16_internetIsDeclaredOnlyForRadarWebSuggestions...`; `NFR_17_noManifestDeclaresInternet` became `NFR_17_onlyTheAppManifestDeclaresInternet`; the permission set in `DeviceKitAuditTest` gained INTERNET. |
-| Default engine | changed | New installs: Google (was DuckDuckGo); stored DuckDuckGo is kept. Ecosia added. |
+| Default engine | changed | Default stays DuckDuckGo (an attempt to make Google the default was reverted by the owner in wave 44); a stored choice is kept. Ecosia added. |
 
 ## Old tests changed
 - `RadarPaletteTest.PAL_15_theStoreLookupSitsJustBeforeTheBrowserHandOff` replaced by `PAL_15_theStoreLookupIsInTheAppsResultsNotInTheWebOnes` (the wave 25 order that caused the bug).
 - `OrbitTypingW20UiTest`: the Play Store label ("Search the Play Store for", also in `SearchModelTest`, `RadarSearchW18UiTest`, `RadarPaletteTest`); the landscape shot no longer expects the store row for a one-letter query; the strip test also asserts the store row stays a strip circle.
-- `RadarSearchW18UiTest`, `RadarHostileQueriesW20Test`: default engine is Google, not DuckDuckGo.
+- `RadarSearchW18UiTest`, `RadarHostileQueriesW20Test`: default engine is DuckDuckGo (unchanged).
 - `RadarDimW30UiTest.everyLayoutAndQuery`: runs with Web results off, because a coloured Play Store row now exists for every query of 2+ letters and that test is about the wheel's background pixels.
 
 ## Tests run

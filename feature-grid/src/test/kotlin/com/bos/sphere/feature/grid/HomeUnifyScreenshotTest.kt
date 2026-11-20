@@ -35,7 +35,6 @@ import com.bos.sphere.core.data.HomeOrder
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.LauncherPrefs
-import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.ThemeVariant
 import kotlinx.coroutines.launch
@@ -90,7 +89,7 @@ class HomeUnifyScreenshotTest {
                         CompositionLocalProvider(LocalLayoutDirection provides if (order.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                             GlanceHomeForTest(
                                 prefs = prefs, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
-                                rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
+                                hasLaunchpad = true,
                                 onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, indicator = false, modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -112,7 +111,7 @@ class HomeUnifyScreenshotTest {
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp), rtl = order.rtl,
                 onMenu = {}, menuLabel = "Open Comms", menuTag = "glance.indicator.launchpad",
                 onGlance = if (glanceOn) ({ scope.launch { pager.scrollToPage(0) } }) else null, glanceCurrent = onGlance,
-                right = listOf(RightDestination.Recents), quiet = onGlance,
+                quiet = onGlance,
             )
         }
         LaunchedEffect(Unit) { grid.goToPage(0, animate = false) }

@@ -14,7 +14,6 @@ import com.bos.sphere.core.data.DefaultCorners
 import com.bos.sphere.core.data.GlanceHotspots
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
-import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.HyleTheme
 import androidx.compose.ui.graphics.toArgb

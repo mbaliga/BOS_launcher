@@ -17,7 +17,6 @@ import com.bos.sphere.core.data.ClockSize
 import com.bos.sphere.core.data.ClockStyle
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
-import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ReducedMotionTesting
@@ -114,7 +113,7 @@ class GlanceClockW41UiTest {
         if (shown) return
         shown = true
         rule.setContent {
-            GlanceHomeForTest(cur.value, m, emptyList(), emptyMap(), listOf(RightDestination.Recents), true, { _, _ -> }, {}, {}, {}, Modifier.fillMaxSize(), dark = curDark.value, onClockTap = { taps++ })
+            GlanceHomeForTest(cur.value, m, emptyList(), emptyMap(), true, { _, _ -> }, {}, {}, {}, Modifier.fillMaxSize(), dark = curDark.value, onClockTap = { taps++ })
         }
     }
 

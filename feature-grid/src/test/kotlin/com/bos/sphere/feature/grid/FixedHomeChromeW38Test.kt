@@ -89,11 +89,11 @@ class FixedHomeChromeW38UiTest {
         goTo = { p -> scope.launch { pager.scrollToPage(p) } }
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(pager, Modifier.fillMaxSize().testTag("pager")) { page ->
-                if (page == 0) GlanceSurface(LauncherPrefs(), listOf(com.bos.sphere.core.data.RightDestination.Recents), true, indicator = false, dark = true)
+                if (page == 0) GlanceSurface(LauncherPrefs(), true, indicator = false, dark = true)
                 else Box(Modifier.fillMaxSize().background(if (page == 1) Color(0xFF203050) else Color(0xFF502030)).testTag("page$page"))
             }
             FixedHomeChrome(m, true, 4, {}, {}, {}, dark = true, corners = { MinimalHotspotLayer(hotspots(), emptyMap(), showHints = false, onRun = { _, _ -> }, showIcons = true) })
-            PageIndicator(count = 2, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter), onMenu = null, menuLabel = "", menuTag = "x", rtl = false, onGlance = {}, glanceCurrent = true, right = emptyList(), onRight = {}, quiet = false, awakeNonce = 0)
+            PageIndicator(count = 2, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter), onMenu = null, menuLabel = "", menuTag = "x", rtl = false, onGlance = {}, glanceCurrent = true, quiet = false, awakeNonce = 0)
         }
     }
 

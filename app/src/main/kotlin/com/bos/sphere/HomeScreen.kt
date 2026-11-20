@@ -1065,12 +1065,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         // W38: the Glance is the calm page: the wallpaper only; the hotspots and the music line are the fixed chrome below.
                         com.bos.sphere.feature.grid.GlanceSurface(
                             prefs = prefs,
-                            rightDestinations = com.bos.sphere.core.data.RightSideDestinations.of(prefs.rightSide),
                             hasLaunchpad = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off,
                             gestures = glanceGestureSpec,
                             onClockTap = { runner.run(CornerActionId.Clock) },
                             onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true },
-                            onOpenRight = { openRecents() },
                             indicator = false, onAwake = { indicatorAwake++ }, // wave 28: the one page indicator is drawn by the home, above the pager
                             underlay = { Background(baseFill = false, surface = com.bos.sphere.core.data.WallpaperSurface.Glance) },
                         )
@@ -1195,7 +1193,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad", rtl = homeOrder.rtl,
                     homeIndex = prefs.homePage.coerceIn(0, (dots - 1).coerceAtLeast(0)),
                     onGlance = if (prefs.glanceEnabled) ({ showSurface(HomeShown.Glance) }) else null, glanceCurrent = landing == HomeShown.Glance,
-                    right = emptyList(), onRight = { openRecents() }, // W44: the trailing dot for the right panel looked like a page that does not exist
                     quiet = landing == HomeShown.Glance, awakeNonce = indicatorAwake + homePager.currentPage,
                     hiddenFromAccessibility = homeEdit.active, // wave 37: the editor's strip cards already say "Page N of M"
                 )

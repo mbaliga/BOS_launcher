@@ -25,7 +25,6 @@ import com.bos.sphere.core.data.DefaultCorners
 import com.bos.sphere.core.data.GlanceHotspots
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
-import com.bos.sphere.core.data.RightDestination
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ReducedMotionTesting
@@ -69,7 +68,7 @@ class GlanceTitleW25UiTest {
         CompositionLocalProvider(LocalDensity provides Density(d.density, fontScale)) {
             GlanceHomeForTest(
                 prefs = LauncherPrefs(), media = media(title), hotspots = hotspots(), appsByKey = emptyMap(),
-                rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
+                hasLaunchpad = true,
                 onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {},
                 modifier = Modifier.fillMaxSize(),
             )

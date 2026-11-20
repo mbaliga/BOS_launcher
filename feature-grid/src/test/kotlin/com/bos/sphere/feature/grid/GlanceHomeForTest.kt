@@ -13,7 +13,6 @@ import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerItem
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
-import com.bos.sphere.core.data.RightDestination
 
 /**
  * Wave 38 test host: the calm Glance page ([GlanceSurface]) with the fixed chrome ([FixedHomeChrome]) above it, the way the home composes them, so the
@@ -25,7 +24,6 @@ fun GlanceHomeForTest(
     media: MediaInfo?,
     hotspots: List<Hotspot>,
     appsByKey: Map<String, AppEntry>,
-    rightDestinations: List<RightDestination>,
     hasLaunchpad: Boolean,
     onRun: (CornerItem, Corner) -> Unit,
     onPrevious: () -> Unit,
@@ -33,14 +31,13 @@ fun GlanceHomeForTest(
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenLaunchpad: () -> Unit = {},
-    onOpenRight: () -> Unit = {},
     indicator: Boolean = true,
     dark: Boolean = isDarkSurface(),
     onClockTap: () -> Unit = {},
 ) {
     var awake by remember { mutableIntStateOf(0) }
     Box(modifier.fillMaxSize()) {
-        GlanceSurface(prefs, rightDestinations, hasLaunchpad, Modifier.fillMaxSize(), onOpenLaunchpad, onOpenRight, indicator, onAwake = { awake++ }, dark = dark, onClockTap = onClockTap)
+        GlanceSurface(prefs, hasLaunchpad, Modifier.fillMaxSize(), onOpenLaunchpad, indicator = indicator, onAwake = { awake++ }, dark = dark, onClockTap = onClockTap)
         FixedHomeChrome(media, prefs.showMusic, prefs.glanceControlsSeconds, onPrevious, onPlayPause, onNext, dark = dark, corners = { MinimalHotspotLayer(hotspots, appsByKey, showHints = false, onRun = onRun, showIcons = true, iconTint = GlanceInk.secondary(dark)) })
     }
 }

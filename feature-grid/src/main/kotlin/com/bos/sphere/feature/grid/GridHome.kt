@@ -965,7 +965,7 @@ private fun Modifier.pageEffect(t: com.bos.sphere.core.data.PageTransition, vert
 /**
  * THE page indicator of the home (wave 28, homeUnify): one component, one place, for every stop of the one pager. When Glance is on it is the first stop
  * ([onGlance] non-null: the house glyph, lit while Glance shows, [glanceCurrent]); the pages follow as dots (the current one a long pill); on Glance the same
- * row is the quiet Glance indicator the owner already had (the Comms glyph [onMenu], the house, then the right-hand dots [right]) and fades after a few
+ * row is the quiet Glance indicator the owner already had (the Comms glyph [onMenu], then the house; no dot for the right panel, which reads as a page that does not exist) and fades after a few
  * seconds when [quiet]. The host draws it ONCE at a fixed place above the pager, so nothing jumps or duplicates when swiping from Glance to page 1.
  */
 @Composable
@@ -987,16 +987,13 @@ fun PageIndicator(
     /** The label of the leading glyph (Comms by default on the home; "Page options" on a bare grid). */
     menuLabel: String = com.bos.sphere.core.design.L10n.tr("Page options"),
     menuTag: String? = null,
-    /** The right-hand dots (Recents, the dock) the Glance indicator always had. */
-    right: List<com.bos.sphere.core.data.RightDestination> = emptyList(),
-    onRight: () -> Unit = {},
     /** The row dims after a few quiet seconds ([awakeNonce] wakes it); false keeps it fully lit. */
     quiet: Boolean = false,
     awakeNonce: Int = 0,
     /** Wave 37 (editorDebt): true while the page editor is open: its strip cards announce "Page N of M", so the dots leave the accessibility tree (they stay drawn and tappable). */
     hiddenFromAccessibility: Boolean = false,
 ) {
-    if (count <= 1 && onGlance == null && onMenu == null && right.isEmpty()) return
+    if (count <= 1 && onGlance == null && onMenu == null) return
     val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
     var awake by remember { mutableStateOf(true) }
     LaunchedEffect(awakeNonce, quiet) { awake = true; if (quiet) { kotlinx.coroutines.delay(4000); awake = false } }
@@ -1043,10 +1040,6 @@ fun PageIndicator(
             ) {
                 Box(Modifier.size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp).background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp)))
             }
-        }
-        for (d in right) {
-            val label = com.bos.sphere.core.design.L10n.tr(if (d == com.bos.sphere.core.data.RightDestination.Recents) "Open recents" else "Show the dock")
-            IndicatorButton("glance.indicator.right.${d.name}", label, onRight) { Box(Modifier.size(5.dp).background(HyleColors.Ink.copy(alpha = 0.55f), androidx.compose.foundation.shape.CircleShape)) }
         }
     }
     if (vertical) {

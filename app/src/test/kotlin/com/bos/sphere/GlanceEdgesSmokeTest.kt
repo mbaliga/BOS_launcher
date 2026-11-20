@@ -118,7 +118,11 @@ class GlanceEdgesSmokeTest {
     @Test fun STR_01_aTapOnTheGlanceLeftHandleOpensLaunchpad() { startFresh(); rule.onNodeWithTag("glance.handle.left", useUnmergedTree = true).performClick(); settle(); assertTrue(launchpadShown()) }
     @Test fun STR_14_aTapOnTheGlanceRightHandleOpensRecents() { startFresh(); rule.onNodeWithTag("recents.handle", useUnmergedTree = true).performClick(); settle(); assertTrue(recentsShown()) }
     @Test fun HOM_23_theIndicatorLaunchpadGlyphOpensLaunchpad() { startFresh(); rule.onNodeWithTag("glance.indicator.launchpad", useUnmergedTree = true).performClick(); settle(); assertTrue(launchpadShown()) }
-    @Test fun HOM_23_theIndicatorRightDotOpensTheRecentsPanel() { startFresh(); rule.onNodeWithTag("glance.indicator.right.Recents", useUnmergedTree = true).performClick(); settle(); assertTrue(recentsShown()) }
+    @Test fun HOM_23_theIndicatorHasNoTrailingDotForTheRightPanelAndTheRightPanelStillOpensByHandleAndSwipe() {
+        startFresh()
+        assertFalse(tagShown("glance.indicator.right.Recents")); assertFalse(tagShown("glance.indicator.right.Dock"))
+        swipeFromRight(); assertTrue(recentsShown())
+    }
     @Test fun STR_01_theGlanceEdgeZoneIsWideEnoughToStartWhereTheHandleIs() {
         startFresh()
         rule.onRoot().performTouchInput { down(Offset(40f * 2f, height * 0.5f)); moveBy(Offset(60f, 0f)); moveBy(Offset(200f, 0f)); moveBy(Offset(300f, 0f)); up() }; settle()
@@ -137,15 +141,15 @@ class GlanceEdgesSmokeTest {
         assertTrue("the right side is untouched", tagShown("recents.handle"))
         swipeFromRight(); assertTrue(recentsShown())
     }
-    @Test fun STR_14_withTheRightSideOffGlanceDrawsNoRecentsHandleOrDot() {
+    @Test fun STR_14_withTheRightSideOffGlanceDrawsNoRecentsHandleAndTheIndicatorNeverHasARightDot() {
         startFresh { it.copy(rightSide = RightSide.Off) }
         assertFalse(tagShown("recents.handle")); assertFalse(tagShown("glance.indicator.right.Recents")); assertFalse(tagShown("glance.indicator.right.Dock"))
         assertTrue(tagShown("glance.handle.left"))
         swipeFromRight(); assertFalse(recentsShown())
     }
-    @Test fun STR_14_withTheRightSideOnTheDockRailGlanceHasNoRecentsHandleButTheDotIsThere() {
+    @Test fun STR_14_withTheRightSideOnTheDockRailGlanceHasNoRecentsHandleAndNoIndicatorDot() {
         startFresh { it.copy(rightSide = RightSide.DockRail) }
-        assertFalse(tagShown("recents.handle")); assertTrue(tagShown("glance.indicator.right.Dock"))
+        assertFalse(tagShown("recents.handle")); assertFalse("no trailing dot: it read as a page that does not exist", tagShown("glance.indicator.right.Dock"))
     }
     @Test fun HOM_23_theRailSettingKeepsTheQuietHandleOnGlance() {
         startFresh { it.copy(launchpadRail = true) }

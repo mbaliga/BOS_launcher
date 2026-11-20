@@ -124,7 +124,7 @@ fun BoxScope.DockLayer(
     homeExtras: com.bos.sphere.feature.grid.HomeExtras? = null,
     /** HOM-19: where the bottom rail and what rides on it sit above the bottom clock and page dots; null keeps the fixed margins. */
     bottomPlan: com.bos.sphere.feature.dock.HomeBottomStack.Plan? = null,
-    /** W20 (HOM-23): Glance with Right side = Dock rail shows the rail even while the dock setting is off (the dot says "Show the dock"). */
+    /** W20 (HOM-23): Glance with Right side = Dock rail shows the rail even while the dock setting is off (its edge reveal shows it; the indicator has no dot since W44). */
     alwaysShown: Boolean = false,
     /** W26: a tap on the dock's Home glyph (the first page; never the dock panel). */
     onGoHome: () -> Unit = {},

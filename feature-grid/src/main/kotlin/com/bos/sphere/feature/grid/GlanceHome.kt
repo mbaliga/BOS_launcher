@@ -28,6 +28,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -155,16 +157,20 @@ fun GlanceSurface(
     BoxWithConstraints(modifier.fillMaxSize().background(if (systemWallpaper) Color.Transparent else if (dark) Color.Black else Color(0xFFF3F3F6)).testTag("glance.surface")) {
         underlay()
         // The tap layer: the home gestures (swipes, long press) share it; a tap only wakes the indicator.
+        var clockBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+        var layerOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        // The clock is drawn BELOW the tap layer on purpose (a node with its own pointer input would hide the gesture layer under it): the tap layer hit-tests a tap against the clock's bounds.
+        // Wave 41: the big wallpaper clock is part of this page (it scrolls away with it); position fixed at the upper-middle.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            GlanceWallpaperClock(prefs.clockStyle, prefs.clockFormat, prefs.glanceClockSize, prefs.glanceClockDate, prefs.glanceClockAccent, dark, clockAccent, onClockTap, onBounds = { clockBounds = it })
+        }
         Box(
             Modifier.fillMaxSize().homeGestures(gestures) { true }
-                .pointerInput(Unit) { detectTapGestures(onTap = { awakeNonce++; onAwake() }) }
+                .onGloballyPositioned { layerOrigin = it.positionInRoot() }
+                .pointerInput(onClockTap) { detectTapGestures(onTap = { p -> if (clockBounds.contains(p + layerOrigin)) onClockTap() else { awakeNonce++; onAwake() } }) }
                 // decoration for accessibility: the surface has no content of its own
                 .clearAndSetSemantics { },
         )
-        // Wave 41: the big wallpaper clock is part of this page (it scrolls away with it); position fixed at the upper-middle.
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            GlanceWallpaperClock(prefs.clockStyle, prefs.clockFormat, prefs.glanceClockSize, prefs.glanceClockDate, prefs.glanceClockAccent, dark, clockAccent, onClockTap)
-        }
         if (indicator && prefs.glanceIndicator) Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             PageIndicator(
                 count = 0, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),

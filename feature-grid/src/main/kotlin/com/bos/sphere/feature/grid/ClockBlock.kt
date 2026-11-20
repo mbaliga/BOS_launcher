@@ -4,6 +4,16 @@ import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -131,7 +141,7 @@ object ClockText {
  */
 @Composable
 fun GlanceWallpaperClock(
-    style: ClockStyle, format: ClockFormat, size: ClockSize, showDate: Boolean, useAccent: Boolean, dark: Boolean, accent: Color, onTap: () -> Unit,
+    style: ClockStyle, format: ClockFormat, size: ClockSize, showDate: Boolean, useAccent: Boolean, dark: Boolean, accent: Color, onTap: () -> Unit, onBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (style == ClockStyle.Off) return
@@ -157,7 +167,10 @@ fun GlanceWallpaperClock(
             val dateH = if (showDate) 28.dp else 0.dp
             Column(
                 Modifier.align(Alignment.TopCenter).padding(top = maxHeight * ClockText.TOP_FRACTION)
-                    .clickable(onClickLabel = open, role = Role.Button, onClick = onTap)
+                    // W41: no pointer input here on purpose: an input on this node would hide the Glance's own gesture layer below it (long press = Home sheet).
+                    // The Glance's tap layer hit-tests a tap against these bounds and calls onTap itself.
+                    .onGloballyPositioned { onBounds(it.boundsInRoot()) }
+                    .semantics { role = Role.Button; onClick(label = open) { onTap(); true } }
                     .launcherItem("glance.clock", focusable = true, onActivate = onTap, ringRadiusDp = 24f)
                     .testTag("glance.clock")
                     .clearAndSetSemantics { contentDescription = spoken }, // innermost: it clears the children's semantics, not the tag or the click above it

@@ -191,4 +191,14 @@ class GlanceModelTest {
         // garbage of any shape starts normally
         assertEquals(ClockStyle.BigDigital, LauncherPrefsStore(MapSharedPreferences(mapOf("clockPosition" to 7, "strip" to "x:y:z,,", "clockSize" to "big"))).prefs.value.clockStyle)
     }
+
+    @Test fun HOM_12_clockTileOptionsPersistAndDefaultToTheOldLook() {
+        val sp = MapSharedPreferences(emptyMap())
+        val d = LauncherPrefsStore(sp).prefs.value
+        assertFalse(d.clockTileAnalog); assertEquals(ClockFormat.System, d.clockTileFormat); assertTrue(d.clockTileDate)
+        LauncherPrefsStore(sp).update { it.copy(clockTileAnalog = true, clockTileFormat = ClockFormat.Hour12, clockTileDate = false) }
+        val back = LauncherPrefsStore(sp).prefs.value
+        assertTrue(back.clockTileAnalog); assertEquals(ClockFormat.Hour12, back.clockTileFormat); assertFalse(back.clockTileDate)
+        assertEquals(ClockFormat.System, LauncherPrefsStore(MapSharedPreferences(mapOf("clockTileFormat" to "Nonsense"))).prefs.value.clockTileFormat)
+    }
 }

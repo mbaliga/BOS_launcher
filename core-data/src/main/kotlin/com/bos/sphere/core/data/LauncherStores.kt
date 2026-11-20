@@ -117,6 +117,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("clockStyle", next.clockStyle.name)
             .putString("clockFormat", next.clockFormat.name)
             .putBoolean("glanceClockDate", next.glanceClockDate).putBoolean("glanceClockAccent", next.glanceClockAccent).putString("glanceClockSize", next.glanceClockSize.name)
+            .putBoolean("clockTileAnalog", next.clockTileAnalog).putString("clockTileFormat", next.clockTileFormat.name).putBoolean("clockTileDate", next.clockTileDate)
             .putBoolean("badgesOn", next.badgesOn).putBoolean("badgeCount", next.badgeCount)
             .putBoolean("adaptiveGrid", next.adaptiveGrid).putFloat("gridDensity", next.gridDensity)
             .putFloat("cornerIconSize", next.cornerIconSize)
@@ -260,6 +261,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             glanceClockDate = sp.getBoolean("glanceClockDate", d.glanceClockDate),
             glanceClockAccent = sp.getBoolean("glanceClockAccent", d.glanceClockAccent),
             glanceClockSize = enumOr(sp.getString("glanceClockSize", null), d.glanceClockSize),
+            clockTileAnalog = sp.getBoolean("clockTileAnalog", d.clockTileAnalog),
+            clockTileFormat = enumOr(sp.getString("clockTileFormat", null), d.clockTileFormat),
+            clockTileDate = sp.getBoolean("clockTileDate", d.clockTileDate),
             badgesOn = sp.getBoolean("badgesOn", d.badgesOn),
             badgeCount = sp.getBoolean("badgeCount", d.badgeCount),
             adaptiveGrid = sp.getBoolean("adaptiveGrid", d.adaptiveGrid),

@@ -331,6 +331,23 @@ class HomeItems internal constructor(
     /** HOM-12: the edit-mode remove handle of a placed item. */
     fun removeFromHome(key: String) = removeKey(key)
 
+    // ---- wave 45 (editSheet): what the item sheet and action bar ask of this host
+    /** Set by the home in edit mode: a long press on a non-app item selects it (returns true) instead of opening the old popup menu. */
+    var selectHook: ((String) -> Boolean)? = null
+    fun openItem(key: String) = tap(key)
+    fun startResize(key: String) { resizing = key }
+    fun canReconfigure(key: String): Boolean = ItemKeys.widgetId(key)?.let { host.providerInfo(it)?.configure != null } == true && WidgetStacks.stackAt(extrasState, key) == null
+    fun reconfigureItem(key: String) = reconfigure(key)
+    fun resizeTo(key: String, cols: Int, rows: Int) {
+        val cur = extrasState.spanOf(key)
+        val (gc, gr) = gridDims()
+        edit { HomeEdit.resizeWidget(it, key, cols - cur.cols, rows - cur.rows, max = com.bos.sphere.core.catalog.WidgetSpan(gc, gr), gridCols = gc, gridRows = gr) }
+    }
+    fun gridSize(): Pair<Int, Int> = gridDims()
+    fun dissolveFolder(key: String) { ItemKeys.folderId(key)?.let { id -> edit { HomeEdit.dissolve(it, id) } } }
+    fun editFolder(key: String) { openFolder = ItemKeys.folderId(key) }
+    fun labelOf(key: String): String = extrasState.items[key]?.label ?: extrasState.folders[ItemKeys.folderId(key)]?.name ?: key
+
     /** HOM-12: while edit mode is on, what a removal takes is kept here (and widget ids stay bound) so undo can bring it back whole. */
     private var graveyard: com.bos.sphere.core.catalog.EditGraveyard? = null
 
@@ -493,7 +510,7 @@ class HomeItems internal constructor(
         },
         onResizeDone = { resizing = null },
         onTap = ::tap,
-        onLongPress = { itemMenu = it },
+        onLongPress = { if (selectHook?.invoke(it) != true) itemMenu = it },
         onAction = ::applyKeyboardAction,
         onDropItems = ::addDroppedInto,
         usageSlices = usageSlices,

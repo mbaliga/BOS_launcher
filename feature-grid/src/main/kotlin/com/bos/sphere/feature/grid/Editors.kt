@@ -310,17 +310,6 @@ private fun SmallGlyphButton(glyph: androidx.compose.ui.graphics.vector.ImageVec
     )
 }
 
-/** Long-press on a page tile (the clock). */
-@Composable
-fun TileMenuDialog(title: String, onRemove: () -> Unit, onDismiss: () -> Unit) {
-    GlassDialog(title = title, onDismiss = onDismiss, footer = { TextButtonPill(L10n.tr("Cancel"), onClick = onDismiss) }) {
-        Text(L10n.tr("Long-press and drag to move it."), color = HyleColors.InkDim, fontSize = 12.sp)
-        Row(horizontalArrangement = Arrangement.Start, modifier = Modifier.padding(top = 10.dp).semantics { contentDescription = "Remove tile" }) {
-            TextButtonPill(L10n.tr("Remove from page"), primary = true, onClick = onRemove)
-        }
-    }
-}
-
 /**
  * INP-15: pick an app, then one of its shortcuts (dynamic, manifest and pinned). Needs Liftoff to be the home app, which
  * is the only time the system lists shortcuts to a launcher; with none listed it says so instead of showing an empty page.

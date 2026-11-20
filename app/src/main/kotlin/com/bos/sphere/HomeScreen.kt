@@ -141,7 +141,6 @@ import com.bos.sphere.feature.grid.GridHome
 import com.bos.sphere.feature.grid.IconCache
 import com.bos.sphere.feature.grid.PeekWidget
 import com.bos.sphere.feature.grid.SettingsSpace
-import com.bos.sphere.feature.grid.TileMenuDialog
 import com.bos.sphere.feature.grid.UiSounds
 import com.bos.sphere.feature.grid.WheelCategoryCache
 import com.bos.sphere.feature.grid.WheelDrawer
@@ -360,7 +359,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var menuApp by remember { mutableStateOf<AppEntry?>(null) }
     var editCorner by remember { mutableStateOf<Corner?>(null) }
     var editGesture by remember { mutableStateOf<HomeGesture?>(null) }
-    var tileMenu by remember { mutableStateOf<String?>(null) }
+    val itemEdit = rememberItemEditState() // wave 45 (editSheet): the selected item's action bar and sheet replace the old full-screen tile menu
     var expandedWidget by remember { mutableStateOf<Corner?>(null) }
 
     val gridState = rememberGridHomeState()
@@ -384,6 +383,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val puckLabels by remember { com.bos.sphere.core.data.PuckActionsStore.get(context).showLabels }.collectAsStateWithLifecycle()
     val torchOk = remember(wheelOpen) { !wheelOpen || com.bos.sphere.core.data.Torch.available(context) } // asked only while the disc is open
     val dndOk = remember(wheelOpen) { !wheelOpen || com.bos.sphere.core.data.PuckAvailability.policyAccess(context) }
+    /** Wave 45 (editSheet): a long press on a home item selects it (action bar + item sheet) while editing; [enterEdit] lets a press outside edit mode start editing first. False = not handled (the old menu opens). */
+    fun selectItem(key: String, enterEdit: Boolean = false): Boolean {
+        if (!homeEdit.active) { if (!enterEdit) return false; homeEdit.enter() }
+        itemEdit.select(key, lastTouch.sourceRect()?.let { androidx.compose.ui.geometry.Rect(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) })
+        return true
+    }
     fun launch(app: AppEntry) {
         com.bos.sphere.feature.dock.SessionUse.mark(app.key)
         appLauncher.launch(app, lastTouch.sourceRect())
@@ -803,7 +808,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     LaunchedEffect(homeSignal) {
         if (homeSignal > 0) {
             settingsOpen = false; wheelOpen = false; hubOpen = false; searchOpen = false; leftOpen = false; rightOpen = false
-            menuApp = null; editCorner = null; editGesture = null; tileMenu = null; expandedWidget = null
+            menuApp = null; editCorner = null; editGesture = null; itemEdit.clear(); expandedWidget = null
             // Wave 26: the Home button returns to what home starts on: Glance when it is on, else the first page.
             showStop(0) // stop 0 is Glance when it is on, else the first page
             gridState.goToPage(prefs.homePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))
@@ -962,7 +967,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             it.requestId = { id -> com.bos.sphere.feature.grid.LauncherInput.focus.request(id) }
         }
     }
-    CompositionLocalProvider(LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail) {
+    CompositionLocalProvider(LocalIconTheme provides iconTheme, com.bos.sphere.feature.grid.LocalIconSources provides homeItems.iconSources, com.bos.sphere.ui.LocalLaunchpadFocusTrail provides launchpadFocusTrail, com.bos.sphere.feature.grid.LocalItemSettingsOpener provides remember(itemEdit, homeEdit) { { k: String -> if (homeEdit.active) itemEdit.openSheet(k) } }, com.bos.sphere.feature.grid.LocalClockTileOptions provides remember(prefs.clockTileAnalog, prefs.clockTileFormat, prefs.clockTileDate) { com.bos.sphere.feature.grid.ClockTileOptions.of(prefs) }) {
     Box(
         modifier = Modifier.fillMaxSize().onKeyEvent { e -> if (homeEdit.active && e.type == KeyEventType.KeyDown && e.key == Key.Escape) { homeEdit.exit(); true } else false }.trackLastTouch(lastTouch).dockShortcuts(shortcutRegistry, dockController)
             .launchpadShortcut(launchpadShortcuts) { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true }
@@ -1086,7 +1091,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     Box(Modifier.fillMaxSize().safeDrawingPadding().deckSwipe(enabled = backSwipeEnabled && !leftOpen, accepts = backSwipeAccepts, ready = { scrollAtStart }, edgeExcludePx = pagesEdgePx, onTrigger = backSwipeAction)) {
                         com.bos.sphere.feature.grid.ColumnScrollHome(
                             keys = pages.flatMap { it.keys }, appsByKey = appsByKey, extras = homeItems.homeExtras, order = homeOrder,
-                            topBand = scrollTop, bottomBand = scrollBottom, onLaunch = ::launch, onAppLongPress = { menuApp = it },
+                            topBand = scrollTop, bottomBand = scrollBottom, onLaunch = ::launch, onAppLongPress = { if (!selectItem(it.key)) menuApp = it },
                             iconScale = prefs.iconScale, showLabels = prefs.showLabels, editing = homeEdit.active,
                             onRemove = { key -> val a = appsByKey[key]; if (a != null) stores.layout.removeFromHome(a.key, pages, preserve) else homeItems.removeFromHome(key) },
                             gestures = homeGestureSpec,
@@ -1113,13 +1118,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             gesturesBound = gestures.keys,
                             capacityOf = capacityOf,
                             onLaunch = ::launch,
-                            onAppLongPress = { menuApp = it },
+                            onAppLongPress = { if (!selectItem(it.key)) menuApp = it },
                             onPagesChange = { savePages(it) },
                             onEmptyLongPress = { page -> if (!homeEdit.active && com.bos.sphere.core.data.FreshHome.isEmpty(pages)) { editFocusAdd = true; homeEdit.enter() } else if (HomeGesture.LongPress in gestures) onGesture(HomeGesture.LongPress) else { quickPage = page; quickOpen = true } },
                             onGesture = ::onGesture,
                             onClockTap = { runner.run(CornerActionId.Clock) },
                             onTileTap = { key -> if (key == HomeTiles.SETTINGS) openSettings(com.bos.sphere.ui.CATEGORY_ROOT) },
-                            onTileLongPress = { key, _ -> tileMenu = key },
+                            onTileLongPress = { key, _ -> selectItem(key, enterEdit = true) },
                             extras = homeItems.homeExtras,
                             editMode = homeEdit.active,
                             onRemoveItem = { key ->
@@ -1734,6 +1739,33 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onDone = { homeEdit.exit() },
             )
             com.bos.sphere.feature.grid.PageEditorGhost(editCard.drag) // wave 36: the dragged app's icon above the live page
+            ItemEditHost(
+                itemEdit,
+                ItemEditOps(
+                    appOf = { appsByKey[it] },
+                    labelOf = { k -> appsByKey[k]?.label ?: if (k == HomeTiles.CLOCK) L10n.tr("Clock") else if (k == HomeTiles.SETTINGS) L10n.tr("Settings") else homeItems.labelOf(k) },
+                    hidden = hidden,
+                    clock = com.bos.sphere.feature.grid.ClockTileOptions.of(prefs),
+                    onClock = { c -> stores.prefs.update { it.copy(clockTileAnalog = c.analog, clockTileFormat = c.format, clockTileDate = c.date) } },
+                    remove = { key -> val a = appsByKey[key]; if (a != null) stores.layout.removeFromHome(a.key, pages, preserve) else if (HomeTiles.isTile(key)) savePages(HomeLayoutMath.remove(pages, key)) else homeItems.removeFromHome(key) },
+                    undo = { homeEdit.undo() },
+                    launch = { a -> homeEdit.exit(); launch(a) },
+                    appInfo = { repository.openAppDetails(it) },
+                    changeIcon = { homeItems.iconFor = it },
+                    setHidden = { a, h -> hiddenStore.setHidden(a.key, h) },
+                    uninstall = { repository.requestUninstall(it) },
+                    openItem = { homeItems.openItem(it) },
+                    startResize = { homeItems.startResize(it) },
+                    canReconfigure = { homeItems.canReconfigure(it) },
+                    reconfigure = { homeItems.reconfigureItem(it) },
+                    resizeTo = { k, c, r -> homeItems.resizeTo(k, c, r) },
+                    spanOf = { k -> extrasState.spanOf(k).let { it.cols to it.rows } },
+                    grid = { homeItems.gridSize() },
+                    dissolveFolder = { homeItems.dissolveFolder(it) },
+                    editFolder = { homeItems.editFolder(it) },
+                ),
+                reserveTop = 64.dp, reserveBottom = dockReserve.bottom.dp + 72.dp,
+            )
         }
         if (!prefs.onboardingDone) {
             com.bos.sphere.ui.Onboarding(
@@ -1748,13 +1780,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         popupSheetHost.Layer() // wave 38: above the sliding Comms underlay and the shrunken home card, across the whole window
         homeItems.Overlays(hiddenStore, hidden)
-        tileMenu?.let { key ->
-            TileMenuDialog(
-                title = if (key == HomeTiles.CLOCK) "Clock tile" else "Tile",
-                onRemove = { savePages(HomeLayoutMath.remove(pages, key)); tileMenu = null },
-                onDismiss = { tileMenu = null },
-            )
-        }
+        androidx.compose.runtime.SideEffect { homeItems.selectHook = { key -> selectItem(key) } }
     }
     }
 }

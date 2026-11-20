@@ -28,6 +28,9 @@ data class HistoryEntry(
     /** W42: the app's conversation shortcut for this notification (empty when it had none) and the user it belongs to: a deep link that survives a restart. */
     val shortcutId: String = "",
     val userId: Int = 0,
+    /** Wave 41: the notification category (`msg`, `call`, `alarm`...) and priority, kept so the Timeline can tell an alert from a plain post. Empty / 0 on older lines. */
+    val category: String = "",
+    val priority: Int = 0,
 ) {
     /** The name shown in bold: the sender, else the title, else the app. */
     val who: String get() = sender.ifBlank { title.ifBlank { appLabel.ifBlank { packageName } } }
@@ -56,11 +59,11 @@ object NotificationHistoryCodec {
     fun encode(e: HistoryEntry): String = listOf(
         e.timeMillis.toString(), (if (e.read) "r" else "u") + (if (e.dismissed) "d" else "a"),
         esc(e.key), esc(e.packageName), esc(e.appLabel), esc(e.sender), esc(e.title), esc(e.text), esc(e.conversation),
-    ).let { if (e.shortcutId.isEmpty()) it else it + listOf(esc(e.shortcutId), e.userId.toString()) }.joinToString("\t") // W42: two optional trailing fields, so old lines read unchanged
+    ).let { if (e.shortcutId.isEmpty() && e.category.isEmpty() && e.priority == 0) it else it + listOf(esc(e.shortcutId), e.userId.toString(), esc(e.category), e.priority.toString()) }.joinToString("\t") // W42 + W41: four optional trailing fields (shortcut, user, category, priority), so 9-field lines of older installs read unchanged
 
     fun decode(line: String): HistoryEntry? {
         val f = line.split('\t')
-        if (f.size != 9 && f.size != 11) return null
+        if (f.size != 9 && f.size != 13) return null
         val time = f[0].toLongOrNull() ?: return null
         val flags = f[1]
         if (flags.length != 2 || flags[0] !in "ru" || flags[1] !in "ad") return null
@@ -68,7 +71,8 @@ object NotificationHistoryCodec {
         return HistoryEntry(
             id = idOf(key, time), key = key, packageName = unesc(f[3]), appLabel = unesc(f[4]), sender = unesc(f[5]), title = unesc(f[6]),
             text = unesc(f[7]), conversation = unesc(f[8]), timeMillis = time, read = flags[0] == 'r', dismissed = flags[1] == 'd',
-            shortcutId = if (f.size == 11) unesc(f[9]) else "", userId = if (f.size == 11) f[10].toIntOrNull() ?: 0 else 0,
+            shortcutId = if (f.size == 13) unesc(f[9]) else "", userId = if (f.size == 13) f[10].toIntOrNull() ?: 0 else 0,
+            category = if (f.size == 13) unesc(f[11]) else "", priority = if (f.size == 13) f[12].toIntOrNull() ?: 0 else 0,
         )
     }
 
@@ -190,6 +194,7 @@ class NotificationHistoryStore(
                         NotificationHistoryCodec.idOf(n.key, n.timestamp), n.key, n.packageName, n.appLabel.ifBlank { n.source }, sender, n.title,
                         n.summary, n.conversation.orEmpty(), n.timestamp,
                         shortcutId = n.shortcutId.orEmpty(), userId = n.profileId,
+                        category = n.category ?: if (n.isMessaging) "msg" else "", priority = n.priority,
                     )
                     map[e.id] = e; changed += e
                 }

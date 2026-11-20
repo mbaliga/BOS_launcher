@@ -51,6 +51,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -98,6 +100,10 @@ object OneUiTags {
     const val SEARCH = "oneui.search"
     const val LEFT_PANE = "oneui.leftPane"
     const val RIGHT_PANE = "oneui.rightPane"
+    /** Wave 46: the row of preview cards of a choice that shows its options inline. */
+    const val RAIL = "oneui.rail"
+    /** Wave 46: the band of the large title (the title is centred in it). */
+    const val TITLE_BAND = "oneui.titleBand"
     fun row(category: String) = "oneui.row.$category"
 }
 
@@ -306,8 +312,10 @@ internal fun OneUiPage(
     val headerDp = if (compactHeader) OneUiModel.COMPACT_HEADER_DP else OneUiModel.headerDp(LocalConfiguration.current.screenHeightDp.toFloat())
     val headerPx = with(density) { headerDp.dp.toPx() }
     val barPx = with(density) { BarHeight.toPx() }
+    val minPad = with(density) { 16.dp.toPx() }
     val collapse = remember(state, headerPx) { derivedStateOf { OneUiModel.collapse(state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset, headerPx, barPx * 0.5f) } }
     val bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
+    // The empty tap handler only stops taps reaching a page beneath; the page is a container with no semantics of its own (the title is the heading).
     Column(modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }.background(OneUi.Page.copy(alpha = alpha)).then(if (tag != null) Modifier.testTag(tag) else Modifier)) {
         OneUiTopBar(title, collapse, onBack, backLabel)
         LazyColumn(
@@ -316,7 +324,15 @@ internal fun OneUiPage(
             contentPadding = PaddingValues(bottom = bottom + 28.dp),
         ) {
             item(key = "title") {
-                Box(Modifier.fillMaxWidth().heightIn(min = headerDp.dp).padding(horizontal = 28.dp, vertical = 16.dp), contentAlignment = Alignment.BottomStart) {
+                // Wave 46: the large title sits in the vertical centre of the empty band between the bar and the first row, not at its bottom.
+                Box(
+                    Modifier.fillMaxWidth().heightIn(min = headerDp.dp).padding(horizontal = 28.dp).testTag(OneUiTags.TITLE_BAND)
+                        .layout { m, c ->
+                            val p = m.measure(c.copy(minWidth = 0, minHeight = 0))
+                            val band = maxOf(headerPx, p.height + 2 * minPad).roundToInt()
+                            layout(c.maxWidth, band) { p.place(0, OneUiModel.centredTop(band.toFloat(), p.height.toFloat()).roundToInt()) }
+                        },
+                ) {
                     Column {
                         Text(
                             title, color = HyleColors.InkBright, fontSize = 36.sp, fontWeight = FontWeight.Normal, lineHeight = 42.sp,
@@ -452,7 +468,7 @@ private fun OneUiItem(item: SettingItem, index: Int, lit: Boolean, host: ItemHos
         is SettingItem.Toggle -> OneUiToggleRow(item, lit) { v -> item.onChange(v); host.play(UiSound.Tick); host.tick() }
         is SettingItem.Slider -> OneUiSliderRow(item, lit) { host.tick() }
         is SettingItem.Stepper -> OneUiStepperRow(item, lit) { host.play(UiSound.Tick); host.tick() }
-        is SettingItem.Choice<*> -> if (item.preview != null) OneUiRailRow(item, lit) { host.openSub(index) } else OneUiChoiceRow(item, lit) { host.openSub(index) }
+        is SettingItem.Choice<*> -> if (OneUiModel.presentation(item) == OneUiModel.Presentation.Rail) OneUiRailRow(item, lit) else OneUiChoiceRow(item, lit) { host.openSub(index) }
         is SettingItem.Action -> OneUiActionRow(item, lit) { host.play(UiSound.Select); if (item.confirm != null) host.confirm(item) else item.onClick() }
         is SettingItem.Pane -> OneUiPaneRow(item, lit) { host.openSub(index) }
     }
@@ -463,7 +479,8 @@ private fun OneUiItem(item: SettingItem, index: Int, lit: Boolean, host: ItemHos
 @Composable
 private fun OneUiSubPage(category: SettingCategory, itemIndex: Int, host: ItemHost, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val row = category.items.getOrNull(itemIndex) ?: return
-    val subtitle = (row as? SettingItem.Pane)?.pageSubtitle?.invoke()
+    // Wave 46: a choice's one-line explanation sits under the large title, like a pane's live line.
+    val subtitle = (row as? SettingItem.Pane)?.pageSubtitle?.invoke() ?: (row as? SettingItem.Choice<*>)?.hint?.takeIf { it.isNotEmpty() }
     OneUiPage(title = row.title, subtitle = subtitle, onBack = onBack, backLabel = L10n.tr("Back"), modifier = modifier, tag = OneUiTags.SUB_PAGE) {
         when (row) {
             is SettingItem.Pane -> item(key = "pane") {
@@ -474,7 +491,6 @@ private fun OneUiSubPage(category: SettingCategory, itemIndex: Int, host: ItemHo
             }
             is SettingItem.Choice<*> -> {
                 @Suppress("UNCHECKED_CAST") val c = row as SettingItem.Choice<Any?>
-                if (!c.hint.isNullOrEmpty()) item(key = "hint") { Text(c.hint, color = HyleColors.InkDim, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)) }
                 item(key = "options") {
                     OneUiCard(c.options.size) {
                         c.options.forEachIndexed { i, opt ->

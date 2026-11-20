@@ -287,7 +287,7 @@ private fun StepButton(glyph: String, label: String, enabled: Boolean, onClick: 
     }
 }
 
-/** A choice: the title, its hint, and the current value in grey at the end; a tap opens the radio list page. */
+/** A choice without cards: the title, its hint, and the current value in grey at the end with a chevron; a tap opens its full radio page. */
 @Composable
 internal fun OneUiChoiceRow(item: SettingItem.Choice<*>, highlighted: Boolean, onOpen: () -> Unit) {
     OneUiRowFrame(
@@ -300,17 +300,19 @@ internal fun OneUiChoiceRow(item: SettingItem.Choice<*>, highlighted: Boolean, o
     )
 }
 
-/** A choice with a row of live preview cards: the title (opens the radio list), the cards, the current value. The cards apply as they are tapped. */
+/**
+ * A choice with a row of live preview cards (wave 46): the title and its hint, then the cards. The cards ARE the control: they apply as they
+ * are tapped, so the row has no chevron, no page of its own and no caption repeating the picked value under them. The picked value is still
+ * read out through the row's description.
+ */
 @Composable
-internal fun OneUiRailRow(item: SettingItem.Choice<*>, highlighted: Boolean, onOpen: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(if (highlighted) OneUi.Highlight else Color.Transparent).padding(bottom = 12.dp)) {
+internal fun OneUiRailRow(item: SettingItem.Choice<*>, highlighted: Boolean) {
+    Column(Modifier.fillMaxWidth().background(if (highlighted) OneUi.Highlight else Color.Transparent).padding(bottom = 12.dp).testTag(OneUiTags.RAIL)) {
         OneUiRowFrame(
-            item.title, summary = item.hint, onClick = onOpen,
+            item.title, summary = item.hint, role = null,
             modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${item.title}, ${item.value}" },
-            trailing = { OneUiChevron() },
         )
         CompositionLocalProvider(LocalRailInset provides 0.dp) { Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) { item.preview?.invoke(this) } }
-        Text(item.value, color = HyleColors.InkDim, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
     }
 }
 
@@ -333,17 +335,27 @@ internal fun OneUiPaneRow(item: SettingItem.Pane, highlighted: Boolean, onClick:
     )
 }
 
-/** A row of the radio list page: the label and a radio dot at the end. */
+/** A row of the radio list page: the label (and a grey line) and a radio dot at the end. */
 @Composable
-internal fun OneUiRadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
+internal fun OneUiRadioRow(label: String, selected: Boolean, detail: String? = null, modifier: Modifier = Modifier, onClick: () -> Unit) {
     OneUiRowFrame(
-        label, role = Role.RadioButton, onClick = onClick,
-        modifier = Modifier.semantics(mergeDescendants = true) { this.selected = selected; contentDescription = label },
+        label, summary = detail, role = Role.RadioButton, onClick = onClick,
+        modifier = modifier.semantics(mergeDescendants = true) { this.selected = selected; contentDescription = label },
         trailing = {
             Box(Modifier.size(22.dp).clip(CircleShape).background(if (selected) HyleColors.Violet else OneUi.Track), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(if (selected) 8.dp else 16.dp).clip(CircleShape).background(if (selected) Color.White else OneUi.Card))
             }
         },
+    )
+}
+
+/** A row of a multi-select page: the label and a checkbox at the end. */
+@Composable
+internal fun OneUiCheckRow(label: String, checked: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OneUiRowFrame(
+        label, role = Role.Checkbox, onClick = onClick,
+        modifier = modifier.semantics(mergeDescendants = true) { this.selected = checked; contentDescription = label },
+        trailing = { OneUiCheckMark(checked) },
     )
 }
 

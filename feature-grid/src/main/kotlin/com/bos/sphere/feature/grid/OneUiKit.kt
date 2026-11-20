@@ -105,7 +105,7 @@ fun OneUiSwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit,
     )
 }
 
-/** A row that shows its current value in grey and a chevron; a tap opens the radio dialog (or a page). */
+/** A row that shows its current value in grey and a chevron; a tap opens a full page of options (never a popup). */
 @Composable
 fun OneUiValueRow(title: String, value: String, onClick: () -> Unit, summary: String? = null, modifier: Modifier = Modifier) {
     OneUiRowFrame(
@@ -132,10 +132,10 @@ fun OneUiBadge(text: String, modifier: Modifier = Modifier) {
 
 /** A prominent full-width button of a page: a rounded tonal bar with an icon and a label (a page's main action). */
 @Composable
-fun OneUiPrimaryButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, glyph: ImageVector = Glyphs.Plus) {
+fun OneUiPrimaryButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, glyph: ImageVector = Glyphs.Plus, enabled: Boolean = true) {
     Row(
-        modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(28.dp)).background(HyleColors.Violet.copy(alpha = 0.24f))
-            .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 20.dp),
+        modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(28.dp)).background(HyleColors.Violet.copy(alpha = if (enabled) 0.24f else 0.1f))
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
         Icon(glyph, null, tint = HyleColors.Violet, modifier = Modifier.size(22.dp))

@@ -216,13 +216,15 @@ fun DockStyleChooser(current: DockStyle, onSelect: (DockStyle) -> Unit, modifier
     }
 }
 
-/** The dock's own long-press route to the same choice. */
+/** The dock's own long-press route to the same choice: a full page (wave 46), not a popup, because it holds a set of options. */
 @Composable
 internal fun DockStyleDialog(current: DockStyle, onSelect: (DockStyle) -> Unit, onDismiss: () -> Unit) {
     androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
-        com.bos.sphere.feature.grid.OneUiDialog(L10n.tr("Dock style"), onDismiss, cancelLabel = L10n.tr("Close")) {
-            Column(Modifier.testTag("dock.styleDialog").padding(horizontal = 18.dp)) {
-                DockStyleChooser(current, onSelect = { onSelect(it); onDismiss() })
+        com.bos.sphere.feature.grid.OneUiFullPage(onDismiss) {
+            com.bos.sphere.feature.grid.OneUiPageFrame(L10n.tr("Dock style"), onDismiss, tag = "dock.styleDialog") {
+                item(key = "style") {
+                    Column(Modifier.padding(horizontal = 18.dp)) { DockStyleChooser(current, onSelect = { onSelect(it); onDismiss() }) }
+                }
             }
         }
     }

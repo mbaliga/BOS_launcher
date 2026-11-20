@@ -25,6 +25,9 @@ data class HistoryEntry(
     val timeMillis: Long,
     val read: Boolean = false,
     val dismissed: Boolean = false,
+    /** W42: the app's conversation shortcut for this notification (empty when it had none) and the user it belongs to: a deep link that survives a restart. */
+    val shortcutId: String = "",
+    val userId: Int = 0,
 ) {
     /** The name shown in bold: the sender, else the title, else the app. */
     val who: String get() = sender.ifBlank { title.ifBlank { appLabel.ifBlank { packageName } } }
@@ -53,11 +56,11 @@ object NotificationHistoryCodec {
     fun encode(e: HistoryEntry): String = listOf(
         e.timeMillis.toString(), (if (e.read) "r" else "u") + (if (e.dismissed) "d" else "a"),
         esc(e.key), esc(e.packageName), esc(e.appLabel), esc(e.sender), esc(e.title), esc(e.text), esc(e.conversation),
-    ).joinToString("\t")
+    ).let { if (e.shortcutId.isEmpty()) it else it + listOf(esc(e.shortcutId), e.userId.toString()) }.joinToString("\t") // W42: two optional trailing fields, so old lines read unchanged
 
     fun decode(line: String): HistoryEntry? {
         val f = line.split('\t')
-        if (f.size != 9) return null
+        if (f.size != 9 && f.size != 11) return null
         val time = f[0].toLongOrNull() ?: return null
         val flags = f[1]
         if (flags.length != 2 || flags[0] !in "ru" || flags[1] !in "ad") return null
@@ -65,6 +68,7 @@ object NotificationHistoryCodec {
         return HistoryEntry(
             id = idOf(key, time), key = key, packageName = unesc(f[3]), appLabel = unesc(f[4]), sender = unesc(f[5]), title = unesc(f[6]),
             text = unesc(f[7]), conversation = unesc(f[8]), timeMillis = time, read = flags[0] == 'r', dismissed = flags[1] == 'd',
+            shortcutId = if (f.size == 11) unesc(f[9]) else "", userId = if (f.size == 11) f[10].toIntOrNull() ?: 0 else 0,
         )
     }
 
@@ -185,6 +189,7 @@ class NotificationHistoryStore(
                     val e = HistoryEntry(
                         NotificationHistoryCodec.idOf(n.key, n.timestamp), n.key, n.packageName, n.appLabel.ifBlank { n.source }, sender, n.title,
                         n.summary, n.conversation.orEmpty(), n.timestamp,
+                        shortcutId = n.shortcutId.orEmpty(), userId = n.profileId,
                     )
                     map[e.id] = e; changed += e
                 }

@@ -43,9 +43,12 @@ object PendingIntentLauncher {
     fun options(sdkInt: Int = Build.VERSION.SDK_INT): Bundle? {
         if (sdkInt < 34) return null
         return runCatching {
-            ActivityOptions.makeBasic()
+            val o = ActivityOptions.makeBasic()
                 .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
-                .toBundle()
+            // W42: Android 15 also looks at the mode of the PendingIntent's creator; a trampoline (broadcast or service that starts the
+            // activity) is started with the creator's mode, which must not default to blocking.
+            if (sdkInt >= 35) runCatching { o.setPendingIntentCreatorBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED) }
+            o.toBundle()
         }.getOrNull()
     }
 

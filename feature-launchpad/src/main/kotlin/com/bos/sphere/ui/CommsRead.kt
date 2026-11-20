@@ -81,6 +81,7 @@ object CommsRead {
         packageName = e.packageName, appLabel = e.appLabel, unread = !e.read,
         sender = e.sender.ifBlank { null }, conversation = e.conversation.ifBlank { null },
         isMessaging = e.sender.isNotBlank() && e.text.isNotBlank(), // history reads text first, then who, as its own rows do
+        shortcutId = e.shortcutId.ifBlank { null }, profileId = e.userId, // W42: the deep link a history row can still use
     )
 
     /**

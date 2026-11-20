@@ -494,6 +494,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     hint = x("What Comms shows first when it opens."), stepped = true,
                 ) { v -> comms.setDefaultView(v) },
             )
+            add(SettingItem.Toggle(x("Clear from the shade when dismissed in Comms"), Glyphs.Bell, comms.clearFromShade.value, x("Off: dismissing only marks it read and the notification stays in the system shade, still openable from there.")) { v -> comms.setClearFromShade(v) })
             add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true, hint = x("Opens the notifications you have already read.")) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })
             add(SettingItem.Action(x("Groups and rules"), Glyphs.Message, x("Open"), navigates = true, hint = x("Opens the groups and rules manager in Comms.")) { m.openComms(null, true) })
             add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })

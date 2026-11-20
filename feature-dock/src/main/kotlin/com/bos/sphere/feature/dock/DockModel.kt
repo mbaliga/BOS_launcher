@@ -70,6 +70,8 @@ data class DockSettings(
     val edge: DockEdge = DockEdge.Bottom,
     /** Saved app groups shown as chips on the home (WSP-05). */
     val groupShelf: Boolean = true,
+    /** Wave 39 (dockThemes): how the dock is drawn (standard pill, transparent, 3D shelf). */
+    val style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
 ) {
     /** Off by default in T1, on by default in T2 and T3 (spec section 9). */
     fun isEnabled(tier: Tier): Boolean = enabled ?: (tier != Tier.T1)

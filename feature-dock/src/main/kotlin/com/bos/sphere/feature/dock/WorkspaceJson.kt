@@ -26,7 +26,7 @@ object WorkspaceJson {
 
     fun encode(s: DockWorkspaceState): String = JSONObject().apply {
         put("schemaVersion", SCHEMA_VERSION)
-        put("dock", JSONObject().put("enabled", s.dock.enabled ?: JSONObject.NULL).put("mode", s.dock.mode.name).put("edge", s.dock.edge.name).put("groupShelf", s.dock.groupShelf))
+        put("dock", JSONObject().put("enabled", s.dock.enabled ?: JSONObject.NULL).put("mode", s.dock.mode.name).put("edge", s.dock.edge.name).put("groupShelf", s.dock.groupShelf).put("style", s.dock.style.id))
         put("activeId", s.activeId)
         s.captureDue?.let { put("captureDue", it) }
         put("workspaces", JSONArray(s.workspaces.map { w ->
@@ -62,6 +62,7 @@ object WorkspaceJson {
                 mode = d?.optString("mode")?.let { m -> DockMode.entries.firstOrNull { it.name == m } } ?: DockMode.PinnedPlusRecent,
                 edge = d?.optString("edge")?.let { m -> DockEdge.entries.firstOrNull { it.name == m } } ?: DockEdge.Bottom,
                 groupShelf = d?.optBoolean("groupShelf", true) ?: true,
+                style = com.bos.sphere.core.data.DockStyle.orDefault(d?.opt("style") as? String),
             )
             val workspaces = o.optJSONArray("workspaces").objs().map { w ->
                 Workspace(

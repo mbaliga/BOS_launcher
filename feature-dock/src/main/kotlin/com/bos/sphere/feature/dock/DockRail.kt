@@ -64,6 +64,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -94,6 +95,8 @@ class DockActions(
     val onHide: (() -> Unit)? = null,
     /** Null when the dock has no side to choose (portrait, or the surface decides its own edge). */
     val onSetEdge: ((DockEdge) -> Unit)? = null,
+    /** W39: sets the dock style (standard, transparent, 3D); null when the host cannot store it. The long-press menu's "Dock style" entry needs it. */
+    val onSetStyle: ((com.bos.sphere.core.data.DockStyle) -> Unit)? = null,
 )
 
 /**
@@ -116,12 +119,16 @@ fun DockRail(
     widget: (@Composable (DockItem, Dp, Dp) -> Unit)? = null,
     /** W25: the host's own entries for an icon's long-press menu (an app's shortcuts and open choices); loaded when the menu opens. */
     itemExtras: suspend (DockItem) -> List<DockMenuEntry> = { emptyList() },
+    /** W39 (dockThemes): how the dock is drawn; [dark] picks the 3D slab's variant (default: the UI theme). */
+    style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
+    dark: Boolean = !com.bos.sphere.core.design.HyleTheme.isLight,
     icon: @Composable (DockItem, Dp) -> Unit,
 ) {
     val horizontal = edge == DockEdge.Bottom
     val collapsedBand = content.collapsed && !expanded
     var helpOpen by remember { mutableStateOf(false) }
     var editOpen by remember { mutableStateOf(false) }
+    var styleOpen by remember { mutableStateOf(false) }
     // W25: the long-press menu: null, the dock's own (index -1) or one icon's; [menuPress] is where it opens, in window pixels.
     var menuFor by remember { mutableIntStateOf(MENU_NONE) }
     var menuPress by remember { mutableStateOf(androidx.compose.ui.unit.IntOffset.Zero) }
@@ -137,7 +144,7 @@ fun DockRail(
         if (pendingFocus in requesters.indices) { requesters[pendingFocus].runCatching { requestFocus() }; pendingFocus = -1 }
     }
 
-    val dockEntries = DockMenuModel.dock(actions, edge, onEdit = { editOpen = true }, onAbout = { helpOpen = true })
+    val dockEntries = DockMenuModel.dock(actions, edge, onEdit = { editOpen = true }, onAbout = { helpOpen = true }, onStyle = if (actions.onSetStyle != null) ({ styleOpen = true }) else null)
     val openDockMenu = { at: Offset -> menuPress = androidx.compose.ui.unit.IntOffset(at.x.toInt(), at.y.toInt()); menuFor = MENU_DOCK }
     val openItemMenu = { i: Int ->
         val b = slotBounds[i]
@@ -145,7 +152,8 @@ fun DockRail(
         menuPress = androidx.compose.ui.unit.IntOffset(at.x.toInt(), at.y.toInt()); menuFor = i
     }
     val shape = RoundedCornerShape(22.dp)
-    val surface = Modifier.clip(shape).background(HyleColors.SurfaceTranslucent).border(1.dp, HyleColors.Hairline, shape)
+    val surface = Modifier.dockSurface(style, dark, edge, shape)
+    val glyph = glyphColor(style, HyleColors.InkDim)
 
     if (collapsedBand) {
         // The collapsed band: a slim grab strip that expands the dock on tap, Enter or the dock-focus shortcut.
@@ -155,7 +163,7 @@ fun DockRail(
                 .semantics { role = Role.Button; contentDescription = L10n.tr("Dock, collapsed") },
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.then(if (horizontal) Modifier.width(36.dp).height(4.dp) else Modifier.width(4.dp).height(36.dp)).clip(CircleShape).background(HyleColors.InkDim))
+            Box(Modifier.then(if (horizontal) Modifier.width(36.dp).height(4.dp) else Modifier.width(4.dp).height(36.dp)).glyphHalo(style, RoundedCornerShape(50)).clip(CircleShape).background(glyph))
         }
         LaunchedEffect(focusRequest) { if (focusRequest > 0 && !expanded) actions.onToggleExpanded() }
         return
@@ -183,25 +191,26 @@ fun DockRail(
             }
             .semantics {
                 contentDescription = L10n.tr("Dock")
+                stateDescription = DockStyleUi.stateText(style)
                 // TalkBack: every long-press action is also an action here.
                 customActions = dockEntries.map { e -> CustomAccessibilityAction(e.label) { e.run(); true } }
             },
     ) {
         Strip {
-            WorkspaceChip(workspaceName, actions, graphBridge)
+            WorkspaceChip(workspaceName, actions, graphBridge, style)
             content.pinned.forEachIndexed { i, item ->
-                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, bridge = graphBridge, widget = widget,
+                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, bridge = graphBridge, widget = widget, style = style, dark = dark,
                     onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE })
             }
             if (content.showRecentSection && content.recent.isNotEmpty()) {
-                SectionDivider(horizontal)
+                SectionDivider(horizontal, style)
                 content.recent.forEachIndexed { j, item ->
                     val i = content.pinned.size + j
-                    DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = {}, reorderable = false, bridge = graphBridge,
+                    DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = {}, reorderable = false, bridge = graphBridge, style = style, dark = dark,
                         onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE })
                 }
             }
-            if (content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge)
+            if (content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge, style)
         }
     }
     if (menuFor == MENU_DOCK) DockMenuPopup(menuPress, DockMenuModel.TAG_DOCK_MENU, dockEntries) { menuFor = MENU_NONE }
@@ -210,6 +219,7 @@ fun DockRail(
         DockMenuPopup(menuPress, DockMenuModel.TAG_ITEM_MENU, DockMenuModel.item(item, menuFor, items.size, menuFor < content.pinned.size, actions, extra)) { menuFor = MENU_NONE }
     }
     if (editOpen) EditDockDialog(content, actions) { editOpen = false }
+    if (styleOpen) actions.onSetStyle?.let { set -> DockStyleDialog(style, set) { styleOpen = false } }
     if (helpOpen) HelpDialog { helpOpen = false }
 }
 
@@ -247,8 +257,18 @@ private fun HelpDialog(onDismiss: () -> Unit) {
 
 /** A thin rule between the pinned items and the recent ones; icons only, so no "Recent" text. */
 @Composable
-private fun SectionDivider(horizontal: Boolean) {
-    Box(Modifier.then(if (horizontal) Modifier.width(1.dp).height(28.dp) else Modifier.width(28.dp).height(1.dp)).background(HyleColors.Hairline).semantics { contentDescription = L10n.tr("Recent apps") })
+private fun SectionDivider(horizontal: Boolean, style: com.bos.sphere.core.data.DockStyle) {
+    val desc = Modifier.semantics { contentDescription = L10n.tr("Recent apps") }
+    if (style == com.bos.sphere.core.data.DockStyle.Transparent) {
+        // Over the wallpaper a thin white rule would vanish on a light one: it sits on a dark halo strip.
+        Box(
+            Modifier.then(if (horizontal) Modifier.width(5.dp).height(30.dp) else Modifier.width(30.dp).height(5.dp)).clip(CircleShape)
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = DockStyleTokens.HALO_ALPHA)).then(desc),
+            contentAlignment = Alignment.Center,
+        ) { Box(Modifier.then(if (horizontal) Modifier.width(1.dp).height(26.dp) else Modifier.width(26.dp).height(1.dp)).background(androidx.compose.ui.graphics.Color(DockStyleTokens.GLYPH))) }
+        return
+    }
+    Box(Modifier.then(if (horizontal) Modifier.width(1.dp).height(28.dp) else Modifier.width(28.dp).height(1.dp)).background(HyleColors.Hairline).then(desc))
 }
 
 /**
@@ -257,10 +277,10 @@ private fun SectionDivider(horizontal: Boolean) {
  * reach that. TalkBack gets the same two switches as actions. The name is only its description.
  */
 @Composable
-private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.FocusBridge?) {
-    val tint = HyleColors.InkBright
+private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.FocusBridge?, style: com.bos.sphere.core.data.DockStyle) {
+    val tint = glyphColor(style, HyleColors.InkBright)
     Box(
-        Modifier.size(40.dp).clip(CircleShape).background(HyleColors.Violet.copy(alpha = 0.22f))
+        Modifier.size(40.dp).clip(CircleShape).glyphHalo(style).background(HyleColors.Violet.copy(alpha = 0.22f))
             .pointerInput(Unit) {
                 var total = 0f
                 detectHorizontalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total > 40f) actions.onSwitchWorkspace(-1) else if (total < -40f) actions.onSwitchWorkspace(1) }) { _, d -> total += d }
@@ -286,10 +306,10 @@ private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.
 
 /** Asks for usage access (so Recent can fill): an icon button, a ring with a plus, instead of a sentence. */
 @Composable
-private fun EnableButton(onClick: () -> Unit, bridge: DockInput.FocusBridge?) {
-    val tint = HyleColors.Ink
+private fun EnableButton(onClick: () -> Unit, bridge: DockInput.FocusBridge?, style: com.bos.sphere.core.data.DockStyle) {
+    val tint = glyphColor(style, HyleColors.Ink)
     Box(
-        Modifier.size(40.dp).clip(CircleShape).border(1.dp, HyleColors.Hairline, CircleShape).graphNode("dock.enable", bridge).clickable(onClick = onClick)
+        Modifier.size(40.dp).clip(CircleShape).glyphHalo(style).border(1.dp, if (style == com.bos.sphere.core.data.DockStyle.Transparent) tint else HyleColors.Hairline, CircleShape).graphNode("dock.enable", bridge).clickable(onClick = onClick)
             .semantics { role = Role.Button; contentDescription = L10n.tr(DockText.ENABLE_ROW) }
             .drawBehind {
                 val c = Offset(size.width / 2, size.height / 2); val r = size.width * 0.2f
@@ -320,6 +340,8 @@ private fun DockSlot(
     onMenu: () -> Unit = {},
     /** A drag after the long press is a reorder: the menu the press opened closes. */
     onDragBegin: () -> Unit = {},
+    style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
+    dark: Boolean = true,
 ) {
     val slot = 52.dp
     // HOM-02: a pinned widget takes its span of slots along the rail and one slot across it.
@@ -392,8 +414,9 @@ private fun DockSlot(
                     .semantics { contentDescription = L10n.tr("Drag to reorder") }.then(reorderDrag),
                 contentAlignment = Alignment.TopCenter,
             ) { Box(Modifier.padding(top = 4.dp).size(24.dp, 3.dp).clip(CircleShape).background(HyleColors.InkDim.copy(alpha = 0.7f))) }
-        } else icon(item, 40.dp)
-        if (item.recentlyUsed) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).size(8.dp).clip(CircleShape).background(HyleColors.Violet))
+        } else StyledIcon(style, dark, item, 40.dp, icon)
+        // The active dot keeps its place in every style; over the wallpaper (Transparent) it gets a dark ring so it reads on a light one.
+        if (item.recentlyUsed) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).size(8.dp).clip(CircleShape).background(HyleColors.Violet).then(if (style == com.bos.sphere.core.data.DockStyle.Transparent) Modifier.border(1.5.dp, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f), CircleShape) else Modifier).testTag("dock.activeDot"))
         if (showNumbers && index < 9) Text("${index + 1}", color = HyleColors.OnAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.TopStart).padding(2.dp).clip(CircleShape).background(HyleColors.Violet).padding(horizontal = 5.dp))
     }

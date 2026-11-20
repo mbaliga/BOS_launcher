@@ -54,10 +54,11 @@ object DockMenuModel {
     const val TAG_ITEM_MENU = "dock.itemMenu"
 
     /** Long press on the dock background (or the menu key on the home chip). */
-    fun dock(actions: DockActions, edge: DockEdge, onEdit: () -> Unit, onAbout: () -> Unit): List<DockMenuEntry> = buildList {
+    fun dock(actions: DockActions, edge: DockEdge, onEdit: () -> Unit, onAbout: () -> Unit, onStyle: (() -> Unit)? = null): List<DockMenuEntry> = buildList {
         add(DockMenuEntry(L10n.tr("Edit dock"), onEdit))
         add(DockMenuEntry(L10n.tr("Workspaces and groups"), actions.onOpenPanel))
         add(DockMenuEntry(L10n.tr("Dock settings"), actions.onOpenPanel))
+        onStyle?.let { add(DockMenuEntry(L10n.tr("Dock style"), it)) } // W39
         actions.onSetEdge?.let { set ->
             if (edge != DockEdge.Bottom) add(DockMenuEntry(L10n.tr("Dock at the bottom")) { set(DockEdge.Bottom) })
             if (edge != DockEdge.Left) add(DockMenuEntry(L10n.tr("Dock on the left")) { set(DockEdge.Left) })

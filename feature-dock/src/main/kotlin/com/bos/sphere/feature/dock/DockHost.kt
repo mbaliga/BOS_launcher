@@ -236,6 +236,7 @@ fun DockHost(
             onAddApps = { adding = true },
             onHide = if (forceEnabled || alwaysShown) null else ({ manager.setDock { it.copy(enabled = false) } }),
             onSetEdge = if (landscape && edgeOverride == null) ({ e -> manager.setDock { it.copy(edge = e) } }) else null,
+            onSetStyle = { st -> manager.setDock { it.copy(style = st) } }, // W39 (dockThemes)
         )
     }
     val edge = edgeNow
@@ -253,6 +254,7 @@ fun DockHost(
         onDismiss = { adding = false })
     DockRail(
         itemExtras = { item -> DockAppOptions.entries(context, launcher, manager, byKey[item.ref.id].takeIf { item.ref.kind == ItemKind.App }) },
+        style = state.dock.style,
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
         focusRequest = controller.focusRequest - focusBase, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge).railModifier(), widget = widgetOther,
         graphBridge = if (forceEnabled) null else DockInput.bridge, // the desktop surface's rail stays out of the phone home's graph

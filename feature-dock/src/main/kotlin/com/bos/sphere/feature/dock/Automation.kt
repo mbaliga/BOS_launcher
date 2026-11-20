@@ -87,7 +87,7 @@ object Scheduler {
         val (future, missed) = mgr.current.schedules.partition { it.atMillis > now }
         future.forEach { schedule(context, it) }
         // A schedule that came due while the device was off is announced now instead of being kept forever.
-        missed.forEach { ScheduleNotifications.post(context, it.label, it.target); mgr.removeSchedule(it.id) }
+        missed.forEach { recordFired(context, it); ScheduleNotifications.post(context, it.label, it.target); mgr.removeSchedule(it.id) }
     }
 }
 
@@ -95,9 +95,19 @@ class ScheduledLaunchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val mgr = WorkspaceRepository.get(context)
         val sl = mgr.current.schedules.firstOrNull { it.id == intent.getStringExtra(AutomationIntents.EXTRA_ID) } ?: return
+        recordFired(context, sl)
         ScheduleNotifications.post(context, sl.label, sl.target)
         mgr.removeSchedule(sl.id)
     }
+}
+
+/** Wave 41: the Timeline shows a scheduled launch when it fires (the app it opens is the target's package when the target is an app). */
+internal fun recordFired(context: Context, sl: ScheduledLaunch) {
+    com.bos.sphere.core.data.TimelineEvents.init(context)
+    com.bos.sphere.core.data.TimelineEvents.record(
+        com.bos.sphere.core.data.TimelineKind.ScheduledLaunch,
+        if (sl.target.kind == RunKind.App) com.bos.sphere.core.data.TimelineModel.packageOfKey(sl.target.id) else "", sl.label, sl.target.kind.name,
+    )
 }
 
 class BootReceiver : BroadcastReceiver() {

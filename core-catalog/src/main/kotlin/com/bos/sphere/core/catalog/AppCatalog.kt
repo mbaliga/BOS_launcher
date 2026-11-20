@@ -74,6 +74,7 @@ class AppCatalog(context: Context) {
         val kind = kindOf(user)
         runCatching { launcherApps.getActivityList(null, user) }.getOrDefault(emptyList()).map { info ->
             val flags = info.applicationInfo.flags
+            knownLabels[info.applicationInfo.packageName] = info.label.toString()
             val rec = AppRecord(
                 key = "${info.componentName.flattenToShortString()}#${user.hashCode()}",
                 packageName = info.applicationInfo.packageName,
@@ -87,17 +88,35 @@ class AppCatalog(context: Context) {
         }
     }.sortedBy { it.record.label.lowercase() }
 
+    /** Wave 41: the last label seen per package, so the Timeline can name an app that has just been removed. */
+    private val knownLabels = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Wave 41: install / update / removal as Timeline events. A package callback also fires for component changes, so an update counts only when the package was just updated. */
+    private fun recordPackage(kind: com.bos.sphere.core.data.TimelineKind, pkg: String?) {
+        if (pkg == null || pkg == app.packageName) return
+        val label = runCatching { pm.getApplicationInfo(pkg, 0).loadLabel(pm).toString() }.getOrNull() ?: knownLabels[pkg].orEmpty()
+        if (kind == com.bos.sphere.core.data.TimelineKind.PackageUpdated) {
+            val updated = runCatching { pm.getPackageInfo(pkg, 0).lastUpdateTime }.getOrDefault(0L)
+            if (System.currentTimeMillis() - updated > 60_000L) return
+        }
+        com.bos.sphere.core.data.TimelineEvents.record(kind, pkg, label.ifBlank { pkg })
+    }
+
     /** Emits Unit whenever the inventory may have changed; the collector re-reads [apps]. Bursts collapse to one emission. */
     val changes: Flow<Unit> = callbackFlow {
         val cb = object : LauncherApps.Callback() {
-            override fun onPackageAdded(packageName: String?, user: UserHandle?) { trySend(Unit) }
-            override fun onPackageRemoved(packageName: String?, user: UserHandle?) { trySend(Unit) }
-            override fun onPackageChanged(packageName: String?, user: UserHandle?) { trySend(Unit) }
+            override fun onPackageAdded(packageName: String?, user: UserHandle?) { recordPackage(com.bos.sphere.core.data.TimelineKind.PackageInstalled, packageName); trySend(Unit) }
+            override fun onPackageRemoved(packageName: String?, user: UserHandle?) {
+                if (packageName != null && packageName != app.packageName) com.bos.sphere.core.data.TimelineEvents.record(com.bos.sphere.core.data.TimelineKind.PackageRemoved, packageName, knownLabels[packageName] ?: packageName)
+                trySend(Unit)
+            }
+            override fun onPackageChanged(packageName: String?, user: UserHandle?) { recordPackage(com.bos.sphere.core.data.TimelineKind.PackageUpdated, packageName); trySend(Unit) }
             override fun onPackagesAvailable(packageNames: Array<out String>?, user: UserHandle?, replacing: Boolean) { trySend(Unit) }
             override fun onPackagesUnavailable(packageNames: Array<out String>?, user: UserHandle?, replacing: Boolean) { trySend(Unit) }
             override fun onPackagesSuspended(packageNames: Array<out String>?, user: UserHandle?) { trySend(Unit) }
             override fun onPackagesUnsuspended(packageNames: Array<out String>?, user: UserHandle?) { trySend(Unit) }
         }
+        com.bos.sphere.core.data.TimelineEvents.init(app)
         launcherApps.registerCallback(cb)
         trySend(Unit)
         awaitClose { launcherApps.unregisterCallback(cb) }

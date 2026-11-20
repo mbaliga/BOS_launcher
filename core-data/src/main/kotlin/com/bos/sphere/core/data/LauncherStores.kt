@@ -30,6 +30,8 @@ class LauncherStores private constructor(context: Context) {
         history.mirror = log::record
         log.seedFrom(history.events.value)
     }
+    /** Wave 41: the Timeline's own record of events nothing else keeps (scheduled launch fired, package changes, hide / unhide). */
+    val timelineEvents = TimelineEvents.init(app)
     /** HOM-22: what the user removed from the Recent landing; private usage history, never exported or backed up. */
     val recentsState = RecentsStateStore(java.io.File(app.filesDir, RecentsStateStore.RELATIVE_PATH))
     val iconColors = IconColorStore(TolerantPrefs.of(app, "icon_colors"))

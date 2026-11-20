@@ -981,7 +981,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val leftProgress = reveal.progress
         val leftActive = leftOpen || leftProgress > 0.001f
         val hubPanelBody: @Composable (com.bos.sphere.ui.HubView) -> Unit = { v ->
-            HomePanelsBody(v, timelineLog, appsByKey) { a -> launch(a) } // W31: Comms (and the standalone hub) stay open under the app, so Back returns to them
+            HomePanelsBody(v, timelineLog, appsByKey, onHide = { a -> hiddenStore.setHidden(a.key, true) }) { a -> launch(a) } // W31: Comms (and the standalone hub) stay open under the app, so Back returns to them
         }
         if (hubStandalone && prefs.leftPage != com.bos.sphere.core.data.LeftPage.Launchpad) com.bos.sphere.ui.LaunchpadPanel(
             visible = true, onDismiss = { hubStandalone = false },

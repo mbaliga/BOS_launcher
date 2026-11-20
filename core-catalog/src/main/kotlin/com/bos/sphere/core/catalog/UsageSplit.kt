@@ -60,4 +60,23 @@ class UsageStatsSource(context: Context) {
             usm.queryAndAggregateUsageStats(fromMs, toMs).values.map { UsageSample(it.packageName, it.totalTimeInForeground) }
         }.getOrDefault(emptyList())
     }
+
+    /** Wave 41: foreground and background events of every app from [fromMs] to [toMs], so the Timeline can show how long an open lasted; empty without access. Run it off the main thread. */
+    fun sessions(fromMs: Long, toMs: Long): com.bos.sphere.core.data.UsageSessionIndex {
+        if (!granted()) return com.bos.sphere.core.data.UsageSessionIndex(emptyList())
+        val usm = app.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val raw = ArrayList<com.bos.sphere.core.data.RawUsageEvent>()
+        runCatching {
+            val q = usm.queryEvents(fromMs, toMs)
+            val e = android.app.usage.UsageEvents.Event()
+            while (q.hasNextEvent()) {
+                q.getNextEvent(e)
+                when (e.eventType) {
+                    android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> raw += com.bos.sphere.core.data.RawUsageEvent(e.packageName, e.timeStamp, true)
+                    android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> raw += com.bos.sphere.core.data.RawUsageEvent(e.packageName, e.timeStamp, false)
+                }
+            }
+        }
+        return com.bos.sphere.core.data.UsageSessionIndex.from(raw)
+    }
 }

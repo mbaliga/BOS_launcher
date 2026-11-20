@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Backed by [android.content.SharedPreferences] — zero extra dependencies, fine for a small set.
  * Exposes a [hidden] [StateFlow] the surface filters against live.
  */
-class HiddenAppsStore(context: Context) {
+class HiddenAppsStore(private val context: Context) {
 
     private val prefs =
         TolerantPrefs.of(context.applicationContext, "hidden_apps")
@@ -25,7 +25,10 @@ class HiddenAppsStore(context: Context) {
         val next = _hidden.value.toMutableSet().apply {
             if (hidden) add(key) else remove(key)
         }
+        val changed = (key in _hidden.value) != hidden
         _hidden.value = next
+        // Wave 41: the Timeline shows the user's hide / unhide; the key is "component#user", its package part names the app.
+        if (changed) { TimelineEvents.init(context); TimelineEvents.record(if (hidden) TimelineKind.AppHidden else TimelineKind.AppUnhidden, key.substringBefore('/').substringBefore('#')) }
         prefs.edit().putStringSet(KEY, next).apply()
     }
 

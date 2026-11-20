@@ -96,7 +96,7 @@ object StateSchema {
      * Files (relative to the app's files directory) that hold usage history and are never exported (HOM-18): the timeline
      * log of up to 5000 opens, and the recents list's removals (HOM-22). Each lives under a directory in [BACKUP_EXCLUDED_FILES], so system backup skips it too.
      */
-    val NEVER_EXPORTED_FILES: Set<String> = setOf(TimelineLogStore.RELATIVE_PATH, RecentsStateStore.RELATIVE_PATH, NotificationHistoryStore.RELATIVE_PATH)
+    val NEVER_EXPORTED_FILES: Set<String> = setOf(TimelineLogStore.RELATIVE_PATH, RecentsStateStore.RELATIVE_PATH, NotificationHistoryStore.RELATIVE_PATH, TimelineEventStore.RELATIVE_PATH)
 
     val NEVER_EXPORTED_STORES: Set<String> = setOf(
         "launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "liftoff_misc",

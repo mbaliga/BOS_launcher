@@ -47,19 +47,34 @@ import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.catalog.FilesView
 import com.bos.sphere.core.catalog.HomePanelPrefs
 import com.bos.sphere.core.catalog.PinnedFolder
-import com.bos.sphere.core.catalog.TimelineView
 import com.bos.sphere.core.catalog.UsageRange
 import com.bos.sphere.core.catalog.RecentFile
 import com.bos.sphere.core.catalog.RecentFilesModel
 import com.bos.sphere.core.catalog.RecentFilesSource
-import com.bos.sphere.core.catalog.Timeline
-import com.bos.sphere.core.catalog.TimelineEntry
 import com.bos.sphere.ui.AppTime
 import com.bos.sphere.ui.UsageWeekRepo
 import com.bos.sphere.ui.UsageWeekSource
 import com.bos.sphere.core.catalog.UsageStatsSource
 import com.bos.sphere.core.data.AppEntry
+import android.app.AlarmManager
+import androidx.compose.runtime.produceState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bos.sphere.core.data.LaunchEvent
+import com.bos.sphere.core.data.LaunchpadSettings
+import com.bos.sphere.core.data.NotificationHistory
+import com.bos.sphere.core.data.NotificationProvider
+import com.bos.sphere.core.data.PendingIntentLauncher
+import com.bos.sphere.core.data.TimelineEvent
+import com.bos.sphere.core.data.TimelineEvents
+import com.bos.sphere.core.data.TimelineInputs
+import com.bos.sphere.core.data.TimelineKind
+import com.bos.sphere.core.data.TimelineModel
+import com.bos.sphere.core.data.UpcomingLaunch
+import com.bos.sphere.core.data.UsageSessionIndex
+import com.bos.sphere.feature.dock.RunKind
+import com.bos.sphere.ui.NextAlarm
+import com.bos.sphere.ui.TimelineActions
+import com.bos.sphere.ui.TimelineEventsList
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.dock.WorkspaceRepository
@@ -80,6 +95,7 @@ fun HomePanelsBody(
     view: com.bos.sphere.ui.HubView,
     history: List<LaunchEvent>,
     appsByKey: Map<String, AppEntry>,
+    onHide: ((AppEntry) -> Unit)? = null,
     onLaunch: (AppEntry) -> Unit = {},
 ) {
     val ctx = LocalContext.current
@@ -89,7 +105,7 @@ fun HomePanelsBody(
     val modifier = if (view == com.bos.sphere.ui.HubView.Timeline) Modifier.fillMaxSize() else Modifier.fillMaxSize().background(HyleColors.Surface)
     Box(modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
         when (view) {
-            com.bos.sphere.ui.HubView.Timeline -> TimelinePanel(history, appsByKey, onLaunch)
+            com.bos.sphere.ui.HubView.Timeline -> TimelinePanel(history, appsByKey, onLaunch, onHide)
             else -> FilesPanel(prefs)
         }
     }
@@ -208,32 +224,49 @@ private fun FilesPanel(prefs: HomePanelPrefs) {
 }
 
 @Composable
-private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, AppEntry>, onLaunch: (AppEntry) -> Unit) {
+private fun TimelinePanel(history: List<LaunchEvent>, appsByKey: Map<String, AppEntry>, onLaunch: (AppEntry) -> Unit, onHide: ((AppEntry) -> Unit)?) {
     val context = LocalContext.current
-    val now = System.currentTimeMillis()
-    val ink = PanelInk.comms()
-    val entries = remember(history, appsByKey) {
-        val scheduled = runCatching {
-            WorkspaceRepository.get(context).current.schedules.map { TimelineEntry(it.atMillis, "", it.label, scheduled = true, id = it.id) }
-        }.getOrDefault(emptyList())
-        TimelineView.build(history, scheduled, now) { appsByKey[it]?.label }
+    val now = remember { System.currentTimeMillis() }
+    // Wave 41: one list of everything the launcher recorded. The sources are read where they live (launch log, notification history, the Timeline's
+    // own event store, the schedules); the merge itself runs off the main thread inside TimelineEventsList.
+    val notes by remember(context) { NotificationHistory.init(context).entries }.collectAsStateWithLifecycle()
+    val stored by remember(context) { TimelineEvents.init(context).events }.collectAsStateWithLifecycle()
+    val sessions by produceState<UsageSessionIndex?>(null, context) {
+        value = withContext(Dispatchers.IO) { runCatching { UsageStatsSource(context).sessions(System.currentTimeMillis() - 7 * 86_400_000L, System.currentTimeMillis()) }.getOrNull() }
     }
-    val startOfToday = remember { Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis }
-    val fmt = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
-    val rows = remember(entries, startOfToday) { TimelineView.rows(entries, startOfToday, java.util.TimeZone.getDefault()) }
+    val nextAlarm by produceState<NextAlarm?>(null, context) {
+        value = withContext(Dispatchers.IO) { runCatching { context.getSystemService(AlarmManager::class.java)?.nextAlarmClock }.getOrNull() }?.let { NextAlarm(it.triggerTime) }
+    }
+    val alarmShow = remember(context) { runCatching { context.getSystemService(AlarmManager::class.java)?.nextAlarmClock?.showIntent }.getOrNull() }
+    val upcoming = remember(context) {
+        runCatching {
+            WorkspaceRepository.get(context).current.schedules.map { UpcomingLaunch(it.id, it.label, it.atMillis, if (it.target.kind == RunKind.App) TimelineModel.packageOfKey(it.target.id) else "") }
+        }.getOrDefault(emptyList())
+    }
+    val byPackage = remember(appsByKey) { appsByKey.values.groupBy { it.packageName }.mapValues { (_, l) -> l.first() } }
+    val inputs = remember(history, notes, stored, upcoming, appsByKey, sessions) {
+        TimelineInputs(history, notes, stored, upcoming, appsByKey.mapValues { it.value.label }, byPackage.mapValues { it.value.label }, sessions)
+    }
     val usage = remember(context) { UsageWeekHost.repo(context) }
     val labelOf: (String) -> String = remember(appsByKey) { val labels = appsByKey.values.associate { it.packageName to it.label }; { pkg -> labels[pkg] ?: pkg } }
-    // Wave 28: the usage block is the first item of the list, so it scrolls away with it and the list opens scrolled to the top.
-    LazyColumn(Modifier.testTag("timeline.list")) {
-        item { com.bos.sphere.ui.UsageTimelineBlock(usage, labelOf) }
-        if (entries.isEmpty()) item { Text(L10n.tr("Nothing yet. Opened apps and scheduled launches appear here."), color = ink.ink, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp)) }
-        itemsIndexed(rows) { i, r ->
-            val e = r.entry
-            if (r.header) Text(if (r.dayArg == null) L10n.tr(r.dayKey) else L10n.tr(r.dayKey, r.dayArg), color = ink.dim, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp))
-            val app = if (e.key.isNotEmpty()) appsByKey[e.key] else null
-            Line((if (e.scheduled) L10n.tr("Scheduled") + ": " else "") + e.label, fmt.format(Date(e.timeMs)), ink = ink, tag = "timeline.row.$i", onClick = app?.let { a -> { onLaunch(a) } })
-        }
+    val actions = remember(appsByKey, onLaunch, onHide, alarmShow) {
+        fun appOf(e: TimelineEvent): AppEntry? = (if (e.kind == TimelineKind.AppOpened) appsByKey[e.key] else null) ?: byPackage[e.packageName]
+        TimelineActions(
+            open = { e ->
+                if (e.kind.family == TimelineKind.Family.Notification || e.kind.family == TimelineKind.Family.Alert) {
+                    // Comms' own hand-off: the live notification's content intent when it is still posted, else the app; it marks the notification read.
+                    val live = NotificationProvider.snapshot.firstOrNull { it.key == e.key }
+                    LaunchpadSettings.markRead(e.key)
+                    val sent = live?.contentIntent?.let { PendingIntentLauncher.open(it, context) { false }.ok } == true
+                    if (!sent) appOf(e)?.let(onLaunch)
+                } else appOf(e)?.takeIf { e.kind != TimelineKind.PackageRemoved }?.let(onLaunch)
+            },
+            hideApp = onHide?.let { hide -> { e -> appOf(e)?.let(hide) } },
+            openNextAlarm = alarmShow?.let { pi -> { runCatching { pi.send() } } },
+        )
     }
+    val is24 = remember(context) { android.text.format.DateFormat.is24HourFormat(context) }
+    TimelineEventsList(inputs, now, is24, actions, Modifier, nextAlarm) { com.bos.sphere.ui.UsageTimelineBlock(usage, labelOf) }
 }
 
 /**

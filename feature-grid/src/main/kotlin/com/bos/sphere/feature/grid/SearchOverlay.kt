@@ -103,7 +103,11 @@ import com.bos.sphere.core.data.ContactHit
 import com.bos.sphere.core.data.ContactLogic
 import com.bos.sphere.core.data.ContactSource
 import com.bos.sphere.core.data.LauncherPrefs
+import com.bos.sphere.core.data.WebHits
+import com.bos.sphere.core.data.WebLive
 import com.bos.sphere.core.data.WebSearch
+import com.bos.sphere.core.data.WebSuggestSource
+import com.bos.sphere.core.data.WebSuggestions
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.AppSearch
@@ -125,6 +129,7 @@ import com.bos.sphere.feature.search.WebRow
 import com.bos.sphere.feature.search.sections
 import com.bos.sphere.feature.search.suggest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
@@ -260,6 +265,10 @@ internal fun SearchScreen(
     alertLayer: @Composable () -> Unit = {},
     hiddenApps: List<AppEntry> = emptyList(),
     onUnhideApp: (AppEntry) -> Unit = {},
+    /** Wave 43 (radarWeb): the live web and Play Store suggestions; the default is the real, process-wide client. Tests pass one with a fake fetcher. */
+    webSuggest: WebSuggestSource = WebSuggestSource.shared,
+    /** Test seam (wave 43): whether the one-time "Suggestions come from ..." note was already shown; null reads and writes the radar_ui pref. */
+    webNoteSeen: ((Boolean) -> Boolean)? = null,
 ) {
     val context = LocalContext.current
     val voiceOn = remember(context, voiceAvailable) { voiceAvailable ?: PushToTalk.visible(onDeviceSpeechAvailable(context)) }
@@ -360,10 +369,35 @@ internal fun SearchScreen(
     val webFirst = remember(trimmed, prefs.searchWeb) {
         prefs.searchWeb && trimmed.isNotEmpty() && WebSearch.looksLikeUrl(trimmed)
     }
+    // ---- wave 43 (radarWeb): live results. The query leaves the phone only here: Web scope (and Everything, unless a contact matched) to the chosen engine,
+    // Apps scope and Everything to the Play Store's suggestion endpoint; never with "Web suggestions" off, "Web results" off, or a query WebSuggestRules refuses.
+    val liveOn = prefs.webSuggestions && prefs.searchWeb
+    val contactMatched = contactRows.isNotEmpty() && trimmed.isNotEmpty()
+    val wantEngine = liveOn && trimmed.isNotEmpty() && (userCat == SearchCategory.Web || (userCat == null && !contactMatched))
+    val wantPlay = liveOn && trimmed.isNotEmpty() && (userCat == SearchCategory.Apps || (userCat == null && !contactMatched))
+    var live by remember { mutableStateOf(WebLive()) }
+    var noteOn by remember { mutableStateOf(false) }
+    LaunchedEffect(trimmed, wantEngine, wantPlay, prefs.webEngine) {
+        if (!wantEngine && !wantPlay) { live = WebLive(); return@LaunchedEffect }
+        // The effect restarts on every keystroke, which cancels the wait and any request in flight (and leaving Radar cancels it too).
+        val (eng, play) = kotlinx.coroutines.coroutineScope {
+            val e = if (wantEngine) async { webSuggest.web(trimmed, prefs.webEngine) } else null
+            val p = if (wantPlay) async { webSuggest.play(trimmed) } else null
+            (e?.await() ?: WebSuggestions()) to (p?.await() ?: emptyList())
+        }
+        live = WebLive(eng.suggestions, eng.answer, play)
+        if (wantEngine && (eng.suggestions.isNotEmpty() || eng.answer != null) && !noteOn) {
+            val seen = webNoteSeen ?: { mark -> RadarWebNote.seen(context, mark) }
+            if (!seen(true)) noteOn = true // first time ever: the line stays for this visit
+        }
+    }
+    val liveWeb = remember(live, prefs.webEngine, trimmed) { if (trimmed.isEmpty()) emptyList() else WebHits.web(prefs.webEngine, trimmed, live) }
+    val livePlay = remember(live, trimmed) { if (trimmed.isEmpty()) emptyList() else WebHits.play(live) }
     val settingEntries = remember(settingsSource, trimmed, prefs.searchActions) {
         if (settingsSource == null || !prefs.searchActions || trimmed.length < 2) emptyList() else settingsSource.results(trimmed, 8)
     }
-    val data = remember(trimmed, ranked, contactRows, contactsPermitted, wantContacts, web, webFirst, hubMap, fileAccess, hub, prefs.searchFiles, settingEntries, habit) {
+    val noteText = if (noteOn) L10n.tr("Suggestions come from %s. Turn off in settings.", prefs.webEngine.label) else null
+    val data = remember(trimmed, ranked, contactRows, contactsPermitted, wantContacts, web, webFirst, hubMap, fileAccess, hub, prefs.searchFiles, settingEntries, habit, liveWeb, livePlay, noteText) {
         SearchData(
             query = trimmed, apps = ranked, habit = habit,
             contacts = if (!wantContacts) emptyList() else if (trimmed.isEmpty()) contactRows.sortedByDescending { habit["contact:${it.hit.id}"] ?: 0.0 } else contactRows,
@@ -372,7 +406,7 @@ internal fun SearchScreen(
             hits = hubMap,
             askFiles = hub != null && prefs.searchFiles && !fileAccess,
             deepHint = hub != null && prefs.searchFiles && hub.deepSources().isEmpty(),
-            settings = settingEntries,
+            settings = settingEntries, liveWeb = liveWeb, livePlay = livePlay, webNote = noteText,
         )
     }
     val selected: SearchCategory? = userCat
@@ -382,7 +416,7 @@ internal fun SearchScreen(
     val ringTiles = remember(data, selected, orbitTyped) {
         if (!orbitTyped) emptyList() else RadarRings.stableOrder(lastRingKeys[0], data.ringTiles(selected), { it.key })
     }
-    val stripTiles = remember(data, orbitTyped) { if (orbitTyped) data.stripTiles() else emptyList() }
+    val stripTiles = remember(data, orbitTyped, selected) { if (orbitTyped) data.stripTiles(selected) else emptyList() }
     androidx.compose.runtime.SideEffect { lastRingKeys[0] = if (orbitTyped) ringTiles.map { it.key } else emptyList() }
     val counts = remember(data) { if (data.blank) null else SearchCategory.entries.associateWith { data.count(it) }.takeIf { m -> m.values.any { it > 0 } } }
 
@@ -399,6 +433,8 @@ internal fun SearchScreen(
     fun tick() { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); sounds?.play(UiSound.Tick) }
     fun setQuery(text: String) { field = TextFieldValue(text, TextRange(text.length)) }
     fun openHit(hit: SearchHit) {
+        // Wave 43: a live web result or a Play Store suggestion opens straight in the browser or the store; nothing about it is learned or stored.
+        if (isLiveWebHit(hit)) { openHitIntent(context, hit)?.let(onOpenIntent); return }
         PaletteHost.learnHit(context, hit)
         // PAL-05 copy, PAL-03 app shortcut and launcher command run here; plain files and web hits fall through to the host.
         when (val o = PaletteHitRunner.run(context, hit, palette)) {
@@ -754,6 +790,17 @@ fun submitSearch(
         else -> null
     }
     if (url != null) onOpenIntent(WebSearch.intentFor(url))
+}
+
+/** Wave 43: the "Suggestions come from <engine>" line is shown once; this remembers that in the Radar UI pref file (not secret, not an identifier). */
+internal object RadarWebNote {
+    /** Returns whether the note had been shown before, and when [mark] records that it is being shown now. */
+    fun seen(c: android.content.Context, mark: Boolean): Boolean = runCatching {
+        val sp = c.getSharedPreferences("radar_ui", android.content.Context.MODE_PRIVATE)
+        val was = sp.getBoolean("webNoteSeen", false)
+        if (mark && !was) sp.edit().putBoolean("webNoteSeen", true).apply()
+        was
+    }.getOrDefault(true)
 }
 
 internal class ContactRow(val hit: ContactHit, val channels: List<Channel>, val primary: Channel? = badgeChannel(channels))

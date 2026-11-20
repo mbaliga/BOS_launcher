@@ -133,7 +133,7 @@ fun <A, C> sections(
     if (searchWeb) {
         if (isUrl) web += WebRow.Open("Open ${q.removePrefix("https://").removePrefix("http://")}", WebSearch.toUrl(q))
         web += WebRow.Search("Search ${engine.label} for “$q”", engine.url(q))
-        web += WebRow.PlayStore("Search Play Store for “$q”", WebSearch.playStoreUrl(q), WebSearch.playStoreMarketUri(q))
+        web += WebRow.PlayStore("Search the Play Store for “$q”", WebSearch.playStoreUrl(q), WebSearch.playStoreMarketUri(q))
     }
     val askPerm = searchContacts && !hasContactsPermission
     val showContacts = searchContacts && (contacts.isNotEmpty() || askPerm)

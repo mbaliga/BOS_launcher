@@ -32,3 +32,7 @@ Nothing in this stream removes the permission; this file is the input to the dec
 ## Wave 38 update
 
 The weather client (`Weather.kt`), the `INTERNET` and `ACCESS_COARSE_LOCATION` permissions and the Weather setting are removed together with the clock strip (docs/decisions/glanceFixed.md). Nothing in the launcher opens a network connection now; the audits (`NFR_17_noSourceFileOpensAnHttpConnection`, `NFR_17_noManifestDeclaresInternet`, `NFR_16_internetIsNotDeclaredAndTheDecisionIsDocumented`) pin that. Option A above is what happened.
+
+## Wave 43 (radarWeb): the network is back, for one purpose
+
+The owner asked for live web results in Radar ("If I search the web, I should start seeing search results here"). `INTERNET` is declared again and one class, `core-data/.../WebSuggestHttp.kt`, may open a connection; the audits changed from "no network at all" to "exactly this file, this permission". Location stays out. Details, limits and privacy statement: `radarWebSuggest.md`.

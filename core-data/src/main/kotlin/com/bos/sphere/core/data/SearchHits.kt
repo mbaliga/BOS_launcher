@@ -33,7 +33,8 @@ data class SearchHit(
     val extras: Map<String, String> = emptyMap(),
 )
 
-enum class HitKind { Action, Document, Image, Video, Audio, Archive, Folder, Web, Other }
+/** Wave 43 (radarWeb): [WebSuggestion] and [WebAnswer] are live results from the chosen engine, [PlayStore] an app suggestion from the Play Store. */
+enum class HitKind { Action, Document, Image, Video, Audio, Archive, Folder, Web, WebSuggestion, WebAnswer, PlayStore, Other }
 
 /** Anything that can answer a query with hits. Implementations must be quick and never throw. */
 fun interface SearchProvider {

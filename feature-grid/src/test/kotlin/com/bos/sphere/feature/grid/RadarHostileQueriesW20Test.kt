@@ -78,7 +78,7 @@ class RadarHostileQueriesW20Test {
         }
         rule.mainClock.advanceTimeBy(1_000)
         assertEquals(1, rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size)
-        assertTrue(rule.onAllNodesWithText("Search DuckDuckGo for", substring = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText("Search Google for", substring = true).fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

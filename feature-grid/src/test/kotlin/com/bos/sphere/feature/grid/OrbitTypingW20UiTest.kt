@@ -130,8 +130,9 @@ class OrbitTypingW20UiTest {
             web = com.bos.sphere.feature.search.sections("bra", LauncherPrefs().webEngine, emptyList<AppEntry>(), emptyList<ContactRow>(), searchWeb = true, searchContacts = false).web,
             webFirst = false, hits = emptyMap(), askFiles = false, deepHint = false).stripTiles()
         assertTrue((strip.first() as Tile.Web).row is com.bos.sphere.feature.search.WebRow.Search)
-        // The web rows are not rings tiles: no traversal index on them.
+        // The web rows (the engine hand-off and the Play Store row) are strip circles, not rings tiles (wave 43: store suggestions are ring tiles).
         assertTrue(orbitTiles().none { it.first.startsWith("Search ") })
+        assertTrue(rule.onAllNodesWithContentDescription("Search the Play Store for", substring = true).fetchSemanticsNodes().isNotEmpty())
         shoot("w20-typed-orbit-portrait-dark")
     }
 
@@ -143,7 +144,7 @@ class OrbitTypingW20UiTest {
         open(SearchLayout.Orbit, "a")
         assertTrue(orbitTiles().isNotEmpty())
         assertEquals("Best match", orbitTiles().first().second)
-        assertTrue(rule.onAllNodesWithContentDescription("Search Play Store for", substring = true).fetchSemanticsNodes().isNotEmpty())
+        assertEquals("wave 43: the Play Store row needs 2+ characters", 0, rule.onAllNodesWithContentDescription("Search the Play Store for", substring = true).fetchSemanticsNodes().size)
         shoot("w20-typed-orbit-landscape-dark")
     }
 

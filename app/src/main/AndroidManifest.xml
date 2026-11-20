@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions -->
+    <!-- Wave 43 (radarWeb, docs/decisions/radarWebSuggest.md): normal permission, no prompt. Used by exactly one class, core-data WebSuggestHttp.kt: Radar's live web and Play Store suggestions (the typed text to the chosen engine over HTTPS), switchable off in Ground Control > Radar > Web suggestions. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <!-- W25: ACTION_DELETE shows nothing on Android 9+ without this normal permission; it only lets the system confirmation dialog appear. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />

@@ -52,7 +52,7 @@ class SearchModelTest {
         assertEquals(2, s.web.size)
         assertEquals("Search DuckDuckGo for “w bows of denmark”", (s.web[0] as WebRow.Search).label)
         assertEquals("https://duckduckgo.com/?q=w+bows+of+denmark", (s.web[0] as WebRow.Search).url)
-        assertEquals("Search Play Store for “w bows of denmark”", (s.web[1] as WebRow.PlayStore).label)
+        assertEquals("Search the Play Store for “w bows of denmark”", (s.web[1] as WebRow.PlayStore).label)
         val g = sections("chess", WebEngine.Google, listOf("x"), emptyList<String>())
         assertEquals(listOf(SectionKind.Apps, SectionKind.Web), g.order)
     }

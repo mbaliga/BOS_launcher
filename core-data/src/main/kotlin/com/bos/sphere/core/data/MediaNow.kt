@@ -2,13 +2,19 @@ package com.bos.sphere.core.data
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
+import android.view.KeyEvent
+import android.app.PendingIntent
 import android.os.Looper
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -36,7 +42,11 @@ object MediaLogic {
     const val ACTION_SKIP_TO_PREVIOUS = 16L
     const val ACTION_SKIP_TO_NEXT = 32L
 
-    fun isPlaying(state: Int): Boolean = state == STATE_PLAYING || state == STATE_BUFFERING || state == STATE_CONNECTING
+    const val STATE_ERROR = 7
+    /** Fast-forward, rewind and the skipping states: the player is mid-playback, so the icon must not flip to Play while it changes track. */
+    private val TRANSITIONAL = setOf(4, 5, 9, 10, 11)
+
+    fun isPlaying(state: Int): Boolean = state == STATE_PLAYING || state == STATE_BUFFERING || state == STATE_CONNECTING || state in TRANSITIONAL
 
     fun canPrev(actions: Long): Boolean = actions and ACTION_SKIP_TO_PREVIOUS != 0L
     fun canNext(actions: Long): Boolean = actions and ACTION_SKIP_TO_NEXT != 0L
@@ -48,9 +58,25 @@ object MediaLogic {
      * Index of the session to show: the first playing one, else the first active (paused) one, else null.
      * [states] is in the system's order (most recently active first).
      */
-    fun choose(states: List<Int>): Int? =
-        states.indexOfFirst { isPlaying(it) }.takeIf { it >= 0 }
-            ?: states.indexOfFirst { isActive(it) }.takeIf { it >= 0 }
+    fun choose(states: List<Int>): Int? = chooseSession(states.map { Candidate(it, "") }, null)
+
+    /** One session as the picker sees it: its playback state and its package. */
+    data class Candidate(val state: Int, val packageName: String)
+
+    /** 2 = playing (or buffering / connecting / skipping), 1 = paused or errored (still controllable), 0 = stopped or no state (nothing to control). */
+    fun rank(state: Int): Int = if (isPlaying(state)) 2 else if (isActive(state)) 1 else 0
+
+    /**
+     * W42: the session to show and control. Playing beats paused beats stopped (never picked); among sessions of the same rank the one from
+     * [preferPackage] (the one already shown: no flip-flopping between two players) wins, else the first in [candidates], which is the
+     * system's order (most recently active first). Re-run on every session-list change, every playback-state change and every tap.
+     */
+    fun chooseSession(candidates: List<Candidate>, preferPackage: String?): Int? {
+        val best = candidates.maxOfOrNull { rank(it.state) } ?: return null
+        if (best == 0) return null
+        val tied = candidates.indices.filter { rank(candidates[it].state) == best }
+        return tied.firstOrNull { preferPackage != null && candidates[it].packageName == preferPackage } ?: tied.first()
+    }
 
     const val ART_PX = 160
 
@@ -74,29 +100,98 @@ object MediaLogic {
 }
 
 /**
+ * W42: one media session as [MediaNow] needs it. The real one wraps a [MediaController]; tests use fakes (Robolectric has no media sessions).
+ * [transport], [controllerKey] and [systemKey] are the three routes of [MediaCommands].
+ */
+interface MediaPort : MediaCommands.Target {
+    /** Stable identity of the session (its token): equal for the same session across calls that return fresh controller objects. */
+    val id: Any
+    val packageName: String
+    val state: Int
+    val actions: Long
+    val title: String?
+    val artist: String?
+    val artwork: android.graphics.Bitmap?
+    val sessionActivity: PendingIntent?
+    /** Calls [onChange] (main thread) on every playback-state or metadata change, and when the session is destroyed. */
+    fun register(onChange: () -> Unit)
+    fun unregister()
+}
+
+private class ControllerPort(val c: MediaController, private val handler: Handler, private val audio: AudioManager?) : MediaPort {
+    override val id: Any get() = c.sessionToken ?: c.packageName
+    override val packageName: String get() = c.packageName
+    override val state: Int get() = c.playbackState?.state ?: MediaLogic.STATE_NONE
+    override val actions: Long get() = c.playbackState?.actions ?: 0L
+    override val title: String? get() = c.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+    override val artist: String? get() = c.metadata?.let { it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: it.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST) }
+    override val artwork: android.graphics.Bitmap? get() = c.metadata?.let {
+        it.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: it.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: it.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+    }
+    override val sessionActivity: PendingIntent? get() = c.sessionActivity
+    private var cb: MediaController.Callback? = null
+
+    override fun register(onChange: () -> Unit) {
+        val k = object : MediaController.Callback() {
+            override fun onPlaybackStateChanged(state: PlaybackState?) = onChange()
+            override fun onMetadataChanged(metadata: MediaMetadata?) = onChange()
+            override fun onSessionDestroyed() = onChange()
+        }
+        cb = k
+        c.registerCallback(k, handler)
+    }
+    override fun unregister() { cb?.let { runCatching { c.unregisterCallback(it) } }; cb = null }
+
+    override fun transport(cmd: MediaCommands.Cmd) {
+        val t = c.transportControls
+        when (cmd) {
+            MediaCommands.Cmd.Play -> t.play()
+            MediaCommands.Cmd.Pause -> t.pause()
+            MediaCommands.Cmd.Next -> t.skipToNext()
+            MediaCommands.Cmd.Previous -> t.skipToPrevious()
+        }
+    }
+    override fun controllerKey(keyCode: Int): Boolean =
+        c.dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode)) && c.dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+    override fun systemKey(keyCode: Int): Boolean {
+        val a = audio ?: return false
+        a.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        a.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+        return true
+    }
+}
+
+/**
  * The current media session as a flow. Needs notification access (the app's
  * [SphereNotificationListener] is the component the system checks); without it [needsAccess] is true.
+ *
+ * W42 ("the music controls at the top don't always work"): every active session is watched (not only the shown one), so a second player that
+ * starts playing takes over the line at once; the session is re-picked on a session-list change, on every playback-state change and again
+ * on every tap before the command goes out; commands follow [MediaCommands] (transport, then media-button event, then the system key).
  */
 object MediaNow {
     private val _info = MutableStateFlow<MediaInfo?>(null)
     val info: StateFlow<MediaInfo?> = _info.asStateFlow()
     private val _needsAccess = MutableStateFlow(false)
     val needsAccess: StateFlow<Boolean> = _needsAccess.asStateFlow()
+    private val _failures = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    /** The player's display name each time every route of a command failed ("Can't control <app>"). */
+    val failures: SharedFlow<String> = _failures.asSharedFlow()
 
     private var manager: MediaSessionManager? = null
     private var listenerComponent: ComponentName? = null
     private var appContext: Context? = null
-    private var current: MediaController? = null
+    private var provider: (() -> List<MediaPort>)? = null
+    /** The watched sessions, in the system's order (most recently active first). */
+    private var ports: List<MediaPort> = emptyList()
+    private var current: MediaPort? = null
     private var refCount = 0
     private val handler = Handler(Looper.getMainLooper())
 
-    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { list -> pick(list.orEmpty()) }
+    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { list -> adopt(list.orEmpty().map { wrap(it) }) }
 
-    private val callback = object : MediaController.Callback() {
-        override fun onPlaybackStateChanged(state: PlaybackState?) = publish()
-        override fun onMetadataChanged(metadata: MediaMetadata?) = publish()
-        override fun onSessionDestroyed() = refresh()
-    }
+    private fun wrap(c: MediaController): MediaPort =
+        ControllerPort(c, handler, appContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
 
     /** Starts watching (reference counted: pair every call with [stop]). Call on the main thread. */
     fun start(context: Context) {
@@ -119,12 +214,14 @@ object MediaNow {
         manager = mgr
         val comp = ComponentName(ctx, SphereNotificationListener::class.java)
         listenerComponent = comp
+        provider = { mgr.getActiveSessions(comp).map { wrap(it) } }
         try {
             mgr.addOnActiveSessionsChangedListener(sessionsListener, comp, handler)
             _needsAccess.value = false
-            pick(mgr.getActiveSessions(comp))
+            adopt(provider!!())
         } catch (_: SecurityException) {
             _needsAccess.value = true
+            dropPorts()
             _info.value = null
         }
     }
@@ -133,69 +230,89 @@ object MediaNow {
         if (refCount == 0) return
         if (--refCount > 0) return
         runCatching { manager?.removeOnActiveSessionsChangedListener(sessionsListener) }
-        detach()
+        dropPorts()
         manager = null
+        provider = null
         _info.value = null
     }
 
     /** Tests only: publishes [info] as if a session had reported it (Robolectric has no media sessions). */
     fun publishForTest(info: MediaInfo?) { _info.value = info }
 
+    /** Tests only: the session list as the system would report it, and where a tap's refresh reads it from. */
+    fun sessionsForTest(list: List<MediaPort>, source: (() -> List<MediaPort>)? = { list }) { provider = source; adopt(list) }
+    fun resetForTest() { dropPorts(); provider = null; refCount = 0; _info.value = null; _needsAccess.value = false }
+
+    /** Play when paused, pause when playing, after re-reading the session list (a stale controller is the classic "does nothing"). */
     fun playPause() {
-        val c = current ?: return
-        if (c.playbackState?.state?.let(MediaLogic::isPlaying) == true) c.transportControls.pause() else c.transportControls.play()
+        refresh()
+        val p = current ?: return
+        send(p, if (MediaLogic.isPlaying(p.state)) MediaCommands.Cmd.Pause else MediaCommands.Cmd.Play)
     }
 
-    fun next() { current?.transportControls?.skipToNext() }
-    fun previous() { current?.transportControls?.skipToPrevious() }
+    fun next() { refresh(); current?.let { send(it, MediaCommands.Cmd.Next) } }
+    fun previous() { refresh(); current?.let { send(it, MediaCommands.Cmd.Previous) } }
+
+    private fun send(p: MediaPort, cmd: MediaCommands.Cmd) {
+        if (MediaCommands.execute(p, cmd, p.actions) == null) _failures.tryEmit(labelOf(p.packageName))
+        reselect() // the player's own state callback follows; this only picks up a change that already happened
+    }
 
     /** Opens the player: the session's own activity if it has one, else the package's launch intent. */
     fun openPlayer(context: Context) {
+        refresh()
         val c = current ?: return
-        val pi = c.sessionActivity
-        if (PendingIntentLauncher.fire(pi, context)) return
+        if (PendingIntentLauncher.fire(c.sessionActivity, context)) return
         context.packageManager.getLaunchIntentForPackage(c.packageName)?.let {
             runCatching { context.startActivity(it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
     }
 
+    /** Re-reads the session list from the system (cheap: one binder call). */
     private fun refresh() {
-        val mgr = manager ?: return
-        val comp = listenerComponent ?: return
-        try { pick(mgr.getActiveSessions(comp)) } catch (_: SecurityException) { _needsAccess.value = true; detach(); _info.value = null }
+        val src = provider ?: return
+        try { adopt(src()) } catch (_: SecurityException) { _needsAccess.value = true; dropPorts(); _info.value = null }
     }
 
-    private fun pick(sessions: List<MediaController>) {
-        val idx = MediaLogic.choose(sessions.map { it.playbackState?.state ?: MediaLogic.STATE_NONE })
-        val chosen = idx?.let { sessions[it] }
-        if (chosen?.sessionToken != current?.sessionToken) {
-            detach()
-            current = chosen
-            chosen?.registerCallback(callback, handler)
-        }
+    /** Takes the new session list: keeps the watched port of a session that is still there, watches new ones, forgets the gone ones. */
+    private fun adopt(fresh: List<MediaPort>) {
+        val old = ports.associateBy { it.id }
+        val next = fresh.map { f -> old[f.id] ?: f.also { it.register(::reselect) } }
+        val keep = next.map { it.id }.toSet()
+        ports.filter { it.id !in keep }.forEach { it.unregister() }
+        ports = next
+        reselect()
+    }
+
+    private fun reselect() {
+        val idx = MediaLogic.chooseSession(ports.map { MediaLogic.Candidate(it.state, it.packageName) }, current?.packageName)
+        current = idx?.let { ports[it] }
         publish()
     }
 
-    private fun detach() {
-        runCatching { current?.unregisterCallback(callback) }
+    private fun dropPorts() {
+        ports.forEach { it.unregister() }
+        ports = emptyList()
         current = null
+    }
+
+    private fun labelOf(pkg: String): String {
+        val ctx = appContext ?: return pkg
+        return runCatching { ctx.packageManager.getApplicationLabel(ctx.packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrNull() ?: pkg
     }
 
     private fun publish() {
         val c = current
         if (c == null) { _info.value = null; return }
-        val st = c.playbackState
-        val md = c.metadata
-        val ctx = appContext
-        val fallback = ctx?.let { runCatching { it.packageManager.getApplicationLabel(it.packageManager.getApplicationInfo(c.packageName, 0)).toString() }.getOrNull() } ?: c.packageName
+        val actions = c.actions
         _info.value = MediaInfo(
-            title = MediaLogic.displayTitle(md?.getString(MediaMetadata.METADATA_KEY_TITLE), fallback),
-            artist = md?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: md?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST) ?: "",
+            title = MediaLogic.displayTitle(c.title, labelOf(c.packageName)),
+            artist = c.artist ?: "",
             packageName = c.packageName,
-            playing = MediaLogic.isPlaying(st?.state ?: MediaLogic.STATE_NONE),
-            canPrev = MediaLogic.canPrev(st?.actions ?: 0L),
-            canNext = MediaLogic.canNext(st?.actions ?: 0L),
-            artwork = artworkOf(md),
+            playing = MediaLogic.isPlaying(c.state),
+            canPrev = MediaCommands.enabled(MediaCommands.Cmd.Previous, actions),
+            canNext = MediaCommands.enabled(MediaCommands.Cmd.Next, actions),
+            artwork = artworkOf(c.artwork),
         )
     }
 
@@ -203,11 +320,8 @@ object MediaNow {
     private var lastArt: android.graphics.Bitmap? = null
 
     /** Album art, else art, else the display icon; scaled down once per source bitmap. */
-    private fun artworkOf(md: MediaMetadata?): android.graphics.Bitmap? {
-        val src = md?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-            ?: md?.getBitmap(MediaMetadata.METADATA_KEY_ART)
-            ?: md?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-            ?: return null
+    private fun artworkOf(src: android.graphics.Bitmap?): android.graphics.Bitmap? {
+        if (src == null) return null
         if (src === lastArtSource) return lastArt
         val (w, h) = MediaLogic.artSize(src.width, src.height)
         val out = if (w == src.width && h == src.height) src else runCatching { android.graphics.Bitmap.createScaledBitmap(src, w, h, true) }.getOrDefault(src)

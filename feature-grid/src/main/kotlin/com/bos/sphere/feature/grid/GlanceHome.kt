@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -244,7 +245,8 @@ internal fun ControlsNotch(
     val fingerDown by androidx.compose.runtime.rememberUpdatedState(onFingerDown)
     val fingerUp by androidx.compose.runtime.rememberUpdatedState(onFingerUp)
     val progress = remember { Animatable(0f) }
-    var composed by remember { mutableStateOf(false) }
+    // W42: composed from the very first frame the notch is wanted (not one frame later from an effect), so a tap is never dropped before it exists.
+    var composed by remember { mutableStateOf(visible) }
     LaunchedEffect(visible, reduced) {
         if (visible) {
             composed = true
@@ -257,9 +259,17 @@ internal fun ControlsNotch(
     if (!composed) return
     val height = GlanceNotch.heightDp(cutoutTop.value).dp
     Box(
-        modifier.graphicsLayer {
+        // W42: the pop-in is DRAWN only (a graphicsLayer translation or alpha would also move / fade the hit area): the three targets sit at their
+        // final place and take taps from the first frame, while the spring only changes where the black tab is painted.
+        modifier.drawWithContent {
             val p = progress.value
-            if (reduced) alpha = p.coerceIn(0f, 1f) else translationY = -(1f - p) * height.toPx()
+            val dy = if (reduced) 0f else -(1f - p) * height.toPx()
+            val a = if (reduced) p.coerceIn(0f, 1f) else 1f
+            if (a < 1f) {
+                drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height), androidx.compose.ui.graphics.Paint().apply { alpha = a })
+                drawContent()
+                drawContext.canvas.restore()
+            } else translate(0f, dy) { this@drawWithContent.drawContent() }
         }
             .testTag("glance.notch")
             // Wave 23: the box, the drawn shape and the 48 dp targets are the same height, so a tap outside the black falls through to the home card.

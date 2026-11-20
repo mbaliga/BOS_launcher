@@ -812,20 +812,13 @@ private fun WheelContent(
         val inputMode by LocalInputMode.current
         val selectedKey = if (inputMode == com.bos.sphere.core.input.InputMode.Keyboard && interactive) groups.getOrNull(focusedGroup())?.apps?.getOrNull(kbItem)?.key else null
 
-        // Band labels, measured once per layout; ellipsised to their segment's arc length.
-        val measurer = rememberTextMeasurer()
-        val bandLabels: List<TextLayoutResult> = remember(groups, layout, metrics) {
-            val style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.6.sp)
+        // Band labels (wave 44): set on the band's arc, each glyph tangent to the circle; built once per layout (paths and paints cached),
+        // ellipsised to their segment's arc length.
+        val bandPaints = remember(density) { ArcPaints(with(density) { 11.sp.toPx() }, 0.055f, with(density) { 1.6.dp.toPx() }) }
+        val bandLabels: List<ArcLabel> = remember(groups, layout, metrics, bandPaints) {
             groups.mapIndexed { i, g ->
                 val arc = Math.toRadians(layout.segments[i].width.toDouble()).toFloat() * metrics.bandMid
-                measurer.measure(
-                    text = g.label,
-                    style = style,
-                    overflow = TextOverflow.Ellipsis,
-                    softWrap = false,
-                    maxLines = 1,
-                    constraints = Constraints(maxWidth = max(1, (arc - metrics.labelPad).toInt())),
-                )
+                ArcLabel(bandPaints.fit(g.label, max(1f, arc - metrics.labelPad)), bandPaints, metrics.bandMid)
             }
         }
 
@@ -1062,16 +1055,10 @@ private fun WheelContent(
 
                     val label = bandLabels.getOrNull(i) ?: continue
                     val centerAngle = qs + seg.center + turn + rot
-                    val c = WheelGeometry.polarToScreen(anchor, w, h, mid, centerAngle)
-                    val pivot = Offset(c.x, c.y)
-                    rotate(WheelGeometry.tangentTextRotation(centerAngle), pivot) {
-                        drawText(
-                            textLayoutResult = label,
-                            color = if (i == focused) HyleColors.InkBright else HyleColors.Ink,
-                            topLeft = Offset(pivot.x - label.size.width / 2f, pivot.y - label.size.height / 2f),
-                            alpha = a,
-                        )
-                    }
+                    label.draw(
+                        drawContext.canvas.nativeCanvas, corner.x, corner.y, centerAngle, s,
+                        (if (i == focused) HyleColors.InkBright else HyleColors.Ink).copy(alpha = a).toArgb(), false, false, 0,
+                    )
                 }
                 // Band edges.
                 drawCircle(HyleColors.Hairline, radius = metrics.bandOuter * s, center = corner, style = Stroke(1.dp.toPx()), alpha = a)
@@ -1094,61 +1081,61 @@ private fun WheelContent(
                 val textInk = HyleColors.InkBright
                 val dimInk = HyleColors.InkDim
                 val accent = HyleColors.Violet
+                val chipPaints = remember(density) { ArcPaints(with(density) { 11.sp.toPx() }, 0.14f, with(density) { 1.6.dp.toPx() }) }
+                val chipInkR = with(density) { (puck.chipRadiusDp + 3.5f).dp.toPx() }
+                val chipLabels = remember(chipPaints, chipInkR, grouping) { WheelGrouping.entries.map { ArcLabel(it.label, chipPaints, chipInkR) } }
+                val chipAngles = remember(qs) { WheelGrouping.entries.indices.map { qs + ChipAngles[it.coerceAtMost(ChipAngles.lastIndex)] } }
+                // The whole curved slot of each label (wave 44): its text span plus a margin, at least 48 dp along the arc where the neighbours
+                // allow, from the ring's edge to the hub's edge radially. Never overlapping.
+                val chipSlots = remember(chipLabels, chipAngles, ring, density, puck) {
+                    val d = density.density
+                    RingLabelGeometry.slots(
+                        chipAngles, chipLabels.map { it.spanDeg }, chipInkR, max(ring.outer, puck.chipRadiusDp - 7f) * d, (puck.chipRadiusDp + 14f) * d,
+                        48f * d, RingLabelGeometry.degOf(6f * d, chipInkR),
+                    )
+                }
                 Canvas(Modifier.fillMaxSize()) {
                     val corner = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
-                    val r = puck.chipRadiusDp.dp.toPx()
-                    val oval = android.graphics.RectF(corner.x - r, corner.y - r, corner.x + r, corner.y + r)
+                    val nc = drawContext.canvas.nativeCanvas
                     WheelGrouping.entries.forEachIndexed { i, g ->
                         val selected = g == grouping
-                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                            textSize = 11.sp.toPx()
-                            letterSpacing = 0.06f
-                            typeface = if (selected) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-                            color = (if (selected) textInk else dimInk).toArgb()
-                        }
-                        val textW = paint.measureText(g.label)
-                        val sweep = Math.toDegrees((textW / r).toDouble()).toFloat()
-                        val start = qs + ChipAngles[i.coerceAtMost(ChipAngles.lastIndex)] - sweep / 2f
-                        val path = android.graphics.Path().apply { addArc(oval, start, sweep) }
-                        drawContext.canvas.nativeCanvas.drawTextOnPath(g.label, path, 0f, 0f, paint)
-                        if (selected) {
-                            val ur = r - 4.dp.toPx()
-                            drawArc(
-                                color = accent,
-                                startAngle = start,
-                                sweepAngle = sweep,
-                                useCenter = false,
-                                topLeft = Offset(corner.x - ur, corner.y - ur),
-                                size = Size(ur * 2, ur * 2),
-                                style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round),
-                            )
-                        }
+                        chipLabels[i].draw(nc, corner.x, corner.y, chipAngles[i], 1f, (if (selected) textInk else dimInk).toArgb(), selected, selected, accent.toArgb())
                     }
-                }
-                // Invisible touch targets over each label.
-                val chipCentres = WheelGrouping.entries.indices.map { i ->
-                    WheelGeometry.polarToScreen(anchor, w, h, with(density) { puck.chipRadiusDp.dp.toPx() }, qs + ChipAngles[i.coerceAtMost(ChipAngles.lastIndex)])
-                }
-                val chipBoxes = WheelGeometry.chipTouchBoxes(chipCentres, with(density) { 72.dp.toPx() }, with(density) { 40.dp.toPx() })
-                WheelGrouping.entries.forEachIndexed { i, g ->
-                    val pt = chipCentres[i]
-                    Box(
-                        Modifier
-                            .centeredAt { Offset(pt.x, pt.y) }
-                            .size(width = with(density) { chipBoxes[i].first.toDp() }, height = with(density) { chipBoxes[i].second.toDp() })
-                            .semantics { contentDescription = g.label; selected = g == grouping }
-                            .clickable(
-                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                indication = null,
-                                role = Role.Tab,
-                            ) { if (g != grouping) onGroupingChange(g) },
-                    )
                 }
                 // Wave 30: four wedge sections around a round Back hub (PuckSections.kt), group labels outside.
                 PuckSectionsLayer(
                     anchor, corner, ring, RingWindow(corner.x / density1, corner.y / density1, w / density1, h / density1), ringSegments, ringState,
                     showRingLabels, actions, interactive, onDismiss,
                 )
+                // Touch (wave 44), ABOVE the ring's overlay: one layer that shares touches with the ring below it and answers only inside a label's curved slot, so a label
+                // is never shadowed by the ring's overlay (its square corner used to cover the Category label on the diagonal).
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .ringLabelTap(
+                            slotAt = { pos ->
+                                val polar = WheelGeometry.screenToPolar(anchor, w, h, pos.x, pos.y)
+                                RingLabelGeometry.hit(chipSlots, polar.radius, polar.angleDeg)
+                            },
+                            onTap = { i -> val g = WheelGrouping.entries[i]; if (g != grouping) onGroupingChange(g) },
+                        ),
+                )
+                // TalkBack nodes (wave 44): one per label on the slot's own centre, cut so no two overlap (a rotated box's bounds would
+                // overlap its neighbour's), role Tab, selected state, click. Touch is the curved slot above, not these boxes.
+                val nodeCentres = chipSlots.map { WheelGeometry.polarToScreen(anchor, w, h, (it.innerPx + it.outerPx) / 2f, it.centreDeg) }
+                val nodeBoxes = WheelGeometry.chipTouchBoxes(nodeCentres, with(density) { 72.dp.toPx() }, with(density) { 40.dp.toPx() })
+                WheelGrouping.entries.forEachIndexed { i, g ->
+                    val pt = nodeCentres[i]
+                    Box(
+                        Modifier
+                            .centeredAt { Offset(pt.x, pt.y) }
+                            .size(width = with(density) { nodeBoxes[i].first.toDp() }, height = with(density) { nodeBoxes[i].second.toDp() })
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = g.label; selected = g == grouping; role = Role.Tab
+                                onClick { if (g != grouping) onGroupingChange(g); true }
+                            },
+                    )
+                }
             }
 
             // Spokes (only those near the visible quadrant are composed).

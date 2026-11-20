@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.AddCarouselModel
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.Corner
-import com.bos.sphere.core.data.GlanceItem
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
@@ -221,10 +220,7 @@ private fun SettingsContent(page: Int?, pageCount: Int, prefs: LauncherPrefs, ac
             ActionTile(L10n.tr("Delete page %d", page + 1), { actions.onDeletePage(page) })
         } else {
             Text(L10n.tr("Glance"), color = HyleColors.InkBright, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Text(L10n.tr("Content"), color = HyleColors.InkDim, fontSize = 12.sp)
-            GlanceItem.entries.forEach { item ->
-                ToggleRow(L10n.tr(item.label), item in prefs.glanceContent, { v -> actions.onPrefs { it.copy(glanceContent = if (v) it.glanceContent + item else it.glanceContent - item) } })
-            }
+            ToggleRow(L10n.tr("Show music"), prefs.showMusic, { v -> actions.onPrefs { it.copy(showMusic = v) } }) // wave 38: the clock, date and weather are gone; the music line is the one toggle
             Text(L10n.tr("Hotspots"), color = HyleColors.InkDim, fontSize = 12.sp)
             Corner.entries.forEach { c ->
                 ToggleRow(L10n.tr(c.label), c in prefs.glanceHotspots, { v -> actions.onPrefs { it.copy(glanceHotspots = if (v) it.glanceHotspots + c else it.glanceHotspots - c) } })

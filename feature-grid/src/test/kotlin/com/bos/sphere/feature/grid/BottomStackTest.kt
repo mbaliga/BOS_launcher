@@ -1,6 +1,5 @@
 package com.bos.sphere.feature.grid
 
-import com.bos.sphere.core.data.ClockPosition
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.feature.dock.DockEdge
 import com.bos.sphere.feature.dock.DockFootprint
@@ -22,14 +21,14 @@ class BottomStackTest {
     /** small phone, phone, large phone, tablet portrait and landscape, foldable cover, foldable inner square-ish and its tall form. */
     private val sizes = listOf(320 to 568, 360 to 640, 411 to 891, 800 to 1280, 1280 to 800, 280 to 653, 673 to 841, 884 to 1104, 640 to 360)
 
-    private fun prefs(clock: ClockPosition, weather: Boolean) = LauncherPrefs().copy(clockPosition = clock, clockShowWeather = weather)
+    private fun prefs() = LauncherPrefs()
 
-    private fun check(w: Int, h: Int, edge: DockEdge, collapsed: Boolean, clock: ClockPosition, weather: Boolean) {
-        val p = prefs(clock, weather)
+    private fun check(w: Int, h: Int, edge: DockEdge, collapsed: Boolean) {
+        val p = prefs()
         val band = HomeFrame.band(w.toFloat(), h.toFloat())
         val lower = bottomStackDp(p, w.toFloat(), h.toFloat())
         val plan = HomeBottomStack.plan(true, edge, collapsed, band, lower)
-        val label = "$w x $h edge=$edge collapsed=$collapsed clock=$clock weather=$weather"
+        val label = "$w x $h edge=$edge collapsed=$collapsed"
 
         val lowerRect = R(w * 0.2f, h - lower, w * 0.8f, h.toFloat())
         val rail = when (edge) {
@@ -59,8 +58,7 @@ class BottomStackTest {
     @Test
     fun HOM_19_railClockAndDotsNeverOverlapAtSmallPhoneTabletAndFoldableSizes() {
         for ((w, h) in sizes) for (edge in DockEdge.entries) for (collapsed in listOf(false, true))
-            for (clock in listOf(ClockPosition.Bottom, ClockPosition.Top, ClockPosition.Hidden)) for (weather in listOf(false, true))
-                check(w, h, edge, collapsed, clock, weather)
+            check(w, h, edge, collapsed)
     }
 
     @Test
@@ -89,13 +87,9 @@ class BottomStackTest {
     }
 
     @Test
-    fun HOM_19_theBottomStackCountsTheClockOnlyWhenItIsAtTheBottom() {
-        val top = bottomStackDp(prefs(ClockPosition.Top, true), 360f, 640f)
-        val bottom = bottomStackDp(prefs(ClockPosition.Bottom, true), 360f, 640f)
-        // Dots only vs clock and dots.
-        assertEquals(ClockBandFit.clockBottomDp(true), top, 0.001f)
-        assertTrue(bottom > top)
-        assertTrue(bottom <= HomeFrame.band(360f, 640f) + 0.5f)
+    fun HOM_19_w38_theBottomStackIsJustThePageDotsNowThatTheClockLeftThePages() {
+        assertEquals(ClockBandFit.clockBottomDp(true), bottomStackDp(prefs(), 360f, 640f), 0.001f)
+        assertEquals(0f, bottomStackDp(prefs().copy(portraitPaging = com.bos.sphere.core.data.PagingAxis.Vertical), 360f, 640f), 0.001f)
     }
 
     // ---- W26: the dock above the position indicator (page dots or the Glance indicator), at least 8 dp clear.
@@ -108,11 +102,11 @@ class BottomStackTest {
     fun HOM_19_W26_theDockSitsAboveThePositionIndicatorWithAtLeastEightDpClearAtEverySize() {
         assertTrue(HomeBottomStack.GAP_DP >= 8f)
         for ((w, h) in sizes) for (edge in DockEdge.entries) for (collapsed in listOf(false, true))
-            for (surface in listOf("glance", "dotsClockTop", "dotsClockBottom", "dotsAtStart", "none")) {
+            for (surface in listOf("glance", "dotsAtBottom", "dotsAtStart", "none")) {
                 val glance = surface == "glance"
-                val clockBottom = surface == "dotsClockBottom"
-                val dotsAtBottom = surface.startsWith("dotsClock")
-                val p = prefs(if (clockBottom) ClockPosition.Bottom else ClockPosition.Top, true)
+                val clockBottom = false
+                val dotsAtBottom = surface == "dotsAtBottom"
+                val p = prefs()
                 val stack = bottomStackDp(p, w.toFloat(), h.toFloat())
                 val lower = HomeBottomStack.lowerStackDp(stack, glance, glanceIndicator = true, pageDotsAtBottom = dotsAtBottom, clockAtBottom = clockBottom)
                 val plan = HomeBottomStack.plan(true, edge, collapsed, HomeFrame.band(w.toFloat(), h.toFloat()), lower)

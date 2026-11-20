@@ -27,9 +27,6 @@ enum class HomePages(val label: String) { Off("Off"), Paginated("Paginated"), Co
 /** Holo = bare glyphs; Quarter = Sony-style quarter discs in the corners; Bubble = round floating bubbles. */
 enum class CornerStyle(val label: String) { Glyph("Holo"), Quarter("Sony quarter discs"), Bubble("Bubbles") }
 
-/** Where the home clock sits. It can also be a page tile ([HomeTiles.CLOCK]) or a corner Time complication. */
-enum class ClockPosition(val label: String) { Top("Top"), Bottom("Bottom"), Hidden("Hidden") }
-
 /** Non-app items that can occupy a page slot. Stored in page key lists under a `tile:` prefix. */
 object HomeTiles {
     const val PREFIX = "tile:"
@@ -69,29 +66,8 @@ enum class DensityPreset(val label: String, val portrait: GridSpec, val landscap
     Packed("Packed", GridSpec(5, 8), GridSpec(8, 3)),
 }
 
-/** Small readouts that can sit in the status strip (the clock itself is one of them). */
-enum class StripItem(val label: String) {
-    Time("Time"),
-    Battery("Battery"),
-    Signal("Signal"),
-    Steps("Steps"),
-    NextAlarm("Next alarm"),
-    Ringer("Ring mode"),
-    Storage("Storage"),
-    Memory("Memory"),
-    Notifications("Notifications"),
-    /** The items below need Health Connect (a Fitbit / Samsung Health / Garmin / Google Fit app writing into it). */
-    Floors("Floors climbed"),
-    Elevation("Elevation gained"),
-    Distance("Distance"),
-    Calories("Active calories"),
-}
-
 /** Where steps and the other activity numbers come from. */
 enum class HealthSourcePref(val label: String) { Phone("Phone sensor"), HealthConnect("Health Connect") }
-
-/** Where in the strip an item sits. */
-enum class StripZone(val label: String) { Left("Left"), Centre("Centre"), Right("Right") }
 
 /** How the search screen presents results. */
 enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
@@ -103,9 +79,6 @@ enum class RadarBackground(val label: String) { Dimmed("Dimmed wallpaper"), True
 enum class LeftPage(val label: String) { Off("Off"), Launchpad("Comms"), Widget("A widget") }
 
 /** The backdrop behind Settings. */
-/** The clock as one line ("23:02   18°C") or time over a second line. */
-enum class ClockLayout(val label: String) { Inline("One line"), Stacked("Two lines") }
-
 /** How strong the background items are drawn (Ground Control > Background > Intensity). */
 enum class RadarIntensity(val label: String) { Subtle("Subtle"), Normal("Normal") }
 
@@ -138,6 +111,9 @@ enum class WebEngine(val label: String, private val template: String) {
 
 /** Clock number format. */
 enum class ClockFormat(val label: String) { System("System"), Hour12("12-hour"), Hour24("24-hour") }
+
+/** Wave 38: the clock on every page (the fixed chrome): an analog dial (default) or a digital time in the music text's size. */
+enum class ClockStyle(val label: String) { Analog("Analog"), Digital("Digital") }
 
 /** Whether corner actions show a drawn glyph or the real icon of the app they open. */
 enum class CornerIconMode(val label: String) { Glyph("Glyph"), AppIcon("App icon") }
@@ -201,7 +177,6 @@ data class LauncherPrefs(
     /** Icon edge as a fraction of the cell pitch. */
     val iconScale: Float = DEFAULT_ICON_SCALE,
     val showLabels: Boolean = false,
-    val showSuggestion: Boolean = true,
     /** true = corner slots stay pinned to the device's physical corners as it rotates. */
     val cornersFollowDevice: Boolean = true,
     /** Which way pages turn, per orientation. Swipes on the other axis are free for gestures. */
@@ -216,7 +191,6 @@ data class LauncherPrefs(
     /** How the four corners are drawn. */
     val cornerStyle: CornerStyle = CornerStyle.Glyph,
     val drawerStyle: DrawerStyle = DrawerStyle.Wheel,
-    val clockPosition: ClockPosition = ClockPosition.Top,
     /** Console-style interface tones in the settings space. */
     val uiSounds: Boolean = true,
     val uiSoundVolume: Float = 0.4f,
@@ -228,14 +202,12 @@ data class LauncherPrefs(
     val glanceEnabled: Boolean = true,
     /** Wave 26: Left to right (default) or Right to left: the Launchpad edge, the column / page order and the hotspot roles. */
     val homeOrder: HomeOrder = HomeOrder.LeftToRight,
-    /** HOM-23: which items the Glance home shows (time, date, weather, now playing, battery); default Time + Date + music. */
-    val glanceContent: Set<GlanceItem> = GlanceContent.DEFAULT,
+    /** Wave 38: the music line (title and pop-in controls) at the top of every home page while something plays; default on. */
+    val showMusic: Boolean = true,
     /** HOM-23: which hotspots are on, by physical corner (default all four). */
     val glanceHotspots: Set<Corner> = GlanceHotspots.ALL,
     /** HOM-23: seconds of inactivity before the pop-in music controls pop out (2 to 10). */
     val glanceControlsSeconds: Int = GlanceControls.DEFAULT_SECONDS,
-    /** HOM-23: strength of the weather ambience (Subtle default). */
-    val glanceWeatherIntensity: RadarIntensity = RadarIntensity.Subtle,
     /** HOM-23: the small surface indicator at the bottom centre. */
     val glanceIndicator: Boolean = true,
     /** How many recent apps the Recent landing keeps, [HomeRecents.MIN_LIMIT]..[HomeRecents.MAX_LIMIT]. */
@@ -245,7 +217,6 @@ data class LauncherPrefs(
     /** STR-14: what the right-hand side holds: the Recents panel (default), the dock rail's edge reveal, or nothing. */
     val rightSide: RightSide = RightSide.RecentsPanel,
 
-    val healthSource: HealthSourcePref = HealthSourcePref.Phone,
     /** An always-open keyboard that searches apps as you type — the old-school-phone mode. */
     val alwaysKeyboard: Boolean = false,
 
@@ -316,20 +287,12 @@ data class LauncherPrefs(
     // --- first run
     val onboardingDone: Boolean = false,
 
-    // --- status strip: which readouts sit where (absent = not shown)
-    val strip: Map<StripItem, StripZone> = mapOf(StripItem.Time to StripZone.Centre),
     /** 0 = compact square cells, 1 = icons spread to fill the free space (rows and columns separately). */
     val iconSpacing: Float = 0f,
 
-    // --- clock
-    /** Clock text size in sp. */
-    val clockSize: Float = 26f,
-    val clockLayout: ClockLayout = ClockLayout.Inline,
+    // --- clock (wave 38: one clock, on the Glance page only: Analog or Digital, and for Digital 12 or 24 hour; System follows the device)
+    val clockStyle: ClockStyle = ClockStyle.Analog,
     val clockFormat: ClockFormat = ClockFormat.System,
-    val clockShowDate: Boolean = false,
-    val clockShowDay: Boolean = false,
-    val clockShowWeather: Boolean = false,
-    val weatherFahrenheit: Boolean = false,
 
     // --- badges and adaptive grid (HOM-09, HOM-11)
     val badgesOn: Boolean = true,
@@ -404,8 +367,6 @@ data class LauncherPrefs(
         const val DEFAULT_ICON_SCALE = 0.82f
         const val MIN_ICON_SCALE = 0.5f
         const val MAX_ICON_SCALE = 0.95f
-        const val MIN_CLOCK_SIZE = 14f
-        const val MAX_CLOCK_SIZE = 96f
         const val MIN_CORNER_ICON = 20f
         const val MAX_CORNER_ICON = 72f
     }
@@ -935,36 +896,9 @@ object HomeLayoutMath {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Suggested app
+// Launch history events (the suggested app was removed in wave 38)
 // ---------------------------------------------------------------------------------------------
 
 /** One recorded launch. [hourOfDay] is local time, captured at record time. */
 data class LaunchEvent(val key: String, val timeMillis: Long, val hourOfDay: Int)
 
-object AppSuggester {
-    private const val DAY_MS = 86_400_000.0
-    private const val HALF_LIFE_DAYS = 10.0
-
-    /**
-     * Picks the app most likely to be wanted now: recency-decayed launch count, boosted for
-     * launches made around the same hour of day. Returns null when nothing qualifies.
-     */
-    fun suggest(
-        events: List<LaunchEvent>,
-        nowMillis: Long,
-        nowHour: Int,
-        candidates: Set<String>,
-        exclude: Set<String>,
-    ): String? {
-        val scores = HashMap<String, Double>()
-        for (e in events) {
-            if (e.key !in candidates || e.key in exclude) continue
-            val ageDays = ((nowMillis - e.timeMillis).coerceAtLeast(0L)) / DAY_MS
-            val decay = exp(-ageDays * Math.log(2.0) / HALF_LIFE_DAYS)
-            val dh = Math.floorMod(e.hourOfDay - nowHour, 24).let { minOf(it, 24 - it) }
-            val hourBoost = when (dh) { 0 -> 3.0; 1 -> 2.0; 2 -> 1.3; else -> 1.0 }
-            scores[e.key] = (scores[e.key] ?: 0.0) + decay * hourBoost
-        }
-        return scores.maxWithOrNull(compareBy<Map.Entry<String, Double>> { it.value }.thenBy { it.key })?.key
-    }
-}

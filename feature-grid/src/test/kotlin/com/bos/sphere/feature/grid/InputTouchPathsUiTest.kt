@@ -81,7 +81,7 @@ class InputTouchPathsUiTest {
         val pages = HomeLayoutMath.visualPages(com.bos.sphere.core.data.HomeLayout(pages = listOf(com.bos.sphere.core.data.HomePage(apps.map { it.key }, id = 1L)), seeded = true), apps.map { it.key }, capacityOf = { it.capacity(false, prefs) })
         Box(Modifier.fillMaxSize()) {
             GridHome(
-                pages = pages, appsByKey = apps.associateBy { it.key }, prefs = prefs, isLandscape = false, state = state, suggestion = null,
+                pages = pages, appsByKey = apps.associateBy { it.key }, prefs = prefs, isLandscape = false, state = state,
                 gesturesBound = setOf(HomeGesture.PinchIn), capacityOf = { it.capacity(false, prefs) },
                 onLaunch = {}, onAppLongPress = {}, onPagesChange = { changes += it },
                 onEmptyLongPress = {}, onGesture = {}, onClockTap = {}, onTileLongPress = { _, _ -> },

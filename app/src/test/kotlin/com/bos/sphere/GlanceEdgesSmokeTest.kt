@@ -77,7 +77,7 @@ class GlanceEdgesSmokeTest {
     @Test fun STR_01_theEdgeSwipeWorksWithTheLeftPageAtItsDefaultExplicitlySet() { startFresh { it.copy(leftPage = LeftPage.Launchpad) }; swipeFromLeft(); assertTrue(launchpadShown()) }
     @Test fun STR_01_theEdgeSwipeWorksWhileTheMusicControlsArePoppedIn() {
         startFresh(); MediaNow.publishForTest(track); settle()
-        rule.onRoot().performTouchInput { click(Offset(width * 0.5f, height * 0.72f)) }; settle(300)
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300)
         assertTrue("controls are in", rule.onAllNodesWithContentDescriptionCount("Next") > 0)
         swipeFromLeft(); assertTrue(launchpadShown())
     }
@@ -91,7 +91,7 @@ class GlanceEdgesSmokeTest {
     @Test fun INP_08_theOpenLaunchpadCornerActionOpensLaunchpadOnGlance() {
         startFresh()
         LauncherStores.get(AppSmokeHarness.app).shortcuts.setCorner(Corner.TopLeft, CornerSlot.Single(CornerItem.Action(CornerActionId.OpenLaunchpad))); settle()
-        rule.onNodeWithContentDescription("Top left hotspot", substring = true).performClick(); settle()
+        rule.onNodeWithContentDescription("Comms").performClick(); settle()
         assertTrue(launchpadShown())
     }
     @Test fun STR_14_aSwipeFromTheRightEdgeOpensRecentsOnGlanceWhenTheRightSideIsTheRecentsPanel() {
@@ -100,7 +100,7 @@ class GlanceEdgesSmokeTest {
     }
     @Test fun STR_14_theRightEdgeSwipeWorksWhileTheMusicControlsArePoppedIn() {
         startFresh(); MediaNow.publishForTest(track); settle()
-        rule.onRoot().performTouchInput { click(Offset(width * 0.5f, height * 0.72f)) }; settle(300)
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300)
         swipeFromRight(); assertTrue(recentsShown())
     }
     @Test fun STR_14_aSwipeFromARightHotspotCornerOpensRecents() { startFresh(); swipeFromRight(0.03f); assertTrue(recentsShown()) }
@@ -159,7 +159,7 @@ class GlanceEdgesSmokeTest {
     }
     @Test fun HOM_23_theHandlesWorkAfterTheControlsPopOutToo() {
         startFresh(); MediaNow.publishForTest(track); settle()
-        rule.onRoot().performTouchInput { click(Offset(width * 0.5f, height * 0.72f)) }; settle(300)
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300)
         rule.onNodeWithTag("glance.handle.left", useUnmergedTree = true).performClick(); settle(); assertTrue(launchpadShown())
     }
 

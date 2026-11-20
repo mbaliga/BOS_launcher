@@ -1,5 +1,7 @@
 package com.bos.sphere
 
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import android.view.KeyEvent
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
@@ -43,8 +45,8 @@ class TourBusySmokeTest : TourBase() {
 
     @Test fun HOM_23_busyTourStartsOnGlanceWithTheControlsAndLongPressWorks() {
         startBusy(); check("start", Surface.Home)
-        tapAt(0.5f, 0.72f); assertTrue("controls pop in", controlsShown()); rotateAndCheck("busy controls")
-        tapAt(0.5f, 0.72f); settle(); check("controls tapped again", Surface.Home)
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300); assertTrue("controls pop in", controlsShown()); rotateAndCheck("busy controls")
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300); settle(); check("controls tapped again", Surface.Home)
         longPressAt(0.5f, 0.3f); assertTrue(quickSheetShown()); rotateAndCheck("busy quick sheet")
         closeSheet(); settle(); assertFalse(quickSheetShown()); check("sheet closed", Surface.Home)
     }

@@ -44,7 +44,7 @@ class DrawerSectionsW30Test : TourBase() {
     }
 
     private fun openDisc() {
-        rule.onNodeWithContentDescription("Bottom left hotspot", substring = true).performClick(); settle()
+        rule.onNodeWithContentDescription("All apps", substring = true).performClick(); settle()
         assertTrue("the disc is open", wheelShown())
     }
 

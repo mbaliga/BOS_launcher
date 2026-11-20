@@ -28,11 +28,9 @@ import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerItem
 import com.bos.sphere.core.data.DefaultCorners
 import com.bos.sphere.core.data.GlanceHotspots
-import com.bos.sphere.core.data.GlanceItem
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.RightDestination
-import com.bos.sphere.core.data.WeatherInfo
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.ReducedMotionTesting
@@ -80,14 +78,14 @@ class GlanceHomeUiTest {
     private fun hotspots(on: Set<Corner> = GlanceHotspots.ALL) = DefaultCorners.filterKeys { it in on }.map { (c, slot) -> Hotspot(c, GlanceHotspots.itemOf(slot)!!) }
 
     private fun glance(
-        prefs: LauncherPrefs = LauncherPrefs(), media: MediaInfo? = this.media, weather: WeatherInfo? = null, spots: List<Hotspot> = hotspots(),
+        prefs: LauncherPrefs = LauncherPrefs(), media: MediaInfo? = this.media, spots: List<Hotspot> = hotspots(),
         rtl: Boolean = false, ran: MutableList<Pair<CornerItem, Corner>> = ArrayList(), clicks: IntArray = IntArray(4), dark: Boolean = true,
         right: List<RightDestination> = listOf(RightDestination.Recents),
     ) = rule.setContent {
         CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-            GlanceSurface(
-                prefs = prefs, weather = weather, media = media, hotspots = spots, appsByKey = emptyMap(), rightDestinations = right, hasLaunchpad = true,
-                onRun = { i, c -> ran += i to c }, onClockTap = { clicks[0]++ }, onPrevious = { clicks[1]++ }, onPlayPause = { clicks[2]++ }, onNext = { clicks[3]++ },
+            GlanceHomeForTest(
+                prefs = prefs, media = media, hotspots = spots, appsByKey = emptyMap(), rightDestinations = right, hasLaunchpad = true,
+                onRun = { i, c -> ran += i to c }, onPrevious = { clicks[1]++ }, onPlayPause = { clicks[2]++ }, onNext = { clicks[3]++ },
                 dark = dark, modifier = Modifier.fillMaxSize(),
             )
         }
@@ -96,14 +94,18 @@ class GlanceHomeUiTest {
     private fun tag(t: String) = rule.onNodeWithTag(t, useUnmergedTree = true)
     private fun visible(desc: String) = rule.onAllNodesWithContentDescription(desc).fetchSemanticsNodes().isNotEmpty()
     private fun controlsShown() = visible("Next")
+    /** Wave 38: the Glance has the one clock (analog by default) and no date, weather or battery node. */
+    private fun assertNoClockDateWeather() {
+        for (t in listOf("glance.time", "glance.date", "glance.weather", "glance.battery")) assertEquals(t, 0, rule.onAllNodesWithTag(t, useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals(1, rule.onAllNodesWithTag("glance.clock.analog", useUnmergedTree = true).fetchSemanticsNodes().size) // the default face
+    }
 
     // ---- the centre
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun HOM_23_portraitShowsTheClockTheDateTheMusicLineAndFourHotspots() {
         glance()
-        tag("glance.time").assertIsDisplayed()
-        tag("glance.date").assertIsDisplayed()
+        assertNoClockDateWeather()
         rule.onNodeWithContentDescription("Now playing: Someday Out of The Blue · Artist").assertIsDisplayed()
         for (d in listOf("Top left hotspot: Camera", "Top right hotspot: Music", "Bottom left hotspot: All apps", "Bottom right hotspot: Radar")) assertEquals(d, 1, rule.onAllNodesWithContentDescription(d, substring = true).fetchSemanticsNodes().size)
         assertFalse("the controls are not shown until a tap", controlsShown())
@@ -111,13 +113,9 @@ class GlanceHomeUiTest {
     }
 
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi")
-    fun HOM_23_landscapeIsTheSameCompositionWithTheClockCentred() {
+    fun HOM_23_landscapeIsTheSameCompositionWithNoClock() {
         glance()
-        tag("glance.time").assertIsDisplayed()
-        val t = tag("glance.time").fetchSemanticsNode().boundsInRoot
-        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
-        assertEquals("the clock is centred horizontally", root.center.x, t.center.x, 2f)
-        assertEquals("the clock is centred vertically (within the date's height)", root.center.y, t.center.y, root.height * 0.15f)
+        assertNoClockDateWeather()
         val b = LauncherInput.focus.nodes().associate { it.id to it.rect }
         assertTrue(b.getValue("minimal.corner.TopLeft").left < b.getValue("minimal.corner.TopRight").left)
         shoot("landscape_dark")
@@ -127,7 +125,6 @@ class GlanceHomeUiTest {
     fun HOM_23_lightThemeIsAQuietLightSurfaceWithDarkType() {
         Snapshot.withMutableSnapshot { HyleTheme.apply(ThemeVariant.Light, 0xFF6D5BFF) }
         glance(dark = false)
-        tag("glance.time").assertIsDisplayed()
         shoot("portrait_light")
     }
 
@@ -136,43 +133,11 @@ class GlanceHomeUiTest {
         glance(rtl = true)
         val b = LauncherInput.focus.nodes().associate { it.id to it.rect }
         assertTrue("physical corners stay put", b.getValue("minimal.corner.TopLeft").left < b.getValue("minimal.corner.TopRight").left)
-        tag("glance.time").assertIsDisplayed()
         shoot("portrait_rtl")
     }
 
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi", fontScale = 2f)
-    fun HOM_23_at200PercentFontTheClockGrowsButStaysInsideAndTheDateWraps() {
-        glance(prefs = LauncherPrefs(glanceContent = setOf(GlanceItem.Time, GlanceItem.Date, GlanceItem.Weather, GlanceItem.NowPlaying)), weather = WeatherInfo(14f, 2, 0L))
-        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
-        val t = tag("glance.time").fetchSemanticsNode().boundsInRoot
-        assertTrue("inside the window", t.left >= 0f && t.right <= root.right)
-        val corners = LauncherInput.focus.nodes().filter { it.id.startsWith("minimal.corner.") }.map { it.rect }
-        for (c in corners) assertFalse("the clock does not overlap a hotspot", t.left < c.right && t.right > c.left && t.top < c.bottom && t.bottom > c.top)
-        shoot("portrait_font200")
-    }
-
-    @Test @Config(sdk = [35]) fun HOM_23_theClockSizeScalesWithTheFontButNeverOutgrowsTheWindow() {
-        val a = GlanceText.clockSizeDp(411f, 891f, 1f); val b = GlanceText.clockSizeDp(411f, 891f, 2f)
-        assertTrue(b >= a); assertTrue(b <= 411f * 0.28f + 0.01f)
-        assertTrue(GlanceText.clockSizeDp(891f, 411f, 2f) <= 411f * 0.42f + 0.01f)
+    @Test @Config(sdk = [35]) fun HOM_23_theMusicTextRules() {
         assertEquals("Title", GlanceText.nowPlayingLine("Title", "")); assertEquals("T · A", GlanceText.nowPlayingLine("T", "A"))
-        assertEquals("HH:mm", GlanceText.timePattern(com.bos.sphere.core.data.ClockFormat.Hour24, false)); assertEquals("h:mm", GlanceText.timePattern(com.bos.sphere.core.data.ClockFormat.System, false))
-    }
-
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_theContentToggleHidesTheTimeAndTheDateAndTheWeatherJoinsTheDate() {
-        glance(prefs = LauncherPrefs(glanceContent = setOf(GlanceItem.Date, GlanceItem.Weather)), weather = WeatherInfo(14.4f, 0, 0L), media = null)
-        assertEquals(0, rule.onAllNodesWithTag("glance.time", useUnmergedTree = true).fetchSemanticsNodes().size)
-        tag("glance.date").assertIsDisplayed()
-        assertTrue("the temperature sits next to the date", visible("Clear, 14°"))
-    }
-
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_tappingTheClockRunsTheClockAction() {
-        val clicks = IntArray(4)
-        glance(clicks = clicks)
-        tag("glance.time").performClick()
-        assertEquals(1, clicks[0])
     }
 
     // ---- the pop-in controls
@@ -181,13 +146,13 @@ class GlanceHomeUiTest {
     fun HOM_23_aTapOnTheSurfacePopsTheControlsInAndTheyPopOutAfterFourSeconds() {
         glance()
         assertFalse(controlsShown())
-        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
+        rule.onNodeWithContentDescription("Now playing", substring = true).performTouchInput { click(center) }
         rule.mainClock.advanceTimeBy(600)
         assertTrue("controls pop in", controlsShown() && visible("Previous") && visible("Pause"))
         shoot("portrait_controls")
-        rule.mainClock.advanceTimeBy(3000)
+        rule.mainClock.advanceTimeBy(2500)
         assertTrue("still there before the timeout", controlsShown())
-        rule.mainClock.advanceTimeBy(1500)
+        rule.mainClock.advanceTimeBy(2000)
         rule.mainClock.advanceTimeBy(600)
         assertFalse("controls pop out after inactivity", controlsShown())
     }
@@ -196,7 +161,7 @@ class GlanceHomeUiTest {
     fun HOM_23_usingAControlRestartsTheTimerAndAFingerDownPausesIt() {
         val clicks = IntArray(4)
         glance(clicks = clicks)
-        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
+        rule.onNodeWithContentDescription("Now playing", substring = true).performTouchInput { click(center) }
         rule.mainClock.advanceTimeBy(600)
         rule.mainClock.advanceTimeBy(3000)
         rule.onNodeWithContentDescription("Next").performClick()
@@ -207,18 +172,18 @@ class GlanceHomeUiTest {
         rule.mainClock.advanceTimeBy(20_000)
         assertTrue("a finger down keeps them", controlsShown())
         rule.onNodeWithContentDescription("Pause").performTouchInput { up() }
-        rule.mainClock.advanceTimeBy(4600)
+        repeat(10) { rule.mainClock.advanceTimeBy(500); controlsShown() }
         assertFalse("and releasing restarts the timer", controlsShown())
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun HOM_23_aTapOutsideTheControlsPopsThemOutAndTheTimeoutSettingIsHonoured() {
         glance(prefs = LauncherPrefs(glanceControlsSeconds = 9))
-        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
+        rule.onNodeWithContentDescription("Now playing", substring = true).performTouchInput { click(center) }
         rule.mainClock.advanceTimeBy(600)
         rule.mainClock.advanceTimeBy(6000)
         assertTrue("nine seconds is longer than four", controlsShown())
-        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
+        rule.onNodeWithContentDescription("Now playing", substring = true).performTouchInput { click(center) }
         rule.mainClock.advanceTimeBy(800)
         assertFalse("a tap outside pops them out", controlsShown())
     }
@@ -227,7 +192,6 @@ class GlanceHomeUiTest {
     fun HOM_23_withNothingPlayingTheMusicLineIsAbsentAndATapShowsNothing() {
         glance(media = null)
         assertEquals(0, rule.onAllNodesWithContentDescription("Now playing", substring = true).fetchSemanticsNodes().size)
-        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
         rule.mainClock.advanceTimeBy(600)
         assertFalse(controlsShown())
         shoot("portrait_nothing_playing")
@@ -237,7 +201,7 @@ class GlanceHomeUiTest {
     fun HOM_23_reducedMotionFadesTheControlsInInsteadOfTheSpring() {
         ReducedMotionTesting.force(MotionPrefs(0f, 0f, 0f))
         glance()
-        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
+        rule.onNodeWithContentDescription("Now playing", substring = true).performTouchInput { click(center) }
         rule.mainClock.advanceTimeBy(400)
         assertTrue(controlsShown())
     }
@@ -258,9 +222,9 @@ class GlanceHomeUiTest {
     fun HOM_23_aDisabledHotspotDrawsNothingAndTheCountFollowsThePreset() {
         val on = androidx.compose.runtime.mutableStateOf(GlanceHotspots.ALL)
         rule.setContent {
-            GlanceSurface(
-                prefs = LauncherPrefs(), weather = null, media = null, hotspots = hotspots(on.value), appsByKey = emptyMap(), rightDestinations = emptyList(), hasLaunchpad = false,
-                onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
+            GlanceHomeForTest(
+                prefs = LauncherPrefs(), media = null, hotspots = hotspots(on.value), appsByKey = emptyMap(), rightDestinations = emptyList(), hasLaunchpad = false,
+                onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
             )
         }
         for ((preset, n) in listOf(com.bos.sphere.core.data.HotspotPreset.Four to 4, com.bos.sphere.core.data.HotspotPreset.Two to 2, com.bos.sphere.core.data.HotspotPreset.One to 1, com.bos.sphere.core.data.HotspotPreset.None to 0)) {
@@ -289,10 +253,10 @@ class GlanceHomeUiTest {
         val on = androidx.compose.runtime.mutableStateOf(true)
         val opened = ArrayList<String>()
         rule.setContent {
-            GlanceSurface(
-                prefs = LauncherPrefs(glanceIndicator = on.value), weather = null, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
+            GlanceHomeForTest(
+                prefs = LauncherPrefs(glanceIndicator = on.value), media = null, hotspots = emptyList(), appsByKey = emptyMap(),
                 rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
-                onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
+                onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
                 onOpenLaunchpad = { opened += "launchpad" }, onOpenRight = { opened += "right" },
             )
         }
@@ -314,10 +278,10 @@ class GlanceHomeUiTest {
     fun HOM_23_theDockRailDestinationDotIsAButtonToo() {
         val opened = ArrayList<String>()
         rule.setContent {
-            GlanceSurface(
-                prefs = LauncherPrefs(), weather = null, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
+            GlanceHomeForTest(
+                prefs = LauncherPrefs(), media = null, hotspots = emptyList(), appsByKey = emptyMap(),
                 rightDestinations = listOf(RightDestination.Dock), hasLaunchpad = false,
-                onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(), onOpenRight = { opened += "right" },
+                onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(), onOpenRight = { opened += "right" },
             )
         }
         assertFalse("Comms off: no Comms glyph", visible("Open Comms"))
@@ -330,9 +294,9 @@ class GlanceHomeUiTest {
     private fun handles(rtl: Boolean, wake: androidx.compose.runtime.MutableIntState, taps: MutableList<String>, dark: Boolean = true) = rule.setContent {
         CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             Box(Modifier.fillMaxSize()) {
-                GlanceSurface(
-                    prefs = LauncherPrefs(), weather = null, media = null, hotspots = hotspots(), appsByKey = emptyMap(), rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
-                    onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {}, dark = dark, modifier = Modifier.fillMaxSize(),
+                GlanceHomeForTest(
+                    prefs = LauncherPrefs(), media = null, hotspots = hotspots(), appsByKey = emptyMap(), rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
+                    onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, dark = dark, modifier = Modifier.fillMaxSize(),
                 )
                 val tint = if (dark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black
                 val red = com.bos.sphere.core.design.rememberMotionPrefs().reduced
@@ -400,11 +364,4 @@ class GlanceHomeUiTest {
         shoot("handles_portrait_light")
     }
 
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_weatherInTheContentDrawsTheAmbienceBehindTheClockAndNeverBreaksTheSemantics() {
-        ReducedMotionTesting.force(MotionPrefs(0f, 0f, 0f))
-        glance(prefs = LauncherPrefs(glanceContent = setOf(GlanceItem.Time, GlanceItem.Date, GlanceItem.Weather)), weather = WeatherInfo(8f, 63, 0L), media = null)
-        tag("glance.time").assertIsDisplayed()
-        shoot("portrait_rain")
-    }
 }

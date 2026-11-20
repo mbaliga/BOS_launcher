@@ -67,26 +67,25 @@ class GlanceSmokeTest {
     private fun settle(ms: Long = 1500) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Snapshot.sendApplyNotifications(); rule.mainClock.advanceTimeBy(ms); org.robolectric.shadows.ShadowLooper.idleMainLooper(); rule.mainClock.advanceTimeBy(ms) }
     private fun longPressEmpty() { rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * 0.3f)) }; settle(300) }
     private fun graphIds() = LauncherInput.focus.nodes().map { it.id }
-    private fun hotspotCount() = graphIds().count { it.startsWith("minimal.corner.") }
+    private fun hotspotCount() = graphIds().count { it.startsWith("corner.") }
     private fun controlsShown() = rule.onAllNodesWithContentDescription("Next").fetchSemanticsNodes().isNotEmpty()
     private val track = MediaInfo("Someday Out of The Blue", "Artist", "pkg.music", playing = true, canPrev = true, canNext = true)
 
-    @Test fun HOM_23_aFreshStateLandsOnTheGlanceHomeWithTheClockAndFourHotspotsAndNoHint() {
+    @Test fun HOM_23_aFreshStateLandsOnTheGlanceHomeWithNoClockAndFourHotspotsAndNoHint() {
         startFresh(); settle()
         assertTrue(LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value.glanceEnabled)
-        rule.onNodeWithTag("glance.time", useUnmergedTree = true).assertIsDisplayed()
-        rule.onNodeWithTag("glance.date", useUnmergedTree = true).assertIsDisplayed()
+        assertEquals("wave 38: no clock or date on the Glance", 0, rule.onAllNodesWithTag("glance.time", useUnmergedTree = true).fetchSemanticsNodes().size + rule.onAllNodesWithTag("glance.date", useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(4, hotspotCount())
         assertEquals("the empty-home hint belongs to Selected apps only", 0, rule.onAllNodesWithText("Long press to add apps").fetchSemanticsNodes().size)
         assertFalse("no dock on Glance", graphIds().any { it.startsWith("dock.") })
     }
 
-    @Test fun HOM_23_aTapPopsTheControlsInAndTheyPopOutOnInactivity() {
+    @Test fun HOM_23_aTapOnTheMusicLinePopsTheControlsInAndTheyPopOutOnInactivity() {
         startFresh(); settle()
         MediaNow.publishForTest(track); settle()
         rule.onNodeWithContentDescription("Now playing: Someday Out of The Blue · Artist").assertIsDisplayed()
         assertFalse(controlsShown())
-        rule.onRoot().performTouchInput { click(Offset(width * 0.5f, height * 0.72f)) }; rule.mainClock.advanceTimeBy(700)
+        rule.onNodeWithContentDescription("Now playing: Someday Out of The Blue · Artist").performClick(); rule.mainClock.advanceTimeBy(700)
         assertTrue("the controls pop in", controlsShown())
         rule.mainClock.advanceTimeBy(5000); rule.mainClock.advanceTimeBy(700)
         assertFalse("and pop out", controlsShown())

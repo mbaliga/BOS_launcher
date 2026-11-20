@@ -85,6 +85,7 @@ private fun Corner.spoken(what: String): String = when (this) {
  * The pointer's dwell reveal is the shared hot-corner layer on the root; this layer is what keyboard, touch and TalkBack use.
  * Corners are physical, so the layer lays out left to right whatever the language.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MinimalHotspotLayer(
     hotspots: List<Hotspot>,
@@ -95,6 +96,8 @@ fun MinimalHotspotLayer(
     /** HOM-23: draw the assigned action's glyph in the corner (the Glance home); off on the plain hotspot layer. */
     showIcons: Boolean = false,
     iconTint: Color = Color.White.copy(alpha = 0.6f),
+    /** Wave 38: a long press on a hotspot (the corner editor); null keeps the plain tap-only hotspot. */
+    onLongPress: ((Hotspot) -> Unit)? = null,
 ) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
@@ -105,7 +108,10 @@ fun MinimalHotspotLayer(
                     Modifier.align(h.screen.cornerAlignment()).size(64.dp)
                         .launcherItem("minimal.corner.${h.screen.name}", kind = FocusKind.Corner, focusable = true, onActivate = { onRun(h.item, h.screen) }, ringRadiusDp = 32f)
                         .semantics { role = Role.Button; contentDescription = spoken }
-                        .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClickLabel = what) { onRun(h.item, h.screen) },
+                        .combinedClickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClickLabel = what,
+                            onLongClick = onLongPress?.let { f -> { f(h) } }, onClick = { onRun(h.item, h.screen) },
+                        ),
                 ) {
                     if (showIcons) Box(Modifier.align(Alignment.Center)) { ItemGlyph(h.item, appsByKey, 24.dp, iconTint) }
                     if (showHints) {

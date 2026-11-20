@@ -113,7 +113,6 @@ class ScreenshotTest {
         calm: CalmEffect? = CalmEffect.AnimatedDots,
         alert: com.bos.sphere.core.data.AlertEffect? = null,
         prefs2: LauncherPrefs? = null,
-        weather: com.bos.sphere.core.data.WeatherInfo? = null,
     ) {
         val state = rememberGridHomeState()
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -128,12 +127,11 @@ class ScreenshotTest {
                 prefs = prefs,
                 isLandscape = landscape,
                 state = state,
-                suggestion = apps[9],
+               
                 gesturesBound = setOf(HomeGesture.PinchIn),
                 capacityOf = { it.capacity(landscape, prefs) },
                 onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {},
                 onClockTap = {}, onTileLongPress = { _, _ -> },
-                weather = weather,
             )
             CornerLayer(
                 placements = cornerPlacements(corners, rotation, true),
@@ -193,25 +191,17 @@ class ScreenshotTest {
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun mockupPortrait() {
         rule.mainClock.autoAdvance = false
-        val prefs = LauncherPrefs(clockShowWeather = true)
-        rule.setContent { Scene(prefs, landscape = false, pages = mockPages, weather = com.bos.sphere.core.data.WeatherInfo(18f, 0, 0)) }
+        val prefs = LauncherPrefs()
+        rule.setContent { Scene(prefs, landscape = false, pages = mockPages) }
         shoot("00-mockup-portrait")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
     fun mockupLandscape() {
         rule.mainClock.autoAdvance = false
-        val prefs = LauncherPrefs(clockShowWeather = true)
-        rule.setContent { Scene(prefs, landscape = true, pages = mockPages, weather = com.bos.sphere.core.data.WeatherInfo(18f, 0, 0)) }
+        val prefs = LauncherPrefs()
+        rule.setContent { Scene(prefs, landscape = true, pages = mockPages) }
         shoot("00-mockup-landscape")
-    }
-
-    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun clockBottomPortrait() {
-        rule.mainClock.autoAdvance = false
-        val prefs = LauncherPrefs(clockPosition = com.bos.sphere.core.data.ClockPosition.Bottom, clockShowWeather = true)
-        rule.setContent { Scene(prefs, landscape = false, pages = pagesFor(prefs, false)) }
-        shoot("01b-clock-bottom")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -342,7 +332,7 @@ class ScreenshotTest {
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun clockBigAndEffects() {
         rule.mainClock.autoAdvance = false
-        val prefs = LauncherPrefs(clockSize = 64f, clockShowDay = true, clockShowDate = true, cornerIconSize = 40f)
+        val prefs = LauncherPrefs(cornerIconSize = 40f)
         rule.setContent {
             Scene(
                 prefs, landscape = false, pages = pagesFor(prefs, false),
@@ -436,7 +426,6 @@ class ScreenshotTest {
         rule.setContent {
             DetailScreen(listOf("Settings", "Home", "Style"), {}) {
                 VisualChoice(com.bos.sphere.core.data.HomeStyle.entries, com.bos.sphere.core.data.HomeStyle.Grid, {}, { it.name }, previewHeight = 140.dp) { HomeStylePreview(it) }
-                VisualChoice(com.bos.sphere.core.data.ClockPosition.entries, com.bos.sphere.core.data.ClockPosition.entries.first(), {}, { it.label }, previewHeight = 96.dp) { StripPositionPreview(it) }
             }
         }
         shoot("20-detail-visual")

@@ -80,7 +80,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.bos.sphere.core.data.AppEntry
-import com.bos.sphere.core.data.ClockPosition
 import com.bos.sphere.core.data.HomeTiles
 import com.bos.sphere.core.data.HomeGesture
 import com.bos.sphere.core.data.HomeLayoutMath
@@ -186,7 +185,6 @@ internal sealed interface PageGeometry {
 
 private sealed interface Hit {
     data class App(val key: String) : Hit
-    data class Suggested(val app: AppEntry) : Hit
     /** A non-focused coverflow item: tapping brings it to the centre. */
     data class Focus(val page: Int, val index: Int) : Hit
     data class Tile(val key: String) : Hit
@@ -212,7 +210,6 @@ fun GridHome(
     prefs: LauncherPrefs,
     isLandscape: Boolean,
     state: GridHomeState,
-    suggestion: AppEntry?,
     gesturesBound: Set<HomeGesture>,
     capacityOf: (PageLayout) -> Int,
     onLaunch: (AppEntry) -> Unit,
@@ -223,8 +220,6 @@ fun GridHome(
     onClockTap: () -> Unit,
     onTileTap: (String) -> Unit = {},
     onTileLongPress: (key: String, page: Int) -> Unit,
-    weather: com.bos.sphere.core.data.WeatherInfo? = null,
-    health: com.bos.sphere.core.data.HealthToday? = null,
     /** HOM-01 / HOM-02 / HOM-08: folders, shortcuts, links and widget tiles that share the pages with apps. */
     extras: HomeExtras? = null,
     /** HOM-12: edit mode. Items are grabbed at once (no long press), and apps and shortcuts carry a remove handle. */
@@ -258,16 +253,11 @@ fun GridHome(
     val safeInsets = WindowInsets.safeDrawing
     val dir = LayoutDirection.Ltr
     val indicatorAtStartEarly = prefs.pagingFor(isLandscape) == PagingAxis.Vertical
-    val clockTop = prefs.clockPosition == ClockPosition.Top
-    val clockBottom = prefs.clockPosition == ClockPosition.Bottom
-    val clockH = stripHeight(prefs)
     val cornerRow = prefs.cornerIconSize.dp + 22.dp
     // The apps area is the same inset on every side, in either orientation; the corner icons, the
     // clock and the page dots live in that margin band (see the mock-ups).
-    val padTopDpRaw = if (clockTop) maxOf(clockH + 14.dp, cornerRow) else cornerRow
+    val padTopDpRaw = cornerRow
     val padBottomDpRaw = when {
-        clockBottom && !indicatorAtStartEarly -> maxOf(clockH + 76.dp, cornerRow)
-        clockBottom -> maxOf(clockH + 24.dp, cornerRow)
         indicatorAtStartEarly -> cornerRow
         else -> maxOf(cornerRow, 44.dp)
     }.coerceAtLeast(cornerRow)
@@ -374,7 +364,7 @@ fun GridHome(
 
     // Latest values for the long-lived gesture coroutine.
     val st by rememberUpdatedState(
-        GestureInputs(pages, appsByKey, suggestion, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl, contentOffset),
+        GestureInputs(pages, appsByKey, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl, contentOffset),
     )
     val cb by rememberUpdatedState(
         GestureCallbacks(
@@ -395,8 +385,6 @@ fun GridHome(
         if (slot < 0) return Hit.Empty
         if (geom is PageGeometry.Coverflow && slot != kotlin.math.round(coverPosition).toInt()) return Hit.Focus(page, slot)
         keyAtSlot(p, geom, slot, ex)?.let { return if (HomeTiles.isTile(it) || ex?.owns(it) == true) Hit.Tile(it) else Hit.App(it) }
-        val sug = s.suggestion
-        if (page == 0 && sug != null && s.prefs.showSuggestion && slot == p.keys.size) return Hit.Suggested(sug)
         return Hit.Empty
     }
 
@@ -405,8 +393,6 @@ fun GridHome(
 
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr, LocalLabelScale provides prefs.labelScale) {
     Box(modifier = modifier.fillMaxSize()) {
-        StripHost(prefs, weather, health, onClockTap)
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -459,7 +445,6 @@ fun GridHome(
                                 if (!settled) return@awaitEachGesture
                                 when (hit) {
                                     is Hit.App -> st.apps[hit.key]?.let(cb.onLaunch)
-                                    is Hit.Suggested -> cb.onLaunch(hit.app)
                                     is Hit.Focus -> cb.focusCover(hit.page, hit.index)
                                     is Hit.Tile -> if (hit.key == HomeTiles.CLOCK) cb.onClockTap() else cb.onTileTap(hit.key)
                                     Hit.Empty -> if (HomeGesture.DoubleTap in st.bound) {
@@ -487,7 +472,6 @@ fun GridHome(
                                                     // Not a double tap: an ordinary tap somewhere else.
                                                     when (val h2 = hitTest(pagerState.currentPage, second.position)) {
                                                         is Hit.App -> st.apps[h2.key]?.let(cb.onLaunch)
-                                                        is Hit.Suggested -> cb.onLaunch(h2.app)
                                                         is Hit.Focus -> cb.focusCover(h2.page, h2.index)
                                                         is Hit.Tile -> if (h2.key == HomeTiles.CLOCK) cb.onClockTap() else cb.onTileTap(h2.key)
                                                         Hit.Empty -> Unit
@@ -566,13 +550,12 @@ fun GridHome(
                                             ev.changes.forEach { it.consume() }
                                         } while (ev.changes.any { it.pressed })
                                     }
-                                    is Hit.Suggested, is Hit.Tile -> {
+                                    is Hit.Tile -> {
                                         do {
                                             val ev = awaitPointerEvent(PointerEventPass.Initial)
                                             ev.changes.forEach { it.consume() }
                                         } while (ev.changes.any { it.pressed })
                                         when (pressed) {
-                                            is Hit.Suggested -> cb.onAppLongPress(pressed.app)
                                             is Hit.Tile -> cb.onTileLongPress(pressed.key, startPage)
                                             else -> Unit
                                         }
@@ -670,7 +653,6 @@ fun GridHome(
                     appsByKey = appsByKey,
                     showLabels = prefs.showLabels && page.layout.shape != PageShape.Circle,
                     draggingKey = dragKey,
-                    suggestion = if (index == 0 && prefs.showSuggestion && dragKey == null) suggestion else null,
                     onLaunch = onLaunch,
                     onLongPress = onAppLongPress,
                     onItemFocused = { if (pagerState.currentPage != index) scope.launch { pagerState.pageTo(index, stillPaging) } },
@@ -749,10 +731,7 @@ fun GridHome(
             modifier = if (indicatorAtStart) {
                 Modifier.align(Alignment.CenterStart).windowInsetsPadding(safe).padding(start = 14.dp)
             } else {
-                // Lift the dots above a bottom clock.
-                Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe)
-                    .padding(bottom = if (prefs.clockPosition == ClockPosition.Bottom) ClockBandFit.DOTS_BOTTOM_DP.dp else 26.dp)
-                    .then(if (prefs.clockPosition == ClockPosition.Bottom) Modifier.height(ClockBandFit.DOTS_DP.dp) else Modifier)
+                Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(bottom = 26.dp)
             },
         )
     }
@@ -769,7 +748,6 @@ private fun clampedCover(map: Map<Int, Float>, page: Int, p: HomePage?): Float {
 private data class GestureInputs(
     val pages: List<HomePage>,
     val apps: Map<String, AppEntry>,
-    val suggestion: AppEntry?,
     val bound: Set<HomeGesture>,
     val paging: PagingAxis,
     val areaSize: IntSize,
@@ -800,7 +778,6 @@ private fun PageView(
     appsByKey: Map<String, AppEntry>,
     showLabels: Boolean,
     draggingKey: String?,
-    suggestion: AppEntry?,
     onLaunch: (AppEntry) -> Unit,
     onLongPress: (AppEntry) -> Unit,
     modifier: Modifier = Modifier,
@@ -898,11 +875,6 @@ private fun PageView(
                 }
             }
         }
-        if (suggestion != null && geometry !is PageGeometry.Coverflow &&
-            page.keys.size < geometry.capacity && suggestion.key !in page.keys
-        ) {
-            SuggestionSlot(suggestion, geometry, page.keys.size, geometry.iconPx)
-        }
     }
 }
 
@@ -953,38 +925,6 @@ internal fun AppLabel(label: String, iconDp: Dp) {
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = 4.dp).width(iconDp * 1.25f),
     )
-}
-
-/** The predicted app: a hairline above it and a bolt, like the reference's last slot. */
-@Composable
-private fun BoxScope.SuggestionSlot(app: AppEntry, geometry: PageGeometry, index: Int, iconPx: Float) {
-    val density = LocalDensity.current
-    val center = geometry.center(index)
-    val inner = iconPx * 0.86f
-    val iconDp = with(density) { iconPx.toDp() }
-    val innerDp = with(density) { inner.toDp() }
-    Box(
-        Modifier
-            .offset { IntOffset((center.x - iconPx / 2).roundToInt(), (center.y - iconPx / 2).roundToInt()) }
-            .size(iconDp)
-            .semantics(mergeDescendants = true) { contentDescription = "Suggested: ${app.label}" },
-    ) {
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = -(iconDp * 0.06f))
-                .width(iconDp * 1.1f)
-                .height(1.dp)
-                .background(HyleColors.InkDim.copy(alpha = 0.6f)),
-        )
-        AppIcon(app, innerDp, Modifier.align(Alignment.BottomEnd).size(innerDp))
-        Icon(
-            Glyphs.Bolt,
-            contentDescription = null,
-            tint = HyleColors.InkBright,
-            modifier = Modifier.align(Alignment.TopStart).padding(top = iconDp * 0.06f).size(iconDp * 0.2f),
-        )
-    }
 }
 
 /**

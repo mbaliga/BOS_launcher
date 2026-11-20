@@ -49,9 +49,9 @@ class DeviceKitAuditTest {
         val expected = setOf(
             "android.permission.QUERY_ALL_PACKAGES", "android.permission.REQUEST_DELETE_PACKAGES", "android.permission.RECORD_AUDIO", "android.permission.PACKAGE_USAGE_STATS", "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
             "android.permission.health.READ_STEPS", "android.permission.health.READ_FLOORS_CLIMBED", "android.permission.health.READ_ELEVATION_GAINED", "android.permission.health.READ_DISTANCE",
-            "android.permission.health.READ_ACTIVE_CALORIES_BURNED", "android.permission.ACTIVITY_RECOGNITION", "android.permission.INTERNET", "com.bos.sphere.permission.READ_SEARCH",
+            "android.permission.health.READ_ACTIVE_CALORIES_BURNED", "android.permission.ACTIVITY_RECOGNITION", "com.bos.sphere.permission.READ_SEARCH",
             "android.permission.READ_CONTACTS", "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VIDEO", "android.permission.READ_MEDIA_AUDIO",
-            "android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE", "android.permission.VIBRATE", "android.permission.ACCESS_NOTIFICATION_POLICY",
+            "android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE", "android.permission.VIBRATE", "android.permission.ACCESS_NOTIFICATION_POLICY",
             "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE", "android.permission.POST_NOTIFICATIONS",
         ).toSortedSet()
         assertEquals(expected, declared)

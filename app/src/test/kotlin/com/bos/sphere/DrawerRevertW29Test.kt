@@ -40,7 +40,7 @@ class DrawerRevertW29Test : TourBase() {
         launch()
     }
 
-    private fun appsHotspot() = rule.onNodeWithContentDescription("Bottom left hotspot", substring = true)
+    private fun appsHotspot() = rule.onNodeWithContentDescription("All apps", substring = true)
 
     @Test fun HOM_01_w29_theAppsHotspotOnGlanceOpensTheWheelDiscAndBackClosesIt() {
         start(); assertTrue(glanceShown())
@@ -59,7 +59,7 @@ class DrawerRevertW29Test : TourBase() {
 
     @Test fun HOM_23_w29_inTheRightToLeftOrderTheAppsHotspotStillOpensTheWheelDisc() {
         start(order = HomeOrder.RightToLeft); assertTrue(glanceShown())
-        val roles = listOf("Bottom left hotspot", "Bottom right hotspot")
+        val roles = listOf("All apps", "Bottom right hotspot")
         // the hotspot roles swap in right to left: whichever corner holds the apps role opens the disc
         var opened = false
         for (d in roles) { rule.onNodeWithContentDescription(d, substring = true).performClick(); settle(); if (wheelShown()) { opened = true; back(); break }; if (radarShown()) back() }
@@ -70,7 +70,7 @@ class DrawerRevertW29Test : TourBase() {
     private fun openedFromTheTappedSide(order: HomeOrder) {
         start(order = order); assertTrue(glanceShown())
         val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.width
-        for (d in listOf("Bottom left hotspot", "Bottom right hotspot")) {
+        for (d in listOf("All apps", "Bottom right hotspot")) {
             val spot = rule.onNodeWithContentDescription(d, substring = true)
             val spotX = spot.fetchSemanticsNode().boundsInRoot.center.x
             spot.performClick(); settle()
@@ -89,7 +89,7 @@ class DrawerRevertW29Test : TourBase() {
     fun HOM_01_w29_theAppsHotspotOpensTheWheelDiscInLandscapeAndBackClosesIt() {
         start(); assertTrue(glanceShown())
         var opened = false
-        for (d in listOf("Bottom left hotspot", "Bottom right hotspot", "Top left hotspot", "Top right hotspot")) {
+        for (d in listOf("All apps", "Bottom right hotspot", "Top left hotspot", "Top right hotspot")) {
             if (rule.onAllNodesWithContentDescription(d, substring = true).fetchSemanticsNodes().isEmpty()) continue
             rule.onNodeWithContentDescription(d, substring = true).performClick(); settle()
             if (wheelShown()) { opened = true; break }

@@ -28,3 +28,7 @@ D if the existing widget hosting is good enough for a weather widget (cheapest, 
 - C, D: as A, plus the replacement surface.
 
 Nothing in this stream removes the permission; this file is the input to the decision.
+
+## Wave 38 update
+
+The weather client (`Weather.kt`), the `INTERNET` and `ACCESS_COARSE_LOCATION` permissions and the Weather setting are removed together with the clock strip (docs/decisions/glanceFixed.md). Nothing in the launcher opens a network connection now; the audits (`NFR_17_noSourceFileOpensAnHttpConnection`, `NFR_17_noManifestDeclaresInternet`, `NFR_16_internetIsNotDeclaredAndTheDecisionIsDocumented`) pin that. Option A above is what happened.

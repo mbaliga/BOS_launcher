@@ -4,6 +4,8 @@ import android.view.KeyEvent
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performTextInput
 import com.bos.sphere.feature.grid.LauncherInput
 import androidx.compose.ui.test.performScrollTo
@@ -46,7 +48,7 @@ class TourFreshSmokeTest : TourBase() {
         startFresh(); MediaNow.publishForTest(track); settle()
         assertTrue(stores.prefs.prefs.value.glanceEnabled); assertTrue(glanceShown())
         check("start", Surface.Home); assertFalse(controlsShown())
-        tapAt(0.5f, 0.72f); assertTrue("a tap pops the controls in", controlsShown()); check("controls in", Surface.Home)
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300); assertTrue("a tap on the music line pops the controls in", controlsShown()); check("controls in", Surface.Home)
         rotateAndCheck("controls in, rotated")
         // out again: a tap on the controls' empty area or inactivity pops them out
         waitFor("the controls pop out after inactivity", 12_000) { !controlsShown() }
@@ -85,7 +87,7 @@ class TourFreshSmokeTest : TourBase() {
         back(); settle(); check("back", Surface.Home)
         // a corner action
         stores.shortcuts.setCorner(Corner.TopLeft, CornerSlot.Single(CornerItem.Action(CornerActionId.OpenLaunchpad))); settle()
-        rule.onNodeWithTagOrDesc("Top left hotspot").performClick(); settle(); check("corner", Surface.Launchpad)
+        rule.onNodeWithTagOrDesc("Comms", exact = true).performClick(); settle(); check("corner", Surface.Launchpad)
         back(); check("back from corner", Surface.Home)
     }
 
@@ -112,7 +114,7 @@ class TourFreshSmokeTest : TourBase() {
         key(KeyEvent.KEYCODE_SLASH, ctrl = true); check("shortcut", Surface.Radar)
         key(ESC); check("esc", Surface.Home)
         stores.shortcuts.setCorner(Corner.TopRight, CornerSlot.Single(CornerItem.Action(CornerActionId.Search))); settle()
-        rule.onNodeWithTagOrDesc("Top right hotspot").performClick(); settle(); check("corner", Surface.Radar)
+        rule.onAllNodesWithContentDescription("Radar").onFirst().performClick(); settle(); check("corner", Surface.Radar)
         key(KeyEvent.KEYCODE_D); key(KeyEvent.KEYCODE_E); check("typing 2", Surface.Radar)
         val before = stores.history.events.value.size
         key(KeyEvent.KEYCODE_ENTER); check("Enter on a result")
@@ -216,5 +218,5 @@ class TourFreshSmokeTest : TourBase() {
     private fun onNodeTapSliver() { rule.onNodeWithTag("lp.card", useUnmergedTree = true).performClick(); settle() }
     private fun tagShownPrefix(p: String) = rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("tag $p") { n ->
         androidx.compose.ui.semantics.SemanticsProperties.TestTag.let { t -> t in n.config && n.config[t].startsWith(p) } }, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-    private fun androidx.compose.ui.test.junit4.ComposeTestRule.onNodeWithTagOrDesc(d: String) = onNodeWithContentDescription(d, substring = true)
+    private fun androidx.compose.ui.test.junit4.ComposeTestRule.onNodeWithTagOrDesc(d: String, exact: Boolean = false) = onNodeWithContentDescription(d, substring = !exact)
 }

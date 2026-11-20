@@ -8,32 +8,16 @@ import org.junit.Test
 
 /** HOM-23: the pure rules of the Glance home. */
 class GlanceModelTest {
-    // ---- content presets
-    @Test fun HOM_23_defaultContentIsTimeDateAndTheMusicLine() {
-        assertEquals(setOf(GlanceItem.Time, GlanceItem.Date, GlanceItem.NowPlaying), LauncherPrefs().glanceContent)
-        assertEquals(GlancePreset.TimeDate, GlanceContent.presetOf(GlanceContent.DEFAULT))
-    }
+    // ---- the music toggle (wave 38: replaces the Glance content set)
+    @Test fun HOM_23_showMusicIsOnByDefault() { assertTrue(LauncherPrefs().showMusic) }
 
-    @Test fun HOM_23_presetsReplaceOnlyTheClockPartAndKeepMusicAndBattery() {
-        val start = setOf(GlanceItem.Time, GlanceItem.NowPlaying, GlanceItem.Battery)
-        assertEquals(setOf(GlanceItem.Date, GlanceItem.Weather, GlanceItem.NowPlaying, GlanceItem.Battery), GlanceContent.applyPreset(start, GlancePreset.DateWeather))
-        assertEquals(setOf(GlanceItem.Time, GlanceItem.NowPlaying, GlanceItem.Battery), GlanceContent.applyPreset(start, GlancePreset.Time))
-        assertEquals(start, GlanceContent.applyPreset(start, GlancePreset.Custom))
-        for (p in GlancePreset.entries.filter { it != GlancePreset.Custom }) assertEquals(p, GlanceContent.presetOf(GlanceContent.applyPreset(start, p)))
-    }
-
-    @Test fun HOM_23_aFreeCombinationIsCustom() {
-        assertEquals(GlancePreset.Custom, GlanceContent.presetOf(setOf(GlanceItem.Weather)))
-        assertEquals(GlancePreset.Custom, GlanceContent.presetOf(emptySet()))
-        assertEquals(setOf(GlanceItem.Time), GlanceContent.toggle(setOf(GlanceItem.Time, GlanceItem.Date), GlanceItem.Date))
-    }
-
-    @Test fun HOM_23_contentRoundTripsAndAnEmptyStringIsNothing() {
-        val all = GlanceItem.entries.toSet()
-        assertEquals(all, GlanceContent.decode(GlanceContent.encode(all)))
-        assertEquals(emptySet<GlanceItem>(), GlanceContent.decode(""))
-        assertEquals(GlanceContent.DEFAULT, GlanceContent.decode(null))
-        assertEquals(setOf(GlanceItem.Time), GlanceContent.decode("Time,Hologram"))
+    @Test fun HOM_23_aStoredShowMusicWinsAndTheOldContentSetIsOnlyMigrationInput() {
+        assertTrue(GlanceMusic.resolve(null, null))
+        assertTrue(GlanceMusic.resolve(null, "Time,Date,NowPlaying"))
+        assertFalse(GlanceMusic.resolve(null, "Time,Date"))
+        assertFalse("an empty stored set was a deliberate nothing", GlanceMusic.resolve(null, ""))
+        assertFalse(GlanceMusic.resolve(false, "Time,NowPlaying"))
+        assertTrue(GlanceMusic.resolve(true, "Time"))
     }
 
     // ---- hotspots
@@ -124,61 +108,71 @@ class GlanceModelTest {
         assertEquals(2, GlanceControls.clampSeconds(0)); assertEquals(10, GlanceControls.clampSeconds(99)); assertEquals(7, GlanceControls.clampSeconds(7))
     }
 
-    // ---- weather to effect
-    private fun w(code: Int) = WeatherInfo(12f, code, 0L)
-
-    @Test fun HOM_23_weatherConditionsMapToEffects() {
-        assertEquals(GlanceWeatherEffect.ClearDay, GlanceWeather.effectOf(w(0), true))
-        assertEquals(GlanceWeatherEffect.ClearNight, GlanceWeather.effectOf(w(0), false))
-        assertEquals(GlanceWeatherEffect.ClearNight, GlanceWeather.effectOf(w(1), false))
-        assertEquals(GlanceWeatherEffect.Clouds, GlanceWeather.effectOf(w(3), true))
-        assertEquals(GlanceWeatherEffect.Fog, GlanceWeather.effectOf(w(45), true))
-        assertEquals(GlanceWeatherEffect.Rain, GlanceWeather.effectOf(w(63), true))
-        assertEquals(GlanceWeatherEffect.Rain, GlanceWeather.effectOf(w(81), false))
-        assertEquals(GlanceWeatherEffect.Snow, GlanceWeather.effectOf(w(73), true))
-        assertEquals(GlanceWeatherEffect.Thunder, GlanceWeather.effectOf(w(95), true))
-        assertEquals(GlanceWeatherEffect.Clouds, GlanceWeather.effectOf(w(1234), true))
-    }
-
-    @Test fun HOM_23_noWeatherMeansNoLayer() { assertNull(GlanceWeather.effectOf(null, true)) }
-
-    @Test fun HOM_23_daylightIsAPlainHourRule() {
-        assertFalse(GlanceWeather.isDaylight(5)); assertTrue(GlanceWeather.isDaylight(6)); assertTrue(GlanceWeather.isDaylight(19)); assertFalse(GlanceWeather.isDaylight(20))
-    }
-
-    @Test fun HOM_23_thunderFlashesAreRareSoftAndSlow() {
-        // never in the first 6 s, one flash per period, the gap between flash starts is at least 20 s, soft, and a single pulse well under 3 Hz.
-        assertEquals(0f, GlanceWeather.flashAlpha(0), 0f)
-        assertTrue(GlanceWeather.FLASH_PERIOD_MS >= GlanceWeather.FLASH_MIN_GAP_MS)
-        var starts = 0; var max = 0f; var prev = 0f
-        var t = 0L
-        while (t < 120_000L) {
-            val a = GlanceWeather.flashAlpha(t); max = maxOf(max, a)
-            if (a > 0f && prev == 0f) starts++
-            prev = a; t += 50
-        }
-        assertEquals(5, starts) // flashes at 6, 29, 52, 75 and 98 s: one per period
-        assertTrue(max <= GlanceWeather.FLASH_PEAK + 1e-6f)
-        assertTrue(1000f / GlanceWeather.FLASH_LENGTH_MS <= GlanceWeather.FLASH_MAX_HZ)
-        assertTrue(GlanceWeather.mayFlash(30_000, 0)); assertFalse(GlanceWeather.mayFlash(10_000, 0)); assertTrue(GlanceWeather.mayFlash(1, -1))
-    }
-
-    @Test fun HOM_23_theAmbienceNeverRunsUnderReducedMotionOrScreenOffOrHidden() {
-        assertTrue(GlanceWeather.animates(false, true, true))
-        assertFalse(GlanceWeather.animates(true, true, true)); assertFalse(GlanceWeather.animates(false, false, true)); assertFalse(GlanceWeather.animates(false, true, false))
-        assertTrue(GlanceWeather.strength(RadarIntensity.Subtle) < GlanceWeather.strength(RadarIntensity.Normal))
-    }
-
     @Test fun HOM_23_theGlanceSettingsArePersistedPlainPrefs() {
         val sp = MapSharedPreferences()
-        LauncherPrefsStore(sp).update { it.copy(glanceContent = setOf(GlanceItem.Date, GlanceItem.Weather), glanceHotspots = setOf(Corner.BottomLeft), glanceControlsSeconds = 9, glanceWeatherIntensity = RadarIntensity.Normal, glanceIndicator = false) }
+        LauncherPrefsStore(sp).update { it.copy(showMusic = false, glanceHotspots = setOf(Corner.BottomLeft), glanceControlsSeconds = 9, glanceIndicator = false) }
         val back = LauncherPrefsStore(sp).prefs.value
-        assertEquals(setOf(GlanceItem.Date, GlanceItem.Weather), back.glanceContent)
+        assertFalse(back.showMusic)
         assertEquals(setOf(Corner.BottomLeft), back.glanceHotspots)
-        assertEquals(9, back.glanceControlsSeconds); assertEquals(RadarIntensity.Normal, back.glanceWeatherIntensity); assertFalse(back.glanceIndicator)
+        assertEquals(9, back.glanceControlsSeconds); assertFalse(back.glanceIndicator)
         // exported with the other settings
         val doc = SettingsCodec.encode(back)
-        assertEquals(back.glanceContent, SettingsCodec.decode(doc).prefs.glanceContent)
+        assertFalse(SettingsCodec.decode(doc).prefs.showMusic)
         assertEquals(back.glanceHotspots, SettingsCodec.decode(doc).prefs.glanceHotspots)
+    }
+
+    @Test fun GFX_38_anOldInstallKeepsItsMusicChoiceAndTheClockKeysAreGone() {
+        // an old install that had turned the music line off (content set without NowPlaying) and a weather strength
+        val old = MapSharedPreferences(mapOf("glanceContent" to "Time,Date,Weather", "glanceWeather" to "Normal", "glanceIndicator" to true))
+        val store = LauncherPrefsStore(old)
+        assertFalse(store.prefs.value.showMusic)
+        store.update { it.copy(glanceControlsSeconds = 5) }
+        assertFalse("the retired keys are deleted on the first save", old.contains("glanceContent") || old.contains("glanceWeather"))
+        assertTrue(old.contains("showMusic"))
+        assertFalse(LauncherPrefsStore(old).prefs.value.showMusic)
+        // an old install with the default set keeps the music on; a fresh one is on
+        assertTrue(LauncherPrefsStore(MapSharedPreferences(mapOf("glanceContent" to "Time,Date,NowPlaying"))).prefs.value.showMusic)
+        assertTrue(LauncherPrefsStore(MapSharedPreferences()).prefs.value.showMusic)
+        // an unreadable value never crashes
+        assertTrue(LauncherPrefsStore(MapSharedPreferences(mapOf("glanceContent" to "garbage,,"))).prefs.value.glanceControlsSeconds > 0)
+    }
+
+    @Test fun GFX_38_theRetiredKeysArePurgedAndDroppedOnImportButTheContentSetWaitsForShowMusic() {
+        assertTrue("glanceWeather" in RetiredPrefKeys.BY_FILE.getValue("launcher_prefs")); assertTrue("glanceWeather" in RetiredPrefKeys.DROPPED_ON_IMPORT)
+        assertEquals("showMusic", RetiredPrefKeys.AFTER_MIGRATION.getValue("launcher_prefs")["glanceContent"])
+        val doc = SettingsCodec.encode(LauncherPrefs())
+        assertTrue(SettingsCodec.decode(doc).prefs.showMusic)
+    }
+
+    @Test fun GFX_38_theSuggestedAppKeyIsRetiredAndDeletedOnTheFirstSave() {
+        val old = MapSharedPreferences(mapOf("suggestion" to true))
+        val store = LauncherPrefsStore(old)
+        store.update { it.copy(glanceControlsSeconds = 6) }
+        assertFalse(old.contains("suggestion"))
+        assertTrue("suggestion" in RetiredPrefKeys.BY_FILE.getValue("launcher_prefs")); assertTrue("suggestion" in RetiredPrefKeys.DROPPED_ON_IMPORT)
+    }
+
+    @Test fun GFX_38_theClockSettingsAreOneStyleAndTheKeptTwelveOrTwentyFourHourChoice() {
+        val d = LauncherPrefs()
+        assertEquals("analog is the default face", ClockStyle.Analog, d.clockStyle); assertEquals("the default follows the device", ClockFormat.System, d.clockFormat)
+        val sp = MapSharedPreferences()
+        LauncherPrefsStore(sp).update { it.copy(clockStyle = ClockStyle.Analog, clockFormat = ClockFormat.Hour12) }
+        val back = LauncherPrefsStore(sp).prefs.value
+        assertEquals(ClockStyle.Analog, back.clockStyle); assertEquals(ClockFormat.Hour12, back.clockFormat)
+        assertEquals(ClockStyle.Analog, LauncherPrefsStore(MapSharedPreferences(mapOf("clockStyle" to "Hologram"))).prefs.value.clockStyle)
+    }
+
+    @Test fun GFX_38_theOldClockKeysAreRetiredButTheUsersFormatSurvives() {
+        val old = MapSharedPreferences(mapOf(
+            "clockPosition" to "Bottom", "clockLayout" to "Stacked", "clockSize" to 40f, "clockDate" to true, "clockDay" to true, "clockWeather" to true, "weatherF" to true,
+            "strip" to "Time:Left,Battery:Right", "healthSource" to "HealthConnect", "clockFormat" to "Hour12",
+        ))
+        val store = LauncherPrefsStore(old)
+        assertEquals("the 12 hour choice is kept", ClockFormat.Hour12, store.prefs.value.clockFormat)
+        store.update { it.copy(glanceControlsSeconds = 5) }
+        for (k in ClockRetired.KEYS) { assertFalse("$k is deleted on the first save", old.contains(k)); assertTrue("$k is retired", k in RetiredPrefKeys.BY_FILE.getValue("launcher_prefs")); assertTrue(k in RetiredPrefKeys.DROPPED_ON_IMPORT) }
+        assertEquals(ClockFormat.Hour12, LauncherPrefsStore(old).prefs.value.clockFormat)
+        // garbage of any shape starts normally
+        assertEquals(ClockStyle.Analog, LauncherPrefsStore(MapSharedPreferences(mapOf("clockPosition" to 7, "strip" to "x:y:z,,", "clockSize" to "big"))).prefs.value.clockStyle)
     }
 }

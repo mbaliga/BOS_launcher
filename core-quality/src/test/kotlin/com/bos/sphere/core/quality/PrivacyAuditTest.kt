@@ -32,15 +32,16 @@ class PrivacyAuditTest {
         assertFalse(m.contains("SYSTEM_ALERT_WINDOW"))
     }
 
-    @Test fun NFR_17_onlyWeatherOpensAnHttpConnection() {
+    @Test fun NFR_17_noSourceFileOpensAnHttpConnection() {
+        // Wave 38: the weather client went with the clock strip; nothing in the launcher uses the network.
         val users = Repo.mainSources().filter { f -> f.readText().let { it.contains("HttpURLConnection") || it.contains("openConnection") || it.contains("okhttp") } }
-        assertEquals(listOf("Weather.kt"), users.map { it.name })
+        assertEquals(emptyList<String>(), users.map { it.name })
     }
 
-    @Test fun NFR_16_internetIsDeclaredOnlyForWeatherAndTheDecisionIsDocumented() {
-        // NFR-16 is unmet by design until the owner decides; this test pins the current state so a change is deliberate.
+    @Test fun NFR_16_internetIsNotDeclaredAndTheDecisionIsDocumented() {
         val m = Repo.file("app/src/main/AndroidManifest.xml").readText()
-        assertTrue(m.contains("android.permission.INTERNET"))
+        assertFalse(m.contains("android.permission.INTERNET"))
+        assertFalse(m.contains("ACCESS_COARSE_LOCATION"))
         assertTrue(Repo.file("docs/decisions/NFR-16.md").exists())
     }
 
@@ -48,6 +49,6 @@ class PrivacyAuditTest {
         val m = Repo.file("app/src/main/AndroidManifest.xml").readText()
         val perms = Regex("uses-permission android:name=\"([^\"]+)\"").findAll(m).map { it.groupValues[1] }.toSet()
         val networkLike = perms.filter { it.contains("INTERNET") || it.contains("CHANGE_NETWORK") || it.contains("CHANGE_WIFI") || it.contains("BLUETOOTH") }
-        assertEquals(setOf("android.permission.INTERNET"), networkLike.toSet())
+        assertEquals(emptySet<String>(), networkLike.toSet())
     }
 }

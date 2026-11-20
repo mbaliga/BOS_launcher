@@ -77,10 +77,10 @@ class HomePagesW26ScreenshotTest {
         rule.setContent {
             // The home sets the layout direction from the ORDER (the language never decides): that is what the app does around the Glance surface.
             CompositionLocalProvider(LocalLayoutDirection provides if (order.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-                GlanceSurface(
-                    prefs = LauncherPrefs(homeOrder = order), weather = null, media = null, hotspots = emptyList(), appsByKey = emptyMap(),
+                GlanceHomeForTest(
+                    prefs = LauncherPrefs(homeOrder = order), media = null, hotspots = emptyList(), appsByKey = emptyMap(),
                     rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
-                    onRun = { _, _ -> }, onClockTap = {}, onPrevious = {}, onPlayPause = {}, onNext = {},
+                    onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {},
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -93,9 +93,9 @@ class HomePagesW26ScreenshotTest {
         val pages = twoPages
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             GridHome(
-                pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = state, suggestion = null, gesturesBound = emptySet(),
-                capacityOf = { it.capacity(false, prefs) }, onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {},
-                onClockTap = {}, onTileLongPress = { _, _ -> }, drawIndicator = false,
+                pages = pages, appsByKey = byKey, prefs = prefs, isLandscape = false, state = state, gesturesBound = emptySet(),
+                capacityOf = { it.capacity(false, prefs) }, onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {}, onClockTap = {},
+                onTileLongPress = { _, _ -> }, drawIndicator = false,
             )
             // wave 28: the home draws the ONE indicator above the pager; Glance is its first stop when it is on
             PageIndicator(

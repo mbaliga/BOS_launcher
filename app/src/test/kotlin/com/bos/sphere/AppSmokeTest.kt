@@ -388,10 +388,10 @@ class AppSmokeTest {
         assertTrue(graphIds().any { it.startsWith("dock.app:") })
         setGlance(true)
         val ids = graphIds()
-        assertTrue("the clock, the hotspots and the indicator buttons are on the focus graph: $ids", ids.containsAll(listOf("glance.clock", "glance.indicator.launchpad", "minimal.corner.TopLeft", "minimal.corner.TopRight", "minimal.corner.BottomLeft", "minimal.corner.BottomRight")))
+        assertTrue("the hotspots and the indicator buttons are on the focus graph: $ids", ids.containsAll(listOf("glance.indicator.launchpad", "corner.TopLeft", "corner.TopRight", "corner.BottomLeft", "corner.BottomRight")))
         assertFalse("no dock", ids.any { it.startsWith("dock.") })
         for (l in listOf("Alpha", "Bravo", "Delta")) assertFalse("no tile for $l", showsLabel(l)) // wave 16: Camera is the top left hotspot's own action, so its name is on screen
-        for (d in listOf("Top left hotspot", "Top right hotspot", "Bottom left hotspot", "Bottom right hotspot")) rule.onNodeWithContentDescription(d, substring = true).assertIsDisplayed()
+        for (d in listOf("Camera", "Music", "All apps", "Radar")) rule.onNodeWithContentDescription(d, substring = true).assertIsDisplayed() // wave 38: the corner layer labels each hotspot with its action
         rule.onAllNodesWithContentDescription("Dock").fetchSemanticsNodes().let { assertTrue("the dock is not drawn", it.isEmpty()) }
         setGlance(false)
         assertTrue("dock and apps are back", graphIds().any { it.startsWith("dock.app:") } && showsLabel("Camera"))
@@ -401,17 +401,17 @@ class AppSmokeTest {
         val sc = start()
         setGlance(true)
         // wave 16: the Glance hotspots are the corner assignments as they are (the owner's reference: camera top left, music top right, apps bottom left, search bottom right)
-        rule.onNodeWithContentDescription("Bottom right hotspot", substring = true).performClick(); settle()
+        rule.onNodeWithContentDescription("Radar", substring = true).performClick(); settle()
         assertTrue("the bottom right hotspot is Radar", radarOpen())
         back(sc, manual = true)
-        rule.onNodeWithContentDescription("Bottom left hotspot", substring = true).performClick(); settle()
+        rule.onNodeWithContentDescription("All apps", substring = true).performClick(); settle()
         assertTrue("the bottom left hotspot opens all apps (the drawer or the puck, by style)", LauncherInput.focus.anyLayerActive)
     }
 
     @Test fun HOM_22_groundControlHomeHasTheGlanceSwitchAddPageAndOrderAndNoLandingRow() {
         val sc = start()
         setGlance(true)
-        rule.onNodeWithContentDescription("Top left hotspot", substring = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Camera", substring = true).assertIsDisplayed()
         AppSmokeHarness.press(sc, KeyEvent.KEYCODE_COMMA, ctrl = true); settle()
         rule.onNodeWithContentDescription("Home screen").performClick(); settle()
         assertTrue("the Home category has the Glance switch", rule.onAllNodesWithText("Calm home screen (Glance)").fetchSemanticsNodes().isNotEmpty())

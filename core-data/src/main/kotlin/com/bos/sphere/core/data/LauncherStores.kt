@@ -66,7 +66,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
                 iconScale = it.iconScale.coerceIn(LauncherPrefs.MIN_ICON_SCALE, LauncherPrefs.MAX_ICON_SCALE),
                 motionSensitivity = it.motionSensitivity.coerceIn(0f, 1f),
                 uiSoundVolume = it.uiSoundVolume.coerceIn(0f, 1f),
-                clockSize = it.clockSize.coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
                 iconSpacing = it.iconSpacing.coerceIn(0f, 1f),
                 cornerIconSize = it.cornerIconSize.coerceIn(LauncherPrefs.MIN_CORNER_ICON, LauncherPrefs.MAX_CORNER_ICON),
                 indicatorIntensity = it.indicatorIntensity.coerceIn(0f, 1f),
@@ -84,7 +83,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putInt("lCols", next.landscapeGrid.columns).putInt("lRows", next.landscapeGrid.rows)
             .putFloat("iconScale", next.iconScale)
             .putBoolean("labels", next.showLabels)
-            .putBoolean("suggestion", next.showSuggestion)
             .putBoolean("cornersFollow", next.cornersFollowDevice)
             .putString("pPaging", next.portraitPaging.name)
             .putString("lPaging", next.landscapePaging.name)
@@ -93,12 +91,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putFloat("motionSens", next.motionSensitivity)
             .putString("cornerStyle", next.cornerStyle.name)
             .putString("drawerStyle", next.drawerStyle.name)
-            .putString("clockPosition", next.clockPosition.name)
             .putBoolean("uiSounds", next.uiSounds)
             .putFloat("uiSoundVolume", next.uiSoundVolume)
-            .putString("strip", next.strip.entries.joinToString(",") { "${it.key.name}:${it.value.name}" })
             .putFloat("iconSpacing", next.iconSpacing)
-            .putString("healthSource", next.healthSource.name)
             .putString("webEngine", next.webEngine.name)
             .putBoolean("searchWeb", next.searchWeb).putBoolean("searchContacts", next.searchContacts)
             .putString("leftPage", next.leftPage.name).putBoolean("launchpadRail", next.launchpadRail).putString("lpTheme", next.launchpadTheme.name)
@@ -118,12 +113,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("searchActions", next.searchActions).putBoolean("searchDeep", next.searchDeep)
             .putBoolean("onboardingDone", next.onboardingDone)
             .putBoolean("alwaysKeyboard", next.alwaysKeyboard)
-            .putFloat("clockSize", next.clockSize).putString("clockLayout", next.clockLayout.name)
+            .putString("clockStyle", next.clockStyle.name)
             .putString("clockFormat", next.clockFormat.name)
-            .putBoolean("clockDate", next.clockShowDate)
-            .putBoolean("clockDay", next.clockShowDay)
-            .putBoolean("clockWeather", next.clockShowWeather)
-            .putBoolean("weatherF", next.weatherFahrenheit)
             .putBoolean("badgesOn", next.badgesOn).putBoolean("badgeCount", next.badgeCount)
             .putBoolean("adaptiveGrid", next.adaptiveGrid).putFloat("gridDensity", next.gridDensity)
             .putFloat("cornerIconSize", next.cornerIconSize)
@@ -152,13 +143,16 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name)
             .putBoolean("glanceEnabled", next.glanceEnabled).putString("homeOrder", next.homeOrder.name)
-            .putString("glanceContent", GlanceContent.encode(next.glanceContent)).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
-            .putInt("glanceControlsSec", next.glanceControlsSeconds).putString("glanceWeather", next.glanceWeatherIntensity.name).putBoolean("glanceIndicator", next.glanceIndicator)
+            .putBoolean("showMusic", next.showMusic).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
+            .putInt("glanceControlsSec", next.glanceControlsSeconds).putBoolean("glanceIndicator", next.glanceIndicator)
             .putInt("recentsLimit", next.recentsLimit)
             .putBoolean("recentsUsage", next.recentsUseUsageAccess)
             .putString("rightSide", next.rightSide.name)
             .apply()
         // Wave 26: the removed home-landing keys are deleted once (HomeModelMigration read them).
+        if (ClockRetired.KEYS.any { sp.contains(it) }) sp.edit().also { e -> ClockRetired.KEYS.forEach { e.remove(it) } }.apply() // wave 38: the clock position, layout, size, date, weather and the status strip are gone
+        if (sp.contains("suggestion")) sp.edit().remove("suggestion").apply() // wave 38: the Suggested app slot is gone
+        if (GlanceMusic.RETIRED_KEYS.any { sp.contains(it) }) sp.edit().also { e -> GlanceMusic.RETIRED_KEYS.forEach { e.remove(it) } }.apply() // wave 38: showMusic was just written from them
         if (HomeModelMigration.RETIRED_KEYS.any { sp.contains(it) }) sp.edit().also { e -> HomeModelMigration.RETIRED_KEYS.forEach { e.remove(it) } }.apply()
         if (sp.contains("indEffects") || sp.contains("indInvert")) sp.edit().remove("indEffects").remove("indInvert").apply() // wave 35: the old effect set and the ramp flip
         // Wave 15: the keys of the removed background gallery are deleted once, so nothing of it lingers.
@@ -224,7 +218,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             iconScale = sp.getFloat("iconScale", d.iconScale)
                 .coerceIn(LauncherPrefs.MIN_ICON_SCALE, LauncherPrefs.MAX_ICON_SCALE),
             showLabels = sp.getBoolean("labels", d.showLabels),
-            showSuggestion = sp.getBoolean("suggestion", d.showSuggestion),
             cornersFollowDevice = sp.getBoolean("cornersFollow", d.cornersFollowDevice),
             portraitPaging = enumOr(sp.getString("pPaging", null), d.portraitPaging),
             landscapePaging = enumOr(sp.getString("lPaging", null), d.landscapePaging),
@@ -233,19 +226,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             motionSensitivity = sp.getFloat("motionSens", d.motionSensitivity).coerceIn(0f, 1f),
             cornerStyle = enumOr(sp.getString("cornerStyle", null), d.cornerStyle),
             drawerStyle = enumOr(sp.getString("drawerStyle", null), d.drawerStyle),
-            clockPosition = enumOr(sp.getString("clockPosition", null), d.clockPosition),
             uiSounds = sp.getBoolean("uiSounds", d.uiSounds),
             uiSoundVolume = sp.getFloat("uiSoundVolume", d.uiSoundVolume).coerceIn(0f, 1f),
-            strip = sp.getString("strip", null)?.let { raw ->
-                raw.split(',').filter { it.isNotEmpty() }.mapNotNull { pair ->
-                    val (a, b) = pair.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
-                    val item = StripItem.entries.firstOrNull { it.name == a } ?: return@mapNotNull null
-                    val zone = StripZone.entries.firstOrNull { it.name == b } ?: return@mapNotNull null
-                    item to zone
-                }.toMap()
-            } ?: d.strip,
             iconSpacing = sp.getFloat("iconSpacing", d.iconSpacing).coerceIn(0f, 1f),
-            healthSource = enumOr(sp.getString("healthSource", null), d.healthSource),
             webEngine = enumOr(sp.getString("webEngine", null), d.webEngine),
             searchWeb = sp.getBoolean("searchWeb", d.searchWeb),
             searchContacts = sp.getBoolean("searchContacts", d.searchContacts),
@@ -275,13 +258,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             // An install that already has settings saved is not a first run.
             onboardingDone = sp.getBoolean("onboardingDone", sp.contains("style") || sp.contains("pCols")),
             alwaysKeyboard = sp.getBoolean("alwaysKeyboard", d.alwaysKeyboard),
-            clockLayout = enumOr(sp.getString("clockLayout", null), d.clockLayout),
-            clockSize = sp.getFloat("clockSize", d.clockSize).coerceIn(LauncherPrefs.MIN_CLOCK_SIZE, LauncherPrefs.MAX_CLOCK_SIZE),
+            clockStyle = enumOr(sp.getString("clockStyle", null), d.clockStyle),
             clockFormat = enumOr(sp.getString("clockFormat", null), d.clockFormat),
-            clockShowDate = sp.getBoolean("clockDate", d.clockShowDate),
-            clockShowDay = sp.getBoolean("clockDay", d.clockShowDay),
-            clockShowWeather = sp.getBoolean("clockWeather", d.clockShowWeather),
-            weatherFahrenheit = sp.getBoolean("weatherF", d.weatherFahrenheit),
             badgesOn = sp.getBoolean("badgesOn", d.badgesOn),
             badgeCount = sp.getBoolean("badgeCount", d.badgeCount),
             adaptiveGrid = sp.getBoolean("adaptiveGrid", d.adaptiveGrid),
@@ -316,10 +294,9 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             hotCornerDwellMs = sp.getInt("hotCornerDwell", d.hotCornerDwellMs).coerceIn(0, 1000),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
             glanceEnabled = migrated.glanceEnabled, homeOrder = HomeOrder.parse(sp.getString("homeOrder", null)),
-            glanceContent = GlanceContent.decode(sp.getString("glanceContent", null)),
+            showMusic = GlanceMusic.resolve(if (sp.contains("showMusic")) sp.getBoolean("showMusic", true) else null, sp.getString("glanceContent", null)),
             glanceHotspots = GlanceHotspots.decode(sp.getString("glanceHotspots", null)),
             glanceControlsSeconds = GlanceControls.clampSeconds(sp.getInt("glanceControlsSec", d.glanceControlsSeconds)),
-            glanceWeatherIntensity = enumOr(sp.getString("glanceWeather", null), d.glanceWeatherIntensity),
             glanceIndicator = sp.getBoolean("glanceIndicator", d.glanceIndicator),
             recentsLimit = HomeRecents.clampLimit(sp.getInt("recentsLimit", d.recentsLimit)),
             recentsUseUsageAccess = sp.getBoolean("recentsUsage", d.recentsUseUsageAccess),
@@ -568,7 +545,7 @@ object ShortcutCodec {
     private fun kindOf(name: String): ComplicationKind? = ComplicationKind.entries.firstOrNull { it.name == name }
 }
 
-/** Bounded log of launches feeding [AppSuggester]. */
+/** Bounded log of launches (recents and history). */
 class LaunchHistoryStore internal constructor(private val sp: SharedPreferences) {
     /** HOM-18: called with every recorded launch so a larger log can keep more than [MAX_EVENTS]. */
     var mirror: ((LaunchEvent) -> Unit)? = null

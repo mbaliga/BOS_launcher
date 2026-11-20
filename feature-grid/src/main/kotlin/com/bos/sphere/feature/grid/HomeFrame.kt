@@ -71,3 +71,10 @@ data class ClockBandFit(val showWeather: Boolean, val clockScale: Float, val use
         }
     }
 }
+
+/**
+ * HOM-19: how far up from the bottom edge the page dots reach at this window size, so the dock rail can sit above them. Zero when the dots are on the start
+ * edge. Wave 38: the clock left the pages, so only the dots are counted.
+ */
+fun bottomStackDp(prefs: com.bos.sphere.core.data.LauncherPrefs, widthDp: Float, heightDp: Float): Float =
+    if (prefs.pagingFor(widthDp > heightDp) != com.bos.sphere.core.data.PagingAxis.Vertical) ClockBandFit.clockBottomDp(true) else 0f

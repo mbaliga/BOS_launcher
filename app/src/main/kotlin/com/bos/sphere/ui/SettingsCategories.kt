@@ -39,12 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.bos.sphere.core.data.ClockPosition
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerActionId
 import com.bos.sphere.core.data.CornerItem
-import com.bos.sphere.core.data.StripItem
-import com.bos.sphere.core.data.StripZone
 import com.bos.sphere.core.data.CornerSlot
 import com.bos.sphere.core.data.CornerStyle
 import com.bos.sphere.core.data.DensityPreset
@@ -67,7 +64,6 @@ import com.bos.sphere.feature.grid.HomeStylePreview
 import com.bos.sphere.feature.grid.PageShapePreview
 import com.bos.sphere.feature.grid.PagingPreview
 import com.bos.sphere.feature.grid.DrawerViewPreview
-import com.bos.sphere.feature.grid.StripPositionPreview
 import com.bos.sphere.feature.grid.CornerStylePreview
 import com.bos.sphere.feature.grid.ThemeModePreview
 import com.bos.sphere.feature.grid.ThemedSampleIcon
@@ -98,9 +94,7 @@ class SettingsModel(
     val corners: Map<Corner, CornerSlot>,
     val gestures: Map<HomeGesture, CornerItem>,
     val setGesture: (HomeGesture, CornerItem?) -> Unit,
-    val requestHealth: () -> Unit,
     val about: List<Pair<String, String>>,
-    val healthAvailable: Boolean,
     val appsByKey: Map<String, AppEntry>,
     val isLandscape: Boolean,
     val chosenApp: (CornerActionId) -> String?,
@@ -166,22 +160,6 @@ fun settingsCategoryIndex(categories: List<SettingCategory>, which: Int): Int {
 const val CATEGORY_INDEX_BASE = 1000
 
 private fun homeStyleName(s: HomeStyle) = when (s) { HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" }
-
-/** A miniature status strip showing what is placed where. */
-@Composable
-private fun StripPreview(strip: Map<StripItem, StripZone>) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp).background(androidx.compose.ui.graphics.Color.Black, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-            .border(1.dp, HyleColors.Hairline, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-    ) {
-        StripZone.entries.forEach { z ->
-            val items = strip.filterValues { it == z }.keys.joinToString("  ") { L10n.tr(it.label) }
-            Text(if (items.isEmpty()) "·" else items, color = HyleColors.InkBright, fontSize = 11.sp, maxLines = 1, modifier = Modifier.weight(1f),
-                textAlign = when (z) { StripZone.values().first() -> androidx.compose.ui.text.style.TextAlign.Start; StripZone.values().last() -> androidx.compose.ui.text.style.TextAlign.End; else -> androidx.compose.ui.text.style.TextAlign.Center })
-        }
-    }
-}
 
 private fun pct(v: Float) = "${(v * 100).roundToInt()}%"
 
@@ -298,7 +276,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })
                 add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Uses usage access when it is allowed; otherwise only apps opened from Liftoff are listed")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })
             }
-            if (p.glanceEnabled) addAll(glanceSettings(p) { f -> upd(f) })
+            addAll(glanceSettings(p) { f -> upd(f) })
             add(
                 SettingItem.Choice(
                     x("Style"), Glyphs.Apps, HomeStyle.entries, p.homeStyle, { x(homeStyleName(it)) },
@@ -384,7 +362,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Toggle(x("App labels"), Glyphs.Message, p.showLabels, if (p.homeStyle == HomeStyle.Psp) x("Off shows only the focused app's name") else null) { v -> upd { it.copy(showLabels = v) } })
             add(SettingItem.Toggle(x("Notification badges"), Glyphs.Bell, p.badgesOn, x("A dot on apps with unread notifications. Needs notification access; work apps use their own profile's notifications")) { v -> upd { it.copy(badgesOn = v) } })
             if (p.badgesOn) add(SettingItem.Toggle(x("Count in badges"), Glyphs.Bell, p.badgeCount, x("Off shows a plain dot")) { v -> upd { it.copy(badgeCount = v) } })
-            if (paged) add(SettingItem.Toggle(x("Suggested app"), Glyphs.Bolt, p.showSuggestion, x("A predicted app in the first free slot of page one")) { v -> upd { it.copy(showSuggestion = v) } })
             if (paged) {
                 add(
                     SettingItem.Choice(
@@ -444,42 +421,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             )
             add(com.bos.sphere.ui.drawerShortcutsItem(m.appsByKey)) // wave 30: the four sections around the disc's hub
         },
-    )
-
-    // --- Clock -------------------------------------------------------------------------------
-    out += SettingCategory(
-        x("Clock"),
-        Glyphs.Clock,
-        listOf(
-            SettingItem.Choice(
-                x("Clock position"), Glyphs.Clock, ClockPosition.entries, p.clockPosition, { x(it.label) },
-                hint = x("It can also be a tile on a page, or a corner complication."),
-                preview = { VisualChoice(ClockPosition.entries, p.clockPosition, { c -> upd { it.copy(clockPosition = c) } }, { x(it.label) }, previewHeight = 96.dp) { StripPositionPreview(it) } },
-            ) { c -> upd { it.copy(clockPosition = c) } },
-            SettingItem.Choice(x("Clock layout"), Glyphs.Clock, com.bos.sphere.core.data.ClockLayout.entries, p.clockLayout, { x(it.label) }, hint = x("One line: time, date and temperature side by side. Two lines: time over the details.")) { v -> upd { it.copy(clockLayout = v) } },
-            SettingItem.Slider(x("Clock size"), Glyphs.Dial, p.clockSize, LauncherPrefs.MIN_CLOCK_SIZE..LauncherPrefs.MAX_CLOCK_SIZE, "${p.clockSize.roundToInt()}", step = 1f) { v -> upd { it.copy(clockSize = v) } },
-            SettingItem.Choice(x("Clock format"), Glyphs.Clock, ClockFormat.entries, p.clockFormat, { x(it.label) }) { c -> upd { it.copy(clockFormat = c) } },
-            SettingItem.Toggle(x("Day"), Glyphs.Calendar, p.clockShowDay) { v -> upd { it.copy(clockShowDay = v) } },
-            SettingItem.Toggle(x("Date"), Glyphs.Calendar, p.clockShowDate) { v -> upd { it.copy(clockShowDate = v) } },
-            SettingItem.Toggle(x("Weather"), Glyphs.Globe, p.clockShowWeather, x("Uses your approximate location and open-meteo.com")) { v -> upd { it.copy(clockShowWeather = v) } },
-            SettingItem.Toggle(x("Fahrenheit"), Glyphs.Globe, p.weatherFahrenheit) { v -> upd { it.copy(weatherFahrenheit = v) } },
-            SettingItem.Pane(x("Status strip"), Glyphs.Dial, "${p.strip.size}") {
-                note("Put readouts on the left, centre or right of the strip — like the top of a Nintendo 3DS.")
-                StripPreview(p.strip)
-                StripItem.entries.forEach { item ->
-                    Sub(item.label)
-                    ChipRow(listOf<StripZone?>(null) + StripZone.entries, p.strip[item], { z -> if (z == null) L10n.tr("Off") else L10n.tr(z.label) }) { z ->
-                        upd { it.copy(strip = if (z == null) it.strip - item else it.strip + (item to z)) }
-                    }
-                }
-            },
-            SettingItem.Choice(x("Health data"), Glyphs.Steps, com.bos.sphere.core.data.HealthSourcePref.entries, p.healthSource, { x(it.label) }, hint = x("Steps, floors, distance and calories can come from Health Connect (Fitbit, Samsung Health, Garmin …).")) { v -> upd { it.copy(healthSource = v) } },
-            SettingItem.Action(
-                x("Allow Health Connect access"), Glyphs.Steps,
-                if (m.healthAvailable) "" else x("Health Connect isn't available on this phone yet — install or update it from the Play Store."),
-                navigates = true, onClick = m.requestHealth,
-            ),
-        ),
     )
 
     // --- Corners -----------------------------------------------------------------------------
@@ -821,7 +762,7 @@ internal fun gestureSummary(style: HomeStyle, surface: com.bos.sphere.core.data.
 
 /**
  * The information architecture, as a launcher user expects it: what's on the home screen, how it
- * looks, the clock, corners, gestures, the app drawer, search, the left page, then system.
+ * looks, corners, gestures, the app drawer, search, the left page, then system.
  * (The categories above are built by topic; this regroups them.) [paged] = the first built
  * category is the "Page N" one, which only the paged home has.
  */
@@ -832,7 +773,6 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     if (paged) built.firstOrNull()?.let { out += it } // This page
     out += SettingCategory(x(HOME_SCREEN_TITLE), Glyphs.Apps, items("Home"))
     out += SettingCategory(x("Look"), Glyphs.Palette, items("Theme", "Indicator"))
-    out += SettingCategory(x("Clock & status"), Glyphs.Clock, items("Clock"))
     out += SettingCategory(x("Corners"), Glyphs.Plus, items("Corners"))
     out += SettingCategory(x("Gestures"), Glyphs.Pinch, items("Gestures", "Motion"))
     out += SettingCategory(x("App drawer"), Glyphs.Widget, cat("Apps")?.items.orEmpty())
@@ -858,18 +798,15 @@ internal fun wallpaperSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> Launch
     if (!p.pagesSameAsGlance) add(SettingItem.Pane(x("Pages wallpaper"), Glyphs.Image, com.bos.sphere.feature.grid.wallpaperSummary(p.wallpaper(WallpaperSurface.Pages), tr)) { com.bos.sphere.feature.grid.BackgroundPane(p, WallpaperSurface.Pages, upd) })
 }
 
-/** HOM-23: the Glance settings rows (content presets and free toggles, hotspot presets and corners, controls timeout, weather strength, indicator). */
+/** HOM-23: the Glance settings rows (the music toggle, hotspot presets and corners, controls timeout, indicator; wave 38: the clock, date and weather settings are gone). */
 internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): List<SettingItem> = buildList {
-    val preset = com.bos.sphere.core.data.GlanceContent.presetOf(p.glanceContent)
-    add(
-        SettingItem.Choice(
-            x("Glance content"), Glyphs.Clock, com.bos.sphere.core.data.GlancePreset.entries.filter { it != com.bos.sphere.core.data.GlancePreset.Custom }, preset.takeIf { it != com.bos.sphere.core.data.GlancePreset.Custom } ?: com.bos.sphere.core.data.GlancePreset.TimeDate, { x(it.label) },
-            hint = x("What the Glance home shows in the middle. The toggles below mix it freely."),
-        ) { v -> upd { it.copy(glanceContent = com.bos.sphere.core.data.GlanceContent.applyPreset(it.glanceContent, v)) } },
-    )
-    for (item in com.bos.sphere.core.data.GlanceItem.entries) {
-        add(SettingItem.Toggle(x(item.label), Glyphs.Dial, item in p.glanceContent) { on -> upd { it.copy(glanceContent = if (on) it.glanceContent + item else it.glanceContent - item) } })
+    // Wave 38: the one clock setting: the Glance page's clock is Analog or Digital, and a digital one is 12 or 24 hour.
+    add(SettingItem.Choice(x("Clock"), Glyphs.Clock, com.bos.sphere.core.data.ClockStyle.entries, p.clockStyle, { x(it.label) }, hint = x("The clock at the top of every page")) { v -> upd { it.copy(clockStyle = v) } })
+    if (p.clockStyle == com.bos.sphere.core.data.ClockStyle.Digital) {
+        val fmt = com.bos.sphere.core.data.ClockFormat.entries.filter { it != com.bos.sphere.core.data.ClockFormat.System }
+        add(SettingItem.Choice(x("Clock format"), Glyphs.Clock, fmt, p.clockFormat.takeIf { it != com.bos.sphere.core.data.ClockFormat.System } ?: com.bos.sphere.core.data.ClockFormat.Hour24, { x(it.label) }) { v -> upd { it.copy(clockFormat = v) } })
     }
+    add(SettingItem.Toggle(x("Show music"), Glyphs.Music, p.showMusic, x("The song that is playing, with its controls, at the top of every page")) { on -> upd { it.copy(showMusic = on) } })
     val hp = com.bos.sphere.core.data.GlanceHotspots.presetOf(p.glanceHotspots)
     add(
         SettingItem.Choice(
@@ -881,11 +818,5 @@ internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherP
         add(SettingItem.Toggle(x("%s hotspot", x(c.label)), Glyphs.Dial, c in p.glanceHotspots) { on -> upd { it.copy(glanceHotspots = if (on) it.glanceHotspots + c else it.glanceHotspots - c) } })
     }
     add(SettingItem.Stepper(x("Controls hide after (seconds)"), Glyphs.Clock, p.glanceControlsSeconds, com.bos.sphere.core.data.GlanceControls.MIN_SECONDS..com.bos.sphere.core.data.GlanceControls.MAX_SECONDS, x("The music controls pop out after this long without a touch")) { v -> upd { it.copy(glanceControlsSeconds = com.bos.sphere.core.data.GlanceControls.clampSeconds(v)) } })
-    add(
-        SettingItem.Choice(
-            x("Weather effect"), Glyphs.Sun, com.bos.sphere.core.data.RadarIntensity.entries, p.glanceWeatherIntensity, { x(it.label) },
-            hint = x("A quiet ambience behind the clock that follows the weather. It needs Weather in the content."),
-        ) { v -> upd { it.copy(glanceWeatherIntensity = v) } },
-    )
     add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("A small row at the bottom: Comms, home and the right-hand panel")) { v -> upd { it.copy(glanceIndicator = v) } })
 }

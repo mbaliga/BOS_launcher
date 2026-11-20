@@ -74,17 +74,17 @@ class GlanceNotchUiTest {
 
     private fun glance(media: MediaInfo = playing, rtl: Boolean = false, clicks: IntArray = IntArray(4)) = rule.setContent {
         CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-            GlanceSurface(
-                prefs = LauncherPrefs(), weather = null, media = media, hotspots = hotspots(), appsByKey = emptyMap(),
+            GlanceHomeForTest(
+                prefs = LauncherPrefs(), media = media, hotspots = hotspots(), appsByKey = emptyMap(),
                 rightDestinations = listOf(RightDestination.Recents), hasLaunchpad = true,
-                onRun = { _, _ -> }, onClockTap = {}, onPrevious = { clicks[1]++ }, onPlayPause = { clicks[2]++ }, onNext = { clicks[3]++ },
+                onRun = { _, _ -> }, onPrevious = { clicks[1]++ }, onPlayPause = { clicks[2]++ }, onNext = { clicks[3]++ },
                 modifier = Modifier.fillMaxSize(),
             )
         }
     }
 
     private fun popIn() {
-        rule.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.5f, height * 0.75f)) }
+        rule.onNodeWithContentDescription("Now playing", substring = true).performClick()
         rule.mainClock.advanceTimeBy(700)
     }
 

@@ -71,10 +71,19 @@ internal object PuckSectionsGeometry {
     /** The radial depth a thumb-sized segment keeps whenever the window allows, and the arc width the segments keep across the ring. */
     const val MIN_TOUCH_DP = 48f
     const val MIN_ARC_DP = 44f
-    /** An app icon in a segment is this share of the segment's smaller dimension. */
-    const val APP_ICON_SHARE = 0.6f
-    /** An action glyph never gets smaller than this, whatever the segment. */
-    const val MIN_GLYPH_DP = 22f
+    /**
+     * Wave 43 (ringGlyphs): ONE fixed size for every glyph, whatever the segment count, the rotation or the window: 24 dp for an action glyph (and
+     * the empty slot's plus), [APP_ICON_DP] for an app icon. Only the user's icon-size setting scales them (a factor the caller passes), never the
+     * geometry. The aspect ratio is always 1:1.
+     */
+    const val GLYPH_DP = 24f
+    const val APP_ICON_DP = 36f
+    /** A glyph is drawn only when its whole box is this far (dp) inside the window. */
+    const val GLYPH_MARGIN_DP = 2f
+    /** The label under a glyph: fixed width and height (dp) and the gap below the glyph box. */
+    const val LABEL_WIDTH_DP = 56f
+    const val LABEL_HEIGHT_DP = 12f
+    const val LABEL_GAP_DP = 1f
     /** Least width, at the mid radius, that the visible part of a segment needs to count as visible (node, tap area). */
     const val MIN_VISIBLE_ARC_DP = 10f
     /** The group labels' baseline sits on the chip radius and their ink rises about 10 dp above it. */
@@ -155,12 +164,12 @@ internal object PuckSectionsGeometry {
      * point between the hub and the ring's outer edge is the segment holding its angle; anything else is [Hit.None] (the outer wheel's). With a
      * [window], a segment that is not visible in it (a sliver by the hub that the screen edge hides the rest of) is not a target: [Hit.None].
      */
-    fun hit(anchor: Corner, n: Int, p: Float, r: SectionRing, dx: Float, dy: Float, window: RingWindow? = null): Hit {
+    fun hit(anchor: Corner, n: Int, p: Float, r: SectionRing, dx: Float, dy: Float, window: RingWindow? = null, glyphDp: Float = 0f): Hit {
         val d = hypot(dx, dy)
         if (d <= r.backRadius) return Hit.Back
         if (d > r.outer) return Hit.None
         val i = segmentAt(anchor, n, p, Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
-        if (window != null && visibleSegment(anchor, n, p, i, r, window) == null) return Hit.None
+        if (window != null && visibleSegment(anchor, n, p, i, r, window, glyphDp) == null) return Hit.None
         return Hit.Slot(i)
     }
 
@@ -173,10 +182,10 @@ internal object PuckSectionsGeometry {
     private const val STEP_DEG = 1f
 
     /**
-     * What of segment [i] is inside [w] at position [p]: null when none of it shows at the mid radius (a sliver by the hub does not count). The glyph goes at [VisibleSegment.midAngleDeg] on the mid radius
+     * What of segment [i] is inside [w] at position [p]: null when none of it shows at the mid radius (a sliver by the hub does not count). [VisibleSegment.midAngleDeg] (the long-press name pill's anchor, not the glyph, wave 43) is on the mid radius
      * (the middle of the segment's longest visible run there) and the node's box is [VisibleSegment.bounds], the box of the visible part.
      */
-    fun visibleSegment(anchor: Corner, n: Int, p: Float, i: Int, r: SectionRing, w: RingWindow): VisibleSegment? {
+    fun visibleSegment(anchor: Corner, n: Int, p: Float, i: Int, r: SectionRing, w: RingWindow, glyphDp: Float = 0f): VisibleSegment? {
         val seg = segmentDeg(n)
         val a0 = startAngle(anchor, n, p, i)
         val steps = (seg / STEP_DEG).toInt().coerceAtLeast(1)
@@ -196,7 +205,9 @@ internal object PuckSectionsGeometry {
         // A segment counts as visible when a run of at least [MIN_VISIBLE_ARC_DP] of it shows at the mid radius; a sliver at the hub that the edge
         // hides the rest of, or a corner of it that only touches the edge, does not.
         if (!any || bestStart < 0) return null
-        if (Math.toRadians(((bestLen - 1) * seg / steps).toDouble()) * r.mid < MIN_VISIBLE_ARC_DP) return null
+        // Wave 43: a segment whose whole glyph box shows is a target even if its visible run is short.
+        val glyphShows = glyphDp > 0f && glyphVisible(w, glyphOffset(centerAngle(anchor, n, p, i), r), glyphDp)
+        if (!glyphShows && Math.toRadians(((bestLen - 1) * seg / steps).toDouble()) * r.mid < MIN_VISIBLE_ARC_DP) return null
         val bounds = SectionBox(l, t, rt, b)
         val runDeg = (bestLen - 1) * seg / steps
         val mid = a0 + seg * bestStart / steps + runDeg / 2f
@@ -204,46 +215,35 @@ internal object PuckSectionsGeometry {
     }
 
     /**
-     * Where the glyph (a square of [boxDp]) of segment [i] goes, relative to the wheel's centre (dp), or null when it cannot be shown whole: the
-     * point of the segment nearest the middle of its visible part (the mid radius at [VisibleSegment.midAngleDeg]) at which the whole square is inside
-     * the window (2 dp clear of the edges) and clear of the segment's dividers. A segment the screen edge cuts therefore carries its glyph on the
-     * part that shows; one with no room for it shows no glyph (it stays a tap area).
+     * Wave 43: where the glyph (a square of [boxDp]) of segment [i] goes, relative to the wheel's centre (dp): ALWAYS the segment's own centre
+     * (mid radius, mid angle), never clamped, shifted or shrunk. Null when its whole box is not inside the window ([GLYPH_MARGIN_DP] clear of the
+     * edges): the glyph is then not drawn (the segment and its tap area stay; turning the ring brings it into view).
      */
     fun glyphPlacement(anchor: Corner, n: Int, p: Float, i: Int, r: SectionRing, w: RingWindow, boxDp: Float): Pair<Float, Float>? {
-        val v = visibleSegment(anchor, n, p, i, r, w) ?: return null
-        val seg = segmentDeg(n)
-        val a0 = startAngle(anchor, n, p, i)
+        val c = glyphCentre(anchor, n, p, i, r)
+        return if (glyphVisible(w, c, boxDp)) c else null
+    }
+
+    /** The centre of segment [i]'s glyph relative to the wheel's centre: the segment's mid angle on the mid radius. */
+    fun glyphCentre(anchor: Corner, n: Int, p: Float, i: Int, r: SectionRing): Pair<Float, Float> = glyphOffset(centerAngle(anchor, n, p, i), r)
+
+    /** True when the square box of [boxDp] centred [centre] (relative to the wheel's centre) is wholly inside [w], [GLYPH_MARGIN_DP] clear of its edges. */
+    fun glyphVisible(w: RingWindow, centre: Pair<Float, Float>, boxDp: Float): Boolean {
         val half = boxDp / 2f
-        val target = glyphOffset(v.midAngleDeg, r)
-        var best: Pair<Float, Float>? = null; var bestD = Float.MAX_VALUE
-        var rad = r.inner + half * 0.9f
-        while (rad <= r.outer - half * 0.9f + 0.01f) {
-            var deg = 0f
-            while (deg <= seg) {
-                val a = Math.toRadians((a0 + deg).toDouble())
-                val x = (rad * cos(a)).toFloat(); val y = (rad * sin(a)).toFloat()
-                // clear of the two dividers: distance to each boundary ray
-                val dl = rad * sin(Math.toRadians(deg.toDouble())).toFloat(); val dr = rad * sin(Math.toRadians((seg - deg).toDouble())).toFloat()
-                if (dl >= half * 0.8f && dr >= half * 0.8f) {
-                    val px = w.cx + x; val py = w.cy + y
-                    if (px - half >= 2f && px + half <= w.width - 2f && py - half >= 2f && py + half <= w.height - 2f) {
-                        val dd = (x - target.first) * (x - target.first) + (y - target.second) * (y - target.second)
-                        if (dd < bestD) { bestD = dd; best = x to y }
-                    }
-                }
-                deg += 1f
-            }
-            rad += 3f
-        }
-        return best
+        val px = w.cx + centre.first; val py = w.cy + centre.second
+        return px - half >= GLYPH_MARGIN_DP && px + half <= w.width - GLYPH_MARGIN_DP && py - half >= GLYPH_MARGIN_DP && py + half <= w.height - GLYPH_MARGIN_DP
+    }
+
+    /** True when the label under a glyph of [boxDp] (fixed offset below the box, [LABEL_WIDTH_DP] x [LABEL_HEIGHT_DP]) is wholly inside [w] (and so is the glyph). */
+    fun labelVisible(w: RingWindow, centre: Pair<Float, Float>, boxDp: Float): Boolean {
+        if (!glyphVisible(w, centre, boxDp)) return false
+        val px = w.cx + centre.first; val top = w.cy + centre.second + boxDp / 2f + LABEL_GAP_DP
+        return px - LABEL_WIDTH_DP / 2f >= GLYPH_MARGIN_DP && px + LABEL_WIDTH_DP / 2f <= w.width - GLYPH_MARGIN_DP && top + LABEL_HEIGHT_DP <= w.height - GLYPH_MARGIN_DP
     }
 
     /** The visible segments for [p]: those with any part inside [w]. */
-    fun visibleSegments(anchor: Corner, n: Int, p: Float, r: SectionRing, w: RingWindow): List<VisibleSegment> =
-        (0 until n).mapNotNull { visibleSegment(anchor, n, p, it, r, w) }
-
-    /** Edge, in dp, of the square glyph of a segment: its smaller dimension (whole arc at mid radius or ring depth) times [share]. */
-    fun glyphSize(n: Int, r: SectionRing, share: Float): Float = share * min(arcAt(n, r.mid), r.thickness)
+    fun visibleSegments(anchor: Corner, n: Int, p: Float, r: SectionRing, w: RingWindow, glyphDp: Float = 0f): List<VisibleSegment> =
+        (0 until n).mapNotNull { visibleSegment(anchor, n, p, it, r, w, glyphDp) }
 
     /**
      * Wave 38: where the Back arrow goes relative to the hub's centre (dp): the middle of the part of the hub that is inside [w]. The hub reaches

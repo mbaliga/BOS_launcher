@@ -118,8 +118,8 @@ object Glyphs {
         moveTo(4.5f, 20.5f); curveTo(5f, 16.5f, 8f, 14f, 12f, 14f); curveTo(16f, 14f, 19f, 16.5f, 19.5f, 20.5f)
     }
     val Calculator = glyph("calculator") {
-        rrect(5f, 2.8f, 19f, 21.2f, 2f)
-        moveTo(8f, 6.5f); lineTo(16f, 6.5f)
+        rrect(4f, 3f, 20f, 21f, 2f)
+        moveTo(7.5f, 6.5f); lineTo(16.5f, 6.5f)
         moveTo(8.5f, 11f); lineTo(8.6f, 11f); moveTo(12f, 11f); lineTo(12.1f, 11f); moveTo(15.5f, 11f); lineTo(15.6f, 11f)
         moveTo(8.5f, 14.5f); lineTo(8.6f, 14.5f); moveTo(12f, 14.5f); lineTo(12.1f, 14.5f); moveTo(15.5f, 14.5f); lineTo(15.6f, 14.5f)
         moveTo(8.5f, 18f); lineTo(8.6f, 18f); moveTo(12f, 18f); lineTo(15.6f, 18f)

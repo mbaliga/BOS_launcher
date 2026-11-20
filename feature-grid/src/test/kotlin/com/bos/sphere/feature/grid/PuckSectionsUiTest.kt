@@ -11,6 +11,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -115,7 +118,7 @@ class PuckSectionsUiTest {
 
     /** Where the glyph of [slot] is, in root px, with the ring at rest position [p]. */
     private fun glyphAt(slot: Int, p: Float): Offset {
-        val v = PuckSectionsGeometry.visibleSegment(anchor, n, p, slot, ring(), window()) ?: error("slot $slot is not visible at $p")
+        val v = PuckSectionsGeometry.visibleSegment(anchor, n, p, slot, ring(), window(), PuckSectionsGeometry.GLYPH_DP) ?: error("slot $slot is not visible at $p")
         val (gx, gy) = PuckSectionsGeometry.glyphOffset(v.midAngleDeg, ring())
         return Offset(centre().x + gx * d, centre().y + gy * d)
     }
@@ -124,7 +127,7 @@ class PuckSectionsUiTest {
     private fun restPosition(): Int {
         val nodes = names.take(n).mapIndexedNotNull { i, nm -> rule.onAllNodesWithContentDescription(nm).fetchSemanticsNodes().firstOrNull()?.let { i to it.boundsInRoot } }
         for (p in 0 until n) {
-            val vis = PuckSectionsGeometry.visibleSegments(anchor, n, p.toFloat(), ring(), window()).associateBy { it.index }
+            val vis = PuckSectionsGeometry.visibleSegments(anchor, n, p.toFloat(), ring(), window(), PuckSectionsGeometry.GLYPH_DP).associateBy { it.index }
             if (vis.keys != nodes.map { it.first }.toSet()) continue
             if (nodes.all { (i, b) -> val v = vis.getValue(i).bounds; abs(b.left - v.left * d) < 3f && abs(b.top - v.top * d) < 3f && abs(b.right - v.right * d) < 3f }) return p
         }
@@ -178,7 +181,7 @@ class PuckSectionsUiTest {
 
     @Test fun CFG_15_w38_theVisibleSegmentsAreTheNodesAndTheHiddenOnesAreNotInTheTree() {
         show(Corner.BottomLeft)
-        val vis = PuckSectionsGeometry.visibleSegments(anchor, 8, 1f, ring(), window()).map { it.index }.toSet()
+        val vis = PuckSectionsGeometry.visibleSegments(anchor, 8, 1f, ring(), window(), PuckSectionsGeometry.GLYPH_DP).map { it.index }.toSet()
         for ((i, nm) in names.withIndex()) assertEquals("$nm (slot $i)", if (i in vis) 1 else 0, rule.onAllNodesWithContentDescription(nm).fetchSemanticsNodes().size)
         assertEquals(setOf(7, 0, 1, 2, 3), vis)
         assertEquals("the centre is Back", 1, rule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().size)
@@ -210,7 +213,7 @@ class PuckSectionsUiTest {
 
     @Test fun CFG_15_w38_theWholeVisiblePartOfASegmentIsItsTapArea() {
         show(Corner.BottomLeft)
-        val v = PuckSectionsGeometry.visibleSegment(anchor, 8, 1f, 1, ring(), window())!!
+        val v = PuckSectionsGeometry.visibleSegment(anchor, 8, 1f, 1, ring(), window(), PuckSectionsGeometry.GLYPH_DP)!!
         val c = centre(); val r = ring()
         // near the hub's edge, mid ring and near the outer edge, on the segment's own centre line and 40 percent of a segment either side of it
         for (radius in listOf(r.inner + 3f, r.mid, r.outer - 3f)) for (off in listOf(-0.4f, 0f, 0.4f)) {
@@ -503,4 +506,166 @@ class PuckSectionsUiTest {
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W38_shotDarkLandscapeLeft8() = shoot("w38-ring-dark-landscape-left-8", Corner.BottomLeft)
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W38_shotLightLandscapeRight8() = shoot("w38-ring-light-landscape-right-8", Corner.BottomRight, light = true)
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W38_shotDarkLandscapeRight6() = shoot("w38-ring-dark-landscape-right-6", Corner.BottomRight, 6)
+
+    // ------------------------------------------------------------------------------------------------ wave 43: glyphs never adapt
+
+    /** Dark ink pixels (the glyph is black on the white ring in the dark theme) within [radiusDp] of the segment centre of [slot] at rest position [p]. */
+    private fun ink(bmp: Bitmap, slot: Int, p: Float, radiusDp: Float = 14f): List<Pair<Int, Int>> {
+        val (gx, gy) = PuckSectionsGeometry.glyphCentre(anchor, n, p, slot, ring())
+        val cx = centre().x + gx * d; val cy = centre().y + gy * d
+        val out = mutableListOf<Pair<Int, Int>>()
+        val r = (radiusDp * d).toInt()
+        for (y in (cy - r).toInt()..(cy + r).toInt()) for (x in (cx - r).toInt()..(cx + r).toInt()) {
+            if (x !in 0 until bmp.width || y !in 0 until bmp.height) continue
+            if (hypot(x - cx, y - cy) > r) continue
+            val c = bmp.getPixel(x, y)
+            if (android.graphics.Color.red(c) < 110 && android.graphics.Color.green(c) < 110 && android.graphics.Color.blue(c) < 110) out += x to y
+        }
+        return out
+    }
+
+    @Test fun INP_19_w43_aGlyphWhoseBoxIsCutByTheEdgeIsNotDrawnAndTurningTheRingBringsItWholeIntoView() {
+        show(Corner.BottomLeft)
+        val g = PuckSectionsGeometry.GLYPH_DP
+        // slot 7 (settings) is cut by the bottom edge at rest: no ink at its centre, though its segment is a tap target
+        assertEquals(null, PuckSectionsGeometry.glyphPlacement(anchor, 8, 1f, 7, ring(), window(), g))
+        assertEquals("no pixels of the cut glyph", 0, ink(grab(), 7, 1f).size)
+        // every drawn glyph (0, 1, 2) has ink, all of it inside the window
+        for (i in listOf(0, 1, 2)) assertTrue("slot $i has ink", ink(grab(), i, 1f).isNotEmpty())
+        // turn until slot 7 is whole in view: now it is drawn at the exact segment centre
+        var p = 1
+        while (PuckSectionsGeometry.glyphPlacement(anchor, 8, p.toFloat(), 7, ring(), window(), g) == null) { key(KeyEvent.KEYCODE_DPAD_RIGHT, shift = true); p = restPosition() }
+        assertTrue("slot 7 drawn at p=$p: ink ${ink(grab(), 7, p.toFloat()).size}", ink(grab(), 7, p.toFloat()).isNotEmpty())
+    }
+
+    @Test fun INP_19_w43_aGlyphKeepsItsSizeAndOneToOneInkAspectWhateverTheRotation() {
+        show(Corner.BottomLeft)
+        fun box(slot: Int, p: Float): Triple<Int, Int, Int> {
+            val pts = ink(grab(), slot, p, 16f)
+            assertTrue("slot $slot at $p drawn", pts.isNotEmpty())
+            return Triple(pts.maxOf { it.first } - pts.minOf { it.first }, pts.maxOf { it.second } - pts.minOf { it.second }, pts.size)
+        }
+        val sizes = mutableListOf<Triple<Int, Int, Int>>()
+        // slot 1 (the clock, a circle) is centred at p=1; turn one step each way and it is still whole in view
+        for (turn in listOf(0, 1)) {
+            val p = restPosition()
+            if (PuckSectionsGeometry.glyphPlacement(anchor, 8, p.toFloat(), 1, ring(), window(), PuckSectionsGeometry.GLYPH_DP) != null) sizes += box(1, p.toFloat())
+            key(KeyEvent.KEYCODE_DPAD_RIGHT, shift = true)
+        }
+        key(KeyEvent.KEYCODE_DPAD_LEFT, shift = true); key(KeyEvent.KEYCODE_DPAD_LEFT, shift = true)
+        val p = restPosition()
+        if (PuckSectionsGeometry.glyphPlacement(anchor, 8, p.toFloat(), 1, ring(), window(), PuckSectionsGeometry.GLYPH_DP) != null) sizes += box(1, p.toFloat())
+        assertTrue("the clock is drawn at at least two rotations: $sizes", sizes.size >= 2)
+        for (s in sizes) { assertEquals("a circle: width equals height", s.first.toFloat(), s.second.toFloat(), 2f); assertEquals("same size at every rotation", sizes[0].first.toFloat(), s.first.toFloat(), 2f) }
+        // and the ink is the fixed 24 dp glyph's: a ring of radius 8.5/24 of the box, so about 17/24 * 24 dp wide (plus stroke)
+        assertEquals(17f + 2.1f, sizes[0].first / d, 2.5f)
+    }
+
+    @Test fun INP_19_w43_everyActionGlyphIsASquareWithNonEmptyInkInsideItAndNoneIsStretched() {
+        val ids = com.bos.sphere.core.data.CornerActionId.entries
+        for (id in ids) {
+            val v = Glyphs.forAction(id)
+            assertEquals("${id.name} default size is square", v.defaultWidth.value, v.defaultHeight.value, 0f)
+            assertEquals("${id.name} viewport is square", v.viewportWidth, v.viewportHeight, 0f)
+        }
+        rule.setContent {
+            Box(Modifier.fillMaxSize().background(Color.White)) {
+                ids.forEachIndexed { i, id ->
+                    Box(Modifier.offset((8 + (i % 6) * 60).dp, (8 + (i / 6) * 60).dp).size(48.dp)) {
+                        androidx.compose.material3.Icon(Glyphs.forAction(id), null, tint = Color.Black, modifier = Modifier.size(48.dp))
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        val bmp = grab()
+        val boxPx = (48 * d).toInt()
+        for ((i, id) in ids.withIndex()) {
+            val x0 = ((8 + (i % 6) * 60) * d).toInt(); val y0 = ((8 + (i / 6) * 60) * d).toInt()
+            var l = Int.MAX_VALUE; var t = Int.MAX_VALUE; var r = -1; var b = -1; var count = 0
+            for (y in y0 until y0 + boxPx) for (x in x0 until x0 + boxPx) {
+                if (android.graphics.Color.red(bmp.getPixel(x, y)) < 128) { count++; l = minOf(l, x); r = maxOf(r, x); t = minOf(t, y); b = maxOf(b, y) }
+            }
+            assertTrue("${id.name} has ink", count > 20)
+            assertTrue("${id.name} ink stays inside its square (not clipped)", l > x0 && t > y0 && r < x0 + boxPx - 1 && b < y0 + boxPx - 1)
+            val w = (r - l + 1).toFloat(); val h = (b - t + 1).toFloat()
+            // A uniform scale of a 24-unit drawing: ink is at most the 24 unit square, and no glyph is a sliver (a squeezed one would be)
+            assertTrue("${id.name} ink ${w}x$h is not squeezed", w / h in 0.25f..4f)
+        }
+        File(outDir, "w43-action-glyphs-square.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test fun INP_19_w43_noGlyphIsDrawnWithANonUniformScaleOrAStretchingContentScale() {
+        val dir = File(System.getProperty("user.dir"), "src/main/kotlin/com/bos/sphere/feature/grid")
+        for (f in listOf("PuckSections.kt", "Glyphs.kt")) {
+            val text = File(dir, f).readText()
+            assertFalse("$f has no scaleX/scaleY", Regex("""\bscale[XY]\b""").containsMatchIn(text))
+            assertFalse("$f has no stretching ContentScale", Regex("""FillBounds|FillWidth|FillHeight|Crop\b""").containsMatchIn(text))
+        }
+        // the ring's glyph box is one square size (never width x height with different values)
+        assertFalse(Regex("""Icon\([^\n]*Modifier\.(fillMaxSize|width|height)""").containsMatchIn(File(dir, "PuckSections.kt").readText()))
+    }
+
+    @Test fun INP_19_w43_anAppIconInTheRingKeepsItsFixedSquare36dpSize() {
+        val target = app(7, "Notes")
+        show(Corner.BottomLeft, listOf(PuckAction("Notes", app = target) {}) + eight.drop(1))
+        assertEquals(36f, PuckSectionsGeometry.APP_ICON_DP, 0f)
+        // slot 0 is whole in view at rest: its coloured icon is drawn at 36 dp x 36 dp (adaptive icons keep a circle or squircle, never an ellipse)
+        val (gx, gy) = PuckSectionsGeometry.glyphCentre(anchor, 8, 1f, 0, ring())
+        val cx = centre().x + gx * d; val cy = centre().y + gy * d
+        var l = 0; var t = 0; var r = -1; var b = -1
+        // the icon loads off the main thread: give it up to ~3 s
+        for (attempt in 0 until 30) {
+            val bmp = grab()
+            l = Int.MAX_VALUE; t = Int.MAX_VALUE; r = -1; b = -1
+            for (y in (cy - 30 * d).toInt()..(cy + 30 * d).toInt()) for (x in (cx - 30 * d).toInt()..(cx + 30 * d).toInt()) {
+                val c = bmp.getPixel(x, y)
+                val hi = maxOf(android.graphics.Color.red(c), android.graphics.Color.green(c), android.graphics.Color.blue(c))
+                val lo = minOf(android.graphics.Color.red(c), android.graphics.Color.green(c), android.graphics.Color.blue(c))
+                if (hi - lo > 80) {
+                    l = minOf(l, x); r = maxOf(r, x); t = minOf(t, y); b = maxOf(b, y)
+                }
+            }
+            if (r > l) break
+            Thread.sleep(100); settle()
+        }
+        assertTrue("the app icon is drawn", r > l && b > t)
+        assertEquals("square", (r - l + 1).toFloat(), (b - t + 1).toFloat(), 3f * d)
+        assertTrue("at most the fixed 36 dp", (r - l + 1) / d <= 37f)
+    }
+
+    @Test fun INP_19_w43_theLabelUnderAGlyphIsAtAFixedOffsetBelowItAndOnlyWhenItFitsTheWindow() {
+        show(Corner.BottomLeft, labels = true)
+        val g = PuckSectionsGeometry.GLYPH_DP
+        for (i in names.indices) {
+            val vis = PuckSectionsGeometry.visibleSegment(anchor, 8, 1f, i, ring(), window(), g) != null
+            val labelNodes = rule.onAllNodesWithText(names[i]).fetchSemanticsNodes()
+            if (!vis) { assertEquals("slot $i not visible: no label node", 0, labelNodes.size); continue }
+            val c = PuckSectionsGeometry.glyphCentre(anchor, 8, 1f, i, ring())
+            if (!PuckSectionsGeometry.labelVisible(window(), c, g)) continue // placed but transparent: nothing is drawn
+            val t = labelNodes.first().boundsInRoot
+            // fixed offset: the label's top is 1 dp under the glyph box (the node box is the text's own height), centred on the glyph
+            assertEquals("slot $i label centre x", centre().x + c.first * d, t.center.x, 2f * d)
+            assertTrue("slot $i label is under the glyph box", t.top >= centre().y + (c.second + g / 2f) * d - 1f)
+            assertTrue("slot $i label is wholly inside the window", t.bottom <= rootSize().bottom - 2f * d && t.left >= 2f * d)
+        }
+        // slot 7 (cut by the bottom edge): glyph and label are both hidden by the rule
+        assertFalse(PuckSectionsGeometry.labelVisible(window(), PuckSectionsGeometry.glyphCentre(anchor, 8, 1f, 7, ring()), g))
+    }
+
+    // ------------------------------------------------------------------------------------------------ wave 43 screenshots
+
+    @Test fun W43_shotDarkPortraitLeftRest() = shoot("w43-ring-dark-portrait-left-rest", Corner.BottomLeft)
+    @Test fun W43_shotDarkPortraitLeftTurned1() = shoot("w43-ring-dark-portrait-left-turned1", Corner.BottomLeft, turn = 1)
+    @Test fun W43_shotDarkPortraitLeftTurned2() = shoot("w43-ring-dark-portrait-left-turned2", Corner.BottomLeft, turn = 2)
+    @Test fun W43_shotLightPortraitLeftRest() = shoot("w43-ring-light-portrait-left-rest", Corner.BottomLeft, light = true)
+    @Test fun W43_shotLightPortraitLeftTurned1() = shoot("w43-ring-light-portrait-left-turned1", Corner.BottomLeft, light = true, turn = 1)
+    @Test fun W43_shotDarkPortraitRightRest() = shoot("w43-ring-dark-portrait-right-rest", Corner.BottomRight)
+    @Test fun W43_shotDarkPortraitRightTurned1() = shoot("w43-ring-dark-portrait-right-turned1", Corner.BottomRight, turn = 1)
+    @Test fun W43_shotLightPortraitRightRest() = shoot("w43-ring-light-portrait-right-rest", Corner.BottomRight, light = true)
+    @Test fun W43_shotDarkPortraitLeftLabels() = shoot("w43-ring-dark-portrait-left-labels", Corner.BottomLeft, labels = true)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W43_shotDarkLandscapeLeftRest() = shoot("w43-ring-dark-landscape-left-rest", Corner.BottomLeft)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W43_shotDarkLandscapeLeftTurned1() = shoot("w43-ring-dark-landscape-left-turned1", Corner.BottomLeft, turn = 1)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W43_shotLightLandscapeRightRest() = shoot("w43-ring-light-landscape-right-rest", Corner.BottomRight, light = true)
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi") fun W43_shotLightLandscapeRightTurned1() = shoot("w43-ring-light-landscape-right-turned1", Corner.BottomRight, light = true, turn = 1)
 }

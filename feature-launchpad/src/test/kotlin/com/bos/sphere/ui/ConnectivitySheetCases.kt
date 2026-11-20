@@ -123,7 +123,7 @@ abstract class ConnectivitySheetCases(private val orientation: String) : Launchp
     @Test fun CON_26_airplaneModeShowsMobileOffAndTheNote() {
         show(ConnectivityFixtures.snap(airplane = true, wifiOn = false, connected = false))
         assertEquals(ToggleableState.Off, toggle("cn.mobile"))
-        rule.onNodeWithText("Airplane mode is on").assertIsDisplayed()
+        rule.onNodeWithText("Airplane mode is on").performScrollTo().assertIsDisplayed() // landscape: the sheet is taller than the window and scrolls
     }
 
     @Test fun CON_27_withoutLocationAccessTheConnectedRowHasNoNameAndAQuietExplanationNotACrash() {

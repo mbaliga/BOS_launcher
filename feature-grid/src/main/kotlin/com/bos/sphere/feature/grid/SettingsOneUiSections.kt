@@ -16,7 +16,7 @@ object OneUiSections {
             "Order" to "Layout",
             "Glance wallpaper" to "Wallpaper",
             "Recent apps shown" to "Recent apps",
-            "Clock" to "Glance",
+            "Clock style" to "Glance",
             "Style" to "Home style",
             "Default density" to "Icons and grid",
             "Page turning · portrait" to "Page turning",

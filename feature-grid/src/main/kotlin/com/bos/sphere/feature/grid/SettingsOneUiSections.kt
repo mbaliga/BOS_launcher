@@ -40,8 +40,8 @@ object OneUiSections {
             "Motion gestures" to "Motion",
         ),
         "App drawer" to listOf(
-            "All apps opens as" to "View",
-            "Sort by" to "Sorting",
+            "Ring segments" to "Shortcut ring",
+            "Show labels under glyphs" to "Shortcut ring",
             "Open with" to "Shortcuts",
         ),
         "Radar" to listOf(

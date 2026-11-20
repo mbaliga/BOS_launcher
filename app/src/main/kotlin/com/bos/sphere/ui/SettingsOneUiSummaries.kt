@@ -24,7 +24,7 @@ fun settingsSummaries(homePages: HomePages, pageCount: Int, gestureCount: Int, h
                 HomePages.Off -> L10n.tr("Glance only")
                 else -> join(value(c, "Pages"), if (pageCount == 1) L10n.tr("1 page") else L10n.tr("%d pages", pageCount))
             }
-            "App drawer" -> join(value(c, "All apps opens as"), value(c, "Sort by"))
+            "App drawer" -> value(c, "Ring segments")?.let { L10n.tr("%s shortcut segments", it) }
             "Corners" -> join(value(c, "Corner style"), value(c, "Icon type"))
             "Gestures" -> if (gestureCount == 0) L10n.tr("No gestures assigned") else L10n.tr("%d gestures assigned", gestureCount)
             "Radar" -> join(value(c, "Radar layout"), value(c, "Web engine"))

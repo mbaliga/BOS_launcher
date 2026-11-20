@@ -125,6 +125,8 @@ class SettingsModel(
     val restorePages: (() -> Unit)? = null,
     /** Wave 29: bring Comms up (on a hub view and/or with the Groups and rules manager open), closing settings; the app wires it to the Comms surface. */
     val openComms: (com.bos.sphere.ui.HubView?, Boolean) -> Unit = { v, g -> com.bos.sphere.ui.LaunchpadHubNav.openComms(v, g) },
+    /** Wave 38: the Hidden apps page (null = none, as in tests that do not build it). */
+    val hiddenApps: HiddenAppsAccess? = null,
 )
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
@@ -797,6 +799,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         )
     }
     // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
+    m.hiddenApps?.let { out += hiddenAppsCategory(it) } // wave 38
     out += com.bos.sphere.ui.backupCategory()
     out += com.bos.sphere.ui.desktopCategory()
     // --- About -------------------------------------------------------------------------------
@@ -836,6 +839,7 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     out += SettingCategory(x("Corners"), Glyphs.Plus, items("Corners"))
     out += SettingCategory(x("Gestures"), Glyphs.Pinch, items("Gestures", "Motion"))
     out += SettingCategory(x("App drawer"), Glyphs.Widget, cat("Apps")?.items.orEmpty())
+    built.firstOrNull { it.items.singleOrNull()?.title == x("Hidden apps") }?.let { out += it } // wave 38: its own row in the top-level list
     cat("Radar")?.let { out += it }
     cat("Comms")?.let { out += it }
     out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))

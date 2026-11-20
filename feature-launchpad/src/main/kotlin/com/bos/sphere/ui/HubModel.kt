@@ -116,6 +116,11 @@ class HubPrefs(private val sp: SharedPreferences?) {
         get() = HubGrouping.entries.firstOrNull { it.name == sp?.getString("grouping", null) } ?: HubGrouping.Flat
         set(v) { sp?.edit()?.putString("grouping", v.name)?.apply() }
 
+    /** W42: Dismiss in Comms also clears the notification from the system shade (default on, as before). Off: it is only marked read and the shade keeps it. */
+    var clearFromShade: Boolean
+        get() = sp?.getBoolean("clearFromShade", true) ?: true
+        set(v) { sp?.edit()?.putBoolean("clearFromShade", v)?.apply(); CommsOptions.mirrorClear(v) }
+
     companion object { fun of(context: Context) = HubPrefs(TolerantPrefs.of(context.applicationContext, "launchpad_hub")) }
 }
 
@@ -155,7 +160,13 @@ object CommsOptions {
         appContext = context.applicationContext
         prefs = HubPrefs.of(context) // rebound on every init: a fresh process or test context owns its own file handle
         _defaultView.value = prefs!!.defaultView
+        _clearFromShade.value = prefs!!.clearFromShade
     }
+    private val _clearFromShade = MutableStateFlow(true)
+    /** W42: whether Dismiss in Comms also removes the notification from the shade. */
+    val clearFromShade: kotlinx.coroutines.flow.StateFlow<Boolean> = _clearFromShade
+    internal fun mirrorClear(v: Boolean) { _clearFromShade.value = v }
+    fun setClearFromShade(v: Boolean) { val p = prefs; if (p != null) p.clearFromShade = v else _clearFromShade.value = v }
     internal fun mirror(v: HubView) { _defaultView.value = v }
     fun setDefaultView(v: HubView) { val p = prefs; if (p != null) p.defaultView = v else _defaultView.value = v }
 

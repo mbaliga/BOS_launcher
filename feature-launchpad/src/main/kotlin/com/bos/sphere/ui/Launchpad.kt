@@ -384,7 +384,7 @@ fun LaunchpadPanel(
                 launchApp?.invoke(pkg) ?: run { onOpenApp(pkg); true } // W31: Comms stays open under the app, so Back returns to it
             },
             onOpenApp = { pkg -> onOpenApp(pkg) }, // W31: stays open
-            onDismissItem = { NotificationProvider.dismiss(it.key) },
+            onDismissItem = { if (CommsOptions.clearFromShade.value) NotificationProvider.dismiss(it.key) }, // W42: off keeps it in the shade (marked read only)
             onClearAll = { NotificationProvider.clearAll() },
             onAddRule = { LaunchpadSettings.addRule(it) },
             onSetDefaultMode = { LaunchpadSettings.setDefaultMode(it) },
@@ -630,12 +630,17 @@ fun LaunchpadContent(
         val isCollapsed = key in collapsed
         collapsed = if (open == null) (if (isCollapsed) collapsed - key else collapsed + key) else if (open) collapsed - key else collapsed + key
     }
+    /** W42: a row with no live intent: remembered intent, then the app's conversation shortcut, then the app; a failure keeps Comms open and says so. */
+    fun openHistoryRow(n: HubNotification) {
+        val launch: (String) -> Boolean = { pkg -> if (openApp == null) { onOpenApp(pkg); true } else openApp(pkg) }
+        if (!com.bos.sphere.core.data.NotificationOpener.open(n, ctx, launch).ok) toast.value = L10n.tr("Couldn't open %s", n.appLabel.ifBlank { n.packageName.ifBlank { n.title } })
+    }
     /** STR-02: the shared way to open a notification; a failed hand-off keeps Launchpad open and says so. */
     fun open(n: HubNotification) {
         val h = historyOnly[n.key]
-        if (h != null) { // wave 29: a row whose notification left the shade has no intent: tapping reads it and opens its app
+        if (h != null) { // wave 29: a row whose notification left the shade: tapping reads it; W42: and opens what it pointed at (remembered intent, shortcut), else its app
             hub?.store?.setRead(listOf(h.id), true)
-            if (n.packageName.isNotBlank()) { if (openApp == null) onOpenApp(n.packageName) else if (!openApp(n.packageName)) toast.value = L10n.tr("Couldn't open %s", n.appLabel.ifBlank { n.packageName }) }
+            openHistoryRow(n)
             return
         }
         if (openItem == null) onOpenItem(n)
@@ -799,7 +804,7 @@ fun LaunchpadContent(
             hub, now, zone, is24, liveKeys = items.mapTo(HashSet()) { it.key }, modifier = Modifier.weight(1f), hasAccess = hasAccess, onRequestAccess = onRequestAccess, panelBody = hubPanelBody,
             onOpen = { e ->
                 val live = items.firstOrNull { it.key == e.key }
-                if (live != null) open(live) else if (openApp == null) onOpenApp(e.packageName) else if (!openApp(e.packageName)) toast.value = L10n.tr("Couldn't open %s", e.appLabel.ifBlank { e.packageName })
+                if (live != null) open(live) else openHistoryRow(CommsRead.fromEntry(e))
             },
             onMore = { e -> items.firstOrNull { it.key == e.key }?.let { menuFor = it; menuExpand = null } },
         ) else GrantGate(

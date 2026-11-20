@@ -277,4 +277,16 @@ class CommsOptionsW29Test {
             assertFalse("$d still describes Options in the Comms menu", Regex("Options row of the Comms menu|in Options stores|the switcher tabs, Options|Options are inline|then the Options rows|Options live in the Comms menu").containsMatchIn(t))
         }
     }
+
+    @Test fun STR_02_w42_theShadeRowDefaultsOnPersistsAndChangesWhatDismissDoes() {
+        val r = row("Clear from the shade when dismissed in Comms") as SettingItem.Toggle
+        assertTrue("default on keeps the wave 32 behaviour", r.checked)
+        assertTrue(HubPrefs.of(ctx).clearFromShade)
+        r.onChange(false)
+        assertFalse(HubPrefs.of(ctx).clearFromShade)
+        assertFalse((row("Clear from the shade when dismissed in Comms") as SettingItem.Toggle).checked)
+        assertFalse("the live flag Comms reads when dismissing", CommsOptions.clearFromShade.value)
+        CommsOptions.setClearFromShade(true)
+        assertTrue(HubPrefs.of(ctx).clearFromShade)
+    }
 }

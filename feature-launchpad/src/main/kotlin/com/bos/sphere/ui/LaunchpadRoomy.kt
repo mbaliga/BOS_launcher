@@ -74,7 +74,7 @@ internal object LaunchpadOpen {
         markRead: (String) -> Unit, cancel: (String) -> Unit, close: () -> Unit,
     ): HandOff {
         markRead(n.key)
-        val result = PendingIntentLauncher.open(n.contentIntent, context) { n.packageName.isNotBlank() && launchApp(n.packageName) }
+        val result = com.bos.sphere.core.data.NotificationOpener.open(n, context, launchApp).handOff // W42: live intent, remembered intent, conversation shortcut, then the app
         if (result.ok) {
             if (result == HandOff.Sent && n.autoCancel && !n.isOngoing) cancel(n.key)
             close()

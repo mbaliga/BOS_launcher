@@ -76,29 +76,12 @@ object DockGeometry {
 }
 
 /**
- * The dock itself, anchored top-end under the Ground Control header. Always visible while settings are open, never
- * focusable and never in the way of the list (it sits above the empty right side of the category strip).
+ * The preview as a floating window (wave 39, see [PreviewWindow]): by default it sits top-end under the Ground Control header at
+ * the size the fixed dock had, and it can be dragged, resized and minimised. Absent until the home has drawn once.
  */
 @Composable
-fun BoxScope.SettingsPreviewDock(capture: HomeCapture, modifier: Modifier = Modifier) {
-    val conf = LocalConfiguration.current
-    val box = DockGeometry.size(conf.screenWidthDp.toFloat(), conf.screenHeightDp.toFloat(), capture.size.width, capture.size.height)
-    if (box.widthDp <= 0f) return
-    val shape = RoundedCornerShape(12.dp)
-    val label = L10n.tr("Live preview of your home")
-    Box(
-        modifier
-            .align(Alignment.TopEnd)
-            .padding(top = 64.dp, end = 12.dp)
-            .size(box.widthDp.dp, box.heightDp.dp)
-            .clip(shape)
-            .background(Color.Black)
-            .border(1.dp, HyleColors.InsetHighlight, shape)
-            .semantics { contentDescription = label },
-    ) {
-        Canvas(Modifier.size(box.widthDp.dp, box.heightDp.dp)) {
-            val k = DockGeometry.scale(capture.size.width, size.width)
-            clipRect { scale(k, k, pivot = Offset.Zero) { drawLayer(capture.layer) } }
-        }
-    }
+@Suppress("UnusedReceiverParameter")
+fun BoxScope.SettingsPreviewDock(capture: HomeCapture, modifier: Modifier = Modifier, rtl: Boolean? = null) {
+    if (capture.size.width <= 0 || capture.size.height <= 0) return
+    PreviewWindow(capture, modifier, rtl)
 }

@@ -16,6 +16,8 @@ import org.json.JSONObject
  *
  * Wave 28: the Comms content scale (75 to 125 percent) lives in its own exported pref file "comms_scale" (PrefFilesSource.ALLOWED), see [CommsScaleSettings]; additive, no version bump.
  *
+ * Wave 39: the floating Settings preview window (position, size and minimised state per orientation) lives in its own device-local pref file "preview_window", excluded from backup and transfer (BACKUP_EXCLUDED_PREF_FILES) and never exported.
+ *
  * Schema history (every version listed here has a fixture under `core-data/src/test/resources` and a
  * migration step in [StateMigrations]):
  *  - 1: first export format. Flat `prefs` map at the top, `layoutPages` as an embedded JSON string,
@@ -87,7 +89,7 @@ object StateSchema {
      * the desktop profile table describe this device, and crash reports hold stack traces. The user's own export file is
      * the portable copy of the part of this that is setup (aliases).
      */
-    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE, "launchpad_hub")
+    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE, "launchpad_hub", "preview_window")
     val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage", "wallpapers", LegacyHomeBackup.FILE)
 
     /**

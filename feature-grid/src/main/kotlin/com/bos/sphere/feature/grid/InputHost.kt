@@ -79,6 +79,9 @@ object LauncherInput {
     /** Shift + arrow in edit mode (INP-09): resize a widget by one cell or file an item into its neighbour. */
     @Volatile var shiftMoveHook: ((FocusDir) -> Boolean)? = null
 
+    /** Delete / Backspace in edit mode (wave 45, HOM-12): removes the selected item; returns true when it did. */
+    @Volatile var deleteHook: (() -> Boolean)? = null
+
     /** INP-12: Radar or the drawer is open and the prefs ask for the keyboard in this orientation; text fields on those surfaces take focus. */
     val keyboardWanted = mutableStateOf(false)
 
@@ -126,6 +129,7 @@ object LauncherInput {
         if (!Keys.isModifier(e.keyCode)) tracker.onKey()
         if (!down) return swallowedUps.remove(e.keyCode)
         for (i in keyHandlers.indices.reversed()) if (keyHandlers[i](e)) { swallowedUps += e.keyCode; return true }
+        if (editMode.value && (e.keyCode == KeyEvent.KEYCODE_DEL || e.keyCode == KeyEvent.KEYCODE_FORWARD_DEL) && deleteHook?.invoke() == true) { swallowedUps += e.keyCode; return true }
         val route = router.route(e.keyCode, e.isCtrlPressed, e.isAltPressed, e.isShiftPressed, e.isMetaPressed)
         val consumed = when (route) {
             is KeyRoute.Command -> { if (e.repeatCount == 0) _commands.tryEmit(route.command); true }

@@ -33,6 +33,8 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.bos.sphere.core.design.L10n
 import androidx.compose.ui.graphics.Brush
@@ -86,6 +88,7 @@ import com.bos.sphere.core.data.HomeGesture
 import com.bos.sphere.core.data.HomeLayoutMath
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.catalog.SpanGrid
+import com.bos.sphere.core.catalog.rect
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.core.data.PageLayout
 import com.bos.sphere.core.data.PageShape
@@ -293,6 +296,15 @@ fun GridHome(
     var ontoArmed by remember { mutableStateOf<String?>(null) }
     var edgeDir by remember { mutableIntStateOf(0) }
 
+    // Wave 45: the selection belongs to edit mode and to an item that is still on a page; its Remove goes through the home's remove path.
+    val removeNow by rememberUpdatedState(onRemoveItem)
+    androidx.compose.runtime.SideEffect { ex?.selection?.onRemove = { removeNow(it) } }
+    LaunchedEffect(editMode, pages) {
+        val sel = ex?.selection ?: return@LaunchedEffect
+        val k = sel.selectedKey ?: return@LaunchedEffect
+        if (!editMode || pages.none { k in it.keys }) sel.clear()
+    }
+
     // Fractional focused index per coverflow page.
     val coverPos = remember { androidx.compose.runtime.mutableStateMapOf<Int, Float>() }
 
@@ -324,7 +336,8 @@ fun GridHome(
         return tp to idx
     }
 
-    val shown: List<HomePage> = dragKey?.takeIf { ontoArmed == null }?.let { key ->
+    // Wave 45: icons push the others aside while dragged (the page reflows live); a widget BLOCKS, so nothing moves for it until it is dropped on free cells.
+    val shown: List<HomePage> = dragKey?.takeIf { ontoArmed == null && ex?.isWidget(it) != true }?.let { key ->
         val (tp, idx) = dropTarget()
         HomeLayoutMath.move(dragBase, key, tp, idx, capacityOf, dropEmpty = false)
     } ?: pages
@@ -444,6 +457,16 @@ fun GridHome(
 
                             Early.Up -> {
                                 if (!settled) return@awaitEachGesture
+                                if (editNow) {
+                                    // Wave 45: in edit mode a tap selects the item (again: deselects); a tap on empty space deselects.
+                                    when (hit) {
+                                        is Hit.App -> ex?.selection?.toggle(hit.key)
+                                        is Hit.Tile -> ex?.selection?.toggle(hit.key)
+                                        Hit.Empty -> ex?.selection?.clear()
+                                        is Hit.Focus -> Unit
+                                    }
+                                    return@awaitEachGesture
+                                }
                                 when (hit) {
                                     is Hit.App -> st.apps[hit.key]?.let(cb.onLaunch)
                                     is Hit.Focus -> cb.focusCover(hit.page, hit.index)
@@ -572,6 +595,7 @@ fun GridHome(
                                                 dragging = true
                                                 dragBase = st.pages
                                                 dragKey = pressed.key
+                                                if (editNow) ex?.selection?.select(pressed.key)
                                             }
                                             if (dragging) {
                                                 dragPos = c.position
@@ -602,19 +626,38 @@ fun GridHome(
                                         if (dragging) {
                                             val key = dragKey
                                             if (key != null) {
-                                                val (tp, idx) = dropTargetNow()
+                                                val (tp, idx0) = dropTargetNow()
+                                                var idx = idx0
+                                                var refused = false
+                                                // Wave 45: a widget BLOCKS: dropped over another item it is refused (reject buzz); on free cells it lands where its ghost was.
+                                                if (ex?.isWidget(key) == true) {
+                                                    val b = dragBase.getOrNull(tp)
+                                                    val gg = (PageGeometry.of(b?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, b?.keys?.size ?: 0, clampedCover(st.coverPos, tp, b)) as? PageGeometry.Grid)?.g
+                                                    if (gg != null && b != null) {
+                                                        val spanOfNow: (String) -> com.bos.sphere.core.catalog.WidgetSpan = { ex?.spanOf(it) ?: com.bos.sphere.core.catalog.WidgetSpan(1, 1) }
+                                                        val lc = dragPos - st.contentOffset
+                                                        val rect = ItemDropMath.snapCentre(spanOfNow(key), lc.x, lc.y, gg.originX, gg.originY, gg.pitchX, gg.pitchY, gg.columns, gg.rows, gg.mirror)
+                                                        when (val wd = ItemDropMath.widgetDrop(b, key, spanOfNow, rect, gg.columns, gg.rows)) {
+                                                            is ItemDropMath.WidgetDrop.Blocked -> refused = true
+                                                            is ItemDropMath.WidgetDrop.Place -> idx = wd.index
+                                                            ItemDropMath.WidgetDrop.Fallback -> Unit
+                                                        }
+                                                    }
+                                                }
                                                 // HOM-04: ending on another item's centre files into a folder instead of reordering.
                                                 val iconPx = PageGeometry.of(dragBase.getOrNull(tp)?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, dragBase.getOrNull(tp)?.keys?.size ?: 0, clampedCover(st.coverPos, tp, dragBase.getOrNull(tp))).iconPx
                                                 val decision = ex?.let { com.bos.sphere.core.catalog.DropRule.decide(dropTracker, key, iconPx, it.state, android.os.SystemClock.uptimeMillis()) } ?: com.bos.sphere.core.catalog.DropDecision.Reorder
                                                 val onto = (decision as? com.bos.sphere.core.catalog.DropDecision.Onto)?.key
                                                 dropTracker.reset(); ontoArmed = null
-                                                if (onto != null) ex?.onDropOnto?.invoke(key, onto)
+                                                if (refused) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                else if (onto != null) ex?.onDropOnto?.invoke(key, onto)
                                                 else cb.onPagesChange(HomeLayoutMath.move(dragBase, key, tp, idx, cb.capacityOf, dropEmpty = true))
                                             }
                                             dragKey = null
                                             dragBase = emptyList()
                                         } else {
-                                            st.apps[pressed.key]?.let(cb.onAppLongPress) ?: ex?.onLongPress?.invoke(pressed.key)
+                                            if (editNow) { if (grabNow) ex?.selection?.toggle(pressed.key) else ex?.selection?.select(pressed.key) }
+                                            else st.apps[pressed.key]?.let(cb.onAppLongPress) ?: ex?.onLongPress?.invoke(pressed.key)
                                         }
                                     }
                                 }
@@ -660,6 +703,7 @@ fun GridHome(
                     extras = extras,
                     editing = editMode,
                     onRemove = onRemoveItem,
+                    pageIndex = index,
                 )
             }
             GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.pageTo(it, stillPaging) } }, extras = extras)
@@ -679,6 +723,40 @@ fun GridHome(
                         beyondViewportPageCount = 1,
                         modifier = Modifier.fillMaxSize(),
                     ) { page -> Box(Modifier.fillMaxSize().pageEffect(prefs.pageTransition, vertical = true) { pagerState.getOffsetDistanceInPages(page) }) { pageContent(page) } }
+                }
+            }
+
+            // Wave 45: where the dragged item will land (dashed ghost on the snapped cells; error colour when a widget is blocked) and, for an
+            // icon over another icon, the ring on the item it will make a folder with.
+            run {
+                val gk = dragKey ?: return@run
+                val exn = ex ?: return@run
+                val tpg = pagerState.currentPage
+                val gbase = dragBase.getOrNull(tpg) ?: return@run
+                val gg = (geomFor(tpg, gbase) as? PageGeometry.Grid)?.g ?: return@run
+                val pad = gg.base * 0.04f
+                val spanOfNow: (String) -> com.bos.sphere.core.catalog.WidgetSpan = { exn.spanOf(it) }
+                var blocked = false
+                val rect: com.bos.sphere.core.catalog.CellRect? = if (exn.isWidget(gk)) {
+                    val lc = dragPos - contentOffset
+                    val r = ItemDropMath.snapCentre(spanOfNow(gk), lc.x, lc.y, gg.originX, gg.originY, gg.pitchX, gg.pitchY, gg.columns, gg.rows, gg.mirror)
+                    blocked = ItemDropMath.widgetDrop(gbase, gk, spanOfNow, r, gg.columns, gg.rows) is ItemDropMath.WidgetDrop.Blocked
+                    r
+                } else shown.getOrNull(tpg)?.let { ItemDropMath.landing(it, gk, spanOfNow, gg.columns, gg.rows) }
+                val col = if (blocked) EditChrome.Error else HyleColors.Violet
+                fun place(r: com.bos.sphere.core.catalog.CellRect, mod: Modifier): Modifier {
+                    val l = contentOffset.x + gg.spanLeft(r.col, r.cols) + pad
+                    val t = contentOffset.y + gg.originY + r.row * gg.pitchY + pad
+                    return Modifier.offset { IntOffset(l.roundToInt(), t.roundToInt()) }
+                        .size(with(density) { (r.cols * gg.pitchX - 2 * pad).toDp() }, with(density) { (r.rows * gg.pitchY - 2 * pad).toDp() })
+                        .then(mod)
+                }
+                val radius = with(density) { (if (exn.isWidget(gk)) EditChrome.WidgetRadius.toPx() else gg.base * 0.2f) }
+                if (rect != null && ontoArmed == null) Box(place(rect, Modifier.testTag("move-ghost").moveGhost(col, radius, with(density) { 2.dp.toPx() }, with(density) { 10.dp.toPx() })))
+                val onto = ontoArmed
+                if (onto != null) {
+                    val tr = ItemDropMath.landing(gbase, onto, spanOfNow, gg.columns, gg.rows)
+                    if (tr != null) Box(place(tr, Modifier.testTag("folder-target").folderTarget(HyleColors.Violet, radius, with(density) { 2.dp.toPx() })))
                 }
             }
 
@@ -720,6 +798,8 @@ fun GridHome(
                 }
             }
         }
+
+        if (editMode) ex?.selection?.let { EditSelectionOverlay(it, showBar = dragKey == null) }
 
         if (drawIndicator) PageIndicator(
             count = pageCount,
@@ -787,9 +867,20 @@ private fun PageView(
     extras: HomeExtras? = null,
     editing: Boolean = false,
     onRemove: (String) -> Unit = {},
+    /** Wave 45 (editHandles): which page this is, for the edit actions of its items. */
+    pageIndex: Int = 0,
 ) {
     val density = LocalDensity.current
     val packed = spanPacked(page, geometry, extras)
+    // Wave 45: the edit actions of every item here share one view of the page's grid (cells, order, mirror).
+    val gridG = (geometry as? PageGeometry.Grid)?.g
+    val editorOf: (String) -> ItemEditor? = { k ->
+        if (!editing || extras == null || gridG == null) null
+        else ItemEditor(k, extras, page.keys, pageIndex, gridG.columns, gridG.rows, gridG.mirror, true) { onRemove(k) }
+    }
+    if (editing && extras != null && gridG != null) androidx.compose.runtime.SideEffect {
+        extras.selection.pitchDpX = gridG.pitchX / density.density; extras.selection.pitchDpY = gridG.pitchY / density.density
+    }
     Box(modifier.fillMaxSize()) {
         if (geometry is PageGeometry.Circle) {
             // Faint ring guides for circular pages.
@@ -811,7 +902,7 @@ private fun PageView(
             if (geometry is PageGeometry.Coverflow && !geometry.c.visible(index)) return@forEachIndexed
             key(itemKey) {
                 if (extra != null && extra.isWidget(itemKey) && place != null && geometry is PageGeometry.Grid) {
-                    WidgetSlot(itemKey, extra, place, geometry, onItemFocused, editing, { onRemove(itemKey) })
+                    WidgetSlot(itemKey, extra, place, geometry, onItemFocused, editing, { onRemove(itemKey) }, packed?.placed.orEmpty(), page.keys, pageIndex)
                 } else {
                 val itemPx = if (geometry is PageGeometry.Coverflow) geometry.c.sizeAt(index) else geometry.iconPx
                 val itemDp = with(density) { itemPx.toDp() }
@@ -823,6 +914,8 @@ private fun PageView(
                 val y = if (animated) animateFloatAsState(target.y.toFloat(), spring(dampingRatio = 0.8f, stiffness = 500f), label = "y").value else target.y.toFloat()
                 val isDragged = itemKey == draggingKey
                 val settingsOpener = LocalItemSettingsOpener.current
+                val selectedNow = editing && extras?.selection?.isSelected(itemKey) == true
+                val editActions = if (editing) editorOf(itemKey)?.actions().orEmpty() else emptyList()
                 val cf = geometry is PageGeometry.Coverflow
                 val dCover = if (cf) index - (geometry as PageGeometry.Coverflow).c.position else 0f
                 val depth = if (cf) -kotlin.math.abs(dCover) else 0f
@@ -839,6 +932,7 @@ private fun PageView(
                                 cameraDistance = 14f * density.density
                             }
                         }
+                        .then(if (selectedNow && extras != null) Modifier.onGloballyPositioned { extras.selection.report(itemKey, it.boundsInRoot()) } else Modifier)
                         .launcherItem(
                             "grid.$itemKey", onFocused = onItemFocused,
                             onActivate = app?.let { a -> { onLaunch(a) } } ?: extra?.let { e -> { e.onTap(itemKey) } },
@@ -848,11 +942,13 @@ private fun PageView(
                             if (app != null) {
                                 contentDescription = app.label
                                 onClick { onLaunch(app); true }
-                                customActions = listOf(CustomAccessibilityAction("Options") { onLongPress(app); true }) + itemSettingsActions(settingsOpener, itemKey, editing)
+                                customActions = listOf(CustomAccessibilityAction("Options") { onLongPress(app); true }) + itemSettingsActions(settingsOpener, itemKey, editing) + editActions
+                                if (editing) selected = selectedNow
                             } else if (extra != null) {
                                 contentDescription = extraLabel(itemKey, extra)
                                 onClick { extra.onTap(itemKey); true }
-                                customActions = listOf(CustomAccessibilityAction("Options") { extra.onLongPress(itemKey); true }) + itemSettingsActions(settingsOpener, itemKey, editing)
+                                customActions = listOf(CustomAccessibilityAction("Options") { extra.onLongPress(itemKey); true }) + itemSettingsActions(settingsOpener, itemKey, editing) + editActions
+                                if (editing) selected = selectedNow
                             } else {
                                 contentDescription = "Clock"
                                 customActions = itemSettingsActions(settingsOpener, itemKey, editing)
@@ -860,7 +956,7 @@ private fun PageView(
                         },
                 ) {
                     if (app != null) {
-                        if (editing) EditHandleBox(itemDp, app.label, { onRemove(itemKey) }) { BadgedAppIcon(app, itemDp, Modifier.size(itemDp)) }
+                        if (editing) EditHandleBox(itemDp, app.label, { onRemove(itemKey) }) { BadgedAppIcon(app, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f)) }
                         else BadgedAppIcon(app, itemDp, Modifier.size(itemDp))
                         // Coverflow names only the focused card; the rest would just pile up their labels.
                         if (showLabels && (!cf || kotlin.math.abs(dCover) < 0.5f)) AppLabel(app.label, itemDp)
@@ -868,7 +964,7 @@ private fun PageView(
                         SettingsTile(itemDp, Modifier.size(itemDp))
                         if (showLabels) AppLabel(L10n.tr("Settings"), itemDp)
                     } else if (extra != null) {
-                        if (editing) EditHandleBox(itemDp, extraLabel(itemKey, extra), { onRemove(itemKey) }) { ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp)) }
+                        if (editing) EditHandleBox(itemDp, extraLabel(itemKey, extra), { onRemove(itemKey) }) { ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f)) }
                         else ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp))
                         if (showLabels && !cf) AppLabel(extraLabel(itemKey, extra), itemDp)
                     } else {
@@ -1098,9 +1194,13 @@ fun rememberNow(): Date {
     return now
 }
 
-/** HOM-08: a widget tile in its span box on a grid page. */
+/** HOM-08: a widget tile in its span box on a grid page. In edit mode it carries the move / resize / remove accessibility actions (wave 45) and, selected, the handles. */
 @Composable
-private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit, editing: Boolean = false, onRemove: () -> Unit = {}) {
+private fun WidgetSlot(
+    itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit,
+    editing: Boolean = false, onRemove: () -> Unit = {},
+    placed: List<com.bos.sphere.core.catalog.TilePlacement> = emptyList(), pageKeys: List<String> = emptyList(), pageIndex: Int = 0,
+) {
     val density = LocalDensity.current
     val g = geometry.g
     val slot = com.bos.sphere.core.catalog.SpanGrid.cellOf(place, g.columns)
@@ -1109,16 +1209,23 @@ private fun WidgetSlot(itemKey: String, extra: HomeExtras, place: com.bos.sphere
     val hPx = place.span.rows * g.pitchY - 2 * pad
     val left = g.spanLeft(slot % g.columns, place.span.cols) + pad
     val top = g.cellTop(slot) + pad
+    val ctx = com.bos.sphere.feature.grid.ResizeContext(
+        place.rect(), g.columns, g.rows, g.pitchX, g.pitchY, g.mirror, true, placed, pageKeys, pageIndex, onRemove,
+    )
+    val a11y = if (editing) ItemEditor(itemKey, extra, pageKeys, pageIndex, g.columns, g.rows, g.mirror, true, onRemove).actions() else emptyList()
     Box(
         Modifier.offset { IntOffset(left.roundToInt(), top.roundToInt()) }
-            .size(with(density) { wPx.toDp() }, with(density) { hPx.toDp() }),
+            .size(with(density) { wPx.toDp() }, with(density) { hPx.toDp() })
+            .childrenOutOfBounds()
+            // The selected widget sits above its neighbours so its handles (half outside it) take the touches that fall on them.
+            .zIndex(if (editing && extra.isSelected(itemKey)) 10f else 0f),
     ) {
         HomeWidgetCell(
             itemKey, extra, g.pitchX, g.pitchY,
-            Modifier.fillMaxSize().launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) }),
+            Modifier.fillMaxSize().launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) })
+                .then(if (a11y.isEmpty()) Modifier else Modifier.semantics { customActions = a11y }),
+            ctx, editing,
         )
-        // HOM-12: the remove handle of a widget in edit mode.
-        if (editing) EditHandleBox(with(density) { wPx.toDp() }, extraLabel(itemKey, extra), onRemove) {}
     }
 }
 

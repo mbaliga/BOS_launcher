@@ -184,7 +184,8 @@ class InputW3UiTest {
             widgets = mapOf(widget to com.bos.sphere.core.catalog.WidgetSpan(2, 2)),
         )
         val actions = mutableListOf<ItemAction>()
-        val extras = HomeExtras(state, resolveApp = { null }, shortcutIcon = { null }, widget = { _, _ -> }, onAction = { actions += it })
+        val resized = mutableListOf<com.bos.sphere.core.catalog.CellRect>()
+        val extras = HomeExtras(state, resolveApp = { null }, shortcutIcon = { null }, widget = { _, _ -> }, onAction = { actions += it }, onResizeTo = { _, r, _ -> resized += r })
         rule.setContent {
             androidx.compose.ui.platform.LocalInputModeManager.current.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
             InputModeProvider {
@@ -205,8 +206,9 @@ class InputW3UiTest {
             actions.clear()
             LauncherInput.focus.request("grid.$widget"); rule.waitForIdle()
             assertTrue(shiftArrow(KeyEvent.KEYCODE_DPAD_RIGHT))
-            val resize = actions.single() as ItemAction.Resize
-            assertEquals(widget, resize.key); assertEquals(1, resize.dCols)
+            // Wave 45: a widget resizes by one cell within its limits through the one resize path (a rectangle), not by an ItemAction.Resize.
+            assertTrue(actions.isEmpty())
+            assertEquals(3, resized.single().cols)
         } finally { LauncherInput.editMode.value = false }
     }
 }

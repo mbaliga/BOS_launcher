@@ -54,6 +54,8 @@ class WidgetEditHandleW24Test {
     private val notes = ItemKeys.widget(9)
     private val stack = WidgetStacks.stackKey("s1")
 
+    private val sel = EditSelectionState()
+
     private class Probe { val removed = mutableListOf<String>(); var widgetTouches = 0; var longPresses = 0 }
 
     private val state = HomeState(
@@ -77,7 +79,7 @@ class WidgetEditHandleW24Test {
                     awaitPointerEventScope { while (true) { val e = awaitPointerEvent(); e.changes.forEach { it.consume() }; probe.widgetTouches++ } }
                 })
             },
-            onLongPress = { probe.longPresses++ },
+            onLongPress = { probe.longPresses++ }, selection = sel,
         )
         val pages = listOf(HomePage(keys = listOf(clock, stack, app.key), id = 1L))
         Box(Modifier.fillMaxSize()) {
@@ -90,43 +92,52 @@ class WidgetEditHandleW24Test {
         }
     }
 
+    private fun settle() { rule.runOnUiThread { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }; rule.mainClock.advanceTimeBy(300) }
+
+    /** Wave 45 (editHandles): the in-widget remove badge is gone (it sat on the widget's content). A tap selects the widget; Remove is a 48 dp button beside the selection. */
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_12_aWidgetInEditModeHasARemoveHandleThatWinsOverTheHostedView() {
+    fun HOM_12_aWidgetInEditModeIsSelectedByATapEvenWhenTheHostedViewSwallowsTouchesAndRemovedByTheRemoveButton() {
         rule.mainClock.autoAdvance = false
         val probe = Probe()
         rule.setContent { Scene(true, probe) }
         rule.mainClock.advanceTimeBy(500)
-        rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).assertExists().performClick()
-        rule.mainClock.advanceTimeBy(100)
+        rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithTag("hosted.$clock", useUnmergedTree = true).performTouchInput { click(center) }
+        settle()
+        assertEquals(clock, sel.selectedKey)
+        assertEquals("the edit-mode shield keeps the touch from the hosted view", 0, probe.widgetTouches)
+        rule.onNodeWithTag("selection-remove").performClick()
+        settle()
         assertEquals(listOf(clock), probe.removed)
-        assertEquals("the handle took the touch, not the hosted view", 0, probe.widgetTouches)
         assertEquals("no menu opened", 0, probe.longPresses)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_12_aTapOnTheWidgetBodyInEditModeRemovesNothing() {
+    fun HOM_12_aTapOnTheWidgetBodyInEditModeRemovesNothingItOnlySelects() {
         rule.mainClock.autoAdvance = false
         val probe = Probe()
         rule.setContent { Scene(true, probe) }
         rule.mainClock.advanceTimeBy(500)
         rule.onNodeWithTag("hosted.$clock", useUnmergedTree = true).performTouchInput { click(center) }
-        rule.mainClock.advanceTimeBy(100)
-        assertTrue("the body belongs to the widget", probe.widgetTouches > 0)
+        settle()
         assertTrue(probe.removed.isEmpty())
+        assertEquals(clock, sel.selectedKey)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_14_aStackInEditModeHasOneRemoveHandleForTheWholeStack() {
+    fun HOM_14_aStackInEditModeIsOneSelectableItemAndOneRemoveRemovesTheWholeStack() {
         rule.mainClock.autoAdvance = false
         val probe = Probe()
         rule.setContent { Scene(true, probe) }
         rule.mainClock.advanceTimeBy(500)
-        assertEquals(1, rule.onAllNodesWithContentDescription("Remove from home: Weather", useUnmergedTree = true).fetchSemanticsNodes().size)
-        assertEquals(0, rule.onAllNodesWithContentDescription("Remove from home: Notes", useUnmergedTree = true).fetchSemanticsNodes().size)
-        rule.onNodeWithContentDescription("Remove from home: Weather", useUnmergedTree = true).performClick()
-        rule.mainClock.advanceTimeBy(100)
+        assertEquals(0, rule.onAllNodesWithContentDescription("Remove from home: Weather", useUnmergedTree = true).fetchSemanticsNodes().size)
+        rule.onNodeWithTag("hosted.$stack", useUnmergedTree = true).performTouchInput { click(center) }
+        settle()
+        assertEquals(stack, sel.selectedKey)
+        rule.onNodeWithTag("selection-remove").performClick()
+        settle()
         assertEquals("the stack key goes to the host, which removes every member", listOf(stack), probe.removed)
-        // the app beside them keeps its handle too
+        // the app beside them keeps its own handle
         rule.onNodeWithContentDescription("Remove from home: Alpha", useUnmergedTree = true).assertExists()
     }
 

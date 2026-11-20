@@ -164,8 +164,9 @@ private fun ScrollCellContent(
     if (extra != null && extra.isWidget(key)) {
         // A widget spans its cells with a small inset, like a tile.
         val inset = cell * 0.04f
-        Box(Modifier.fillMaxSize().padding(inset)) {
-            HomeWidgetCell(key, extra, cell.value * span.cols, cell.value * span.rows, Modifier.fillMaxSize().launcherItem("scroll.$key", onMenu = { extra.onLongPress(key) }))
+        val px = androidx.compose.ui.platform.LocalDensity.current.density
+        Box(Modifier.fillMaxSize().padding(inset).childrenOutOfBounds()) {
+            HomeWidgetCell(key, extra, cell.value * px, cell.value * px, Modifier.fillMaxSize().launcherItem("scroll.$key", onMenu = { extra.onLongPress(key) }), editing = editing)
             if (editing) EditHandleBox(cell * span.cols, extraLabel(key, extra), onRemove) {}
         }
         return

@@ -822,6 +822,7 @@ private fun PageView(
                 val x = if (animated) animateFloatAsState(target.x.toFloat(), spring(dampingRatio = 0.8f, stiffness = 500f), label = "x").value else target.x.toFloat()
                 val y = if (animated) animateFloatAsState(target.y.toFloat(), spring(dampingRatio = 0.8f, stiffness = 500f), label = "y").value else target.y.toFloat()
                 val isDragged = itemKey == draggingKey
+                val settingsOpener = LocalItemSettingsOpener.current
                 val cf = geometry is PageGeometry.Coverflow
                 val dCover = if (cf) index - (geometry as PageGeometry.Coverflow).c.position else 0f
                 val depth = if (cf) -kotlin.math.abs(dCover) else 0f
@@ -847,13 +848,14 @@ private fun PageView(
                             if (app != null) {
                                 contentDescription = app.label
                                 onClick { onLaunch(app); true }
-                                customActions = listOf(CustomAccessibilityAction("Options") { onLongPress(app); true })
+                                customActions = listOf(CustomAccessibilityAction("Options") { onLongPress(app); true }) + itemSettingsActions(settingsOpener, itemKey, editing)
                             } else if (extra != null) {
                                 contentDescription = extraLabel(itemKey, extra)
                                 onClick { extra.onTap(itemKey); true }
-                                customActions = listOf(CustomAccessibilityAction("Options") { extra.onLongPress(itemKey); true })
+                                customActions = listOf(CustomAccessibilityAction("Options") { extra.onLongPress(itemKey); true }) + itemSettingsActions(settingsOpener, itemKey, editing)
                             } else {
                                 contentDescription = "Clock"
+                                customActions = itemSettingsActions(settingsOpener, itemKey, editing)
                             }
                         },
                 ) {
@@ -879,13 +881,13 @@ private fun PageView(
     }
 }
 
-/** The clock as a page tile, sized like an icon. */
+/** The clock as a page tile, sized like an icon. Its face, hour format and day line come from [options] (the tile's item sheet, wave 45). */
 @Composable
-fun ClockTile(size: Dp, modifier: Modifier = Modifier) {
+fun ClockTile(size: Dp, modifier: Modifier = Modifier, options: ClockTileOptions = LocalClockTileOptions.current) {
     val now = rememberNow()
     val context = LocalContext.current
-    val text = remember(now) {
-        val is24 = DateFormat.is24HourFormat(context)
+    val text = remember(now, options.format) {
+        val is24 = when (options.format) { com.bos.sphere.core.data.ClockFormat.Hour12 -> false; com.bos.sphere.core.data.ClockFormat.Hour24 -> true; else -> DateFormat.is24HourFormat(context) }
         java.text.SimpleDateFormat(if (is24) "HH:mm" else "h:mm", java.util.Locale.getDefault()).format(now)
     }
     val day = remember(now) { java.text.SimpleDateFormat("EEE d", java.util.Locale.getDefault()).format(now) }
@@ -894,10 +896,31 @@ fun ClockTile(size: Dp, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         modifier = modifier
             .background(HyleColors.Surface, RoundedCornerShape(size * 0.22f))
-            .padding(4.dp),
+            .padding(4.dp)
+            .testTag(if (options.analog) "clock-tile-analog" else "clock-tile-digital"),
     ) {
-        Text(text, color = HyleColors.InkBright, fontSize = (size.value * 0.24f).sp, fontWeight = FontWeight.Light, maxLines = 1)
-        Text(day.uppercase(), color = HyleColors.InkDim, fontSize = (size.value * 0.1f).sp, letterSpacing = 1.sp, maxLines = 1)
+        if (options.analog) {
+            val cal = remember(now) { java.util.Calendar.getInstance().apply { timeInMillis = now.time } }
+            val minute = cal.get(java.util.Calendar.MINUTE)
+            val hour = cal.get(java.util.Calendar.HOUR) % 12 + minute / 60f
+            val ink = HyleColors.InkBright
+            val dim = HyleColors.InkDim
+            val face = if (options.date) size * 0.62f else size * 0.78f
+            androidx.compose.foundation.Canvas(Modifier.size(face)) {
+                val c = center
+                val r = this.size.minDimension / 2f
+                drawCircle(dim, r, c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = r * 0.06f))
+                fun hand(frac: Float, len: Float, w: Float) {
+                    val a = (frac * 2f * Math.PI - Math.PI / 2).toFloat()
+                    drawLine(ink, c, androidx.compose.ui.geometry.Offset(c.x + kotlin.math.cos(a) * r * len, c.y + kotlin.math.sin(a) * r * len), strokeWidth = w, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                }
+                hand(hour / 12f, 0.5f, r * 0.1f)
+                hand(minute / 60f, 0.78f, r * 0.06f)
+            }
+        } else {
+            Text(text, color = HyleColors.InkBright, fontSize = (size.value * 0.24f).sp, fontWeight = FontWeight.Light, maxLines = 1)
+        }
+        if (options.date) Text(day.uppercase(), color = HyleColors.InkDim, fontSize = (size.value * 0.1f).sp, letterSpacing = 1.sp, maxLines = 1)
     }
 }
 

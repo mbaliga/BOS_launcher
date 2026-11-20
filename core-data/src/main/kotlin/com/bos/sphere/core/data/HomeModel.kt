@@ -311,6 +311,10 @@ data class LauncherPrefs(
     val glanceClockDate: Boolean = false,
     val glanceClockAccent: Boolean = false,
     val glanceClockSize: ClockSize = ClockSize.Large,
+    /** Wave 45 (editSheet): the options of the clock TILE on a page (its item sheet): analog face instead of digital, 12/24 hour for the digital face, and the day line. Defaults are the look it always had. */
+    val clockTileAnalog: Boolean = false,
+    val clockTileFormat: ClockFormat = ClockFormat.System,
+    val clockTileDate: Boolean = true,
 
     // --- badges and adaptive grid (HOM-09, HOM-11)
     val badgesOn: Boolean = true,

@@ -10,6 +10,14 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.text.style.TextOverflow
+import com.bos.sphere.core.design.L10n
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
@@ -126,12 +134,25 @@ fun ActionRow(
     }
 }
 
+/** True inside the footer of a [GlassDialog]: there a [TextButtonPill] is drawn as One UI's flat accent text button instead of a pill (wave 41). */
+internal val LocalDialogFooter = androidx.compose.runtime.compositionLocalOf { false }
+
 @Composable
-fun TextButtonPill(text: String, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) = TactilePill(text, primary, enabled, onClick)
+fun TextButtonPill(text: String, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    if (LocalDialogFooter.current) {
+        Text(
+            text, fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            color = when { !enabled -> HyleColors.InkDim.copy(alpha = 0.5f); primary -> HyleColors.Violet; else -> HyleColors.Violet },
+            modifier = Modifier.heightIn(min = 56.dp).clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+        )
+    } else TactilePill(text, primary, enabled, onClick)
+}
 
 /**
- * A full-screen sheet in the settings space's look (gradient, waves, spaced-caps header) used for
- * every picker and editor, so nothing floats over the UI as a Material dialog.
+ * A full-screen editor in One UI's page chrome (wave 41): the page background, a 56 dp bar with a back arrow and a centred title, the
+ * [content], and a footer of flat accent text buttons under a hairline. Used for every picker and editor the settings open that holds
+ * more than a dialog can (the app picker, the corner and gesture editors); short questions use [OneUiDialog].
  */
 @Composable
 fun GlassDialog(
@@ -147,49 +168,39 @@ fun GlassDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        DialogControllerKeys()
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
-        ) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color(0xFF07080D), androidx.compose.ui.graphics.Color(0xFF0E0C22), androidx.compose.ui.graphics.Color(0xFF071622)))),
+        LocalOneUiDialogHook.current()
+        Box(Modifier.fillMaxSize().background(OneUi.Page).semantics { paneTitle = title }) {
+            Column(
+                Modifier.fillMaxSize().windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing).imePadding(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                WaveField(Modifier.fillMaxSize())
+                Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.padding(start = 4.dp).size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onDismiss)
+                            .semantics { contentDescription = L10n.tr("Back") },
+                        contentAlignment = Alignment.Center,
+                    ) { OneUiBackArrow() }
+                    Text(
+                        title, color = HyleColors.InkBright, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.weight(1f).semantics { heading() },
+                    )
+                    Spacer(Modifier.width(52.dp))
+                }
                 Column(
                     Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
-                        .imePadding(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp).fillMaxWidth(),
-                    ) {
-                        Text("LIFTOFF", color = HyleColors.InkBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 4.sp)
-                        Text("  ·  ${title.uppercase()}", color = HyleColors.InkDim, fontSize = 12.sp, letterSpacing = 4.sp, maxLines = 1, modifier = Modifier.weight(1f))
-                        Icon(
-                            Glyphs.Close,
-                            contentDescription = "Close",
-                            tint = HyleColors.Ink,
-                            modifier = Modifier.size(40.dp).clickable(onClick = onDismiss).padding(10.dp),
-                        )
-                    }
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .widthIn(max = width)
-                            .fillMaxWidth()
-                            .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                            .padding(horizontal = 18.dp, vertical = 4.dp),
-                        content = content,
-                    )
-                    if (footer != null) {
+                        .weight(1f)
+                        .widthIn(max = width)
+                        .fillMaxWidth()
+                        .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                        .padding(horizontal = 18.dp, vertical = 4.dp),
+                    content = content,
+                )
+                if (footer != null) {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDialogFooter provides true) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                            modifier = Modifier.widthIn(max = width).fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.widthIn(max = width).fillMaxWidth().padding(horizontal = 10.dp),
                         ) { footer() }
                     }
                 }
@@ -207,21 +218,5 @@ fun ConfirmDialog(
     dismiss: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-) {
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        DialogControllerKeys()
-        Column(
-            Modifier
-                .background(HyleColors.SurfaceTranslucent.copy(alpha = 0.98f), RoundedCornerShape(20.dp))
-                .border(1.dp, HyleColors.Hairline, RoundedCornerShape(20.dp))
-                .padding(20.dp),
-        ) {
-            Text(title, color = HyleColors.InkBright, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-            Text(text, color = HyleColors.Ink, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
-                TextButtonPill(dismiss, onClick = onDismiss)
-                TextButtonPill(confirm, primary = true, onClick = onConfirm)
-            }
-        }
-    }
-}
+    destructive: Boolean = false,
+) = OneUiConfirmDialog(title, text, confirm, onConfirm, onDismiss, cancelLabel = dismiss, destructive = destructive)

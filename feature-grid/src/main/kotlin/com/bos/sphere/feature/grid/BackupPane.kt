@@ -158,31 +158,37 @@ fun ColumnScope.BackupPane(onStateChanged: (Context) -> Unit = {}) {
             pickLauncher.launch(arrayOf("application/octet-stream", "application/zip", "application/x-sqlite3", "*/*"))
         }
         launcherImport?.let { r ->
-            note(L10n.tr("Layout found: %d apps on %d pages. %d folders flattened, %d widgets and %d shortcuts left out, %d apps not installed here.", r.apps, r.pages, r.foldersFlattened, r.widgetsSkipped, r.shortcutsSkipped, r.placeholders.size))
-            TextButtonPill(L10n.tr("Replace home layout"), primary = true) {
-                launcherImport = null
-                scope.launch {
-                    runCatching { withContext(Dispatchers.IO) { service.importLauncherLayout(r.layout) } }
-                        .onSuccess { message = L10n.tr("Layout imported. A snapshot of the previous one was taken first."); reloaded() }.onFailure(::fail)
-                }
-            }
-            TextButtonPill(L10n.tr("Cancel")) { launcherImport = null }
+            OneUiConfirmDialog(
+                L10n.tr("Replace home layout"),
+                L10n.tr("Layout found: %d apps on %d pages. %d folders flattened, %d widgets and %d shortcuts left out, %d apps not installed here.", r.apps, r.pages, r.foldersFlattened, r.widgetsSkipped, r.shortcutsSkipped, r.placeholders.size),
+                L10n.tr("Replace home layout"),
+                onConfirm = {
+                    launcherImport = null
+                    scope.launch {
+                        runCatching { withContext(Dispatchers.IO) { service.importLauncherLayout(r.layout) } }
+                            .onSuccess { message = L10n.tr("Layout imported. A snapshot of the previous one was taken first."); reloaded() }.onFailure(::fail)
+                    }
+                },
+                onDismiss = { launcherImport = null }, destructive = true,
+            )
         }
 
         pending?.let { (text, summary) ->
-            note(summary)
-            TextButtonPill(L10n.tr("Import now"), primary = true) {
-                pending = null
-                scope.launch {
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            val installed = runCatching { LauncherAppsAppRepository(context).apps.first().mapTo(HashSet()) { it.key } }.getOrDefault(emptySet())
-                            service.import(text, installed)
-                        }
-                    }.onSuccess { message = describe(it); reloaded() }.onFailure(::fail)
-                }
-            }
-            TextButtonPill(L10n.tr("Cancel")) { pending = null }
+            OneUiConfirmDialog(
+                L10n.tr("Import now"), summary, L10n.tr("Import now"),
+                onConfirm = {
+                    pending = null
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                val installed = runCatching { LauncherAppsAppRepository(context).apps.first().mapTo(HashSet()) { it.key } }.getOrDefault(emptySet())
+                                service.import(text, installed)
+                            }
+                        }.onSuccess { message = describe(it); reloaded() }.onFailure(::fail)
+                    }
+                },
+                onDismiss = { pending = null }, destructive = true,
+            )
         }
         message?.let { note(it) }
         if (needsReload) {

@@ -27,12 +27,13 @@ class DockDeskReviewW24RulesTest {
         assertNull(FocusDockRouting.noDock(HomeShown.Pages, c, dockEnabled = true, editing = false))
     }
 
-    @Test fun CFG_14_settingsSearchFindsTheDockPanelByWorkspacesAndGroups() {
+    @Test fun CFG_14_settingsSearchFindsTheDockPagesByWorkspacesAndGroups() {
         L10n.setLanguage("en")
         val index = SettingsIndex.fromCategories(listOf(desktopCategory()))
-        listOf("workspaces", "groups", "sessions").forEach { q ->
-            assertTrue("\"$q\" finds the dock panel row", index.search(q).any { it.title == "Workspaces, groups and sessions" })
-        }
+        assertTrue("workspaces finds the Workspaces page", index.search("workspaces").any { it.title == "Workspaces" })
+        assertTrue("groups finds the App groups page", index.search("groups").any { it.title == "App groups" })
+        assertTrue("sessions finds the App groups page by its summary", index.search("sessions").any { it.title == "App groups" })
+        assertTrue("dock finds the Dock page", index.search("dock").any { it.title == "Dock" })
     }
 
     @Test fun INP_05_theToastsNameGroundControlWithTheSettingsOwnLabelsInEveryLanguage() {

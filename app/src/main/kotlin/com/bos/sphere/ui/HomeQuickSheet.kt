@@ -69,10 +69,8 @@ fun HomeQuickSheet(
     onGroundControl: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss, containerColor = SheetBlack, dragHandle = null,
-        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp), scrimColor = Color.Black.copy(alpha = 0.62f),
-    ) {
+    // Wave 41: One UI's sheet shape (28 dp top corners and a grabber) through the shared sheet; the black look and the scrim stay.
+    com.bos.sphere.feature.grid.OneUiSheet(onDismiss, containerColor = SheetBlack, scrimColor = Color.Black.copy(alpha = 0.62f)) {
         HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl)
     }
 }

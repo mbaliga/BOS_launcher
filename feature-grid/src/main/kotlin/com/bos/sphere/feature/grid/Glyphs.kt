@@ -217,6 +217,9 @@ object Glyphs {
     val ViewDetails = glyph("viewdetails") {
         for (y in listOf(6.5f, 12.5f, 18.5f)) { moveTo(4f, y - 2f); lineTo(7f, y - 2f); lineTo(7f, y + 1.5f); lineTo(4f, y + 1.5f); close(); moveTo(10f, y - 1.5f); lineTo(20f, y - 1.5f); moveTo(10f, y + 1.2f); lineTo(16f, y + 1.2f) }
     }
+    /** Three dots in a column: the overflow button of a card row (wave 41). */
+    val Check = glyph("check") { moveTo(5f, 12.5f); lineTo(10f, 17.5f); lineTo(19f, 7f) }
+    val More = glyph("more") { moveTo(12f, 5.5f); lineTo(12.1f, 5.5f); moveTo(12f, 12f); lineTo(12.1f, 12f); moveTo(12f, 18.5f); lineTo(12.1f, 18.5f) }
     val Menu = glyph("menu") { moveTo(5f, 7f); lineTo(19f, 7f); moveTo(5f, 12f); lineTo(19f, 12f); moveTo(5f, 17f); lineTo(19f, 17f) }
     val Home = glyph("home", fill = true) { moveTo(12f, 4f); lineTo(21f, 12f); lineTo(18f, 12f); lineTo(18f, 19f); lineTo(6f, 19f); lineTo(6f, 12f); lineTo(3f, 12f); close() }
     /** Radar: rings, a sweep line and a blip. */

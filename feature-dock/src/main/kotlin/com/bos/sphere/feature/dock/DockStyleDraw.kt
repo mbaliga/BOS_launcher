@@ -219,12 +219,11 @@ fun DockStyleChooser(current: DockStyle, onSelect: (DockStyle) -> Unit, modifier
 /** The dock's own long-press route to the same choice. */
 @Composable
 internal fun DockStyleDialog(current: DockStyle, onSelect: (DockStyle) -> Unit, onDismiss: () -> Unit) {
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        DockDialogInput()
-        val shape = RoundedCornerShape(20.dp)
-        Column(Modifier.testTag("dock.styleDialog").clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(L10n.tr("Dock style"), color = HyleColors.InkBright, fontSize = 17.sp)
-            DockStyleChooser(current, onSelect = { onSelect(it); onDismiss() })
+    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
+        com.bos.sphere.feature.grid.OneUiDialog(L10n.tr("Dock style"), onDismiss, cancelLabel = L10n.tr("Close")) {
+            Column(Modifier.testTag("dock.styleDialog").padding(horizontal = 18.dp)) {
+                DockStyleChooser(current, onSelect = { onSelect(it); onDismiss() })
+            }
         }
     }
 }

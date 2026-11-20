@@ -142,11 +142,25 @@ class WorkspaceManager(
 
     // ---- workspaces (WSP-07)
 
-    fun create(name: String): String {
+    fun create(name: String): String = create(name, null)
+
+    /**
+     * Wave 41: a new workspace, empty or a copy of [copyFrom]. A copy takes the home arrangement (the live one when [copyFrom] is the
+     * active workspace and the host can capture it), the dock, the pinned Radar actions and the calm-centre apps. It does not take the
+     * widget slots: those are hosted widget ids that two workspaces cannot share. It is not made active.
+     */
+    fun create(name: String, copyFrom: String?): String {
         val id = newId()
-        update { it.copy(workspaces = it.workspaces + Workspace(id, name.trim().ifEmpty { "Workspace" })) }
+        val src = copyFrom?.let { f -> current.workspaces.firstOrNull { it.id == f } }
+        val live = if (src != null && src.id == current.activeId) liveHome() else null
+        val fresh = if (src == null) Workspace(id, name.trim().ifEmpty { "Workspace" })
+        else src.copy(id = id, name = name.trim().ifEmpty { src.name }, homeArrangement = live ?: src.homeArrangement, widgets = emptyList())
+        update { it.copy(workspaces = it.workspaces + fresh) }
         return id
     }
+
+    /** The live home arrangement when the host can capture one now, else null. */
+    fun liveHome(): String? = hooks().takeIf { it.ready }?.captureHome()
 
     fun rename(id: String, name: String) = update { s -> s.copy(workspaces = s.workspaces.map { if (it.id == id) it.copy(name = name.trim().ifEmpty { it.name }) else it }) }
 

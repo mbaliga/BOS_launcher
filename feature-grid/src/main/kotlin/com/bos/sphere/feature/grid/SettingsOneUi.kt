@@ -94,6 +94,7 @@ object OneUiTags {
     const val BACK = "oneui.back"
     const val TITLE_LARGE = "oneui.titleLarge"
     const val TITLE_SMALL = "oneui.titleSmall"
+    const val SUBTITLE = "oneui.subtitle"
     const val SEARCH = "oneui.search"
     const val LEFT_PANE = "oneui.leftPane"
     const val RIGHT_PANE = "oneui.rightPane"
@@ -226,14 +227,11 @@ internal fun OneUiSettingsHost(
                 }
             }
             confirming?.let { a ->
-                GlassDialog(title = L10n.tr(a.title), onDismiss = { confirming = null }, footer = {
-                    Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextButtonPill(L10n.tr("Cancel"), onClick = { confirming = null })
-                        TextButtonPill(L10n.tr(a.confirmLabel), primary = true, onClick = { confirming = null; a.onClick() })
-                    }
-                }) {
-                    Text(L10n.tr(a.confirm ?: ""), color = HyleColors.Ink, fontSize = 16.sp, modifier = Modifier.padding(22.dp).testTag("gc.confirm.text"))
-                }
+                OneUiConfirmDialog(
+                    title = L10n.tr(a.title), body = L10n.tr(a.confirm ?: ""), confirmLabel = L10n.tr(a.confirmLabel),
+                    onConfirm = { confirming = null; a.onClick() }, onDismiss = { confirming = null },
+                    destructive = true, bodyTag = "gc.confirm.text",
+                )
             }
           }
         }
@@ -291,8 +289,9 @@ private fun OneUiTopBar(title: String, collapse: androidx.compose.runtime.State<
 
 /** Page frame: the bar on top and a list under it whose first item is the large title; reports the collapse fraction to the bar. */
 @Composable
-private fun OneUiPage(
+internal fun OneUiPage(
     title: String,
+    subtitle: String? = null,
     onBack: (() -> Unit)?,
     backLabel: String,
     modifier: Modifier = Modifier,
@@ -318,10 +317,16 @@ private fun OneUiPage(
         ) {
             item(key = "title") {
                 Box(Modifier.fillMaxWidth().heightIn(min = headerDp.dp).padding(horizontal = 28.dp, vertical = 16.dp), contentAlignment = Alignment.BottomStart) {
-                    Text(
-                        title, color = HyleColors.InkBright, fontSize = 36.sp, fontWeight = FontWeight.Normal, lineHeight = 42.sp,
-                        modifier = Modifier.testTag(OneUiTags.TITLE_LARGE).semantics { heading() }.graphicsLayer { this.alpha = OneUiModel.largeTitleAlpha(collapse.value) },
-                    )
+                    Column {
+                        Text(
+                            title, color = HyleColors.InkBright, fontSize = 36.sp, fontWeight = FontWeight.Normal, lineHeight = 42.sp,
+                            modifier = Modifier.testTag(OneUiTags.TITLE_LARGE).semantics { heading() }.graphicsLayer { this.alpha = OneUiModel.largeTitleAlpha(collapse.value) },
+                        )
+                        if (subtitle != null) Text(
+                            subtitle, color = HyleColors.InkDim, fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp).testTag(OneUiTags.SUBTITLE)
+                                .graphicsLayer { this.alpha = OneUiModel.largeTitleAlpha(collapse.value) },
+                        )
+                    }
                 }
             }
             content()
@@ -458,10 +463,12 @@ private fun OneUiItem(item: SettingItem, index: Int, lit: Boolean, host: ItemHos
 @Composable
 private fun OneUiSubPage(category: SettingCategory, itemIndex: Int, host: ItemHost, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val row = category.items.getOrNull(itemIndex) ?: return
-    OneUiPage(title = row.title, onBack = onBack, backLabel = L10n.tr("Back"), modifier = modifier, tag = OneUiTags.SUB_PAGE) {
+    val subtitle = (row as? SettingItem.Pane)?.pageSubtitle?.invoke()
+    OneUiPage(title = row.title, subtitle = subtitle, onBack = onBack, backLabel = L10n.tr("Back"), modifier = modifier, tag = OneUiTags.SUB_PAGE) {
         when (row) {
             is SettingItem.Pane -> item(key = "pane") {
-                Box(Modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().clip(OneUi.CardShape).background(OneUi.Card).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                if (row.bare) Column(Modifier.fillMaxWidth()) { row.content(this) }
+                else Box(Modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().clip(OneUi.CardShape).background(OneUi.Card).padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Column(Modifier.fillMaxWidth()) { row.content(this) }
                 }
             }

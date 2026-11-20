@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -19,6 +21,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,48 +98,41 @@ internal class PressPositionProvider(private val press: IntOffset, private val g
 @Composable
 internal fun DockMenuPopup(press: IntOffset, tag: String, entries: List<DockMenuEntry>, onDismiss: () -> Unit) {
     val first = androidx.compose.runtime.remember { FocusRequester() }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(com.bos.sphere.feature.grid.OneUiDialogSpec.MENU_CORNER_DP.dp)
     Popup(popupPositionProvider = PressPositionProvider(press, 12), onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+        // One UI popup menu (wave 41): rounded 16 dp, raised, 48 dp rows, no dividers.
         Column(
-            Modifier.testTag(tag).widthIn(min = 180.dp, max = 260.dp).heightIn(max = 360.dp).clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape)
-                .verticalScroll(rememberScrollState()).padding(vertical = 6.dp),
+            Modifier.testTag(tag).widthIn(min = 180.dp, max = 280.dp).heightIn(max = 360.dp).shadow(8.dp, shape).clip(shape).background(HyleColors.Surface)
+                .verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
         ) {
-            entries.forEachIndexed { i, e ->
-                Text(
-                    e.label, color = HyleColors.InkBright, fontSize = 14.sp,
-                    modifier = Modifier.fillMaxWidth().then(if (i == 0) Modifier.focusRequester(first) else Modifier)
-                        .clickable { onDismiss(); e.run() }.padding(horizontal = 16.dp, vertical = 12.dp).semantics { role = Role.Button },
-                )
-            }
+            com.bos.sphere.feature.grid.OneUiMenuRows(entries.map { e -> com.bos.sphere.feature.grid.OneUiMenuEntry(e.label, run = e.run) }, onDismiss, firstModifier = Modifier.focusRequester(first))
         }
     }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 }
 
-/** "Edit dock": the pinned items with move and remove, and a way to add apps; the old panel's pin editing without a drag. */
+/** "Edit dock": the pinned items, each with a menu (move earlier, move later, remove), and a way to add apps; the old panel's pin editing without a drag. */
 @Composable
 internal fun EditDockDialog(content: DockContent, actions: DockActions, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        DockDialogInput()
-        val shape = RoundedCornerShape(20.dp)
-        Column(
-            Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).verticalScroll(rememberScrollState()).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Heading("Edit dock")
-            if (content.pinned.isEmpty()) Hint(L10n.tr("Nothing is pinned to the dock yet."))
+    var menuFor by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
+        com.bos.sphere.feature.grid.OneUiDialog(L10n.tr("Edit dock"), onDismiss, cancelLabel = null, confirmLabel = L10n.tr("Done"), onConfirm = onDismiss) {
+            if (content.pinned.isEmpty()) Text(L10n.tr("Nothing is pinned to the dock yet."), color = HyleColors.InkDim, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             content.pinned.forEachIndexed { i, item ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(item.label, color = HyleColors.Ink, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
-                    if (i > 0) Btn("Move earlier") { actions.onReorder(i, i - 1) }
-                    Spacer(Modifier.width(8.dp))
-                    if (i < content.pinned.lastIndex) Btn("Move later") { actions.onReorder(i, i + 1) }
-                    Spacer(Modifier.width(8.dp))
-                    Btn("Unpin") { actions.onUnpin(item) }
+                val entries = buildList {
+                    if (i > 0) add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Move earlier")) { actions.onReorder(i, i - 1) })
+                    if (i < content.pinned.lastIndex) add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Move later")) { actions.onReorder(i, i + 1) })
+                    add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Unpin"), destructive = true) { actions.onUnpin(item) })
+                }
+                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 24.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(item.label, color = HyleColors.InkBright, fontSize = 17.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                    com.bos.sphere.feature.grid.OneUiMoreButton(L10n.tr("More options for %s", item.label), menuFor == i, { open -> menuFor = if (open) i else null }, entries)
                 }
             }
-            Btn("Add apps") { actions.onAddApps() }
-            Box(Modifier.align(Alignment.End)) { Btn("Done", onDismiss) }
+            Text(
+                L10n.tr("Add apps"), color = HyleColors.Violet, fontSize = 17.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { actions.onAddApps() }.padding(horizontal = 24.dp, vertical = 16.dp),
+            )
         }
     }
 }

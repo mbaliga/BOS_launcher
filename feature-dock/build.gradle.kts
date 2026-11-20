@@ -42,6 +42,7 @@ android {
 
 dependencies {
     implementation(project(":core-design"))
+    implementation(project(":feature-grid"))
     api(project(":core-data"))
     api(project(":core-capabilities"))
     api(project(":core-launch"))

@@ -65,6 +65,8 @@ class ShortcutRebindUiTest {
             }
         }
         rule.mainClock.advanceTimeBy(300)
+        // Wave 41: the editor no longer draws the looping wave field, which used to keep the frame loop (and so the looper) running by itself.
+        rule.waitForIdle(); rule.mainClock.advanceTimeBy(100)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

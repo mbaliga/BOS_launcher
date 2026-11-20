@@ -102,18 +102,15 @@ fun PageEditorMenuButton(menu: PageEditorMenu, modifier: Modifier = Modifier) {
                 .semantics { role = Role.Button; contentDescription = L10n.tr("Page editor menu") },
             contentAlignment = Alignment.Center,
         ) { androidx.compose.material3.Icon(Glyphs.Menu, null, tint = HyleColors.InkBright, modifier = Modifier.size(24.dp)) }
-        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            @Composable fun Item(label: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(label) }, enabled = enabled, onClick = { open = false; onClick() },
-                    modifier = Modifier.testTag(tag).semantics { contentDescription = label },
-                )
-            }
-            Item(L10n.tr("Done"), "pe.menu.done", onClick = menu.onDone)
-            Item(L10n.tr("Undo"), "pe.menu.undo", menu.canUndo, menu.onUndo)
-            Item(L10n.tr("Redo"), "pe.menu.redo", menu.canRedo, menu.onRedo)
-            Item(L10n.tr("Add page"), "pe.menu.add", onClick = menu.onAddPage)
-        }
+        OneUiMenu(
+            open, { open = false },
+            listOf(
+                OneUiMenuEntry(L10n.tr("Done"), tag = "pe.menu.done", run = menu.onDone),
+                OneUiMenuEntry(L10n.tr("Undo"), enabled = menu.canUndo, tag = "pe.menu.undo", run = menu.onUndo),
+                OneUiMenuEntry(L10n.tr("Redo"), enabled = menu.canRedo, tag = "pe.menu.redo", run = menu.onRedo),
+                OneUiMenuEntry(L10n.tr("Add page"), tag = "pe.menu.add", run = menu.onAddPage),
+            ),
+        )
     }
 }
 

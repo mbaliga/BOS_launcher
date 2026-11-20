@@ -258,7 +258,20 @@ class W4RadarInputDockTest {
                 }
             }
         }
-        assertEquals("the seven dialog windows of the dock (panel, group editor, app picker, session, schedule, rail help, edit dock)", 7, dialogs)
+        assertEquals("wave 41: the only raw dialog window of the dock is the panel's full page", 1, dialogs)
+        // Every other dock dialog is a One UI dialog (group editor, app picker, session, schedule, rail help, edit dock, style, confirms): it
+        // takes the window hook from LocalOneUiDialogHook, which the dock provides (DockPagesScope), so a file that opens one must provide it.
+        val oneUi = Regex("""\bOneUi\w*Dialog\(""")
+        var users = 0
+        for (f in files) {
+            val text = f.readText()
+            if (oneUi.containsMatchIn(text)) {
+                users++
+                assertTrue("${f.name} opens a One UI dialog without providing the dock's dialog hook",
+                    "DockPagesScope" in text || "DockDialogHook" in text)
+            }
+        }
+        assertTrue("the dock's dialogs are found (pages, menu, schedule, rail, style)", users >= 4)
     }
 
     @Test fun INP_20_theRailsHelpDialogInstallsTheDialogHook() {

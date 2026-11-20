@@ -193,7 +193,7 @@ fun PushToTalkButton(onText: (String) -> Unit, modifier: Modifier = Modifier, av
         PushToTalk(
             recogniserOverride ?: AndroidOnDeviceRecogniser(context),
             hasPermission = { context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED },
-            askPermission = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.Microphone) { permission.launch(Manifest.permission.RECORD_AUDIO) } }, // CFG-07: explanation first
+            askPermission = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.Microphone) { runCatching { permission.launch(Manifest.permission.RECORD_AUDIO) } } }, // CFG-07: explanation first (wave 41: a launcher whose Radar closed meanwhile is unregistered; that is not a crash)
             onText = { latestText(it) },
             onListening = { listening = it },
         )

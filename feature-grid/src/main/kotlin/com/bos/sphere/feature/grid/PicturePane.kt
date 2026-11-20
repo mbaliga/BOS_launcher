@@ -211,16 +211,12 @@ internal fun PictureEditor(surface: WallpaperSurface, w: Wallpaper, apply: (Wall
 /** The confirmation before an animated wallpaper is switched on: a small centred card, two 48 dp buttons, read as a dialog by TalkBack. */
 @Composable
 internal fun PowerDialog(video: Boolean, onUse: () -> Unit, onOther: () -> Unit) {
-    androidx.compose.ui.window.Dialog(onDismissRequest = onOther) {
-        Column(
-            Modifier.clip(RoundedCornerShape(20.dp)).background(HyleColors.SurfaceTranslucent.copy(alpha = 0.98f)).padding(20.dp).semantics { liveRegion = LiveRegionMode.Assertive },
-        ) {
-            Text(L10n.tr("Animated wallpapers use more power"), color = HyleColors.InkBright, fontSize = 17.sp)
-            Text(L10n.tr("This may consume excessive battery and compute, and may cause the phone to heat up or lag."), color = HyleColors.Ink, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
-            PaneButton(L10n.tr("Use anyway"), Modifier.fillMaxWidth(), primary = true, onClick = onUse)
-            PaneButton(L10n.tr(if (video) "Cancel" else "Choose a still instead"), Modifier.fillMaxWidth().padding(top = 8.dp), onClick = onOther)
-        }
-    }
+    OneUiDialog(
+        L10n.tr("Animated wallpapers use more power"), onOther, cancelLabel = L10n.tr(if (video) "Cancel" else "Choose a still instead"),
+        confirmLabel = L10n.tr("Use anyway"), onConfirm = onUse,
+        body = L10n.tr("This may consume excessive battery and compute, and may cause the phone to heat up or lag."),
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+    )
 }
 
 /** The standing warning line, shown while an animated picture or a video is the wallpaper. */

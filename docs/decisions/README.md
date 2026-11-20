@@ -4,6 +4,7 @@ One line per record, newest wave first. A record explains why a requirement is b
 
 | Record | Wave | What it decides |
 | --- | --- | --- |
+| [settingsPopups.md](settingsPopups.md) | 41 | Settings popups in One UI style: pane = page (the dock panel card is gone), the shared dialog, radio, check, text-entry, segmented, menu and sheet kit; the Workspaces page (what a workspace is, list with active badge and menu, add with a copy, calm-centre radio) and the App groups page (WSP-05, WSP-07, WSP-08, DCK-04, CFG-21) |
 | [previewWindow.md](previewWindow.md) | 39 | The Settings live preview is a floating window: bar, drag, resize, pinch, minimise to a pill, remembered per orientation in a device-local file; keys and TalkBack actions (CFG-18) |
 | [wallpaper.md](wallpaper.md) | 34 | One Wallpaper picker with five kinds (solid, gradient, signal, system live, picture); picture from the Photo Picker copied to private local-only storage with Fill/Fit and dim; animated GIF/WebP and video with Still / Play once / Loop (Continuous or Bounce, Bounce for GIF only); a power-warning dialog and standing line; the system live wallpaper through a transparent surface; the spider-sense alert over every kind and on Radar |
 | [filesViews.md](filesViews.md) | 31 | Files tab as a list or a grid of real previews: one persisted toggle, async cached thumbnails through the granted document URIs, type tiles, long-press Quick Look preview (HOM-15) |

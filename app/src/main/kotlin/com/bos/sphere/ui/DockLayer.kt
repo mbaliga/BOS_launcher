@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -243,26 +244,34 @@ fun DockPanelHost(
         manager = manager, tier = tier, apps = panelApps, displays = launcher.displays(),
         onRunGroup = { g -> onRunGroup(g); onDismiss() },
         onRestore = { s -> onRestore(s); onDismiss() },
-        onSchedule = { target, label, at ->
-            val sl = ScheduledLaunch(manager.idFor("sc"), label, at, target)
-            manager.addSchedule(sl); Scheduler.schedule(context, sl)
-            val on = context.getSystemService(android.app.NotificationManager::class.java)?.areNotificationsEnabled() != false
-            android.widget.Toast.makeText(context, L10n.tr(if (on) "A notification with an Open action will appear at the chosen time" else "Notifications are off for Liftoff, so the scheduled launch cannot appear"), android.widget.Toast.LENGTH_SHORT).show()
-        },
+        onSchedule = { target, label, at -> scheduleFromPanel(context, manager, target, label, at) },
         onDismiss = onDismiss,
         paletteActionChoices = PinnableActions.choices(),
         groupShelfOn = wsState.dock.groupShelf,
         onGroupShelf = { v -> manager.setDock { it.copy(groupShelf = v) } },
-        extra = {
-            // EXT-02: a quick way to reopen the desktop surface, as a dock item.
-            val pin = DockItemRef(ItemKind.Shortcut, DESKTOP_PIN_ID)
-            val pinned = pin in wsState.active.dockPins
-            com.bos.sphere.feature.dock.Heading("Desktop on an external display")
-            com.bos.sphere.feature.dock.Btn(if (pinned) "Remove the Desktop item from the dock" else "Add a Desktop item to the dock") {
-                manager.setPins(if (pinned) wsState.active.dockPins - pin else wsState.active.dockPins + pin)
-            }
-            com.bos.sphere.feature.dock.Hint(L10n.tr("The Desktop item opens the Liftoff desktop on a connected display."))
-        },
+        extra = { DesktopPinRow(manager) },
+    )
+}
+
+/** A scheduled launch from the panel or the Ground Control page: stored, handed to the scheduler, and the toast says whether it can show. */
+internal fun scheduleFromPanel(context: android.content.Context, manager: com.bos.sphere.feature.dock.WorkspaceManager, target: com.bos.sphere.feature.dock.RunTarget, label: String, at: Long) {
+    val sl = ScheduledLaunch(manager.idFor("sc"), label, at, target)
+    manager.addSchedule(sl); Scheduler.schedule(context, sl)
+    val on = context.getSystemService(android.app.NotificationManager::class.java)?.areNotificationsEnabled() != false
+    android.widget.Toast.makeText(context, L10n.tr(if (on) "A notification with an Open action will appear at the chosen time" else "Notifications are off for Liftoff, so the scheduled launch cannot appear"), android.widget.Toast.LENGTH_SHORT).show()
+}
+
+/** EXT-02: a quick way to reopen the desktop surface, as a dock item (one switch row of the Dock page). */
+@Composable
+internal fun DesktopPinRow(manager: com.bos.sphere.feature.dock.WorkspaceManager) {
+    val wsState by manager.state.collectAsState()
+    val pin = DockItemRef(ItemKind.Shortcut, DESKTOP_PIN_ID)
+    val pinned = pin in wsState.active.dockPins
+    com.bos.sphere.feature.grid.OneUiSwitchRow(
+        L10n.tr("Desktop item in the dock"), pinned,
+        { on -> manager.setPins(if (on) wsState.active.dockPins + pin else wsState.active.dockPins - pin) },
+        summary = L10n.tr("The Desktop item opens the Liftoff desktop on a connected display."),
+        modifier = androidx.compose.ui.Modifier.testTag("dock.desktopItem"),
     )
 }
 

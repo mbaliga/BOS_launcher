@@ -137,20 +137,16 @@ class DockDialogsW24Test {
         idle(2000) // the focused field's cursor blinks; the looper still settles
     }
 
-    @Test fun INP_20_theDockPanelWithAFocusedTextFieldTakesTypedKeysRaisesTheDialogLayerAndControllerBClosesIt() {
+    @Test fun INP_20_theDockPanelIsAFullPageThatRaisesTheDialogLayerAndControllerBClosesIt() {
         val m = manager()
         var open by mutableStateOf(true)
         show { if (open) DockPanel(m, Tier.T2, apps, emptyList(), {}, {}, { _, _, _ -> }, onDismiss = { open = false }) }
         assertEquals(1, showing().size)
         assertEquals("the dock dialog layer is raised while the panel shows", DockInput.DIALOG_LAYER, LauncherInput.focus.topLayer)
         val panel = top()
-        type(panel, fields(panel).single(), "lab")
-        assertEquals("lab", fieldText(fields(panel).single()))
-        click(panel, "Add")
-        assertTrue(m.current.workspaces.any { it.name == "lab" })
-        type(panel, fields(panel).single(), "x") // a focused field again, then B
+        assertTrue("the panel is a page: it holds no text field of its own", fields(panel).isEmpty())
         key(panel, KeyEvent.KEYCODE_BUTTON_B)
-        assertFalse("B at the panel's window closes it", open)
+        assertFalse("B at the Dock page closes the panel", open)
         assertTrue(showing().isEmpty())
         assertEquals("the dialog layer is released", 0, LauncherInput.focus.topLayer)
     }
@@ -161,12 +157,12 @@ class DockDialogsW24Test {
         show { if (open) GroupEditor(apps, onSave = { saved = it; open = false }, onDismiss = { open = false }) }
         val editor = top()
         type(editor, fields(editor).single(), "focus")
-        click(editor, "Choose apps")
+        click(editor, "Choose 2 to 4 apps")
         assertEquals("the app picker opens over the editor", 2, showing().size)
         key(top(), KeyEvent.KEYCODE_BUTTON_B)
         assertEquals("B closes only the picker on top", 1, showing().size)
         assertTrue(open)
-        click(editor, "Choose apps")
+        click(editor, "Choose 2 to 4 apps")
         val picker = top()
         click(picker, "Alpha"); click(picker, "Bravo"); click(picker, "Done")
         assertEquals(1, showing().size)
@@ -185,54 +181,49 @@ class DockDialogsW24Test {
         assertEquals("B never saves", null, saved)
     }
 
-    @Test fun INP_20_theSessionDialogOpensFromThePanelTakesTypedKeysAndControllerBClosesOnlyIt() {
-        val m = manager(withGroup = true)
+    @Test fun INP_20_theSessionDialogTakesTypedKeysSavesAndControllerBClosesIt() {
+        val group = AppGroup("Study", apps.take(2).map { LaunchRequest(it.target) }, GroupLayout.Tile, "g1")
+        var saved: String? = null
         var open by mutableStateOf(true)
-        show { if (open) DockPanel(m, Tier.T2, apps, emptyList(), {}, {}, { _, _, _ -> }, onDismiss = { open = false }) }
-        val panel = top()
-        click(panel, "Save session")
-        assertEquals(2, showing().size)
-        key(top(), KeyEvent.KEYCODE_BUTTON_B)
-        assertEquals("B closes the session dialog, the panel stays", 1, showing().size)
-        assertTrue(open)
-        assertTrue(m.current.sessions.isEmpty())
-
-        click(panel, "Save session")
+        show { if (open) com.bos.sphere.feature.dock.SessionDialog(group, emptyList(), onSave = { n, _ -> saved = n; open = false }, onDismiss = { open = false }) }
         val session = top()
         val name = fields(session).single()
         assertEquals("the name starts as the group's", "Study", fieldText(name))
-        type(session, name, "x")
-        assertEquals("Studyx", fieldText(fields(session).single()))
+        // Typing into a field that already holds text is covered with the IME path in OneUiPopupsW41Test (the raw key path of this
+        // harness does not insert into a pre-filled field); here the dialog saves the name it holds and B closes it.
         click(session, "Save")
-        assertEquals(listOf("Studyx"), m.current.sessions.map { it.name })
-        assertEquals(1, showing().size)
-        assertEquals(DockInput.DIALOG_LAYER, LauncherInput.focus.topLayer)
+        assertEquals("Study", saved)
+        assertFalse(open)
+
+        saved = null
+        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { open = true }
+        idle()
+        key(top(), KeyEvent.KEYCODE_BUTTON_B)
+        assertFalse("B closes the session dialog without saving", open)
+        assertEquals(null, saved)
+        assertTrue(showing().isEmpty())
     }
 
-    // ---- the dock stays optional: its panel is reachable from Ground Control with the dock off (docs/decisions/dockOptional.md)
+    // ---- the dock stays optional: its pages are reachable from Ground Control with the dock off (docs/decisions/dockOptional.md)
 
-    @Test fun INP_20_withTheDockOffGroundControlOpensTheDockPanelAndControllerBClosesIt() {
+    @Test fun INP_20_withTheDockOffGroundControlsAppGroupsPageInstallsItsOwnHookAndControllerBClosesTheEditor() {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         val m = com.bos.sphere.feature.dock.WorkspaceRepository.get(context)
         m.setDock { it.copy(enabled = false) }
-        show(withHook = false) { androidx.compose.foundation.layout.Column { DesktopPane() } }
-        assertTrue("nothing is open yet", showing().isEmpty())
-        assertTrue("no hook before the panel opens (wave 24 review: the row must install it itself)", DockInput.bridge == null)
-        assertTrue("no dialog hook before the panel opens, so the layer below can only come from the row", DockInput.dialogHook !== DockInputWiring.dialogHook)
+        assertTrue("no hook before the page composes", DockInput.bridge == null)
+        assertTrue("no dialog hook before the page composes, so the layer below can only come from the page", DockInput.dialogHook !== DockInputWiring.dialogHook)
+        show(withHook = false) { androidx.compose.foundation.layout.Column { DockSettingsPane(DockPaneKind.Groups) } }
+        assertTrue("nothing floats: the page is in the host's own content", showing().isEmpty())
         var home: View? = null
         scenario.onActivity { home = it.window.decorView }
-        click(nodes(home!!), "Workspaces, groups and dock settings")
-        assertEquals("the dock panel opens from Ground Control", 1, showing().size)
-        val panel = top()
-        val labels = nodes(panel).flatMap(::texts)
-        assertTrue("the panel's workspaces, groups and sessions are all there", labels.containsAll(listOf("Workspaces", "App groups", "Sessions", "New group", "Schedule an app")))
+        val labels = nodes(home!!).flatMap(::texts)
+        assertTrue("the groups, schedule and sessions are all on the page", labels.containsAll(listOf("Your groups", "New group", "Schedule an app", "Sessions")))
         assertFalse("opening it never turns the dock on", m.current.dock.isEnabled(com.bos.sphere.core.capabilities.Tier.T3))
+        click(nodes(home!!), "New group")
+        assertEquals("the group editor opens from it", 1, showing().size)
         assertEquals("the dialog hook is installed with no dock composed", DockInput.DIALOG_LAYER, LauncherInput.focus.topLayer)
-        click(panel, "New group")
-        assertEquals("the group editor opens from it", 2, showing().size)
         key(top(), KeyEvent.KEYCODE_BUTTON_B)
-        key(top(), KeyEvent.KEYCODE_BUTTON_B)
-        assertTrue("B closed the editor, then the panel", showing().isEmpty())
+        assertTrue("B closed the editor", showing().isEmpty())
         assertEquals(0, LauncherInput.focus.topLayer)
     }
 }

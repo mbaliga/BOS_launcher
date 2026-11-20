@@ -242,15 +242,15 @@ private fun Modifier.graphNode(id: String, bridge: DockInput.FocusBridge?): Modi
 
 @Composable
 private fun HelpDialog(onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        DockDialogInput() // INP-20: controller window hook and the shared focus layer
-        val shape = RoundedCornerShape(20.dp)
-        Column(Modifier.clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(20.dp)) {
-            Text(L10n.tr("About the dock"), color = HyleColors.InkBright, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(10.dp))
-            Text(L10n.tr(DockText.RECENCY_HELP), color = HyleColors.Ink, fontSize = 14.sp)
-            Spacer(Modifier.height(8.dp))
-            Text(L10n.tr("Alt with an arrow key, or a long press and drag, reorders pinned items."), color = HyleColors.InkDim, fontSize = 13.sp)
+    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
+        com.bos.sphere.feature.grid.OneUiDialog(
+            L10n.tr("About the dock"), onDismiss, cancelLabel = null, confirmLabel = L10n.tr("Done"), onConfirm = onDismiss,
+            body = L10n.tr(DockText.RECENCY_HELP),
+        ) {
+            androidx.compose.material3.Text(
+                L10n.tr("Alt with an arrow key, or a long press and drag, reorders pinned items."), color = HyleColors.InkDim, fontSize = 15.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
+            )
         }
     }
 }

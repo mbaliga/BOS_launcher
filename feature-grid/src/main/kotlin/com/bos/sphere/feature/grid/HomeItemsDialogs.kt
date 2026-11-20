@@ -48,18 +48,20 @@ import kotlinx.coroutines.withContext
 
 @Composable
 private fun Panel(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    // Wave 41: One UI's dialog shape (28 dp, no border), the rows below are 56 dp.
     Dialog(onDismissRequest = onDismiss) {
-        val shape = RoundedCornerShape(24.dp)
-        Column(Modifier.clip(shape).background(HyleColors.Surface.copy(alpha = 0.97f)).border(1.dp, HyleColors.Hairline, shape).padding(16.dp)) { content() }
+        LocalOneUiDialogHook.current()
+        val shape = RoundedCornerShape(OneUiDialogSpec.CORNER_DP.dp)
+        Column(Modifier.clip(shape).background(HyleColors.Surface).padding(vertical = 16.dp, horizontal = 8.dp)) { content() }
     }
 }
 
 @Composable
 private fun Row1(text: String, selected: Boolean = false, hint: String? = null, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(text, color = HyleColors.InkBright, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (hint != null) Text(hint, color = HyleColors.InkDim, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(text, color = HyleColors.InkBright, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (hint != null) Text(hint, color = HyleColors.InkDim, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         if (selected) Text("✓", color = HyleColors.InkBright, fontSize = 16.sp)
     }
@@ -82,7 +84,7 @@ fun HomeItemsSheet(
     onPanel: ((com.bos.sphere.core.catalog.PanelTab) -> Unit)? = null,
 ) {
     Panel(onDismiss) {
-        Text(L10n.tr("Home items"), color = HyleColors.InkBright, fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
+        Text(L10n.tr("Home items"), color = HyleColors.InkBright, fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
         Row1(L10n.tr("Widget"), hint = L10n.tr("Pick from a searchable list")) { onWidget() }
         Row1(L10n.tr("New folder")) { onFolder() }
         Row1(L10n.tr("App shortcut"), hint = L10n.tr("A shortcut an app offers")) { onShortcut() }
@@ -109,16 +111,12 @@ fun GroupPickerDialog(groups: List<Triple<String, String, Int>>, onPick: (id: St
 
 @Composable
 fun LinkDialog(onAdd: (String) -> Unit, onDismiss: () -> Unit) {
-    var text by remember { mutableStateOf("https://") }
-    Panel(onDismiss) {
-        Text(L10n.tr("Web link"), color = HyleColors.InkBright, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
-        BasicTextField(
-            value = text, onValueChange = { text = it }, singleLine = true,
-            textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 16.sp), cursorBrush = SolidColor(HyleColors.InkBright),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        )
-        Row1(L10n.tr("Add to home")) { text.trim().takeIf { it.length > 8 && ' ' !in it }?.let { onAdd(it); onDismiss() } }
-    }
+    OneUiTextEntryDialog(
+        L10n.tr("Web link"), "https://", L10n.tr("Web link"), L10n.tr("Add to home"),
+        onConfirm = { t -> t.takeIf { it.length > 8 && ' ' !in it }?.let { onAdd(it); onDismiss() } },
+        onDismiss = onDismiss,
+        error = { t -> if (t.isNotEmpty() && (t.length <= 8 || ' ' in t)) L10n.tr("Enter a full web address") else null },
+    )
 }
 
 /** A shortcut an app offers. */

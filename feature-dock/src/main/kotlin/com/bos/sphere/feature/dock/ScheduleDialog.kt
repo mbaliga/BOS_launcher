@@ -2,6 +2,12 @@ package com.bos.sphere.feature.dock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,35 +41,38 @@ fun ScheduleDialog(label: String, now: Long, onDismiss: () -> Unit, onPick: (Lon
     val start = remember { java.util.Calendar.getInstance().apply { timeInMillis = now + 3_600_000L } }
     var hour by remember { mutableIntStateOf(start.get(java.util.Calendar.HOUR_OF_DAY)) }
     var minute by remember { mutableIntStateOf((start.get(java.util.Calendar.MINUTE) / 5) * 5) }
-    Dialog(onDismissRequest = onDismiss) {
-        DockDialogInput() // INP-20: controller window hook and the shared focus layer
-        val shape = RoundedCornerShape(24.dp)
-        Column(
-            Modifier.fillMaxWidth().clip(shape).background(HyleColors.Surface).border(1.dp, HyleColors.Hairline, shape).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
+        com.bos.sphere.feature.grid.OneUiDialog(
+            L10n.tr("Remind me to open %s", label), onDismiss, confirmLabel = L10n.tr("Set"),
+            onConfirm = { onPick(ScheduleTime.nextOccurrence(now, hour, minute)) },
+            body = L10n.tr("At %s a notification with an Open action appears. Nothing opens on its own.", ScheduleTime.clock(hour, minute)),
         ) {
-            Heading(L10n.tr("Remind me to open %s", label))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                Stepper("hour", hour, { hour = ScheduleTime.wrap(hour, it, 24) })
+                Stepper(hour, { hour = ScheduleTime.wrap(hour, it, 24) }, L10n.tr("hour"))
                 Text(":", color = HyleColors.InkBright, fontSize = 28.sp, modifier = Modifier.padding(horizontal = 8.dp))
-                Stepper("minute", minute, { minute = ScheduleTime.wrap(minute, it * 5, 60) })
+                Stepper(minute, { minute = ScheduleTime.wrap(minute, it * 5, 60) }, L10n.tr("minute"))
             }
-            Hint(L10n.tr("At %s a notification with an Open action appears. Nothing opens on its own.", ScheduleTime.clock(hour, minute)))
-            Row {
-                Btn("Cancel", onDismiss)
-                Spacer(Modifier.width(8.dp))
-                Btn("In 1 h") { onPick(ScheduleTime.inMinutes(now, 60)) }
-                Btn("Set") { onPick(ScheduleTime.nextOccurrence(now, hour, minute)) }
-            }
+            Text(
+                L10n.tr("In 1 h"), color = HyleColors.Violet, fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { onPick(ScheduleTime.inMinutes(now, 60)) }.padding(16.dp),
+            )
         }
     }
 }
 
 @Composable
-private fun Stepper(what: String, value: Int, step: (Int) -> Unit) {
+private fun Stepper(value: Int, step: (Int) -> Unit, what: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Btn("+") { step(1) }
+        StepButton("+", L10n.tr("Next %s", what)) { step(1) }
         Text("%02d".format(value), color = HyleColors.InkBright, fontSize = 28.sp, fontWeight = FontWeight.Medium)
-        Btn("-") { step(-1) }
+        StepButton("−", L10n.tr("Previous %s", what)) { step(-1) }
     }
+}
+
+@Composable
+private fun StepButton(glyph: String, label: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(48.dp).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick).semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) { Text(glyph, color = HyleColors.Violet, fontSize = 24.sp, fontWeight = FontWeight.Medium) }
 }

@@ -66,7 +66,7 @@ class SettingsIndex(val entries: List<SettingEntry>) {
 
     companion object {
         /** Hidden search aliases: the product word before the rename ("Launchpad") still finds Comms. Never shown. */
-        private val ALIASES = mapOf("launchpad" to "comms")
+        private val ALIASES = mapOf("launchpad" to "comms", "sessions" to "groups") // wave 41: sessions live on the App groups page
 
         fun id(category: Int, item: Int) = "$category/$item"
 

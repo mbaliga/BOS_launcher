@@ -838,11 +838,12 @@ internal fun ResultPreview(
                     tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
                 }
             }
-            Row(Modifier.padding(top = 20.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
-                if (tile is Tile.App) Text(L10n.tr("Options").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0x33FFFFFF)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
-                Text(L10n.tr("Open").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
+            // Never side by side: the primary action is a coloured box on top, the secondary one is plain text below it.
+            androidx.compose.foundation.layout.Column(Modifier.padding(top = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(L10n.tr("Open").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(min = 200.dp).clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
+                if (tile is Tile.App) Text(L10n.tr("Options").uppercase(), color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(14.dp)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
             }
         }
     }

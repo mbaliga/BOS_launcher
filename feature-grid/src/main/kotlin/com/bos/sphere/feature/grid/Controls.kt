@@ -141,11 +141,14 @@ internal val LocalDialogFooter = androidx.compose.runtime.compositionLocalOf { f
 @Composable
 fun TextButtonPill(text: String, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     if (LocalDialogFooter.current) {
+        // Footer buttons are stacked, never side by side: the primary one is a coloured box, the others plain accent text.
         Text(
             text, fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            color = when { !enabled -> HyleColors.InkDim.copy(alpha = 0.5f); primary -> HyleColors.Violet; else -> HyleColors.Violet },
-            modifier = Modifier.heightIn(min = 56.dp).clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
-                .padding(horizontal = 18.dp, vertical = 16.dp),
+            color = when { !enabled -> HyleColors.InkDim.copy(alpha = 0.5f); primary -> androidx.compose.ui.graphics.Color.White; else -> HyleColors.Violet },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                .background(if (primary) (if (enabled) HyleColors.Violet.copy(alpha = 0.75f) else HyleColors.InkDim.copy(alpha = 0.18f)) else androidx.compose.ui.graphics.Color.Transparent)
+                .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 14.dp),
         )
     } else TactilePill(text, primary, enabled, onClick)
 }
@@ -175,9 +178,9 @@ fun GlassDialog(
             if (footer != null) {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
                 androidx.compose.runtime.CompositionLocalProvider(LocalDialogFooter provides true) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().background(OneUi.Page).windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal + androidx.compose.foundation.layout.WindowInsetsSides.Bottom)).padding(horizontal = 10.dp),
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth().background(OneUi.Page).padding(horizontal = 20.dp, vertical = 8.dp).windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal + androidx.compose.foundation.layout.WindowInsetsSides.Bottom)).padding(horizontal = 10.dp),
                     ) { footer() }
                 }
             }

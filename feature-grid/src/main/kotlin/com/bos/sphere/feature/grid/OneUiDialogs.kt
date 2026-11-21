@@ -164,10 +164,10 @@ internal fun OneUiDialogCard(
                 }
                 if (cancelLabel != null || confirmLabel != null) {
                     Box(Modifier.fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
-                    Row(Modifier.fillMaxWidth()) {
+                    // Never side by side: the primary action is a coloured box on top, the secondary one plain text below it.
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (confirmLabel != null) OneUiDialogButton(confirmLabel, OneUiDialogTags.CONFIRM, { onConfirm?.invoke() }, enabled = confirmEnabled, destructive = destructive, filled = true)
                         if (cancelLabel != null) OneUiDialogButton(cancelLabel, OneUiDialogTags.CANCEL, onDismiss)
-                        if (cancelLabel != null && confirmLabel != null) Box(Modifier.width(1.dp).height(OneUiDialogSpec.BUTTON_HEIGHT_DP.dp).background(HyleColors.Hairline))
-                        if (confirmLabel != null) OneUiDialogButton(confirmLabel, OneUiDialogTags.CONFIRM, { onConfirm?.invoke() }, enabled = confirmEnabled, destructive = destructive)
                     }
                 }
             }
@@ -177,14 +177,16 @@ internal fun OneUiDialogCard(
 
 
 @Composable
-private fun RowScope.OneUiDialogButton(label: String, tag: String, onClick: () -> Unit, enabled: Boolean = true, destructive: Boolean = false) {
+private fun OneUiDialogButton(label: String, tag: String, onClick: () -> Unit, enabled: Boolean = true, destructive: Boolean = false, filled: Boolean = false) {
+    val accent = if (destructive) Danger else HyleColors.Violet
     val color = when {
         !enabled -> HyleColors.InkDim.copy(alpha = 0.5f)
-        destructive -> Danger
-        else -> HyleColors.Violet
+        filled -> Color.White
+        else -> accent
     }
+    val fill = if (filled) (if (enabled) accent.copy(alpha = if (destructive) 0.9f else 0.75f) else HyleColors.InkDim.copy(alpha = 0.18f)) else Color.Transparent
     Box(
-        Modifier.weight(1f).heightIn(min = OneUiDialogSpec.BUTTON_HEIGHT_DP.dp).testTag(tag)
+        Modifier.fillMaxWidth().heightIn(min = OneUiDialogSpec.BUTTON_HEIGHT_DP.dp).testTag(tag).clip(RoundedCornerShape(24.dp)).background(fill)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick).semantics { if (!enabled) disabled() },
         contentAlignment = Alignment.Center,
     ) { Text(label, color = color, fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) }

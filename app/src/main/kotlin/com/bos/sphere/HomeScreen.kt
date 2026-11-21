@@ -1698,8 +1698,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 title = app.label,
                 onDismiss = { colorApp = null },
                 footer = {
-                    TextButtonPill(L10n.tr("Reset")) { stores.iconColors.set(app.key, null); colorApp = null }
                     TextButtonPill(L10n.tr("Done"), primary = true) { colorApp = null }
+                    TextButtonPill(L10n.tr("Reset")) { stores.iconColors.set(app.key, null); colorApp = null }
                 },
             ) {
                 ColorPicker(current, { v -> stores.iconColors.set(app.key, v) })

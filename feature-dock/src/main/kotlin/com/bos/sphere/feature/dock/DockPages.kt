@@ -381,28 +381,41 @@ fun GroupEditor(apps: List<PanelApp>, onSave: (AppGroup) -> Unit, onDismiss: () 
     var chosen by remember { mutableStateOf(emptySet<String>()) }
     var picking by remember { mutableStateOf(false) }
     val valid = chosen.size in 2..4 && name.isNotBlank()
-    DockPagesScope { OneUiDialog(
-        L10n.tr("New app group"), onDismiss, confirmLabel = L10n.tr("Save"), confirmEnabled = valid,
-        onConfirm = {
-            val members = apps.filter { it.key in chosen }.map { LaunchRequest(it.target) }
-            onSave(AppGroup(name.trim(), members, layout, "g" + System.currentTimeMillis().toString(36)))
-        },
-    ) {
-        Column(Modifier.padding(horizontal = 24.dp)) {
-            OneUiUnderlineField(name, { name = it }, L10n.tr("Group name"))
-            Spacer(Modifier.size(16.dp))
-            OneUiSegmented(GroupLayout.entries.map { L10n.tr(it.label) }, GroupLayout.entries.indexOf(layout), { layout = GroupLayout.entries[it] }, description = L10n.tr("Layout"))
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { picking = true }.padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(L10n.tr("Apps"), color = HyleColors.InkBright, fontSize = 17.sp)
-                    Text(apps.filter { it.key in chosen }.joinToString { it.label }.ifEmpty { L10n.tr("Choose 2 to 4 apps") }, color = HyleColors.InkDim, fontSize = 13.sp)
+    DockPagesScope {
+        com.bos.sphere.feature.grid.OneUiFullPage(onDismiss) {
+            com.bos.sphere.feature.grid.OneUiPageFrame(L10n.tr("New app group"), onDismiss, tag = DockPanelTags.GROUP_PAGE) {
+                item(key = "form") {
+                    Column(Modifier.padding(horizontal = 32.dp)) {
+                        OneUiUnderlineField(name, { name = it }, L10n.tr("Group name"))
+                        Spacer(Modifier.size(16.dp))
+                        OneUiSegmented(GroupLayout.entries.map { L10n.tr(it.label) }, GroupLayout.entries.indexOf(layout), { layout = GroupLayout.entries[it] }, description = L10n.tr("Layout"))
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { picking = true }.padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(L10n.tr("Apps"), color = HyleColors.InkBright, fontSize = 17.sp)
+                                Text(apps.filter { it.key in chosen }.joinToString { it.label }.ifEmpty { L10n.tr("Choose 2 to 4 apps") }, color = HyleColors.InkDim, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+                item(key = "save") {
+                    Column {
+                        com.bos.sphere.feature.grid.OneUiGap()
+                        com.bos.sphere.feature.grid.OneUiPrimaryButton(
+                            L10n.tr("Save"),
+                            {
+                                val members = apps.filter { it.key in chosen }.map { LaunchRequest(it.target) }
+                                onSave(AppGroup(name.trim(), members, layout, "g" + System.currentTimeMillis().toString(36)))
+                            },
+                            Modifier.testTag(com.bos.sphere.feature.grid.OneUiDialogTags.CONFIRM), glyph = com.bos.sphere.feature.grid.Glyphs.Check, enabled = valid,
+                        )
+                    }
                 }
             }
         }
-    } }
+    }
     if (picking) AppPicker(L10n.tr("Pick 2 to 4 apps"), apps, chosen, max = 4, min = 2, onDone = { chosen = it; picking = false }, onDismiss = { picking = false })
 }
 
@@ -422,24 +435,36 @@ fun AppPicker(title: String, apps: List<PanelApp>, selected: Set<String>, max: I
 fun SessionDialog(group: AppGroup, displays: List<DisplayRef>, onSave: (String, Map<Int, DisplayRef?>) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(group.name) }
     val assign = remember { mutableStateListOf<Int>().also { l -> repeat(group.members.size) { l.add(-1) } } }
-    DockPagesScope { OneUiDialog(
-        L10n.tr("Save session"), onDismiss, confirmLabel = L10n.tr("Save"),
-        onConfirm = { onSave(name.ifBlank { group.name }, assign.withIndex().associate { (i, d) -> i to displays.getOrNull(d) }) },
-    ) {
-        Column(Modifier.padding(horizontal = 24.dp)) {
-            OneUiUnderlineField(name, { name = it }, L10n.tr("Session name"))
-            group.members.forEachIndexed { i, m ->
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 56.dp)
-                        .clickable(role = Role.Button) { assign[i] = if (assign[i] + 1 >= displays.size) -1 else assign[i] + 1 },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(m.target.packageName, color = HyleColors.InkBright, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    Text(assign[i].let { if (it < 0) L10n.tr("This display") else displays.getOrNull(it)?.name ?: "?" }, color = HyleColors.Violet, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+    DockPagesScope {
+        com.bos.sphere.feature.grid.OneUiFullPage(onDismiss) {
+            com.bos.sphere.feature.grid.OneUiPageFrame(L10n.tr("Save session"), onDismiss, tag = DockPanelTags.SESSION_PAGE) {
+                item(key = "form") {
+                    Column(Modifier.padding(horizontal = 32.dp)) {
+                        OneUiUnderlineField(name, { name = it }, L10n.tr("Session name"))
+                        group.members.forEachIndexed { i, m ->
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                    .clickable(role = Role.Button) { assign[i] = if (assign[i] + 1 >= displays.size) -1 else assign[i] + 1 },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(m.target.packageName, color = HyleColors.InkBright, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                                Text(assign[i].let { if (it < 0) L10n.tr("This display") else displays.getOrNull(it)?.name ?: "?" }, color = HyleColors.Violet, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                        Text(L10n.tr(SessionRestorer.APPS_ONLY_NOTICE), color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+                item(key = "save") {
+                    Column {
+                        com.bos.sphere.feature.grid.OneUiGap()
+                        com.bos.sphere.feature.grid.OneUiPrimaryButton(
+                            L10n.tr("Save"),
+                            { onSave(name.ifBlank { group.name }, assign.withIndex().associate { (i, d) -> i to displays.getOrNull(d) }) },
+                            Modifier.testTag(com.bos.sphere.feature.grid.OneUiDialogTags.CONFIRM), glyph = com.bos.sphere.feature.grid.Glyphs.Check,
+                        )
+                    }
                 }
             }
-            Text(L10n.tr(SessionRestorer.APPS_ONLY_NOTICE), color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
         }
-    }
     }
 }

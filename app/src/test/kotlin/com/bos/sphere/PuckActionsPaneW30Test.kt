@@ -7,7 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.CornerActionId
@@ -48,7 +53,7 @@ class PuckActionsPaneW30Test {
 
     @Test fun CFG_15_w30_choosingAnActionForASlotChangesOnlyThatSlot() {
         rule.onNodeWithText("2. Clock").performClick()
-        rule.onNodeWithText("Maps").performClick()
+        rule.onNodeWithText("Maps").performScrollTo().performClick()
         rule.waitForIdle()
         assertEquals(PuckSlot.Action(CornerActionId.Maps), store.slots.value[1])
         assertEquals(PuckActions.DEFAULT[0], store.slots.value[0])
@@ -68,6 +73,16 @@ class PuckActionsPaneW30Test {
         rule.onNodeWithText("Empty").performClick()
         assertEquals(PuckSlot.Empty, store.slots.value[3])
         rule.onNodeWithText("4. Empty").assertExists()
+    }
+
+    @Test fun CFG_21_w48_aSlotsChoiceIsAFullRadioPageWithTheCurrentOneSelectedAndBackChangesNothing() {
+        rule.onNodeWithText("2. Clock").performClick(); rule.waitForIdle()
+        rule.onNodeWithTag(com.bos.sphere.feature.grid.OneUiDialogTags.PAGE).assertExists()
+        assertEquals("no popup card", 0, rule.onAllNodesWithTag(com.bos.sphere.feature.grid.OneUiDialogTags.DIALOG).fetchSemanticsNodes().size)
+        rule.onNodeWithText("Clock").assertIsSelected()
+        rule.onNodeWithContentDescription("Back").performClick(); rule.waitForIdle()
+        assertEquals(0, rule.onAllNodesWithTag(com.bos.sphere.feature.grid.OneUiDialogTags.PAGE).fetchSemanticsNodes().size)
+        assertEquals(PuckActions.DEFAULT[1], store.slots.value[1])
     }
 
     @Test fun CFG_15_w30_resetPutsTheDefaultsBack() {

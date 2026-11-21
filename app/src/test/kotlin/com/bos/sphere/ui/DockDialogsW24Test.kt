@@ -64,6 +64,9 @@ class DockDialogsW24Test {
 
     @Before fun setUp() {
         L10n.setLanguage("en")
+        // The shadow keeps every dialog ever shown in this sandbox; one a previous test left showing (its activity closed without a dismiss)
+        // would count as showing here. Wave 48: start each test with an empty list so `showing()` only sees this test's dialogs.
+        ShadowDialog.reset()
         scenario = ActivityScenario.launch(ComponentActivity::class.java)
     }
 
@@ -76,6 +79,7 @@ class DockDialogsW24Test {
         // from then on no recomposer of a later test (or class: DockWiringTest, then never idle for the compose rule) gets a frame, so `open = false` is never applied.
         // Running the looper after the scenario is closed lets that requested frame be delivered first.
         repeat(3) { ShadowLooper.idleMainLooper(200, TimeUnit.MILLISECONDS) }
+        ShadowDialog.reset()
         DockInput.bridge = null
         DockInput.dialogHook = {}
         LauncherInput.focus.nodes().map { it.id }.forEach(LauncherInput.focus::unregister)
@@ -106,11 +110,18 @@ class DockDialogsW24Test {
         idle()
     }
 
-    private fun showing(): List<Dialog> = ShadowDialog.getShownDialogs().filter { it.isShowing }
+    private fun showing(): List<Dialog> = ShadowDialog.getShownDialogs().filter { it.isShowing && it.ownerActivity?.isDestroyed != true }
 
     /** A compose dialog is dismissed by the composition that removes it, which needs a frame after the state change: gives the removal a few more rounds (up to 10 s of wall time). A dialog that never goes still fails. */
     private fun settleDialogs() { val end = System.nanoTime() + 10_000_000_000L; while (showing().isNotEmpty() && System.nanoTime() < end) { Thread.sleep(25); idle(300) } }
     private fun top(): Dialog = showing().last()
+
+    /**
+     * True once no dialog window shows. Closing a Compose dialog leaves composition on one frame and the window's dismiss runs on a later
+     * pass of the looper, so a single idle right after the state change can still see the window (the old "dialog left showing" flake):
+     * idle in steps, up to a few seconds of looper time, until it is gone.
+     */
+    private fun noneShowing(): Boolean { repeat(10) { if (showing().isEmpty()) return true; idle(300) }; return showing().isEmpty() }
 
     private fun composeRoot(v: View): ViewRootForTest? {
         if (v is ViewRootForTest) return v
@@ -213,6 +224,7 @@ class DockDialogsW24Test {
         click(session, "Save")
         assertEquals("Study", saved)
         assertFalse(open)
+        assertTrue("Save closes the first window before the second opens", noneShowing())
 
         saved = null
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { open = true }

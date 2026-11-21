@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -54,26 +56,31 @@ fun AppPickerDialog(
         val (fit, rest) = matches.sortedBy { it.label.lowercase() }.partition { it.packageName in suggested }
         fit to rest
     }
-    GlassDialog(title = title, onDismiss = onDismiss, scrollable = false) {
-        BasicTextField(
-            value = query, onValueChange = { query = it }, singleLine = true,
-            textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 16.sp),
-            cursorBrush = SolidColor(HyleColors.Violet),
-            modifier = Modifier.fillMaxWidth().background(HyleColors.Surface.copy(alpha = 0.7f), RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
-            decorationBox = { inner -> Box { if (query.isEmpty()) Text(L10n.tr("Search apps"), color = HyleColors.InkDim, fontSize = 16.sp); inner() } },
-        )
-        Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
-            if (list.first.isNotEmpty()) item { Header(L10n.tr("Suggested")) }
-            items(list.first, key = { "s:" + it.key }) { PickerRow(it, onPick) }
-            if (list.second.isNotEmpty()) item { Header(L10n.tr("All apps")) }
-            items(list.second, key = { "a:" + it.key }) { PickerRow(it, onPick) }
-        }
-        if (resetLabel != null && onReset != null) {
-            Text(
-                resetLabel, color = HyleColors.InkDim, fontSize = 14.sp,
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onReset).padding(vertical = 14.dp),
-            )
+    // Wave 48: a full One UI page (large title, search, the apps as lazy rows), not a popup. The reset row is a flat text button under the list.
+    OneUiFullPage(onDismiss) {
+        Column(Modifier.fillMaxSize().imePadding()) {
+            OneUiPageFrame(title, onDismiss, modifier = Modifier.weight(1f), tag = OneUiDialogTags.EDITOR_PAGE) {
+                item(key = "search") {
+                    BasicTextField(
+                        value = query, onValueChange = { query = it }, singleLine = true,
+                        textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 16.sp),
+                        cursorBrush = SolidColor(HyleColors.Violet),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).background(HyleColors.Surface.copy(alpha = 0.7f), RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+                        decorationBox = { inner -> Box { if (query.isEmpty()) Text(L10n.tr("Search apps"), color = HyleColors.InkDim, fontSize = 16.sp); inner() } },
+                    )
+                }
+                if (list.first.isNotEmpty()) item(key = "h:s") { Box(Modifier.padding(horizontal = 18.dp)) { Header(L10n.tr("Suggested")) } }
+                items(list.first, key = { "s:" + it.key }) { Box(Modifier.padding(horizontal = 18.dp)) { PickerRow(it, onPick) } }
+                if (list.second.isNotEmpty()) item(key = "h:a") { Box(Modifier.padding(horizontal = 18.dp)) { Header(L10n.tr("All apps")) } }
+                items(list.second, key = { "a:" + it.key }) { Box(Modifier.padding(horizontal = 18.dp)) { PickerRow(it, onPick) } }
+            }
+            if (resetLabel != null && onReset != null) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
+                Text(
+                    resetLabel, color = HyleColors.Violet, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onReset).padding(horizontal = 28.dp, vertical = 16.dp),
+                )
+            }
         }
     }
 }

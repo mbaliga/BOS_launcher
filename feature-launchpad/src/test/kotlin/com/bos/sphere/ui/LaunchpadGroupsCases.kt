@@ -23,6 +23,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performTextInput
@@ -266,6 +269,46 @@ abstract class LaunchpadGroupsCases(private val orientation: String) : Launchpad
         rule.onNodeWithTag("grp.remove.0").performScrollTo().performClick(); rule.waitForIdle()
         assertTrue(rule.onAllNodesWithTag("grp.condition.0").fetchSemanticsNodes().isEmpty())
         shot("rule-editor-dark")
+    }
+
+    // ---- wave 48: the condition kind is chosen on a full page, not in a dropdown ------------------------------------------
+
+    private fun editorWith(vararg kinds: ConditionKind) {
+        val rule0 = GroupRule("n", kinds.map { newCondition(it) }, "work")
+        rule.setContent { Themed(true) { Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { GroupRuleEditor(lpGColors(), config.copy(rules = emptyList()), rule0, feed, NoContacts, emptyList(), {}, {}) } } }
+        rule.waitForIdle()
+    }
+
+    @Test fun STR_13_w48_addingAConditionOpensAFullPageOfRadioRowsAndPickingOneAddsItAndReturns() {
+        editorWith()
+        rule.onNodeWithTag("grp.addCondition").performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithTag(GroupKindPageTags.PAGE).assertIsDisplayed()
+        ConditionKind.entries.forEach { rule.onNodeWithTag(GroupKindPageTags.option(it)).assertExists() }
+        rule.onNodeWithTag(GroupKindPageTags.option(ConditionKind.SenderContains)).performClick(); rule.waitForIdle()
+        assertTrue("the page closed", rule.onAllNodesWithTag(GroupKindPageTags.PAGE).fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithTag("grp.condition.0").assertExists()
+        rule.onNodeWithTag("grp.value.0").assertExists()
+    }
+
+    @Test fun STR_13_w48_theBackArrowOfTheKindPageAddsNothing() {
+        editorWith()
+        rule.onNodeWithTag("grp.addCondition").performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithContentDescription("Back").performClick(); rule.waitForIdle()
+        assertTrue(rule.onAllNodesWithTag(GroupKindPageTags.PAGE).fetchSemanticsNodes().isEmpty())
+        assertTrue(rule.onAllNodesWithTag("grp.condition.0").fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test fun STR_13_w48_changingAConditionsKindUsesTheSamePageWithTheCurrentKindSelectedAndKeepsNot() {
+        editorWith(ConditionKind.SenderContains)
+        rule.onNodeWithTag("grp.negate.0").performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithTag("grp.kind.0").performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithTag(GroupKindPageTags.option(ConditionKind.SenderContains)).assertIsSelected()
+        rule.onNodeWithTag(GroupKindPageTags.option(ConditionKind.LastNameIsMine)).performScrollTo().performClick(); rule.waitForIdle()
+        rule.onNodeWithTag("grp.kind.0").assertExists()
+        rule.onNodeWithTag("grp.negate.0").assertExists()
+        assertTrue("one condition only", rule.onAllNodesWithTag("grp.condition.1").fetchSemanticsNodes().isEmpty())
+        val want = "Condition: ${GroupTexts.kindLabel(ConditionKind.LastNameIsMine)}"
+        rule.waitUntil(5_000) { rule.onAllNodesWithContentDescription(want).fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test fun STR_13_ruleEditor_saveIsRefusedWithoutAnyCondition() {

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.CornerActionId
@@ -102,7 +103,7 @@ class DrawerRingW38Test {
     @Test fun CFG_15_w38_aSlotBeyondTheFourthCanBeEditedLikeTheFirstFour() {
         rule.setContent { Column { PuckActionsPane(mapOf(app.key to app)) } }
         rule.onNodeWithText("7. Calculator").performClick()
-        rule.onNodeWithText("Maps").performClick()
+        rule.onNodeWithText("Maps").performScrollTo().performClick()
         rule.waitForIdle()
         assertEquals(PuckSlot.Action(CornerActionId.Maps), store.slots.value[6])
         rule.onNodeWithText("8. Settings").performClick()

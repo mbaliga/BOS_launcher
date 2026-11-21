@@ -75,6 +75,8 @@ object OneUiDialogTags {
     const val FIELD = "oneui.dialog.field"
     /** Wave 46: the full page a radio or checkbox picker opens (it is not a dialog card). */
     const val PAGE = "oneui.picker.page"
+    /** Wave 48: the full page an editor (corner, gesture, drawer colour, group, session, dock) opens. */
+    const val EDITOR_PAGE = "oneui.editor.page"
     fun option(i: Int) = "oneui.dialog.option.$i"
 }
 

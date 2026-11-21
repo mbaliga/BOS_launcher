@@ -26,7 +26,7 @@ import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.grid.ActionRow
 import com.bos.sphere.feature.grid.AppIcon
 import com.bos.sphere.feature.grid.AppPickerDialog
-import com.bos.sphere.feature.grid.GlassDialog
+import com.bos.sphere.feature.grid.OneUiRadioPage
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.SettingItem
 import com.bos.sphere.feature.grid.TextButtonPill
@@ -82,15 +82,17 @@ fun ColumnScope.PuckActionsPane(appsByKey: Map<String, AppEntry>) {
     }
 
     if (editing in 0 until count && !pickingApp) {
+        // Wave 48: a choice from many is a full One UI radio page (title, one row per option), not a popup editor.
         val i = editing
-        GlassDialog(title = L10n.tr("Drawer shortcut %d", i + 1), onDismiss = { editing = -1 }) {
-            ActionRow(L10n.tr("Empty"), null, null, selected = slots[i] == PuckSlot.Empty) { store.set(i, PuckSlot.Empty); editing = -1 }
-            ActionRow(L10n.tr("App..."), L10n.tr("Pick an installed app"), Glyphs.Apps, selected = slots[i] is PuckSlot.App) { pickingApp = true }
-            PuckActions.AVAILABLE.forEach { id ->
-                val sel = (slots[i] as? PuckSlot.Action)?.id == id
-                ActionRow(L10n.tr(id.label), null, Glyphs.forAction(id), selected = sel) { store.set(i, PuckSlot.Action(id)); editing = -1 }
-            }
-        }
+        val options: List<PuckChoice> = listOf(PuckChoice.Empty, PuckChoice.PickApp) + PuckActions.AVAILABLE.map { PuckChoice.Act(it) }
+        val current: PuckChoice = when (val sl = slots[i]) { PuckSlot.Empty -> PuckChoice.Empty; is PuckSlot.App -> PuckChoice.PickApp; is PuckSlot.Action -> PuckChoice.Act(sl.id) }
+        OneUiRadioPage(
+            title = L10n.tr("Drawer shortcut %d", i + 1), options = options, selected = current,
+            label = { c -> when (c) { PuckChoice.Empty -> L10n.tr("Empty"); PuckChoice.PickApp -> L10n.tr("App..."); is PuckChoice.Act -> L10n.tr(c.id.label) } },
+            detail = { c -> if (c == PuckChoice.PickApp) L10n.tr("Pick an installed app") else null },
+            onSelect = { c -> when (c) { PuckChoice.Empty -> store.set(i, PuckSlot.Empty); PuckChoice.PickApp -> pickingApp = true; is PuckChoice.Act -> store.set(i, PuckSlot.Action(c.id)) } },
+            onDismiss = { if (!pickingApp) editing = -1 },
+        )
     }
     if (editing in 0 until count && pickingApp) {
         val i = editing
@@ -101,4 +103,11 @@ fun ColumnScope.PuckActionsPane(appsByKey: Map<String, AppEntry>) {
             onDismiss = { pickingApp = false },
         )
     }
+}
+
+/** Wave 48: what a drawer shortcut page offers (a row each). */
+private sealed interface PuckChoice {
+    data object Empty : PuckChoice
+    data object PickApp : PuckChoice
+    data class Act(val id: CornerActionId) : PuckChoice
 }

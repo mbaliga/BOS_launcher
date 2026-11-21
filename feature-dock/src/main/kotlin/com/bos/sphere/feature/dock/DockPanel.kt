@@ -34,6 +34,10 @@ enum class DockPanelPage { Dock, Workspaces, Groups }
 
 object DockPanelTags {
     const val PAGE = "dockpanel.page"
+    /** Wave 48: the Edit dock page, the group editor page and the session page. */
+    const val EDIT_PAGE = "dockpanel.editPage"
+    const val GROUP_PAGE = "dockpanel.groupEditor"
+    const val SESSION_PAGE = "dockpanel.sessionPage"
 }
 
 /** The dock's window hook (INP-20) as the One UI dialogs' hook, so every dialog the pages open is a dock dialog. */

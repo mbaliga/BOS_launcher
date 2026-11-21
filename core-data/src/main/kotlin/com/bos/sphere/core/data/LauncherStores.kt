@@ -141,7 +141,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("kbOpenP", next.keyboardOnOpenPortrait).putBoolean("kbOpenL", next.keyboardOnOpenLandscape)
             .putBoolean("cornersPerOri", next.cornersPerOrientation)
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
-            .putString("wheelGrouping", next.wheelGrouping.name)
+            .putString("wheelGrouping", next.wheelGrouping.name).putBoolean("wheelWorkOnly", next.wheelWorkOnly)
             .putBoolean("glanceEnabled", next.glanceEnabled).putString("homeOrder", next.homeOrder.name)
             .putBoolean("showMusic", next.showMusic).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
             .putInt("glanceControlsSec", next.glanceControlsSeconds).putBoolean("glanceIndicator", next.glanceIndicator)
@@ -294,6 +294,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             hotCornersOn = sp.getBoolean("hotCornersOn", d.hotCornersOn),
             hotCornerDwellMs = sp.getInt("hotCornerDwell", d.hotCornerDwellMs).coerceIn(0, 1000),
             wheelGrouping = enumOr(sp.getString("wheelGrouping", null), d.wheelGrouping),
+            wheelWorkOnly = sp.getBoolean("wheelWorkOnly", d.wheelWorkOnly),
             glanceEnabled = migrated.glanceEnabled, homeOrder = HomeOrder.parse(sp.getString("homeOrder", null)),
             showMusic = GlanceMusic.resolve(if (sp.contains("showMusic")) sp.getBoolean("showMusic", true) else null, sp.getString("glanceContent", null)),
             glanceHotspots = GlanceHotspots.decode(sp.getString("glanceHotspots", null)),

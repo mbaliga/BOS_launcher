@@ -207,6 +207,8 @@ data class LauncherPrefs(
     val uiSounds: Boolean = true,
     val uiSoundVolume: Float = 0.4f,
     val wheelGrouping: WheelGrouping = WheelGrouping.Letter,
+    /** Wave 48: the disc lists only the work profile's apps (the Work scope label); ignored while there is no work profile. */
+    val wheelWorkOnly: Boolean = false,
 
     // --- home landing (HOM-22)
     /** What the home shows: the user's pages, the recent apps, every app, or only the wallpaper and the four hotspots. */

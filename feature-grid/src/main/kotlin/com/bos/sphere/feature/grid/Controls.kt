@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -150,9 +151,11 @@ fun TextButtonPill(text: String, primary: Boolean = false, enabled: Boolean = tr
 }
 
 /**
- * A full-screen editor in One UI's page chrome (wave 41): the page background, a 56 dp bar with a back arrow and a centred title, the
- * [content], and a footer of flat accent text buttons under a hairline. Used for every picker and editor the settings open that holds
- * more than a dialog can (the app picker, the corner and gesture editors); short questions use [OneUiDialog].
+ * A full-screen editor in One UI's page chrome (waves 41 and 48): the standard page (back arrow, the title large and centred in the empty
+ * band under the bar, collapsing into the bar on scroll), the [content] in one rounded-free column, and a footer of flat accent text
+ * buttons (Save, Cancel) under a hairline that stays visible while the content scrolls. Used for the editors that hold more than a
+ * choice (the corner and gesture editors, the drawer colour); a choice from a list is a radio or check page, a short question a
+ * [OneUiDialog]. The page is its own window ([OneUiFullPage]) so the host's dialog hook (the dock's controller layer) applies.
  */
 @Composable
 fun GlassDialog(
@@ -160,49 +163,22 @@ fun GlassDialog(
     onDismiss: () -> Unit,
     width: Dp = 560.dp,
     footer: (@Composable () -> Unit)? = null,
-    /** False when [content] manages its own scrolling (a LazyColumn that fills the space). */
-    scrollable: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        LocalOneUiDialogHook.current()
-        Box(Modifier.fillMaxSize().background(OneUi.Page).semantics { paneTitle = title }) {
-            Column(
-                Modifier.fillMaxSize().windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing).imePadding(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.padding(start = 4.dp).size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onDismiss)
-                            .semantics { contentDescription = L10n.tr("Back") },
-                        contentAlignment = Alignment.Center,
-                    ) { OneUiBackArrow() }
-                    Text(
-                        title, color = HyleColors.InkBright, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.weight(1f).semantics { heading() },
-                    )
-                    Spacer(Modifier.width(52.dp))
+    OneUiFullPage(onDismiss) {
+        Column(Modifier.fillMaxSize().semantics { paneTitle = title }.imePadding()) {
+            OneUiPageFrame(title, onDismiss, modifier = Modifier.weight(1f), tag = OneUiDialogTags.EDITOR_PAGE) {
+                item(key = "editor") {
+                    Column(Modifier.fillMaxWidth().widthIn(max = width).padding(horizontal = 18.dp, vertical = 4.dp), content = content)
                 }
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .widthIn(max = width)
-                        .fillMaxWidth()
-                        .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                        .padding(horizontal = 18.dp, vertical = 4.dp),
-                    content = content,
-                )
-                if (footer != null) {
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
-                    androidx.compose.runtime.CompositionLocalProvider(LocalDialogFooter provides true) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.widthIn(max = width).fillMaxWidth().padding(horizontal = 10.dp),
-                        ) { footer() }
-                    }
+            }
+            if (footer != null) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
+                androidx.compose.runtime.CompositionLocalProvider(LocalDialogFooter provides true) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().background(OneUi.Page).windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal + androidx.compose.foundation.layout.WindowInsetsSides.Bottom)).padding(horizontal = 10.dp),
+                    ) { footer() }
                 }
             }
         }

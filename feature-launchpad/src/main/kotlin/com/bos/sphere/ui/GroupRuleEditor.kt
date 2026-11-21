@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -105,11 +103,7 @@ internal fun GroupRuleEditor(
         Box1 {
             var open by remember { mutableStateOf(false) }
             GChip(c, L10n.tr("Add a condition"), tag = "grp.addCondition") { open = true }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                ConditionKind.entries.forEach { k ->
-                    DropdownMenuItem(text = { Text(GroupTexts.kindLabel(k)) }, onClick = { conds = conds + newCondition(k); open = false })
-                }
-            }
+            if (open) GroupKindPage(c, L10n.tr("Add a condition"), null, onPick = { k -> conds = conds + newCondition(k) }, onDismiss = { open = false })
         }
 
         Text(L10n.tr("Put it in"), color = c.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -178,11 +172,7 @@ private fun ConditionRow(
             androidx.compose.foundation.layout.Box {
                 var open by remember { mutableStateOf(false) }
                 GChip(c, GroupTexts.kindLabel(cond.kind), description = L10n.tr("Condition: %s", GroupTexts.kindLabel(cond.kind)), tag = "grp.kind.$index") { open = true }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    ConditionKind.entries.forEach { k ->
-                        DropdownMenuItem(text = { Text(GroupTexts.kindLabel(k)) }, onClick = { onChange(newCondition(k).copy(negate = cond.negate)); open = false })
-                    }
-                }
+                if (open) GroupKindPage(c, L10n.tr("Condition"), cond.kind, onPick = { k -> if (k != cond.kind) onChange(newCondition(k).copy(negate = cond.negate)) }, onDismiss = { open = false })
             }
             GChip(c, L10n.tr("Not"), selected = cond.negate, tag = "grp.negate.$index") { onChange(cond.copy(negate = !cond.negate)) }
             GChip(c, L10n.tr("Remove"), description = L10n.tr("Remove condition: %s", GroupTexts.kindLabel(cond.kind)), tag = "grp.remove.$index") { onRemove() }

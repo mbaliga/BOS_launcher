@@ -64,11 +64,15 @@ class DockDialogsW24Test {
 
     @Before fun setUp() {
         L10n.setLanguage("en")
+        // The shadow keeps every dialog ever shown in this sandbox; one a previous test left showing (its activity closed without a dismiss)
+        // would count as showing here. Wave 48: start each test with an empty list so `showing()` only sees this test's dialogs.
+        ShadowDialog.reset()
         scenario = ActivityScenario.launch(ComponentActivity::class.java)
     }
 
     @After fun reset() {
         scenario.close()
+        ShadowDialog.reset()
         DockInput.bridge = null
         DockInput.dialogHook = {}
         LauncherInput.focus.nodes().map { it.id }.forEach(LauncherInput.focus::unregister)
@@ -91,8 +95,15 @@ class DockDialogsW24Test {
         idle()
     }
 
-    private fun showing(): List<Dialog> = ShadowDialog.getShownDialogs().filter { it.isShowing }
+    private fun showing(): List<Dialog> = ShadowDialog.getShownDialogs().filter { it.isShowing && it.ownerActivity?.isDestroyed != true }
     private fun top(): Dialog = showing().last()
+
+    /**
+     * True once no dialog window shows. Closing a Compose dialog leaves composition on one frame and the window's dismiss runs on a later
+     * pass of the looper, so a single idle right after the state change can still see the window (the old "dialog left showing" flake):
+     * idle in steps, up to a few seconds of looper time, until it is gone.
+     */
+    private fun noneShowing(): Boolean { repeat(10) { if (showing().isEmpty()) return true; idle(300) }; return showing().isEmpty() }
 
     private fun composeRoot(v: View): ViewRootForTest? {
         if (v is ViewRootForTest) return v
@@ -147,7 +158,7 @@ class DockDialogsW24Test {
         assertTrue("the panel is a page: it holds no text field of its own", fields(panel).isEmpty())
         key(panel, KeyEvent.KEYCODE_BUTTON_B)
         assertFalse("B at the Dock page closes the panel", open)
-        assertTrue(showing().isEmpty())
+        assertTrue("the dialog window is gone", noneShowing())
         assertEquals("the dialog layer is released", 0, LauncherInput.focus.topLayer)
     }
 
@@ -194,6 +205,7 @@ class DockDialogsW24Test {
         click(session, "Save")
         assertEquals("Study", saved)
         assertFalse(open)
+        assertTrue("Save closes the first window before the second opens", noneShowing())
 
         saved = null
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot { open = true }
@@ -201,7 +213,7 @@ class DockDialogsW24Test {
         key(top(), KeyEvent.KEYCODE_BUTTON_B)
         assertFalse("B closes the session dialog without saving", open)
         assertEquals(null, saved)
-        assertTrue(showing().isEmpty())
+        assertTrue("the dialog window is gone", noneShowing())
     }
 
     // ---- the dock stays optional: its pages are reachable from Ground Control with the dock off (docs/decisions/dockOptional.md)

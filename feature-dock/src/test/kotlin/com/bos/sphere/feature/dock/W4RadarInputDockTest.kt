@@ -259,9 +259,9 @@ class W4RadarInputDockTest {
             }
         }
         assertEquals("wave 41: the only raw dialog window of the dock is the panel's full page", 1, dialogs)
-        // Every other dock dialog is a One UI dialog (group editor, app picker, session, schedule, rail help, edit dock, style, confirms): it
+        // Every other dock dialog or page window (wave 48: OneUiFullPage for the group editor, session and Edit dock pages) is a One UI one (group editor, app picker, session, schedule, rail help, edit dock, style, confirms): it
         // takes the window hook from LocalOneUiDialogHook, which the dock provides (DockPagesScope), so a file that opens one must provide it.
-        val oneUi = Regex("""\bOneUi\w*Dialog\(""")
+        val oneUi = Regex("""\bOneUi\w*(Dialog|FullPage)\(""")
         var users = 0
         for (f in files) {
             val text = f.readText()

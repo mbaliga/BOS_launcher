@@ -111,28 +111,41 @@ internal fun DockMenuPopup(press: IntOffset, tag: String, entries: List<DockMenu
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 }
 
-/** "Edit dock": the pinned items, each with a menu (move earlier, move later, remove), and a way to add apps; the old panel's pin editing without a drag. */
+/**
+ * "Edit dock" (wave 48: a full One UI page, not a dialog): the pinned items in one rounded card, each with a menu (move earlier, move
+ * later, unpin), and a way to add apps; the old panel's pin editing without a drag. The back arrow (or Done) leaves; every change applies at once.
+ */
 @Composable
 internal fun EditDockDialog(content: DockContent, actions: DockActions, onDismiss: () -> Unit) {
     var menuFor by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Int?>(null) }
-    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
-        com.bos.sphere.feature.grid.OneUiDialog(L10n.tr("Edit dock"), onDismiss, cancelLabel = null, confirmLabel = L10n.tr("Done"), onConfirm = onDismiss) {
-            if (content.pinned.isEmpty()) Text(L10n.tr("Nothing is pinned to the dock yet."), color = HyleColors.InkDim, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-            content.pinned.forEachIndexed { i, item ->
-                val entries = buildList {
-                    if (i > 0) add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Move earlier")) { actions.onReorder(i, i - 1) })
-                    if (i < content.pinned.lastIndex) add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Move later")) { actions.onReorder(i, i + 1) })
-                    add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Unpin"), destructive = true) { actions.onUnpin(item) })
+    DockPagesScope {
+        com.bos.sphere.feature.grid.OneUiFullPage(onDismiss) {
+            com.bos.sphere.feature.grid.OneUiPageFrame(L10n.tr("Edit dock"), onDismiss, tag = DockPanelTags.EDIT_PAGE) {
+                item(key = "pinned") {
+                    if (content.pinned.isEmpty()) {
+                        Text(L10n.tr("Nothing is pinned to the dock yet."), color = HyleColors.InkDim, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp))
+                    } else com.bos.sphere.feature.grid.OneUiGroup(content.pinned.size) {
+                        content.pinned.forEachIndexed { i, item ->
+                            if (i > 0) com.bos.sphere.feature.grid.OneUiRowDivider(20.dp)
+                            val entries = buildList {
+                                if (i > 0) add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Move earlier")) { actions.onReorder(i, i - 1) })
+                                if (i < content.pinned.lastIndex) add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Move later")) { actions.onReorder(i, i + 1) })
+                                add(com.bos.sphere.feature.grid.OneUiMenuEntry(L10n.tr("Unpin"), destructive = true) { actions.onUnpin(item) })
+                            }
+                            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(item.label, color = HyleColors.InkBright, fontSize = 17.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                                com.bos.sphere.feature.grid.OneUiMoreButton(L10n.tr("More options for %s", item.label), menuFor == i, { open -> menuFor = if (open) i else null }, entries)
+                            }
+                        }
+                    }
                 }
-                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 24.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(item.label, color = HyleColors.InkBright, fontSize = 17.sp, maxLines = 1, modifier = Modifier.weight(1f))
-                    com.bos.sphere.feature.grid.OneUiMoreButton(L10n.tr("More options for %s", item.label), menuFor == i, { open -> menuFor = if (open) i else null }, entries)
+                item(key = "add") {
+                    Column {
+                        com.bos.sphere.feature.grid.OneUiGap()
+                        com.bos.sphere.feature.grid.OneUiPrimaryButton(L10n.tr("Add apps"), { actions.onAddApps() })
+                    }
                 }
             }
-            Text(
-                L10n.tr("Add apps"), color = HyleColors.Violet, fontSize = 17.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { actions.onAddApps() }.padding(horizontal = 24.dp, vertical = 16.dp),
-            )
         }
     }
 }

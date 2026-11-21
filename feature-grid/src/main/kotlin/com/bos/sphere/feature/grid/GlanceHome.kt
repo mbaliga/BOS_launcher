@@ -56,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -310,14 +311,22 @@ internal fun ControlsNotch(
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Top,
         ) {
             GlanceControlButton("glance.prev", OutlineMediaGlyphs.Rewind, L10n.tr("Previous"), media.canPrev, onPrevious)
-            GlanceControlButton("glance.playpause", if (media.playing) OutlineMediaGlyphs.Pause else OutlineMediaGlyphs.Play, if (media.playing) L10n.tr("Pause") else L10n.tr("Play"), true, onPlayPause)
+            // The glyph answers the tap at once: it flips to what the tap asked for, and the player's own state confirms it (the flip is
+            // dropped when the real state arrives, or after PENDING_MS if the player never changed: a failed command shows as the old glyph).
+            var pending by remember(media.playing, media.title) { mutableStateOf<Boolean?>(null) }
+            LaunchedEffect(pending) { if (pending != null) { delay(GlanceNotch.PENDING_MS); pending = null } }
+            val shownPlaying = pending ?: media.playing
+            GlanceControlButton(
+                "glance.playpause", if (shownPlaying) OutlineMediaGlyphs.Pause else OutlineMediaGlyphs.Play, if (shownPlaying) L10n.tr("Pause") else L10n.tr("Play"), true,
+                { pending = !shownPlaying; onPlayPause() }, morph = true,
+            )
             GlanceControlButton("glance.next", OutlineMediaGlyphs.Forward, L10n.tr("Next"), media.canNext, onNext)
         } }
     }
 }
 
 @Composable
-private fun GlanceControlButton(id: String, glyph: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+private fun GlanceControlButton(id: String, glyph: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit, morph: Boolean = false) {
     Box(
         Modifier.size(GlanceNotch.TARGET_DP.dp).clip(CircleShape)
             .testTag(id)
@@ -326,7 +335,13 @@ private fun GlanceControlButton(id: String, glyph: ImageVector, label: String, e
             .semantics { contentDescription = label }
             .graphicsLayer { alpha = if (enabled) 1f else 0.35f },
         contentAlignment = Alignment.TopCenter,
-    ) { Icon(glyph, null, tint = Color.White, modifier = Modifier.padding(top = GlanceNotch.ICON_TOP_DP.dp).size(GlanceNotch.ICON_DP.dp)) }
+    ) {
+        if (morph) androidx.compose.animation.AnimatedContent(
+            glyph, label = "glanceControlGlyph",
+            transitionSpec = { (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)) + androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(140), initialScale = 0.6f)).togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)) + androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(100), targetScale = 0.6f)) },
+        ) { g -> Icon(g, null, tint = Color.White, modifier = Modifier.padding(top = GlanceNotch.ICON_TOP_DP.dp).size(GlanceNotch.ICON_DP.dp)) }
+        else Icon(glyph, null, tint = Color.White, modifier = Modifier.padding(top = GlanceNotch.ICON_TOP_DP.dp).size(GlanceNotch.ICON_DP.dp))
+    }
 }
 
 @Composable

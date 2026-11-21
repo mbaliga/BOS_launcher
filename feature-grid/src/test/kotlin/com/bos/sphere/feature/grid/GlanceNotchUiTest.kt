@@ -136,7 +136,8 @@ class GlanceNotchUiTest {
         rule.onNodeWithContentDescription("Previous").performClick()
         rule.onNodeWithContentDescription("Next").performClick()
         assertEquals(listOf(1, 1, 1), listOf(clicks[1], clicks[2], clicks[3]))
-        assertEquals(0, rule.onAllNodes(hasContentDescription("Pause")).fetchSemanticsNodes().size)
+        // the tap on Play flipped the glyph to Pause at once (the player confirms it later)
+        assertEquals(1, rule.onAllNodes(hasContentDescription("Pause")).fetchSemanticsNodes().size)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

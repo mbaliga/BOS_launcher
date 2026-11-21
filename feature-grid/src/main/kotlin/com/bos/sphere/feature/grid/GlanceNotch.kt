@@ -25,6 +25,8 @@ object GlanceNotch {
     const val ICON_DP = 22f
     /** The icon centre sits this far below the top of the controls row (cutout bottom). */
     const val ICON_TOP_DP = 13f
+    /** How long a tapped play/pause glyph stays flipped while the player has not confirmed; a command the player ignored shows the old glyph again. */
+    const val PENDING_MS = 1500L
     /** W25: the title is pushed down by exactly the notch body while the controls are in, so it never touches the notch. */
     const val TITLE_PUSH_DP = BODY_HEIGHT_DP
     /** The title line's gap under the status area when the controls are away. */

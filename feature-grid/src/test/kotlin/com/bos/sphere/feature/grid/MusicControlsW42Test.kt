@@ -9,9 +9,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -201,7 +203,7 @@ class MusicControlsW42UiTest {
         host(); line().performClick(); rule.mainClock.advanceTimeBy(600)
         ctl("glance.prev").performClick(); ctl("glance.playpause").performClick(); ctl("glance.next").performClick()
         assertEquals(listOf("prev", "pp", "next"), clicks)
-        rule.onNodeWithContentDescription("Play", useUnmergedTree = true).assertExists()
+        rule.onNodeWithContentDescription("Pause", useUnmergedTree = true).assertExists() // paused showed Play; the tap flipped it at once
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
@@ -214,12 +216,29 @@ class MusicControlsW42UiTest {
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_23_thePlayPauseIconFollowsTheReportedStateNotALocalGuess() {
+    fun HOM_23_thePlayPauseGlyphFlipsAtOnceOnATapAndTheReportedStateConfirmsIt() {
         host(); line().performClick(); rule.mainClock.advanceTimeBy(600)
-        ctl("glance.playpause").performClick() // the callback is a no-op here: nothing was reported, so nothing changes
         rule.onNodeWithContentDescription("Pause", useUnmergedTree = true).assertExists()
-        media = base.copy(playing = false); rule.waitForIdle()
+        ctl("glance.playpause").performClick() // the tap itself flips the glyph, before the player has said anything
+        rule.mainClock.advanceTimeBy(400)
         rule.onNodeWithContentDescription("Play", useUnmergedTree = true).assertExists()
+        rule.onAllNodesWithContentDescription("Pause", useUnmergedTree = true).assertCountEquals(0)
+        media = base.copy(playing = false); rule.waitForIdle() // the player confirms: it stays
+        rule.mainClock.advanceTimeBy(GlanceNotch.PENDING_MS + 500)
+        rule.onNodeWithContentDescription("Play", useUnmergedTree = true).assertExists()
+        ctl("glance.playpause").performClick() // and back
+        rule.mainClock.advanceTimeBy(400)
+        rule.onNodeWithContentDescription("Pause", useUnmergedTree = true).assertExists()
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_23_aTapThePlayerNeverAnswersShowsTheOldGlyphAgainAfterAMoment() {
+        host(10); line().performClick(); rule.mainClock.advanceTimeBy(600)
+        ctl("glance.playpause").performClick()
+        rule.mainClock.advanceTimeBy(300)
+        rule.onNodeWithContentDescription("Play", useUnmergedTree = true).assertExists()
+        rule.mainClock.advanceTimeBy(GlanceNotch.PENDING_MS + 500) // no state change was reported: the glyph tells the truth again
+        rule.onNodeWithContentDescription("Pause", useUnmergedTree = true).assertExists()
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

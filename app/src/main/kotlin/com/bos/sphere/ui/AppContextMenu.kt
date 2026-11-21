@@ -1,6 +1,7 @@
 package com.bos.sphere.ui
 
 import androidx.compose.foundation.background
+import com.bos.sphere.core.design.smokyBackdrop
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -72,16 +73,13 @@ fun AppContextMenu(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         DialogControllerKeys()
-        val shape = RoundedCornerShape(24.dp)
         val ctx = AppMenuModel.context(isHidden, isOnHome, hasIconColour = onIconColor != null, hasHomeSettings = onHomeSettings != null, canUninstall = !app.isSystem)
         val rows = AppMenuModel.rows(ctx)
         Column(
             modifier = Modifier
-                .width(300.dp)
-                .clip(shape)
-                .background(HyleColors.Surface.copy(alpha = 0.97f))
-                .border(1.dp, HyleColors.Hairline, shape)
-                .padding(bottom = 6.dp),
+                .width(380.dp)
+                .smokyBackdrop()
+                .padding(start = 40.dp, end = 40.dp, top = 40.dp, bottom = 46.dp),
         ) {
             Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(app, 48.dp)

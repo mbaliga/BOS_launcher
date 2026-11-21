@@ -81,6 +81,7 @@ import com.bos.sphere.core.data.Channel
 import com.bos.sphere.core.data.ContactActions
 import com.bos.sphere.core.data.SearchCategory
 import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.smokyBackdrop
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.search.WebRow
 import kotlin.math.PI
@@ -817,7 +818,7 @@ internal fun ResultPreview(
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         DialogControllerKeys()
         androidx.compose.foundation.layout.Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color(0xF2101018)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(24.dp)).padding(22.dp),
+            Modifier.fillMaxWidth().smokyBackdrop().padding(horizontal = 40.dp, vertical = 56.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             TileFace(tile, 84.dp)
@@ -839,7 +840,7 @@ internal fun ResultPreview(
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
                 if (tile is Tile.App) Text(L10n.tr("Options").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF241F37)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
+                    modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0x33FFFFFF)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
                 Text(L10n.tr("Open").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                     modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
             }

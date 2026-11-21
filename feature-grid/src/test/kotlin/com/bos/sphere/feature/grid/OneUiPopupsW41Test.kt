@@ -244,11 +244,13 @@ class OneUiPopupsW41Test {
         assertTrue(rule.onNodeWithTag(OneUiMenuTags.SHEET).fetchSemanticsNode().layoutInfo.isPlaced)
     }
 
-    @Test fun CFG_21_popups_15_aGlassDialogEditorIsAOneUiPageWithABackArrowAndFlatFooterButtons() {
-        rule.setContent { GlassDialog("Drawer shortcut 1", { log += "back" }, footer = { TextButtonPill("Cancel") { log += "cancel" }; TextButtonPill("Save", primary = true) { log += "save" } }) { androidx.compose.material3.Text("BODY") } }
+    @Test fun CFG_21_popups_15_aGlassDialogEditorIsAOneUiPageWithABackArrowAndStackedFooterButtons() {
+        rule.setContent { GlassDialog("Drawer shortcut 1", { log += "back" }, footer = { TextButtonPill("Save", primary = true) { log += "save" }; TextButtonPill("Cancel") { log += "cancel" } }) { androidx.compose.material3.Text("BODY") } }
         rule.waitForIdle()
         rule.onNodeWithText("BODY").assertIsDisplayed()
-        assertTrue("footer text button is 56 dp tall", rule.onNodeWithText("Save").getUnclippedBoundsInRoot().let { it.bottom - it.top } >= 56.dp)
+        assertTrue("footer button is at least 48 dp tall", rule.onNodeWithText("Save").getUnclippedBoundsInRoot().let { it.bottom - it.top } >= 48.dp)
+        // never side by side: the primary is on top, the secondary is below it
+        assertTrue("Save sits above Cancel", rule.onNodeWithText("Save").getUnclippedBoundsInRoot().bottom <= rule.onNodeWithText("Cancel").getUnclippedBoundsInRoot().top)
         rule.onNodeWithText("Save").performClick()
         assertEquals(listOf("save"), log)
     }

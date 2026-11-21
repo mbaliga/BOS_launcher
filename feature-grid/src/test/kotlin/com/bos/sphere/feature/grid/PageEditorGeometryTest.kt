@@ -58,7 +58,7 @@ class PageEditorGeometryTest {
         assertTrue("without system bars the panel is about a quarter of the window", bare.content.height >= 0.25f * 891 * d)
         assertTrue(bare.target.scale >= 0.449f)
         assertEquals("a window tall enough gets the full 30 percent", 0.30f * 1400 * d, lay(500f, 1400f).content.height, 1f)
-        for ((w, h) in phones) assertTrue("$w x $h", lay(w, h).content.height >= PageEditorGeometry.CONTENT_FLOOR_DP * d - 0.5f)
+        for ((w, h) in phones) assertTrue("$w x $h", lay(w, h).content.height >= (if (h < PageEditorGeometry.SMALL_HEIGHT_DP) PageEditorGeometry.SMALL_CONTENT_MIN_DP else PageEditorGeometry.CONTENT_FLOOR_DP) * d - 0.5f)
         assertTrue("the font grows the tab row", lay(411f, 891f, font = 1.3f).tabRow.height >= 1.3f * 48 * d - 0.5f)
         assertEquals("up to 1.5 times", 1.5f * 48 * d, lay(411f, 891f, font = 2f).tabRow.height, 0.5f)
     }
@@ -71,7 +71,8 @@ class PageEditorGeometryTest {
         assertEquals((l.strip.top + l.strip.bottom) / 2f, l.slotY, 0.5f)
         assertTrue("the strip holds the card with room for the outline", l.strip.height >= l.cardH + 2 * 8 * d - 0.5f)
         assertEquals(0.9f, PageEditorGeometry.NEIGHBOUR_SCALE, 0f)
-        assertTrue("a small window scales the cards down a little, not below 0.8", lay(320f, 568f).cardW in 0.8f * 64 * d - 0.5f..64 * d)
+        assertTrue("a small window scales the cards down (W48: not below 0.6; a window of 640 dp or more not below 0.8)", lay(320f, 568f).cardW in 0.6f * 64 * d - 0.5f..64 * d)
+        assertTrue(lay(360f, 740f).cardW >= 0.8f * 64 * d - 0.5f)
     }
 
     @Test fun HOM_12_pe02_mirroredPutsTheSideStripOnTheLeftAndTheTabsOnTheRight() {
@@ -254,5 +255,22 @@ class PageEditorGeometryTest {
         // the round trip: scrolling to the start of a page with its own column selects that page
         assertEquals(3, at(PageEditorGeometry.scrollForColumn(6, 100f, 1000, false), 0))
         assertEquals(3, at(PageEditorGeometry.scrollForColumn(6, 100f, 1000, true), 0, rtl = true))
+    }
+
+    @Test fun HOM_12_w48_theLiveCardOnA320By568WindowIsAtLeastFortyFivePercent() {
+        val l = lay(320f, 568f)
+        println("W48 live card 320x568 (24 dp bars): scale ${l.target.scale}, content ${l.content.height / d} dp, strip card ${l.cardH / d} dp")
+        assertTrue("scale ${l.target.scale}", l.target.scale >= 0.449f)
+        assertTrue("the content panel is still at least 72 dp", l.content.height >= 72f * d - 0.5f)
+        assertTrue("card inside the window and above the tabs", l.card.bottom <= l.tabRow.top + 0.5f && l.card.top >= l.strip.bottom - 0.5f)
+        assertTrue("content inside the window", l.content.bottom <= 568f * d - 24f * d + 0.5f)
+        val bare = lay(320f, 568f, top = 0f, bottom = 0f)
+        assertTrue("without system bars the panel has more room", bare.content.height > l.content.height && bare.target.scale >= 0.449f)
+    }
+
+    @Test fun HOM_12_w48_aNormalPhoneKeepsItsLayoutUnchanged() {
+        val l = lay(411f, 891f)
+        assertEquals(64 * d, l.cardW, 0.5f); assertEquals(48 * d, l.tabRow.height, 0.5f)
+        assertTrue(l.content.height >= PageEditorGeometry.CONTENT_FLOOR_DP * d)
     }
 }

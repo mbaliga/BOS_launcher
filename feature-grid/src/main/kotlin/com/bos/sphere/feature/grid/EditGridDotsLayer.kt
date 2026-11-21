@@ -29,12 +29,13 @@ internal fun EditGridDotsLayer(g: GridGeometry, modifier: Modifier = Modifier) {
     val reduced = rememberMotionPrefs().reduced
     val fade = remember { Animatable(0f) }
     LaunchedEffect(reduced) { fade.animateTo(1f, tween(if (reduced) 0 else EditChromeGeometry.HINT_FADE_MS)) }
+    val light = com.bos.sphere.core.design.HyleTheme.isLight
     val corners = remember(g) { EditGridDots.corners(g) }
     Box(modifier.fillMaxSize().testTag("edit.gridDots").clearAndSetSemantics { }.onGloballyPositioned { state?.layer = it }) {
         Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }) {
             val active = state?.active // read here: a drag redraws the dots, it never recomposes the page
             val r = EditChromeGeometry.DOT_DP.dp.toPx() / 2f
-            for ((x, y) in corners) drawCircle(Color.White.copy(alpha = EditGridDots.alpha(x, y, active, g.pitchX, g.pitchY)), r, Offset(x, y))
+            for ((x, y) in corners) drawCircle(EditGridDots.ink(light).copy(alpha = EditGridDots.alpha(x, y, active, g.pitchX, g.pitchY, light)), r, Offset(x, y))
         }
     }
 }

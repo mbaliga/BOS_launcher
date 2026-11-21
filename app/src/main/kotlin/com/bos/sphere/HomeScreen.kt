@@ -686,7 +686,18 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         gridDims = { pages.getOrNull(gridState.currentPage)?.layout?.gridFor(isLandscape, prefs)?.let { it.columns to it.rows } ?: (prefs.gridFor(isLandscape).let { it.columns to it.rows }) },
         selection = editSelection,
     )
-    androidx.compose.runtime.SideEffect { homeEdit.hooks = homeItems }
+    androidx.compose.runtime.SideEffect {
+        homeEdit.hooks = homeItems
+        // W48: Cancel also puts the clock tile's settings back (the widget/tile options that live in the prefs).
+        homeEdit.configSnapshot = {
+            val c = stores.prefs.prefs.value
+            fun same(p: com.bos.sphere.core.data.LauncherPrefs) = p.clockTileAnalog == c.clockTileAnalog && p.clockTileFormat == c.clockTileFormat && p.clockTileDate == c.clockTileDate
+            EditConfigEntry(
+                restore = { if (!same(stores.prefs.prefs.value)) stores.prefs.update { it.copy(clockTileAnalog = c.clockTileAnalog, clockTileFormat = c.clockTileFormat, clockTileDate = c.clockTileDate) } },
+                changed = { !same(stores.prefs.prefs.value) },
+            )
+        }
+    }
     // Wave 30 (pagesExplicit): "Delete page" really removes the page and what the user put on it. A page that holds something asks first
     // ("N items will be removed from this page; they stay in the drawer"); the last page is emptied (Pages stays on with one empty page).
     var pendingDelete by remember { mutableStateOf<Int?>(null) }
@@ -1772,7 +1783,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         val editDensity = androidx.compose.ui.platform.LocalDensity.current
         val safeTopDp = with(editDensity) { androidx.compose.foundation.layout.WindowInsets.safeDrawing.getTop(this).toDp().value }
-        val editTrayBottomDp = maxOf(if (bottomPlan.railTopDp > 0f) bottomPlan.railTopDp + 8f else 8f, if (indicatorShown) 60f else 8f)
+        // W48: the tray never lies over the page's dimmed bottom hotspots and the hint never over the top ones (the chrome uses the same two functions).
+        val editTrayBottomDp = com.bos.sphere.feature.grid.EditChromeGeometry.trayBottomDp(chromePage, editDensity.density, maxOf(if (bottomPlan.railTopDp > 0f) bottomPlan.railTopDp + 8f else 8f, if (indicatorShown) 60f else 8f))
+        val editHintTopDp = com.bos.sphere.feature.grid.EditChromeGeometry.hintTopPx(chromePage, safeTopDp * editDensity.density, editDensity.density) / editDensity.density
         if (homeEdit.active) {
             if (pageEditorOn) {
                 BackHandler { chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() } } // W47: Back in the page editor is Cancel, as in the single-page edit mode
@@ -1801,6 +1814,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     canReconfigure = { homeItems.canReconfigure(it) },
                     reconfigure = { homeItems.reconfigureItem(it) },
                     resizeTo = { k, c, r -> homeItems.resizeTo(k, c, r) },
+                    presetBlocked = { k, c, r -> homeItems.presetBlocked(k, c, r) },
                     widgetLimits = { homeItems.widgetLimits(it) },
                     spanOf = { k -> extrasState.spanOf(k).let { it.cols to it.rows } },
                     grid = { homeItems.gridSize() },
@@ -1808,8 +1822,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     editFolder = { homeItems.editFolder(it) },
                 ),
                 // W47: the room the bar may use is what the chrome leaves: below the top bar (and the hint), above the tray (which sits above the dock), clear of a side dock.
-                reserveTop = com.bos.sphere.feature.grid.EditChromeGeometry.actionBarReserveDp(safeTopDp, showEditHint && !pageEditorOn, editTrayBottomDp, tray = !pageEditorOn).first.dp,
-                reserveBottom = com.bos.sphere.feature.grid.EditChromeGeometry.actionBarReserveDp(safeTopDp, showEditHint && !pageEditorOn, editTrayBottomDp, tray = !pageEditorOn).second.dp,
+                reserveTop = com.bos.sphere.feature.grid.EditChromeGeometry.actionBarReserveDp(safeTopDp, showEditHint && !pageEditorOn, editTrayBottomDp, tray = !pageEditorOn, hintTopDp = editHintTopDp).first.dp,
+                reserveBottom = com.bos.sphere.feature.grid.EditChromeGeometry.actionBarReserveDp(safeTopDp, showEditHint && !pageEditorOn, editTrayBottomDp, tray = !pageEditorOn, hintTopDp = editHintTopDp).second.dp,
+                scrollSurface = prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous && !pageEditorOn,
                 avoid = remember(dockReserve.start, dockReserve.end, homeSizePx) {
                     val dd = editDensity.density
                     buildList {

@@ -16,6 +16,7 @@
 HOM-07 and HOM-12 had three and four rows (one appended per stream); each is one row now (`docs/Spec.md`).
 
 ## Not matched / honest limits
+(Wave 48, `docs/decisions/editGaps.md`, closed: the preset reflow path, the Cancel snapshot's extras, the bar over the scroll surface's icons, the hint and tray over the hotspots, the 0.45 card on 320x568; the history badge and the light-theme dots.)
 - The widget sheet's presets go through the old reflow path (`HomeEdit.resizeWidget`), not the handles' "widgets block" rule: a preset that does not fit pushes neighbours like the grid's list does. Clamping to the provider limits is done; neighbours are not checked.
 - Presets that are clamped to a size equal to the current one apply nothing and only show the note.
 - The bar's `Resize` has no visual pulse on the handles; it focuses the frame (keyboard) and announces.

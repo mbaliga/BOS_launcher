@@ -341,10 +341,19 @@ class HomeItems internal constructor(
     fun startResize(key: String) { selection.select(key); selection.focusResize() }
     fun canReconfigure(key: String): Boolean = ItemKeys.widgetId(key)?.let { host.providerInfo(it)?.configure != null } == true && WidgetStacks.stackAt(extrasState, key) == null
     fun reconfigureItem(key: String) = reconfigure(key)
-    fun resizeTo(key: String, cols: Int, rows: Int) {
-        val cur = extrasState.spanOf(key)
+    /** W48: the page that holds [key] packed as the grid shows it, and what a preset of [cols] x [rows] would do there (widgets block). */
+    private fun presetFit(key: String, cols: Int, rows: Int): com.bos.sphere.core.catalog.PresetFit.Result {
+        val keys = pagesNow().firstOrNull { key in it.keys }?.keys ?: return com.bos.sphere.core.catalog.PresetFit.Result.Unknown
         val (gc, gr) = gridDims()
-        edit { HomeEdit.resizeWidget(it, key, cols - cur.cols, rows - cur.rows, max = com.bos.sphere.core.catalog.WidgetSpan(gc, gr), gridCols = gc, gridRows = gr) }
+        return com.bos.sphere.core.catalog.PresetFit.fit(keys, { extrasState.spanOf(it) }, gc, gr.coerceAtLeast(1), key, cols, rows)
+    }
+    fun presetBlocked(key: String, cols: Int, rows: Int): Boolean = presetFit(key, cols, rows) is com.bos.sphere.core.catalog.PresetFit.Result.Blocked
+    /** A size preset: applied only when it covers nothing else (a neighbour is never pushed); false = refused. */
+    fun resizeTo(key: String, cols: Int, rows: Int): Boolean {
+        val fit = presetFit(key, cols, rows) as? com.bos.sphere.core.catalog.PresetFit.Result.Fits ?: return false
+        val (gc, gr) = gridDims()
+        edit { com.bos.sphere.core.catalog.EditHandlesApply.resizeTo(it, key, fit.rect, fit.moveOrigin, gc, gr, capacityOf) }
+        return true
     }
     fun gridSize(): Pair<Int, Int> = gridDims()
     /** W47: the provider's resize limits in cells (the handles' limits), for the sheet's size presets; null: free within the grid. */
@@ -359,7 +368,19 @@ class HomeItems internal constructor(
     /** HOM-12: while edit mode is on, what a removal takes is kept here (and widget ids stay bound) so undo can bring it back whole. */
     private var graveyard: com.bos.sphere.core.catalog.EditGraveyard? = null
 
+    private var entry: com.bos.sphere.core.catalog.EditExtrasEntry? = null
+
+    override fun cancelled() {
+        val e = entry ?: return
+        val r = e.restore(store.state.value.copy(pages = pagesNow()))
+        if (r.state != store.state.value.copy(pages = pagesNow())) store.set(r.state)
+        r.widgetKeysToFree.forEach { k -> ItemKeys.widgetId(k)?.let { host.deleteWidget(it) } }
+    }
+
+    override fun extrasChanged(): Boolean = entry?.changed(store.state.value) == true
+
     override fun begin(pages: List<HomePage>) {
+        entry = com.bos.sphere.core.catalog.EditExtrasEntry(store.state.value)
         graveyard = com.bos.sphere.core.catalog.EditGraveyard().also { it.record(pages, store.state.value) }
     }
 
@@ -373,6 +394,7 @@ class HomeItems internal constructor(
     }
 
     override fun end(pages: List<HomePage>) {
+        entry = null
         val g = graveyard ?: return
         graveyard = null
         val cur = store.state.value.copy(pages = pages)

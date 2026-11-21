@@ -80,6 +80,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -251,9 +252,11 @@ fun HomeEditChrome(
             )
         }
         // ---- hint
-        HintLine(showHint, touchSignal, reduced, progress)
+        val dens = LocalDensity.current
+        val safeTop = WindowInsets.safeDrawing.getTop(dens).toFloat()
+        HintLine(showHint, touchSignal, reduced, progress, EditChromeGeometry.hintTopPx(page, safeTop, dens.density))
         // ---- tray
-        EditTray(progress, trayBottomDp, showAddPage, onApps, onWidgets, onFolders, onAddPage)
+        EditTray(progress, EditChromeGeometry.trayBottomDp(page, dens.density, trayBottomDp), showAddPage, onApps, onWidgets, onFolders, onAddPage)
     }
     EditCancelDialog(state, onCancel)
 }
@@ -292,8 +295,8 @@ fun EditTopBar(
                 .then(if (onTitleClick != null) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = L10n.tr("Open the page editor")) { onTitleClick() } else Modifier)
                 .testTag(EditChromeTags.TITLE).semantics { heading(); traversalIndex = -2f },
         )
-        BarIcon(EditGlyphs.Undo, if (undoCount > 0) L10n.tr("Undo") + " ($undoCount)" else L10n.tr("Undo"), canUndo, EditChromeTags.UNDO, onUndo)
-        BarIcon(EditGlyphs.Redo, if (redoCount > 0) L10n.tr("Redo") + " ($redoCount)" else L10n.tr("Redo"), canRedo, EditChromeTags.REDO, onRedo)
+        BarIcon(EditGlyphs.Undo, if (undoCount > 0) L10n.tr("Undo, %d available", undoCount) else L10n.tr("Undo"), canUndo, EditChromeTags.UNDO, onUndo, undoCount, if (undoCount > 0) null else L10n.tr("Nothing to undo"))
+        BarIcon(EditGlyphs.Redo, if (redoCount > 0) L10n.tr("Redo, %d available", redoCount) else L10n.tr("Redo"), canRedo, EditChromeTags.REDO, onRedo, redoCount, if (redoCount > 0) null else L10n.tr("Nothing to redo"))
         Text(
             L10n.tr("Done"), color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp).heightIn(min = EditChromeGeometry.BUTTON_DP.dp).defaultMinSize(minWidth = 64.dp)
@@ -345,17 +348,25 @@ private fun BarText(label: String, tag: String, onClick: () -> Unit) {
     )
 }
 
+/** W48: the bar's Undo / Redo with a small history badge (the count, 9+ above nine) at the corner; the spoken description carries the count, a disabled one says why ([why]). */
 @Composable
-private fun BarIcon(glyph: ImageVector, description: String, enabled: Boolean, tag: String, onClick: () -> Unit) {
+private fun BarIcon(glyph: ImageVector, description: String, enabled: Boolean, tag: String, onClick: () -> Unit, count: Int = 0, why: String? = null) {
     Box(
         Modifier.size(EditChromeGeometry.BUTTON_DP.dp).clip(RoundedCornerShape(50)).clickable(enabled = enabled, role = Role.Button) { onClick() }
-            .graphicsLayer { alpha = if (enabled) 1f else EditChromeGeometry.DISABLED_ALPHA }.testTag(tag).semantics { contentDescription = description },
+            .testTag(tag).semantics { contentDescription = description; if (why != null) stateDescription = why },
         contentAlignment = Alignment.Center,
-    ) { Icon(glyph, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
+    ) {
+        Icon(glyph, null, tint = Color.White, modifier = Modifier.size(24.dp).graphicsLayer { alpha = if (enabled) 1f else EditChromeGeometry.DISABLED_ALPHA })
+        if (count > 0) Text(
+            if (count > 9) "9+" else count.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 2.dp).defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                .background(HyleColors.Violet, RoundedCornerShape(50)).padding(horizontal = 4.dp).wrapCentre().testTag(tag + ".badge").clearAndSetSemantics { },
+        )
+    }
 }
 
 @Composable
-private fun HintLine(show: Boolean, touchSignal: Int, reduced: Boolean, progress: State<Float>) {
+private fun HintLine(show: Boolean, touchSignal: Int, reduced: Boolean, progress: State<Float>, topPx: Float) {
     if (!show) return
     var shown by remember { mutableStateOf(true) }
     val first = remember { touchSignal }
@@ -365,7 +376,7 @@ private fun HintLine(show: Boolean, touchSignal: Int, reduced: Boolean, progress
     LaunchedEffect(shown) { if (!shown) fade.animateTo(0f, tween(if (reduced) 0 else EditChromeGeometry.HINT_FADE_MS)) }
     if (!shown && fade.value <= 0.001f) return
     Box(
-        Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)).padding(top = EditChromeGeometry.TOP_BAR_DP.dp)
+        Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).absoluteOffset { androidx.compose.ui.unit.IntOffset(0, topPx.toInt()) }
             .graphicsLayer { alpha = fade.value * progress.value }.testTag(EditChromeTags.HINT),
         contentAlignment = Alignment.TopCenter,
     ) {

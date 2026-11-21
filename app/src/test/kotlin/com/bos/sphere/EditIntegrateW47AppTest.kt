@@ -292,6 +292,89 @@ abstract class EditIntegrateBase : TourBase() {
         assertTrue("with the inline note", tagShown(ItemSheetTags.PRESET_NOTE) && textShown("Not available for this widget"))
     }
 
+
+    // ---- (e) W48 (editGaps): presets block, Cancel restores more than the layout
+
+    /** The widget (2 x 1 by default) at the start of the page with an icon in the cell under its left half, so a 2 x 2 preset would cover it. */
+    protected fun startWithIconUnderWidget() {
+        start(provider(AppWidgetProviderInfo.RESIZE_HORIZONTAL or AppWidgetProviderInfo.RESIZE_VERTICAL), widgetSpan = WidgetSpan(2, 1))
+        val st = extras.state.value
+        stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(widgetKey, key(0), key(1), key(3), key(4)), id = 7L), HomePage(keys = listOf(key(2)), id = 8L)), seeded = true))
+        assertEquals(WidgetSpan(2, 1), st.spanOf(widgetKey))
+    }
+
+    /** The widget (2 x 1) alone on its page: every cell around it is free. */
+    protected fun startWithWidgetAlone() {
+        start(provider(AppWidgetProviderInfo.RESIZE_HORIZONTAL or AppWidgetProviderInfo.RESIZE_VERTICAL), widgetSpan = WidgetSpan(2, 1))
+        stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(widgetKey), id = 7L), HomePage(keys = listOf(key(2)), id = 8L)), seeded = true))
+    }
+
+    @Test fun HOM_07_w48_e1_aSizePresetThatWouldCoverANeighbourIsRefusedLikeAHandleDrag() {
+        startWithIconUnderWidget(); enterEdit()
+        val pagesBefore = pages()
+        widgetNode().performTouchInput { click(center) }; settle(500)
+        tapTag(ItemBarTags.SETTINGS)
+        rule.onNodeWithText("2 × 2", useUnmergedTree = true).performClick(); settle(800)
+        assertEquals("the preset was refused: size unchanged", WidgetSpan(2, 1), spanNow())
+        assertEquals("and nothing was pushed aside", pagesBefore, pages())
+        assertTrue("with the same reason as a handle drag", tagShown(ItemSheetTags.PRESET_NOTE) && textShown("Can't resize: another item is in the way"))
+    }
+
+    @Test fun HOM_07_w48_e2_aSizePresetOverFreeCellsStillApplies() {
+        startWithWidgetAlone(); enterEdit()
+        widgetNode().performTouchInput { click(center) }; settle(500)
+        tapTag(ItemBarTags.SETTINGS)
+        rule.onNodeWithText("2 × 2", useUnmergedTree = true).performClick(); settle(800)
+        assertEquals(WidgetSpan(2, 2), spanNow()); assertFalse(tagShown(ItemSheetTags.PRESET_NOTE))
+    }
+
+    @Test fun HOM_12_w48_e3_cancelPutsTheWidgetSizeBackNotOnlyTheLayout() {
+        startWithWidgetAlone(); enterEdit()
+        widgetNode().performTouchInput { click(center) }; settle(500)
+        tapTag(ItemBarTags.SETTINGS)
+        rule.onNodeWithText("2 × 2", useUnmergedTree = true).performClick(); settle(800)
+        assertEquals(WidgetSpan(2, 2), spanNow())
+        closeSheet()
+        tapTag("edit.cancel")
+        assertTrue("a size change counts as a change: Cancel asks", textShown("Discard changes?"))
+        rule.onNodeWithText("Discard").performClick(); settle()
+        assertEquals("the widget is as it was on entry", WidgetSpan(2, 1), spanNow())
+    }
+
+    @Test fun HOM_12_w48_e4_cancelPutsFolderContentsAndTheClockTileSettingsBack() {
+        start(); 
+        val f = com.bos.sphere.core.catalog.Folder("f9", "Games", listOf(key(5), key(6)))
+        extras.set(extras.state.value.copy(folders = mapOf(f.id to f)))
+        stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(f.key, key(0), key(1)), id = 7L), HomePage(keys = listOf(key(2)), id = 8L)), seeded = true))
+        val analogBefore = stores.prefs.prefs.value.clockTileAnalog
+        enterEdit()
+        // what the folder editor and the clock tile's sheet do: write the shared extras and the prefs
+        extras.set(extras.state.value.copy(folders = mapOf(f.id to f.copy(name = "Renamed", keys = listOf(key(5))))))
+        stores.prefs.update { it.copy(clockTileAnalog = !analogBefore) }; settle()
+        tapTag("edit.cancel")
+        assertTrue("the extras differ from the entry: Cancel asks", textShown("Discard changes?"))
+        rule.onNodeWithText("Discard").performClick(); settle()
+        assertEquals("folder contents and name are back", f, extras.state.value.folders[f.id])
+        assertEquals("the clock tile's setting is back", analogBefore, stores.prefs.prefs.value.clockTileAnalog)
+    }
+
+    @Test fun HOM_12_w48_e5_doneKeepsTheFolderAndClockChanges() {
+        start()
+        val f = com.bos.sphere.core.catalog.Folder("f9", "Games", listOf(key(5), key(6)))
+        extras.set(extras.state.value.copy(folders = mapOf(f.id to f)))
+        stores.layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(f.key, key(0), key(1)), id = 7L), HomePage(keys = listOf(key(2)), id = 8L)), seeded = true))
+        enterEdit()
+        extras.set(extras.state.value.copy(folders = mapOf(f.id to f.copy(name = "Renamed"))))
+        tapTag("edit.done")
+        assertEquals("Renamed", extras.state.value.folders[f.id]?.name)
+    }
+
+    @Test fun HOM_12_w48_e6_cancelWithNothingChangedStillLeavesAtOnceWithoutAsking() {
+        start(); enterEdit()
+        tapTag("edit.cancel")
+        assertFalse(textShown("Discard changes?")); assertFalse(tagShown("edit.bar"))
+    }
+
     // ---- (c) the page editor: from the title, behind the one bar
 
     protected fun openPageEditor() { tapTag("edit.title"); assertTrue("the page editor", descShown("Page carousel")) }
@@ -427,6 +510,27 @@ class EditIntegrateContinuousW47AppTest : EditIntegrateBase() {
     override val horizontalHandles = 1
     override val hasGridDots = false
     override fun widgetNode() = rule.onNodeWithTag("scroll.cell.$widgetKey", useUnmergedTree = true)
+
+    private fun bounds(n: androidx.compose.ui.test.SemanticsNodeInteraction) = n.getUnclippedBoundsInRoot()
+    /** The icon's own area inside its cell node (the cell has padding above the icon and the label under it). */
+    private fun iconArea(r: androidx.compose.ui.unit.DpRect) = androidx.compose.ui.unit.DpRect(r.left + androidx.compose.ui.unit.Dp(10f), r.top + androidx.compose.ui.unit.Dp(22f), r.right - androidx.compose.ui.unit.Dp(10f), r.bottom - androidx.compose.ui.unit.Dp(32f))
+    @Test fun HOM_12_w48_f1_theBarNeverCoversTheSelectedIconOrTheIconUnderIt() {
+        start(); enterEdit()
+        for (label in listOf("App 00", "App 01")) {
+            selectByLongPress(label)
+            assertTrue("a bar for $label", barShown())
+            val bar = bounds(rule.onNodeWithTag(ItemBarTags.BAR, useUnmergedTree = true))
+            val sel = iconArea(bounds(icon(label)))
+            fun hit(a: androidx.compose.ui.unit.DpRect, b: androidx.compose.ui.unit.DpRect) = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+            assertFalse("the bar $bar covers the selected $label $sel", hit(bar, sel))
+            val next = if (label == "App 00") "App 01" else "App 03"
+            if (rule.onAllNodesWithContentDescription(next, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
+                val under = iconArea(bounds(icon(next)))
+                // the icon under the selected one is the next cell of its column (when it is the same column)
+                if (under.left == sel.left && under.top >= sel.bottom - androidx.compose.ui.unit.Dp(1f)) assertFalse("the bar $bar covers the icon under it ($next $under)", hit(bar, under))
+            }
+        }
+    }
 }
 
 /** Pages right to left (the notifications on the right, the columns filled right to left) in a right-to-left layout direction. */

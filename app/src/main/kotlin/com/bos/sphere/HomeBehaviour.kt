@@ -57,7 +57,14 @@ interface HomeEditHooks {
     /** An undo or redo took the arrangement from [before] to [after]. */
     fun revived(before: List<com.bos.sphere.core.data.HomePage>, after: List<com.bos.sphere.core.data.HomePage>)
     fun end(pages: List<com.bos.sphere.core.data.HomePage>)
+    /** W48: Cancel: put the extras (folder contents, item definitions, widget sizes and stacks) back to what they were when edit mode began. */
+    fun cancelled() {}
+    /** W48: the extras differ from what edit mode began with. */
+    fun extrasChanged(): Boolean = false
 }
+
+/** W48: the settings outside the layout that edit mode may change (the clock tile's options): noted at entry, put back by Cancel. */
+class EditConfigEntry(val restore: () -> Unit, val changed: () -> Boolean)
 
 /** HOM-12: edit mode state for the live home; see [com.bos.sphere.core.catalog.LayoutEditSession]. */
 class HomeEditState internal constructor(private val layoutStore: HomeLayoutStore, private val dock: HomeDockPins? = null) {
@@ -69,15 +76,19 @@ class HomeEditState internal constructor(private val layoutStore: HomeLayoutStor
     val undoDepth: Int get() { rev; return session?.undoDepth ?: 0 }
     val redoDepth: Int get() { rev; return session?.redoDepth ?: 0 }
     /** W45 (editChrome): something differs from what the session started with (the Cancel confirm asks only then). */
-    val hasChanges: Boolean get() { rev; return session?.hasChanges == true }
+    val hasChanges: Boolean get() { rev; return session?.hasChanges == true || (session != null && (hooks?.extrasChanged() == true || config?.changed?.invoke() == true)) }
+
+    /** W48: set by the screen: notes the widget/tile settings at entry. */
+    var configSnapshot: (() -> EditConfigEntry)? = null
+    private var config: EditConfigEntry? = null
 
     /** Set by the screen once the item host exists. */
     var hooks: HomeEditHooks? = null
 
-    fun enter() { session = LayoutDockEditSession(layoutStore.layout.value, dock?.view() ?: DockPinsView("", emptyList())); hooks?.begin(layoutStore.layout.value.pages); rev++ }
+    fun enter() { session = LayoutDockEditSession(layoutStore.layout.value, dock?.view() ?: DockPinsView("", emptyList())); config = configSnapshot?.invoke(); hooks?.begin(layoutStore.layout.value.pages); rev++ }
     fun exit() {
         if (session != null) hooks?.end(layoutStore.layout.value.pages)
-        session?.exit(); session = null; rev++
+        session?.exit(); session = null; config = null; rev++
     }
     /** W45 (editChrome): Cancel. Puts the arrangement and the rail back to what they were on entry, then ends the session. */
     fun cancel() {
@@ -85,8 +96,10 @@ class HomeEditState internal constructor(private val layoutStore: HomeLayoutStor
         val was = layoutStore.layout.value.pages
         val r = s.cancel()
         write(was, r)
+        hooks?.cancelled()
+        config?.restore?.invoke()
         hooks?.end(layoutStore.layout.value.pages)
-        session = null; rev++
+        session = null; config = null; rev++
     }
     private fun write(was: List<com.bos.sphere.core.data.HomePage>, r: EditRestore?) {
         r ?: return

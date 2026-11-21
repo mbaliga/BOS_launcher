@@ -101,4 +101,59 @@ class ItemSheetModelTest {
         assertEquals(ClockFormat.System, ClockTileOptions().format)
         assertTrue("the tile keeps the day line it always had", ClockTileOptions().date)
     }
+
+    // ---- W48 (editGaps): the scroll surface keeps the bar off the selected item and the cell under it
+    private fun onScroll(item: Rect, a: Rect = area, avoid: List<Rect> = emptyList()) = ActionBarMath.placeOnScroll(item, bar.first, bar.second, a, avoid, gap = 24f, labelRoom = 60f)
+    private fun barRect(p: ActionBarMath.Placement) = Rect(p.x, p.y, p.x + bar.first, p.y + bar.second)
+    private fun under(item: Rect) = Rect(item.left, item.bottom, item.right, item.bottom + 60f + 24f + ActionBarMath.UNDER_FACTOR * item.height)
+
+    @Test fun HOM_12_w48_scrollBarSitsAboveTheItemAndNeverOverTheItemOrTheCellUnderIt() {
+        val item = Rect(400f, 900f, 560f, 1060f)
+        val p = onScroll(item)
+        assertFalse("not on the item", barRect(p).overlaps(item)); assertFalse("not on the cell under it", barRect(p).overlaps(under(item)))
+        assertFalse("above first", p.below)
+        assertTrue(p.y + bar.second <= item.top)
+    }
+
+    @Test fun HOM_12_w48_scrollBarFlipsBelowTheCellUnderItWhenTheTopIsTaken() {
+        val item = Rect(400f, 130f, 560f, 290f) // the first row: nothing above it inside the area
+        val p = onScroll(item)
+        assertTrue("flipped below", p.below)
+        assertFalse(barRect(p).overlaps(item)); assertFalse(barRect(p).overlaps(under(item)))
+        assertTrue("inside the area", p.y >= area.top && p.y + bar.second <= area.bottom)
+    }
+
+    @Test fun HOM_12_w48_scrollBarTheLastRowGoesAbove() {
+        val item = Rect(400f, 1500f, 560f, 1660f)
+        val p = onScroll(item)
+        assertFalse(barRect(p).overlaps(item)); assertFalse(barRect(p).overlaps(under(item)))
+        assertFalse(p.below)
+    }
+
+    @Test fun HOM_12_w48_scrollBarSweepOverEveryRowNeverCoversTheItemOrTheCellUnder() {
+        var y = 110f
+        while (y + 160f <= 1800f) {
+            val item = Rect(40f, y, 200f, y + 160f)
+            val p = onScroll(item)
+            assertFalse("row at $y: item", barRect(p).overlaps(item))
+            if (item.bottom + 200f <= area.bottom || p.below.not()) assertFalse("row at $y: under", barRect(p).overlaps(under(item)))
+            assertTrue("row at $y: inside", p.x >= 0f && p.x + bar.first <= area.right && p.y >= area.top && p.y + bar.second <= area.bottom)
+            y += 40f
+        }
+    }
+
+    @Test fun HOM_12_w48_scrollBarStaysOutOfTheDockStrip() {
+        val dock = Rect(0f, 100f, 200f, 1800f) // a side dock at the start edge
+        val item = Rect(300f, 900f, 460f, 1060f)
+        val p = onScroll(item, avoid = listOf(dock))
+        assertFalse(barRect(p).overlaps(dock))
+    }
+
+    @Test fun HOM_12_w48_theOldPlacementCouldCoverTheItemWhereTheScrollOneCannot() {
+        // an item that fills the room between the reserves leaves no side: the old fallback sat inside the area just under the item's top
+        val tall = Rect(100f, 110f, 900f, 1790f)
+        val old = place(tall)
+        assertTrue("the old placement overlaps the tall item", Rect(old.x, old.y, old.x + bar.first, old.y + bar.second).overlaps(tall))
+        assertFalse("flipping needs room: a tall item has none, so the scroll one is the least overlapping but still inside", barRect(onScroll(tall)).let { it.top < area.top || it.bottom > area.bottom })
+    }
 }

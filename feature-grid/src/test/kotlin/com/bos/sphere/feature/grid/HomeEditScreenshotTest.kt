@@ -47,7 +47,7 @@ class HomeEditScreenshotTest {
         rule.setContent {
             EditTopBar(title = "Editing pages", undoCount = 3, redoCount = 0, canUndo = true, canRedo = false, onCancel = {}, onUndo = { undos++ }, onRedo = {}, onDone = { done++ })
         }
-        rule.onNodeWithContentDescription("Undo (3)").assertIsEnabled().performClick()
+        rule.onNodeWithContentDescription("Undo, 3 available").assertIsEnabled().performClick()
         rule.onNodeWithContentDescription("Redo").assertIsNotEnabled()
         rule.onNodeWithText("Done").performClick()
         assertEquals(1, undos); assertEquals(1, done)

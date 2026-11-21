@@ -196,11 +196,11 @@ class HomeEditChromeUiTest {
     fun HOM_12_undoAndRedoShowTheirCountsAndTheDisabledOnesAreDimmedAndInert() {
         undoCount = 3; redoCount = 0
         content()
-        rule.onNodeWithContentDescription("Undo (3)").assertIsEnabled().performClick()
+        rule.onNodeWithContentDescription("Undo, 3 available").assertIsEnabled().performClick()
         rule.onNodeWithContentDescription("Redo").assertIsNotEnabled()
         assertEquals(1, calls.undo); assertEquals(0, calls.redo)
         redoCount = 2; rule.waitForIdle()
-        rule.onNodeWithContentDescription("Redo (2)").assertIsEnabled().performClick()
+        rule.onNodeWithContentDescription("Redo, 2 available").assertIsEnabled().performClick()
         assertEquals(1, calls.redo)
         assertEquals(0.38f, EditChromeGeometry.DISABLED_ALPHA, 0f)
     }
@@ -425,6 +425,62 @@ class HomeEditChromeUiTest {
         val page = rule.onNodeWithTag("page").getBoundsInRoot()
         assertTrue("landscape page is smaller than 0.88 of the height: ${page.height}", page.height.value < 411f * 0.88f)
     }
+
+    // ---- W48 (editGaps): history badge, hint and tray clear of the dimmed hotspots
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_w48_undoAndRedoShowAHistoryBadgeWithTheCountAndASpokenDescription() {
+        undoCount = 3; redoCount = 12
+        content()
+        rule.onNodeWithTag(EditChromeTags.UNDO + ".badge", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithTag(EditChromeTags.REDO + ".badge", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Undo, 3 available").assertExists()
+        rule.onNodeWithContentDescription("Redo, 12 available").assertExists()
+        undoCount = 0; redoCount = 0; rule.waitForIdle()
+        rule.onNodeWithTag(EditChromeTags.UNDO + ".badge", useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithContentDescription("Undo").assertIsNotEnabled()
+        val sd = rule.onNodeWithTag(EditChromeTags.UNDO).fetchSemanticsNode().config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.StateDescription)
+        assertEquals("Nothing to undo", sd)
+    }
+
+    private fun squares(): List<androidx.compose.ui.unit.DpRect> {
+        rule.mainClock.advanceTimeBy(500); rule.waitForIdle()
+        val page = rule.onNodeWithTag("page").getBoundsInRoot()
+        val root = rule.onRoot().getBoundsInRoot()
+        val side = 64.dp * (page.width / root.width)
+        return listOf(
+            androidx.compose.ui.unit.DpRect(page.left, page.top, page.left + side, page.top + side), androidx.compose.ui.unit.DpRect(page.right - side, page.top, page.right, page.top + side),
+            androidx.compose.ui.unit.DpRect(page.left, page.bottom - side, page.left + side, page.bottom), androidx.compose.ui.unit.DpRect(page.right - side, page.bottom - side, page.right, page.bottom),
+        )
+    }
+    private fun hits(a: androidx.compose.ui.unit.DpRect, b: androidx.compose.ui.unit.DpRect) = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+
+    private fun clearOfHotspots() {
+        showHint = true; showAddPage = true
+        content()
+        val sq = squares()
+        val hint = rule.onNodeWithText("Drag to move. Tap an item to resize or change it.").getBoundsInRoot()
+        sq.forEach { assertFalse("the hint $hint lies over a dimmed hotspot $it", hits(androidx.compose.ui.unit.DpRect(hint.left, hint.top, hint.right, hint.bottom), it)) }
+        for (tag in listOf(EditChromeTags.CHIP_APPS, EditChromeTags.CHIP_WIDGETS, EditChromeTags.CHIP_FOLDERS, EditChromeTags.CHIP_PAGE)) {
+            val c = rule.onNodeWithTag(tag).getBoundsInRoot()
+            sq.forEach { assertFalse("$tag $c lies over a dimmed hotspot $it", hits(androidx.compose.ui.unit.DpRect(c.left, c.top, c.right, c.bottom), it)) }
+            rule.onNodeWithTag(tag).assertIsDisplayed()
+        }
+        val root = rule.onRoot().getBoundsInRoot()
+        assertTrue("the tray is inside the window", rule.onNodeWithTag(EditChromeTags.CHIP_APPS).getBoundsInRoot().bottom <= root.bottom)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_w48_portraitHintAndTrayAreClearOfTheDimmedHotspots() = clearOfHotspots()
+
+    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi")
+    fun HOM_12_w48_landscapeHintAndTrayAreClearOfTheDimmedHotspots() = clearOfHotspots()
+
+    @Test @Config(sdk = [35], qualifiers = "w320dp-h568dp-port-xhdpi")
+    fun HOM_12_w48_smallPhoneHintAndTrayAreClearOfTheDimmedHotspots() = clearOfHotspots()
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_w48_theHintShotShowsTheLoweredHintAndTheRaisedTray() { showHint = true; content(); shoot("w48-1-portrait-hint-tray") }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun HOM_12_screenshotPortraitEntryWithHint() {

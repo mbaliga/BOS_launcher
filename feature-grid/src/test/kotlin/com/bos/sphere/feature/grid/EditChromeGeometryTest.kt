@@ -1,6 +1,7 @@
 package com.bos.sphere.feature.grid
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -113,5 +114,61 @@ class EditChromeGeometryTest {
         val r = EdgeRect(0f, 0f, 10f, 10f)
         assertEquals(0f, EditGridDots.distance(5f, 5f, r), 0f)
         assertEquals(5f, EditGridDots.distance(13f, 14f, r), 1e-4f)
+    }
+
+    // ---- W48 (editGaps): the hint and the tray keep clear of the dimmed hotspots
+    private fun hotspots(f: EditChromeGeometry.PageFrame, dd: Float): List<EdgeRect> {
+        val s = EditChromeGeometry.hotspotSidePx(f, dd); val r = f.rect
+        return listOf(EdgeRect(r.left, r.top, r.left + s, r.top + s), EdgeRect(r.right - s, r.top, r.right, r.top + s), EdgeRect(r.left, r.bottom - s, r.left + s, r.bottom), EdgeRect(r.right - s, r.bottom - s, r.right, r.bottom))
+    }
+    private fun overlaps(a: EdgeRect, b: EdgeRect) = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+    private val windows = listOf(411f to 891f, 320f to 568f, 360f to 640f, 393f to 852f, 891f to 411f, 640f to 360f, 800f to 1280f)
+
+    @Test fun HOM_12_w48_theHintLiesBelowTheTopHotspotsAndTheMusicStripInEveryWindow() {
+        for ((wd, hd) in windows) {
+            val ww = wd * d; val hh = hd * d
+            val f = EditChromeGeometry.pageFrame(ww, hh, 24 * d, d)
+            val top = EditChromeGeometry.hintTopPx(f, 24 * d, d)
+            val hint = EdgeRect(0f, top, ww, top + EditChromeGeometry.HINT_DP * d)
+            hotspots(f, d).forEach { assertFalse("${wd}x$hd: hint over a hotspot", overlaps(hint, it)) }
+            assertTrue("${wd}x$hd: under the bar and the music strip", top >= EditChromeGeometry.barBottomPx(24 * d, d) + EditChromeGeometry.MUSIC_STRIP_DP * d - 0.5f)
+        }
+    }
+
+    @Test fun HOM_12_w48_theTrayLiesAboveTheBottomHotspotsOrBelowThePageInEveryWindow() {
+        for ((wd, hd) in windows) for (requested in listOf(8f, 60f, 112f)) {
+            val ww = wd * d; val hh = hd * d
+            val f = EditChromeGeometry.pageFrame(ww, hh, 24 * d, d)
+            val bottom = EditChromeGeometry.trayBottomDp(f, d, requested)
+            assertTrue("${wd}x$hd: never lowered", bottom >= requested)
+            val tray = EdgeRect(0f, hh - (bottom + EditChromeGeometry.TRAY_DP) * d, ww, hh - bottom * d)
+            hotspots(f, d).forEach { assertFalse("${wd}x$hd req $requested: tray over a hotspot", overlaps(tray, it)) }
+            assertEquals("idempotent: the chrome applies it again to the effective value", bottom, EditChromeGeometry.trayBottomDp(f, d, bottom), 0.01f)
+        }
+    }
+
+    @Test fun HOM_12_w48_landscapeKeepsTheTrayWhereItWasBecauseThePageEndsAboveIt() {
+        val f = EditChromeGeometry.pageFrame(891 * d, 411 * d, 0f, d)
+        assertEquals(8f, EditChromeGeometry.trayBottomDp(f, d, 8f), 0.01f)
+    }
+
+    @Test fun HOM_12_w48_theActionBarReserveFollowsTheLoweredHint() {
+        val f = EditChromeGeometry.pageFrame(w, h, 24 * d, d)
+        val hintTop = EditChromeGeometry.hintTopPx(f, 24 * d, d) / d
+        assertEquals(hintTop + EditChromeGeometry.HINT_DP, EditChromeGeometry.actionBarReserveDp(24f, true, 60f, hintTopDp = hintTop).first, 0.01f)
+        assertEquals(24f + 56f, EditChromeGeometry.actionBarReserveDp(24f, false, 60f, hintTopDp = hintTop).first, 0.01f)
+    }
+
+    @Test fun HOM_12_w48_theGridDotsAreDarkAndStrongerOnTheLightTheme() {
+        assertTrue(EditGridDots.alpha(0f, 0f, null, 100f, 100f, light = true) > EditGridDots.alpha(0f, 0f, null, 100f, 100f, light = false))
+        assertEquals(EditChromeGeometry.DOT_NEAR_ALPHA_LIGHT, EditGridDots.alpha(5f, 5f, EdgeRect(0f, 0f, 10f, 10f), 100f, 100f, light = true), 0f)
+        assertEquals(androidx.compose.ui.graphics.Color.White, EditGridDots.ink(false))
+        assertTrue("dark ink on light", EditGridDots.ink(true).red < 0.2f && EditGridDots.ink(true).green < 0.2f)
+        // contrast of the dot colour against a light wallpaper (0xF2F2F7) at the resting alpha: white would be ~1.0:1
+        fun lum(c: androidx.compose.ui.graphics.Color) = 0.2126f * c.red + 0.7152f * c.green + 0.0722f * c.blue
+        val wall = androidx.compose.ui.graphics.Color(0xFFF2F2F7)
+        val dotOnLight = lum(EditGridDots.ink(true)) * EditChromeGeometry.DOT_ALPHA_LIGHT + lum(wall) * (1 - EditChromeGeometry.DOT_ALPHA_LIGHT)
+        val whiteOnLight = 1f * EditChromeGeometry.DOT_ALPHA + lum(wall) * (1 - EditChromeGeometry.DOT_ALPHA)
+        assertTrue("the dark dot differs from the wallpaper by far more than a white one", (lum(wall) - dotOnLight) > 4 * kotlin.math.abs(whiteOnLight - lum(wall)))
     }
 }

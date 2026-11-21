@@ -48,6 +48,8 @@ class ItemSheetActions(
     val onWidgetSize: (cols: Int, rows: Int) -> Unit = { _, _ -> },
     /** W47: the provider's resize limits in cells (null: free within the grid). A preset outside them is clamped, buzzes and shows a note. */
     val widgetLimits: CellLimits? = null,
+    /** W48: true when a widget of this size would cover another item ("widgets block", like a handle drag): the preset is refused with a buzz and a note. */
+    val widgetBlocked: (cols: Int, rows: Int) -> Boolean = { _, _ -> false },
 )
 
 object ItemSheetTags {
@@ -104,20 +106,25 @@ private fun Row(o: SheetOption, clock: ClockTileOptions, a: ItemSheetActions, cl
         SheetOption.WidgetSize -> {
             val presets = WidgetSizePresets.forGrid(a.gridCols, a.gridRows)
             val haptics = rememberLauncherHaptics()
-            var unavailable by remember { mutableStateOf(false) }
+            var note by remember { mutableStateOf<String?>(null) }
             Column(tag) {
                 OneUiSegmentedRow(L10n.tr("Size"), presets.map { WidgetSizePresets.label(it) }, presets.indexOf(a.widgetSpan), { i ->
                     val (c, r) = presets[i]
                     val limits = a.widgetLimits
                     val res = if (limits == null) null else PresetClamp.clamp(limits, c, r)
-                    if (res != null && res.clamped) {
+                    val tc = res?.cols ?: c; val tr = res?.rows ?: r
+                    if ((tc to tr) != a.widgetSpan && a.widgetBlocked(tc, tr)) {
+                        // W48: widgets block: a preset that would cover a neighbour is refused, the same buzz and reason as a handle drag.
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        note = "Can't resize: another item is in the way"
+                    } else if (res != null && res.clamped) {
                         // W47: the provider's limits are the handles' limits too; outside them the preset clamps, buzzes and says so.
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        unavailable = true
+                        note = "Not available for this widget"
                         if (res.cols to res.rows != a.widgetSpan) a.onWidgetSize(res.cols, res.rows)
-                    } else { unavailable = false; a.onWidgetSize(c, r) }
+                    } else { note = null; a.onWidgetSize(c, r) }
                 })
-                if (unavailable) Text(L10n.tr("Not available for this widget"), color = Color(0xFFE5484D), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp).testTag(ItemSheetTags.PRESET_NOTE))
+                note?.let { Text(L10n.tr(it), color = Color(0xFFE5484D), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp).testTag(ItemSheetTags.PRESET_NOTE)) }
             }
         }
         SheetOption.OpenItem -> item("Open", Glyphs.Apps, run = a.onOpen)()

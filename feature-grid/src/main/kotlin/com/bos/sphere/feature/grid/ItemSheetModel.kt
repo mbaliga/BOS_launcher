@@ -123,4 +123,39 @@ object ActionBarMath {
         val y = (below).coerceIn(area.top, (area.bottom - barH).coerceAtLeast(area.top))
         return Placement(x, y, y >= item.center.y)
     }
+
+    /**
+     * W48 (editGaps): the placement on the scroll surface (Pages Continuous), where the cells touch each other. The bar never covers [item] nor the cell under it
+     * ([under]: the item moved down by 1.3 heights, its label and the gap), so the icon the person may tap next stays reachable. It sits ABOVE the item first,
+     * flips BELOW the cell under it, then to the top or bottom strip of [area]; the candidate with the least overlap of the kept-clear rects wins when none is free.
+     * Stays inside [area] and clear of [avoid].
+     */
+    /** The cell under an icon is taken as this many icon heights tall (its label and padding included on top of [labelRoom]): the pitch of the scroll surface is about 1.95 icons. */
+    const val UNDER_FACTOR = 1.3f
+
+    fun placeOnScroll(item: Rect, barW: Float, barH: Float, area: Rect, avoid: List<Rect>, gap: Float, labelRoom: Float): Placement {
+        // A side dock (an avoid rect that spans the area's full height at one edge) narrows the room sideways, so the bar slides clear of it.
+        var left = area.left; var right = area.right
+        avoid.forEach { r -> if (r.top <= area.top + 1f && r.bottom >= area.bottom - 1f) { if (r.left <= area.left + 1f) left = maxOf(left, r.right) else if (r.right >= area.right - 1f) right = minOf(right, r.left) } }
+        val maxX = (right - barW).coerceAtLeast(left)
+        val x = (item.center.x - barW / 2f).coerceIn(left, maxX)
+        val under = Rect(item.left, item.bottom, item.right, item.bottom + labelRoom + gap + UNDER_FACTOR * item.height)
+        val keep = listOf(item.inflate(gap / 2f), under.copy(top = under.top - gap / 2f))
+        fun rectAt(y: Float) = Rect(x, y, x + barW, y + barH)
+        fun inside(y: Float) = y >= area.top && y + barH <= area.bottom
+        fun overlapArea(r: Rect, o: Rect): Float {
+            val w = minOf(r.right, o.right) - maxOf(r.left, o.left); val h = minOf(r.bottom, o.bottom) - maxOf(r.top, o.top)
+            return if (w > 0f && h > 0f) w * h else 0f
+        }
+        val candidates = listOf(
+            item.top - gap - barH to false,
+            under.bottom + gap to true,
+            area.top to false,
+            area.bottom - barH to true,
+        ).map { (y, below) -> y.coerceIn(area.top, (area.bottom - barH).coerceAtLeast(area.top)).let { c -> Triple(c, below, inside(y)) } }
+        candidates.firstOrNull { (y, _, fits) -> fits && keep.none { it.overlaps(rectAt(y)) } && avoid.none { it.overlaps(rectAt(y)) } }
+            ?.let { return Placement(x, it.first, it.second) }
+        val best = candidates.minBy { (y, _, _) -> keep.sumOf { overlapArea(rectAt(y), it).toDouble() } + avoid.sumOf { overlapArea(rectAt(y), it).toDouble() } * 4.0 }
+        return Placement(x, best.first, best.second)
+    }
 }

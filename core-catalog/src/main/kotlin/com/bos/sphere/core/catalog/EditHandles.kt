@@ -338,3 +338,30 @@ object EditHandlesApply {
         return if (idx == keys.indexOf(key)) sized else HomeEdit.reorderOnPage(sized, key, idx, cap)
     }
 }
+
+/**
+ * W48 (editGaps, HOM-07): a size preset of the item sheet follows the same "widgets block" rule as a handle drag. The wanted size
+ * keeps the widget's origin (shifted back inside the grid when it would stick out); when it would cover any other item the preset
+ * is [Blocked] (nothing moves, the others are never pushed). Shrinking is always free. The provider limits are [PresetClamp]'s job.
+ */
+object PresetFit {
+    sealed interface Result {
+        /** The widget takes [rect] (its origin moves only to stay inside the grid). */
+        data class Fits(val rect: CellRect, val moveOrigin: Boolean) : Result
+        /** [by] is in the way. */
+        data class Blocked(val by: String) : Result
+        data object Unknown : Result
+    }
+
+    fun fit(keys: List<String>, spanOf: (String) -> WidgetSpan, gridCols: Int, gridRows: Int, key: String, cols: Int, rows: Int): Result {
+        val packed = TilePacker.pack(keys, spanOf, gridCols, gridRows)
+        val me = packed.placed.firstOrNull { it.key == key }?.rect() ?: return Result.Unknown
+        val c = cols.coerceIn(1, gridCols.coerceAtLeast(1)); val r = rows.coerceIn(1, gridRows.coerceAtLeast(1))
+        val col = me.col.coerceAtMost((gridCols - c).coerceAtLeast(0)); val row = me.row.coerceAtMost((gridRows - r).coerceAtLeast(0))
+        val want = CellRect(col, row, c, r)
+        return when (val v = EditCollision.resizeVerdict(packed.placed, key, want)) {
+            is EditVerdict.Blocked -> Result.Blocked(v.by)
+            else -> Result.Fits(want, moveOrigin = col != me.col || row != me.row)
+        }
+    }
+}

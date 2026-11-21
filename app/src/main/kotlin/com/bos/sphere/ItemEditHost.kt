@@ -55,6 +55,8 @@ class ItemEditOps(
     val canReconfigure: (String) -> Boolean,
     val reconfigure: (String) -> Unit,
     val resizeTo: (String, Int, Int) -> Unit,
+    /** W48: true when a preset of this size would cover another item (widgets block). */
+    val presetBlocked: (String, Int, Int) -> Boolean = { _, _, _ -> false },
     val widgetLimits: (String) -> com.bos.sphere.core.catalog.CellLimits?,
     val spanOf: (String) -> Pair<Int, Int>,
     val grid: () -> Pair<Int, Int>,
@@ -64,12 +66,12 @@ class ItemEditOps(
 
 /** HOM-07 / HOM-12: the item action bar, its Undo snackbar and the item sheet, composed while home edit mode is on. */
 @Composable
-fun ItemEditHost(state: ItemEditState, ops: ItemEditOps, reserveTop: androidx.compose.ui.unit.Dp, reserveBottom: androidx.compose.ui.unit.Dp, avoid: List<Rect> = emptyList(), modifier: Modifier = Modifier) {
+fun ItemEditHost(state: ItemEditState, ops: ItemEditOps, reserveTop: androidx.compose.ui.unit.Dp, reserveBottom: androidx.compose.ui.unit.Dp, avoid: List<Rect> = emptyList(), scrollSurface: Boolean = false, modifier: Modifier = Modifier) {
     DisposableEffect(Unit) { onDispose { state.clear() } }
     ItemActionLayer(
         source = state.selection, notice = state.notice, onNoticeDone = { state.notice = null },
         onResize = { ops.startResize(it) }, // keeps the selection: the handles of the selected widget are the resize
-        avoid = avoid, showOutline = false, // the handles stream draws the one outline
+        avoid = avoid, scrollSurface = scrollSurface, showOutline = false, // the handles stream draws the one outline
         onRemove = { key ->
             val name = ops.labelOf(key)
             ops.remove(key)
@@ -100,6 +102,7 @@ fun ItemEditHost(state: ItemEditState, ops: ItemEditOps, reserveTop: androidx.co
             onReconfigure = { ops.reconfigure(key) },
             widgetSpan = span, gridCols = gc, gridRows = gr,
             onWidgetSize = { c, r -> ops.resizeTo(key, c, r) },
+            widgetBlocked = { c, r -> ops.presetBlocked(key, c, r) },
             widgetLimits = if (kind == SheetKind.Widget) ops.widgetLimits(key) else null,
         )
         ItemSheet(kind, app?.label ?: L10n.tr(if (kind == SheetKind.Clock) ItemSheetModel.title(kind) else ops.labelOf(key).ifBlank { ItemSheetModel.title(kind) }), ops.clock, caps, actions, dismiss)

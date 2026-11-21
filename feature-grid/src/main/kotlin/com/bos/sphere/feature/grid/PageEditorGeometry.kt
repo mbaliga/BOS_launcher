@@ -42,6 +42,16 @@ object PageEditorGeometry {
     /** The live card should not drop below this share of the window (the content panel gives way first), unless the window is tiny. */
     const val LIVE_SCALE_WISH = 0.45f
     const val LIVE_SCALE_FLOOR = 0.2f
+    /**
+     * W48 (editGaps): a window shorter than this (320 x 568 dp class) gives up room that big windows can spare so the live card still reaches [LIVE_SCALE_WISH]:
+     * smaller strip cards (down to 0.6 of the default), a 4 dp strip padding, 6 dp gaps, a 44 dp tab row and a content panel of at least [SMALL_CONTENT_MIN_DP] (it scrolls).
+     */
+    const val SMALL_HEIGHT_DP = 640f
+    const val SMALL_CONTENT_MIN_DP = 72f
+    const val SMALL_TAB_ROW_DP = 44f
+    const val SMALL_STRIP_PAD_DP = 4f
+    const val SMALL_GAP_DP = 6f
+    const val SMALL_CARD_SCALE_MIN = 0.6f
     const val SIDE_MIN_DP = 600f
     const val SIDE_LIVE_SHARE = 0.45f
     const val SIDE_TABS_MIN_DP = 260f
@@ -103,10 +113,12 @@ object PageEditorGeometry {
         val dp = density.coerceAtLeast(0.1f)
         val side = sideMode(w, h, dp)
         val landscape = w > h
-        val sf = (h / dp / 740f).coerceIn(0.8f, 1f)
+        val small = !side && h / dp < SMALL_HEIGHT_DP
+        val sf = (h / dp / 740f * (if (small) 0.8f else 1f)).coerceIn(if (small) SMALL_CARD_SCALE_MIN else 0.8f, 1f)
         val cW = CARD_W_DP * dp * sf; val cH = CARD_H_DP * dp * sf
-        val gap = GAP_DP * dp; val pad = STRIP_PAD_DP * dp; val margin = MARGIN_DP * dp
-        val tabH = TAB_ROW_DP * dp * fontScale.coerceIn(1f, TAB_FONT_MAX)
+        val gap = (if (small) SMALL_GAP_DP else GAP_DP) * dp; val pad = (if (small) SMALL_STRIP_PAD_DP else STRIP_PAD_DP) * dp; val margin = MARGIN_DP * dp
+        val tabH = (if (small) SMALL_TAB_ROW_DP else TAB_ROW_DP) * dp * fontScale.coerceIn(1f, TAB_FONT_MAX)
+        val contentMin = (if (small) SMALL_CONTENT_MIN_DP else CONTENT_MIN_DP) * dp; val contentFloor = (if (small) SMALL_CONTENT_MIN_DP else CONTENT_FLOOR_DP) * dp
         val topBar = EdgeRect(0f, topInsetPx.coerceAtLeast(0f), w, topInsetPx.coerceAtLeast(0f) + topBarDp * dp)
         val limit = (h - bottomInsetPx.coerceAtLeast(0f) - bottomBarDp * dp).coerceAtLeast(topBar.bottom + 1f)
         val card: EdgeRect; val strip: EdgeRect; val tabRow: EdgeRect; val content: EdgeRect
@@ -114,8 +126,8 @@ object PageEditorGeometry {
         if (!side) {
             strip = EdgeRect(0f, topBar.bottom, w, topBar.bottom + cH + 2 * pad)
             val free = limit - strip.bottom - tabH - 2 * gap
-            var contentH = minOf(CONTENT_SHARE * h, free - LIVE_SCALE_WISH * h).coerceAtLeast(CONTENT_MIN_DP * dp)
-            if (free - contentH < LIVE_SCALE_FLOOR * h) contentH = (free - LIVE_SCALE_FLOOR * h).coerceAtLeast(CONTENT_FLOOR_DP * dp)
+            var contentH = minOf(CONTENT_SHARE * h, free - LIVE_SCALE_WISH * h).coerceAtLeast(contentMin)
+            if (free - contentH < LIVE_SCALE_FLOOR * h) contentH = (free - LIVE_SCALE_FLOOR * h).coerceAtLeast(contentFloor)
             contentH = contentH.coerceAtMost((free - 1f).coerceAtLeast(1f))
             val avail = (free - contentH).coerceAtLeast(1f)
             scale = minOf(LIVE_SCALE_MAX, avail / h, (w - 2 * margin) / w).coerceAtLeast(0.05f)

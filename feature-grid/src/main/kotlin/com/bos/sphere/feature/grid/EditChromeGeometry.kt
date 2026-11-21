@@ -29,6 +29,9 @@ object EditChromeGeometry {
     const val DOT_DP = 2f
     const val DOT_ALPHA = 0.18f
     const val DOT_NEAR_ALPHA = 0.40f
+    /** W48: on the light theme the dots are dark ink (white vanishes on a light wallpaper) and a little stronger. */
+    const val DOT_ALPHA_LIGHT = 0.34f
+    const val DOT_NEAR_ALPHA_LIGHT = 0.62f
     /** The four hotspots, the music line: dimmed to this and inert. The page dots too, but they stay the page switcher. */
     const val FIXED_DIM = 0.40f
     const val DOCK_DIM = 0.70f
@@ -47,14 +50,46 @@ object EditChromeGeometry {
      * W47 (editIntegrate): the room the item action bar must leave to the chrome, in dp, as (top, bottom): the top bar (the safe inset plus 56 dp) and the hint line
      * under it while it shows, and the tray (72 dp above [trayBottomDp], the dock's or the page dots' room). [tray] false (the page editor, which has no tray) leaves only the safe top.
      */
-    fun actionBarReserveDp(safeTopDp: Float, hint: Boolean, trayBottomDp: Float, tray: Boolean = true): Pair<Float, Float> =
-        (safeTopDp + TOP_BAR_DP + if (hint) HINT_DP else 0f) to (if (tray) trayBottomDp + TRAY_DP else 0f)
+    fun actionBarReserveDp(safeTopDp: Float, hint: Boolean, trayBottomDp: Float, tray: Boolean = true, hintTopDp: Float = safeTopDp + TOP_BAR_DP): Pair<Float, Float> =
+        (if (hint) hintTopDp + HINT_DP else safeTopDp + TOP_BAR_DP) to (if (tray) trayBottomDp + TRAY_DP else 0f)
+
+    /** W48 (editGaps): the music line's strip under the top bar (the shield's 48 dp), dimmed like the hotspots. */
+    const val MUSIC_STRIP_DP = 48f
+    /** The extra room kept between the chrome and a dimmed hotspot. */
+    const val HOTSPOT_GAP_DP = 8f
+
+    /** The side of a hotspot's touch square at the page's scale, in px (the shield swallows exactly this square at each page corner). */
+    fun hotspotSidePx(page: PageFrame, density: Float): Float = FixedHomeChrome.HOTSPOT_TOUCH_DP * page.scale * density
+
+    /**
+     * W48: the top of the hint line in window px. The hint used to sit right under the top bar, over the page's top corners (the dimmed hotspots) and the
+     * music line's strip. It now starts below both: under the bar, under the strip and under the top hotspot squares (the lower of the three).
+     */
+    fun hintTopPx(page: PageFrame, safeTopPx: Float, density: Float): Float {
+        val barBottom = barBottomPx(safeTopPx, density)
+        return max(barBottom, max(page.rect.top + hotspotSidePx(page, density), barBottom + MUSIC_STRIP_DP * density))
+    }
+
+    /**
+     * W48: where the tray's bottom edge may be (dp above the window's bottom): the requested one ([requestedDp]: the dock's or the page dots' room), unless the
+     * tray would then lie over the page's bottom hotspot squares; then it is raised to sit above them (with [HOTSPOT_GAP_DP]). In landscape the page ends above
+     * the tray, so nothing changes there.
+     */
+    fun trayBottomDp(page: PageFrame, density: Float, requestedDp: Float): Float {
+        val h = page.windowHeightPx
+        if (h <= 0f) return requestedDp
+        val side = hotspotSidePx(page, density)
+        val trayTop = h - (requestedDp + TRAY_DP) * density; val trayBottom = h - requestedDp * density
+        val overlaps = trayTop < page.rect.bottom && trayBottom > page.rect.bottom - side
+        if (!overlaps) return requestedDp
+        return max(requestedDp, (h - page.rect.bottom + side) / density + HOTSPOT_GAP_DP)
+    }
 
     /** The top of the tray in window px, when its bottom edge is [bottomOffsetPx] above the window's bottom (the safe inset, or the dock's top). */
     fun trayTopPx(heightPx: Float, bottomOffsetPx: Float, density: Float): Float = heightPx - bottomOffsetPx - TRAY_DP * density
 
     /** The page as the edit mode shows it: [scale] and the vertical translation of the home layer (its pivot is its own centre), and the rectangle it covers in window px. */
-    data class PageFrame(val scale: Float, val translationY: Float, val rect: EdgeRect)
+    data class PageFrame(val scale: Float, val translationY: Float, val rect: EdgeRect, val windowHeightPx: Float = 0f)
 
     /**
      * Portrait: scale 0.88 exactly. The page is centred, then eased down by half of what the top bar would otherwise cover (never past the window's bottom), so the
@@ -71,7 +106,7 @@ object EditChromeGeometry {
         val centredTop = (h - ph) / 2f
         val top = min(centredTop + 0.5f * max(0f, barBottom - centredTop), if (landscape) h - trayRoom - ph else h - ph).coerceAtLeast(0f)
         val left = (w - pw) / 2f
-        return PageFrame(scale, (top + ph / 2f) - h / 2f, EdgeRect(left, top, left + pw, top + ph))
+        return PageFrame(scale, (top + ph / 2f) - h / 2f, EdgeRect(left, top, left + pw, top + ph), h)
     }
 
     /** The layer frame at [progress] 0 (full screen) .. 1 (edit). Reduced motion: no scale animation, the page is at rest from the first frame and the scrim cross-fades with [EditCardGeometry.Frame.carouselAlpha]. */
@@ -139,6 +174,10 @@ object EditGridDots {
     }
 
     /** 18% normally, 40% within one cell ([pitchX] / [pitchY], the larger) of [active]. */
-    fun alpha(x: Float, y: Float, active: EdgeRect?, pitchX: Float, pitchY: Float): Float =
-        if (active != null && distance(x, y, active) <= max(abs(pitchX), abs(pitchY))) EditChromeGeometry.DOT_NEAR_ALPHA else EditChromeGeometry.DOT_ALPHA
+    fun alpha(x: Float, y: Float, active: EdgeRect?, pitchX: Float, pitchY: Float, light: Boolean = false): Float =
+        if (active != null && distance(x, y, active) <= max(abs(pitchX), abs(pitchY))) (if (light) EditChromeGeometry.DOT_NEAR_ALPHA_LIGHT else EditChromeGeometry.DOT_NEAR_ALPHA)
+        else (if (light) EditChromeGeometry.DOT_ALPHA_LIGHT else EditChromeGeometry.DOT_ALPHA)
+
+    /** The dot's colour: white on the dark theme, the dark ink on the light one. */
+    fun ink(light: Boolean): androidx.compose.ui.graphics.Color = if (light) androidx.compose.ui.graphics.Color(0xFF14161F) else androidx.compose.ui.graphics.Color.White
 }

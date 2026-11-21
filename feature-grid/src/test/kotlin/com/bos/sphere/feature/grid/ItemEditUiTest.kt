@@ -88,7 +88,7 @@ class ItemEditUiTest {
     private val itemBounds = Rect(300f, 500f, 480f, 680f)
 
     /** A page with a few fake tiles, the action layer, and (optionally) the sheet rows as the sheet would hold them. */
-    private fun host(key: String, bounds: Rect? = itemBounds, withNotice: Boolean = false, content: @androidx.compose.runtime.Composable () -> Unit = {}): EditSelectionState {
+    private fun host(key: String, bounds: Rect? = itemBounds, withNotice: Boolean = false, scroll: Boolean = false, content: @androidx.compose.runtime.Composable () -> Unit = {}): EditSelectionState {
         val sel = EditSelectionState()
         var notice by mutableStateOf<RemovedNotice?>(null)
         rule.setContent {
@@ -99,7 +99,7 @@ class ItemEditUiTest {
                     sel, notice, { notice = null }, onResize = { log += "resize:$it" },
                     onRemove = { log += "remove:$it"; sel.clear(); notice = RemovedNotice("Removed", { log += "undo" }) },
                     onSettings = { log += "settings:$it" }, label = { if (it == HomeTiles.CLOCK) "Clock" else it },
-                    reserveBottom = 120.dp,
+                    reserveBottom = 120.dp, scrollSurface = scroll,
                 )
             }
         }
@@ -139,6 +139,43 @@ class ItemEditUiTest {
         val above = rule.onNodeWithTag(ItemBarTags.BAR).getUnclippedBoundsInRoot()
         assertTrue("above the item", above.bottom.value * px <= 2000f)
         assertNotNull(sel.selectedKey)
+    }
+
+    // ---- W48 (editGaps)
+    private fun barPx() = rule.onNodeWithTag(ItemBarTags.BAR).getUnclippedBoundsInRoot().let { Rect(it.left.value * px, it.top.value * px, it.right.value * px, it.bottom.value * px) }
+    private fun underCell(i: Rect) = Rect(i.left, i.bottom, i.right, i.bottom + 24f * px + 8f * px + ActionBarMath.UNDER_FACTOR * i.height)
+
+    private fun scrollCase(item: Rect) {
+        host(HomeTiles.CLOCK, item, scroll = true)
+        val bar = barPx()
+        assertFalse("item $item: bar $bar covers the item", bar.overlaps(item))
+        assertFalse("item $item: bar $bar covers the cell under it", bar.overlaps(underCell(item)))
+    }
+    @Test fun HOM_12_w48_onTheScrollSurfaceTheBarNeverCoversTheSelectedItemOrTheIconUnderIt() = scrollCase(itemBounds)
+    @Test fun HOM_12_w48_onTheScrollSurfaceTheFirstRowFlipsTheBarBelowTheCellUnderIt() { scrollCase(Rect(300f, 60f, 480f, 240f)); assertTrue(barPx().top >= underCell(Rect(300f, 60f, 480f, 240f)).bottom - 1f) }
+    @Test fun HOM_12_w48_onTheScrollSurfaceTheLastRowPutsTheBarAboveTheItem() { scrollCase(Rect(300f, 1400f, 480f, 1580f)); assertTrue(barPx().bottom <= 1400f + 1f) }
+
+    @Test fun HOM_12_w48_theOldPlacementSatBelowTheItemOverTheIconUnderIt() {
+        host(HomeTiles.CLOCK, itemBounds, scroll = false)
+        assertTrue("without the scroll rule the bar is right under the item, over the cell under it", barPx().overlaps(underCell(itemBounds)))
+    }
+
+    @Test fun HOM_07_w48_aPresetThatWouldCoverANeighbourIsRefusedWithTheReasonAndNothingChanges() {
+        val applied = mutableListOf<Pair<Int, Int>>()
+        sheet(SheetKind.Widget, actions = ItemSheetActions(widgetSpan = 2 to 1, gridCols = 4, gridRows = 6, onWidgetSize = { c, r -> applied += c to r }, widgetBlocked = { c, r -> c == 2 && r == 2 }))
+        rule.onNodeWithText("2 × 2").performClick(); rule.waitForIdle()
+        assertTrue("blocked: nothing applied", applied.isEmpty())
+        rule.onNodeWithText("Can't resize: another item is in the way").assertExists()
+        rule.onNodeWithText("4 × 2").performClick(); rule.waitForIdle()
+        assertEquals("a free preset applies and clears the note", listOf(4 to 2), applied)
+        rule.onNodeWithTag(ItemSheetTags.PRESET_NOTE).assertDoesNotExist()
+    }
+
+    @Test fun HOM_07_w48_theCurrentSizeIsNeverAskedToBeBlocked() {
+        val asked = mutableListOf<Pair<Int, Int>>()
+        sheet(SheetKind.Widget, actions = ItemSheetActions(widgetSpan = 2 to 1, gridCols = 4, gridRows = 6, widgetBlocked = { c, r -> asked += c to r; true }))
+        rule.onNodeWithText("2 × 1").performClick(); rule.waitForIdle()
+        assertTrue(asked.isEmpty())
     }
 
     @Test fun HOM_12_bar_13_removeRemovesAndAnUndoSnackbarTakesItBack() {

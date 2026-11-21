@@ -84,6 +84,8 @@ fun ItemActionLayer(
     showOutline: Boolean = false,
     reserveTop: androidx.compose.ui.unit.Dp = 0.dp,
     reserveBottom: androidx.compose.ui.unit.Dp = 0.dp,
+    /** W48: the scroll surface (Pages Continuous): the bar keeps clear of the selected item and the cell under it, above first. */
+    scrollSurface: Boolean = false,
 ) {
     var origin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var area by remember { mutableStateOf(IntSize.Zero) }
@@ -109,8 +111,10 @@ fun ItemActionLayer(
                 ?: Rect(areaRect.center.x, areaRect.center.y, areaRect.center.x, areaRect.center.y)
             val w = if (barSize.width > 0) barSize.width.toFloat() else with(density) { 288.dp.toPx() }
             val h = with(density) { 48.dp.toPx() }
-            val p = ActionBarMath.place(
-                item, w, h, areaRect, avoid.map { Rect(it.left - origin.x, it.top - origin.y, it.right - origin.x, it.bottom - origin.y) },
+            val avoidLocal = avoid.map { Rect(it.left - origin.x, it.top - origin.y, it.right - origin.x, it.bottom - origin.y) }
+            val p = if (scrollSurface) ActionBarMath.placeOnScroll(item, w, h, areaRect, avoidLocal, gap = with(density) { 8.dp.toPx() }, labelRoom = with(density) { 24.dp.toPx() })
+            else ActionBarMath.place(
+                item, w, h, areaRect, avoidLocal,
                 gap = with(density) { 8.dp.toPx() }, handleReach = with(density) { 30.dp.toPx() },
             )
             if (!source.dragging) Row(

@@ -1464,6 +1464,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             // CFG-15 (waves 30, 38): the segments of the white ring around the hub (6 to 8) show what the user chose in Ground Control > App drawer > Drawer shortcuts.
             ringSegments = puckSegments,
             showRingLabels = puckLabels,
+            // Wave 48 (workProfile): the Work scope label (only with a work profile) and the pause pill; the state is the system's quiet mode.
+            work = run {
+                val discPaused by com.bos.sphere.core.catalog.WorkProfileState.workPaused.collectAsStateWithLifecycle()
+                val kinds by com.bos.sphere.core.catalog.WorkProfileState.profileKinds.collectAsStateWithLifecycle()
+                val quiet by com.bos.sphere.core.catalog.WorkProfileState.quietProfileIds.collectAsStateWithLifecycle()
+                val p = discPaused
+                if (p == null) null else com.bos.sphere.feature.grid.WheelWork(
+                    on = prefs.wheelWorkOnly, paused = p,
+                    workUsers = kinds.filterValues { it == com.bos.sphere.core.catalog.ProfileKind.Work }.keys, quietUsers = quiet,
+                    onChange = { on -> stores.prefs.update { it.copy(wheelWorkOnly = on) } },
+                    onTogglePause = { com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, !p) },
+                )
+            },
             actions = puckSlots.take(puckSegments).mapIndexed { i, slot ->
                 when (slot) {
                     com.bos.sphere.core.data.PuckSlot.Empty ->
@@ -1776,7 +1789,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             val reg = com.bos.sphere.core.catalog.WorkProfileState.start(context)
             onDispose { reg.close() }
         }
-        if (workPaused != null && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.WorkPausedBanner, chromeSettings)) {
+        // Wave 48: while the disc is open it carries its own pause pill (the Work scope), so the home's chip steps aside.
+        if (workPaused != null && !wheelOpen && !homeEdit.active && HomeChromeRules.shows(landing, ChromeElement.WorkPausedBanner, chromeSettings)) {
             Box(Modifier.fillMaxSize().safeDrawingPadding().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
                 com.bos.sphere.feature.grid.WorkPauseChip(workPaused, onToggle = { com.bos.sphere.core.catalog.WorkProfileState.setWorkPaused(context, workPaused != true) })
             }

@@ -281,13 +281,14 @@ internal fun DesktopPinRow(manager: com.bos.sphere.feature.dock.WorkspaceManager
  * whichever surface composes a dock first, and migrates the old per-workspace pins into the list the first time.
  */
 object DockPinBinding {
-    private var bound = false
+    /** The manager and store this binding was made for. Keyed by identity, not a plain flag: in the app there is one of each per process, so it still runs once; a test (or a restart of the repositories) that makes new ones gets them bound too, where a process-wide flag left their pins unconnected to the home's dock list (wave 48, PackageRemovedW26SmokeTest). */
+    private var boundTo: Pair<Any, Any>? = null
 
     @Synchronized fun ensure(context: android.content.Context) {
-        if (bound) return
-        bound = true
         val store = com.bos.sphere.core.catalog.HomeExtrasStore.get(context)
         val manager = WorkspaceRepository.get(context)
+        if (boundTo?.let { it.first === manager && it.second === store } == true) return
+        boundTo = manager to store
         com.bos.sphere.feature.dock.HomeDockKeys.migrate(store.state.value.dock, manager.current.active.dockPins)?.let { store.set(store.state.value.copy(dock = it)) }
         manager.pinSink = { pins ->
             val enc = com.bos.sphere.feature.dock.HomeDockKeys.encodeAll(pins)

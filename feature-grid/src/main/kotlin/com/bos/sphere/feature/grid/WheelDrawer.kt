@@ -74,6 +74,13 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.stateDescription
+import com.bos.sphere.core.catalog.AppPresentation
+import com.bos.sphere.core.catalog.WorkDrawerRules
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -501,6 +508,8 @@ object WheelCategoryCache {
 }
 
 private const val MAX_RECENT = 24
+/** Wave 48: the Work scope label's text and its English key in [L10n]. */
+private const val WORK_LABEL = "Work"
 private val ByLabel: Comparator<AppEntry> = compareBy(String.CASE_INSENSITIVE_ORDER) { it.label }
 
 private fun buildWheelGroups(
@@ -580,6 +589,21 @@ private const val INSET_DEG = 4f
 private const val CULL_MARGIN_DEG = WheelGeometry.LOOP_MARGIN_DEG
 // Spread across the hub; chips stay upright (readable) and inset from the screen edges.
 private val ChipAngles = floatArrayOf(13f, 45f, 77f)
+/** Wave 48: with the Work scope label there are four labels on the quadrant. */
+private val ChipAngles4 = floatArrayOf(9f, 32f, 56f, 80f)
+
+/**
+ * Wave 48 (workProfile): what the disc needs to offer the work profile. Pass null while there is no work profile (no Work label).
+ * [on] lists the work apps only; [paused] is the profile's quiet mode; [quietUsers] are the `UserHandle.hashCode()` of every paused profile.
+ */
+data class WheelWork(
+    val on: Boolean,
+    val paused: Boolean,
+    val workUsers: Set<Int>,
+    val quietUsers: Set<Int>,
+    val onChange: (Boolean) -> Unit,
+    val onTogglePause: () -> Unit,
+)
 
 /** Unfurl: the wheel grows from 35% and sweeps 60° clockwise into place as [p] goes 0 → 1. */
 private fun openScale(p: Float) = 0.35f + 0.65f * p
@@ -618,6 +642,8 @@ fun WheelDrawer(
     /** Wave 38: how many segments the white shortcut ring has (6 to 8) and whether the visible ones show a label under their glyph. */
     ringSegments: Int = com.bos.sphere.core.data.PuckActions.DEFAULT_SEGMENTS,
     showRingLabels: Boolean = false,
+    /** Wave 48: the Work scope label and pause pill; null while there is no work profile. */
+    work: WheelWork? = null,
 ) {
     // NFR-14: with animations off the wheel does not unfold; it cross-fades in place.
     val motion = com.bos.sphere.core.design.rememberMotionPrefs()
@@ -652,6 +678,7 @@ fun WheelDrawer(
         actions = actions,
         ringSegments = com.bos.sphere.core.data.PuckActions.clampSegments(ringSegments),
         showRingLabels = showRingLabels,
+        work = work,
         onDismiss = onDismiss,
         interactive = visible,
         progress = if (motion.reduced) geometry else progress,
@@ -674,6 +701,7 @@ private fun WheelContent(
     actions: List<PuckAction>,
     ringSegments: Int,
     showRingLabels: Boolean,
+    work: WheelWork?,
     onDismiss: () -> Unit,
     interactive: Boolean,
     progress: State<Float>,
@@ -697,8 +725,10 @@ private fun WheelContent(
                 value = WheelCategoryCache.resolve(context, apps.map { it.packageName })
             }
         }
-        val groups = remember(apps, grouping, recentKeys, categories) {
-            buildWheelGroups(apps, grouping, recentKeys, categories)
+        val workOn = work != null && WorkDrawerRules.effective(work.on, work.paused)
+        val shown = remember(apps, work?.workUsers, workOn) { if (work != null && workOn) WorkDrawerRules.scoped(apps, work.workUsers, true, work.paused) else apps }
+        val groups = remember(shown, grouping, recentKeys, categories) {
+            buildWheelGroups(shown, grouping, recentKeys, categories)
         }
         val layout = remember(groups, metrics) {
             WheelGeometry.layout(groups.map { it.apps.size }, metrics.perSpoke, metrics.spokeStepDeg, metrics.gapDeg)
@@ -1083,8 +1113,12 @@ private fun WheelContent(
                 val accent = HyleColors.Violet
                 val chipPaints = remember(density) { ArcPaints(with(density) { 11.sp.toPx() }, 0.14f, with(density) { 1.6.dp.toPx() }) }
                 val chipInkR = with(density) { (puck.chipRadiusDp + 3.5f).dp.toPx() }
-                val chipLabels = remember(chipPaints, chipInkR, grouping) { WheelGrouping.entries.map { ArcLabel(it.label, chipPaints, chipInkR) } }
-                val chipAngles = remember(qs) { WheelGrouping.entries.indices.map { qs + ChipAngles[it.coerceAtMost(ChipAngles.lastIndex)] } }
+                // Wave 48: the grouping labels, then (with a work profile) the Work scope label, which is lit while the scope is on.
+                val chipNames = remember(work != null) { WheelGrouping.entries.map { it.label } + listOfNotNull(if (work != null) L10n.tr(WORK_LABEL) else null) }
+                val chipCount = chipNames.size
+                fun chipSelected(i: Int) = if (i < WheelGrouping.entries.size) WheelGrouping.entries[i] == grouping else workOn
+                val chipLabels = remember(chipPaints, chipInkR, chipNames) { chipNames.map { ArcLabel(it, chipPaints, chipInkR) } }
+                val chipAngles = remember(qs, chipCount) { (0 until chipCount).map { qs + (if (chipCount > 3) ChipAngles4 else ChipAngles)[it.coerceAtMost(chipCount - 1)] } }
                 // The whole curved slot of each label (wave 44): its text span plus a margin, at least 48 dp along the arc where the neighbours
                 // allow, from the ring's edge to the hub's edge radially. Never overlapping.
                 val chipSlots = remember(chipLabels, chipAngles, ring, density, puck) {
@@ -1097,8 +1131,8 @@ private fun WheelContent(
                 Canvas(Modifier.fillMaxSize()) {
                     val corner = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
                     val nc = drawContext.canvas.nativeCanvas
-                    WheelGrouping.entries.forEachIndexed { i, g ->
-                        val selected = g == grouping
+                    chipNames.indices.forEach { i ->
+                        val selected = chipSelected(i)
                         chipLabels[i].draw(nc, corner.x, corner.y, chipAngles[i], 1f, (if (selected) textInk else dimInk).toArgb(), selected, selected, accent.toArgb())
                     }
                 }
@@ -1117,22 +1151,25 @@ private fun WheelContent(
                                 val polar = WheelGeometry.screenToPolar(anchor, w, h, pos.x, pos.y)
                                 RingLabelGeometry.hit(chipSlots, polar.radius, polar.angleDeg)
                             },
-                            onTap = { i -> val g = WheelGrouping.entries[i]; if (g != grouping) onGroupingChange(g) },
+                            onTap = { i -> if (i < WheelGrouping.entries.size) { val g = WheelGrouping.entries[i]; if (g != grouping) onGroupingChange(g) } else work?.onChange?.invoke(!workOn) },
                         ),
                 )
                 // TalkBack nodes (wave 44): one per label on the slot's own centre, cut so no two overlap (a rotated box's bounds would
                 // overlap its neighbour's), role Tab, selected state, click. Touch is the curved slot above, not these boxes.
                 val nodeCentres = chipSlots.map { WheelGeometry.polarToScreen(anchor, w, h, (it.innerPx + it.outerPx) / 2f, it.centreDeg) }
                 val nodeBoxes = WheelGeometry.chipTouchBoxes(nodeCentres, with(density) { 72.dp.toPx() }, with(density) { 40.dp.toPx() })
-                WheelGrouping.entries.forEachIndexed { i, g ->
+                chipNames.indices.forEach { i ->
                     val pt = nodeCentres[i]
                     Box(
                         Modifier
                             .centeredAt { Offset(pt.x, pt.y) }
                             .size(width = with(density) { nodeBoxes[i].first.toDp() }, height = with(density) { nodeBoxes[i].second.toDp() })
                             .semantics(mergeDescendants = true) {
-                                contentDescription = g.label; selected = g == grouping; role = Role.Tab
-                                onClick { if (g != grouping) onGroupingChange(g); true }
+                                contentDescription = chipNames[i]; selected = chipSelected(i); role = Role.Tab
+                                onClick {
+                                    if (i < WheelGrouping.entries.size) { val g = WheelGrouping.entries[i]; if (g != grouping) onGroupingChange(g) } else work?.onChange?.invoke(!workOn)
+                                    true
+                                }
                             },
                     )
                 }
@@ -1160,6 +1197,7 @@ private fun WheelContent(
                             },
                             alpha = { ((progress.value - delay) / (1f - delay)).coerceIn(0f, 1f) },
                             selected = app.key == selectedKey,
+                            paused = work != null && WorkDrawerRules.paused(app, work.quietUsers),
                             onClick = { onLaunch(app) },
                             onLongClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1203,6 +1241,25 @@ private fun WheelContent(
                 }
             }
 
+            // Wave 48: with the Work scope on, a pill at the far edge turns the work profile off or on (the system's quiet mode).
+            val pill = if (work != null) WorkDrawerRules.pillLabel(workOn, work.paused) else null
+            if (work != null && pill != null) {
+                val atTop = anchor == Corner.BottomLeft || anchor == Corner.BottomRight
+                Text(
+                    text = L10n.tr(pill),
+                    color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .align(if (atTop) Alignment.TopCenter else Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(12.dp)
+                        .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
+                        .clip(RoundedCornerShape(50))
+                        .background(if (work.paused) Color(0xE6B3541E) else Color(0xCC101426))
+                        .clickable(role = Role.Switch) { work.onTogglePause() }
+                        .semantics { stateDescription = L10n.tr(if (work.paused) "Paused" else "On") }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                )
+            }
             if (groups.isEmpty()) {
                 val text = when {
                     grouping == WheelGrouping.Recent -> "No recent apps yet"
@@ -1244,6 +1301,8 @@ private fun WheelIcon(
     onLongClick: () -> Unit,
     /** The keyboard's current app (INP-18): drawn with a ring. */
     selected: Boolean = false,
+    /** Wave 48: the app's profile is paused: dimmed, marked with pause bars, not launchable until resumed. */
+    paused: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -1259,13 +1318,17 @@ private fun WheelIcon(
             .centeredAt(position)
             .size(size)
             .graphicsLayer {
-                this.alpha = alpha()
+                this.alpha = alpha() * (if (paused) AppPresentation.DIMMED else 1f)
                 scaleX = scale
                 scaleY = scale
             }
-            .semantics { contentDescription = app.label }
+            .semantics { contentDescription = if (paused) L10n.tr("%s, paused", app.label) else app.label; if (paused) disabled() }
             .drawWithContent {
                 drawContent()
+                if (paused) {
+                    val bw = this.size.minDimension * 0.07f; val bh = this.size.minDimension * 0.26f; val y = this.size.height - bh - bw
+                    drawRect(Color.White, Offset(bw * 2f, y), Size(bw, bh)); drawRect(Color.White, Offset(bw * 4f, y), Size(bw, bh))
+                }
                 if (selected) drawCircle(Color.White, radius = this.size.minDimension / 2f, style = Stroke(2.dp.toPx()))
             }
             .launcherItem("puck.app.${app.key}", FocusKind.PuckSpoke, layer = 3, focusable = false, onMenu = onLongClick, ringRadiusDp = 22f)
@@ -1274,7 +1337,7 @@ private fun WheelIcon(
                 indication = null,
                 role = Role.Button,
                 onLongClick = onLongClick,
-                onClick = onClick,
+                onClick = { if (!paused) onClick() },
             ),
     )
 }

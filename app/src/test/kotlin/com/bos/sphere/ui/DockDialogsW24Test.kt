@@ -68,7 +68,14 @@ class DockDialogsW24Test {
     }
 
     @After fun reset() {
+        // A dialog a failed assertion left behind keeps measuring on the shared looper and would stop the next class from ever getting idle.
+        showing().forEach { runCatching { it.dismiss() } }
         scenario.close()
+        // The real cause of INP_20's "dialog stays isShowing" (wave 48): the sandbox keeps one Choreographer for the main thread across tests. A test that
+        // ends while a frame is requested (a focused field's cursor blinks forever) leaves it waiting for a vsync that Robolectric's looper reset throws away, and
+        // from then on no recomposer of a later test (or class: DockWiringTest, then never idle for the compose rule) gets a frame, so `open = false` is never applied.
+        // Running the looper after the scenario is closed lets that requested frame be delivered first.
+        repeat(3) { ShadowLooper.idleMainLooper(200, TimeUnit.MILLISECONDS) }
         DockInput.bridge = null
         DockInput.dialogHook = {}
         LauncherInput.focus.nodes().map { it.id }.forEach(LauncherInput.focus::unregister)
@@ -83,7 +90,15 @@ class DockDialogsW24Test {
         return m
     }
 
-    private fun idle(ms: Long = 1500) = repeat(3) { ShadowLooper.idleMainLooper(ms / 3, TimeUnit.MILLISECONDS) }
+    /**
+     * Runs the main looper for [ms] of looper time. Wave 48, found by instrumenting the failing INP_20 tests (a recomposer with pending work and no
+     * change applied, the dialog still composed): these tests host their content in a plain ComposeView, with no compose test rule, and the sandbox
+     * shares Compose's process-wide state across tests. Two things were needed for a state write such as a dialog's `open = false` to reach its
+     * recomposer in every test order. Each round applies pending global snapshot writes by hand (the rule does this itself; Compose's own applier is a
+     * coroutine launched once per write burst, which a looper reset between tests can drop), and each round yields a few real milliseconds, because
+     * work handed back from a real thread (focus and text-field coroutines on the default dispatcher) only arrives in wall-clock time, not looper time.
+     */
+    private fun idle(ms: Long = 1500) = repeat(3) { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications(); ShadowLooper.idleMainLooper(ms / 3, TimeUnit.MILLISECONDS); Thread.sleep(5) }
 
     /** [withHook] false composes no dock and no hook, so a test sees only what the content installs itself (the Ground Control row). */
     private fun show(withHook: Boolean = true, content: @Composable () -> Unit) {
@@ -92,6 +107,9 @@ class DockDialogsW24Test {
     }
 
     private fun showing(): List<Dialog> = ShadowDialog.getShownDialogs().filter { it.isShowing }
+
+    /** A compose dialog is dismissed by the composition that removes it, which needs a frame after the state change: gives the removal a few more rounds (up to 10 s of wall time). A dialog that never goes still fails. */
+    private fun settleDialogs() { val end = System.nanoTime() + 10_000_000_000L; while (showing().isNotEmpty() && System.nanoTime() < end) { Thread.sleep(25); idle(300) } }
     private fun top(): Dialog = showing().last()
 
     private fun composeRoot(v: View): ViewRootForTest? {
@@ -147,6 +165,7 @@ class DockDialogsW24Test {
         assertTrue("the panel is a page: it holds no text field of its own", fields(panel).isEmpty())
         key(panel, KeyEvent.KEYCODE_BUTTON_B)
         assertFalse("B at the Dock page closes the panel", open)
+        settleDialogs()
         assertTrue(showing().isEmpty())
         assertEquals("the dialog layer is released", 0, LauncherInput.focus.topLayer)
     }
@@ -201,6 +220,7 @@ class DockDialogsW24Test {
         key(top(), KeyEvent.KEYCODE_BUTTON_B)
         assertFalse("B closes the session dialog without saving", open)
         assertEquals(null, saved)
+        settleDialogs()
         assertTrue(showing().isEmpty())
     }
 
@@ -223,6 +243,7 @@ class DockDialogsW24Test {
         assertEquals("the group editor opens from it", 1, showing().size)
         assertEquals("the dialog hook is installed with no dock composed", DockInput.DIALOG_LAYER, LauncherInput.focus.topLayer)
         key(top(), KeyEvent.KEYCODE_BUTTON_B)
+        settleDialogs()
         assertTrue("B closed the editor", showing().isEmpty())
         assertEquals(0, LauncherInput.focus.topLayer)
     }

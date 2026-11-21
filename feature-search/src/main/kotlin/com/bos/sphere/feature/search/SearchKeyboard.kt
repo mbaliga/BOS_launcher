@@ -31,6 +31,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.L10n
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 
 private val KeyRows = listOf(
     "qwertyuiop".map { it.toString() },
@@ -92,7 +97,7 @@ private fun SearchField(query: String) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         if (query.isEmpty()) {
-            Text("Search apps · type a command", color = HyleColors.InkDim, size = 16)
+            Text(L10n.tr("Search apps"), color = HyleColors.InkDim, size = 16)
         } else {
             Text(query, color = HyleColors.InkBright, size = 16)
         }
@@ -145,7 +150,7 @@ private fun KeyGrid(onKey: (String) -> Unit) {
                         "⇧", "⌫", "123", "⏎", "." -> 1.5f
                         else -> 1f
                     }
-                    Key(label = if (key == "space") "" else key, modifier = Modifier.weight(weight)) {
+                    Key(label = if (key == "space") "" else key, description = keyDescription(key), modifier = Modifier.weight(weight)) {
                         onKey(key)
                     }
                 }
@@ -155,10 +160,11 @@ private fun KeyGrid(onKey: (String) -> Unit) {
 }
 
 @Composable
-private fun Key(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun Key(label: String, description: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier = modifier
             .height(42.dp)
+            .semantics { role = Role.Button; contentDescription = description }
             .clickable(onClick = onClick)
             .background(HyleColors.Surface.copy(alpha = 0.45f), RoundedCornerShape(9.dp))
             .border(1.dp, HyleColors.Hairline, RoundedCornerShape(9.dp)),
@@ -166,6 +172,17 @@ private fun Key(label: String, modifier: Modifier = Modifier, onClick: () -> Uni
     ) {
         Text(label, color = HyleColors.InkBright, size = 16)
     }
+}
+
+/** What a screen reader says for a key: letters as themselves, the symbol keys by name (INP/NFR accessibility audit). */
+internal fun keyDescription(key: String): String = when (key) {
+    "⌫" -> L10n.tr("Backspace")
+    "space" -> L10n.tr("Space")
+    "⇧" -> L10n.tr("Shift")
+    "123" -> L10n.tr("Numbers")
+    "⏎" -> L10n.tr("Search")
+    "." -> "."
+    else -> key
 }
 
 /** Small text helper so call sites read cleanly. */

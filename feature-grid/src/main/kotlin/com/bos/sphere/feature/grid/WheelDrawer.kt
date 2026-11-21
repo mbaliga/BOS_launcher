@@ -1,0 +1,1343 @@
+package com.bos.sphere.feature.grid
+
+import androidx.compose.ui.draw.drawBehind
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import com.bos.sphere.core.design.predictiveBackLayer
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.stateDescription
+import com.bos.sphere.core.catalog.AppPresentation
+import com.bos.sphere.core.catalog.WorkDrawerRules
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bos.sphere.core.data.AppEntry
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.traversalIndex
+import com.bos.sphere.core.input.FocusKind
+import com.bos.sphere.core.input.PuckEffect
+import com.bos.sphere.core.input.PuckKey
+import com.bos.sphere.core.input.PuckKeys
+import com.bos.sphere.core.input.PuckLayout
+import com.bos.sphere.core.input.PuckMode
+import com.bos.sphere.core.input.PuckState
+import com.bos.sphere.core.data.Corner
+import com.bos.sphere.core.data.WheelGrouping
+import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.L10n
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.Normalizer
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
+
+// =============================================================================================
+// Pure geometry (JVM-testable; see WheelGeometryTest)
+// =============================================================================================
+
+internal data class WheelPoint(val x: Float, val y: Float)
+
+/** [angleDeg] is a screen angle in [0, 360): 0 = +x (right), increasing clockwise (y is down). */
+internal data class WheelPolar(val radius: Float, val angleDeg: Float)
+
+/**
+ * One group's arc of the wheel, in *wheel degrees* (0 = the wheel's leading edge; the screen
+ * angle is `quadrantStart + wheelAngle + rotation`). [spokeAngles] are its sub-spokes' angles.
+ */
+internal data class WheelSegment(val start: Float, val end: Float, val spokeAngles: List<Float>) {
+    val center: Float get() = (start + end) / 2f
+    val width: Float get() = end - start
+}
+
+internal data class WheelLayout(val segments: List<WheelSegment>) {
+    val span: Float get() = segments.lastOrNull()?.end ?: 0f
+    val firstSpoke: Float? get() = segments.firstOrNull()?.spokeAngles?.firstOrNull()
+    val lastSpoke: Float? get() = segments.lastOrNull()?.spokeAngles?.lastOrNull()
+}
+
+/**
+ * Polar geometry of a wheel centred on a screen corner. Screen angles follow Compose's `drawArc`
+ * convention (0° = right, clockwise positive). Each corner's on-screen quadrant is
+ * `[quadrantStart, quadrantStart + 90]`; wheel content runs clockwise through it.
+ */
+internal object WheelGeometry {
+    const val QUADRANT = 90f
+    const val MID = QUADRANT / 2f
+    /** The drawing margin (each side of the quadrant) the loop is sized for; the drawer culls with the same value. */
+    const val LOOP_MARGIN_DEG = 30f
+
+    /** Screen angle where [anchor]'s visible quadrant begins (TopLeft 0, TopRight 90, BottomRight 180, BottomLeft 270). */
+    fun quadrantStart(anchor: Corner): Float = anchor.ordinal * QUADRANT
+
+    /**
+     * How far in from the two screen edges the wheel's centre sits (about a centimetre), so the hub
+     * and its controls are fully on screen instead of being cut by the corner, like Concepts' wheel.
+     * Set from the density by the drawer before the wheel is laid out.
+     */
+    @Volatile var insetPx: Float = 0f
+
+    fun cornerX(anchor: Corner, width: Float): Float =
+        if (anchor == Corner.TopRight || anchor == Corner.BottomRight) width - insetPx else insetPx
+
+    fun cornerY(anchor: Corner, height: Float): Float =
+        if (anchor == Corner.BottomRight || anchor == Corner.BottomLeft) height - insetPx else insetPx
+
+    /**
+     * Wave 29 review: the touch box (width, height) of each grouping chip, never overlapping a neighbour. On a small window the chips sit
+     * closer together than the nominal box, so each box is cut to the gap to its neighbour (the wider cut that keeps the larger area wins).
+     */
+    fun chipTouchBoxes(centers: List<WheelPoint>, maxW: Float, maxH: Float): List<Pair<Float, Float>> = centers.mapIndexed { i, c ->
+        var w = maxW; var h = maxH
+        var wByCut = maxW; var hByCut = maxH
+        for ((j, o) in centers.withIndex()) {
+            if (j == i) continue
+            val dx = kotlin.math.abs(o.x - c.x); val dy = kotlin.math.abs(o.y - c.y)
+            if (dx < maxW && dy < maxH) { wByCut = minOf(wByCut, dx); hByCut = minOf(hByCut, dy) }
+        }
+        if (wByCut * maxH >= maxW * hByCut) w = wByCut else h = hByCut
+        w to h
+    }
+
+    fun polarToScreen(anchor: Corner, width: Float, height: Float, radius: Float, angleDeg: Float): WheelPoint {
+        val rad = Math.toRadians(angleDeg.toDouble())
+        return WheelPoint(
+            cornerX(anchor, width) + radius * cos(rad).toFloat(),
+            cornerY(anchor, height) + radius * sin(rad).toFloat(),
+        )
+    }
+
+    fun screenToPolar(anchor: Corner, width: Float, height: Float, x: Float, y: Float): WheelPolar {
+        val dx = x - cornerX(anchor, width)
+        val dy = y - cornerY(anchor, height)
+        val a = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+        return WheelPolar(hypot(dx, dy), normalize360(a))
+    }
+
+    /** [0, 360). */
+    fun normalize360(deg: Float): Float = ((deg % 360f) + 360f) % 360f
+
+    /** [-180, 180). */
+    fun normalize180(deg: Float): Float = normalize360(deg + 180f) - 180f
+
+    fun screenAngle(anchor: Corner, wheelAngle: Float, rotation: Float): Float =
+        quadrantStart(anchor) + wheelAngle + rotation
+
+    /** Inverse of [screenAngle] for a point on screen (resolves to the winding nearest the quadrant). */
+    fun wheelAngleAt(anchor: Corner, screenAngleDeg: Float, rotation: Float): Float =
+        normalize180(screenAngleDeg - quadrantStart(anchor)) - rotation
+
+    /** Icons that fit on one spoke between [firstRadius] and [maxRadius] (always ≥ 1). */
+    fun spokeCapacity(firstRadius: Float, maxRadius: Float, radialStep: Float): Int =
+        if (radialStep <= 0f || maxRadius <= firstRadius) 1
+        else floor((maxRadius - firstRadius) / radialStep).toInt() + 1
+
+    /**
+     * Wave 33: the arc distance between two neighbouring spokes of one group. Icons are upright squares, so where the spoke direction is the
+     * 45 degree diagonal two icons [iconPx] wide need a centre distance of at least icon x sqrt(2) not to overlap; the old icon + 10 dp
+     * overlapped by up to ~10 dp there. The icon + 10 dp spacing stays where it is already wider (icons under about 24 dp).
+     */
+    fun spokeArc(iconPx: Float, tenDpPx: Float, onePx: Float): Float = max(iconPx + tenDpPx, iconPx * 1.42f + onePx)
+
+    /** Angle between two spokes whose icons sit [arcPx] apart at [radius] (the chord, not the arc, is what must clear). */
+    fun spokeStepDegrees(arcPx: Float, radius: Float): Float = Math.toDegrees(2.0 * kotlin.math.asin((arcPx / (2f * radius)).coerceAtMost(1f).toDouble())).toFloat()
+
+    /** Size of one section's TalkBack node: [radialPx] deep along the radius, [arcPx] wide along the band. */
+    data class BandNode(val radialPx: Float, val arcPx: Float)
+
+    /**
+     * Wave 33: the node of a band slice [widthDeg] wide whose middle is at [radius]: [radialPx] deep (the radial direction is free, slices share no
+     * radial extent) and as wide along the band as fits inside its own sector, measured at the inner edge where the sector is narrowest, so the
+     * rectangles of neighbours never overlap. The node is that slice, not 48 dp, when the slice is narrower (a 48 dp minimum would reach into the neighbour).
+     */
+    fun bandNode(widthDeg: Float, radius: Float, radialPx: Float): BandNode {
+        val inner = (radius - radialPx / 2f).coerceAtLeast(1f)
+        val half = Math.toRadians(widthDeg / 2.0)
+        return BandNode(radialPx, (2.0 * inner * kotlin.math.tan(half) * 0.99).toFloat()) // 1 percent short of the sector edge: neighbours never even touch
+    }
+
+    fun subSpokes(count: Int, perSpoke: Int): Int {
+        val per = perSpoke.coerceAtLeast(1)
+        return ((count + per - 1) / per).coerceAtLeast(1)
+    }
+
+    /**
+     * Lays groups end to end. Each segment is `gap + subSpokes * spokeStep` wide (so band widths
+     * are proportional to the spokes), with sub-spokes evenly spaced inside it.
+     */
+    fun layout(groupSizes: List<Int>, perSpoke: Int, spokeStep: Float, gap: Float): WheelLayout {
+        var at = 0f
+        val segments = groupSizes.map { n ->
+            val k = subSpokes(n, perSpoke)
+            val start = at
+            val end = start + gap + k * spokeStep
+            at = end
+            WheelSegment(start, end, List(k) { start + gap / 2f + spokeStep * (it + 0.5f) })
+        }
+        return WheelLayout(segments)
+    }
+
+    /** Rotation range: the first spoke can come to the middle of the quadrant, as can the last. */
+    fun rotationBounds(layout: WheelLayout): ClosedFloatingPointRange<Float> {
+        val first = layout.firstSpoke ?: return 0f..0f
+        val last = layout.lastSpoke ?: first
+        return (MID - last)..(MID - first)
+    }
+
+    fun clampRotation(rotation: Float, layout: WheelLayout): Float = rotation.coerceIn(rotationBounds(layout))
+
+    // ---- Wave 30 (drawerLoop): the sections form a ring. The rotation is periodic in the layout's span.
+
+    /** The window (degrees, wheel-relative) in which anything is drawn: the quadrant plus a margin each side. */
+    fun windowWidth(marginDeg: Float): Float = QUADRANT + 2f * marginDeg
+
+    /**
+     * True when the sections loop: at least two groups, and the whole ring is at least as wide as the drawn window, so no group is
+     * drawn twice at once. A smaller ring (few groups) fits the quadrant, is drawn once and keeps the clamped, centred arrangement.
+     */
+    fun loops(layout: WheelLayout, marginDeg: Float = LOOP_MARGIN_DEG): Boolean =
+        // The ring must be wider than the window plus its widest group: otherwise one group's arc meets both ends of the window and is drawn twice.
+        layout.segments.size >= 2 && layout.span >= windowWidth(marginDeg) + (layout.segments.maxOfOrNull { it.width } ?: 0f)
+
+    /** Cyclic group index: [i] modulo [n] (any integer, negative included); 0 when there are no groups. */
+    fun wrapIndex(i: Int, n: Int): Int = if (n <= 0) 0 else Math.floorMod(i, n)
+
+    /** [value] taken into [0, [span]). */
+    fun wrapAngle(value: Float, span: Float): Float {
+        if (span <= 0f) return value
+        val r = value - floor(value / span) * span
+        return if (r >= span) 0f else r
+    }
+
+    /** The rotation with whole turns of the ring removed (the same picture); unchanged when the sections do not loop. */
+    fun wrapRotation(rotation: Float, layout: WheelLayout): Float =
+        if (loops(layout)) wrapAngle(rotation, layout.span) else rotation
+
+    /** Signed number of steps (-n/2 .. n/2, a tie goes forward) from group [from] to group [to] the short way round a ring of [n]. */
+    fun shortestSteps(from: Int, to: Int, n: Int): Int {
+        if (n <= 1) return 0
+        val d = wrapIndex(to - from, n)
+        return if (d * 2 > n) d - n else d
+    }
+
+    /**
+     * Rotation that brings group [index]'s centre to the middle of the quadrant, the winding nearest [from] when the sections loop
+     * (the short way round, across the seam), the clamped one otherwise.
+     */
+    fun rotationToGroup(layout: WheelLayout, index: Int, from: Float): Float {
+        if (!loops(layout)) return rotationToCenter(layout, index)
+        val base = MID - layout.segments[wrapIndex(index, layout.segments.size)].center
+        val span = layout.span
+        val d = wrapAngle(base - from + span / 2f, span) - span / 2f
+        return from + d
+    }
+
+    /** A group, or one spoke's index, drawn at [copy] whole turns of the ring away from its home position. */
+    data class Slot(val index: Int, val copy: Int)
+
+    private fun copyRange(span: Float, rotation: Float, marginDeg: Float): IntRange {
+        // wheel angle a + copy * span + rotation must fall in -margin .. QUADRANT + margin for some a in [0, span)
+        val lo = floor((-marginDeg - rotation) / span).toInt() - 1
+        val hi = floor((QUADRANT + marginDeg - rotation) / span).toInt() + 1
+        return lo..hi
+    }
+
+    /**
+     * The groups drawn at [rotation] with their copy number, in ring order: every group whose arc meets the window, each at most once.
+     * Without a loop it is the plain culling of the single copy.
+     */
+    fun visibleSegments(layout: WheelLayout, rotation: Float, marginDeg: Float): List<Slot> {
+        val out = ArrayList<Slot>()
+        // The loop decision never depends on the caller's margin (the accessibility nodes ask with none): a ring is drawn one way only.
+        val copies = if (loops(layout)) copyRange(layout.span, rotation, marginDeg) else 0..0
+        for (k in copies) for ((i, seg) in layout.segments.withIndex()) {
+            val rel0 = seg.start + k * layout.span + rotation
+            val rel1 = seg.end + k * layout.span + rotation
+            if (rel1 < -marginDeg || rel0 > QUADRANT + marginDeg) continue
+            out += Slot(i, k)
+        }
+        return out
+    }
+
+    /** Spokes ([angles] ascending, ring of [span]) within the window at [rotation], cyclically when [loop]. */
+    fun visibleSpokes(angles: List<Float>, span: Float, loop: Boolean, rotation: Float, marginDeg: Float): List<Slot> {
+        val out = ArrayList<Slot>()
+        val copies = if (loop) copyRange(span, rotation, marginDeg) else 0..0
+        for (k in copies) for (i in angles.indices) {
+            if (inView(angles[i] + k * span, rotation, marginDeg)) out += Slot(i, k)
+        }
+        return out
+    }
+
+    /** Absolute scrub mapping on a looping ring: a finger at [fraction] (0..1) of the quadrant puts the rotation one turn per quadrant, first group centred at 0. */
+    fun scrubRotation(layout: WheelLayout, fraction: Float): Float =
+        MID - layout.segments.first().center - fraction * layout.span
+
+    /** The winding of [value] (modulo the ring) nearest [from]. */
+    fun nearestWinding(value: Float, from: Float, span: Float): Float =
+        if (span <= 0f) value else from + wrapAngle(value - from + span / 2f, span) - span / 2f
+
+    /** Centres a wheel that fits in the quadrant; otherwise starts it [insetDeg] past the leading edge. */
+    fun initialRotation(layout: WheelLayout, insetDeg: Float): Float {
+        if (loops(layout)) return MID - layout.segments.first().center // the first group in the middle, the last one visibly before it
+        val r = if (layout.span <= QUADRANT - 2f * insetDeg) MID - layout.span / 2f else insetDeg
+        return clampRotation(r, layout)
+    }
+
+    /** Rotation that brings segment [index]'s centre to the middle of the quadrant (clamped). */
+    fun rotationToCenter(layout: WheelLayout, index: Int): Float =
+        clampRotation(MID - layout.segments[index].center, layout)
+
+    /** Segment containing [wheelAngle], or -1. */
+    fun segmentAt(layout: WheelLayout, wheelAngle: Float): Int =
+        layout.segments.indexOfFirst { wheelAngle >= it.start && wheelAngle < it.end }
+
+    /** Segment under the middle of the quadrant at [rotation], or -1. */
+    fun focusedSegment(layout: WheelLayout, rotation: Float): Int {
+        val a = MID - rotation
+        return segmentAt(layout, if (loops(layout)) wrapAngle(a, layout.span) else a)
+    }
+
+    fun inView(wheelAngle: Float, rotation: Float, marginDeg: Float): Boolean =
+        (wheelAngle + rotation) in -marginDeg..(QUADRANT + marginDeg)
+
+    /** Indices of ascending [angles] within the quadrant (± [marginDeg]); empty range if none. */
+    fun visibleRange(angles: List<Float>, rotation: Float, marginDeg: Float): IntRange {
+        var first = -1
+        var last = -2
+        for (i in angles.indices) {
+            if (inView(angles[i], rotation, marginDeg)) {
+                if (first < 0) first = i
+                last = i
+            }
+        }
+        return if (first < 0) IntRange.EMPTY else first..last
+    }
+
+    /** Angular velocity (deg/s, clockwise positive) of a point at ([rx], [ry]) from the centre moving at ([vx], [vy]). */
+    fun angularVelocityDeg(rx: Float, ry: Float, vx: Float, vy: Float): Float {
+        val r2 = rx * rx + ry * ry
+        if (r2 < 1e-3f) return 0f
+        return Math.toDegrees(((rx * vy - ry * vx) / r2).toDouble()).toFloat()
+    }
+
+    /** rotationZ (deg) for text laid tangentially at [screenAngleDeg], flipped so it never reads upside down. */
+    fun tangentTextRotation(screenAngleDeg: Float): Float {
+        val r = normalize180(screenAngleDeg + 90f)
+        return when {
+            r > 90f -> r - 180f
+            r < -90f -> r + 180f
+            else -> r
+        }
+    }
+}
+
+// =============================================================================================
+// Grouping
+// =============================================================================================
+
+internal data class WheelGroup(val label: String, val apps: List<AppEntry>)
+
+/** Letter bucket for a label: the base (accent-stripped) first letter, upper-cased; "#" for non-letters. */
+internal fun wheelLetterOf(label: String): String {
+    val c = label.trimStart().firstOrNull() ?: return "#"
+    val base = Normalizer.normalize(c.toString(), Normalizer.Form.NFD).firstOrNull() ?: c
+    return if (base.isLetter()) base.uppercaseChar().toString() else "#"
+}
+
+/** Letters in order, "#" last. */
+internal val WheelLetterOrder: Comparator<String> = Comparator { a, b ->
+    when {
+        a == b -> 0
+        a == "#" -> 1
+        b == "#" -> -1
+        else -> a.compareTo(b)
+    }
+}
+
+/**
+ * Wave 23 second review: the words drawn on a category or Recent band. The grouping keys stay English ([WheelCategoryOrder]); only the
+ * shown label is in the app language (the bands read "Games", "Social" on every phone before).
+ */
+internal fun wheelGroupLabel(name: String): String = com.bos.sphere.core.design.L10n.tr(name)
+
+/** Display order of category spokes. */
+internal val WheelCategoryOrder = listOf(
+    "Games", "Audio", "Video", "Images", "Social", "News", "Maps", "Productivity", "Accessibility", "Other",
+)
+
+internal fun wheelCategoryName(category: Int): String = when (category) {
+    ApplicationInfo.CATEGORY_GAME -> "Games"
+    ApplicationInfo.CATEGORY_AUDIO -> "Audio"
+    ApplicationInfo.CATEGORY_VIDEO -> "Video"
+    ApplicationInfo.CATEGORY_IMAGE -> "Images"
+    ApplicationInfo.CATEGORY_SOCIAL -> "Social"
+    ApplicationInfo.CATEGORY_NEWS -> "News"
+    ApplicationInfo.CATEGORY_MAPS -> "Maps"
+    ApplicationInfo.CATEGORY_PRODUCTIVITY -> "Productivity"
+    ApplicationInfo.CATEGORY_ACCESSIBILITY -> "Accessibility"
+    else -> "Other"
+}
+
+/**
+ * Process-wide cache of `ApplicationInfo.category` per package, filled off the main thread the
+ * first time the wheel is grouped by category. Call [invalidate] when a package is updated.
+ */
+object WheelCategoryCache {
+    private val cache = ConcurrentHashMap<String, Int>()
+
+    fun invalidate(packageName: String? = null) {
+        if (packageName == null) cache.clear() else cache.remove(packageName)
+    }
+
+    /** Category name for [packageName] from the cache ("Other" until it has been resolved). */
+    fun nameOf(packageName: String): String =
+        wheelCategoryName(cache[packageName] ?: ApplicationInfo.CATEGORY_UNDEFINED)
+
+    /** Resolves and caches categories for [packages] off the main thread (so search can use them). */
+    suspend fun warm(context: Context, packages: Collection<String>) { resolve(context, packages) }
+
+    /** Seeds the cache (tests and previews: the real fill reads the package manager). */
+    internal fun seed(packageName: String, category: Int) { cache[packageName] = category }
+
+    /** All of [packages] from the cache, or null if any is missing. */
+    internal fun cachedFor(packages: Collection<String>): Map<String, Int>? {
+        val out = HashMap<String, Int>(packages.size)
+        for (p in packages) out[p] = cache[p] ?: return null
+        return out
+    }
+
+    internal suspend fun resolve(context: Context, packages: Collection<String>): Map<String, Int> =
+        withContext(Dispatchers.IO) {
+            val pm = context.packageManager
+            packages.distinct().associateWith { p ->
+                cache.getOrPut(p) {
+                    runCatching { pm.getApplicationInfo(p, 0).category }
+                        .getOrDefault(ApplicationInfo.CATEGORY_UNDEFINED)
+                }
+            }
+        }
+}
+
+private const val MAX_RECENT = 24
+/** Wave 48: the Work scope label's text and its English key in [L10n]. */
+private const val WORK_LABEL = "Work"
+private val ByLabel: Comparator<AppEntry> = compareBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+
+private fun buildWheelGroups(
+    apps: List<AppEntry>,
+    grouping: WheelGrouping,
+    recentKeys: List<String>,
+    categories: Map<String, Int>?,
+): List<WheelGroup> = when (grouping) {
+    WheelGrouping.Letter -> apps.groupBy { wheelLetterOf(it.label) }
+        .toSortedMap(WheelLetterOrder)
+        .map { (letter, list) -> WheelGroup(letter, list.sortedWith(ByLabel)) }
+
+    WheelGrouping.Category -> if (categories == null) {
+        emptyList()
+    } else {
+        val byName = apps.groupBy { wheelCategoryName(categories[it.packageName] ?: ApplicationInfo.CATEGORY_UNDEFINED) }
+        WheelCategoryOrder.mapNotNull { name -> byName[name]?.let { WheelGroup(wheelGroupLabel(name), it.sortedWith(ByLabel)) } }
+    }
+
+    WheelGrouping.Recent -> {
+        val byKey = apps.associateBy { it.key }
+        val recent = recentKeys.asSequence().distinct().mapNotNull { byKey[it] }.take(MAX_RECENT).toList()
+        if (recent.isEmpty()) emptyList() else listOf(WheelGroup(wheelGroupLabel("Recent"), recent))
+    }
+}
+
+// =============================================================================================
+// Metrics
+// =============================================================================================
+
+/** Pixel metrics for a wheel on a [width]×[height] px screen. */
+internal class WheelMetrics(width: Float, height: Float, density: Density) {
+    val minSide = min(width, height)
+    val iconDp: Dp = with(density) { (minSide.toDp() * 0.11f).coerceIn(40.dp, 52.dp) }
+    val iconPx: Float
+    val hubRadius: Float
+    val bandInner: Float
+    val bandOuter: Float
+    val firstRadius: Float
+    val radialStep: Float
+    val perSpoke: Int
+    val spokeStepDeg: Float
+    val gapDeg: Float
+    val outerRadius: Float
+    val chipRadius: Float
+    val searchRadius: Float
+    val labelPad: Float
+
+    init {
+        with(density) {
+            iconPx = iconDp.toPx()
+            hubRadius = PuckLayout.hubRadius(minSide / density.density).dp.toPx()
+            bandInner = hubRadius + 3.dp.toPx()
+            bandOuter = bandInner + 26.dp.toPx()
+            firstRadius = bandOuter + 14.dp.toPx() + iconPx / 2f
+            // Wave 30: the selected group now sits at the middle of the quadrant (45 degrees) when the drawer opens, where two icons of one spoke
+            // are diagonal: their centres must be a square's diagonal apart or the icons overlap.
+            radialStep = max(iconPx + 14.dp.toPx(), iconPx * 1.42f + 1.dp.toPx())
+            val maxRadius = minSide - 10.dp.toPx() - iconPx / 2f
+            perSpoke = WheelGeometry.spokeCapacity(firstRadius, maxRadius, radialStep)
+            spokeStepDeg = WheelGeometry.spokeStepDegrees(WheelGeometry.spokeArc(iconPx, 10.dp.toPx(), 1.dp.toPx()), firstRadius)
+            gapDeg = spokeStepDeg * 0.35f
+            outerRadius = firstRadius + (perSpoke - 1) * radialStep + iconPx / 2f + 16.dp.toPx()
+            chipRadius = hubRadius * 0.8f
+            searchRadius = hubRadius * 0.34f
+            labelPad = 8.dp.toPx()
+        }
+    }
+
+    val bandMid: Float get() = (bandInner + bandOuter) / 2f
+    val bandThickness: Float get() = bandOuter - bandInner
+}
+
+private class Spoke(val angle: Float, val apps: List<AppEntry>)
+
+private const val INSET_DEG = 4f
+private const val CULL_MARGIN_DEG = WheelGeometry.LOOP_MARGIN_DEG
+// Spread across the hub; chips stay upright (readable) and inset from the screen edges.
+private val ChipAngles = floatArrayOf(13f, 45f, 77f)
+/** Wave 48: with the Work scope label there are four labels on the quadrant. */
+private val ChipAngles4 = floatArrayOf(9f, 32f, 56f, 80f)
+
+/**
+ * Wave 48 (workProfile): what the disc needs to offer the work profile. Pass null while there is no work profile (no Work label).
+ * [on] lists the work apps only; [paused] is the profile's quiet mode; [quietUsers] are the `UserHandle.hashCode()` of every paused profile.
+ */
+data class WheelWork(
+    val on: Boolean,
+    val paused: Boolean,
+    val workUsers: Set<Int>,
+    val quietUsers: Set<Int>,
+    val onChange: (Boolean) -> Unit,
+    val onTogglePause: () -> Unit,
+)
+
+/** Unfurl: the wheel grows from 35% and sweeps 60° clockwise into place as [p] goes 0 → 1. */
+private fun openScale(p: Float) = 0.35f + 0.65f * p
+private fun openRotation(p: Float) = -60f * (1f - p)
+
+// =============================================================================================
+// Composable
+// =============================================================================================
+
+/**
+ * The "All apps" drawer as a Concepts-style colour wheel centred on screen corner [anchor].
+ *
+ * Layout from the corner outward: a hub disc holding the [grouping] chips and a search button
+ * ([onSearch]); a ring band with one segment per group (tap to bring that group to the middle);
+ * then one spoke of upright icons per group (large groups split into adjacent sub-spokes). Only
+ * the on-screen quadrant is visible; drag around the corner to rotate (with fling). Tapping the
+ * scrim outside the wheel, or Back, calls [onDismiss]. Only icons near the visible quadrant are
+ * composed. Category grouping reads `ApplicationInfo.category` off the main thread, cached in
+ * [WheelCategoryCache].
+ */
+@Composable
+fun WheelDrawer(
+    visible: Boolean,
+    anchor: Corner,
+    apps: List<AppEntry>,
+    grouping: WheelGrouping,
+    onGroupingChange: (WheelGrouping) -> Unit,
+    recentKeys: List<String>,
+    onLaunch: (AppEntry) -> Unit,
+    onLongPressApp: (AppEntry) -> Unit,
+    onSearch: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** More buttons for the hub, like the tool puck in Concepts. */
+    actions: List<PuckAction> = emptyList(),
+    /** Wave 38: how many segments the white shortcut ring has (6 to 8) and whether the visible ones show a label under their glyph. */
+    ringSegments: Int = com.bos.sphere.core.data.PuckActions.DEFAULT_SEGMENTS,
+    showRingLabels: Boolean = false,
+    /** Wave 48: the Work scope label and pause pill; null while there is no work profile. */
+    work: WheelWork? = null,
+) {
+    // NFR-14: with animations off the wheel does not unfold; it cross-fades in place.
+    val motion = com.bos.sphere.core.design.rememberMotionPrefs()
+    val progress = animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = if (motion.reduced) androidx.compose.animation.core.tween(com.bos.sphere.core.quality.MorphPolicy.progressMs(motion, 120))
+        else spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
+        label = "wheelOpen",
+    )
+    val backProgress = com.bos.sphere.core.design.rememberPredictiveBackProgress(visible, onDismiss)
+    // About a centimetre in from both edges (160dp per inch), set before anything reads the geometry.
+    WheelGeometry.insetPx = with(androidx.compose.ui.platform.LocalDensity.current) { 63.dp.toPx() }
+    val visibleNow by rememberUpdatedState(visible)
+    val shown by remember { derivedStateOf { visibleNow || progress.value > 0.002f } }
+    if (!shown) return
+    val geometry = remember(motion) { derivedStateOf { com.bos.sphere.core.quality.MorphPolicy.geometry(motion, progress.value, visibleNow) } }
+
+    // The wheel is physical geometry around a screen corner: lay it out LTR so RTL locales don't
+    // shift every positioned child away from where its hit-test expects it.
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+    ) {
+    WheelContent(
+        anchor = anchor,
+        apps = apps,
+        grouping = grouping,
+        onGroupingChange = onGroupingChange,
+        recentKeys = recentKeys,
+        onLaunch = onLaunch,
+        onLongPressApp = onLongPressApp,
+        onSearch = onSearch,
+        actions = actions,
+        ringSegments = com.bos.sphere.core.data.PuckActions.clampSegments(ringSegments),
+        showRingLabels = showRingLabels,
+        work = work,
+        onDismiss = onDismiss,
+        interactive = visible,
+        progress = if (motion.reduced) geometry else progress,
+        modifier = (if (motion.reduced) modifier.graphicsLayer { alpha = com.bos.sphere.core.quality.MorphPolicy.alpha(motion, progress.value) } else modifier).predictiveBackLayer(backProgress),
+    )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WheelContent(
+    anchor: Corner,
+    apps: List<AppEntry>,
+    grouping: WheelGrouping,
+    onGroupingChange: (WheelGrouping) -> Unit,
+    recentKeys: List<String>,
+    onLaunch: (AppEntry) -> Unit,
+    onLongPressApp: (AppEntry) -> Unit,
+    onSearch: () -> Unit,
+    actions: List<PuckAction>,
+    ringSegments: Int,
+    showRingLabels: Boolean,
+    work: WheelWork?,
+    onDismiss: () -> Unit,
+    interactive: Boolean,
+    progress: State<Float>,
+    modifier: Modifier,
+) {
+    BoxWithConstraints(modifier) {
+        val density = LocalDensity.current
+        val w = constraints.maxWidth.toFloat()
+        val h = constraints.maxHeight.toFloat()
+        val metrics = remember(w, h, density) { WheelMetrics(w, h, density) }
+        val qs = WheelGeometry.quadrantStart(anchor)
+        val context = LocalContext.current.applicationContext
+        val scope = rememberCoroutineScope()
+        val haptics = rememberLauncherHaptics()
+
+        val categories by produceState(
+            initialValue = WheelCategoryCache.cachedFor(apps.map { it.packageName }),
+            apps, grouping,
+        ) {
+            if (grouping == WheelGrouping.Category && value == null) {
+                value = WheelCategoryCache.resolve(context, apps.map { it.packageName })
+            }
+        }
+        val workOn = work != null && WorkDrawerRules.effective(work.on, work.paused)
+        val shown = remember(apps, work?.workUsers, workOn) { if (work != null && workOn) WorkDrawerRules.scoped(apps, work.workUsers, true, work.paused) else apps }
+        val groups = remember(shown, grouping, recentKeys, categories) {
+            buildWheelGroups(shown, grouping, recentKeys, categories)
+        }
+        val layout = remember(groups, metrics) {
+            WheelGeometry.layout(groups.map { it.apps.size }, metrics.perSpoke, metrics.spokeStepDeg, metrics.gapDeg)
+        }
+        val spokes = remember(groups, layout) {
+            groups.flatMapIndexed { gi, g ->
+                g.apps.chunked(metrics.perSpoke).mapIndexed { k, chunk -> Spoke(layout.segments[gi].spokeAngles[k], chunk) }
+            }
+        }
+        val spokeAngles = remember(spokes) { spokes.map { it.angle } }
+
+        val rotation = remember(grouping, anchor, groups.size) {
+            Animatable(WheelGeometry.initialRotation(layout, INSET_DEG))
+        }
+        val looping = WheelGeometry.loops(layout)
+        LaunchedEffect(rotation, layout) {
+            if (WheelGeometry.loops(layout)) {
+                // Wave 30: the ring has no ends; the value is periodic, so it is unbounded and only wrapped silently at rest.
+                rotation.updateBounds(null, null)
+                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, layout))
+            } else {
+                val b = WheelGeometry.rotationBounds(layout)
+                rotation.updateBounds(b.start, b.endInclusive)
+                rotation.snapTo(rotation.value) // re-clamp
+            }
+        }
+        if (interactive) {
+            LaunchedEffect(rotation, layout) {
+                snapshotFlow { WheelGeometry.focusedSegment(layout, rotation.value) }
+                    .distinctUntilChanged()
+                    .drop(1)
+                    .collect { if (it >= 0) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+            }
+        }
+
+        val currentLayout by rememberUpdatedState(layout)
+        val currentDismiss by rememberUpdatedState(onDismiss)
+
+        // INP-19: hub and ring spacing come from the window size, so nothing overlaps or clips when it is small.
+        val minSideDp = with(density) { metrics.minSide.toDp().value }
+        val puck = remember(minSideDp) { PuckLayout.compute(minSideDp) }
+        // Wave 38 (drawerRing): the white shortcut ring (6 to 8 segments) around the Back hub, and its turning state.
+        val ring = remember(puck) { PuckSectionsGeometry.ring(puck.hubRadiusDp, puck.chipRadiusDp) }
+        val ringState = remember { PuckRingState() }
+        val density1 = density.density
+
+        // INP-18: keyboard and scroll wheel. The puck owns its keys while open (ahead of the home's shortcuts).
+        val currentGroups by rememberUpdatedState(groups)
+        val currentGrouping by rememberUpdatedState(grouping)
+        val currentActions by rememberUpdatedState(actions)
+        val currentRotation by rememberUpdatedState(rotation)
+        var kbItem by remember(grouping, anchor) { androidx.compose.runtime.mutableIntStateOf(0) }
+        val currentKbItem by rememberUpdatedState(kbItem)
+        // Wave 30 review: reduced motion turns the ring by snapping (no spring, no inertia).
+        val reducedMotion by rememberUpdatedState(com.bos.sphere.core.design.rememberMotionPrefs().reduced)
+        suspend fun turnTo(target: Float, stiffness: Float) {
+            if (reducedMotion) rotation.snapTo(target)
+            else rotation.animateTo(target, spring(dampingRatio = 0.85f, stiffness = stiffness))
+        }
+        // Wave 30 review: the group a spring is heading for. A second key press (or key repeat) while the ring is still turning steps from
+        // there, not from the group under the middle at that instant (which would swallow the press).
+        var pendingGroup by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+        fun focusedGroup() =
+            if (pendingGroup >= 0 && currentRotation.isRunning) pendingGroup.coerceAtMost(max(0, currentGroups.lastIndex))
+            else WheelGeometry.focusedSegment(currentLayout, currentRotation.value).coerceAtLeast(0)
+        fun focusGroup(i: Int) {
+            kbItem = 0
+            pendingGroup = i
+            scope.launch {
+                val l = currentLayout
+                // The short way round, across the seam when that is nearer.
+                turnTo(WheelGeometry.rotationToGroup(l, i, rotation.value), Spring.StiffnessLow)
+                if (pendingGroup == i) pendingGroup = -1
+                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
+            }
+        }
+        // Next/previous section for the scroll wheel, TalkBack and the keyboard: always cyclic.
+        fun stepGroup(steps: Int) {
+            val n = currentGroups.size
+            if (n > 0) focusGroup(WheelGeometry.wrapIndex(focusedGroup() + steps, n))
+        }
+        val currentFocusGroup by rememberUpdatedState(::focusGroup)
+        val currentStepGroup by rememberUpdatedState(::stepGroup)
+        androidx.compose.runtime.DisposableEffect(interactive) {
+            if (!interactive) return@DisposableEffect onDispose { }
+            val handler: (android.view.KeyEvent) -> Boolean = h@{ e ->
+                if (e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@h false
+                val ch = e.unicodeChar.takeIf { it > 0 }?.toChar()
+                if (!PuckKeys.owns(e.keyCode, ch)) return@h false
+                // Wave 38: Shift+Left/Right (or plain Left/Right while a ring segment or the hub has keyboard focus) turn the white ring one segment.
+                val ringStep = PuckKeys.ringStep(e.keyCode, e.isShiftPressed, ringState.ringFocused)
+                if (ringStep != 0) { ringState.turnBy(scope, ringStep, ringSegments, reducedMotion); return@h true }
+                val g = currentGroups.getOrNull(focusedGroup())
+                val state = PuckState(PuckMode.entries[currentGrouping.ordinal], currentGroups.map { it.label }, focusedGroup(), currentKbItem, g?.apps?.size ?: 0)
+                when (val eff = PuckKeys.onKey(state, PuckKey(e.keyCode, e.isShiftPressed, ch))) {
+                    is PuckEffect.FocusGroup -> currentFocusGroup(eff.index)
+                    is PuckEffect.SetMode -> onGroupingChange(WheelGrouping.entries[eff.mode.ordinal])
+                    is PuckEffect.SelectItem -> kbItem = eff.index
+                    PuckEffect.Launch -> g?.apps?.getOrNull(currentKbItem)?.let { onLaunch(it) }
+                    PuckEffect.Search -> onSearch()
+                    is PuckEffect.Action -> currentActions.getOrNull(eff.index)?.takeIf { !it.empty }?.onClick?.invoke()
+                    PuckEffect.Close -> currentDismiss()
+                    null -> Unit
+                }
+                true
+            }
+            LauncherInput.pushKeyHandler(handler)
+            onDispose { LauncherInput.removeKeyHandler(handler) }
+        }
+        var wheelCarry by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        val inputMode by LocalInputMode.current
+        val selectedKey = if (inputMode == com.bos.sphere.core.input.InputMode.Keyboard && interactive) groups.getOrNull(focusedGroup())?.apps?.getOrNull(kbItem)?.key else null
+
+        // Band labels (wave 44): set on the band's arc, each glyph tangent to the circle; built once per layout (paths and paints cached),
+        // ellipsised to their segment's arc length.
+        val bandPaints = remember(density) { ArcPaints(with(density) { 11.sp.toPx() }, 0.055f, with(density) { 1.6.dp.toPx() }) }
+        val bandLabels: List<ArcLabel> = remember(groups, layout, metrics, bandPaints) {
+            groups.mapIndexed { i, g ->
+                val arc = Math.toRadians(layout.segments[i].width.toDouble()).toFloat() * metrics.bandMid
+                ArcLabel(bandPaints.fit(g.label, max(1f, arc - metrics.labelPad)), bandPaints, metrics.bandMid)
+            }
+        }
+
+        val visibleSpokes by remember(spokeAngles, rotation, layout) {
+            derivedStateOf {
+                WheelGeometry.visibleSpokes(
+                    spokeAngles,
+                    layout.span,
+                    WheelGeometry.loops(layout),
+                    rotation.value + openRotation(progress.value),
+                    CULL_MARGIN_DEG,
+                )
+            }
+        }
+
+        val corner = Offset(WheelGeometry.cornerX(anchor, w), WheelGeometry.cornerY(anchor, h))
+        val origin = TransformOrigin(if (corner.x > 0f) 1f else 0f, if (corner.y > 0f) 1f else 0f)
+
+        FocusLayer(layer = 3, active = interactive) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .linearTraversal()
+                .semantics {
+                    // TalkBack: the sections are a ring, so next after the last is the first and previous before the first is the last.
+                    if (interactive) customActions = listOf(
+                        CustomAccessibilityAction(L10n.tr("Next section")) { currentStepGroup(1); true },
+                        CustomAccessibilityAction(L10n.tr("Previous section")) { currentStepGroup(-1); true },
+                    )
+                }
+                .pointerInput(interactive) {
+                    // The scroll wheel (or a trackpad) rotates the puck one group per notch.
+                    if (!interactive) return@pointerInput
+                    awaitPointerEventScope {
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            if (ev.type != androidx.compose.ui.input.pointer.PointerEventType.Scroll) continue
+                            val d = ev.changes.first().scrollDelta
+                            val (steps, carry) = PuckKeys.wheelSteps(d.y + d.x, wheelCarry)
+                            wheelCarry = carry
+                            if (steps != 0 && currentGroups.isNotEmpty()) {
+                                currentStepGroup(steps)
+                            }
+                            ev.changes.forEach { it.consume() }
+                        }
+                    }
+                }
+                .pointerInput(anchor, metrics, rotation, interactive, ring) {
+                    if (!interactive) {
+                        // Closing: swallow touches so nothing underneath fires mid-animation.
+                        awaitEachGesture {
+                            awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        }
+                        return@pointerInput
+                    }
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        // Wave 38: a touch that starts on the hub or the white shortcut ring belongs to the ring's own overlay (it turns the ring);
+                        // only touches outside it turn this wheel.
+                        if (PuckSectionsGeometry.ownsTouch(ring, (down.position.x - corner.x) / density1, (down.position.y - corner.y) / density1)) return@awaitEachGesture
+                        scope.launch { rotation.stop() }
+                        val tracker = VelocityTracker()
+                        tracker.addPosition(down.uptimeMillis, down.position)
+                        val bounds = WheelGeometry.rotationBounds(currentLayout)
+                        val loop = WheelGeometry.loops(currentLayout)
+                        pendingGroup = -1
+                        var target = rotation.value
+                        var scrubStarted = false
+                        var dragging = false
+                        val startPolar = WheelGeometry.screenToPolar(anchor, w, h, down.position.x, down.position.y)
+                        var lastAngle = startPolar.angleDeg
+                        // A drag that starts on the letter band scrubs: the finger's place along the arc
+                        // picks the group, so one swipe across jumps the whole alphabet.
+                        val slack = 14.dp.toPx()
+                        val scrubbing = startPolar.radius in (metrics.bandInner - slack)..(metrics.bandOuter + slack)
+                        var up: PointerInputChange? = null
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                up = change
+                                break
+                            }
+                            tracker.addPosition(change.uptimeMillis, change.position)
+                            if (!dragging && (change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                dragging = true
+                            }
+                            if (dragging && scrubbing) {
+                                val polar = WheelGeometry.screenToPolar(anchor, w, h, change.position.x, change.position.y)
+                                var rel = (polar.angleDeg - WheelGeometry.quadrantStart(anchor)) % 360f
+                                if (rel < 0f) rel += 360f
+                                if (loop) {
+                                    // The ring has no ends: the finger's place along the arc picks the group at first touch (the nearest
+                                    // winding, so no jump), then each further sweep of the finger turns the ring on, past the seam and round.
+                                    if (!scrubStarted) {
+                                        scrubStarted = true
+                                        val f0 = (rel / WheelGeometry.QUADRANT).coerceIn(0f, 1f)
+                                        target = WheelGeometry.nearestWinding(WheelGeometry.scrubRotation(currentLayout, f0), target, currentLayout.span)
+                                    } else {
+                                        val dAngle = WheelGeometry.normalize180(polar.angleDeg - lastAngle)
+                                        target -= dAngle / WheelGeometry.QUADRANT * currentLayout.span
+                                    }
+                                    lastAngle = polar.angleDeg
+                                } else {
+                                    val f = (rel / WheelGeometry.QUADRANT).coerceIn(0f, 1f)
+                                    // First group centred at f = 0, last at f = 1.
+                                    target = bounds.endInclusive + (bounds.start - bounds.endInclusive) * f
+                                }
+                                val t = target
+                                scope.launch { rotation.snapTo(t) }
+                                change.consume()
+                            } else if (dragging) {
+                                val polar = WheelGeometry.screenToPolar(anchor, w, h, change.position.x, change.position.y)
+                                if (polar.radius > metrics.iconPx * 0.5f) {
+                                    val moved = target + WheelGeometry.normalize180(polar.angleDeg - lastAngle)
+                                    target = if (loop) moved else moved.coerceIn(bounds)
+                                    val t = target
+                                    scope.launch { rotation.snapTo(t) }
+                                }
+                                lastAngle = polar.angleDeg
+                                change.consume()
+                            }
+                        }
+                        val release = up
+                        if (dragging && scrubbing) {
+                            // Settle on the nearest group.
+                            val l = currentLayout
+                            val i = WheelGeometry.focusedSegment(l, target)
+                            scope.launch {
+                                rotation.snapTo(target)
+                                if (i >= 0) turnTo(WheelGeometry.rotationToGroup(l, i, target), Spring.StiffnessMedium)
+                                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
+                            }
+                        } else if (dragging && release != null) {
+                            val v = tracker.calculateVelocity()
+                            val omega = WheelGeometry.angularVelocityDeg(
+                                release.position.x - corner.x, release.position.y - corner.y, v.x, v.y,
+                            ).coerceIn(-1500f, 1500f)
+                            scope.launch {
+                                rotation.snapTo(target)
+                                if (reducedMotion) {
+                                    val i = WheelGeometry.focusedSegment(currentLayout, target)
+                                    if (i >= 0) rotation.snapTo(WheelGeometry.rotationToGroup(currentLayout, i, target))
+                                } else if (abs(omega) > 20f) rotation.animateDecay(omega, exponentialDecay(frictionMultiplier = 1.4f))
+                                rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, currentLayout))
+                            }
+                        } else if (!dragging && release != null && !release.isConsumed) {
+                            release.consume()
+                            val polar = WheelGeometry.screenToPolar(anchor, w, h, release.position.x, release.position.y)
+                            when {
+                                polar.radius in metrics.bandInner..metrics.bandOuter -> {
+                                    val l = currentLayout
+                                    val wa = WheelGeometry.wheelAngleAt(anchor, polar.angleDeg, rotation.value)
+                                    val i = WheelGeometry.segmentAt(l, if (loop) WheelGeometry.wrapAngle(wa, l.span) else wa)
+                                    if (i >= 0) scope.launch {
+                                        turnTo(WheelGeometry.rotationToGroup(l, i, rotation.value), Spring.StiffnessLow)
+                                        rotation.snapTo(WheelGeometry.wrapRotation(rotation.value, l))
+                                    }
+                                }
+                                polar.radius > metrics.outerRadius -> currentDismiss()
+                            }
+                        }
+                    }
+                },
+        ) {
+            // Scrim, hub disc, band.
+            Canvas(Modifier.fillMaxSize()) {
+                val p = progress.value
+                val a = p.coerceIn(0f, 1f)
+                val s = openScale(p)
+                val rot = rotation.value + openRotation(p)
+                // Black, solid at the corner the wheel opens from, fading radially to nothing.
+                val reach = kotlin.math.hypot(size.width, size.height) * 0.95f
+                drawRect(
+                    Brush.radialGradient(
+                        0f to Color.Black.copy(alpha = a),
+                        0.35f to Color.Black.copy(alpha = 0.88f * a),
+                        0.65f to Color.Black.copy(alpha = 0.45f * a),
+                        1f to Color.Transparent,
+                        center = corner, radius = reach,
+                    ),
+                )
+
+                // Faint outer boundary + hub.
+                drawCircle(HyleColors.Hairline.copy(alpha = 0.06f * a), radius = metrics.outerRadius * s, center = corner, style = Stroke(1.dp.toPx()))
+                val hubR = metrics.hubRadius * s
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        0f to HyleColors.Surface,
+                        1f to HyleColors.SurfaceTranslucent,
+                        center = corner,
+                        radius = hubR.coerceAtLeast(1f),
+                    ),
+                    radius = hubR,
+                    center = corner,
+                    alpha = a,
+                )
+                drawCircle(HyleColors.Hairline, radius = hubR, center = corner, style = Stroke(1.dp.toPx()), alpha = a)
+
+                // Band segments.
+                val mid = metrics.bandMid * s
+                val thick = metrics.bandThickness * s
+                val arcTopLeft = Offset(corner.x - mid, corner.y - mid)
+                val arcSize = Size(mid * 2f, mid * 2f)
+                val focused = WheelGeometry.focusedSegment(layout, rotation.value)
+                val alt = lerp(HyleColors.Surface, HyleColors.Ink, 0.07f)
+                val ringOdd = looping && layout.segments.size % 2 == 1
+                for (slot in WheelGeometry.visibleSegments(layout, rot, CULL_MARGIN_DEG)) {
+                    val i = slot.index
+                    val seg = layout.segments[i]
+                    val turn = slot.copy * layout.span
+                    val rel0 = seg.start + turn + rot
+                    val color = when {
+                        i == focused -> lerp(HyleColors.Surface, HyleColors.Violet, 0.38f)
+                        // An odd ring would put two equal shades side by side at the seam: its last band takes a third one.
+                        ringOdd && i == layout.segments.lastIndex -> lerp(HyleColors.Surface, HyleColors.Ink, 0.035f)
+                        i % 2 == 0 -> HyleColors.Surface
+                        else -> alt
+                    }
+                    drawArc(
+                        color = color,
+                        startAngle = qs + rel0,
+                        sweepAngle = seg.width,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = thick, cap = StrokeCap.Butt),
+                        alpha = a,
+                    )
+                    // Hairline divider at the segment's leading edge.
+                    val inner = WheelGeometry.polarToScreen(anchor, w, h, mid - thick / 2f, qs + rel0)
+                    val outer = WheelGeometry.polarToScreen(anchor, w, h, mid + thick / 2f, qs + rel0)
+                    drawLine(HyleColors.Hairline, Offset(inner.x, inner.y), Offset(outer.x, outer.y), 1.dp.toPx(), alpha = a)
+
+                    val label = bandLabels.getOrNull(i) ?: continue
+                    val centerAngle = qs + seg.center + turn + rot
+                    label.draw(
+                        drawContext.canvas.nativeCanvas, corner.x, corner.y, centerAngle, s,
+                        (if (i == focused) HyleColors.InkBright else HyleColors.Ink).copy(alpha = a).toArgb(), false, false, 0,
+                    )
+                }
+                // Band edges.
+                drawCircle(HyleColors.Hairline, radius = metrics.bandOuter * s, center = corner, style = Stroke(1.dp.toPx()), alpha = a)
+            }
+
+            // Hub controls: grouping chips along the inside of the quadrant + search.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val p = progress.value
+                        val s = openScale(p)
+                        scaleX = s
+                        scaleY = s
+                        alpha = p.coerceIn(0f, 1f)
+                        transformOrigin = origin
+                    },
+            ) {
+                // Labels follow the hub's curve: no enclosing shapes, the active one is lit and underlined.
+                val textInk = HyleColors.InkBright
+                val dimInk = HyleColors.InkDim
+                val accent = HyleColors.Violet
+                val chipPaints = remember(density) { ArcPaints(with(density) { 11.sp.toPx() }, 0.14f, with(density) { 1.6.dp.toPx() }) }
+                val chipInkR = with(density) { (puck.chipRadiusDp + 3.5f).dp.toPx() }
+                // Wave 48: the grouping labels, then (with a work profile) the Work scope label, which is lit while the scope is on.
+                val chipNames = remember(work != null) { WheelGrouping.entries.map { it.label } + listOfNotNull(if (work != null) L10n.tr(WORK_LABEL) else null) }
+                val chipCount = chipNames.size
+                fun chipSelected(i: Int) = if (i < WheelGrouping.entries.size) WheelGrouping.entries[i] == grouping else workOn
+                val chipLabels = remember(chipPaints, chipInkR, chipNames) { chipNames.map { ArcLabel(it, chipPaints, chipInkR) } }
+                val chipAngles = remember(qs, chipCount) { (0 until chipCount).map { qs + (if (chipCount > 3) ChipAngles4 else ChipAngles)[it.coerceAtMost(chipCount - 1)] } }
+                // The whole curved slot of each label (wave 44): its text span plus a margin, at least 48 dp along the arc where the neighbours
+                // allow, from the ring's edge to the hub's edge radially. Never overlapping.
+                val chipSlots = remember(chipLabels, chipAngles, ring, density, puck) {
+                    val d = density.density
+                    RingLabelGeometry.slots(
+                        chipAngles, chipLabels.map { it.spanDeg }, chipInkR, max(ring.outer, puck.chipRadiusDp - 7f) * d, (puck.chipRadiusDp + 14f) * d,
+                        48f * d, RingLabelGeometry.degOf(6f * d, chipInkR),
+                    )
+                }
+                Canvas(Modifier.fillMaxSize()) {
+                    val corner = WheelGeometry.polarToScreen(anchor, w, h, 0f, 0f)
+                    val nc = drawContext.canvas.nativeCanvas
+                    chipNames.indices.forEach { i ->
+                        val selected = chipSelected(i)
+                        chipLabels[i].draw(nc, corner.x, corner.y, chipAngles[i], 1f, (if (selected) textInk else dimInk).toArgb(), selected, selected, accent.toArgb())
+                    }
+                }
+                // Wave 30: four wedge sections around a round Back hub (PuckSections.kt), group labels outside.
+                PuckSectionsLayer(
+                    anchor, corner, ring, RingWindow(corner.x / density1, corner.y / density1, w / density1, h / density1), ringSegments, ringState,
+                    showRingLabels, actions, interactive, onDismiss,
+                )
+                // Touch (wave 44), ABOVE the ring's overlay: one layer that shares touches with the ring below it and answers only inside a label's curved slot, so a label
+                // is never shadowed by the ring's overlay (its square corner used to cover the Category label on the diagonal).
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .ringLabelTap(
+                            slotAt = { pos ->
+                                val polar = WheelGeometry.screenToPolar(anchor, w, h, pos.x, pos.y)
+                                RingLabelGeometry.hit(chipSlots, polar.radius, polar.angleDeg)
+                            },
+                            onTap = { i -> if (i < WheelGrouping.entries.size) { val g = WheelGrouping.entries[i]; if (g != grouping) onGroupingChange(g) } else work?.onChange?.invoke(!workOn) },
+                        ),
+                )
+                // TalkBack nodes (wave 44): one per label on the slot's own centre, cut so no two overlap (a rotated box's bounds would
+                // overlap its neighbour's), role Tab, selected state, click. Touch is the curved slot above, not these boxes.
+                val nodeCentres = chipSlots.map { WheelGeometry.polarToScreen(anchor, w, h, (it.innerPx + it.outerPx) / 2f, it.centreDeg) }
+                val nodeBoxes = WheelGeometry.chipTouchBoxes(nodeCentres, with(density) { 72.dp.toPx() }, with(density) { 40.dp.toPx() })
+                chipNames.indices.forEach { i ->
+                    val pt = nodeCentres[i]
+                    Box(
+                        Modifier
+                            .centeredAt { Offset(pt.x, pt.y) }
+                            .size(width = with(density) { nodeBoxes[i].first.toDp() }, height = with(density) { nodeBoxes[i].second.toDp() })
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = chipNames[i]; selected = chipSelected(i); role = Role.Tab
+                                onClick {
+                                    if (i < WheelGrouping.entries.size) { val g = WheelGrouping.entries[i]; if (g != grouping) onGroupingChange(g) } else work?.onChange?.invoke(!workOn)
+                                    true
+                                }
+                            },
+                    )
+                }
+            }
+
+            // Spokes (only those near the visible quadrant are composed).
+            val range = visibleSpokes
+            for (slot in range) {
+                val spoke = spokes[slot.index]
+                val turn = slot.copy * layout.span
+                spoke.apps.forEachIndexed { k, app ->
+                    key(app.key to slot.copy) {
+                        val radius = metrics.firstRadius + k * metrics.radialStep
+                        val delay = if (metrics.perSpoke > 1) 0.18f * k / (metrics.perSpoke - 1) else 0f
+                        WheelIcon(
+                            app = app,
+                            size = metrics.iconDp,
+                            position = {
+                                val p = progress.value
+                                val pt = WheelGeometry.polarToScreen(
+                                    anchor, w, h, radius * openScale(p),
+                                    qs + spoke.angle + turn + rotation.value + openRotation(p),
+                                )
+                                Offset(pt.x, pt.y)
+                            },
+                            alpha = { ((progress.value - delay) / (1f - delay)).coerceIn(0f, 1f) },
+                            selected = app.key == selectedKey,
+                            paused = work != null && WorkDrawerRules.paused(app, work.quietUsers),
+                            onClick = { onLaunch(app) },
+                            onLongClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onLongPressApp(app)
+                            },
+                        )
+                    }
+                }
+            }
+
+            // One accessibility node per section on the band (the labels themselves are drawn on the canvas). Touch is handled by the disc.
+            if (interactive) {
+                val bandSlots by remember(layout, rotation) {
+                    derivedStateOf { WheelGeometry.visibleSegments(layout, rotation.value, 0f) }
+                }
+                // Read in the semantics lambda below (not here), so the turning ring does not recompose the whole disc on every frame.
+                val focusedNow by remember(layout, rotation) { derivedStateOf { WheelGeometry.focusedSegment(layout, rotation.value) } }
+                val minNode = with(density) { 48.dp.toPx() }
+                for (slot in bandSlots) {
+                    val i = slot.index
+                    val seg = layout.segments[i]
+                    val turn = slot.copy * layout.span
+                    // Wave 33: the node is the slice's own piece of the band (tangent width = its arc at the band's middle, 48 dp deep radially),
+                    // turned to lie along the band, so a neighbour's touch exploration never lands on it and the slices do not overlap.
+                    val node = WheelGeometry.bandNode(seg.width, metrics.bandMid, minNode)
+                    Box(
+                        Modifier
+                            .centeredAt {
+                                val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.bandMid, qs + seg.center + turn + rotation.value)
+                                Offset(pt.x, pt.y)
+                            }
+                            .size(width = with(density) { node.radialPx.toDp() }, height = with(density) { node.arcPx.toDp() })
+                            .graphicsLayer { rotationZ = qs + seg.center + turn + rotation.value }
+                            .semantics {
+                                contentDescription = L10n.tr("Section %s", groups[i].label)
+                                role = Role.Button
+                                selected = i == focusedNow
+                                onClick { currentFocusGroup(i); true }
+                            },
+                    )
+                }
+            }
+
+            // Wave 48: with the Work scope on, a pill at the far edge turns the work profile off or on (the system's quiet mode).
+            val pill = if (work != null) WorkDrawerRules.pillLabel(workOn, work.paused) else null
+            if (work != null && pill != null) {
+                val atTop = anchor == Corner.BottomLeft || anchor == Corner.BottomRight
+                Text(
+                    text = L10n.tr(pill),
+                    color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .align(if (atTop) Alignment.TopCenter else Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(12.dp)
+                        .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
+                        .clip(RoundedCornerShape(50))
+                        .background(if (work.paused) Color(0xE6B3541E) else Color(0xCC101426))
+                        .clickable(role = Role.Switch) { work.onTogglePause() }
+                        .semantics { stateDescription = L10n.tr(if (work.paused) "Paused" else "On") }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                )
+            }
+            if (groups.isEmpty()) {
+                val text = when {
+                    grouping == WheelGrouping.Recent -> "No recent apps yet"
+                    grouping == WheelGrouping.Category && categories == null -> "Sorting…"
+                    else -> "No apps"
+                }
+                val pt = WheelGeometry.polarToScreen(anchor, w, h, metrics.firstRadius, qs + WheelGeometry.MID)
+                Text(
+                    text = text,
+                    color = HyleColors.InkDim,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .centeredAt { Offset(pt.x, pt.y) }
+                        .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) },
+                )
+            }
+        }
+        }
+    }
+}
+
+/** Places the content centred on [position] (read at placement time, so moving it only re-places). */
+private fun Modifier.centeredAt(position: () -> Offset): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+    layout(placeable.width, placeable.height) {
+        val o = position()
+        placeable.place((o.x - placeable.width / 2f).roundToInt(), (o.y - placeable.height / 2f).roundToInt())
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WheelIcon(
+    app: AppEntry,
+    size: Dp,
+    position: () -> Offset,
+    alpha: () -> Float,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    /** The keyboard's current app (INP-18): drawn with a ring. */
+    selected: Boolean = false,
+    /** Wave 48: the app's profile is paused: dimmed, marked with pause bars, not launchable until resumed. */
+    paused: Boolean = false,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+        label = "iconPress",
+    )
+    AppIcon(
+        app = app,
+        size = size,
+        modifier = Modifier
+            .centeredAt(position)
+            .size(size)
+            .graphicsLayer {
+                this.alpha = alpha() * (if (paused) AppPresentation.DIMMED else 1f)
+                scaleX = scale
+                scaleY = scale
+            }
+            .semantics { contentDescription = if (paused) L10n.tr("%s, paused", app.label) else app.label; if (paused) disabled() }
+            .drawWithContent {
+                drawContent()
+                if (paused) {
+                    val bw = this.size.minDimension * 0.07f; val bh = this.size.minDimension * 0.26f; val y = this.size.height - bh - bw
+                    drawRect(Color.White, Offset(bw * 2f, y), Size(bw, bh)); drawRect(Color.White, Offset(bw * 4f, y), Size(bw, bh))
+                }
+                if (selected) drawCircle(Color.White, radius = this.size.minDimension / 2f, style = Stroke(2.dp.toPx()))
+            }
+            .launcherItem("puck.app.${app.key}", FocusKind.PuckSpoke, layer = 3, focusable = false, onMenu = onLongClick, ringRadiusDp = 22f)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onLongClick = onLongClick,
+                onClick = { if (!paused) onClick() },
+            ),
+    )
+}

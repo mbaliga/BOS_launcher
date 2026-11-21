@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="digest_widget_label">Liftoff digest</string>
+    <string name="digest_widget_description">Notifications batched for your digest, on the home screen.</string>
+</resources>

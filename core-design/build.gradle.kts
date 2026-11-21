@@ -31,4 +31,9 @@ dependencies {
     api(libs.androidx.compose.ui.graphics)
     api(libs.androidx.compose.foundation)
     api(libs.androidx.compose.material3)
+    api(project(":core-quality"))
+    implementation(libs.androidx.activity.compose)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 }

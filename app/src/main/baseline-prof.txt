@@ -1,0 +1,31 @@
+# Hand-written baseline profile for the home render path (NFR-01, NFR-02, NFR-05).
+# Covers cold start (Application, MainActivity, theme), the first home frame and the palette open path.
+# Replace or extend with generated rules from benchmark/ (BaselineProfileGenerator) once it can be run on a device.
+HSPLcom/bos/sphere/LiftoffApplication;-><init>()V
+HSPLcom/bos/sphere/LiftoffApplication;->onCreate()V
+HSPLcom/bos/sphere/MainActivity;->**(**)**
+HSPLcom/bos/sphere/HomeScreenKt;->**(**)**
+HSPLcom/bos/sphere/HomeScreenKt$**;->**(**)**
+HSPLcom/bos/sphere/core/design/**;->**(**)**
+HSPLcom/bos/sphere/core/data/LauncherStores;->**(**)**
+HSPLcom/bos/sphere/core/data/LauncherPrefs**;->**(**)**
+HSPLcom/bos/sphere/core/data/CrashLoopGuard;->**(**)**
+HSPLcom/bos/sphere/feature/grid/GridHome**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/SearchOverlay**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/WheelDrawer**;->**(**)**
+HSPLcom/bos/sphere/feature/search/**;->**(**)**
+Lcom/bos/sphere/MainActivity;
+Lcom/bos/sphere/LiftoffApplication;
+Lcom/bos/sphere/HomeScreenKt;
+HSPLcom/bos/sphere/HomeTiming;->**(**)**
+HSPLcom/bos/sphere/PrefsWarmup;->**(**)**
+HSPLcom/bos/sphere/PrefsWarmup$**;->**(**)**
+HSPLcom/bos/sphere/core/quality/**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/PaletteTraceKt**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/HomeLegibilityKt**;->**(**)**
+HSPLcom/bos/sphere/feature/grid/BackgroundSamples;->**(**)**
+HSPLcom/bos/sphere/feature/grid/SignalBackgroundKt**;->**(**)**
+# Wave 8 to 12 additions on the first-frame path: the landing host, the landing rules and the groups store read at start.
+HSPLcom/bos/sphere/UsageAccessHostKt**;->**(**)**
+HSPLcom/bos/sphere/core/data/HomeShown**;->**(**)**
+HSPLcom/bos/sphere/core/data/GroupsSettings;->**(**)**

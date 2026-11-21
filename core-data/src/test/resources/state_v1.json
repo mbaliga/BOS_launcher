@@ -1,0 +1,13 @@
+{
+  "format": "liftoff-state",
+  "schemaVersion": 1,
+  "exportedAt": 1700000000000,
+  "prefs": {"style": "List", "pCols": 5, "pRows": 7, "iconScale": 0.7, "labels": true, "flavour": "keep-me"},
+  "layoutPages": "[{\"k\":[\"tile:clock\",\"com.example.mail/.Main#0\"],\"s\":\"Grid\",\"r\":2,\"id\":1}]",
+  "removed": ["com.example.old/.Main#0"],
+  "seeded": true,
+  "corners": {"TopLeft": "{\"t\":\"single\",\"i\":\"app:com.example.mail/.Main#0\"}"},
+  "gestures": {"DoubleTap": "action:AllApps", "PinchIn": ""},
+  "launchpadRules": [{"id": "r1", "action": "Silent", "pkg": "com.example.chat", "minutes": 0}],
+  "futureThing": {"a": 1, "b": [1, 2, 3]}
+}

@@ -1,21 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions -->
+    <!-- Wave 43 (radarWeb, docs/decisions/radarWebSuggest.md): normal permission, no prompt. Used by exactly one class, core-data WebSuggestHttp.kt: Radar's live web and Play Store suggestions (the typed text to the chosen engine over HTTPS), switchable off in Ground Control > Radar > Web suggestions. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- W25: ACTION_DELETE shows nothing on Android 9+ without this normal permission; it only lets the system confirmation dialog appear. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- HOM-17: usage access is a special access the user grants in system settings; read-only, never leaves the device. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    <!-- Optional Health Connect readouts (steps, floors, elevation, distance, calories) -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_FLOORS_CLIMBED" />
+    <uses-permission android:name="android.permission.health.READ_ELEVATION_GAINED" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <!-- Optional step count in the status strip -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- PAL-17: other apps guard a read-only search provider with this normal permission; Radar lists them and the user approves each. -->
+    <permission android:name="com.bos.sphere.permission.READ_SEARCH" android:protectionLevel="normal" />
+    <uses-permission android:name="com.bos.sphere.permission.READ_SEARCH" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Network-aware dot grid -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Wave 34: WifiManager.isWifiEnabled for the Connectivity sheet (normal permission, no prompt). -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Haptic tick when a motion gesture fires -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Silent / vibrate / Do-Not-Disturb actions (user grants access in system settings) -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Optional background motion gestures -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Query other launchable activities so LauncherApps can enumerate the inventory. -->
     <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.whatsapp" />
+        <package android:name="io.github.mbaliga.fylz" />
+        <package android:name="io.github.mbaliga.fylz.debug" />
+        <package android:name="com.fotoxplorr.app" />
+        <package android:name="com.fotoxplorr.app.debug" />
+        <package android:name="com.fotoxplorr.app.connect" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="org.thoughtcrime.securesms" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- PAL-17: lets Radar see apps that offer a guarded search provider (package visibility, Android 11+). -->
+        <intent>
+            <action android:name="com.bos.sphere.action.SEARCH_PROVIDER" />
+        </intent>
     </queries>
 
     <application
+        android:name=".LiftoffApplication"
+        android:enableOnBackInvokedCallback="true"
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -26,10 +77,16 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:stateNotNeeded="true"
+            android:windowSoftInputMode="adjustNothing"
             android:clearTaskOnLaunch="true"
             android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection"
             android:theme="@style/Theme.SphereLauncher">
+
+            <!-- Health Connect asks where to explain why we read health data (Android 13 and below) -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
 
             <!-- Standard launch -->
             <intent-filter>
@@ -45,6 +102,56 @@
             </intent-filter>
         </activity>
 
+        <!-- Desktop surface for external displays (EXT-02): resizable, not a home app, one per display. -->
+        <activity
+            android:name=".DesktopActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:launchMode="standard"
+            android:taskAffinity="com.bos.sphere.desktop"
+            android:windowSoftInputMode="adjustNothing"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|layoutDirection"
+            android:theme="@style/Theme.SphereLauncher">
+            <!-- EXT-05: a sensible freeform window, never smaller than the compact layout is tested for. -->
+            <layout android:defaultWidth="960dp" android:defaultHeight="600dp" android:minWidth="360dp" android:minHeight="320dp" android:gravity="center" />
+        </activity>
+
+        <!-- The phone as trackpad and keyboard for the desktop surface (EXT-10). -->
+        <activity
+            android:name=".PhoneInputActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SphereLauncher" />
+
+        <!-- Wave 39 (dockThemes): a .liftofftheme file opened from elsewhere lands on the theme preview; nothing is applied until Apply is tapped. -->
+        <activity
+            android:name=".ThemeImportActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.SphereLauncher">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/x-liftofftheme" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" android:pathPattern=".*\\.liftofftheme" />
+            </intent-filter>
+        </activity>
+
+        <!-- Android 14+: Health Connect's "view permission usage" entry point -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name="com.bos.sphere.core.data.SphereNotificationListener"
             android:exported="true"
@@ -52,6 +159,14 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+        </service>
+        <service
+            android:name=".MotionGestureService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Listens to the accelerometer and gyroscope for user-configured motion gestures (shake, flick, flip) that toggle ringer mode, flashlight and shortcuts while the launcher is not in the foreground." />
         </service>
     </application>
 

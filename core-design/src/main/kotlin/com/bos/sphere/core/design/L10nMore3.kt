@@ -1,0 +1,87 @@
+package com.bos.sphere.core.design
+
+/** Health-data strings, merged into each table by [L10n.tableFor]. */
+internal val L10nMore3English: Set<String> = setOf(
+    "Health data",
+    "Phone sensor",
+    "Floors climbed",
+    "Elevation gained",
+    "Distance",
+    "Active calories",
+    "Health Connect isn't available on this phone yet — install or update it from the Play Store.",
+)
+
+internal val L10nMore3: Map<String, Map<String, String>> = mapOf(
+    "es" to mapOf(
+        "Health data" to "Datos de salud",
+        "Phone sensor" to "Sensor del teléfono",
+        "Floors climbed" to "Pisos subidos",
+        "Elevation gained" to "Altitud ganada",
+        "Distance" to "Distancia",
+        "Active calories" to "Calorías activas",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "Health Connect aún no está disponible en este teléfono: instálalo o actualízalo desde Play Store.",
+    ),
+    "fr" to mapOf(
+        "Health data" to "Données de santé",
+        "Phone sensor" to "Capteur du téléphone",
+        "Floors climbed" to "Étages montés",
+        "Elevation gained" to "Dénivelé positif",
+        "Distance" to "Distance",
+        "Active calories" to "Calories actives",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "Health Connect n'est pas encore disponible sur ce téléphone : installez-le ou mettez-le à jour depuis le Play Store.",
+    ),
+    "de" to mapOf(
+        "Health data" to "Gesundheitsdaten",
+        "Phone sensor" to "Handy-Sensor",
+        "Floors climbed" to "Gestiegene Etagen",
+        "Elevation gained" to "Höhenmeter",
+        "Distance" to "Strecke",
+        "Active calories" to "Aktive Kalorien",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "Health Connect ist auf diesem Handy noch nicht verfügbar – im Play Store installieren oder aktualisieren.",
+    ),
+    "pt" to mapOf(
+        "Health data" to "Dados de saúde",
+        "Phone sensor" to "Sensor do telefone",
+        "Floors climbed" to "Andares subidos",
+        "Elevation gained" to "Elevação ganha",
+        "Distance" to "Distância",
+        "Active calories" to "Calorias ativas",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "O Health Connect ainda não está disponível neste telefone: instale ou atualize pela Play Store.",
+    ),
+    "hi" to mapOf(
+        "Health data" to "स्वास्थ्य डेटा",
+        "Phone sensor" to "फ़ोन सेंसर",
+        "Floors climbed" to "चढ़ी गई मंज़िलें",
+        "Elevation gained" to "चढ़ाई की ऊँचाई",
+        "Distance" to "दूरी",
+        "Active calories" to "सक्रिय कैलोरी",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "इस फ़ोन पर Health Connect अभी उपलब्ध नहीं है — Play Store से इंस्टॉल या अपडेट करें।",
+    ),
+    "zh" to mapOf(
+        "Health data" to "健康数据",
+        "Phone sensor" to "手机传感器",
+        "Floors climbed" to "爬楼层数",
+        "Elevation gained" to "海拔爬升",
+        "Distance" to "距离",
+        "Active calories" to "活动热量",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "此手机上暂无 Health Connect，请从 Play 商店安装或更新。",
+    ),
+    "ja" to mapOf(
+        "Health data" to "ヘルスデータ",
+        "Phone sensor" to "スマホのセンサー",
+        "Floors climbed" to "上った階数",
+        "Elevation gained" to "獲得標高",
+        "Distance" to "距離",
+        "Active calories" to "アクティブカロリー",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "このスマホではまだ Health Connect を利用できません。Play ストアからインストールまたは更新してください。",
+    ),
+    "ar" to mapOf(
+        "Health data" to "البيانات الصحية",
+        "Phone sensor" to "مستشعر الهاتف",
+        "Floors climbed" to "الطوابق المصعودة",
+        "Elevation gained" to "الارتفاع المكتسب",
+        "Distance" to "المسافة",
+        "Active calories" to "السعرات النشطة",
+        "Health Connect isn't available on this phone yet — install or update it from the Play Store." to "Health Connect غير متاح على هذا الهاتف بعد — ثبّته أو حدّثه من متجر Play.",
+    ),
+)

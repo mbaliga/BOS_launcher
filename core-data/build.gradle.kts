@@ -23,4 +23,9 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.health.connect.client)
+
+    testImplementation(libs.junit)
+    // Real org.json on the JVM test classpath (the android.jar copy is stubbed).
+    testImplementation(libs.org.json)
 }

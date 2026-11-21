@@ -1,0 +1,15 @@
+# Ring glyphs never adapt (wave 43)
+
+Source: the owner: "The icons are trying to adapt and therefore getting squished in the wheel- dont do that." A screenshot showed the clock, calculator and camera glyphs of the drawer's shortcut ring cut by the screen edge or squeezed. Replaces the glyph rule of [drawerRing.md](drawerRing.md) (wave 38: "each glyph is moved onto the part of its segment that is inside the window"); everything else of that decision stands.
+
+## Decisions
+- **One fixed size.** An action glyph (and the empty slot's plus) is `PuckSectionsGeometry.GLYPH_DP` = 24 dp, an app icon `APP_ICON_DP` = 36 dp (what the old rule gave at 8 segments on a phone). The size no longer depends on the segment count, the window, the rotation or the segment's cut. `PuckSectionsLayer` takes an `iconScale` factor (default 1) for the user's icon-size setting; nothing in the geometry scales it. The wheel does not pass a user setting yet, so it is 1 today (there is no ring icon-size preference in the app).
+- **Always square, upright.** One square box (`Modifier.size(boxDp.dp)`), the vector glyphs are 24-unit square viewports, `Icon` draws them with fit semantics. No non-uniform scale, no stretching content scale (a source test guards `PuckSections.kt` and `Glyphs.kt`). The calculator was the only glyph with a visibly narrow ink box (14 by 18 units); it is now 16 by 18 units. The other action glyphs were checked by a rendered sheet (`w43-action-glyphs-square.png`) and by a test: square viewport, non-empty ink, not clipped, no sliver.
+- **At the segment's own centre.** The glyph centre is the segment's mid angle on the mid radius (`glyphCentre`), for every rotation, corner and count. Never clamped, shifted or shrunk.
+- **Skip, do not squeeze.** A glyph is drawn only if its whole box is inside the window, 2 dp clear of the edges (`glyphVisible`, `glyphPlacement` returns null otherwise). The segment and its tap area stay; turning the ring brings the glyph into full view (tested for every slot).
+- **Tap target.** A segment is a target when its glyph box shows OR at least 10 dp of it shows at the mid radius (the wave 38 rule). `visibleSegment`/`hit`/`visibleSegments` take the glyph size for this; with 0 they behave as before.
+- **Labels.** "Show labels under glyphs": the label is a fixed 56 x 12 dp box 1 dp under the glyph box, centred on it, drawn only when it and the glyph are wholly inside the window (`labelVisible`). The glyph no longer shifts up to make room for it.
+- **Long-press name.** Still anchored on the middle of the visible run (`VisibleSegment.midAngleDeg`); it is not a glyph.
+
+## Not matched / honest limits
+JVM and Robolectric only; nothing here is device-confirmed. The owner's screenshot was a device with its own density and icon theme; the cut glyphs now disappear at the edge instead of being squeezed, which the Robolectric screenshots show, not the phone. With the ring at rest on a phone, two of the eight glyphs are hidden by the screen edge until the ring is turned.

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="digest_widget_label">Liftoff डाइजेस्ट</string>
+    <string name="digest_widget_description">होम स्क्रीन पर आपके डाइजेस्ट में जमा की गई सूचनाएँ।</string>
+</resources>

@@ -1,0 +1,13 @@
+{
+  "format": "liftoff-state",
+  "schemaVersion": 2,
+  "exportedAt": 1750000000000,
+  "settings": {
+    "format": "liftoff-settings",
+    "settingsVersion": 1,
+    "prefs": {"style": "List", "pCols": 4, "iconScale": 0.6, "bgKind": "Live", "bgPreset": "aurora", "bgA": 4278190096, "bgB": 4281022302, "wallpaper": true, "searchBdStyle": "Radar", "searchBackdrop": false, "radarSweep": false, "radarSignalView": "off", "radarComic": false, "radarIntensity": "Subtle", "flavour": "keep-me-v2"}
+  },
+  "layout": {"pages": [], "removed": [], "seeded": true},
+  "shortcuts": {"corners": {}, "gestures": {}},
+  "futureThing": {"a": 2}
+}

@@ -44,7 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bos.sphere.core.catalog.FilesView
+import com.bos.sphere.core.catalog.FilesCollectionPrefs
 import com.bos.sphere.core.catalog.HomePanelPrefs
 import com.bos.sphere.core.catalog.PinnedFolder
 import com.bos.sphere.core.catalog.UsageRange
@@ -120,15 +120,12 @@ fun HomePanelSettings() {
     val prefs = remember { HomePanelPrefs(context) }
     val source = remember { RecentFilesSource(context) }
     var range by remember { mutableStateOf(prefs.usageRange) }
-    var count by remember { mutableIntStateOf(prefs.filesPerFolder) }
     var rev by remember { mutableIntStateOf(0) }
     var trees by remember { mutableStateOf<List<Uri>>(emptyList()) }
     LaunchedEffect(rev) { trees = withContext(Dispatchers.IO) { source.grantedTrees() } }
     Column(Modifier.padding(horizontal = 4.dp)) {
         Text(L10n.tr("Usage panel"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
         SettingChips(UsageRange.entries, range, { L10n.tr(it.label) }) { range = it; prefs.usageRange = it }
-        Text(L10n.tr("Files panel"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 14.dp))
-        SettingChips(listOf(10, 20, 50), count, { L10n.tr("%d files", it) }) { count = it; prefs.filesPerFolder = it }
         Text(L10n.tr("Folders the launcher may read"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 14.dp))
         if (trees.isEmpty()) Text(L10n.tr("No folder chosen yet. Pick one and its newest files show here; nothing else is read."), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
         trees.forEach { t ->
@@ -184,43 +181,30 @@ private fun Line(title: String, sub: String, onLong: (() -> Unit)? = null, ink: 
 @Composable
 private fun FilesPanel(prefs: HomePanelPrefs) {
     val context = LocalContext.current
-    val source = remember { RecentFilesSource(context) }
+    val store = remember { FilesCollectionPrefs(context) }
     var rev by remember { mutableIntStateOf(0) }
-    var files by remember { mutableStateOf<List<RecentFile>>(emptyList()) }
-    var folders by remember { mutableStateOf<List<PinnedFolder>>(emptyList()) }
-    var only by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(rev) {
-        withContext(Dispatchers.IO) {
-            val trees = source.grantedTrees()
-            val granted = trees.map { it.toString() }.toSet()
-            folders = trees.map { PinnedFolder(it.toString(), runCatching { Uri.decode(it.lastPathSegment.orEmpty()).substringAfterLast(':').ifEmpty { it.toString() } }.getOrDefault(it.toString())) }
-            files = RecentFilesModel.withinGrants(source.all(prefs.filesPerFolder), granted)
-            if (only !in granted) only = null
-        }
-    }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             rev++
         }
     }
-    val now = System.currentTimeMillis()
-    var mode by remember { mutableStateOf(prefs.filesView) }
     val thumbs = remember { RealFileThumbs(context) }
     androidx.compose.runtime.CompositionLocalProvider(LocalFileThumbs provides thumbs) {
-        FilesPanelContent(
-            folders, FilesView.filter(files, only), only, mode, now, HyleColors.InkBright, HyleColors.Ink, HyleColors.InkDim, HyleColors.Violet,
-            onToggle = { mode = mode.other(); prefs.filesView = mode },
-            onChoose = { pick.launch(null) },
-            onFolderOpen = { f ->
-                runCatching {
-                    val tree = Uri.parse(f.uri)
-                    context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree)), DocumentsContract.Document.MIME_TYPE_DIR)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                }
-            },
-            onFolderLong = { f -> only = if (only == f.uri) null else f.uri },
-            onFileOpen = { openRecentFile(context, it) },
+        FilesSection(
+            prefs, store,
+            FilesActions(
+                pickFolder = { pick.launch(null) },
+                openFile = { openRecentFile(context, it) },
+                openFolder = { f ->
+                    runCatching {
+                        val tree = Uri.parse(f.uri)
+                        context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree)), DocumentsContract.Document.MIME_TYPE_DIR)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                    }
+                },
+            ),
+            reload = rev,
         )
     }
 }

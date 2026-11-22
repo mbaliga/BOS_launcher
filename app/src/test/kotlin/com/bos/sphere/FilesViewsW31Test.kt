@@ -36,7 +36,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.bos.sphere.core.catalog.FileKind
 import com.bos.sphere.core.catalog.FilesViewMode
 import com.bos.sphere.core.catalog.HomePanelPrefs
-import com.bos.sphere.core.catalog.PinnedFolder
+import com.bos.sphere.core.catalog.FilesArrange
+import com.bos.sphere.core.catalog.ViewOptions
 import com.bos.sphere.core.catalog.RecentFile
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.ui.HubView
@@ -81,7 +82,7 @@ class FilesViewsW31Test {
         file("notes.txt", "text/plain", 800),
         file("whatsapp-messenger-2-18-271.apk.temp", "", 1200),
     )
-    private val folders = listOf(PinnedFolder("content://x/tree", "downloads"))
+    private val chips = listOf(FilesChip("all", "All", Glyph.Grid), FilesChip("f:content://x/tree", "downloads", Glyph.Folder))
 
     @Before fun setUp() {
         FileThumbCache.cache.clear()
@@ -126,9 +127,10 @@ class FilesViewsW31Test {
                 androidx.compose.runtime.key(k) {
                     Box(Modifier.fillMaxSize().background(if (k.light) Color(0xFFF4F5F8) else HyleColors.Surface).padding(horizontal = 18.dp, vertical = 12.dp)) {
                         FilesPanelContent(
-                            folders, k.list, null, k.mode, now,
+                            chips, "all", FilesArrange.arrange(k.list, ViewOptions(), now, java.util.TimeZone.getTimeZone("UTC"), java.util.Locale.US), false, true, ViewOptions(), k.mode, now,
                             bright = if (k.light) Color(0xFF14161A) else HyleColors.InkBright, ink = if (k.light) Color(0xFF30343B) else HyleColors.Ink, dim = if (k.light) Color(0xFF6A707B) else HyleColors.InkDim, accent = HyleColors.Violet,
-                            onToggle = {}, onChoose = {}, onFolderOpen = {}, onFolderLong = {}, onFileOpen = { opened = it },
+                            onSelect = {}, onAdd = {}, onToggle = {}, onSortGroup = {}, onChoose = {}, onOpenFolder = null, onEdit = null, onFileOpen = { opened = it },
+                            ground = if (k.light) Color(0xFFF4F5F8) else HyleColors.Surface,
                         )
                     }
                 }
@@ -148,8 +150,15 @@ class FilesViewsW31Test {
 
     // ---- the toggle ----
 
+    private val tree = "content://x/tree"
+    private val panelData get() = FakeFilesData(snapshotOf(com.bos.sphere.core.catalog.PinnedFolder(tree, "downloads"), files = listOf(file("notes.txt", "text/plain"), file("budget.xlsx"))))
+    private fun panel() {
+        rule.setContent { CompositionLocalProvider(LocalFilesData provides panelData) { HomePanelsBody(HubView.Files, emptyList(), emptyMap()) } }
+        rule.waitUntil(10_000) { rule.onAllNodesWithTag("files.list").fetchSemanticsNodes().isNotEmpty() || rule.onAllNodesWithTag("files.grid").fetchSemanticsNodes().isNotEmpty() }
+    }
+
     @Test fun HOM_15_w31_theToggleSwitchesBetweenListAndGridAndPersists() {
-        rule.setContent { HomePanelsBody(HubView.Files, emptyList(), emptyMap()) }
+        panel()
         rule.waitForIdle()
         rule.onNodeWithTag("files.list").assertExists()
         rule.onAllNodesWithTag("files.grid").assertCountEquals(0)
@@ -164,7 +173,7 @@ class FilesViewsW31Test {
 
     @Test fun HOM_15_w31_theChoiceIsRestoredOnTheNextOpen() {
         HomePanelPrefs(ctx).filesView = FilesViewMode.Grid
-        rule.setContent { HomePanelsBody(HubView.Files, emptyList(), emptyMap()) }
+        panel()
         rule.waitForIdle()
         rule.onNodeWithTag("files.grid").assertExists()
     }
@@ -187,10 +196,11 @@ class FilesViewsW31Test {
         assertEquals("Grid view", n.getOrNull(SemanticsProperties.StateDescription))
     }
 
-    @Test fun HOM_15_w31_theHeaderKeepsFoldersAndChooseAFolder() {
-        rule.setContent { HomePanelsBody(HubView.Files, emptyList(), emptyMap()) }
-        rule.waitForIdle()
-        rule.onNodeWithText("Folders").assertExists(); rule.onNodeWithText("Choose a folder").assertExists(); rule.onNodeWithText("Recent files").assertExists()
+    @Test fun HOM_15_w31_withNoFolderTheTabSaysHowToAddOneAndKeepsTheSwitcher() {
+        rule.setContent { CompositionLocalProvider(LocalFilesData provides FakeFilesData(snapshotOf(files = emptyList()))) { HomePanelsBody(HubView.Files, emptyList(), emptyMap()) } }
+        rule.waitUntil(10_000) { rule.onAllNodesWithTag("files.empty").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("files.sources").assertExists(); rule.onNodeWithTag("files.add").assertExists()
+        rule.onNodeWithTag("files.empty").assertExists(); rule.onNodeWithText("Choose a folder").assertExists()
     }
 
     // ---- list rows and grid cells ----
@@ -236,17 +246,6 @@ class FilesViewsW31Test {
         show(FilesViewMode.Grid); rule.waitForIdle()
         rule.onNodeWithTag(tag("movie_clip.mp4", "duration"), true).assertExists()
         rule.onNodeWithText("1:05", useUnmergedTree = true).assertExists()
-    }
-
-    @Test fun HOM_15_w31_aFolderShowsAFolderTileAndKeepsItsPinnedLabel() {
-        show(FilesViewMode.List); rule.waitForIdle()
-        rule.onNodeWithTag("files.folder.downloads").assertExists()
-        rule.onNodeWithText("Pinned folder").assertExists()
-    }
-
-    @Test fun HOM_15_w31_gridFoldersAreCellsToo() {
-        show(FilesViewMode.Grid); rule.waitForIdle()
-        rule.onNodeWithTag("files.folder.downloads").assertExists()
     }
 
     @Test fun HOM_15_w31_tappingAFileOpensIt() {
@@ -333,7 +332,7 @@ class FilesViewsW31Test {
     @Test fun HOM_15_w31_bothViewsHoldAtFontScale2AndInRtl() {
         for (mode in FilesViewMode.entries) for (rtl in listOf(false, true)) {
             show(mode, font = 2f, rtl = rtl); rule.waitForIdle()
-            rule.onNodeWithText("Choose a folder").assertExists()
+            rule.onNodeWithTag("files.add").assertExists()
             rule.onNodeWithTag("files.viewToggle").assertWidthIsAtLeast(48.dp)
         }
     }

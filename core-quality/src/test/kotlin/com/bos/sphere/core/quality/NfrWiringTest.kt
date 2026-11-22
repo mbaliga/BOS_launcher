@@ -67,7 +67,10 @@ class NfrWiringTest {
     @Test fun NFR_15_homeDrawsTheScrimBehindTheTextLayer() {
         // Wave 26: the scrim moved into the one wallpaper seam, HomeSurfaceBackground, which the home draws before the indicator layer.
         val home = text("app/src/main/kotlin/com/bos/sphere/HomeScreen.kt")
-        assertTrue(home.indexOf("HomeSurfaceBackground(") in 0 until home.indexOf("IndicatorLayer("))
+        // Wave 55: the home draws the wallpaper once, in FixedHomeBackdrop below the pager; the indicator layer is its overlay, drawn after the wallpaper and its scrim.
+        assertTrue(home.contains("FixedHomeBackdrop(") && home.contains("overlay = { BackdropIndicator() }"))
+        val backdrop = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/FixedHomeBackdrop.kt")
+        assertTrue(backdrop.lastIndexOf("HomeSurfaceBackground(") in 0 until backdrop.indexOf("        overlay()"))
         val seam = text("feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/WallpaperSurfaces.kt")
         assertTrue(seam.contains("HomeScrim(") && seam.contains("SignalBackground("))
         assertTrue("the seam draws SignalBackground before its scrim", seam.indexOf("SignalBackground(") < seam.indexOf("HomeScrim("))

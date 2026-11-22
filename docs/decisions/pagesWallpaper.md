@@ -27,3 +27,7 @@ HomeScreen: `Background(baseFill, surface = Pages)`; the Glance underlay passes 
 ## Not done / limits
 
 Not device-confirmed (Robolectric only). Gradient angle is in 45 degree steps (chips), not a free slider. Light theme: a user solid/gradient is drawn as chosen; the scrim keeps the text legible.
+
+## Superseded in part by wave 55 (fixedBackdrop)
+
+"Drawing" above (the Pages stream calls `HomeSurfaceBackground(Pages)` from the paged and scroll homes; the Glance underlay passes Glance) is replaced: both are drawn by one fixed layer below the pager, `FixedHomeBackdrop`. Same wallpaper on both surfaces: one instance, no crossfade. Different: the Pages wallpaper fades in over the Glance one with the pager position instead of sliding with the page. See `docs/decisions/fixedBackdrop.md`.

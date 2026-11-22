@@ -37,7 +37,7 @@ import com.bos.sphere.core.design.L10n
  * and Ground Control draws that same layer, scaled, in a small frame. Nothing is rendered twice and nothing is a
  * mock-up: whatever the home looks like right now, with the setting just changed, is what the dock shows.
  */
-class HomeCapture internal constructor(internal val layer: GraphicsLayer) {
+class HomeCapture internal constructor(internal val layer: GraphicsLayer, /** W55: the fixed wallpaper is drawn below the home card, so it is recorded on its own layer and drawn first in the preview. */ internal val wallpaperLayer: GraphicsLayer) {
     /** Size of the captured home in pixels; zero until it has been drawn once. */
     var size by mutableStateOf(IntSize.Zero)
         internal set
@@ -46,7 +46,8 @@ class HomeCapture internal constructor(internal val layer: GraphicsLayer) {
 @Composable
 fun rememberHomeCapture(): HomeCapture {
     val layer = rememberGraphicsLayer()
-    return remember(layer) { HomeCapture(layer) }
+    val wallpaper = rememberGraphicsLayer()
+    return remember(layer, wallpaper) { HomeCapture(layer, wallpaper) }
 }
 
 /** Put on the home surface: draws the home as usual and records it for the dock. */
@@ -54,6 +55,12 @@ fun Modifier.captureHome(capture: HomeCapture): Modifier = this.drawWithContent 
     capture.layer.record { this@drawWithContent.drawContent() }
     capture.size = IntSize(size.width.toInt(), size.height.toInt())
     drawLayer(capture.layer)
+}
+
+/** W55: put on the fixed wallpaper: draws it as usual and records it, so the preview shows it behind the home. */
+fun Modifier.captureWallpaper(capture: HomeCapture): Modifier = this.drawWithContent {
+    capture.wallpaperLayer.record { this@drawWithContent.drawContent() }
+    drawLayer(capture.wallpaperLayer)
 }
 
 /** Pure sizing of the dock so it fits any window and keeps the home's own aspect. */

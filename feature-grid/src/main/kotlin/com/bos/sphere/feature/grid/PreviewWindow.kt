@@ -316,7 +316,7 @@ private fun PreviewContent(capture: HomeCapture, ctl: PreviewController, w: Floa
     ) {
         Canvas(Modifier.size(w.dp, h.dp)) {
             val k = DockGeometry.scale(capture.size.width, size.width)
-            clipRect { scale(k, k, pivot = Offset.Zero) { drawLayer(capture.layer) } }
+            clipRect { scale(k, k, pivot = Offset.Zero) { drawLayer(capture.wallpaperLayer); drawLayer(capture.layer) } }
         }
     }
 }

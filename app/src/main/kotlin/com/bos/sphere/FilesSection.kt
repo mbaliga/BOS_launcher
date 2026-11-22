@@ -97,6 +97,7 @@ private enum class FilesSheet { None, SortGroup, Chooser }
 internal fun FilesSection(
     homePrefs: HomePanelPrefs, store: FilesCollectionPrefs, actions: FilesActions, reload: Int = 0, clock: () -> Long = System::currentTimeMillis,
     bright: Color = HyleColors.InkBright, ink: Color = HyleColors.Ink, dim: Color = HyleColors.InkDim, accent: Color = HyleColors.Violet, ground: Color = HyleColors.Surface,
+    inset: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp(0f),
 ) {
     val context = LocalContext.current
     val data = LocalFilesData.current ?: remember { RealFilesData(context) }
@@ -117,7 +118,9 @@ internal fun FilesSection(
     var chooserStart by remember { mutableStateOf<ChooserStart>(ChooserStart.List) }
     var mode by remember { mutableStateOf(homePrefs.filesView) }
 
-    val folders = snapshot?.folders.orEmpty()
+    var folderOrder by remember { mutableStateOf(store.folderOrder) }
+    // W54: the folder chips follow the order the owner dragged them into; a folder not named there goes after the named ones.
+    val folders = FilesChipReorder.orderBy(snapshot?.folders.orEmpty(), folderOrder) { it.uri }
     val shown = collections.resolved()
     // A source that is gone (a removed collection, a folder whose grant was taken back) falls back to All; nothing is written for it.
     val selected = when {
@@ -153,7 +156,23 @@ internal fun FilesSection(
         onChoose = actions.pickFolder,
         onOpenFolder = selectedFolder?.let { f -> { actions.openFolder(f) } },
         onEdit = selectedCustom?.let { c -> { chooserStart = ChooserStart.Edit(c.id); sheet = FilesSheet.Chooser } },
-        onFileOpen = actions.openFile, ground = ground,
+        onFileOpen = actions.openFile, ground = ground, inset = inset,
+        onMoveChip = { id, to ->
+            // A chip moves among its own kind: the collections keep their order in the collection store, the folders in the folder order.
+            val at = chips.indexOfFirst { it.id == id }
+            val range = if (at >= 0) movableRange(chips, at) else null
+            if (range != null && to in range) {
+                val ids = chips.slice(range).map { it.id }
+                val next = FilesChipReorder.move(ids, at - range.first, to - range.first)
+                if (FileSourceIds.isFolder(id)) {
+                    val uris = next.map { FileSourceIds.treeOf(it) }
+                    folderOrder = uris; store.folderOrder = uris
+                } else {
+                    val c = collections.copy(shown = FilesChipReorder.replaceResolved(collections.shown, ids.toSet(), next))
+                    collections = c; store.collections = c
+                }
+            }
+        },
     )
     when (sheet) {
         FilesSheet.SortGroup -> SortGroupSheet(

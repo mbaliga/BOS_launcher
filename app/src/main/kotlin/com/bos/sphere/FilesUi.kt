@@ -336,49 +336,6 @@ internal class FilesChip(val id: String, val label: String, val glyph: Glyph)
 /** A focus-graph node for a clickable (keyboard Enter and controller confirm do what a tap does). Put it directly before the clickable. */
 internal fun Modifier.filesFocus(id: String, onActivate: () -> Unit): Modifier = launcherItem(id, FocusKind.Item, focusable = false, onActivate = onActivate)
 
-/** The source switcher: a row of chips (All, the collections, the folders) that scrolls sideways and keeps the selected one in sight, and the Add tile, which stays put beside it. */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-internal fun FilesSourceBar(chips: List<FilesChip>, selected: String, bright: Color, dim: Color, accent: Color, onSelect: (String) -> Unit, onAdd: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).testTag("files.sources"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            chips.forEach { c ->
-                val on = c.id == selected
-                val shape = RoundedCornerShape(50)
-                val inSight = remember { BringIntoViewRequester() }
-                if (on) LaunchedEffect(selected, chips.size) { inSight.bringIntoView() }
-                Box(
-                    Modifier.heightIn(min = 48.dp).bringIntoViewRequester(inSight).testTag("files.source." + c.id).filesFocus("files.src." + c.id) { onSelect(c.id) }
-                        .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(c.id) }),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(
-                        Modifier.height(38.dp).background(if (on) accent.copy(alpha = .30f) else Color(0x14FFFFFF), shape).border(1.dp, if (on) accent else Color.Transparent, shape).padding(horizontal = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        GlyphIcon(c.glyph, if (on) bright else dim, Modifier.size(16.dp))
-                        Text(c.label, color = if (on) bright else dim, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
-                    }
-                }
-            }
-        }
-        val addLabel = L10n.tr("Add a folder or a collection")
-        Box(
-            Modifier.padding(start = 8.dp).heightIn(min = 48.dp).testTag("files.add").filesFocus("files.add", onAdd)
-                .semantics { contentDescription = addLabel }.clickable(role = Role.Button, onClick = onAdd),
-            contentAlignment = Alignment.Center,
-        ) {
-            Row(
-                Modifier.height(38.dp).border(1.dp, accent.copy(alpha = .7f), RoundedCornerShape(50)).padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                GlyphIcon(Glyph.Plus, accent, Modifier.size(16.dp))
-                Text(L10n.tr("Add"), color = accent, fontSize = 13.sp, maxLines = 1)
-            }
-        }
-    }
-}
-
 /** The words of the current sort and grouping ("Date modified, newest first, grouped by Date"), for the control's state description. */
 @Composable
 internal fun optionsSummary(o: ViewOptions): String {
@@ -451,14 +408,17 @@ internal fun FilesPanelContent(
     onSelect: (String) -> Unit, onAdd: () -> Unit, onToggle: () -> Unit, onSortGroup: () -> Unit, onChoose: () -> Unit,
     onOpenFolder: (() -> Unit)?, onEdit: (() -> Unit)?, onFileOpen: (RecentFile) -> Unit,
     ground: Color = HyleColors.Surface,
+    /** The side margin the page around the section keeps; the chip row alone ignores it (it runs edge to edge) and the rest keeps it. */
+    inset: Dp = 0.dp,
+    onMoveChip: (id: String, toIndex: Int) -> Unit = { _, _ -> },
 ) {
     var preview by remember { mutableStateOf<RecentFile?>(null) }
     val grid = mode == FilesViewMode.Grid
     val grouped = options.group != GroupKey.None
     val isCollection = selected != FileSourceIds.ALL && !FileSourceIds.isFolder(selected)
     Column(Modifier.fillMaxSize()) {
-        FilesSourceBar(chips, selected, bright, dim, accent, onSelect, onAdd)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        FilesSourceBar(chips, selected, bright, dim, accent, onSelect, onAdd, inset, onMoveChip)
+        Row(Modifier.fillMaxWidth().padding(horizontal = inset), verticalAlignment = Alignment.CenterVertically) {
             val total = arranged?.total ?: 0
             val summary = when {
                 arranged == null -> L10n.tr(if (indexing) "Looking through your folders..." else "Loading...")
@@ -479,7 +439,7 @@ internal fun FilesPanelContent(
             ) { GlyphIcon(Glyph.Sort, bright, Modifier.size(24.dp)) }
             FilesViewToggle(mode, bright, onToggle)
         }
-        Box(Modifier.fillMaxSize().weight(1f)) {
+        Box(Modifier.fillMaxSize().weight(1f).padding(horizontal = inset)) {
             when {
                 arranged == null -> Unit
                 arranged.total == 0 -> Column(Modifier.verticalScroll(rememberScrollState())) { FilesEmptyState(hasFolders, isCollection, bright, ink, dim, accent, onChoose, onAdd, onEdit) }

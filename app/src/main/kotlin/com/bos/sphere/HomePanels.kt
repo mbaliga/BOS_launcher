@@ -105,10 +105,12 @@ fun HomePanelsBody(
     val modifier = if (view == com.bos.sphere.ui.HubView.Timeline) Modifier.fillMaxSize() else Modifier.fillMaxSize().background(HyleColors.Surface)
     // Wave 52: the Widgets section draws its own margins (the Comms page's), so it takes the whole body.
     if (view == com.bos.sphere.ui.HubView.Widgets) { Box(Modifier.fillMaxSize()) { PanelWidgetsBody() }; return }
-    Box(modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
+    // W54: Files keeps its 18 dp side margin itself (inset), so its chip row can run to the page edges; Timeline keeps it here.
+    val timeline = view == com.bos.sphere.ui.HubView.Timeline
+    Box(modifier.padding(horizontal = if (timeline) 18.dp else 0.dp, vertical = 12.dp)) {
         when (view) {
             com.bos.sphere.ui.HubView.Timeline -> TimelinePanel(history, appsByKey, onLaunch, onHide)
-            else -> FilesPanel(prefs)
+            else -> FilesPanel(prefs, 18.dp)
         }
     }
 }
@@ -179,7 +181,7 @@ private fun Line(title: String, sub: String, onLong: (() -> Unit)? = null, ink: 
 }
 
 @Composable
-private fun FilesPanel(prefs: HomePanelPrefs) {
+private fun FilesPanel(prefs: HomePanelPrefs, inset: androidx.compose.ui.unit.Dp) {
     val context = LocalContext.current
     val store = remember { FilesCollectionPrefs(context) }
     var rev by remember { mutableIntStateOf(0) }
@@ -204,7 +206,7 @@ private fun FilesPanel(prefs: HomePanelPrefs) {
                     }
                 },
             ),
-            reload = rev,
+            reload = rev, inset = inset,
         )
     }
 }

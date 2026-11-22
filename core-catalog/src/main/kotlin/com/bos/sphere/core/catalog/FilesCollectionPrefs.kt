@@ -15,6 +15,14 @@ class FilesCollectionPrefs(context: Context) {
         get() = FileCollections.decode(runCatching { sp.getString(K_COLLECTIONS, null) }.getOrNull())
         set(v) { sp.edit().putString(K_COLLECTIONS, v.encode()).apply() }
 
+    /**
+     * W54 (filesChips): the order the owner dragged the folder chips into, as folder URIs (the collections keep theirs in [collections]). A folder not
+     * named here follows the named ones in the order the system lists the grants; a name with no grant any more is ignored.
+     */
+    var folderOrder: List<String>
+        get() = runCatching { sp.getString(K_FOLDER_ORDER, null) }.getOrNull()?.lines()?.filter { it.isNotEmpty() }.orEmpty()
+        set(v) { sp.edit().putString(K_FOLDER_ORDER, v.distinct().joinToString("\n")).apply() }
+
     /** The source shown last (`all`, `b:...`, `c:...`, `f:<tree>`). */
     var source: String
         get() = runCatching { sp.getString(K_SOURCE, null) }.getOrNull() ?: FileSourceIds.ALL
@@ -63,6 +71,7 @@ class FilesCollectionPrefs(context: Context) {
 
     companion object {
         const val K_COLLECTIONS = "panel.files.collections"
+        const val K_FOLDER_ORDER = "panel.files.folders.order"
         const val K_SOURCE = "panel.files.source"
         const val K_DEFAULT = "panel.files.sort.default"
         const val K_PER_SOURCE = "panel.files.sort.by"

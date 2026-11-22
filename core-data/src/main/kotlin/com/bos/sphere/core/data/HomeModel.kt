@@ -313,6 +313,11 @@ data class LauncherPrefs(
     val glanceClockDate: Boolean = false,
     val glanceClockAccent: Boolean = false,
     val glanceClockSize: ClockSize = ClockSize.Large,
+    /** Wave 50 (glanceClockEdit): where the user put the Glance clock, per orientation, as fractions of the usable area (centre x, top y); the defaults are the factory place. */
+    val glanceClockX: Float = ClockPlacement.DEFAULT_X,
+    val glanceClockY: Float = ClockPlacement.DEFAULT_Y,
+    val glanceClockXLand: Float = ClockPlacement.DEFAULT_X,
+    val glanceClockYLand: Float = ClockPlacement.DEFAULT_Y,
     /** Wave 45 (editSheet): the options of the clock TILE on a page (its item sheet): analog face instead of digital, 12/24 hour for the digital face, and the day line. Defaults are the look it always had. */
     val clockTileAnalog: Boolean = false,
     val clockTileFormat: ClockFormat = ClockFormat.System,

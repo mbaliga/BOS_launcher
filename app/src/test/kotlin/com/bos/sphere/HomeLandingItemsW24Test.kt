@@ -102,7 +102,7 @@ class HomeLandingItemsW24Test : TourBase() {
     }
 
     private fun openQuickSheet() {
-        longPressAt(0.5f, 0.3f)
+        longPressAt(0.5f, 0.75f)
         assertTrue("a long press on Glance opens the quick sheet", quickSheetShown())
     }
 

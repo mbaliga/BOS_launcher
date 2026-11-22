@@ -626,6 +626,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         })
     }
     // Wave 28: Glance is a stop of the horizontal pager, so its gestures use the paged surface: a sideways swipe is the pager's, only up / down swipes are free for gestures.
+    var glanceClockEditing by remember { mutableStateOf(false) } // wave 50 (glanceClockEdit): the Glance clock is being edited in place: the pager, the dots and the fixed chrome stand still
     val glanceGestureSpec = remember(homeGestureSpec) {
         HomeGestureSpec(HomeSurface(SurfaceScroll.Horizontal, paged = true, hasDensity = false, leftPageOn = false), homeGestureSpec.bound, homeGestureSpec.onGesture, homeGestureSpec.onEmptyLongPress)
     }
@@ -1091,13 +1092,13 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             val dots = com.bos.sphere.core.data.HomeDeck.stops(prefs.glanceEnabled, prefs.homePages, pages.size) - (if (prefs.glanceEnabled) 1 else 0)
             com.bos.sphere.feature.grid.PageIndicator(
                 count = dots, current = gridState.currentPage.coerceIn(0, (dots - 1).coerceAtLeast(0)), vertical = false,
-                onSelect = { page -> showDot(page + (if (prefs.glanceEnabled) 1 else 0)) }, // the indicator reports the page; the dot index counts Glance as 0 (W45: while editing, a dot is the page switcher)
+                onSelect = { page -> if (!glanceClockEditing) showDot(page + (if (prefs.glanceEnabled) 1 else 0)) }, // the indicator reports the page; the dot index counts Glance as 0 (W45: while editing, a dot is the page switcher)
                 modifier = modifier
                     .graphicsLayer { alpha = 1f - (1f - com.bos.sphere.feature.grid.EditChromeGeometry.FIXED_DIM) * chromeProgress.value }, // W45: dimmed to 40% while editing, still the page switcher
-                onMenu = if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) ({ if (!homeEdit.active) leftOpen = true }) else null,
+                onMenu = if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) ({ if (!homeEdit.active && !glanceClockEditing) leftOpen = true }) else null,
                 menuLabel = L10n.tr("Open Comms"), menuTag = "glance.indicator.launchpad", rtl = homeOrder.rtl,
                 homeIndex = prefs.homePage.coerceIn(0, (dots - 1).coerceAtLeast(0)),
-                onGlance = if (prefs.glanceEnabled) ({ if (!homeEdit.active) showSurface(HomeShown.Glance) }) else null, glanceCurrent = landing == HomeShown.Glance,
+                onGlance = if (prefs.glanceEnabled) ({ if (!homeEdit.active && !glanceClockEditing) showSurface(HomeShown.Glance) }) else null, glanceCurrent = landing == HomeShown.Glance,
                 quiet = landing == HomeShown.Glance, awakeNonce = indicatorAwake + homePager.currentPage,
                 hiddenFromAccessibility = homeEdit.active && pageEditorOn, // wave 37: the editor's strip cards already say "Page N of M"
             )
@@ -1116,7 +1117,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr) {
                 androidx.compose.foundation.pager.HorizontalPager(
                     state = homePager, reverseLayout = homeOrder.rtl,
-                    userScrollEnabled = !homeEdit.active && !leftOpen && !rightOpen,
+                    userScrollEnabled = !homeEdit.active && !glanceClockEditing && !leftOpen && !rightOpen,
                     modifier = Modifier.fillMaxSize().testTag("home.pager"),
                 ) { stop ->
                     // Only the stop on screen (or moving into view) is composed: a pager prefetches its neighbour while idle, and a prefetched
@@ -1133,7 +1134,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             hasLaunchpad = prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off,
                             gestures = glanceGestureSpec,
                             onClockTap = { runner.run(CornerActionId.Clock) },
-                            onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true },
+                            onPrefsEdit = { f -> stores.prefs.update(f) }, onEditingChange = { glanceClockEditing = it },
+                            onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !glanceClockEditing) leftOpen = true },
                             indicator = false, onAwake = { indicatorAwake++ }, // wave 28: the one page indicator is drawn by the home, above the pager
                             underlay = { Background(baseFill = false, surface = com.bos.sphere.core.data.WallpaperSurface.Glance) },
                         )
@@ -1240,8 +1242,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             // Wave 38 (glanceFixed): the FIXED chrome above the pager: the four hotspots and the music line stay exactly in place on every page and during a swipe.
             Box(
                 Modifier.fillMaxSize().padding(bottom = bottomClear)
-                    .graphicsLayer { alpha = 1f - (1f - com.bos.sphere.feature.grid.EditChromeGeometry.FIXED_DIM) * chromeProgress.value } // W45: the hotspots and the music line dim to 40% while editing (inert: see EditFixedChromeShield)
-                    .then(if (homeEdit.active) Modifier.clearAndSetSemantics { } else Modifier),
+                    .graphicsLayer { alpha = 1f - (1f - com.bos.sphere.feature.grid.EditChromeGeometry.FIXED_DIM) * (if (glanceClockEditing) 1f else chromeProgress.value) } // W45: the hotspots and the music line dim to 40% while editing (inert: see EditFixedChromeShield); W50: the same while the Glance clock is edited
+                    .then(if (homeEdit.active || glanceClockEditing) Modifier.clearAndSetSemantics { } else Modifier),
             ) {
                 com.bos.sphere.feature.grid.FixedHomeChrome(
                     media = mediaInfo, showMusic = prefs.showMusic, controlsSeconds = prefs.glanceControlsSeconds,
@@ -1249,6 +1251,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     onAwake = { indicatorAwake++ },
                     corners = { Corners() },
                 )
+                if (glanceClockEditing) com.bos.sphere.feature.grid.GlanceClockEditShield() // wave 50: dimmed like the home editor does, and inert
             }
             // Wave 28: the ONE page indicator, at one fixed place above the pager: Glance is its first stop, the pages (or the scroll) follow.
             // W45: while the single-page edit mode is up it is drawn OUTSIDE the scaled, clipped page (see the call after this layer), where the dock already leaves room for it.

@@ -8,6 +8,16 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import com.bos.sphere.core.data.ClockPlacement
 import androidx.compose.ui.semantics.role
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -143,6 +153,11 @@ object ClockText {
 fun GlanceWallpaperClock(
     style: ClockStyle, format: ClockFormat, size: ClockSize, showDate: Boolean, useAccent: Boolean, dark: Boolean, accent: Color, onTap: () -> Unit, onBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
     modifier: Modifier = Modifier,
+    /** Wave 50 (glanceClockEdit): where the clock sits (fractions of the area), whether it is being edited (an edit frame is drawn, a tap does nothing), the TalkBack actions and the Menu key. */
+    pos: ClockPlacement.Pos = ClockPlacement.Default,
+    editing: Boolean = false,
+    actions: List<CustomAccessibilityAction> = emptyList(),
+    onMenu: (() -> Unit)? = null,
 ) {
     if (style == ClockStyle.Off) return
     val context = LocalContext.current
@@ -156,6 +171,7 @@ fun GlanceWallpaperClock(
     val ink = if (useAccent) accent else GlanceInk.clock(dark)
     val shadow = Shadow(if (dark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.6f), Offset(0f, 2f), 14f)
     val open = L10n.tr("Open clock")
+    val editingLabel = L10n.tr("Editing clock")
     val spoken = if (showDate) "$spokenTime, $dateText" else spokenTime
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -165,13 +181,20 @@ fun GlanceWallpaperClock(
             val areaH = maxHeight * ClockText.AREA_HEIGHT
             val f = size.factor
             val dateH = if (showDate) 28.dp else 0.dp
+            // Wave 50: the clock is placed by its fractions (centre x, top y) and kept inside the area; the factory place is the old top-centre one.
+            ClockPlacer(pos) {
             Column(
-                Modifier.align(Alignment.TopCenter).padding(top = maxHeight * ClockText.TOP_FRACTION)
+                Modifier
                     // W41: no pointer input here on purpose: an input on this node would hide the Glance's own gesture layer below it (long press = Home sheet).
                     // The Glance's tap layer hit-tests a tap against these bounds and calls onTap itself.
                     .onGloballyPositioned { onBounds(it.boundsInRoot()) }
-                    .semantics { role = Role.Button; onClick(label = open) { onTap(); true } }
-                    .launcherItem("glance.clock", focusable = true, onActivate = onTap, ringRadiusDp = 24f)
+                    .then(if (editing) Modifier.drawBehind { drawEditFrame(accent) } else Modifier)
+                    .semantics {
+                        role = Role.Button
+                        if (!editing) onClick(label = open) { onTap(); true } else stateDescription = editingLabel
+                        if (actions.isNotEmpty()) customActions = actions
+                    }
+                    .launcherItem("glance.clock", focusable = true, onActivate = if (editing) null else onTap, onMenu = if (editing) null else onMenu, ringRadiusDp = 24f)
                     .testTag("glance.clock")
                     .clearAndSetSemantics { contentDescription = spoken }, // innermost: it clears the children's semantics, not the tag or the click above it
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -236,6 +259,31 @@ fun GlanceWallpaperClock(
                 }
                 if (showDate) Text(dateText, color = ink, fontSize = 14.sp, maxLines = 1, style = TextStyle(shadow = shadow, color = ink, fontSize = 14.sp), modifier = Modifier.padding(top = 8.dp).testTag("glance.clock.date"))
             }
+            }
         }
     }
+}
+
+/** Places its one child at [pos] (fractions of this area: centre x, top y), kept inside the area; the area itself is as large as it is allowed to be. */
+@Composable
+private fun ClockPlacer(pos: ClockPlacement.Pos, content: @Composable () -> Unit) {
+    Layout(content = content, modifier = Modifier.fillMaxSize()) { measurables, c ->
+        val loose = c.copy(minWidth = 0, minHeight = 0)
+        val p = measurables.firstOrNull()?.measure(loose)
+        layout(c.maxWidth, c.maxHeight) {
+            if (p != null) {
+                val (l, t) = ClockPlacement.topLeft(pos, c.maxWidth.toFloat(), c.maxHeight.toFloat(), p.width.toFloat(), p.height.toFloat())
+                p.place(kotlin.math.round(l).toInt(), kotlin.math.round(t).toInt())
+            }
+        }
+    }
+}
+
+/** The edit frame: a soft tint, a 2 dp outline and four corner dots, drawn 10 dp outside the clock so it never changes its layout. */
+private fun DrawScope.drawEditFrame(accent: Color) {
+    val pad = 10.dp.toPx(); val r = 14.dp.toPx()
+    val tl = Offset(-pad, -pad); val sz = Size(size.width + 2 * pad, size.height + 2 * pad)
+    drawRoundRect(accent.copy(alpha = 0.10f), tl, sz, CornerRadius(r))
+    drawRoundRect(accent, tl, sz, CornerRadius(r), style = Stroke(2.dp.toPx()))
+    for (x in listOf(tl.x, tl.x + sz.width)) for (y in listOf(tl.y, tl.y + sz.height)) drawCircle(accent, 4.dp.toPx(), Offset(x, y))
 }

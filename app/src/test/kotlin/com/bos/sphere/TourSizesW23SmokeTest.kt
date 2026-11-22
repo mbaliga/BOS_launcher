@@ -31,7 +31,7 @@ class TourSizesW23SmokeTest : TourBase() {
         back(); check("radar closed", Surface.Home)
         key(KeyEvent.KEYCODE_COMMA, ctrl = true); check("settings", Surface.Settings)
         back(); check("settings closed", Surface.Home)
-        longPressAt(0.5f, 0.3f); check("quick sheet")
+        longPressAt(0.5f, 0.75f); check("quick sheet")
         closeSheet(); settle(); check("quick sheet closed", Surface.Home)
         rotateAndCheck("home")
         assertFalse("no surface is left open", open().any { it != Surface.Home })

@@ -76,7 +76,7 @@ class HomeUnifyFlowTest : TourBase() {
     }
     private fun backward(rtl: Boolean = false) = forward(!rtl)
 
-    private fun quickSheetOnGlance() { longPressAt(0.5f, 0.3f); assertTrue("a long press on Glance opens the quick sheet", quickSheetShown()) }
+    private fun quickSheetOnGlance() { longPressAt(0.5f, 0.75f); assertTrue("a long press on Glance opens the quick sheet", quickSheetShown()) }
 
     @Test fun HOM_01_w28_fromGlanceWithPagesOffTheQuickSheetTurnsPagedOnEditHomeAddsAnAppAndATileAndOneIndicatorStaysInPlaceWhileSwiping() {
         start()

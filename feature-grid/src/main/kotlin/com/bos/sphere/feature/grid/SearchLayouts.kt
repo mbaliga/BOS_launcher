@@ -129,16 +129,17 @@ private val StripTile = 76.dp
 
 /**
  * Wave 25: what the Filmstrip draws in the height it is given: the tile (76 dp, down to 32 dp), the caption line under it (26 dp), the footnote line
- * (16 dp) and, for an app with shortcuts, the row of shortcut circles (48 dp, part of the tile, so the height is reserved). [of] drops the row and the
+ * (16 dp) and, for an app with shortcuts, the wrapping row of shortcut bubbles ([rowH] dp, part of the tile, so the height is reserved). [of] drops the row and the
  * extras and shrinks the tile before any of it would run past [heightDp].
  */
 internal class StripFit(val tile: Dp, val caption: Boolean, val footnote: Boolean, val pills: Boolean) {
     companion object {
         val Full = StripFit(StripTile, caption = true, footnote = true, pills = true)
-        fun of(heightDp: Float, withRow: Boolean = false): StripFit {
+        fun of(heightDp: Float, rowH: Float = 0f): StripFit {
+            val withRow = rowH > 0f
             // 4 dp of air under the caption (the caller's bottom padding).
             val room = heightDp - 4f
-            val row = ShortcutForm.SLOT_DP
+            val row = rowH
             if (withRow && room >= 76f + row + 26f + 16f) return Full
             if (withRow && room >= 76f + row + 26f) return StripFit(StripTile, caption = true, footnote = false, pills = true)
             if (room >= 76f + 26f + 16f) return StripFit(StripTile, caption = true, footnote = true, pills = false)
@@ -280,7 +281,7 @@ private fun tileCaption(t: Tile, query: String): AnnotatedString {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StripTileView(tile: Tile, actions: TileActions, fit: StripFit) {
-  val rowW = if (tile is Tile.App && fit.pills && tile.shortcuts.isNotEmpty()) maxOf(fit.tile.value, ShortcutForm.smallRowWidth(tile.shortcuts.size)).dp else fit.tile
+  val rowW = if (tile is Tile.App && fit.pills && tile.shortcuts.isNotEmpty()) maxOf(fit.tile.value, ShortcutForm.BUBBLE_W * minOf(tile.shortcuts.size, ShortcutForm.PER_LINE)).dp else fit.tile
   Column(Modifier.width(rowW), horizontalAlignment = Alignment.CenterHorizontally) {
     Box(
         Modifier
@@ -293,7 +294,7 @@ private fun StripTileView(tile: Tile, actions: TileActions, fit: StripFit) {
             .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
     ) { TileFace(tile, fit.tile) }
     // PAL-03, wave 25 (shortcutForm): the app's shortcuts are one row of circles under its tile; the row's height is part of the layout (dropped, not overlapped, when the room is short).
-    if (tile is Tile.App && fit.pills) ShortcutCircleRow(tile, rowW, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) })
+    if (tile is Tile.App && fit.pills) ShortcutBubbleRow(tile, onRun = { actions.onTap(Tile.Hit(it)) }, perLine = ShortcutForm.PER_LINE)
   }
 }
 
@@ -439,9 +440,53 @@ internal fun Orbit(
 
         val shown = tiles.take(placements.size)
         androidx.compose.runtime.SideEffect { onVisibleCount(shown.size) }
+        // The centre of a result's face now, and where it rests (no travel): the satellites keep their offset to it.
+        fun centreAt(i: Int, travelPx: Float): Offset {
+            val (ring, baseAngle) = placements[i]
+            val dir = if (ring % 2 == 1) -1.0 else 1.0
+            val a = baseAngle + dir * travelPx / radii[ring].toDouble()
+            return Offset(cx + radii[ring] * cos(a).toFloat(), cy + radii[ring] * sin(a).toFloat())
+        }
+        fun restCentre(i: Int) = centreAt(i, 0f)
+        fun liveCentre(i: Int) = centreAt(i, travel.floatValue)
+        val dpPx = density.density
+        // The bubbles' labels follow the system font size up to 1.3 (the Orbit has no room for more around an app); the long-press tooltip and TalkBack carry the full title.
+        val satFont = minOf(density.fontScale, ORBIT_BUBBLE_FONT_MAX)
+        val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+        val layerW = with(density) { maxWidth.toPx() }
+        val satellites: List<List<ShortcutSatellites.Spot>> = remember(placements, shown, satFont, rtl, rg, hPx, centrePx, z) {
+            val counts = shown.map { (it as? Tile.App)?.shortcuts?.size ?: 0 }
+            if (counts.all { it == 0 }) return@remember emptyList()
+            // dp units from here on; a result's box is its 54 dp face and the caption under it (one line of the scaled text), 80 dp wide
+            val tileBoxDp = maxOf(80f, 54f + 3f + kotlin.math.ceil(10f * z * maxOf(1f, density.fontScale) * 1.25f) + 4f)
+            fun box(i: Int): androidx.compose.ui.geometry.Rect {
+                val c = restCentre(i)
+                return androidx.compose.ui.geometry.Rect((c.x - colWPx / 2f) / dpPx, (c.y - tilePx / 2f) / dpPx, (c.x + colWPx / 2f) / dpPx, (c.y - tilePx / 2f) / dpPx + tileBoxDp)
+            }
+            val fixed = androidx.compose.ui.geometry.Rect((cx - textLeft) / dpPx, (cy - textHalfH) / dpPx, (cx + textRight) / dpPx, (cy + textHalfH) / dpPx)
+            val bounds = androidx.compose.ui.geometry.Rect(12f, rg.top / dpPx, layerW / dpPx - 12f, (rg.top + hPx) / dpPx)
+            ShortcutSatellites.placeAll(
+                shown.indices.map(::box), counts, shown.indices.map { i -> placements[i].second }, satFont, bounds, listOf(fixed), rtl,
+            )
+        }
         Canvas(Modifier.fillMaxSize()) {
             // Each ring is a faint tier guide; the inner tiers are a little brighter.
             for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.16f - 0.035f * r), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
+            // The thin line from an app to each of its shortcut bubbles, from the rim of the face to the rim of the bubble's circle.
+            satellites.forEachIndexed { i, spots ->
+                if (spots.isEmpty()) return@forEachIndexed
+                val rest = restCentre(i); val live = liveCentre(i)
+                spots.forEach { sp ->
+                    val target = sp.circleCentre * dpPx - rest + live
+                    val v = target - live
+                    val len = v.getDistance()
+                    val r0 = 27.dp.toPx(); val r1 = (ShortcutForm.CIRCLE_DP / 2f).dp.toPx()
+                    if (len > r0 + r1) {
+                        val u = v / len
+                        drawLine(Color.White.copy(alpha = 0.4f), live + u * r0, target - u * r1, strokeWidth = 1.dp.toPx())
+                    }
+                }
+            }
         }
         // TalkBack: one quiet heading per ring that has results, named for its tier.
         placements.map { it.first }.distinct().forEach { r ->
@@ -484,7 +529,25 @@ internal fun Orbit(
                         overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
                     )
                 }
-                if (tile is Tile.App) ShortcutCircleRow(tile, colW, onRun = { actions.onTap(Tile.Hit(it)) }, onMore = { actions.onLongPress(tile) }, modifier = Modifier.padding(top = 0.dp))
+            }
+        }
+        // Wave 49 (actionBubbles, PAL-03): an app's shortcuts are bubbles of their own next to it, tied to it by a thin line, never a "+N".
+        shown.forEachIndexed { i, tile ->
+            val spots = satellites.getOrNull(i) ?: return@forEachIndexed
+            if (tile !is Tile.App || spots.isEmpty()) return@forEachIndexed
+            val rest = restCentre(i)
+            tile.shortcuts.take(spots.size).forEachIndexed { k, h ->
+                val box = spots[k].box
+                val dx = box.left * dpPx - rest.x; val dy = box.top * dpPx - rest.y
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .offset { val c = liveCentre(i); IntOffset((c.x + dx).roundToInt(), (c.y + dy).roundToInt()) }
+                        .semantics { traversalIndex = i + (k + 1) / 100f },
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDensity provides androidx.compose.ui.unit.Density(density.density, satFont)) {
+                        ShortcutBubble(tile, h, onRun = { actions.onTap(Tile.Hit(it)) })
+                    }
+                }
             }
         }
         if (footnote != null) {
@@ -501,6 +564,9 @@ internal fun Orbit(
         }
     }
 }
+
+/** Largest font scale the Orbit's shortcut bubbles use for their labels. */
+internal const val ORBIT_BUBBLE_FONT_MAX = 1.3f
 
 /** Height of the typed Orbit's result strip; the rings are centred above it. */
 internal val RadarStripHeight = 52.dp
@@ -788,7 +854,7 @@ private fun FlatTileRow(
             }
         }
         // Wave 25 (shortcutForm): the app's shortcut circles are a row of their own under the app's row (not inside its tap area), aligned with the name.
-        if (tile is Tile.App) ShortcutCircleRow(tile, 2000.dp, onRun = { onTap(Tile.Hit(it)) }, onMore = { onPreview(tile) }, modifier = Modifier.padding(start = 16.dp + 36.dp * z + 12.dp - 4.dp), start = true)
+        if (tile is Tile.App) ShortcutBubbleRow(tile, onRun = { onTap(Tile.Hit(it)) }, modifier = Modifier.padding(start = 16.dp + 36.dp * z + 12.dp - 4.dp, end = 8.dp), start = true)
         }
     }
 }

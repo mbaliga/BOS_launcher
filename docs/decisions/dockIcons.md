@@ -15,7 +15,7 @@ Owner: "Dock looks weird - show only icons please. Remove the I icon and put all
 | Press on | Menu |
 | --- | --- |
 | An icon | the app's shortcuts and open choices (host-supplied), App info, Move earlier, Move later, Replace with another app, Remove from dock (a recent icon: Pin to dock) |
-| The dock itself | Edit dock, Workspaces and groups, Dock settings, Dock at the bottom/left/right (landscape phone only), Hide dock (not on the desktop surface or a forced rail), About the dock |
+| The dock itself (W55: replaced by the dock sheet, docs/decisions/dockSheet.md; was) | Edit dock, Workspaces and groups, Dock settings, Dock at the bottom/left/right (landscape phone only), Hide dock (not on the desktop surface or a forced rail), About the dock |
 
 - A long press on a pinned icon opens its menu at once; moving on from the press is still the reorder drag and closes the menu.
 - "Edit dock" is a small dialog: pinned items with move and unpin, and Add apps (the app picker). "Workspaces and groups" and "Dock settings"

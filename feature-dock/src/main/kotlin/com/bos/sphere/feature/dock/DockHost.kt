@@ -149,6 +149,8 @@ fun DockHost(
     edgeOverride: DockEdge? = null,
     /** INP-11: extra modifiers for the rail itself, applied in composition (the app adds the drop target that pins a dropped app or link). */
     railModifier: @Composable Modifier.() -> Modifier = { this },
+    /** W55 (dockSheet): the Desktop item's pin, offered as a switch in the dock's sheet; null where the item is not offered. */
+    desktopPin: DockItemRef? = null,
 ) {
     val context = LocalContext.current
     val manager = remember { WorkspaceRepository.get(context) }
@@ -205,9 +207,12 @@ fun DockHost(
             else -> onLaunchOther(item.ref)
         }
     }
+    // W55 (dockSheet): the sheet around the home (if any) opens from this dock; while it edits the dock, the rail shows even with nothing pinned (just the plus tile).
+    val sheet = LocalDockSheet.current
+    val editing = sheet != null && sheet.open && sheet.editing
     // W26: nothing pinned and nothing recent: no rail at all (not even the Home glyph), and the phone home's stack plan leaves the room out.
-    if (!forceEnabled) androidx.compose.runtime.SideEffect { DockPresence.hasItems = content.hasItems }
-    if (!DockVisibility.shown(true, content.hasItems)) return
+    if (!forceEnabled) androidx.compose.runtime.SideEffect { DockPresence.hasItems = content.hasItems || editing }
+    if (!DockVisibility.shown(true, content.hasItems) && !editing) return
     controller.launchNth = { n -> content.numbered.getOrNull(n)?.let { launchItem(it); true } ?: false }
     DisposableEffect(controller) { controller.railShown = true; onDispose { controller.railShown = false; controller.releaseRail() } }
     // A "focus dock" that arrived while an overlay hid the rail is honoured once the rail is back (INP-05); the counter is relative to this entry.
@@ -219,7 +224,10 @@ fun DockHost(
     var replacing by remember { mutableStateOf<DockItem?>(null) }
     var adding by remember { mutableStateOf(false) }
     val edgeNow = edgeOverride ?: state.dock.edgeFor(landscape)
-    val actions = remember(content, state.active.dockPins, landscape, edgeOverride, forceEnabled, alwaysShown, onGoHome) {
+    val sheetSpec = remember(manager, tier, landscape, edgeOverride, forceEnabled, alwaysShown, desktopPin, onOpenPanel) {
+        DockSheetSpec(manager, tier, landscape, edgeOverride, DockOptionsScope(edgeFixed = edgeOverride != null, canHide = !(forceEnabled || alwaysShown), desktopPin = desktopPin), onOpenPanel)
+    }
+    val actions = remember(content, state.active.dockPins, landscape, edgeOverride, forceEnabled, alwaysShown, onGoHome, sheet, sheetSpec) {
         DockActions(
             onLaunch = { item, _ -> launchItem(item) },
             onReorder = { from, to -> instance.reorder(from, to) },
@@ -227,6 +235,8 @@ fun DockHost(
             onPin = { instance.pin(it.ref) },
             onEnableUsage = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(usage.settingsIntent()) } } },
             onOpenPanel = onOpenPanel,
+            onOpenOptions = { sheet?.show(sheetSpec) },
+            onEditDock = { sheet?.show(sheetSpec); sheet?.startEditing() },
             onGoHome = onGoHome,
             onSwitchWorkspace = { d -> if (d > 0) manager.next() else manager.previous() },
             onToggleExpanded = { expanded = !expanded; instance.expanded = expanded },
@@ -234,9 +244,6 @@ fun DockHost(
             onAppInfo = { item -> if (item.ref.kind == ItemKind.App) byKey[item.ref.id]?.let { runCatching { context.startActivity(DockAppOptions.infoIntent(it.packageName)) } } },
             onReplace = { replacing = it },
             onAddApps = { adding = true },
-            onHide = if (forceEnabled || alwaysShown) null else ({ manager.setDock { it.copy(enabled = false) } }),
-            onSetEdge = if (landscape && edgeOverride == null) ({ e -> manager.setDock { it.copy(edge = e) } }) else null,
-            onSetStyle = { st -> manager.setDock { it.copy(style = st) } }, // W39 (dockThemes)
         )
     }
     val edge = edgeNow
@@ -247,14 +254,11 @@ fun DockHost(
             onDismiss = { replacing = null })
     }
     if (adding) AppPicker(L10n.tr("Add apps to the dock"), panelApps, state.active.dockPins.filter { it.kind == ItemKind.App }.map { it.id }.toSet(), max = Int.MAX_VALUE, min = 0,
-        onDone = { picked ->
-            val keep = state.active.dockPins.filter { it.kind != ItemKind.App || it.id in picked }
-            manager.setPins(picked.fold(keep) { acc, k -> DockPins.add(acc, DockItemRef.app(k)) }); adding = false
-        },
+        onDone = { picked -> manager.setPins(DockPinPicking.apply(state.active.dockPins, picked, panelApps)); adding = false },
         onDismiss = { adding = false })
     DockRail(
         itemExtras = { item -> DockAppOptions.entries(context, launcher, manager, byKey[item.ref.id].takeIf { item.ref.kind == ItemKind.App }) },
-        style = state.dock.style,
+        style = state.dock.style, editing = editing, onCoordinates = sheet?.let { s -> { c -> s.dockCoords = c } },
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
         focusRequest = controller.focusRequest - focusBase, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge).railModifier(), widget = widgetOther,
         graphBridge = if (forceEnabled) null else DockInput.bridge, // the desktop surface's rail stays out of the phone home's graph

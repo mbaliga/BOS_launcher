@@ -68,13 +68,12 @@ class DockFixW26Test {
         assertEquals(listOf("launch Alpha"), ran)
     }
 
-    @Test fun DCK_09_theDockPanelOpensOnlyFromTheLongPressMenu() {
+    @Test fun DCK_09_theDockPanelOpensOnlyFromTheSheetsWorkspacesAndGroupsEntry() {
+        // W55: the long-press menu is gone; the dock's sheet is the way to the Workspaces and groups page (DockSheetW55Test drives the sheet).
         var panels = 0
-        val actions = DockActions(onOpenPanel = { panels++ })
-        val entries = DockMenuModel.dock(actions, DockEdge.Bottom, onEdit = {}, onAbout = {})
-        entries.first { it.label == "Dock settings" }.run()
-        entries.first { it.label == "Workspaces and groups" }.run()
-        assertEquals(2, panels)
+        val spec = DockSheetSpec(WorkspaceManager(InMemoryWorkspaceStore()), com.bos.sphere.core.capabilities.Tier.T2, false, onOpenWorkspaces = { panels++ })
+        spec.onOpenWorkspaces()
+        assertEquals(1, panels)
     }
 
     // ---- (2) hidden when empty

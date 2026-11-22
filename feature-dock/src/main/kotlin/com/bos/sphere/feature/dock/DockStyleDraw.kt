@@ -161,7 +161,7 @@ internal fun Modifier.glyphHalo(style: DockStyle, shape: Shape = CircleShape): M
     if (style == DockStyle.Transparent) background(Color.Black.copy(alpha = DockStyleTokens.HALO_ALPHA), shape) else this
 
 // ---------------------------------------------------------------------------------------------------------------------------------------
-// The chooser: three radio rows with a small preview each (Ground Control, and the dock's own long-press menu).
+// The style's preview (the art of its card in the dock sheet and in Settings): the dock's own drawing code in miniature.
 // ---------------------------------------------------------------------------------------------------------------------------------------
 
 object DockStyleUi {
@@ -190,6 +190,7 @@ fun DockStylePreview(style: DockStyle, modifier: Modifier = Modifier, dark: Bool
         }
     }
 }
+<<<<<<< HEAD
 
 /** The three dock styles as cards, each with a miniature dock drawn by the dock's own code; [onSelect] gets the choice. One node per choice (a radio button, 48 dp or more). */
 @Composable
@@ -215,3 +216,5 @@ internal fun DockStyleDialog(current: DockStyle, onSelect: (DockStyle) -> Unit, 
         }
     }
 }
+=======
+>>>>>>> w55-dockSheet

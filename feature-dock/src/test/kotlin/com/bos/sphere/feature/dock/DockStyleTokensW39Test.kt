@@ -59,12 +59,6 @@ class DockStyleTokensW39Test {
         assertEquals(52f, DockStyleTokens.SLOT_DP); assertTrue(DockStyleTokens.SLOT_DP >= 48f)
     }
 
-    @Test fun DCK_04_style_04_theMenuOffersDockStyleOnlyWhenTheHostCanStoreIt() {
-        val actions = DockActions()
-        assertFalse(DockMenuModel.dock(actions, DockEdge.Bottom, {}, {}).any { it.label == "Dock style" })
-        assertTrue(DockMenuModel.dock(actions, DockEdge.Bottom, {}, {}, onStyle = {}).any { it.label == "Dock style" })
-    }
-
     @Test fun DCK_04_style_05_theStyleIsStoredWithTheDockSettingsAndOlderFilesAreStandard() {
         val s = DockWorkspaceState(dock = DockSettings(style = DockStyle.ThreeD), workspaces = listOf(Workspace("default", "Home")))
         val text = WorkspaceJson.encode(s)

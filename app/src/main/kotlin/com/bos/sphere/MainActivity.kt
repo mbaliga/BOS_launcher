@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
                         // CFG-09: after a crash loop, a minimal grid with widgets off and a snapshot restore on offer.
                         var safe by remember { mutableStateOf(com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
                         if (safe) com.bos.sphere.ui.SafeModeScreen(onContinue = { safe = false })
-                        else HomeScreen(homeSignal = homeSignal, externalAction = externalAction)
+                        else com.bos.sphere.feature.dock.DockSheetHost { HomeScreen(homeSignal = homeSignal, externalAction = externalAction) } // W55: the dock's sheet pushes the whole home out of its way
                     }
                 }
             }

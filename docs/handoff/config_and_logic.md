@@ -136,9 +136,9 @@ Ring segment COUNT (6-8), the 8 shortcut slots, and "labels under glyphs" are Se
 Dock exists on phone only if enabled (`DockSettings.enabled ?: tier != T1`, DockModel.kt:77: OFF by default on a phone, ON on tablets/desktop) or forced by Right side = Dock rail on Glance (HC:52).
 | Surface | Controls | Also in Settings? |
 |---|---|---|
-| Long press the dock | menu: Edit dock, Workspaces and groups, Dock settings, Dock style, Dock at bottom/left/right, Hide dock (hidden when the dock is forced), About the dock (DockMenu.kt:62-72; DockHost.kt:237) | Dock on/off, mode, position, apps: Settings > Desktop & dock > Dock (DesktopSettingsPane.kt:48). Dock style: Settings > Home screen (SC:279 `dockStyleSettingItem`) and theme packs |
+| Long press the dock (W55) | the dock sheet (DockSheet.kt): a share-sheet style bottom sheet (a side sheet beside a side dock in landscape) that pushes the whole home up or sideways by its size; cards for Dock style, Position, Mode; switches Show the dock (not when forced), group chips, Desktop item; tiles Edit dock (in place on the dock: wiggle, drag, x, plus, compact bar with Done), Workspaces and groups (opens that page), About the dock | The same options, under a live dock preview, on Settings > Desktop & dock > Dock (DockSettingsContent); Dock style is only there (the Home screen row was removed) and in theme packs |
 | Long press a dock item | App info, Move earlier/later, Replace, Remove from dock, Pin to dock (DockMenu.kt:78-84); Alt+arrows and drag reorder | ONLY-HERE (plus Edit dock page) |
-| Dock "Hide dock" | sets dock `enabled=false` | DUP of Desktop & dock > Dock |
+| Dock sheet "Show the dock" | sets dock `enabled=false` / true | DUP of Desktop & dock > Dock |
 | External display / DeX "Desktop" | offer-on-connect, disconnect behaviour, per-display profiles | Settings > Desktop & dock > "Dock and external display" (DesktopSettingsPane.kt:54, 80-97); file `desktop_surface` excluded from backup |
 Dock settings (enabled, mode Collapsed/Pinned+recent, edge, style, group shelf) live in the workspace/dock JSON (`dock` export section), not launcher_prefs.
 

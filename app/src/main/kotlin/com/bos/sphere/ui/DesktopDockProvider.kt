@@ -61,7 +61,7 @@ object DesktopDockProvider : DesktopDock {
         }
         // The scope outlives a display change of the same surface; it ends only when the dock leaves the screen.
         DisposableEffect(scope) { onDispose { scope.cancel() } }
-        Box(modifier.fillMaxSize()) {
+        com.bos.sphere.feature.dock.DockSheetHost(modifier = modifier) { Box(Modifier.fillMaxSize()) {
             DockHost(
                 apps = apps, launcher = launcher, controller = controller, refreshKey = 0,
                 onLaunchApp = { a ->
@@ -88,6 +88,6 @@ object DesktopDockProvider : DesktopDock {
                 onRunGroup = { g -> scope.launch { launcher.runGroup(g, state.displayId) } },
                 onRestore = { s -> scope.launch { launcher.restore(s) } },
             )
-        }
+        } }
     }
 }

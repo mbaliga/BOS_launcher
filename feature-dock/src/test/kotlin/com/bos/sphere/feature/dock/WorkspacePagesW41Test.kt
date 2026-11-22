@@ -24,6 +24,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.capabilities.Tier
+import com.bos.sphere.core.data.DockStyle
 import com.bos.sphere.core.data.HomeLayoutCodec
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.design.HyleTheme
@@ -379,57 +380,82 @@ class WorkspacePagesW41Test {
 
     // ---- Dock page, without a floating card --------------------------------------------------------------------------------
 
-    @Test fun DCK_04_page_30_theDockPageHasRowsNotChipsAndNoPurpleLinks() {
+    @Test fun DCK_04_page_30_theDockPageHasTheLivePreviewCardsSwitchesAndRowsNoPurpleLinks() {
         val m = manager(); showDock(m)
+<<<<<<< HEAD
         rule.onNodeWithTag(DockPageTags.SHOW_DOCK).assertIsDisplayed()
         rule.onNodeWithTag(DockPageTags.MODE).assertIsDisplayed()
         rule.onNodeWithText("Pinned and recent").assertIsDisplayed() // the value of the Dock mode row, not a chip
         DockEdge.entries.forEach { rule.onNodeWithTag("dock.edge.${it.name}").assertIsDisplayed() } // Bottom / Left / Right as three drawn cards (wave 54)
         rule.onNodeWithTag(DockPageTags.ADD_APPS).assertIsDisplayed()
+=======
+        rule.onNodeWithTag(DockPageTags.PREVIEW).assertIsDisplayed()
+        rule.onNodeWithTag(DockPageTags.SHOW_DOCK).assertExists()
+        DockStyle.entries.forEach { rule.onNodeWithTag(DockStyleUi.rowTag(it)).performScrollTo().assertIsDisplayed() }
+        DockEdge.entries.forEach { rule.onNodeWithTag(DockOptionTags.position(it)).performScrollTo().assertIsDisplayed() }
+        DockMode.entries.forEach { rule.onNodeWithTag(DockOptionTags.mode(it)).performScrollTo().assertIsDisplayed() }
+        rule.onNodeWithTag(DockOptionTags.GROUP_SHELF).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(DockPageTags.EDIT).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(DockPageTags.ADD_APPS).performScrollTo().assertIsDisplayed()
+>>>>>>> w55-dockSheet
         assertTrue("the Add apps row is a 56 dp row", rule.onNodeWithTag(DockPageTags.ADD_APPS).getUnclippedBoundsInRoot().let { it.bottom - it.top } >= 56.dp)
         rule.onAllNodesWithText("Workspaces").assertCountEquals(0) // the old card's section heading is gone from this page
         rule.onAllNodesWithText("New workspace name").assertCountEquals(0)
     }
 
-    @Test fun DCK_04_page_31_theSwitchTheModeDialogAndTheSegmentedPositionChangeTheDock() {
+    @Test fun DCK_04_page_31_theSwitchesAndTheCardsChangeTheDock() {
         val m = manager(); showDock(m)
-        rule.onNodeWithTag(DockPageTags.SHOW_DOCK).performClick(); settle()
+        rule.onNodeWithTag(DockPageTags.SHOW_DOCK).performScrollTo().performClick(); settle()
         assertEquals(false, m.current.dock.enabled)
+<<<<<<< HEAD
         rule.onNodeWithTag("dock.edge.Right").performClick(); settle()
+=======
+        rule.onNodeWithTag(DockOptionTags.position(DockEdge.Right)).performScrollTo().performClick(); settle()
+>>>>>>> w55-dockSheet
         assertEquals(DockEdge.Right, m.current.dock.edge)
-        rule.onNodeWithTag(DockPageTags.MODE).performClick(); settle()
-        rule.onNodeWithTag(OneUiDialogTags.option(0)).performClick(); settle()
+        rule.onNodeWithTag(DockOptionTags.mode(DockMode.Collapsed)).performScrollTo().performClick(); settle()
         assertEquals(DockMode.Collapsed, m.current.dock.mode)
-        rule.onNodeWithText("Collapsed band").assertIsDisplayed()
-        rule.onNodeWithTag("dock.useDefault").performClick(); settle()
+        rule.onNodeWithTag(DockStyleUi.rowTag(DockStyle.ThreeD)).performScrollTo().performClick(); settle()
+        assertEquals(DockStyle.ThreeD, m.current.dock.style)
+        val shelf = m.current.dock.groupShelf
+        rule.onNodeWithTag(DockOptionTags.GROUP_SHELF).performScrollTo().performClick(); settle()
+        assertEquals(!shelf, m.current.dock.groupShelf)
+        rule.onNodeWithTag("dock.useDefault").performScrollTo().performClick(); settle()
         assertNull(m.current.dock.enabled)
+    }
+
+    @Test fun DCK_04_page_34_everyDockSettingHasAControlOnTheDockPageAndInTheSheet() {
+        // The audit the owner asked for: the dock model's persisted settings are exactly these five, and each has a card or switch (a new field fails here until it has one).
+        val fields = DockSettings::class.java.declaredFields.filter { !it.isSynthetic && !java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet()
+        assertEquals(setOf("enabled", "mode", "edge", "groupShelf", "style"), fields)
+        val m = manager(); showDock(m)
+        val tags = listOf(DockPageTags.SHOW_DOCK, DockOptionTags.GROUP_SHELF) + DockStyle.entries.map { DockStyleUi.rowTag(it) } + DockEdge.entries.map { DockOptionTags.position(it) } + DockMode.entries.map { DockOptionTags.mode(it) }
+        tags.forEach { rule.onNodeWithTag(it).performScrollTo().assertExists() }
     }
 
     @Test fun DCK_04_page_32_addAppsOpensTheCheckListAndPinsThePicked() {
         val m = manager(extraWorkspace = false); showDock(m)
-        rule.onNodeWithTag(DockPageTags.ADD_APPS).performClick(); settle()
+        rule.onNodeWithTag(DockPageTags.ADD_APPS).performScrollTo().performClick(); settle()
         rule.onNodeWithTag(OneUiDialogTags.option(0)).performClick()
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).performClick(); settle()
-        assertTrue(DockItemRef.app("p.Alpha") in m.current.active.dockPins)
+        assertTrue("W55: the wide picker answers with package names; the pin is stored by the app key the rail resolves", DockItemRef.app("kAlpha") in m.current.active.dockPins)
     }
 
-    @Test fun DCK_04_page_33_theDockPanelIsAFullPageWithItsOwnNavigation() {
+    @Test fun DCK_04_page_33_theDockPanelIsTheWorkspacesAndGroupsPageWithItsOwnNavigation() {
         val m = manager(groups = true)
         rule.setContent {
-            DockPanel(m, Tier.T2, apps, emptyList(), {}, {}, { _, _, _ -> }, { log += "closed" })
+            DockPanel(m, apps, emptyList(), {}, {}, { _, _, _ -> }, { log += "closed" })
         }
         settle()
         rule.onNodeWithTag(DockPanelTags.PAGE).assertIsDisplayed()
         rule.onNodeWithTag(OneUiTags.BACK).assertIsDisplayed()
-        assertEquals("Dock", rule.onNodeWithTag(OneUiTags.TITLE_LARGE).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.single().text)
-        rule.onNodeWithTag("dock.openWorkspaces").performScrollTo().performClick(); settle()
+        assertEquals("Workspaces", rule.onNodeWithTag(OneUiTags.TITLE_LARGE).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.single().text)
         rule.onNodeWithText("Active: Home").assertIsDisplayed()
         rule.onNodeWithTag(DockPageTags.ADD).assertExists()
-        rule.onNodeWithTag(OneUiTags.BACK).performClick(); settle()
-        rule.onNodeWithTag(DockPageTags.SHOW_DOCK).assertIsDisplayed()
         rule.onNodeWithTag("dock.openGroups").performScrollTo().performClick(); settle()
         rule.onNodeWithTag(DockPageTags.GROUP_NEW).assertExists()
         rule.onNodeWithTag(OneUiTags.BACK).performClick(); settle()
+        rule.onNodeWithTag(DockPageTags.ADD).assertExists() // back from App groups is the Workspaces page
         rule.onNodeWithTag(OneUiTags.BACK).performClick(); settle()
         assertEquals(listOf("closed"), log)
     }
@@ -445,6 +471,11 @@ class WorkspacePagesW41Test {
 
     @Test fun WSP_07_page_50_screenshotWorkspacesDark() { val m = manager(); m.create("Travel"); showWorkspaces(m, actions = listOf("a1" to "Open Radar")); shoot("w41-workspaces-dark-portrait") }
     @Test fun WSP_07_page_51_screenshotWorkspacesLight() { val m = manager(); m.create("Travel"); showWorkspaces(m, light = true, actions = listOf("a1" to "Open Radar")); shoot("w41-workspaces-light-portrait") }
+    @Test fun DCK_04_page_54_screenshotDockPageDark() { val m = manager(); m.setPins(listOf(DockItemRef.app("kAlpha"), DockItemRef.app("kBravo"))); showDock(m, nav = true); shoot("w55-dock-page-dark-portrait") }
+    @Test fun DCK_04_page_55_screenshotDockPageLight() { val m = manager(); m.setPins(listOf(DockItemRef.app("kAlpha"), DockItemRef.app("kBravo"))); showDock(m, light = true, nav = true); shoot("w55-dock-page-light-portrait") }
+    @Test fun DCK_04_page_56_screenshotDockPageFontScale2() { val m = manager(); showDock(m, font = 2f); shoot("w55-dock-page-fontscale2") }
+    @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi")
+    @Test fun DCK_04_page_57_screenshotDockPageLandscapeWithASideDock() { val m = manager(); m.setDock { it.copy(edge = DockEdge.Left) }; m.setPins(listOf(DockItemRef.app("kAlpha"), DockItemRef.app("kBravo"))); showDock(m); shoot("w55-dock-page-landscape") }
     @Test fun WSP_05_page_52_screenshotGroupsDark() { val m = manager(groups = true); showGroups(m); shoot("w41-groups-dark-portrait") }
     @Test fun WSP_05_page_53_screenshotGroupsLight() { val m = manager(groups = true); showGroups(m, light = true); shoot("w41-groups-light-portrait") }
     @Test fun DCK_04_page_54_screenshotDockDark() { val m = manager(); showDock(m, nav = true); shoot("w41-dock-dark-portrait") }

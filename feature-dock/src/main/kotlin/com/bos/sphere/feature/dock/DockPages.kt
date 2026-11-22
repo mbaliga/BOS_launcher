@@ -73,6 +73,8 @@ object DockPageTags {
     const val SHOW_DOCK = "dock.show"
     const val MODE = "dock.mode"
     const val ADD_APPS = "dock.addApps"
+    const val EDIT = "dock.edit"
+    const val PREVIEW = "dock.livePreview"
     const val GROUP_NEW = "groups.new"
     const val GROUP_SHELF = "groups.shelf"
     const val SCHEDULE = "groups.schedule"
@@ -96,7 +98,11 @@ fun DockPagesScope(content: @Composable () -> Unit) {
     androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook, content = content)
 }
 
-/** The Dock page: show the dock, its mode and position, adding apps, and (inside the panel) the way to the other two pages. */
+/**
+ * The Dock page (Settings > Desktop & dock > Dock). W55 (dockSheet): a live preview of the dock as it is now, then every dock option as the same cards and
+ * switches the dock's sheet shows ([DockOptionsBody]), then the pins (Edit dock list, Add apps), [extra] (the Desktop item), the way on to Workspaces and
+ * App groups, and the way back to the device default. Both surfaces write the one store, `manager.setDock`.
+ */
 @Composable
 fun DockSettingsContent(
     manager: WorkspaceManager,
@@ -107,18 +113,16 @@ fun DockSettingsContent(
     onOpenGroups: (() -> Unit)? = null,
 ) {
     val state by manager.state.collectAsState()
-    var pickingMode by remember { mutableStateOf(false) }
     var addingPins by remember { mutableStateOf(false) }
-    val enabled = state.dock.isEnabled(tier)
-    OneUiGroup(1) {
-        OneUiSwitchRow(
-            L10n.tr("Show the dock"), enabled, { v -> manager.setDock { it.copy(enabled = v) } },
-            summary = if (state.dock.enabled == null) L10n.tr("Default for this device: %s", if (tier == Tier.T1) L10n.tr("off") else L10n.tr("on")) else null,
-            modifier = Modifier.testTag(DockPageTags.SHOW_DOCK),
-        )
-    }
+    var editing by remember { mutableStateOf(false) }
+    val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+    DockLivePreview(manager, apps, landscape)
+    OneUiGap()
+    DockOptionsBody(manager, tier, DockOptionsScope(), landscape = landscape)
     OneUiGap()
     OneUiGroup(2) {
+<<<<<<< HEAD
         OneUiValueRow(L10n.tr("Dock mode"), L10n.tr(state.dock.mode.label), { pickingMode = true }, modifier = Modifier.testTag(DockPageTags.MODE))
         OneUiRowDivider()
         com.bos.sphere.feature.grid.OneUiVisualChoiceRow(
@@ -129,6 +133,10 @@ fun DockSettingsContent(
     OneUiCaption(L10n.tr("In portrait the dock is always at the bottom. In landscape it can also sit on a side."))
     OneUiGap()
     OneUiGroup(1) {
+=======
+        OneUiListRow(L10n.tr("Edit dock"), summary = L10n.tr("Reorder or remove the pinned apps"), tile = Glyphs.Sliders, tileColor = TileViolet, chevron = true, onClick = { editing = true }, modifier = Modifier.testTag(DockPageTags.EDIT))
+        OneUiRowDivider(72.dp)
+>>>>>>> w55-dockSheet
         // W26: an empty dock is hidden, so this is also the way to the first pin from Ground Control.
         OneUiListRow(L10n.tr("Add apps to the dock"), tile = Glyphs.Apps, tileColor = TileBlue, chevron = true, onClick = { addingPins = true }, modifier = Modifier.testTag(DockPageTags.ADD_APPS))
     }
@@ -141,27 +149,28 @@ fun DockSettingsContent(
             if (onOpenGroups != null) OneUiListRow(L10n.tr("App groups"), summary = if (state.groups.size == 1) L10n.tr("1 group") else L10n.tr("%d groups", state.groups.size), tile = Glyphs.Apps, tileColor = TileOrange, chevron = true, onClick = onOpenGroups, modifier = Modifier.testTag("dock.openGroups"))
         }
     }
-    if (state.dock.enabled != null) {
-        OneUiGap()
-        OneUiGroup(1) { OneUiListRow(L10n.tr("Use the default for this device"), onClick = { manager.setDock { it.copy(enabled = null) } }, modifier = Modifier.testTag("dock.useDefault")) }
+    DockUseDefaultRow(manager)
+    if (editing) {
+        val byKey = remember(apps) { apps.associateBy { it.key } }
+        val pinned = state.active.dockPins.mapNotNull { ref ->
+            val label = when (ref.kind) { ItemKind.App -> byKey[ref.id]?.label; ItemKind.Group -> state.groups.firstOrNull { it.id == ref.id }?.name; else -> ref.id }
+            label?.let { DockItem(ref, it) }
+        }
+        EditDockDialog(
+            DockContent(pinned, emptyList(), showEnableRow = false, showRecentSection = false, collapsed = false),
+            DockActions(onReorder = { f, t -> manager.setPins(DockPins.move(manager.current.active.dockPins, f, t)) }, onUnpin = { manager.setPins(DockPins.remove(manager.current.active.dockPins, it.ref)) }, onAddApps = { addingPins = true }),
+        ) { editing = false }
     }
-    if (pickingMode) OneUiRadioPage(
-        L10n.tr("Dock mode"), DockMode.entries, state.dock.mode, { L10n.tr(it.label) }, { m -> manager.setDock { it.copy(mode = m) } }, { pickingMode = false },
-        detail = { m -> L10n.tr(if (m == DockMode.Collapsed) "A thin band that opens when you touch it" else "Your pinned apps, then the ones you used last") },
-    )
     if (addingPins) AppPicker(
         L10n.tr("Add apps to the dock"), apps, state.active.dockPins.filter { it.kind == ItemKind.App }.map { it.id }.toSet(), max = Int.MAX_VALUE, min = 0,
-        onDone = { picked ->
-            val keep = state.active.dockPins.filter { it.kind != ItemKind.App || it.id in picked }
-            manager.setPins(picked.fold(keep) { acc, k -> DockPins.add(acc, DockItemRef.app(k)) }); addingPins = false
-        },
+        onDone = { picked -> manager.setPins(DockPinPicking.apply(state.active.dockPins, picked, apps)); addingPins = false },
         onDismiss = { addingPins = false },
     )
 }
 
 /** The Workspaces page: what a workspace is, the list of them, adding one, and what the calm centre shows for the active one. */
 @Composable
-fun WorkspacesContent(manager: WorkspaceManager, apps: List<PanelApp>, paletteActionChoices: List<Pair<String, String>> = emptyList()) {
+fun WorkspacesContent(manager: WorkspaceManager, apps: List<PanelApp>, paletteActionChoices: List<Pair<String, String>> = emptyList(), onOpenGroups: (() -> Unit)? = null) {
     val state by manager.state.collectAsState()
     val rows = WorkspaceSummary.rows(state, manager.liveHome())
     var menuFor by remember { mutableStateOf<String?>(null) }
@@ -215,6 +224,12 @@ fun WorkspacesContent(manager: WorkspaceManager, apps: List<PanelApp>, paletteAc
     OneUiCaption(L10n.tr("The calm centre and the Radar actions are set for %s, the active workspace. This only changes what Liftoff shows. System notification settings are not touched.", active.name))
     val widgetCount = active.widgets.count { it != WorkspaceWidgets.MARKER }
     OneUiCaption(if (active.widgets.isEmpty()) L10n.tr("Widgets: saved with this workspace the first time you leave it.") else L10n.tr("Widgets: %d saved with this workspace.", widgetCount))
+    if (onOpenGroups != null) {
+        OneUiGap()
+        OneUiGroup(1) {
+            OneUiListRow(L10n.tr("App groups"), summary = if (state.groups.size == 1) L10n.tr("1 group") else L10n.tr("%d groups", state.groups.size), tile = Glyphs.Apps, tileColor = TileOrange, chevron = true, onClick = onOpenGroups, modifier = Modifier.testTag("dock.openGroups"))
+        }
+    }
 
     if (adding) {
         var copy by remember { mutableStateOf(false) }
@@ -417,6 +432,20 @@ fun GroupEditor(apps: List<PanelApp>, onSave: (AppGroup) -> Unit, onDismiss: () 
         }
     }
     if (picking) AppPicker(L10n.tr("Pick 2 to 4 apps"), apps, chosen, max = 4, min = 2, onDone = { chosen = it; picking = false }, onDismiss = { picking = false })
+}
+
+/**
+ * The wide app picker answers with package names (the same picker feeds the calm centre, which stores packages), while a dock pin stores the app's key.
+ * W55: the pick is mapped back to keys here, so keeping an app that is already pinned really keeps it (a key never equals a package name) and a new one is
+ * pinned by its key, the id the rail resolves.
+ */
+object DockPinPicking {
+    fun apply(pins: List<DockItemRef>, picked: Set<String>, apps: List<PanelApp>): List<DockItemRef> {
+        fun pkgOf(id: String) = apps.firstOrNull { it.key == id }?.packageName ?: id
+        val keep = pins.filter { it.kind != ItemKind.App || pkgOf(it.id) in picked || it.id in picked }
+        val have = keep.filter { it.kind == ItemKind.App }.mapTo(HashSet()) { pkgOf(it.id) }
+        return picked.filter { it !in have }.fold(keep) { acc, p -> DockPins.add(acc, DockItemRef.app(apps.firstOrNull { it.packageName == p || it.key == p }?.key ?: p)) }
+    }
 }
 
 @Composable

@@ -237,6 +237,9 @@ fun HomeEditChrome(
     onAddApp: (AppEntry) -> Unit = {},
     onAddWidget: (WidgetChoice) -> Unit = {},
     widgetSource: @Composable () -> List<WidgetChoice>? = { rememberWidgetChoices() },
+    /** A request from outside (the Home sheet's Add apps and Add widgets tiles) to open the tray carousel; [onPanelRequestHandled] clears it. */
+    panelRequest: TrayPanel = TrayPanel.None,
+    onPanelRequestHandled: () -> Unit = {},
 ) {
     if (!visible) return
     val (n, m) = EditChromeText.titleArgs(pageIndex, pageCount)
@@ -253,6 +256,7 @@ fun HomeEditChrome(
     val cancel = { state.requestCancel(hasChanges, onCancel) }
     BackHandler(enabled = visible) { cancel() }
     var panel by remember { mutableStateOf(TrayPanel.None) }
+    LaunchedEffect(panelRequest) { if (panelRequest != TrayPanel.None) { panel = panelRequest; onPanelRequestHandled() } }
     BackHandler(enabled = panel != TrayPanel.None) { panel = TrayPanel.None } // registered last: Back closes the carousel before it cancels the edit
     val focus = remember { FocusRequester() }
     Box(

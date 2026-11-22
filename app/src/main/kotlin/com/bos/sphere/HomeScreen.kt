@@ -415,6 +415,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     var quickPage by remember { mutableStateOf<Int?>(null) }
     var quickOpen by remember { mutableStateOf(false) }
+    var trayRequest by remember { mutableStateOf(com.bos.sphere.feature.grid.TrayPanel.None) }
     fun openSettings(category: Int, page: Int = gridState.currentPage) {
         settingsPage = page.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
         settingsCategory = category
@@ -1635,7 +1636,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
             previewDock = { SettingsPreviewDock(homeCapture) },
-            summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories, pageIndex = settingsPage, workspaceCount = dockState.workspaces.size),
+            summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories, pageIndex = settingsPage, workspaceCount = dockState.workspaces.size,
+                sidePanelWidgets = runCatching { com.bos.sphere.ui.HubPrefs.of(context).let { if (it.widgetsSection) it.widgetList.size else 0 } }.getOrDefault(0)),
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {
@@ -1770,8 +1772,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onDismiss = { quickOpen = false },
                 // W51: the same entry points as the edit tray: Edit home, the app picker and the widget picker (Pages turned on first when they are off).
                 onEditHome = { quickOpen = false; editHome() },
-                onAddApps = { quickOpen = false; editHome(); addAppOpen = true },
-                onAddWidgets = { quickOpen = false; editHome(); homeItems.widgetRequest++ },
+                onAddApps = { quickOpen = false; editHome(); trayRequest = com.bos.sphere.feature.grid.TrayPanel.Apps },
+                onAddWidgets = { quickOpen = false; editHome(); trayRequest = com.bos.sphere.feature.grid.TrayPanel.Widgets },
             )
         }
         if (homeItems.panelRequest >= 0) {
@@ -1859,6 +1861,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         // W45 (editChrome): the single-page edit mode's top bar, hint and tray. Composed only while editing the page itself.
         com.bos.sphere.feature.grid.HomeEditChrome(
+            panelRequest = trayRequest, onPanelRequestHandled = { trayRequest = com.bos.sphere.feature.grid.TrayPanel.None },
             visible = homeEdit.active && !pageEditorOn,
             progress = chromeProgress, page = chromePage,
             pageIndex = if (prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous) editCard.contSel.intValue else gridState.currentPage,

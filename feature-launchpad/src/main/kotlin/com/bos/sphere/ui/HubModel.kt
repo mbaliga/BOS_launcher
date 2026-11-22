@@ -19,7 +19,9 @@ import java.time.ZoneId
  */
 enum class HubView(val id: String, val label: String, val history: Boolean) {
     All("all", "All", true), Unread("unread", "Unread", true), Read("read", "Read", true),
-    Files("files", "Files", false), Timeline("timeline", "Timeline", false);
+    Files("files", "Files", false), Timeline("timeline", "Timeline", false),
+    /** Wave 52: the Widgets section, the fifth tab; only present when the owner turns it on ([PanelSections]). */
+    Widgets("widgets", "Widgets", false);
 
     companion object {
         /** Wave 28: the Usage view was merged into Timeline; a stored or linked "usage" lands on Timeline. */
@@ -121,6 +123,20 @@ class HubPrefs(private val sp: SharedPreferences?) {
         get() = sp?.getBoolean("clearFromShade", true) ?: true
         set(v) { sp?.edit()?.putBoolean("clearFromShade", v)?.apply(); CommsOptions.mirrorClear(v) }
 
+    /** Wave 52 (panelWidgets): the Widgets section exists only when this is on; default off, so nothing changes until the owner chooses. */
+    var widgetsSection: Boolean
+        get() = sp?.getBoolean("widgetsSection", false) ?: false
+        set(v) { sp?.edit()?.putBoolean("widgetsSection", v)?.apply(); CommsOptions.mirrorWidgets(v, widgetsSlot) }
+    /** Where the Widgets tab sits in the row. */
+    var widgetsSlot: WidgetsSlot
+        get() = WidgetsSlot.fromId(sp?.getString("widgetsSlot", null))
+        set(v) { sp?.edit()?.putString("widgetsSlot", v.id)?.apply(); CommsOptions.mirrorWidgets(widgetsSection, v) }
+    private var memoryWidgets: List<PanelWidget> = emptyList()
+    /** The widgets of the section, in order (see [PanelWidgetList.encode]). */
+    var widgetList: List<PanelWidget>
+        get() = if (sp == null) memoryWidgets else PanelWidgetList.decode(sp.getString("widgets", null))
+        set(v) { memoryWidgets = v; sp?.edit()?.putString("widgets", PanelWidgetList.encode(v))?.apply() }
+
     companion object { fun of(context: Context) = HubPrefs(TolerantPrefs.of(context.applicationContext, "launchpad_hub")) }
 }
 
@@ -154,6 +170,8 @@ object CommsOptions {
     val defaultView: kotlinx.coroutines.flow.StateFlow<HubView> = _defaultView
     @Volatile private var prefs: HubPrefs? = null
     @Volatile private var appContext: Context? = null
+    /** True once [init] has published the stored values; before that the flows hold defaults a freshly built hub must not be overwritten with. */
+    val isInitialised: Boolean get() = prefs != null
 
     /** Opens the hub's pref file once (idempotent) and publishes the stored default view. */
     fun init(context: Context) {
@@ -161,6 +179,8 @@ object CommsOptions {
         prefs = HubPrefs.of(context) // rebound on every init: a fresh process or test context owns its own file handle
         _defaultView.value = prefs!!.defaultView
         _clearFromShade.value = prefs!!.clearFromShade
+        _widgetsSection.value = prefs!!.widgetsSection
+        _widgetsSlot.value = prefs!!.widgetsSlot
     }
     private val _clearFromShade = MutableStateFlow(true)
     /** W42: whether Dismiss in Comms also removes the notification from the shade. */
@@ -168,6 +188,17 @@ object CommsOptions {
     internal fun mirrorClear(v: Boolean) { _clearFromShade.value = v }
     fun setClearFromShade(v: Boolean) { val p = prefs; if (p != null) p.clearFromShade = v else _clearFromShade.value = v }
     internal fun mirror(v: HubView) { _defaultView.value = v }
+
+    private val _widgetsSection = MutableStateFlow(false)
+    private val _widgetsSlot = MutableStateFlow(WidgetsSlot.Last)
+    /** Wave 52: whether the Widgets section exists, and where; the Comms settings show and set them, an open hub follows. */
+    val widgetsSection: kotlinx.coroutines.flow.StateFlow<Boolean> = _widgetsSection
+    val widgetsSlot: kotlinx.coroutines.flow.StateFlow<WidgetsSlot> = _widgetsSlot
+    internal fun mirrorWidgets(on: Boolean, slot: WidgetsSlot) { _widgetsSection.value = on; _widgetsSlot.value = slot }
+    fun setWidgetsSection(v: Boolean) { val p = prefs; if (p != null) p.widgetsSection = v else _widgetsSection.value = v }
+    fun setWidgetsSlot(v: WidgetsSlot) { val p = prefs; if (p != null) p.widgetsSlot = v else _widgetsSlot.value = v }
+    /** The views the Default view choice offers: the Widgets section only while it exists. */
+    fun selectableViews(): List<HubView> = HubView.entries.filter { it != HubView.Widgets || _widgetsSection.value }
     fun setDefaultView(v: HubView) { val p = prefs; if (p != null) p.defaultView = v else _defaultView.value = v }
 
     /** Every live notification and every history entry becomes read. */
@@ -193,7 +224,12 @@ class HubUndo(val message: String, val ids: List<String>)
  * Unread and Read are the persistent history; without it All is the history too.
  */
 class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val panels: Boolean, val liveAll: Boolean = false) {
-    val views: List<HubView> = HubView.entries.filter { panels || it.history }
+    /** Wave 52: the Widgets section's switch and place; [applyWidgets] changes them while the hub is open. */
+    var widgetsOn by mutableStateOf(prefs.widgetsSection)
+        private set
+    var widgetsSlot by mutableStateOf(prefs.widgetsSlot)
+        private set
+    val views: List<HubView> get() = HubView.entries.filter { (panels || it.history) && (it != HubView.Widgets || (panels && widgetsOn)) }
     var view by mutableStateOf(prefs.defaultView.takeIf { it in views } ?: HubView.All)
         private set
     var grouping by mutableStateOf(prefs.grouping)
@@ -201,7 +237,12 @@ class HubState(val prefs: HubPrefs, val store: NotificationHistoryStore?, val pa
     var defaultView by mutableStateOf(prefs.defaultView)
         private set
     /** Wave 27: the tab row has no Read tab (the tabs are ALL UNREAD FILES TIMELINE); Read history is a row of Ground Control's Comms category. */
-    val tabs: List<HubView> = views.filter { it != HubView.Read }
+    val tabs: List<HubView> get() = PanelSections.order(widgetsOn, widgetsSlot).filter { it in views }
+    /** The Widgets section was turned on or off, or moved; leaving it while it is shown falls back to All. */
+    fun applyWidgets(on: Boolean, slot: WidgetsSlot) {
+        widgetsOn = on; widgetsSlot = slot
+        if (view !in views) view = HubView.All
+    }
     var undo by mutableStateOf<HubUndo?>(null)
     /** Wave 29: the read filter of the All view (Unread - All - Read); the pinch, the TalkBack actions and the label's tap set it. */
     var readFilter by mutableStateOf(ReadFilter.All)

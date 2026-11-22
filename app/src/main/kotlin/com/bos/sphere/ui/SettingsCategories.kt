@@ -490,9 +490,22 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             val comms = com.bos.sphere.ui.CommsOptions
             add(
                 SettingItem.Choice(
-                    x("Default view"), Glyphs.Bell, com.bos.sphere.ui.HubView.entries, comms.defaultView.value, { x(it.label) },
+                    x("Default view"), Glyphs.Bell, comms.selectableViews(), comms.defaultView.value, { x(it.label) },
                     hint = x("What Comms shows first when it opens."), stepped = true,
                 ) { v -> comms.setDefaultView(v) },
+            )
+            // Wave 52 (panelWidgets): the fifth section, off until chosen; its place in the tab row is a visual card choice.
+            add(SettingItem.Toggle(x("Widgets section"), Glyphs.Bell, comms.widgetsSection.value, x("Adds a Widgets section to this panel, where you can put real widgets instead of on the right side. Off keeps the four sections.")) { v -> comms.setWidgetsSection(v) })
+            if (comms.widgetsSection.value) add(
+                SettingItem.Choice(
+                    x("Widgets position"), Glyphs.Bell, com.bos.sphere.ui.WidgetsSlot.entries, comms.widgetsSlot.value, { x(it.label) },
+                    hint = x("Where the Widgets tab sits among the sections."),
+                    preview = {
+                        VisualChoice(com.bos.sphere.ui.WidgetsSlot.entries, comms.widgetsSlot.value, { v -> comms.setWidgetsSlot(v) }, { x(it.label) }, columns = 3, previewHeight = 64.dp) { sl ->
+                            com.bos.sphere.ui.PanelSectionsPreview(sl)
+                        }
+                    },
+                ) { v -> comms.setWidgetsSlot(v) },
             )
             add(SettingItem.Toggle(x("Clear from the shade when dismissed in Comms"), Glyphs.Bell, comms.clearFromShade.value, x("Off: dismissing only marks it read and the notification stays in the system shade, still openable from there.")) { v -> comms.setClearFromShade(v) })
             add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true, hint = x("Opens the notifications you have already read.")) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })

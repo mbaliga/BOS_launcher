@@ -134,7 +134,8 @@ class HubTest {
     @Test fun HUB_10_theSwitcherIs35dpHighShowsTheFiveTabsAndSwitchesOnATap() {
         host()
         rule.onNodeWithTag("hub.switcher").assertHeightIsAtLeast(34.5.dp) // wave 28: the mock-up's 35 dp tab row; the tap target grows to 48 dp of real screen
-        HubView.entries.filter { it != HubView.Read }.forEach { rule.onNodeWithTag("hub.view.${it.id}").assertExists() }
+        HubView.entries.filter { it != HubView.Read && it != HubView.Widgets }.forEach { rule.onNodeWithTag("hub.view.${it.id}").assertExists() }
+        rule.onNodeWithTag("hub.view.widgets").assertDoesNotExist() // wave 52: the Widgets section is off until the owner turns it on
         rule.onNodeWithTag("hub.view.read").assertDoesNotExist() // wave 27: Read has no tab
         rule.onNodeWithTag("hub.view.usage").assertDoesNotExist() // wave 28: Usage is part of Timeline; the tabs are ALL UNREAD FILES TIMELINE
         rule.onNodeWithTag("hub.view.all").assertIsSelected()

@@ -14,7 +14,7 @@ class UsageViewMigrationTest {
     private val ctx get() = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test fun USG_08_theHubViewsAreAllUnreadReadFilesTimeline() {
-        assertEquals(listOf("all", "unread", "read", "files", "timeline"), HubView.entries.map { it.id })
+        assertEquals(listOf("all", "unread", "read", "files", "timeline", "widgets"), HubView.entries.map { it.id })
         assertEquals(listOf(HubView.All, HubView.Unread, HubView.Files, HubView.Timeline), HubState(HubPrefs(null), null, true).tabs)
     }
 

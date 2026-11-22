@@ -681,7 +681,7 @@ internal fun SearchScreen(
                                 tiles = data.tiles(selected), motion = prefs.searchMotion, query = trimmed,
                                 expanded = expanded, onOpenIntent = onOpenIntent, footnote = data.footnote(selected),
                                 actions = tileActions, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max = below).padding(bottom = 4.dp),
-                                emptyHint = emptyHint, fit = StripFit.of(below.value, withRow = data.tiles(selected).any { it is Tile.App && it.shortcuts.isNotEmpty() }),
+                                emptyHint = emptyHint, fit = StripFit.of(below.value, rowH = data.tiles(selected).maxOfOrNull { if (it is Tile.App) ShortcutForm.flowHeight(it.shortcuts.size) else 0f } ?: 0f),
                             )
                         }
                     }

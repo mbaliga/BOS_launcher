@@ -1,5 +1,7 @@
 # Radar shortcuts, quicklinks and actions: one form (wave 25)
 
+> **Wave 49 (actionBubbles): the "row of three circles plus a +N circle" for an app's shortcuts is gone; see [actionBubbles.md](actionBubbles.md).** The circle itself, the strip for non-app actions and the rest stand.
+
 > **Wave 29 (radarFull): the region rules (the strip and the rings living in a clipped results region) are superseded by [radarFull.md](radarFull.md).** The Orbit is a full-screen layer, nothing is clipped inside the screen, every visible part of a tile is tappable. The rest of this record stands.
 
 

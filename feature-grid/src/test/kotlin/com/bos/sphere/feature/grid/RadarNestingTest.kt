@@ -70,12 +70,20 @@ class RadarNestingTest {
     }
 
     @Test @Config(sdk = [35]) fun PAL_03_shortcutsBeyondTheCapStayRowsSoNoneIsLost() {
-        val many = (1..6).map { shortcut("demo.mail", "s$it", "S$it", 1f - it / 10f) }
+        val many = (1..NestedShortcuts.MAX + 3).map { shortcut("demo.mail", "s$it", "S$it", 1f - it / 10f) }
         val d = data(listOf(mail), *many.toTypedArray())
         val nested = (d.tiles(SearchCategory.Apps).single() as Tile.App).shortcuts
         val rows = d.tiles(SearchCategory.Actions).filterIsInstance<Tile.Hit>().map { it.hit }
         assertEquals(NestedShortcuts.MAX, nested.size)
         assertEquals(many.map { it.id }.toSet(), (nested + rows).map { it.id }.toSet())
+    }
+
+    @Test @Config(sdk = [35]) fun PAL_03_theCapIsSixSoARealAppShowsAllItsShortcutsAsBubbles() {
+        assertEquals(6, NestedShortcuts.MAX)
+        val six = (1..6).map { shortcut("demo.mail", "s$it", "S$it", 1f - it / 10f) }
+        val d = data(listOf(mail), *six.toTypedArray())
+        assertEquals(6, (d.tiles(SearchCategory.Apps).single() as Tile.App).shortcuts.size)
+        assertEquals(0, d.tiles(SearchCategory.Actions).size)
     }
 
     @Test @Config(sdk = [35]) fun PAL_03_plainActionHitsAreNeverNested() {

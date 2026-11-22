@@ -44,15 +44,13 @@ import com.bos.sphere.core.design.L10n
 
 /**
  * PAL-03: an app's own launcher shortcuts that match the query sit inside the app's tile or row in all three Radar
- * layouts (Orbit, Filmstrip, Flat), instead of being separate rows. A shortcut whose app is not among the matched apps
- * (it matched on its own label) has no tile to sit in and stays an ordinary Actions row; so do shortcuts beyond [MAX].
+ * layouts (Orbit, Filmstrip, Flat), instead of being separate rows. Wave 49 (actionBubbles): each one is an action bubble up front (a circle with its own icon and its
+ * title under it), never folded into a "+N" circle. A shortcut whose app is not among the matched apps (it matched on its own label) has no tile to sit in and
+ * stays an ordinary Actions row; so do shortcuts beyond [MAX].
  */
 internal object NestedShortcuts {
-    /** Most shortcuts one app tile carries; the rest stay Actions rows so none is lost. */
-    const val MAX = 4
-
-    /** Most circles one row shows before its "+N" circle, which opens the preview with all of them. */
-    const val ROW_SHOWN = 3
+    /** Most shortcuts one app tile carries as bubbles (an app rarely publishes more); the rest stay Actions rows so none is lost. */
+    const val MAX = 6
 
     class Split(
         /** App key to its nested shortcuts, best match first. */
@@ -86,26 +84,33 @@ internal object NestedShortcuts {
     }
 }
 
-/** Wave 25 (shortcutForm): the one form of a shortcut, quicklink or action: a 24 dp glyph in a 40 dp circle with a 48 dp touch slot. */
+/**
+ * Wave 25 (shortcutForm) and wave 49 (actionBubbles): the one form of a shortcut, quicklink or action: a 24 dp glyph in a 40 dp circle with a 48 dp touch slot.
+ * An app's shortcuts are [ActionBubble]s: the same circle with the shortcut's title under it (1 or 2 lines, ellipsised), [BUBBLE_W] wide.
+ */
 internal object ShortcutForm {
     const val CIRCLE_DP = 40f
     const val GLYPH_DP = 24f
-    /** The touch slot, and the pitch of the row: a 40 dp circle with 4 dp around it, so two neighbours are 8 dp apart and their targets never overlap. */
+    /** The touch slot of a circle: a 40 dp circle with 4 dp around it. */
     const val SLOT_DP = 48f
     /** Longest the tooltip of a long-pressed circle stays up. */
     const val TIP_MILLIS = 1800L
 
-    /** How many circles and how many "+N" a row of [total] shortcuts shows in [widthDp]: all of them when they fit, else the "+N" takes the last slot. */
-    class Row(val shown: Int, val more: Int) { val slots get() = shown + if (more > 0) 1 else 0 }
-    fun row(total: Int, widthDp: Float, maxShown: Int = NestedShortcuts.ROW_SHOWN): Row {
-        val slots = maxOf(1, (widthDp / SLOT_DP).toInt())
-        if (total <= minOf(maxShown, slots)) return Row(total, 0)
-        val shown = minOf(maxShown, slots - 1).coerceAtLeast(0)
-        return Row(shown, total - shown)
-    }
+    /** A bubble is as wide as this (its label wraps inside it) and as high as the slot plus [LABEL_LINES] lines of [LABEL_LINE_DP] (times the font scale). */
+    const val BUBBLE_W = 64f
+    const val LABEL_LINES = 2
+    const val LABEL_SP = 10f
+    const val LABEL_LINE_DP = 12f
+    /** Bubbles per line in the wrapping rows of the Filmstrip and the Flat list. */
+    const val PER_LINE = 3
 
-    /** The width a row of [total] shortcuts needs in the small layouts (up to three slots). */
-    fun smallRowWidth(total: Int): Float = SLOT_DP * minOf(total, NestedShortcuts.ROW_SHOWN)
+    fun labelHeight(fontScale: Float): Float = LABEL_LINES * LABEL_LINE_DP * maxOf(1f, fontScale)
+    fun bubbleHeight(fontScale: Float): Float = SLOT_DP + labelHeight(fontScale)
+
+    /** Lines a wrapping row of [total] bubbles takes in a [perLine]-wide space. */
+    fun lines(total: Int, perLine: Int = PER_LINE): Int = if (total <= 0) 0 else (total + perLine - 1) / perLine
+    /** The height the Filmstrip reserves for the bubbles of an app with [total] shortcuts (font scale 1; the row itself wraps content). */
+    fun flowHeight(total: Int): Float = lines(total) * bubbleHeight(1f)
 }
 
 /**
@@ -150,23 +155,76 @@ internal fun ActionCircle(
 }
 
 /**
- * The shortcuts of an app tile in one tidy row of circles under the app (Orbit, Filmstrip, Flat; the preview lists them with labels). The row is part of the tile's
- * layout: it is [ShortcutForm.SLOT_DP] high, at most [NestedShortcuts.ROW_SHOWN] circles and a "+N" circle that opens the preview. [width] is the room the tile gives it.
+ * Wave 49 (actionBubbles): an app shortcut as an action bubble: the [ShortcutForm.CIRCLE_DP] circle (glyph or own icon in [content]) in its 48 dp slot, and the
+ * shortcut's title under it (up to [ShortcutForm.LABEL_LINES] lines, ellipsised). The whole bubble ([ShortcutForm.BUBBLE_W] wide) is one touch target; the label
+ * is the long-press tooltip too (the full title when the visible one is cut) and [describe] is what TalkBack reads.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ShortcutCircleRow(tile: Tile.App, width: Dp, onRun: (SearchHit) -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier, start: Boolean = false) {
+internal fun ActionBubble(
+    label: String, tag: String, onClick: () -> Unit, modifier: Modifier = Modifier, selected: Boolean = false,
+    describe: String = label, content: @Composable () -> Unit,
+) {
+    var tip by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(tip) { if (tip) { kotlinx.coroutines.delay(ShortcutForm.TIP_MILLIS); tip = false } }
+    Column(
+        modifier.testTag(tag).width(ShortcutForm.BUBBLE_W.dp)
+            .combinedClickable(onClick = onClick, onLongClick = { tip = true })
+            .clearAndSetSemantics {
+                contentDescription = describe; role = Role.Button
+                onClick { onClick(); true }
+                onLongClick(label) { tip = true; true }
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(ShortcutForm.SLOT_DP.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.radarSelectedRing(selected, CircleShape).size(ShortcutForm.CIRCLE_DP.dp).clip(CircleShape).background(Color(0x33FFFFFF)),
+                contentAlignment = Alignment.Center,
+            ) { content() }
+        }
+        Text(
+            label, color = Color.White.copy(alpha = 0.85f), fontSize = ShortcutForm.LABEL_SP.sp, lineHeight = ShortcutForm.LABEL_LINE_DP.sp, maxLines = ShortcutForm.LABEL_LINES,
+            overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp).height(with(androidx.compose.ui.platform.LocalDensity.current) { (ShortcutForm.LABEL_LINES * ShortcutForm.LABEL_LINE_DP).sp.toDp() }),
+        )
+        if (tip) androidx.compose.ui.window.Popup(
+            popupPositionProvider = object : androidx.compose.ui.window.PopupPositionProvider {
+                override fun calculatePosition(anchorBounds: androidx.compose.ui.unit.IntRect, windowSize: androidx.compose.ui.unit.IntSize, layoutDirection: androidx.compose.ui.unit.LayoutDirection, popupContentSize: androidx.compose.ui.unit.IntSize) =
+                    androidx.compose.ui.unit.IntOffset(
+                        (anchorBounds.center.x - popupContentSize.width / 2).coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
+                        (anchorBounds.top - popupContentSize.height - 4).coerceAtLeast(0),
+                    )
+            },
+            onDismissRequest = { tip = false },
+        ) {
+            Text(label, color = Color.White, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xF2101018)).padding(horizontal = 10.dp, vertical = 6.dp))
+        }
+    }
+}
+
+/** The bubble of one of [tile]'s shortcuts: the one place that builds it (ids "nested.<appKey>.<id>", TalkBack "App shortcut: %s"), used by all three layouts. */
+@Composable
+internal fun ShortcutBubble(tile: Tile.App, h: SearchHit, onRun: (SearchHit) -> Unit, modifier: Modifier = Modifier) {
+    ActionBubble(h.title, "nested.${tile.app.key}.${h.id}", onClick = { onRun(h) }, modifier = modifier, describe = L10n.tr("App shortcut: %s", h.title)) {
+        HitLeadingIcon(h, ShortcutForm.GLYPH_DP.dp, Color.White, app = tile.app)
+    }
+}
+
+/**
+ * Filmstrip and Flat: every shortcut of an app tile as a bubble in a wrapping row under the app ([ShortcutForm.PER_LINE] per line at most in the Filmstrip, as many as fit
+ * the width in the Flat list); none is ever folded into a "+N". [perLine] caps the bubbles per line (0 = as many as fit).
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun ShortcutBubbleRow(tile: Tile.App, onRun: (SearchHit) -> Unit, modifier: Modifier = Modifier, perLine: Int = 0, start: Boolean = false) {
     if (tile.shortcuts.isEmpty()) return
-    val row = ShortcutForm.row(tile.shortcuts.size, width.value)
-    Row(modifier.height(ShortcutForm.SLOT_DP.dp), horizontalArrangement = if (start) Arrangement.Start else Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        tile.shortcuts.take(row.shown).forEach { h ->
-            ActionCircle(h.title, "nested.${tile.app.key}.${h.id}", onClick = { onRun(h) }, describe = L10n.tr("App shortcut: %s", h.title)) { HitLeadingIcon(h, ShortcutForm.GLYPH_DP.dp, Color.White, app = tile.app) }
-        }
-        if (row.more > 0) {
-            val say = L10n.tr("%s more shortcuts", row.more.toString())
-            ActionCircle("+${row.more}", "nested.${tile.app.key}.more", onClick = onMore, describe = say) {
-                Text("+${row.more}", color = Color.White, fontSize = 13.sp, maxLines = 1)
-            }
-        }
+    androidx.compose.foundation.layout.FlowRow(
+        modifier.testTag("nested.${tile.app.key}.row"),
+        horizontalArrangement = if (start) Arrangement.Start else Arrangement.Center,
+        maxItemsInEachRow = if (perLine > 0) perLine else Int.MAX_VALUE,
+    ) {
+        tile.shortcuts.forEach { h -> ShortcutBubble(tile, h, onRun) }
     }
 }
 

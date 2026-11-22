@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -35,9 +36,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Wave 25 (shortcutForm, owner: "some shortcuts appear as circles around the radar circles, others as pills below the icon"): ONE form. A result is an app tile
- * (icon circle and name), an app's shortcuts are one row of 40 dp circles under it (48 dp slots), and every action that is not tied to an app sits on the strip, as the
- * same circles, never on the rings. The query of the owner's screenshot: "fylz" with an app that has four shortcuts and a "Deep results" action.
+ * Wave 25 (shortcutForm) and wave 49 (actionBubbles, owner: "I'd rather have the actions suggestions up front as action bubbles", not a "+4"): an app's shortcuts are
+ * action bubbles (40 dp circle in a 48 dp slot, title under it, 64 dp wide): satellites next to the app in the Orbit, a wrapping row under the app in the Filmstrip
+ * and the Flat list; every action that is not tied to an app sits on the strip, as circles, never on the rings. The query of the owner's screenshot: "fylz" with an
+ * app that has four shortcuts and a "Deep results" action.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -71,11 +73,11 @@ class RadarShortcutFormW25UiTest {
     }
     private var launched = 0
 
-    private fun open(layout: SearchLayout, query: String = "fylz", fontScale: Float = 1f) {
+    private fun open(layout: SearchLayout, query: String = "fylz", fontScale: Float = 1f, rtl: Boolean = false) {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             val d = androidx.compose.ui.platform.LocalDensity.current
-            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density, fontScale)) {
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density, fontScale), androidx.compose.ui.platform.LocalLayoutDirection provides if (rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr) {
                 SearchScreen(
                     apps = apps, recent = apps, prefs = LauncherPrefs(searchMotion = false, searchLayout = layout, searchLayoutPinned = true), contacts = null,
                     onLaunch = { launched++ }, onLongPressApp = {}, onOpenIntent = {}, onRequestContactsPermission = {}, onDismiss = {},
@@ -118,32 +120,51 @@ class RadarShortcutFormW25UiTest {
         assertTrue("two interactive nodes overlap ($where): $bad", bad.isEmpty())
     }
 
-    private fun circles(prefix: String) = rule.onAllNodes(SemanticsMatcher("tagged $prefix") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true }, useUnmergedTree = true).fetchSemanticsNodes()
+    private fun circles(prefix: String) = rule.onAllNodes(SemanticsMatcher("tagged $prefix") { it.config.getOrNull(SemanticsProperties.TestTag)?.let { t -> t.startsWith("$prefix.") && !t.endsWith(".row") } == true }, useUnmergedTree = true).fetchSemanticsNodes()
 
-    private fun checkLayout(layout: SearchLayout, font: Float, shot: String? = null) {
-        open(layout, "fylz", font)
+    private fun checkLayout(layout: SearchLayout, font: Float, shot: String? = null, rtl: Boolean = false) {
+        open(layout, "fylz", font, rtl)
         val density = rule.activity.resources.displayMetrics.density
         val r = rule.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().first().boundsInRoot
         val where = "$layout ${r.width / density}x${r.height / density}dp font=$font"
-        val row = circles("nested.demo.fylz")
-        assertTrue("Fylz's shortcut row is drawn ($where)", row.isNotEmpty())
+        val row = circles("nested.${fylz.key}")
+        assertEquals("every one of the four shortcuts is a bubble ($where)", shortcuts.map { it.id }.toSet(), row.map { it.config.getOrNull(SemanticsProperties.TestTag)!!.removePrefix("nested.${fylz.key}.") }.toSet())
         row.forEach {
-            assertEquals("a slot is 48 dp wide ($where)", 48f * density, it.boundsInRoot.width, 1f)
-            assertEquals("a slot is 48 dp high ($where)", 48f * density, it.boundsInRoot.height, 1f)
-            assertTrue("a shortcut circle stays inside the display ($where)", it.boundsInRoot.left >= -0.5f && it.boundsInRoot.right <= r.right + 0.5f && it.boundsInRoot.top >= -0.5f && it.boundsInRoot.bottom <= r.bottom + 0.5f)
+            assertEquals("a bubble is 64 dp wide ($where)", 64f * density, it.boundsInRoot.width, 1f)
+            assertTrue("a bubble is a 48 dp touch target plus its label ($where)", it.boundsInRoot.height >= (48f + 24f) * density - 1f && it.boundsInRoot.width >= 48f * density)
+            assertTrue("a shortcut bubble stays inside the display ($where)", it.boundsInRoot.left >= -0.5f && it.boundsInRoot.right <= r.right + 0.5f && it.boundsInRoot.top >= -0.5f && it.boundsInRoot.bottom <= r.bottom + 0.5f)
         }
-        assertNoOverlap(where)
+        rule.onAllNodes(SemanticsMatcher("a +N circle") { it.config.getOrNull(SemanticsProperties.TestTag)?.endsWith(".more") == true }, useUnmergedTree = true).assertCountEquals(0)
         if (shot != null) shoot(shot)
+        assertNoOverlap(where)
     }
 
-    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_891x411_font1() = checkLayout(SearchLayout.Orbit, 1f, "w25-shortcutForm-orbit-fylz-landscape")
+    @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_891x411_font1() = checkLayout(SearchLayout.Orbit, 1f, "w49-actionBubbles-orbit-fylz-landscape")
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_03_orbitShortcutRowDoesNotOverlap_891x411_font2() = checkLayout(SearchLayout.Orbit, 2f)
     @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_360x640_font1() = checkLayout(SearchLayout.Flat, 1f)
     @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_360x640_font2() = checkLayout(SearchLayout.Flat, 2f)
-    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_411x891_font1() = checkLayout(SearchLayout.Flat, 1f, "w25-shortcutForm-flat-fylz")
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_411x891_font1() = checkLayout(SearchLayout.Flat, 1f, "w49-actionBubbles-flat-fylz")
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_411x891_font2() = checkLayout(SearchLayout.Flat, 2f)
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_891x411_font1() = checkLayout(SearchLayout.Flat, 1f)
     @Test @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-night-xhdpi") fun PAL_03_flatShortcutRowDoesNotOverlap_891x411_font2() = checkLayout(SearchLayout.Flat, 2f)
+
+    // the owner's case: Orbit in portrait (a phone), at both font scales, and mirrored
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_orbitShortcutBubblesDoNotOverlap_411x891_font1() = checkLayout(SearchLayout.Orbit, 1f, "w49-actionBubbles-orbit-fylz-portrait")
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_orbitShortcutBubblesDoNotOverlap_411x891_font2() = checkLayout(SearchLayout.Orbit, 2f)
+    @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_orbitShortcutBubblesDoNotOverlap_360x640_font1() = checkLayout(SearchLayout.Orbit, 1f)
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_orbitShortcutBubblesDoNotOverlap_411x891_font1_5() = checkLayout(SearchLayout.Orbit, 1.5f)
+    /** The corner: a 360 dp wide phone at a large font has no free room around the app (the wheel text and the other rings take it); every bubble is still there (inside the display), only the no-overlap guarantee is dropped. */
+    @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_orbitShortcutBubblesAllAppearEvenWhenThereIsNoFreeRoom_360x640_font1_5() = allAppear(1.5f)
+    @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_orbitShortcutBubblesAllAppearEvenWhenThereIsNoFreeRoom_360x640_font2() = allAppear(2f, "w49-actionBubbles-orbit-fylz-360-font2")
+    private fun allAppear(font: Float, shot: String? = null) {
+        open(SearchLayout.Orbit, "fylz", font)
+        val r = rule.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().first().boundsInRoot
+        val row = circles("nested.${fylz.key}")
+        assertEquals(4, row.size)
+        row.forEach { assertTrue(it.boundsInRoot.left >= -0.5f && it.boundsInRoot.right <= r.right + 0.5f) }
+        if (shot != null) shoot(shot)
+    }
+    @Test @Config(sdk = [35], qualifiers = "ldrtl-w411dp-h891dp-port-night-xhdpi") fun PAL_03_orbitShortcutBubblesDoNotOverlap_rtl_411x891() = checkLayout(SearchLayout.Orbit, 1f, "w49-actionBubbles-orbit-fylz-rtl", rtl = true)
 
     /** The Filmstrip (it is the idle layout; the typed one is the list): a row of four shortcuts is part of the tile's height and overlaps nothing, at both font scales. */
     private fun checkFilmstrip(font: Float) {
@@ -159,11 +180,11 @@ class RadarShortcutFormW25UiTest {
             }
         }
         rule.mainClock.advanceTimeBy(600)
-        assertTrue(circles("nested.demo.fylz").isNotEmpty())
+        assertTrue(circles("nested.${fylz.key}").isNotEmpty())
         assertNoOverlap("Filmstrip font=$font")
         // the row is below the tile it belongs to
         val t = rule.onAllNodes(SemanticsMatcher("tile") { it.config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() == "Fylz" }, useUnmergedTree = true).fetchSemanticsNodes().first().boundsInRoot
-        circles("nested.demo.fylz").forEach { assertTrue("a circle sits under its tile: ${it.boundsInRoot} vs $t", it.boundsInRoot.top >= t.bottom - 1.5f) }
+        circles("nested.${fylz.key}").forEach { assertTrue("a circle sits under its tile: ${it.boundsInRoot} vs $t", it.boundsInRoot.top >= t.bottom - 1.5f) }
     }
     @Test @Config(sdk = [35], qualifiers = "w360dp-h640dp-port-night-xhdpi") fun PAL_03_filmstripShortcutRowDoesNotOverlap_360x640_font1() = checkFilmstrip(1f)
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi") fun PAL_03_filmstripShortcutRowDoesNotOverlap_411x891_font2() = checkFilmstrip(2f)
@@ -185,26 +206,33 @@ class RadarShortcutFormW25UiTest {
         assertTrue(d.stripTiles().all(::isStripTile) && ring.none(::isStripTile))
     }
 
-    @Test fun PAL_03_aRowShowsThreeCirclesAndAPlusNOnlyWhenTheyDoNotAllFit() {
-        fun r(total: Int, w: Float) = ShortcutForm.row(total, w).let { it.shown to it.more }
-        assertEquals(0 to 0, r(0, 200f))
-        assertEquals(3 to 0, r(3, 144f))
-        assertEquals(2 to 2, r(4, 144f)) // a tile three slots wide: two circles and "+2"
-        assertEquals(3 to 1, r(4, 400f)) // room enough: three circles and "+1"
-        assertEquals(0 to 4, r(4, 48f))
-        assertEquals(144f, ShortcutForm.smallRowWidth(9), 0f)
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
+    fun PAL_03_aBubbleRunsItsShortcutAndNoPlusNCircleExists() {
+        open(SearchLayout.Flat)
+        shortcuts.forEach { rule.onNodeWithTag("nested.${fylz.key}.${it.id}").assertExists() }
+        rule.onNodeWithTag("nested.${fylz.key}.${shortcuts[0].id}").performClick()
+        assertEquals(1, launched)
+        rule.onNodeWithTag("nested.${fylz.key}.more").assertDoesNotExist()
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
-    fun PAL_03_aCircleRunsItsShortcutAndThePlusNCircleOpensThePreviewListingAll() {
-        open(SearchLayout.Flat)
-        rule.onNodeWithTag("nested.${fylz.key}.${shortcuts[0].id}").performClick()
-        assertEquals(1, launched)
-        rule.onNodeWithTag("nested.${fylz.key}.more").performClick()
-        rule.mainClock.advanceTimeBy(400)
-        shortcuts.forEach { rule.onNodeWithTag("preview.shortcut.${it.id}").assertExists() }
+    fun PAL_03_thePreviewStillListsEveryShortcutWithItsLabel() {
+        val tile = Tile.App(fylz, shortcuts)
+        rule.setContent { ResultPreview(tile, "fylz", onDismiss = {}, onOpen = {}, onLongPressApp = {}, onShortcut = { launched++ }) }
+        rule.waitForIdle()
+        shortcuts.forEach { rule.onNodeWithTag("preview.shortcut.${it.id}").assertExists().performClick() }
+        assertEquals(4, launched)
     }
 
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-night-xhdpi")
+    fun PAL_03_aBubbleTellsTalkBackAppShortcutAndShowsItsTitle() {
+        open(SearchLayout.Flat)
+        val n = rule.onNodeWithTag("nested.${fylz.key}.${shortcuts[0].id}", useUnmergedTree = true).fetchSemanticsNode()
+        assertEquals(listOf("App shortcut: Tools"), n.config.getOrNull(SemanticsProperties.ContentDescription))
+        // the title is drawn under the 48 dp slot: two label lines (24 dp) make the bubble 72 dp high
+        val density = rule.activity.resources.displayMetrics.density
+        assertEquals(72f * density, n.boundsInRoot.height, 1f)
+    }
 
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.performSemanticsAction(a: androidx.compose.ui.semantics.SemanticsPropertyKey<androidx.compose.ui.semantics.AccessibilityAction<() -> Boolean>>) {
         rule.runOnUiThread { fetchSemanticsNode().config[a].action?.invoke() }

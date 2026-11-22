@@ -190,31 +190,3 @@ fun DockStylePreview(style: DockStyle, modifier: Modifier = Modifier, dark: Bool
         }
     }
 }
-<<<<<<< HEAD
-
-/** The three dock styles as cards, each with a miniature dock drawn by the dock's own code; [onSelect] gets the choice. One node per choice (a radio button, 48 dp or more). */
-@Composable
-fun DockStyleChooser(current: DockStyle, onSelect: (DockStyle) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.semantics { contentDescription = L10n.tr("Dock style") }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        com.bos.sphere.feature.grid.OneUiComposedChoice(
-            DockStyle.entries, current, onSelect, { L10n.tr(it.label) }, tag = "dock.style", id = { it.id },
-        ) { s, _ -> DockStylePreview(s, compact = true) }
-        Text(L10n.tr("Transparent draws no panel: only the icons, with a soft halo. 3D is a glossy shelf with raised icons."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-    }
-}
-
-/** The dock's own long-press route to the same choice: a full page (wave 46), not a popup, because it holds a set of options. */
-@Composable
-internal fun DockStyleDialog(current: DockStyle, onSelect: (DockStyle) -> Unit, onDismiss: () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
-        com.bos.sphere.feature.grid.OneUiFullPage(onDismiss) {
-            com.bos.sphere.feature.grid.OneUiPageFrame(L10n.tr("Dock style"), onDismiss, tag = "dock.styleDialog") {
-                item(key = "style") {
-                    Column(Modifier.padding(horizontal = 18.dp)) { DockStyleChooser(current, onSelect = { onSelect(it); onDismiss() }) }
-                }
-            }
-        }
-    }
-}
-=======
->>>>>>> w55-dockSheet

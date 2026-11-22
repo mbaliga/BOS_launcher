@@ -122,21 +122,8 @@ fun DockSettingsContent(
     DockOptionsBody(manager, tier, DockOptionsScope(), landscape = landscape)
     OneUiGap()
     OneUiGroup(2) {
-<<<<<<< HEAD
-        OneUiValueRow(L10n.tr("Dock mode"), L10n.tr(state.dock.mode.label), { pickingMode = true }, modifier = Modifier.testTag(DockPageTags.MODE))
-        OneUiRowDivider()
-        com.bos.sphere.feature.grid.OneUiVisualChoiceRow(
-            L10n.tr("Dock position"), DockEdge.entries, state.dock.edge, { e -> manager.setDock { it.copy(edge = e) } },
-            { L10n.tr(it.label) }, { DockEdgeArt.edge.art(it) }, tag = "dock.edge",
-        )
-    }
-    OneUiCaption(L10n.tr("In portrait the dock is always at the bottom. In landscape it can also sit on a side."))
-    OneUiGap()
-    OneUiGroup(1) {
-=======
         OneUiListRow(L10n.tr("Edit dock"), summary = L10n.tr("Reorder or remove the pinned apps"), tile = Glyphs.Sliders, tileColor = TileViolet, chevron = true, onClick = { editing = true }, modifier = Modifier.testTag(DockPageTags.EDIT))
         OneUiRowDivider(72.dp)
->>>>>>> w55-dockSheet
         // W26: an empty dock is hidden, so this is also the way to the first pin from Ground Control.
         OneUiListRow(L10n.tr("Add apps to the dock"), tile = Glyphs.Apps, tileColor = TileBlue, chevron = true, onClick = { addingPins = true }, modifier = Modifier.testTag(DockPageTags.ADD_APPS))
     }

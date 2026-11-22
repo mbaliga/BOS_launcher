@@ -382,13 +382,6 @@ class WorkspacePagesW41Test {
 
     @Test fun DCK_04_page_30_theDockPageHasTheLivePreviewCardsSwitchesAndRowsNoPurpleLinks() {
         val m = manager(); showDock(m)
-<<<<<<< HEAD
-        rule.onNodeWithTag(DockPageTags.SHOW_DOCK).assertIsDisplayed()
-        rule.onNodeWithTag(DockPageTags.MODE).assertIsDisplayed()
-        rule.onNodeWithText("Pinned and recent").assertIsDisplayed() // the value of the Dock mode row, not a chip
-        DockEdge.entries.forEach { rule.onNodeWithTag("dock.edge.${it.name}").assertIsDisplayed() } // Bottom / Left / Right as three drawn cards (wave 54)
-        rule.onNodeWithTag(DockPageTags.ADD_APPS).assertIsDisplayed()
-=======
         rule.onNodeWithTag(DockPageTags.PREVIEW).assertIsDisplayed()
         rule.onNodeWithTag(DockPageTags.SHOW_DOCK).assertExists()
         DockStyle.entries.forEach { rule.onNodeWithTag(DockStyleUi.rowTag(it)).performScrollTo().assertIsDisplayed() }
@@ -397,7 +390,6 @@ class WorkspacePagesW41Test {
         rule.onNodeWithTag(DockOptionTags.GROUP_SHELF).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(DockPageTags.EDIT).performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(DockPageTags.ADD_APPS).performScrollTo().assertIsDisplayed()
->>>>>>> w55-dockSheet
         assertTrue("the Add apps row is a 56 dp row", rule.onNodeWithTag(DockPageTags.ADD_APPS).getUnclippedBoundsInRoot().let { it.bottom - it.top } >= 56.dp)
         rule.onAllNodesWithText("Workspaces").assertCountEquals(0) // the old card's section heading is gone from this page
         rule.onAllNodesWithText("New workspace name").assertCountEquals(0)
@@ -407,11 +399,7 @@ class WorkspacePagesW41Test {
         val m = manager(); showDock(m)
         rule.onNodeWithTag(DockPageTags.SHOW_DOCK).performScrollTo().performClick(); settle()
         assertEquals(false, m.current.dock.enabled)
-<<<<<<< HEAD
-        rule.onNodeWithTag("dock.edge.Right").performClick(); settle()
-=======
         rule.onNodeWithTag(DockOptionTags.position(DockEdge.Right)).performScrollTo().performClick(); settle()
->>>>>>> w55-dockSheet
         assertEquals(DockEdge.Right, m.current.dock.edge)
         rule.onNodeWithTag(DockOptionTags.mode(DockMode.Collapsed)).performScrollTo().performClick(); settle()
         assertEquals(DockMode.Collapsed, m.current.dock.mode)

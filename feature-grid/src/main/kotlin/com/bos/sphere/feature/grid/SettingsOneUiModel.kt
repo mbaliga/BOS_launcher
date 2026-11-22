@@ -163,16 +163,22 @@ object OneUiModel {
     // ---- how a row offers its options (wave 46) ---------------------------------------------------------------------------------
 
     /**
-     * Wave 46: the one way each kind of row presents its options, never two. [Rail]: a choice with preview cards shows them inline and has no
-     * chevron and no page. [Page]: a choice without cards shows its value in grey with a chevron and opens a full page of radio rows (no dialog).
-     * [Segmented]: two or three short options sit inline in a segmented control, no chevron. [Switch], [Slider], [Stepper] are inline controls.
+     * Wave 46, changed in wave 54 (settingsVisual): the one way each kind of row presents its options, never two. [Rail]: a choice of two to
+     * [VISUAL_MAX] options shows them inline as a row of drawn cards ([OneUiVisualChoice]): no chevron, no page. [Page]: a choice with more options
+     * than that (the ten languages) shows its value in grey with a chevron and opens a full page. [Switch], [Slider], [Stepper] are inline controls.
      * [Link]: an action (a confirmation dialog first when it is destructive). [Pane]: a pane opens as a page of its own.
      */
     enum class Presentation(val inline: Boolean, val chevron: Boolean, val opensPage: Boolean) {
         Switch(true, false, false), Slider(true, false, false), Stepper(true, false, false),
-        Rail(true, false, false), Segmented(true, false, false),
+        Rail(true, false, false),
         Page(false, true, true), Pane(false, true, true), Link(false, false, false), LinkChevron(false, true, false),
     }
+
+    /** Wave 54: a pick from this many options or fewer is offered as cards; more is a list page. */
+    const val VISUAL_MAX = 9
+
+    /** Whether [c] must be offered as cards (two to [VISUAL_MAX] options). Every such choice of the settings carries its cards ([SettingItem.Choice.preview]); a test holds the builder to it. */
+    fun offersCards(c: SettingItem.Choice<*>): Boolean = c.options.size in 2..VISUAL_MAX
 
     fun presentation(i: SettingItem): Presentation = when (i) {
         is SettingItem.Toggle -> Presentation.Switch

@@ -50,6 +50,7 @@ import com.bos.sphere.core.data.PageTransition
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.grid.Glyphs
+import com.bos.sphere.feature.grid.SettingsArtHome
 
 /**
  * What a long-press on the home screen opens. Wave 34 (homeSheet): styled like the Sound and Vibration sheet (docs/decisions/homeSheet.md): pure black,
@@ -111,9 +112,9 @@ internal fun HomeQuickSheetBody(
         }
         // Wave 28 / 51: Pages and Order, every value a drawn card.
         Heading(L10n.tr("Pages"))
-        CardRow { for (m in com.bos.sphere.core.data.HomePages.entries) OptionCard(m.label, prefs.homePages == m, "quick.pages.${m.name}", { update { it.copy(homePages = m) } }, pagesArt(m)) }
+        CardRow { for (m in com.bos.sphere.core.data.HomePages.entries) OptionCardArt(m.label, prefs.homePages == m, "quick.pages.${m.name}", { update { it.copy(homePages = m) } }, SettingsArtHome.pagesArt(m)) }
         Heading(L10n.tr("Order"))
-        CardRow { for (o in com.bos.sphere.core.data.HomeOrder.entries) OptionCard(o.label, prefs.homeOrder == o, "quick.order.${o.name}", { update { it.copy(homeOrder = o) } }, orderArt(o.rtl)) }
+        CardRow { for (o in com.bos.sphere.core.data.HomeOrder.entries) OptionCardArt(o.label, prefs.homeOrder == o, "quick.order.${o.name}", { update { it.copy(homeOrder = o) } }, SettingsArtHome.orderArt(o.rtl)) }
 
         run {
             // W38: the hotspots are fixed chrome on every page, so their cards are always here.
@@ -122,7 +123,7 @@ internal fun HomeQuickSheetBody(
             CardRow {
                 for (pr in com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }) {
                     val corners = com.bos.sphere.core.data.GlanceHotspots.preset(pr) ?: emptySet()
-                    OptionCard(pr.label, hc == pr, "quick.hotspots.${pr.name}", { update { it.copy(glanceHotspots = corners) } }, hotspotsArt(corners))
+                    OptionCardArt(pr.label, hc == pr, "quick.hotspots.${pr.name}", { update { it.copy(glanceHotspots = corners) } }, SettingsArtHome.hotspotsArt(corners))
                 }
             }
         }

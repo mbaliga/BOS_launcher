@@ -395,7 +395,7 @@ class ScreenshotTest {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().then(Modifier.padding(20.dp))) { // wave 40: the breadcrumb page is gone; the picker itself is what this shot is of
-                VisualChoice(com.bos.sphere.core.data.HomeStyle.entries, com.bos.sphere.core.data.HomeStyle.Grid, {}, { it.name }, previewHeight = 140.dp) { HomeStylePreview(it) }
+                OneUiVisualChoice(com.bos.sphere.core.data.HomeStyle.entries, com.bos.sphere.core.data.HomeStyle.Grid, {}, { it.name }, { SettingsArtHome.homeStyle.art(it) }, tag = "t.style")
             }
         }
         shoot("20-detail-visual")

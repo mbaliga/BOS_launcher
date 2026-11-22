@@ -71,12 +71,12 @@ class SettingsPagesW46Test {
                 SettingItem.Choice(
                     "Left page", Glyphs.Bell, listOf("Off", "Comms", "A widget"), left, { it },
                     hint = "One swipe right from the first page: your notifications, or any app's widget full-screen.",
-                    preview = { VisualChoice(listOf("Off", "Comms", "A widget"), left, { left = it; log += "left=$it" }, { it }, columns = 3, previewHeight = 80.dp) { GlyphPreview(Glyphs.Bell) } },
+                    preview = { OneUiVisualChoice(listOf("Off", "Comms", "A widget"), left, { left = it; log += "left=$it" }, { it }, { SettingsArtHome.leftPage.art(com.bos.sphere.core.data.LeftPage.Off) }, tag = "t.left") },
                 ) { left = it },
                 SettingItem.Choice(
                     "Comms theme", Glyphs.Moon, listOf("Dark", "Light", "Follow the phone"), theme, { it },
                     hint = "Dark suits the rest of the launcher.",
-                    preview = { VisualChoice(listOf("Dark", "Light", "Follow the phone"), theme, { theme = it; log += "theme=$it" }, { it }, columns = 3, previewHeight = 96.dp) { GlyphPreview(Glyphs.Moon) } },
+                    preview = { OneUiVisualChoice(listOf("Dark", "Light", "Follow the phone"), theme, { theme = it; log += "theme=$it" }, { it }, { SettingsArtHome.leftPage.art(com.bos.sphere.core.data.LeftPage.Off) }, tag = "t.theme") },
                 ) { theme = it },
                 SettingItem.Choice("Icon shape", Glyphs.Apps, listOf("Rounded", "Square", "Circle", "Squircle"), shape, { it }, hint = "The shape of every icon") { shape = it; log += "shape=$it" },
                 SettingItem.Toggle("Unread strip", Glyphs.Bell, true) {},

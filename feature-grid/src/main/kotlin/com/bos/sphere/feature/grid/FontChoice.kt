@@ -34,11 +34,11 @@ object FontChoiceTags {
 fun FontChoice(selectedId: String, onSelect: (String) -> Unit) {
     val ctx = LocalContext.current
     val selected = FontCatalog.entry(selectedId)
-    VisualChoice(FontCatalog.entries, selected, { onSelect(it.id) }, { L10n.tr(it.label) }, columns = 2, previewHeight = 72.dp) { e ->
+    OneUiComposedChoice(FontCatalog.entries, selected, { onSelect(it.id) }, { L10n.tr(it.label) }, tag = "cfg.font", width = VisualCards.WideWidth, id = { it.id }) { e, ink ->
         val family = remember(ctx, e.id) { FontCatalog.family(ctx, e.id) }
         Column(Modifier.testTag(FontChoiceTags.sample(e.id)), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(FontChoiceTags.SAMPLE_TEXT_1, color = HyleColors.InkBright, fontSize = 24.sp, fontFamily = family, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, maxLines = 1)
-            Text(FontChoiceTags.SAMPLE_TEXT_2, color = HyleColors.InkDim, fontSize = 17.sp, fontFamily = family, fontWeight = FontWeight.Normal, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+            Text(FontChoiceTags.SAMPLE_TEXT_1, color = ink.strong, fontSize = 24.sp, fontFamily = family, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, maxLines = 1)
+            Text(FontChoiceTags.SAMPLE_TEXT_2, color = ink.soft, fontSize = 17.sp, fontFamily = family, fontWeight = FontWeight.Normal, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

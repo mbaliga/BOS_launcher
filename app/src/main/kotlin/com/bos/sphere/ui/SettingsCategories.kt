@@ -55,15 +55,11 @@ import com.bos.sphere.core.data.PagingAxis
 import com.bos.sphere.core.data.WheelGrouping
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.feature.grid.ChipRow
-import com.bos.sphere.feature.grid.VisualChoice
-import com.bos.sphere.feature.grid.HomeStylePreview
-import com.bos.sphere.feature.grid.PageShapePreview
-import com.bos.sphere.feature.grid.PagingPreview
-import com.bos.sphere.feature.grid.CornerStylePreview
-import com.bos.sphere.feature.grid.ThemeModePreview
-import com.bos.sphere.feature.grid.ThemedSampleIcon
+import com.bos.sphere.feature.grid.OneUiVisualChoice
+import com.bos.sphere.feature.grid.SettingsArtHome
+import com.bos.sphere.feature.grid.SettingsArtLook
+import com.bos.sphere.feature.grid.asCards
 import com.bos.sphere.feature.grid.DensityPreview
-import com.bos.sphere.feature.grid.GlyphPreview
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.LabeledSlider
 import com.bos.sphere.feature.grid.SettingCategory
@@ -213,7 +209,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     PageShape.Coverflow -> x("A strip you scrub sideways; tap the centre app to open it.")
                 },
                 preview = {
-                    VisualChoice(PageShape.entries, layout.shape, { m.setPageLayout(m.pageIndex, layout.copy(shape = it)) }, { x(it.label) }, previewHeight = 110.dp) { PageShapePreview(it) }
+                    OneUiVisualChoice(PageShape.entries, layout.shape, { m.setPageLayout(m.pageIndex, layout.copy(shape = it)) }, { x(it.label) }, { SettingsArtHome.pageShape.art(it) }, tag = "cfg.pageLayout")
                 },
             ) { m.setPageLayout(m.pageIndex, layout.copy(shape = it)) },
         )
@@ -267,14 +263,14 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 SettingItem.Choice(
                     x("Order"), Glyphs.Swipe, com.bos.sphere.core.data.HomeOrder.entries, p.homeOrder, { x(it.label) },
                     hint = x("Right to left puts the Comms on the right edge, the Recents panel on the left, and fills columns and pages from the right."),
-                ) { v -> upd { it.copy(homeOrder = v) } },
+                ) { v -> upd { it.copy(homeOrder = v) } }.asCards({ SettingsArtHome.order.art(it) }, "cfg.order"),
             )
             // STR-14: what a swipe from the right edge does. The dock stays optional: "Dock rail" only reveals it, it never turns it on.
             add(
                 SettingItem.Choice(
                     x("Right side"), Glyphs.Apps, com.bos.sphere.core.data.RightSide.entries, p.rightSide, { x(it.label) },
                     hint = x("What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing"),
-                ) { v -> upd { it.copy(rightSide = v) } },
+                ) { v -> upd { it.copy(rightSide = v) } }.asCards({ SettingsArtHome.rightSide.art(it) }, "cfg.rightSide"),
             )
             add(dockStyleSettingItem()) // W39 (dockThemes): Standard, Transparent or 3D
             addAll(wallpaperSettings(p) { f -> upd(f) }) // HOM-16 (wave 26): Glance and Pages wallpaper, always listed
@@ -295,7 +291,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                         },
                     ),
                     preview = {
-                        VisualChoice(HomeStyle.entries, p.homeStyle, { s -> upd { it.copy(homeStyle = s) } }, { x(homeStyleName(it)) }, previewHeight = 120.dp) { HomeStylePreview(it) }
+                        OneUiVisualChoice(HomeStyle.entries, p.homeStyle, { s -> upd { it.copy(homeStyle = s) } }, { x(homeStyleName(it)) }, { SettingsArtHome.homeStyle.art(it) }, tag = "cfg.homeStyle")
                     },
                 ) { s -> upd { it.copy(homeStyle = s) } },
             )
@@ -304,9 +300,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     x("Pages"), Glyphs.Swipe, com.bos.sphere.core.data.HomePages.entries, p.homePages, { x(it.label) },
                     hint = x("Off: home is the calm screen only. Paginated: regular pages after it, swiped like any home. Continuous: one sideways scroll after it, filled column by column."),
                     preview = {
-                        VisualChoice(com.bos.sphere.core.data.HomePages.entries, p.homePages, { v -> upd { it.copy(homePages = v) } }, { x(it.label) }, columns = 3, previewHeight = 110.dp) { v ->
-                            GlyphPreview(when (v) { com.bos.sphere.core.data.HomePages.Off -> Glyphs.Home; com.bos.sphere.core.data.HomePages.Paginated -> Glyphs.Swipe; else -> Glyphs.Down }, x(v.label))
-                        }
+                        OneUiVisualChoice(com.bos.sphere.core.data.HomePages.entries, p.homePages, { v -> upd { it.copy(homePages = v) } }, { x(it.label) }, { SettingsArtHome.pages.art(it) }, tag = "cfg.pages")
                     },
                 ) { v -> upd { it.copy(homePages = v) } },
             )
@@ -314,7 +308,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 SettingItem.Choice(
                     x("Scroll direction"), Glyphs.Swipe, com.bos.sphere.core.data.ScrollAxis.entries, p.scrollAxis, { x(it.label) },
                     hint = x("\"Long side\" keeps scrolling along the phone's longer edge however you hold it. Swipes across the other way are free for gestures."),
-                ) { v -> upd { it.copy(scrollAxis = v) } },
+                ) { v -> upd { it.copy(scrollAxis = v) } }.asCards({ SettingsArtHome.scrollAxis.art(it) }, "cfg.scrollAxis"),
             )
             add(SettingItem.Toggle(x("Grid follows window size"), Glyphs.Widget, p.adaptiveGrid, x("Columns and rows come from the window (rotation, folding, split screen) and the density below, instead of the fixed grids")) { v -> upd { it.copy(adaptiveGrid = v) } })
             add(SettingItem.Pane(x("Home panels"), Glyphs.Apps, x("Files, usage, timeline"), { com.bos.sphere.HomePanelSettings() })) // HOM-15, HOM-17, HOM-18
@@ -328,9 +322,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                         { if (it == null) x("Custom") + " ${gridLabel(p.portraitGrid)}" else x(it.label) },
                         hint = x("%s portrait · %s landscape", gridLabel(p.portraitGrid), gridLabel(p.landscapeGrid)),
                         preview = {
-                            VisualChoice(DensityPreset.entries, preset ?: DensityPreset.Default, { d -> upd { it.copy(portraitGrid = d.portrait, landscapeGrid = d.landscape) } }, { x(it.label) }, previewHeight = 96.dp) {
-                                DensityPreview(it.portrait.columns, it.portrait.rows, p.iconScale, p.iconSpacing)
-                            }
+                            OneUiVisualChoice<DensityPreset?>(DensityPreset.entries, preset, { d -> if (d != null) upd { it.copy(portraitGrid = d.portrait, landscapeGrid = d.landscape) } }, { x(it?.label ?: "Custom") }, { SettingsArtHome.density.art(it ?: DensityPreset.Default) }, tag = "cfg.density")
                             DensityPreview(p.portraitGrid.columns, p.portraitGrid.rows, p.iconScale, p.iconSpacing, Modifier.padding(vertical = 8.dp).height(150.dp))
                             Sub("Portrait")
                             Stepper(L10n.tr("Columns"), p.portraitGrid.columns, GridSpec.MIN_COLUMNS..GridSpec.MAX_COLUMNS) { v -> upd { it.copy(portraitGrid = it.portraitGrid.copy(columns = v)) } }
@@ -373,13 +365,13 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     SettingItem.Choice(
                         x("Page turning · portrait"), Glyphs.Swipe, PagingAxis.entries, p.portraitPaging, { x(it.label) },
                         hint = x("Swipes across the other axis are free for gestures."),
-                        preview = { VisualChoice(PagingAxis.entries, p.portraitPaging, { a -> upd { it.copy(portraitPaging = a) } }, { x(it.label) }, columns = 2) { PagingPreview(it) } },
+                        preview = { OneUiVisualChoice(PagingAxis.entries, p.portraitPaging, { a -> upd { it.copy(portraitPaging = a) } }, { x(it.label) }, { SettingsArtHome.paging.art(it) }, tag = "cfg.pagingPortrait") },
                     ) { a -> upd { it.copy(portraitPaging = a) } },
                 )
                 add(
                     SettingItem.Choice(
                         x("Page turning · landscape"), Glyphs.Swipe, PagingAxis.entries, p.landscapePaging, { x(it.label) },
-                        preview = { VisualChoice(PagingAxis.entries, p.landscapePaging, { a -> upd { it.copy(landscapePaging = a) } }, { x(it.label) }, columns = 2) { PagingPreview(it) } },
+                        preview = { OneUiVisualChoice(PagingAxis.entries, p.landscapePaging, { a -> upd { it.copy(landscapePaging = a) } }, { x(it.label) }, { SettingsArtHome.paging.art(it) }, tag = "cfg.pagingLandscape") },
                     ) { a -> upd { it.copy(landscapePaging = a) } },
                 )
             }
@@ -399,9 +391,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         buildList {
             // Wave 38: the white shortcut ring (segments, editor, labels) leads the App drawer, then the open-the-drawer settings, then what lives on the home screen.
             addAll(com.bos.sphere.ui.drawerRingItems(m))
-            add(SettingItem.Choice(x("Wheel groups"), Glyphs.Dial, WheelGrouping.entries, p.wheelGrouping, { x(it.label) }, hint = x("How the wheel groups apps into spokes.")) { g -> upd { it.copy(wheelGrouping = g) } })
+            add(SettingItem.Choice(x("Wheel groups"), Glyphs.Dial, WheelGrouping.entries, p.wheelGrouping, { x(it.label) }, hint = x("How the wheel groups apps into spokes.")) { g -> upd { it.copy(wheelGrouping = g) } }.asCards({ SettingsArtHome.wheelGrouping.art(it) }, "cfg.wheelGroups"))
             // Only the paged home has pages to curate; the scrolling homes always show every app.
-            if (paged) add(SettingItem.Choice(x("Pages"), Glyphs.Swipe, PageMode.entries, p.pageMode, { x(it.label) }, hint = x("One page shows just the first page; the rest stay in the drawer.")) { v -> upd { it.copy(pageMode = v) } })
+            if (paged) add(SettingItem.Choice(x("Pages"), Glyphs.Swipe, PageMode.entries, p.pageMode, { x(it.label) }, hint = x("One page shows just the first page; the rest stay in the drawer.")) { v -> upd { it.copy(pageMode = v) } }.asCards({ SettingsArtHome.pageMode.art(it) }, "cfg.drawerPages"))
             add(
                 SettingItem.Pane(x("Open with"), Glyphs.Apps, x("Choose the app for Music, Browser…")) {
                     listOf(
@@ -427,11 +419,11 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 SettingItem.Choice(
                     x("Corner style"), Glyphs.Palette, CornerStyle.entries, p.cornerStyle, { x(it.label) },
                     hint = x("Holo: just the icons. Sony: a quarter-disc in each corner. Bubbles: a round bubble behind each icon."),
-                    preview = { VisualChoice(CornerStyle.entries, p.cornerStyle, { c -> upd { it.copy(cornerStyle = c) } }, { x(it.label) }, columns = 3, previewHeight = 96.dp) { CornerStylePreview(it) } },
+                    preview = { OneUiVisualChoice(CornerStyle.entries, p.cornerStyle, { c -> upd { it.copy(cornerStyle = c) } }, { x(it.label) }, { SettingsArtHome.cornerStyle.art(it) }, tag = "cfg.cornerStyle") },
                 ) { c -> upd { it.copy(cornerStyle = c) } },
             )
             add(SettingItem.Slider(x("Corner icon size"), Glyphs.Dial, p.cornerIconSize, LauncherPrefs.MIN_CORNER_ICON..LauncherPrefs.MAX_CORNER_ICON, "${p.cornerIconSize.roundToInt()}", step = 1f) { v -> upd { it.copy(cornerIconSize = v) } })
-            add(SettingItem.Choice(x("Icon type"), Glyphs.Apps, CornerIconMode.entries, p.cornerIconMode, { x(it.label) }, hint = x("App icon shows the real icon of the app an action opens (Music → your music player).")) { c -> upd { it.copy(cornerIconMode = c) } })
+            add(SettingItem.Choice(x("Icon type"), Glyphs.Apps, CornerIconMode.entries, p.cornerIconMode, { x(it.label) }, hint = x("App icon shows the real icon of the app an action opens (Music → your music player).")) { c -> upd { it.copy(cornerIconMode = c) } }.asCards({ SettingsArtHome.cornerIcon.art(it) }, "cfg.cornerIcon"))
             add(SettingItem.Toggle(x("Follow device rotation"), Glyphs.Flip, p.cornersFollowDevice, x("Each corner stays under the same physical corner when you rotate")) { v -> upd { it.copy(cornersFollowDevice = v) } })
             add(SettingItem.Toggle(x("Separate corners for landscape"), Glyphs.Flip, p.cornersPerOrientation, x("Landscape keeps its own set; edits below apply to the orientation you are in")) { v -> upd { it.copy(cornersPerOrientation = v) } })
             add(SettingItem.Toggle(x("Hot corners with a mouse"), Glyphs.Pinch, p.hotCornersOn, x("Rest the pointer in a corner to reveal its action, click to run it")) { v -> upd { it.copy(hotCornersOn = v) } })
@@ -456,9 +448,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     { if (it == com.bos.sphere.core.data.LeftPage.Widget) (m.leftWidgetLabel ?: x("A widget")) else x(it.label) },
                     hint = x("One swipe right from the first page: your notifications, or any app's widget full-screen."),
                     preview = {
-                        VisualChoice(com.bos.sphere.core.data.LeftPage.entries, p.leftPage, leftPick, { x(it.label) }, columns = 3, previewHeight = 80.dp) { v ->
-                            GlyphPreview(when (v) { com.bos.sphere.core.data.LeftPage.Off -> Glyphs.Close; com.bos.sphere.core.data.LeftPage.Launchpad -> Glyphs.Bell; else -> Glyphs.Widget })
-                        }
+                        OneUiVisualChoice(com.bos.sphere.core.data.LeftPage.entries, p.leftPage, leftPick, { x(it.label) }, { SettingsArtHome.leftPage.art(it) }, tag = "cfg.leftPage")
                     },
                     onSelect = leftPick,
                 ),
@@ -471,9 +461,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     x("Comms theme"), Glyphs.Moon, com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { x(it.label) },
                     hint = x("Dark suits the rest of the launcher; Light is the classic hub look."),
                     preview = {
-                        VisualChoice(com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { v -> upd { it.copy(launchpadTheme = v) } }, { x(it.label) }, columns = 3, previewHeight = 96.dp) { t ->
-                            com.bos.sphere.ui.LaunchpadThemePreview(t)
-                        }
+                        OneUiVisualChoice(com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { v -> upd { it.copy(launchpadTheme = v) } }, { x(it.label) }, { com.bos.sphere.ui.SettingsArtApp.commsTheme.art(it) }, tag = "cfg.commsTheme")
                     },
                 ) { v -> upd { it.copy(launchpadTheme = v) } },
             )
@@ -491,8 +479,8 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Default view"), Glyphs.Bell, comms.defaultChoices(), comms.defaultChoice(), { x(it.label) },
-                    hint = x("What Comms shows first when it opens. Messages, Notifications and Alerts open All with that category."), stepped = true,
-                ) { v -> comms.setDefaultChoice(v) },
+                    hint = x("What Comms shows first when it opens. Messages, Notifications and Alerts open All with that category."),
+                ) { v -> comms.setDefaultChoice(v) }.asCards({ com.bos.sphere.ui.SettingsArtApp.defaultView.art(it) }, "cfg.defaultView", id = { "${it.view.id}${it.category?.let { c -> "." + c.id } ?: ""}" }),
             )
             // Wave 53 (commsCategories): the pinned block (ongoing notifications and Pin-by-rule rows) at the top of Comms; stored with the exported Comms prefs.
             add(SettingItem.Toggle(x("Show pinned at the top"), Glyphs.Bell, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.pinnedAtTop, x("Ongoing notifications such as music, calls, timers, navigation and downloads, and senders you pinned, stay in a block at the top of Comms. Off lists them with the others. They never count as unread and cannot be dismissed.")) { v -> com.bos.sphere.core.data.LaunchpadSettings.setPinnedAtTop(v) })
@@ -503,9 +491,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     x("Widgets position"), Glyphs.Bell, com.bos.sphere.ui.WidgetsSlot.entries, comms.widgetsSlot.value, { x(it.label) },
                     hint = x("Where the Widgets tab sits among the sections."),
                     preview = {
-                        VisualChoice(com.bos.sphere.ui.WidgetsSlot.entries, comms.widgetsSlot.value, { v -> comms.setWidgetsSlot(v) }, { x(it.label) }, columns = 3, previewHeight = 64.dp) { sl ->
-                            com.bos.sphere.ui.PanelSectionsPreview(sl)
-                        }
+                        OneUiVisualChoice(com.bos.sphere.ui.WidgetsSlot.entries, comms.widgetsSlot.value, { v -> comms.setWidgetsSlot(v) }, { x(it.label) }, { com.bos.sphere.ui.SettingsArtApp.widgetsSlot.art(it) }, tag = "cfg.widgetsSlot")
                     },
                 ) { v -> comms.setWidgetsSlot(v) },
             )
@@ -590,7 +576,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Light / dark"), Glyphs.Moon, ThemeMode.entries, p.themeMode, { x(it.label) },
-                    preview = { VisualChoice(ThemeMode.entries, p.themeMode, { v -> upd { it.copy(themeMode = v) } }, { x(it.label) }, previewHeight = 96.dp) { ThemeModePreview(it, androidx.compose.ui.graphics.Color(p.accentColor)) } },
+                    preview = { OneUiVisualChoice(ThemeMode.entries, p.themeMode, { v -> upd { it.copy(themeMode = v) } }, { x(it.label) }, { SettingsArtLook.themeMode.art(it) }, tag = "cfg.themeMode") },
                 ) { v -> upd { it.copy(themeMode = v) } },
             )
             add(SettingItem.Pane(x("Accent"), Glyphs.Palette, "") { ColorPicker(p.accentColor, { v -> upd { it.copy(accentColor = v) } }) })
@@ -606,23 +592,17 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Icon shape"), Glyphs.Apps, IconShape.entries, p.iconShape, { x(it.label) },
-                    preview = { VisualChoice(IconShape.entries, p.iconShape, { v -> upd { it.copy(iconShape = v) } }, { x(it.label) }, columns = 3, previewHeight = 64.dp) { ThemedSampleIcon(52.dp, 1, shape = it) } },
+                    preview = { OneUiVisualChoice(IconShape.entries, p.iconShape, { v -> upd { it.copy(iconShape = v) } }, { x(it.label) }, { SettingsArtLook.iconShape.art(it) }, tag = "cfg.iconShape") },
                 ) { v -> upd { it.copy(iconShape = v) } },
             )
-            add(SettingItem.Choice(x("Icon colour"), Glyphs.Image, IconTint.entries, p.iconTint, { x(it.label) }, hint = x("Long-press an app and choose Icon colour to tint just that app.")) { v -> upd { it.copy(iconTint = v) } })
+            add(SettingItem.Choice(x("Icon colour"), Glyphs.Image, IconTint.entries, p.iconTint, { x(it.label) }, hint = x("Long-press an app and choose Icon colour to tint just that app.")) { v -> upd { it.copy(iconTint = v) } }.asCards({ SettingsArtLook.iconTint.art(it) }, "cfg.iconTint"))
             add(SettingItem.Toggle(x("Icon plate"), Glyphs.Widget, p.iconPlate, x("A tile behind transparent icons")) { v -> upd { it.copy(iconPlate = v) } })
             add(
                 SettingItem.Choice(
                     x("Settings backdrop"), Glyphs.Moon, com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { x(it.label) },
                     hint = x("Settings use your background, dimmed, or pitch black."),
                     preview = {
-                        VisualChoice(com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { v -> upd { it.copy(settingsBackdrop = v) } }, { x(it.label) }, columns = 2, previewHeight = 110.dp) { b ->
-                            if (b == com.bos.sphere.core.data.SettingsBackdrop.Black) androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
-                            else androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                                com.bos.sphere.feature.grid.SignalBackground(p, Modifier.fillMaxSize(), dark = true, baseFill = true, animate = false, announce = false)
-                                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = p.settingsDim)))
-                            }
-                        }
+                        OneUiVisualChoice(com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { v -> upd { it.copy(settingsBackdrop = v) } }, { x(it.label) }, { SettingsArtLook.backdrop.art(it) }, tag = "cfg.backdrop")
                     },
                 ) { v -> upd { it.copy(settingsBackdrop = v) } },
             )
@@ -639,16 +619,12 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         listOf(
             SettingItem.Choice(
                 x("Radar layout"), Glyphs.Apps, com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { x(it.label) },
-                preview = {
-                    VisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } }, { x(it.label) }, previewHeight = 140.dp) {
-                        com.bos.sphere.feature.grid.SearchLayoutPreview(it)
-                    }
-                },
+                preview = { OneUiVisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } }, { x(it.label) }, { SettingsArtHome.searchLayout.art(it) }, tag = "cfg.radarLayout") },
             ) { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } },
             SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: Radar opens as a flat list while a keyboard or mouse is in use")) { v -> upd { it.copy(searchLayoutPinned = v) } },
-            SettingItem.Choice(x("Radar background"), Glyphs.Moon, com.bos.sphere.core.data.RadarBackground.entries, p.radarBackground, { x(it.label) }, hint = x("Dimmed shows your wallpaper at a quarter of its brightness; True black draws nothing, for the most contrast")) { v -> upd { it.copy(radarBackground = v) } },
+            SettingItem.Choice(x("Radar background"), Glyphs.Moon, com.bos.sphere.core.data.RadarBackground.entries, p.radarBackground, { x(it.label) }, hint = x("Dimmed shows your wallpaper at a quarter of its brightness; True black draws nothing, for the most contrast")) { v -> upd { it.copy(radarBackground = v) } }.asCards({ SettingsArtHome.radarBackground.art(it) }, "cfg.radarBackground"),
             SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly; off keeps them still until you move them")) { v -> upd { it.copy(searchMotion = v) } },
-            SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("Enter and the Search row open this engine in your browser")) { v -> upd { it.copy(webEngine = v) } },
+            SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("Enter and the Search row open this engine in your browser")) { v -> upd { it.copy(webEngine = v) } }.asCards({ SettingsArtLook.webEngine.art(it) }, "cfg.webEngine"),
             SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },
             // Wave 43 (radarWeb): the privacy switch of the launcher's only network use. Off = nothing leaves the phone.
             SettingItem.Toggle(x("Web suggestions"), Glyphs.Globe, p.webSuggestions, x("Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions.", p.webEngine.label)) { v -> upd { it.copy(webSuggestions = v) } },
@@ -672,19 +648,19 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 SettingItem.Choice(
                     x("Calm effect"), Glyphs.Dial, listOf<CalmEffect?>(null, *CalmEffect.entries.toTypedArray()), p.indicatorCalm, { if (it == null) x("Off") else x(it.label) },
                     hint = x("Lit while the value is healthy: red, amber, green."),
-                ) { v -> upd { it.copy(indicatorCalm = v) } },
+                ) { v -> upd { it.copy(indicatorCalm = v) } }.asCards({ SettingsArtLook.calm.art(it) }, "cfg.calm"),
             )
             add(
                 SettingItem.Choice(
                     x("Alert effect"), Glyphs.Bolt, listOf<AlertEffect?>(null, *AlertEffect.entries.toTypedArray()), p.indicatorAlert, { if (it == null) x("Off") else x(it.label) },
                     hint = x("Alert effects only appear when the value is low, and become urgent when it is lost."),
-                ) { v -> upd { it.copy(indicatorAlert = v) } },
+                ) { v -> upd { it.copy(indicatorAlert = v) } }.asCards({ SettingsArtLook.alert.art(it) }, "cfg.alert"),
             )
             add(
                 SettingItem.Choice(
                     x("Show"), Glyphs.Dial, IndicatorMetric.entries, p.indicatorMetric, { x(it.label) },
                     hint = x("What the effects map to: the signal level, or the battery (charging counts as healthy)."),
-                ) { v -> upd { it.copy(indicatorMetric = v) } },
+                ) { v -> upd { it.copy(indicatorMetric = v) } }.asCards({ SettingsArtLook.metric.art(it) }, "cfg.metric"),
             )
             add(SettingItem.Slider(x("Glow: intensity"), Glyphs.Dial, p.indicatorIntensity, 0f..1f, pct(p.indicatorIntensity)) { v -> upd { it.copy(indicatorIntensity = v) } })
             add(SettingItem.Slider(x("Glow: speed"), Glyphs.Dial, p.indicatorSpeed, 0f..1f, pct(p.indicatorSpeed)) { v -> upd { it.copy(indicatorSpeed = v) } })
@@ -730,7 +706,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("System"),
         Glyphs.Gear,
         listOf(
-            SettingItem.Choice(x("Language"), Glyphs.Globe, UiLanguage.entries, p.language, { if (it == UiLanguage.System) x("System") else it.label }) { l -> upd { it.copy(language = l) } },
+            SettingItem.Pane(x("Language"), Glyphs.Globe, if (p.language == UiLanguage.System) x("System") else p.language.label) { LanguagePane(p.language) { l -> upd { it.copy(language = l) } } },
             SettingItem.Action(x("Set as default home"), Glyphs.Apps, "", navigates = true, onClick = m.system.setDefaultHome),
             SettingItem.Action(x("Notification access"), Glyphs.Bell, x("For the notifications hub"), navigates = true, onClick = m.system.notificationAccess),
             SettingItem.Action(x("Do Not Disturb access"), Glyphs.Moon, x("Needed for silent mode / DND actions"), navigates = true, onClick = m.system.dndAccess),
@@ -826,15 +802,15 @@ internal fun wallpaperSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> Launch
 /** HOM-23: the Glance settings rows (the clock style rows of wave 41, the music toggle, hotspot presets and corners, controls timeout, indicator; wave 38 removed the old clock, date and weather settings). */
 internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): List<SettingItem> = buildList {
     // Wave 41: the clock settings of the big Glance wallpaper clock: style (Analog/Digital of wave 38 became these styles), 12/24 hour for the digital styles, date, colour, size.
-    add(SettingItem.Choice(x("Clock style"), Glyphs.Clock, com.bos.sphere.core.data.ClockStyle.entries, p.clockStyle, { x(it.label) }, hint = x("The big clock on the Glance page")) { v -> upd { it.copy(clockStyle = v) } })
+    add(SettingItem.Choice(x("Clock style"), Glyphs.Clock, com.bos.sphere.core.data.ClockStyle.entries, p.clockStyle, { x(it.label) }, hint = x("The big clock on the Glance page")) { v -> upd { it.copy(clockStyle = v) } }.asCards({ SettingsArtLook.clockStyle.art(it) }, "cfg.clockStyle"))
     if (p.clockStyle != com.bos.sphere.core.data.ClockStyle.Off) {
         if (p.clockStyle.digital) {
             val fmt = com.bos.sphere.core.data.ClockFormat.entries.filter { it != com.bos.sphere.core.data.ClockFormat.System }
-            add(SettingItem.Choice(x("Clock format"), Glyphs.Clock, fmt, p.clockFormat.takeIf { it != com.bos.sphere.core.data.ClockFormat.System } ?: com.bos.sphere.core.data.ClockFormat.Hour24, { x(it.label) }) { v -> upd { it.copy(clockFormat = v) } })
+            add(SettingItem.Choice(x("Clock format"), Glyphs.Clock, fmt, p.clockFormat.takeIf { it != com.bos.sphere.core.data.ClockFormat.System } ?: com.bos.sphere.core.data.ClockFormat.Hour24, { x(it.label) }) { v -> upd { it.copy(clockFormat = v) } }.asCards({ SettingsArtLook.clockFormat.art(it) }, "cfg.clockFormat"))
         }
         add(SettingItem.Toggle(x("Show date under the clock"), Glyphs.Clock, p.glanceClockDate, x("The day and date in small text")) { on -> upd { it.copy(glanceClockDate = on) } })
-        add(SettingItem.Choice(x("Clock colour"), Glyphs.Clock, listOf(false, true), p.glanceClockAccent, { x(if (it) "Accent" else "Automatic") }, hint = x("Automatic is white or dark, whichever reads on the wallpaper")) { v -> upd { it.copy(glanceClockAccent = v) } })
-        add(SettingItem.Choice(x("Clock size"), Glyphs.Clock, com.bos.sphere.core.data.ClockSize.entries, p.glanceClockSize, { x(it.label) }) { v -> upd { it.copy(glanceClockSize = v) } })
+        add(SettingItem.Choice(x("Clock colour"), Glyphs.Clock, listOf(false, true), p.glanceClockAccent, { x(if (it) "Accent" else "Automatic") }, hint = x("Automatic is white or dark, whichever reads on the wallpaper")) { v -> upd { it.copy(glanceClockAccent = v) } }.asCards({ SettingsArtLook.clockColour.art(it) }, "cfg.clockColour"))
+        add(SettingItem.Choice(x("Clock size"), Glyphs.Clock, com.bos.sphere.core.data.ClockSize.entries, p.glanceClockSize, { x(it.label) }) { v -> upd { it.copy(glanceClockSize = v) } }.asCards({ SettingsArtLook.clockSize.art(it) }, "cfg.clockSize"))
     }
     add(SettingItem.Toggle(x("Show music"), Glyphs.Music, p.showMusic, x("The song that is playing, with its controls, at the top of every page")) { on -> upd { it.copy(showMusic = on) } })
     val hp = com.bos.sphere.core.data.GlanceHotspots.presetOf(p.glanceHotspots)
@@ -842,7 +818,7 @@ internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherP
         SettingItem.Choice(
             x("Hotspots"), Glyphs.Dial, com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }, hp.takeIf { it != com.bos.sphere.core.data.HotspotPreset.Custom } ?: com.bos.sphere.core.data.HotspotPreset.Four, { x(it.label) },
             hint = x("How many corner hotspots the Glance home draws. What each runs is set under Corners."),
-        ) { v -> upd { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(v) ?: it.glanceHotspots) } },
+        ) { v -> upd { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(v) ?: it.glanceHotspots) } }.asCards({ SettingsArtHome.hotspots.art(it) }, "cfg.hotspots"),
     )
     for (c in com.bos.sphere.core.data.Corner.entries) {
         add(SettingItem.Toggle(x("%s hotspot", x(c.label)), Glyphs.Dial, c in p.glanceHotspots) { on -> upd { it.copy(glanceHotspots = if (on) it.glanceHotspots + c else it.glanceHotspots - c) } })

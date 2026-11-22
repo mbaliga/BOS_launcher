@@ -49,7 +49,11 @@ import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.PageTransition
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
-import com.bos.sphere.feature.grid.Glyphs
+import androidx.compose.foundation.layout.fillMaxSize
+import com.bos.sphere.feature.grid.OneUiVisualCard
+import com.bos.sphere.feature.grid.VisualArt
+import com.bos.sphere.feature.grid.VisualCanvas
+import com.bos.sphere.feature.grid.VisualCardGroup
 
 /**
  * Wave 51 (homeMenuVisual): the Home quick sheet's choices as visual cards. Every card is a small drawn illustration (Canvas, no bitmap) over a short
@@ -67,42 +71,19 @@ internal object QuickCards {
 }
 
 /** One group of cards: a row that wraps (it follows the layout direction), so a large font or a narrow window never hides a card. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-internal fun CardRow(content: @Composable () -> Unit) {
-    androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { content() }
-}
+internal fun CardRow(content: @Composable () -> Unit) { VisualCardGroup { content() } }
 
-/** A choice card: [art] over [label]; role radio button with the selected state, the label is what TalkBack reads, 48 dp or more, a focus ring for keys and controllers. */
+/** A choice card with a legacy sheet drawing ([art] gets the size). The card itself is the shared [OneUiVisualCard]; the sheet is always dark. */
 @Composable
 internal fun OptionCard(label: String, selected: Boolean, tag: String, onClick: () -> Unit, art: DrawScope.(Size) -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    val accent = HyleColors.Violet
-    val tile = RoundedCornerShape(16.dp)
-    Column(
-        Modifier.width(QuickCards.CardWidth).testTag(tag).onFocusChanged { focused = it.isFocused }
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .semantics(mergeDescendants = true) {},
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier.fillMaxWidth().height(QuickCards.ArtHeight).clip(tile).background(QuickCards.TileFill)
-                .border(if (selected) 2.5.dp else 1.dp, if (selected) accent else if (focused) Color.White else QuickCards.InkFaint, tile),
-        ) {
-            Canvas(Modifier.fillMaxWidth().height(QuickCards.ArtHeight)) { art(size) }
-            if (selected) {
-                Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp).clip(CircleShape).background(accent), contentAlignment = Alignment.Center) {
-                    Icon(Glyphs.Check, null, tint = HyleColors.OnAccent, modifier = Modifier.size(13.dp))
-                }
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            L10n.tr(label), color = if (selected) Color.White else Color(0xB3FFFFFF), fontSize = 12.sp, lineHeight = 15.sp, textAlign = TextAlign.Center,
-            maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.heightIn(min = 18.dp),
-        )
-        Spacer(Modifier.height(4.dp))
-    }
+    OneUiVisualCard(L10n.tr(label), selected, tag, onClick, dark = true) { Canvas(Modifier.fillMaxSize()) { art(size) } }
+}
+
+/** A choice card whose picture is one of the shared settings illustrations (the same drawing the Settings rows use). */
+@Composable
+internal fun OptionCardArt(label: String, selected: Boolean, tag: String, onClick: () -> Unit, art: VisualArt) {
+    OneUiVisualCard(L10n.tr(label), selected, tag, onClick, dark = true) { ink -> VisualCanvas(ink, art) }
 }
 
 /** A top entry tile (Add apps, Add widgets, Edit home): glyph over label, a button, not a choice. */
@@ -144,62 +125,6 @@ private fun DrawScope.appGrid(box: Pair<Offset, Size>, cols: Int, rows: Int, acc
         val col = if (n == accentCell) Color(0xFFFFFFFF) else color
         drawRoundRect(col, Offset(o.x + pad + c * (cell + gap), top + r * (cell + gap)), Size(cell, cell), CornerRadius(cell * 0.3f))
         n++
-    }
-}
-
-private fun DrawScope.dots(box: Pair<Offset, Size>, count: Int, current: Int) {
-    val (o, sz) = box
-    val r = px(1.6f)
-    for (i in 0 until count) {
-        val cx = o.x + sz.width / 2f + (i - (count - 1) / 2f) * px(6f)
-        drawCircle(if (i == current) Color.White else QuickCards.InkFaint, if (i == current) r * 1.2f else r, Offset(cx, o.y + sz.height - px(6f)))
-    }
-}
-
-internal fun pagesArt(mode: HomePages): DrawScope.(Size) -> Unit = { s ->
-    val box = phone(s)
-    when (mode) {
-        HomePages.Off -> appGrid(box, 2, 3, accentCell = -1)
-        HomePages.Paginated -> { appGrid(box, 2, 3); dots(box, 3, 0) }
-        HomePages.Continuous -> {
-            // columns running off the right edge, with a scroll arrow
-            val (o, sz) = box
-            val gap = sz.width * 0.1f; val cell = sz.width * 0.26f
-            for (c in 0 until 3) for (r in 0 until 3) {
-                val x = o.x + sz.width * 0.12f + c * (cell + gap)
-                if (x + cell <= o.x + sz.width - px(1f)) drawRoundRect(QuickCards.InkSoft, Offset(x, o.y + sz.height * 0.14f + r * (cell + gap)), Size(cell, cell), CornerRadius(cell * 0.3f))
-            }
-            val y = o.y + sz.height - px(7f)
-            drawLine(Color.White, Offset(o.x + sz.width * 0.2f, y), Offset(o.x + sz.width * 0.8f, y), px(2f))
-            val head = Path().apply { moveTo(o.x + sz.width * 0.8f, y - px(3f)); lineTo(o.x + sz.width * 0.8f + px(4f), y); lineTo(o.x + sz.width * 0.8f, y + px(3f)) }
-            drawPath(head, Color.White, style = Stroke(px(1.5f)))
-        }
-    }
-}
-
-internal fun orderArt(rtl: Boolean): DrawScope.(Size) -> Unit = { s ->
-    val tw = s.width * 0.2f; val th = s.height * 0.3f; val gap = s.width * 0.07f
-    val total = 3 * tw + 2 * gap; val x0 = (s.width - total) / 2f; val y0 = s.height * 0.3f
-    for (i in 0 until 3) {
-        val first = if (rtl) i == 2 else i == 0 // the page that comes first is the one at the start side
-        val x = x0 + i * (tw + gap)
-        drawRoundRect(if (first) Color.White else QuickCards.InkSoft, Offset(x, y0), Size(tw, th), CornerRadius(px(4f)), style = if (first) androidx.compose.ui.graphics.drawscope.Fill else Stroke(px(1.5f)))
-    }
-    val y = s.height * 0.8f; val a = x0; val b = x0 + total
-    val (from, to) = if (rtl) b to a else a to b
-    drawLine(Color.White, Offset(from, y), Offset(to, y), px(2f))
-    val d = if (rtl) px(4f) else -px(4f)
-    val head = Path().apply { moveTo(to + d, y - px(3.5f)); lineTo(to, y); lineTo(to + d, y + px(3.5f)) }
-    drawPath(head, Color.White, style = Stroke(px(2f)))
-}
-
-internal fun hotspotsArt(on: Set<Corner>): DrawScope.(Size) -> Unit = { s ->
-    val (o, sz) = phone(s)
-    val inset = px(6f); val r = px(3.4f)
-    for (c in Corner.entries) {
-        val cx = if (c == Corner.TopLeft || c == Corner.BottomLeft) o.x + inset else o.x + sz.width - inset
-        val cy = if (c == Corner.TopLeft || c == Corner.TopRight) o.y + inset else o.y + sz.height - inset
-        if (c in on) drawCircle(Color.White, r, Offset(cx, cy)) else drawCircle(QuickCards.InkFaint, r * 0.7f, Offset(cx, cy), style = Stroke(px(1f)))
     }
 }
 

@@ -240,9 +240,11 @@ class CommsOptionsW29Test {
         assertNotNull("search matches the summary text", SettingsIndex.fromCategories(cats()).search("shade").firstOrNull { it.title == "Delete history" })
     }
 
-    @Test fun STR_01_w29_onlyTheDefaultViewRowIsForcedOffTheSegmentSlab() {
-        val stepped = cats().flatMap { c -> c.items.filterIsInstance<SettingItem.Choice<*>>() }.filter { it.stepped }.map { it.title }
-        assertEquals("other rows keep their slab (Web engine and the like)", listOf("Default view"), stepped)
+    // Wave 54: the Default view row is a row of drawn cards like every other choice, so no choice is forced onto the old stepped slab any more.
+    @Test fun STR_01_w29_noChoiceNeedsTheSteppedSlabNowTheDefaultViewIsCards() {
+        val all = cats().flatMap { c -> c.items.filterIsInstance<SettingItem.Choice<*>>() }
+        assertEquals(emptyList<String>(), all.filter { it.stepped }.map { it.title })
+        assertNotNull("the Default view row has its cards", all.first { it.title == "Default view" }.preview)
     }
     @Suppress("UNCHECKED_CAST") private fun SettingItem.Choice<*>.labelOf(o: Any?): String = (this as SettingItem.Choice<Any?>).label(o)
 

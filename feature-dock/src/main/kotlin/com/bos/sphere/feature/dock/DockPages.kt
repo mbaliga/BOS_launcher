@@ -121,9 +121,9 @@ fun DockSettingsContent(
     OneUiGroup(2) {
         OneUiValueRow(L10n.tr("Dock mode"), L10n.tr(state.dock.mode.label), { pickingMode = true }, modifier = Modifier.testTag(DockPageTags.MODE))
         OneUiRowDivider()
-        OneUiSegmentedRow(
-            L10n.tr("Dock position"), DockEdge.entries.map { L10n.tr(it.label) }, DockEdge.entries.indexOf(state.dock.edge),
-            { i -> manager.setDock { it.copy(edge = DockEdge.entries[i]) } },
+        com.bos.sphere.feature.grid.OneUiVisualChoiceRow(
+            L10n.tr("Dock position"), DockEdge.entries, state.dock.edge, { e -> manager.setDock { it.copy(edge = e) } },
+            { L10n.tr(it.label) }, { DockEdgeArt.edge.art(it) }, tag = "dock.edge",
         )
     }
     OneUiCaption(L10n.tr("In portrait the dock is always at the bottom. In landscape it can also sit on a side."))

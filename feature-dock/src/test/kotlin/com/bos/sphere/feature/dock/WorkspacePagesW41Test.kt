@@ -37,7 +37,6 @@ import com.bos.sphere.feature.grid.OneUiDialogTags
 import com.bos.sphere.feature.grid.OneUiMenuTags
 import com.bos.sphere.feature.grid.OneUiPageFrame
 import com.bos.sphere.feature.grid.OneUiTags
-import com.bos.sphere.feature.grid.oneUiSegmentedTag
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -385,7 +384,7 @@ class WorkspacePagesW41Test {
         rule.onNodeWithTag(DockPageTags.SHOW_DOCK).assertIsDisplayed()
         rule.onNodeWithTag(DockPageTags.MODE).assertIsDisplayed()
         rule.onNodeWithText("Pinned and recent").assertIsDisplayed() // the value of the Dock mode row, not a chip
-        (0..2).forEach { rule.onNodeWithTag(oneUiSegmentedTag(it)).assertIsDisplayed() } // Bottom / Left / Right as one segmented control
+        DockEdge.entries.forEach { rule.onNodeWithTag("dock.edge.${it.name}").assertIsDisplayed() } // Bottom / Left / Right as three drawn cards (wave 54)
         rule.onNodeWithTag(DockPageTags.ADD_APPS).assertIsDisplayed()
         assertTrue("the Add apps row is a 56 dp row", rule.onNodeWithTag(DockPageTags.ADD_APPS).getUnclippedBoundsInRoot().let { it.bottom - it.top } >= 56.dp)
         rule.onAllNodesWithText("Workspaces").assertCountEquals(0) // the old card's section heading is gone from this page
@@ -396,7 +395,7 @@ class WorkspacePagesW41Test {
         val m = manager(); showDock(m)
         rule.onNodeWithTag(DockPageTags.SHOW_DOCK).performClick(); settle()
         assertEquals(false, m.current.dock.enabled)
-        rule.onNodeWithTag(oneUiSegmentedTag(2)).performClick(); settle()
+        rule.onNodeWithTag("dock.edge.Right").performClick(); settle()
         assertEquals(DockEdge.Right, m.current.dock.edge)
         rule.onNodeWithTag(DockPageTags.MODE).performClick(); settle()
         rule.onNodeWithTag(OneUiDialogTags.option(0)).performClick(); settle()

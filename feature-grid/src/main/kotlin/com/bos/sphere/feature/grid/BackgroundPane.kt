@@ -71,10 +71,10 @@ fun BackgroundPane(prefs: LauncherPrefs, surface: WallpaperSurface = WallpaperSu
             return@Column
         }
         Text(L10n.tr("Wallpaper type"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
-        ChipRow(WallpaperKind.entries.toList(), wp.kind, { L10n.tr(it.label) }) { k ->
+        OneUiVisualChoice(WallpaperKind.entries.toList(), wp.kind, { k ->
             // Switching to a picture that plays and was never confirmed starts as a still: the power warning is asked when the user turns the animation on.
             edit { it.copy(kind = k, picture = if (k == WallpaperKind.Picture && com.bos.sphere.core.data.PowerWarning.mustAsk(it.picture)) it.picture.copy(gif = com.bos.sphere.core.data.GifMode.Still) else it.picture) }
-        }
+        }, { L10n.tr(it.label) }, { SettingsArtLook.wallpaperKind.art(it) }, tag = "cfg.wallpaperKind")
         when (wp.kind) {
             WallpaperKind.Solid -> Box(Modifier.padding(top = 10.dp)) { ColorPicker(wp.solid, { c -> edit { it.copy(solid = c) } }) }
             WallpaperKind.Gradient -> GradientEditor(wp.gradient) { g -> edit { it.copy(gradient = g) } }
@@ -113,7 +113,7 @@ private fun LiveWallpaperEditor(choice: BackgroundChoice, intensity: RadarIntens
     SlotPicker(2, choice, previewForce, intensity) { item -> onChoice(choice.with(2, item)) }
     Text(L10n.tr("At most one living wallpaper, plus an effect. Two effects work too, and so does one item alone."), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
     Text(L10n.tr("Intensity"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp))
-    ChipRow(RadarIntensity.entries.toList(), intensity, { L10n.tr(it.label) }, onIntensity)
+    OneUiVisualChoice(RadarIntensity.entries.toList(), intensity, onIntensity, { L10n.tr(it.label) }, { SettingsArtLook.radarIntensity.art(it) }, tag = "cfg.radarIntensity")
 }
 
 /** The strip at the top of the pane: the wallpaper as it will be drawn (live ones animate unless reduced motion is on, then one still frame). */

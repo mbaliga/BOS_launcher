@@ -225,11 +225,12 @@ internal fun timelineDescription(e: TimelineEvent, time: String): String =
 
 @Composable
 private fun Tile(icon: TimelineIcon, tag: String, badgePkg: String?, badgeLabel: String) {
-    Box(Modifier.size(46.dp), Alignment.Center) {
-        Box(Modifier.size(40.dp).background(icon.tile, CircleShape).testTag(tag), Alignment.Center) {
-            Image(rememberVectorPainter(icon.glyph), null, Modifier.size(22.dp))
+    // Smaller than before (owner: "I want these icons to be smaller"): a 28 dp circle with a 16 dp glyph and a 12 dp app badge in a 32 dp slot.
+    Box(Modifier.size(32.dp), Alignment.Center) {
+        Box(Modifier.size(28.dp).background(icon.tile, CircleShape).testTag(tag), Alignment.Center) {
+            Image(rememberVectorPainter(icon.glyph), null, Modifier.size(16.dp))
         }
-        if (!badgePkg.isNullOrBlank()) Box(Modifier.align(Alignment.BottomEnd).testTag("$tag.badge")) { AppIcon(badgePkg, badgeLabel, 16) }
+        if (!badgePkg.isNullOrBlank()) Box(Modifier.align(Alignment.BottomEnd).testTag("$tag.badge")) { AppIcon(badgePkg, badgeLabel, 12) }
     }
 }
 

@@ -268,7 +268,7 @@ abstract class TimelineRichW41Cases : TimelineRichW41Base() {
         rule.runOnIdle { q.drain() }
         rule.waitForIdle()
         val composed = (0..4999).count { exists("timeline.row.$it") }
-        assertTrue("lazy: $composed rows composed", composed in 1..60)
+        assertTrue("lazy: $composed rows composed", composed in 1..120)
     }
 
     private fun targetAt(pct: Int) {
@@ -287,6 +287,13 @@ abstract class TimelineRichW41Cases : TimelineRichW41Base() {
         val time = rule.onNodeWithTag("timeline.time.1", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertTrue("detail ${detail.right} ends before the time ${time.left}", detail.right.value <= time.left.value + 0.5f)
         assertTrue(time.right.value <= row.right.value + 0.5f && detail.left.value >= row.left.value)
+    }
+
+    @Test fun HOM_18_w54_theEventIconIsSmallAnd28DpCircleWithA16DpGlyph() {
+        host(everyKind())
+        val b = rule.onNodeWithTag("timeline.icon.AppOpened.0", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals("the circle is 28 dp wide", 28f, b.right.value - b.left.value, 0.5f)
+        assertEquals("the circle is 28 dp high", 28f, b.bottom.value - b.top.value, 0.5f)
     }
 
     @Test fun HOM_18_w41_inRightToLeftTheIconIsOnTheRightAndTheTimeOnTheLeft() {

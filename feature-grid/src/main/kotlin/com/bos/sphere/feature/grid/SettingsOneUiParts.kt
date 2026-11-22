@@ -5,6 +5,7 @@ package com.bos.sphere.feature.grid
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,45 +73,55 @@ import com.bos.sphere.core.design.rememberMotionPrefs
 
 /** Wave 40 (settingsOneUI): the One UI style building blocks of the settings: cards, rows, the switch, the slider, the radio. */
 internal object OneUi {
-    val CardShape = RoundedCornerShape(26.dp)
     val TileShape = RoundedCornerShape(12.dp)
     val Margin = 16.dp
-    val CardGap = 12.dp
+    /** The empty space between two groups of rows (wave 54: there is no box, so the gap and the grey header do the separating). */
+    val GroupGap = 28.dp
+    /** The start and end padding of a row: text starts here (and the divider under it), the section header too. */
+    val RowPad = 24.dp
+    /** Width of the icon tile of a root row plus the gap after it: where the text of such a row starts, from the row padding. */
+    val TileAdvance = 56.dp
     val RowMin = 56.dp
     val RootRowMin = 64.dp
     val Page: Color get() = HyleColors.Background
-    val Card: Color get() = HyleColors.Surface
+    /** The one filled field left in settings: the search field (a control, not a box around rows). */
+    val Field: Color get() = HyleColors.Surface
     /** The unchecked track of the switch and the unfilled part of a slider. */
     val Track: Color get() = if (com.bos.sphere.core.design.HyleTheme.isLight) Color(0xFFC9CCD4) else Color(0xFF454A57)
     val Focus: Color get() = HyleColors.Violet.copy(alpha = 0.18f)
     val Highlight: Color get() = HyleColors.Violet.copy(alpha = 0.26f)
 }
 
-/** A rounded card: the rows inside it are a list for the screen reader; separators are drawn by [OneUiDivider] between the rows. */
+/**
+ * Wave 54 (settingsLines): a group of rows, flat on the page (no filled rounded box). The rows are a list for the screen reader; thin
+ * lines between them come from [OneUiDivider], the grey [OneUiSectionHeader] above names the group.
+ */
 @Composable
-internal fun OneUiCard(rowCount: Int, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun OneUiRows(rowCount: Int, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
         modifier
-            .padding(horizontal = OneUi.Margin)
             .fillMaxWidth()
-            .clip(OneUi.CardShape)
-            .background(OneUi.Card)
+            .testTag(OneUiTags.GROUP)
             .semantics { collectionInfo = CollectionInfo(rowCount, 1) },
     ) { content() }
 }
 
-/** The hairline between two rows of a card, inset from the start by [inset] (the icon of a root row, the text margin of a page row). */
+/**
+ * The hairline between two rows, inset from the start so it begins where the text begins. [inset] is a legacy size: 20 dp or less means a
+ * row without a tile (text at the row padding), more means a root row with an icon tile (text after the tile). Mirrors in RTL.
+ */
 @Composable
 internal fun OneUiDivider(inset: androidx.compose.ui.unit.Dp) {
-    Box(Modifier.padding(start = inset, end = 20.dp).fillMaxWidth().height(1.dp).background(HyleColors.Hairline))
+    val start = OneUi.RowPad + if (inset > 20.dp) OneUi.TileAdvance else 0.dp
+    Box(Modifier.padding(start = start, end = OneUi.RowPad).fillMaxWidth().height(1.dp).background(HyleColors.Hairline).testTag(OneUiTags.DIVIDER))
 }
 
-/** The small grey title above a card. A heading for the screen reader. */
+/** The small grey title above a group. A heading for the screen reader. */
 @Composable
 internal fun OneUiSectionHeader(text: String) {
     Text(
         text, color = HyleColors.InkDim, fontSize = 14.sp, fontWeight = FontWeight.Medium,
-        modifier = Modifier.fillMaxWidth().padding(start = OneUi.Margin + 16.dp, end = OneUi.Margin, top = 18.dp, bottom = 8.dp).semantics { heading() },
+        modifier = Modifier.fillMaxWidth().padding(start = OneUi.RowPad, end = OneUi.RowPad, top = 24.dp, bottom = 8.dp).semantics { heading() },
     )
 }
 
@@ -161,8 +172,9 @@ internal fun OneUiRowFrame(
             .androidxBringIntoView(reveal)
             .semantics { if (highlighted) this.selected = true }
             .background(fill)
+            .then(if (focused) Modifier.border(2.dp, HyleColors.Violet).testTag(OneUiTags.FOCUS_RING) else Modifier)
             .then(if (onClick != null) Modifier.onFocusChanged { focused = it.isFocused }.clickable(role = role, onClick = onClick) else Modifier)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = OneUi.RowPad, vertical = 10.dp),
     ) {
         Row(Modifier.heightIn(min = min - 20.dp), verticalAlignment = Alignment.CenterVertically) {
             if (leading != null) { leading(); Spacer(Modifier.size(16.dp)) }
@@ -312,7 +324,7 @@ internal fun OneUiRailRow(item: SettingItem.Choice<*>, highlighted: Boolean) {
             item.title, summary = item.hint, role = null,
             modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${item.title}, ${item.value}" },
         )
-        CompositionLocalProvider(LocalRailInset provides 0.dp) { Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) { item.preview?.invoke(this) } }
+        CompositionLocalProvider(LocalRailInset provides 0.dp) { Column(Modifier.fillMaxWidth().padding(horizontal = OneUi.Margin)) { item.preview?.invoke(this) } }
     }
 }
 
@@ -343,7 +355,7 @@ internal fun OneUiRadioRow(label: String, selected: Boolean, detail: String? = n
         modifier = modifier.semantics(mergeDescendants = true) { this.selected = selected; contentDescription = label },
         trailing = {
             Box(Modifier.size(22.dp).clip(CircleShape).background(if (selected) HyleColors.Violet else OneUi.Track), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(if (selected) 8.dp else 16.dp).clip(CircleShape).background(if (selected) Color.White else OneUi.Card))
+                Box(Modifier.size(if (selected) 8.dp else 16.dp).clip(CircleShape).background(if (selected) Color.White else OneUi.Page))
             }
         },
     )
@@ -363,7 +375,7 @@ internal fun OneUiCheckRow(label: String, checked: Boolean, modifier: Modifier =
 @Composable
 internal fun OneUiSearchField(query: String, onQuery: (String) -> Unit, hint: String, modifier: Modifier = Modifier, focusRequester: androidx.compose.ui.focus.FocusRequester? = null) {
     Row(
-        modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).background(OneUi.Card).padding(horizontal = 16.dp),
+        modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).background(OneUi.Field).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Glyphs.Search, null, tint = HyleColors.InkDim, modifier = Modifier.size(22.dp))

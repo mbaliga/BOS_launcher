@@ -102,6 +102,10 @@ object OneUiTags {
     const val RIGHT_PANE = "oneui.rightPane"
     /** Wave 46: the row of preview cards of a choice that shows its options inline. */
     const val RAIL = "oneui.rail"
+    /** Wave 54: a group of rows (flat, no box), the hairline between two rows, and the ring of the row that has the keyboard focus. */
+    const val GROUP = "oneui.group"
+    const val DIVIDER = "oneui.divider"
+    const val FOCUS_RING = "oneui.focusRing"
     /** Wave 46: the band of the large title (the title is centred in it). */
     const val TITLE_BAND = "oneui.titleBand"
     fun row(category: String) = "oneui.row.$category"
@@ -373,7 +377,7 @@ private fun OneUiRootPage(
             if (results.isEmpty()) {
                 item(key = "none") { Text(L10n.tr("No settings match “%s”", query), color = HyleColors.InkDim, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp)) }
             } else item(key = "results") {
-                OneUiCard(results.size) {
+                OneUiRows(results.size) {
                     results.forEachIndexed { i, e ->
                         if (i > 0) OneUiDivider(20.dp)
                         OneUiRowFrame(
@@ -389,8 +393,8 @@ private fun OneUiRootPage(
             groups.forEachIndexed { gi, idx ->
                 item(key = "group$gi") {
                     Column {
-                        if (gi > 0) Spacer(Modifier.height(OneUi.CardGap))
-                        OneUiCard(idx.size) {
+                        if (gi > 0) Spacer(Modifier.height(OneUi.GroupGap))
+                        OneUiRows(idx.size) {
                             idx.forEachIndexed { r, ci ->
                                 val c = categories[ci]
                                 if (r > 0) OneUiDivider(72.dp)
@@ -438,17 +442,17 @@ private fun OneUiCategoryPage(
         if (only != null) { // a category that is one pane (Hidden apps, Workspaces) is that pane: no second level to tap through
             item(key = "pane") {
                 if (only.bare) Column(Modifier.fillMaxWidth()) { only.content(this) }
-                else Box(Modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().clip(OneUi.CardShape).background(OneUi.Card).padding(horizontal = 16.dp, vertical = 8.dp)) { Column(Modifier.fillMaxWidth()) { only.content(this) } }
+                else Box(Modifier.fillMaxWidth().padding(horizontal = OneUi.RowPad, vertical = 8.dp)) { Column(Modifier.fillMaxWidth()) { only.content(this) } }
             }
             return@OneUiPage
         }
         blocks.forEachIndexed { bi, b ->
             when (b) {
                 is OneUiModel.Block.Header -> item(key = "h$bi") { OneUiSectionHeader(b.text) }
-                is OneUiModel.Block.Card -> item(key = "c$bi") {
+                is OneUiModel.Block.Group -> item(key = "c$bi") {
                     Column {
-                        if (bi > 0 && blocks[bi - 1] is OneUiModel.Block.Card) Spacer(Modifier.height(OneUi.CardGap))
-                        OneUiCard(b.rows.size) {
+                        if (bi > 0 && blocks[bi - 1] is OneUiModel.Block.Group) Spacer(Modifier.height(OneUi.GroupGap))
+                        OneUiRows(b.rows.size) {
                             b.rows.forEachIndexed { r, i ->
                                 if (r > 0) OneUiDivider(20.dp)
                                 OneUiItem(items[i], i, lit == i, host)
@@ -484,14 +488,14 @@ private fun OneUiSubPage(category: SettingCategory, itemIndex: Int, host: ItemHo
         when (row) {
             is SettingItem.Pane -> item(key = "pane") {
                 if (row.bare) Column(Modifier.fillMaxWidth()) { row.content(this) }
-                else Box(Modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().clip(OneUi.CardShape).background(OneUi.Card).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                else Box(Modifier.fillMaxWidth().padding(horizontal = OneUi.RowPad, vertical = 8.dp)) {
                     Column(Modifier.fillMaxWidth()) { row.content(this) }
                 }
             }
             is SettingItem.Choice<*> -> {
                 @Suppress("UNCHECKED_CAST") val c = row as SettingItem.Choice<Any?>
                 item(key = "options") {
-                    OneUiCard(c.options.size) {
+                    OneUiRows(c.options.size) {
                         c.options.forEachIndexed { i, opt ->
                             if (i > 0) OneUiDivider(20.dp)
                             OneUiRadioRow(c.label(opt), opt == c.selected) {

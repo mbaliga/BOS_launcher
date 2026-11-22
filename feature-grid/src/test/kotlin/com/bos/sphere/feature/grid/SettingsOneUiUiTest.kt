@@ -135,7 +135,7 @@ class SettingsOneUiUiTest {
 
     @Test fun CFG_21_theRootListsEveryCategoryUpFrontWithItsSummaryAndNoTabsOrPuck() {
         show()
-        for (t in titles().take(7)) rule.onNodeWithTag(OneUiTags.row(t)).assertIsDisplayed()
+        for (t in titles().take(6)) rule.onNodeWithTag(OneUiTags.row(t)).assertIsDisplayed() // wave 54: 28 dp between groups instead of 12 dp cards, so the seventh row is below the fold of this window
         rule.onNodeWithText("Dark · Rounded icons").assertIsDisplayed()
         rule.onNodeWithText("Paginated · 3 pages").assertIsDisplayed()
         assertEquals("no tab role anywhere", 0, rule.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("tab") { it.config.getOrNull(SemanticsProperties.Role) == androidx.compose.ui.semantics.Role.Tab }).fetchSemanticsNodes().size)

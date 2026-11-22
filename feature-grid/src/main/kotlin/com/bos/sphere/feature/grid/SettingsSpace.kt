@@ -164,7 +164,7 @@ sealed interface SettingItem {
         override val title: String,
         override val glyph: ImageVector,
         override val value: String,
-        /** Wave 41: true when the pane lays out its own One UI cards ([OneUiGroup] and friends): the host then adds no card around it. */
+        /** Wave 41: true when the pane lays out its own One UI groups ([OneUiGroup] and friends): the host then adds no padding around it. */
         val bare: Boolean = false,
         /** Wave 41: a live line under the large title of the page (the active workspace, for one). */
         val pageSubtitle: (@Composable () -> String)? = null,

@@ -20,7 +20,7 @@ import com.bos.sphere.core.design.L10n
 /**
  * Wave 46 (settingsPages): the pickers the settings open are full pages, not popups. Dialogs stay for confirmations and short text entry
  * only ([OneUiDialog]). A page hosts the shared One UI page chrome (back arrow, large collapsing title with the one-line explanation under
- * it, rounded cards) in a full-screen window so a pane that lives in a list can still open one; the window has no card, no scrim and no
+ * it, flat lists) in a full-screen window so a pane that lives in a list can still open one; the window has no card, no scrim and no
  * Cancel button: the back arrow (and the system Back) is the way out.
  */
 @Composable
@@ -32,7 +32,7 @@ fun OneUiFullPage(onDismiss: () -> Unit, content: @Composable () -> Unit) {
 }
 
 /**
- * Single choice as a full page: the options are radio rows inside one rounded card under the large title, [body] is the one-line
+ * Single choice as a full page: the options are radio rows inside one flat list under the large title, [body] is the one-line
  * explanation under the title. Picking a row applies it and returns.
  */
 @Composable
@@ -48,7 +48,7 @@ fun <T> OneUiRadioPage(
 ) = OneUiFullPage(onDismiss) {
     OneUiPageFrame(title, onDismiss, subtitle = body, tag = OneUiDialogTags.PAGE) {
         item(key = "options") {
-            OneUiCard(options.size, Modifier.selectableGroup()) {
+            OneUiRows(options.size, Modifier.selectableGroup()) {
                 options.forEachIndexed { i, o ->
                     if (i > 0) OneUiDivider(20.dp)
                     OneUiRadioRow(label(o), o == selected, detail(o), Modifier.testTag(OneUiDialogTags.option(i))) { onSelect(o); onDismiss() }
@@ -59,7 +59,7 @@ fun <T> OneUiRadioPage(
 }
 
 /**
- * Multiple choice as a full page: checkbox rows in one rounded card and a Done button under it; the back arrow leaves without applying.
+ * Multiple choice as a full page: checkbox rows in one flat list and a Done button under it; the back arrow leaves without applying.
  * [min] and [max] bound the count: Done is off outside them.
  */
 @Composable
@@ -79,7 +79,7 @@ fun <T> OneUiCheckPage(
     OneUiFullPage(onDismiss) {
         OneUiPageFrame(title, onDismiss, subtitle = body, tag = OneUiDialogTags.PAGE) {
             item(key = "options") {
-                OneUiCard(options.size) {
+                OneUiRows(options.size) {
                     options.forEachIndexed { i, o ->
                         if (i > 0) OneUiDivider(20.dp)
                         val on = o in picked

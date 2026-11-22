@@ -2,7 +2,9 @@ package com.bos.sphere
 
 import android.content.Intent
 import com.bos.sphere.feature.grid.SettingsPreviewDock
+import com.bos.sphere.core.data.sharesWallpaper
 import com.bos.sphere.feature.grid.captureHome
+import com.bos.sphere.feature.grid.captureWallpaper
 import com.bos.sphere.feature.grid.homeGestures
 import com.bos.sphere.ui.launchpadCloseDrag
 import com.bos.sphere.ui.launchpadEdgeDrag
@@ -890,10 +892,9 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
     }
+    // W55 (fixedBackdrop): the wallpaper is drawn ONCE, fixed, below the pager (see FixedHomeBackdrop at the top of the home box); the indicator effects (calm and alert) ride with it.
     @Composable
-    fun Background(baseFill: Boolean = true, surface: com.bos.sphere.core.data.WallpaperSurface = com.bos.sphere.core.data.WallpaperSurface.Pages) {
-        // HOM-16 (wave 26): one seam per surface; solid, gradient or the two signal-driven slots, and the NFR-15 scrim over it.
-        com.bos.sphere.feature.grid.HomeSurfaceBackground(surface, prefs, Modifier.fillMaxSize(), baseFill = baseFill)
+    fun BackdropIndicator() {
         IndicatorLayer(
             reading = reading,
             calm = prefs.indicatorCalm,
@@ -1007,6 +1008,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             .glanceWakeOnTouch { glanceWake.intValue++ }
             .rightEdgeSwipe(prefs.rightSide == com.bos.sphere.core.data.RightSide.DockRail && !leftOpen && !homeEdit.active, rtl = launchpadRtl) { openRecents() },
     ) {
+        // W55 (fixedBackdrop): the wallpaper and the indicator effects, once, BELOW the pager, the edit-mode page scale and the Comms/Recents card: nothing here is
+        // translated by a swipe or a panel drag. With a different Pages wallpaper it only cross-fades with the pager position (read in a graphicsLayer lambda).
+        com.bos.sphere.feature.grid.FixedHomeBackdrop(
+            prefs = prefs,
+            position = { homePager.currentPage + homePager.currentPageOffsetFraction },
+            modifier = Modifier.captureWallpaper(homeCapture),
+            overlay = { BackdropIndicator() },
+        )
         // W45: the scrim and the backdrop round the scaled page (nothing while the page editor's card is up: it draws its own background).
         run {
             val backdrop = remember { androidx.compose.runtime.derivedStateOf { chromeProgress.value * (1f - editCard.progress.value) } }
@@ -1112,6 +1121,12 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 .then(if (leftActive || rightActive) Modifier.background(Color.Black) else Modifier)
                 .captureHome(homeCapture),
         ) {
+            // W55: while a Comms/Recents panel shows, the home is a card over the (opaque) panel and needs a face of its own: a still copy of the wallpaper on the card. The fixed
+            // backdrop itself is below the panels and never moves; the card face is part of the card, not the backdrop.
+            if (leftActive || rightActive) com.bos.sphere.feature.grid.HomeSurfaceBackground(
+                if (prefs.glanceEnabled && landing == HomeShown.Glance || prefs.sharesWallpaper(com.bos.sphere.core.data.WallpaperSurface.Pages)) com.bos.sphere.core.data.WallpaperSurface.Glance else com.bos.sphere.core.data.WallpaperSurface.Pages,
+                prefs, Modifier.fillMaxSize(), animate = false, announce = false, play = false, alert = false,
+            )
             // Wave 28 (homeUnify): the home is ONE horizontal pager, [Glance (when on)] then the pages stop: the pages (paginated, a grid pager nested in it) or the
             // scroll surface (continuous). Swiping, the indicator and the Home button all work on these stops; there is no second surface and no second set of dots.
             val pagerHostDir = androidx.compose.ui.platform.LocalLayoutDirection.current
@@ -1138,7 +1153,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             onPrefsEdit = { f -> stores.prefs.update(f) }, onEditingChange = { glanceClockEditing = it },
                             onOpenLaunchpad = { if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off && !glanceClockEditing) leftOpen = true },
                             indicator = false, onAwake = { indicatorAwake++ }, // wave 28: the one page indicator is drawn by the home, above the pager
-                            underlay = { Background(baseFill = false, surface = com.bos.sphere.core.data.WallpaperSurface.Glance) },
+                            transparentBase = true, // W55: the wallpaper is the fixed backdrop below the pager, not part of this page
                         )
                     }
                 }
@@ -1148,7 +1163,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                             when (prefs.homeStyle) {
                 HomeStyle.Grid -> if (prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous) {
                     // Wave 26: the SCROLL pages: one continuous surface, column by column (ColumnScrollHome).
-                    Background()
                     Box(Modifier.fillMaxSize().safeDrawingPadding().deckSwipe(enabled = backSwipeEnabled && !leftOpen, accepts = backSwipeAccepts, ready = { scrollAtStart }, edgeExcludePx = pagesEdgePx, onTrigger = backSwipeAction)) {
                         com.bos.sphere.feature.grid.ColumnScrollHome(
                             keys = pages.flatMap { it.keys }, appsByKey = appsByKey, extras = homeItems.homeExtras, order = homeOrder,
@@ -1161,7 +1175,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         )
                     }
                 } else {
-                    Background()
                     Box(
                         Modifier.fillMaxSize().padding(bottom = bottomClear).deckSwipe(
                             enabled = backSwipeEnabled && !leftOpen, accepts = backSwipeAccepts, ready = { gridState.pager.currentPage == 0 && !gridState.pager.isScrollInProgress },
@@ -1197,7 +1210,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 }
 
                 HomeStyle.Psp -> {
-                    Background()
                     val recentForXmb = remember(history, appsByKey) { history.asReversed().map { it.key }.distinct().mapNotNull(appsByKey::get).take(12) }
                     com.bos.sphere.feature.grid.XmbHome(
                         apps = apps, recent = recentForXmb,
@@ -1212,7 +1224,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     SettingsHoldBand()
                 }
                 HomeStyle.Dsi -> {
-                    Background()
                     com.bos.sphere.feature.grid.ContinuousHome(
                         apps = apps, crossCount = 3, landscape = scrollHorizontal, style = com.bos.sphere.feature.grid.ContinuousStyle.Dsi,
                         onLaunch = ::launch, onLongPress = { menuApp = it },
@@ -1224,7 +1235,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     )
                 }
                 HomeStyle.List -> {
-                    Background()
                     com.bos.sphere.feature.grid.ListHome(
                         apps = apps, onLaunch = ::launch, onLongPress = { menuApp = it },
                         modifier = Modifier.fillMaxSize().safeDrawingPadding(),

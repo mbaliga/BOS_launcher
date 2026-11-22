@@ -29,3 +29,7 @@ Owner feedback (verbatim): "1. the four hotspots are supposed to remain constant
 - A widget-peek corner slot now also draws on Glance (it did not before).
 - The Digital clock format row shows 24-hour as selected while the stored value is System and the device is on 12-hour (the row cannot read the device setting); choosing either writes the value.
 - The test indicator inside the feature-grid chrome test is not wired to the pager; the app-level test uses the real one.
+
+## Superseded by wave 55 (fixedBackdrop)
+
+The Glance page no longer carries the wallpaper: it is drawn once, fixed, below the pager (`docs/decisions/fixedBackdrop.md`). The statement above that the Glance page is "the wallpaper only" now reads: the Glance page is transparent and holds the clock and the gestures; the wallpaper is the fixed layer behind it.

@@ -156,6 +156,8 @@ fun GlanceSurface(
     gestures: HomeGestureSpec? = null,
     dark: Boolean = isDarkSurface(),
     underlay: @Composable () -> Unit = {},
+    /** W55: the home draws the wallpaper once below its pager, so the Glance page itself paints no base colour. */
+    transparentBase: Boolean = false,
     /** Wave 41: a tap on the wallpaper clock (the home opens the clock app) and its accent colour. */
     onClockTap: () -> Unit = {},
     clockAccent: Color = com.bos.sphere.core.design.HyleColors.Violet,
@@ -166,7 +168,7 @@ fun GlanceSurface(
     var awakeNonce by remember { mutableIntStateOf(0) }
     // Wave 34: with the system live wallpaper chosen the surface has no base colour at all, so the wallpaper behind the window shows through.
     val systemWallpaper = prefs.wallpaper(com.bos.sphere.core.data.WallpaperSurface.Glance).kind == com.bos.sphere.core.data.WallpaperKind.System
-    BoxWithConstraints(modifier.fillMaxSize().background(if (systemWallpaper) Color.Transparent else if (dark) Color.Black else Color(0xFFF3F3F6)).testTag("glance.surface")) {
+    BoxWithConstraints(modifier.fillMaxSize().background(if (systemWallpaper || transparentBase) Color.Transparent else if (dark) Color.Black else Color(0xFFF3F3F6)).testTag("glance.surface")) {
         underlay()
         // The tap layer: the home gestures (swipes, long press) share it; a tap only wakes the indicator.
         var clockBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }

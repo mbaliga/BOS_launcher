@@ -1251,6 +1251,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     onPrevious = { com.bos.sphere.core.data.MediaNow.previous() }, onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() }, onNext = { com.bos.sphere.core.data.MediaNow.next() },
                     onAwake = { indicatorAwake++ },
                     corners = { Corners() },
+                    topLeftHotspot = com.bos.sphere.core.data.Corner.TopLeft in glanceOn, topRightHotspot = com.bos.sphere.core.data.Corner.TopRight in glanceOn,
                 )
                 if (glanceClockEditing) com.bos.sphere.feature.grid.GlanceClockEditShield() // wave 50: dimmed like the home editor does, and inert
             }

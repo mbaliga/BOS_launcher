@@ -46,6 +46,17 @@ object FixedHomeChrome {
     /** The media listener only needs to run while the music line can show. */
     fun listensToMedia(showMusic: Boolean): Boolean = showMusic
 
+    /** Side margin of the music line when no top hotspot is drawn: the line runs edge to edge, with this much breathing room. */
+    const val EDGE_MARGIN_DP = 12f
+
+    /**
+     * The widest the music line may be in a window [windowDp] wide. A top hotspot reserves [GlanceNotch.TITLE_SIDE_DP] on its side (the line stays centred, so the wider
+     * reserve wins) and the line is capped at 280 dp; with no top hotspot at all it runs edge to edge (window width less [EDGE_MARGIN_DP] each side, no cap).
+     */
+    fun titleWidthDp(windowDp: Float, topLeft: Boolean, topRight: Boolean): Float =
+        if (!topLeft && !topRight) (windowDp - 2 * EDGE_MARGIN_DP).coerceAtLeast(120f)
+        else (windowDp - 2 * GlanceNotch.TITLE_SIDE_DP).coerceIn(120f, 280f)
+
     /** A hotspot's reserved touch area (dp): at least the 48 dp minimum, so it always wins its corner over the pager. */
     const val HOTSPOT_TOUCH_DP = 64f
 
@@ -76,6 +87,9 @@ fun FixedHomeChrome(
     /** The four (or fewer) hotspots, drawn above the music line: the home passes its corner layer, so the chosen corner style (Holo, Sony discs, bubbles) applies. */
     corners: @Composable () -> Unit = {},
     dark: Boolean = isDarkSurface(),
+    /** Whether a hotspot is drawn in the top-left and top-right screen corners; with neither, the music line runs edge to edge (owner request). */
+    topLeftHotspot: Boolean = true,
+    topRightHotspot: Boolean = true,
 ) {
     val motion = rememberMotionPrefs()
     val reduced = motion.reduced
@@ -109,7 +123,7 @@ fun FixedHomeChrome(
             )
             Box(Modifier.align(Alignment.TopCenter).padding(top = GlanceNotch.TITLE_TOP_DP.dp).offset { IntOffset(0, push.roundToPx()) }.height(40.dp).testTag("glance.title.slot")) {
                 if (playing && media != null) {
-                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = (w - 2 * GlanceNotch.TITLE_SIDE_DP).coerceIn(120f, 280f).dp, edge = if (dark) Color.Black else Color(0xFFF3F3F6))
+                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = FixedHomeChrome.titleWidthDp(w, topLeftHotspot, topRightHotspot).dp, edge = if (dark) Color.Black else Color(0xFFF3F3F6))
                 }
             }
         }

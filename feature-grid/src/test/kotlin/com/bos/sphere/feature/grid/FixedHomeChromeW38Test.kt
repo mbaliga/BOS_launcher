@@ -55,6 +55,17 @@ class FixedHomeChromeRulesTest {
         assertTrue(FixedHomeChrome.listensToMedia(true)); assertFalse(FixedHomeChrome.listensToMedia(false))
     }
 
+    @Test fun GFX_38_theMusicLineRunsEdgeToEdgeWhenNeitherTopCornerHasAHotspot() {
+        // 411 dp window: with a top hotspot the line keeps its 280 dp cap and side reserve; with none it is the window less 12 dp each side
+        assertEquals(280f, FixedHomeChrome.titleWidthDp(411f, topLeft = true, topRight = true), 0.01f)
+        assertEquals(280f, FixedHomeChrome.titleWidthDp(411f, topLeft = true, topRight = false), 0.01f)
+        assertEquals(280f, FixedHomeChrome.titleWidthDp(411f, topLeft = false, topRight = true), 0.01f)
+        assertEquals(411f - 24f, FixedHomeChrome.titleWidthDp(411f, topLeft = false, topRight = false), 0.01f)
+        assertEquals("a landscape window is used in full too", 891f - 24f, FixedHomeChrome.titleWidthDp(891f, false, false), 0.01f)
+        assertEquals("never below the 120 dp floor", 120f, FixedHomeChrome.titleWidthDp(100f, false, false), 0.01f)
+        assertEquals("with hotspots a narrow window keeps the 120 dp floor", 120f, FixedHomeChrome.titleWidthDp(200f, true, true), 0.01f)
+    }
+
     @Test fun GFX_38_theHotspotCornersWinTheTouchAndTheCornersAreAtLeast48Dp() {
         assertTrue(FixedHomeChrome.HOTSPOT_TOUCH_DP >= 48f)
         val all = Corner.entries.toSet()

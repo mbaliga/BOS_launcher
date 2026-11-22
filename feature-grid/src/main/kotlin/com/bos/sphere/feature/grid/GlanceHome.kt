@@ -95,6 +95,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.CompositionLocalProvider
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.ClockFormat
+import com.bos.sphere.core.data.ClockPlacement
+import com.bos.sphere.core.data.ClockPlacement.clockPos
+import com.bos.sphere.core.data.ClockSize
+import com.bos.sphere.core.data.ClockStyle
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerItem
 import com.bos.sphere.core.data.ControlsPop
@@ -148,6 +159,9 @@ fun GlanceSurface(
     /** Wave 41: a tap on the wallpaper clock (the home opens the clock app) and its accent colour. */
     onClockTap: () -> Unit = {},
     clockAccent: Color = com.bos.sphere.core.design.HyleColors.Violet,
+    /** Wave 50 (glanceClockEdit): applies a change to the stored prefs (the clock's place and options while it is edited), and tells the home when the clock edit mode starts or ends. */
+    onPrefsEdit: ((LauncherPrefs) -> LauncherPrefs) -> Unit = {},
+    onEditingChange: (Boolean) -> Unit = {},
 ) {
     var awakeNonce by remember { mutableIntStateOf(0) }
     // Wave 34: with the system live wallpaper chosen the surface has no base colour at all, so the wallpaper behind the window shows through.
@@ -157,18 +171,132 @@ fun GlanceSurface(
         // The tap layer: the home gestures (swipes, long press) share it; a tap only wakes the indicator.
         var clockBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
         var layerOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-        // The clock is drawn BELOW the tap layer on purpose (a node with its own pointer input would hide the gesture layer under it): the tap layer hit-tests a tap against the clock's bounds.
-        // Wave 41: the big wallpaper clock is part of this page (it scrolls away with it); position fixed at the upper-middle.
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            GlanceWallpaperClock(prefs.clockStyle, prefs.clockFormat, prefs.glanceClockSize, prefs.glanceClockDate, prefs.glanceClockAccent, dark, clockAccent, onClockTap, onBounds = { clockBounds = it })
+        // Wave 50 (glanceClockEdit): the clock edit mode. A long press ON the clock enters it (the top layer hit-tests the clock's bounds); a long press on empty space is the
+        // home's config options as on every home. While editing, the top layer drags the clock instead of the home gestures, and the options panel is drawn above it.
+        val landscape = maxWidth > maxHeight
+        val haptics = rememberLauncherHaptics()
+        var editing by remember { mutableStateOf(false) }
+        var snapshot by remember { mutableStateOf<LauncherPrefs?>(null) }
+        var override by remember { mutableStateOf<ClockPlacement.Pos?>(null) }
+        var areaPx by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+        val storedPos = prefs.clockPos(landscape)
+        val pos = override ?: storedPos
+        val latestPos by rememberUpdatedState(pos)
+        val latestArea by rememberUpdatedState(areaPx)
+        val latestBounds by rememberUpdatedState(clockBounds)
+        val latestOrigin by rememberUpdatedState(layerOrigin)
+        val latestEdit by rememberUpdatedState(onPrefsEdit)
+        val latestPrefs by rememberUpdatedState(prefs)
+        val landscapeNow by rememberUpdatedState(landscape)
+        LaunchedEffect(storedPos) { override = null }
+        DisposableEffect(editing) { onEditingChange(editing); onDispose { if (editing) onEditingChange(false) } }
+        fun enterEdit() {
+            if (editing || latestPrefs.clockStyle == ClockStyle.Off) return
+            snapshot = latestPrefs; override = null; editing = true
+            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
         }
-        Box(
-            Modifier.fillMaxSize().homeGestures(gestures) { true }
+        fun cancelEdit() {
+            val s = snapshot
+            if (s != null) latestEdit { with(ClockPlacement) { it.restoreClockFrom(s) } }
+            override = null; snapshot = null; editing = false
+        }
+        fun doneEdit() { override = null; snapshot = null; editing = false }
+        fun place(p: ClockPlacement.Pos) { override = p; latestEdit { with(ClockPlacement) { it.withClockPos(landscapeNow, p) } } }
+        fun moveBy(dx: Int, dy: Int) {
+            val a = latestArea; val b = latestBounds
+            place(ClockPlacement.nudge(latestPos, dx, dy, a.width.toFloat(), a.height.toFloat(), b.width, b.height))
+        }
+        fun sizeBy(d: Int) {
+            val e = ClockSize.entries; val n = (e.indexOf(latestPrefs.glanceClockSize) + d).coerceIn(0, e.lastIndex)
+            if (n != e.indexOf(latestPrefs.glanceClockSize)) latestEdit { it.copy(glanceClockSize = e[n]) }
+        }
+        // TalkBack: the clock can be edited and moved without dragging.
+        val aEdit = L10n.tr("Edit clock"); val aUp = L10n.tr("Move clock up"); val aDown = L10n.tr("Move clock down"); val aLeft = L10n.tr("Move clock left"); val aRight = L10n.tr("Move clock right")
+        val aBig = L10n.tr("Larger clock"); val aSmall = L10n.tr("Smaller clock")
+        val clockActions = remember(aEdit, aUp, aDown, aLeft, aRight, aBig, aSmall) {
+            listOf(
+                CustomAccessibilityAction(aEdit) { enterEdit(); true },
+                CustomAccessibilityAction(aUp) { moveBy(0, -1); true }, CustomAccessibilityAction(aDown) { moveBy(0, 1); true },
+                CustomAccessibilityAction(aLeft) { moveBy(-1, 0); true }, CustomAccessibilityAction(aRight) { moveBy(1, 0); true },
+                CustomAccessibilityAction(aBig) { sizeBy(1); true }, CustomAccessibilityAction(aSmall) { sizeBy(-1); true },
+            )
+        }
+        // Keyboard and controller: arrows move the clock while it is edited (Tab still walks the options), Esc is Cancel.
+        DisposableEffect(editing) {
+            val h: (android.view.KeyEvent) -> Boolean = h@{ e ->
+                if (!editing) return@h false // never swallow a key once the mode is over
+                when (e.keyCode) {
+                    android.view.KeyEvent.KEYCODE_DPAD_LEFT -> { moveBy(-1, 0); true }
+                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> { moveBy(1, 0); true }
+                    android.view.KeyEvent.KEYCODE_DPAD_UP -> { moveBy(0, -1); true }
+                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> { moveBy(0, 1); true }
+                    android.view.KeyEvent.KEYCODE_ESCAPE -> { cancelEdit(); true }
+                    else -> false
+                }
+            }
+            if (editing) LauncherInput.pushKeyHandler(h)
+            onDispose { if (editing) LauncherInput.removeKeyHandler(h) }
+        }
+        androidx.activity.compose.BackHandler(enabled = editing) { cancelEdit() }
+        fun onClock(p: Offset) = !latestBounds.isEmpty && latestBounds.contains(p + latestOrigin)
+        // The clock is drawn BELOW the tap layer on purpose (a node with its own pointer input would hide the gesture layer under it): the tap layer hit-tests a tap against the clock's bounds.
+        // Wave 41: the big wallpaper clock is part of this page (it scrolls away with it). Wave 50: its place is stored (fractions of this area), default the upper-middle.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).onSizeChanged { areaPx = it }) {
+            GlanceWallpaperClock(
+                prefs.clockStyle, prefs.clockFormat, prefs.glanceClockSize, prefs.glanceClockDate, prefs.glanceClockAccent, dark, clockAccent, onClockTap, onBounds = { clockBounds = it },
+                pos = pos, editing = editing, actions = clockActions, onMenu = { enterEdit() },
+            )
+        }
+        if (!editing) Box(
+            Modifier.fillMaxSize().homeGestures(gestures) { p -> !onClock(p) }
                 .onGloballyPositioned { layerOrigin = it.positionInRoot() }
-                .pointerInput(onClockTap) { detectTapGestures(onTap = { p -> if (clockBounds.contains(p + layerOrigin)) onClockTap() else { awakeNonce++; onAwake() } }) }
+                .pointerInput(onClockTap) { detectTapGestures(onTap = { p -> if (onClock(p)) onClockTap() else { awakeNonce++; onAwake() } }, onLongPress = { p -> if (onClock(p)) enterEdit() }) }
                 // decoration for accessibility: the surface has no content of its own
                 .clearAndSetSemantics { },
+        ) else Box(
+            Modifier.fillMaxSize().testTag(GlanceClockEditTags.LAYER)
+                .onGloballyPositioned { layerOrigin = it.positionInRoot() }
+                .pointerInput(Unit) {
+                    val grab = 16.dp.toPx(); val snapPx = ClockPlacement.SNAP_DP.dp.toPx()
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val b = latestBounds
+                        if (b.isEmpty || !b.inflate(grab).contains(down.position + latestOrigin)) return@awaitEachGesture
+                        val first = awaitTouchSlopOrCancellation(down.id) { c, _ -> c.consume() } ?: return@awaitEachGesture
+                        val a = latestArea; val aw = a.width.toFloat(); val ah = a.height.toFloat()
+                        val (l0, t0) = ClockPlacement.topLeft(latestPos, aw, ah, b.width, b.height)
+                        var caughtX = false; var caughtY = false
+                        var last: ClockPlacement.Pos? = null
+                        drag(first.id) { c ->
+                            val d = c.position - first.position
+                            val raw = ClockPlacement.fromTopLeft(l0 + d.x, t0 + d.y, aw, ah, b.width, b.height)
+                            val s = ClockPlacement.snap(raw, aw, ah, b.width, b.height, snapPx)
+                            if ((s.x && !caughtX) || (s.y && !caughtY)) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            caughtX = s.x; caughtY = s.y
+                            override = s.pos; last = s.pos
+                            c.consume()
+                        }
+                        last?.let { place(it) }
+                    }
+                }
+                .clearAndSetSemantics { },
         )
+        if (editing) {
+            // The options panel sits on the far side of the clock so it never covers it: portrait top or bottom, landscape left or right.
+            val a = areaPx; val clockH = if (a.height > 0) clockBounds.height / a.height else 0f
+            val surfaceH = maxHeight
+            val rtl = LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+            var startOrTop by remember { mutableStateOf(GlanceClockEditRules.panelAtStartOrTop(landscape, storedPos.x, storedPos.y, clockH)) }
+            LaunchedEffect(storedPos, landscape) { startOrTop = GlanceClockEditRules.panelAtStartOrTop(landscape, storedPos.x, storedPos.y, clockH) }
+            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(8.dp)) {
+                val panelModifier = if (landscape) Modifier.align(if (startOrTop != rtl) Alignment.CenterStart else Alignment.CenterEnd).width(GlanceClockEditRules.LANDSCAPE_WIDTH).fillMaxHeight()
+                else Modifier.align(if (startOrTop) Alignment.TopCenter else Alignment.BottomCenter).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = surfaceH * GlanceClockEditRules.PORTRAIT_MAX_HEIGHT)
+                GlanceClockEditPanel(
+                    prefs, onChange = { f -> latestEdit(f) }, onReset = { override = null; latestEdit { with(ClockPlacement) { it.withClockPos(landscapeNow, null) } } },
+                    onDone = { doneEdit() }, onCancel = { cancelEdit() }, modifier = panelModifier,
+                )
+            }
+        }
         if (indicator && prefs.glanceIndicator) Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             PageIndicator(
                 count = 0, current = 0, vertical = false, onSelect = {}, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),

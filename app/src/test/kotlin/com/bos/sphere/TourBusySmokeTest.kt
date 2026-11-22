@@ -47,7 +47,7 @@ class TourBusySmokeTest : TourBase() {
         startBusy(); check("start", Surface.Home)
         rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300); assertTrue("controls pop in", controlsShown()); rotateAndCheck("busy controls")
         rule.onNodeWithContentDescription("Now playing", substring = true).performClick(); settle(300); settle(); check("controls tapped again", Surface.Home)
-        longPressAt(0.5f, 0.3f); assertTrue(quickSheetShown()); rotateAndCheck("busy quick sheet")
+        longPressAt(0.5f, 0.75f); assertTrue(quickSheetShown()); rotateAndCheck("busy quick sheet")
         closeSheet(); settle(); assertFalse(quickSheetShown()); check("sheet closed", Surface.Home)
     }
 

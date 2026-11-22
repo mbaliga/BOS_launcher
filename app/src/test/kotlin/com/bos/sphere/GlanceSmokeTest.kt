@@ -65,7 +65,7 @@ class GlanceSmokeTest {
     }
 
     private fun settle(ms: Long = 1500) { org.robolectric.shadows.ShadowLooper.idleMainLooper(); Snapshot.sendApplyNotifications(); rule.mainClock.advanceTimeBy(ms); org.robolectric.shadows.ShadowLooper.idleMainLooper(); rule.mainClock.advanceTimeBy(ms) }
-    private fun longPressEmpty() { rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * 0.3f)) }; settle(300) }
+    private fun longPressEmpty() { rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * 0.75f)) }; settle(300) }
     private fun graphIds() = LauncherInput.focus.nodes().map { it.id }
     private fun hotspotCount() = graphIds().count { it.startsWith("corner.") }
     private fun controlsShown() = rule.onAllNodesWithContentDescription("Next").fetchSemanticsNodes().isNotEmpty()
@@ -119,5 +119,20 @@ class GlanceSmokeTest {
         longPressEmpty(); assertTrue("the long press opens the quick sheet", rule.onAllNodesWithTag("quick.sheet", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         assertTrue("wave 34: the sheet has no Glance tile (the switch is Ground Control, Home screen; see HomeUnifyRowsTest)", rule.onAllNodesWithTag("quick.glance", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun HOM_23_w50_aLongPressOnTheClockEditsItInPlaceAndTheRealPrefsKeepTheMovedPlaceWhileOnEmptySpaceItIsTheQuickSheet() {
+        startFresh(); settle()
+        val c = rule.onNodeWithTag("glance.clock", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
+        rule.onRoot().performTouchInput { longClick(Offset(c.x, c.y)) }; settle(300)
+        assertTrue("the clock edit panel opens", rule.onAllNodesWithTag("glance.clockedit.panel", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue("not the quick sheet", rule.onAllNodesWithTag("quick.sheet", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        val before = LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value
+        rule.onRoot().performTouchInput { down(Offset(c.x, c.y)); for (i in 1..8) { moveTo(Offset(c.x - 12f * i, c.y + 25f * i)); advanceEventTime(16) }; up() }; settle(300)
+        val moved = LauncherStores.get(AppSmokeHarness.app).prefs.prefs.value
+        assertTrue("the drag is stored", moved.glanceClockY > before.glanceClockY && moved.glanceClockX < before.glanceClockX)
+        rule.onNodeWithTag("glance.clockedit.done", useUnmergedTree = true).performClick(); settle(300)
+        assertTrue("Done closes the panel", rule.onAllNodesWithTag("glance.clockedit.panel", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        longPressEmpty(); assertTrue("empty space still opens the quick sheet", rule.onAllNodesWithTag("quick.sheet", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
     }
 }

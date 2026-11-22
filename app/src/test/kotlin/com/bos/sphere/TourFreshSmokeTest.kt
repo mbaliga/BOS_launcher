@@ -53,7 +53,7 @@ class TourFreshSmokeTest : TourBase() {
         // out again: a tap on the controls' empty area or inactivity pops them out
         waitFor("the controls pop out after inactivity", 12_000) { !controlsShown() }
         check("controls out", Surface.Home)
-        longPressAt(0.5f, 0.3f); assertTrue("a long press opens the quick sheet", quickSheetShown()); check("quick sheet")
+        longPressAt(0.5f, 0.75f); assertTrue("a long press opens the quick sheet", quickSheetShown()); check("quick sheet")
         rotateAndCheck("quick sheet, rotated")
         closeSheet(); settle(); assertFalse("Back closes the quick sheet", quickSheetShown()); check("quick sheet closed", Surface.Home)
     }

@@ -115,27 +115,10 @@ internal fun ChoiceCard(
     label: String, selected: Boolean, multi: Boolean, tag: String, accent: Color, onClick: () -> Unit,
     modifier: Modifier = Modifier, width: androidx.compose.ui.unit.Dp = 80.dp, art: @Composable BoxScope.() -> Unit,
 ) {
-    var focused by remember { mutableStateOf(false) }
-    val tile = RoundedCornerShape(16.dp)
-    val click = Modifier.filesFocus("files.card.$tag", onClick)
-    val select = if (multi) Modifier.toggleable(value = selected, role = Role.Checkbox, onValueChange = { onClick() }) else Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-    Column(
-        modifier.width(width).testTag(tag).onFocusChanged { focused = it.isFocused }.then(click).then(select).semantics(mergeDescendants = true) {},
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier.fillMaxWidth().height(64.dp).clip(tile).background(Tile).border(if (selected) 2.5.dp else 1.dp, if (selected) accent else if (focused) Color.White else Faint, tile),
-            contentAlignment = Alignment.Center,
-        ) {
-            art()
-            if (selected) Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(18.dp).clip(CircleShape).background(accent), contentAlignment = Alignment.Center) {
-                GlyphIcon(Glyph.Check, HyleColors.OnAccent, Modifier.size(13.dp))
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(label, color = if (selected) Color.White else Color(0xB3FFFFFF), fontSize = 12.sp, lineHeight = 15.sp, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.heightIn(min = 18.dp))
-        Spacer(Modifier.height(4.dp))
-    }
+    // W54: the card chrome is the shared one (Settings, the Home sheet and this sheet draw the same card); only the focus node and the accent are the Files ones.
+    com.bos.sphere.feature.grid.OneUiVisualCard(
+        label, selected, tag, onClick, modifier = modifier.then(Modifier.filesFocus("files.card.$tag", onClick)), width = width, multi = multi, dark = true, accent = accent,
+    ) { art() }
 }
 
 @Composable

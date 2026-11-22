@@ -125,7 +125,7 @@ fun HomePanelSettings() {
     LaunchedEffect(rev) { trees = withContext(Dispatchers.IO) { source.grantedTrees() } }
     Column(Modifier.padding(horizontal = 4.dp)) {
         Text(L10n.tr("Usage panel"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
-        SettingChips(UsageRange.entries, range, { L10n.tr(it.label) }) { range = it; prefs.usageRange = it }
+        com.bos.sphere.feature.grid.OneUiVisualChoice(UsageRange.entries, range, { range = it; prefs.usageRange = it }, { L10n.tr(it.label) }, { com.bos.sphere.feature.grid.SettingsArtLook.usageRange.art(it) }, tag = "cfg.usageRange")
         Text(L10n.tr("Folders the launcher may read"), color = HyleColors.InkDim, fontSize = 11.sp, modifier = Modifier.padding(top = 14.dp))
         if (trees.isEmpty()) Text(L10n.tr("No folder chosen yet. Pick one and its newest files show here; nothing else is read."), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
         trees.forEach { t ->

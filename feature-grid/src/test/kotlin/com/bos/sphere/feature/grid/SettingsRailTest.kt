@@ -29,7 +29,7 @@ class SettingsRailTest {
             "Home", Glyphs.Apps,
             listOf(
                 SettingItem.Choice("Style", Glyphs.Apps, HomeStyle.entries, HomeStyle.Grid, { it.name }, preview = {
-                    VisualChoice(HomeStyle.entries, HomeStyle.Grid, {}, { it.name }, previewHeight = 120.dp) { HomeStylePreview(it) }
+                    OneUiVisualChoice(HomeStyle.entries, HomeStyle.Grid, {}, { it.name }, { SettingsArtHome.homeStyle.art(it) }, tag = "t.style")
                 }) {},
                 SettingItem.Toggle("Labels", Glyphs.Apps, true) {},
             ),

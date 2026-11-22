@@ -77,9 +77,9 @@ fun OnboardingView(
                         TextButtonPill(L10n.tr("Set as default"), primary = true, onClick = onSetDefault)
                     }
                     OnboardingStep.HomeStyle -> {
-                        VisualChoice(HomeStyle.entries, prefs.homeStyle, onStyle, {
+                        OneUiVisualChoice(HomeStyle.entries, prefs.homeStyle, onStyle, {
                             L10n.tr(when (it) { HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" })
-                        }, previewHeight = 140.dp) { HomeStylePreview(it) }
+                        }, { SettingsArtHome.homeStyle.art(it) }, tag = "onboarding.style")
                         Text(L10n.tr("Press and hold anywhere to change things."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                     }
                     OnboardingStep.Import -> {

@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.data.DockStyle
@@ -172,16 +173,16 @@ object DockStyleUi {
 
 /** A miniature dock of [style] over a wallpaper-like gradient: drawn with the same code as the real dock, so what the preview shows is what the dock gets. */
 @Composable
-fun DockStylePreview(style: DockStyle, modifier: Modifier = Modifier, dark: Boolean = !HyleTheme.isLight) {
-    val shape = RoundedCornerShape(12.dp)
+fun DockStylePreview(style: DockStyle, modifier: Modifier = Modifier, dark: Boolean = !HyleTheme.isLight, compact: Boolean = false) {
     val wall = Brush.linearGradient(listOf(Color(0xFFE9D8A6), Color(0xFF6FA8DC), Color(0xFF3B4C7A)))
-    Box(modifier.size(104.dp, 56.dp).clip(RoundedCornerShape(10.dp)).background(wall).testTag(DockStyleUi.previewTag(style)).clearAndSetSemantics { }, contentAlignment = Alignment.Center) {
+    val icons = if (compact) 3 else 4
+    Box(modifier.size(if (compact) DpSize(72.dp, 48.dp) else DpSize(104.dp, 56.dp)).clip(RoundedCornerShape(10.dp)).background(wall).testTag(DockStyleUi.previewTag(style)).clearAndSetSemantics { }, contentAlignment = Alignment.Center) {
         val pill = RoundedCornerShape(12.dp)
         Row(
             Modifier.dockSurface(style, dark, DockEdge.Bottom, pill, 12f).padding(horizontal = 6.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            listOf(Color(0xFF4F8CFF), Color(0xFFFF7A59), Color(0xFF3DDC84), Color(0xFFB36BFF)).forEachIndexed { i, col ->
+            listOf(Color(0xFF4F8CFF), Color(0xFFFF7A59), Color(0xFF3DDC84), Color(0xFFB36BFF)).take(icons).forEachIndexed { i, col ->
                 Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
                     StyledIcon(style, dark, DockItem(DockItemRef.app("preview$i"), ""), 18.dp) { _, s -> Box(Modifier.size(s).clip(RoundedCornerShape(5.dp)).background(col)) }
                 }
@@ -190,28 +191,13 @@ fun DockStylePreview(style: DockStyle, modifier: Modifier = Modifier, dark: Bool
     }
 }
 
-/** Three radio rows (Standard, Transparent, 3D), each with its preview; [onSelect] gets the choice. 48 dp rows, one node per choice. */
+/** The three dock styles as cards, each with a miniature dock drawn by the dock's own code; [onSelect] gets the choice. One node per choice (a radio button, 48 dp or more). */
 @Composable
 fun DockStyleChooser(current: DockStyle, onSelect: (DockStyle) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.semantics { contentDescription = L10n.tr("Dock style") }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        DockStyle.entries.forEach { s ->
-            val selected = s == current
-            val shape = RoundedCornerShape(14.dp)
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(shape)
-                    .background(if (selected) HyleColors.Violet.copy(alpha = 0.18f) else HyleColors.Hairline.copy(alpha = 0.06f))
-                    .then(if (selected) Modifier.border(1.5.dp, HyleColors.Violet, shape) else Modifier)
-                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(s) })
-                    .testTag(DockStyleUi.rowTag(s))
-                    .semantics(mergeDescendants = true) { contentDescription = L10n.tr(s.label); stateDescription = if (selected) L10n.tr("Selected") else L10n.tr("Not selected") }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DockStylePreview(s)
-                Spacer(Modifier.width(14.dp))
-                Text(L10n.tr(s.label), color = HyleColors.InkBright, fontSize = 15.sp, modifier = Modifier.weight(1f))
-            }
-        }
+        com.bos.sphere.feature.grid.OneUiComposedChoice(
+            DockStyle.entries, current, onSelect, { L10n.tr(it.label) }, tag = "dock.style", id = { it.id },
+        ) { s, _ -> DockStylePreview(s, compact = true) }
         Text(L10n.tr("Transparent draws no panel: only the icons, with a soft halo. 3D is a glossy shelf with raised icons."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
     }
 }

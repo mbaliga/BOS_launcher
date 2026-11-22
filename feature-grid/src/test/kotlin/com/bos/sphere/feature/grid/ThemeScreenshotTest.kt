@@ -147,19 +147,6 @@ class ThemeScreenshotTest {
         shoot("24-dsi-landscape")
     }
 
-    @Test @Config(sdk = [34], qualifiers = "w411dp-h400dp-port-xhdpi")
-    fun previews() {
-        rule.mainClock.autoAdvance = false
-        rule.setContent {
-            Row(Modifier.fillMaxSize().background(Color(0xFF14161F)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.width(110.dp).aspectRatio(9f / 17f)) { XmbPreview() }
-                Box(Modifier.width(110.dp).aspectRatio(9f / 17f)) { DsiPreview() }
-                Box(Modifier.width(110.dp).aspectRatio(9f / 17f)) { ContinuousPreview() }
-            }
-        }
-        shoot("25-theme-previews", 200)
-    }
-
     private class LetterDrawable(private val letter: Char) : Drawable() {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         override fun draw(canvas: Canvas) {

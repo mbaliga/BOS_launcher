@@ -29,6 +29,7 @@ import com.bos.sphere.feature.grid.AppPickerDialog
 import com.bos.sphere.feature.grid.OneUiRadioPage
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.SettingItem
+import com.bos.sphere.feature.grid.asCards
 import com.bos.sphere.feature.grid.TextButtonPill
 
 /**
@@ -40,7 +41,7 @@ fun drawerRingItems(m: SettingsModel): List<SettingItem> = listOf(
     SettingItem.Choice(
         L10n.tr("Ring segments"), Glyphs.Dial, PuckActions.SEGMENT_CHOICES, m.puckSegments, { it.toString() },
         hint = L10n.tr("How many segments the white ring around the Back button has. Turn the ring with a finger to reach the others."),
-    ) { m.setPuckSegments(it) },
+    ) { m.setPuckSegments(it) }.asCards({ com.bos.sphere.feature.grid.SettingsArtHome.ringSegments.art(it) }, "cfg.ringSegments"),
     SettingItem.Pane(L10n.tr("Drawer shortcuts"), Glyphs.Dial, L10n.tr("%d segments", m.puckSegments)) { PuckActionsPane(m.appsByKey) },
     SettingItem.Toggle(
         L10n.tr("Show labels under glyphs"), Glyphs.Message, m.puckLabels, L10n.tr("A small name under each shortcut in the visible segments"),

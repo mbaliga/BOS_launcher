@@ -121,7 +121,7 @@ class FilesCollectionsW53UiTest {
 
     private fun await(tag: String) = rule.waitUntil(10_000) { rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
     private fun gone(tag: String) = rule.waitUntil(10_000) { rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
-    private fun tap(tag: String) { rule.onNodeWithTag(tag, useUnmergedTree = true).also { runCatching { it.performScrollTo() } }.performClick(); rule.waitForIdle() }
+    private fun tap(tag: String) { if (tag.startsWith("files.source.") && tag != "files.source.all") rule.revealChip(tag); rule.onNodeWithTag(tag, useUnmergedTree = true).also { runCatching { it.performScrollTo() } }.performClick(); rule.waitForIdle() }
     private fun summary() = rule.onNodeWithTag("files.summary").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text }.orEmpty()
     private fun waitSummary(text: String) {
         try { rule.waitUntil(10_000) { runCatching { summary().startsWith(text) }.getOrDefault(false) } }

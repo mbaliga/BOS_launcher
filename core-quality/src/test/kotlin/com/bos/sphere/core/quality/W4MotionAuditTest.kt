@@ -50,7 +50,7 @@ class W4MotionAuditTest {
             "PuckSections.kt" to 1, // wave 32: a wedge's pressed fill, a 90 ms tween that is snap() under reduced motion (reads rememberMotionPrefs().reduced)
             // press spring already snaps under reduced motion (`still`)
         )
-        val gatedFiles = setOf("ContinuousHome.kt", "HomeScreen.kt", "FilesUi.kt") // W31: FilesUi fades a loaded thumbnail in through rememberMotionPrefs().gate(tween(180))
+        val gatedFiles = setOf("ContinuousHome.kt", "HomeScreen.kt", "FilesUi.kt", "FilesChipBar.kt") // W31: FilesUi fades a loaded thumbnail in through rememberMotionPrefs().gate(tween(180)); W54: FilesChipBar slides a chip aside through rememberMotionPrefs().gate(tween(120))
         val counts = HashMap<String, Int>()
         Repo.mainSources().forEach { f ->
             val n = f.readLines().count { Regex("""\banimate(Float|Color|Dp|Int|Offset|Size|IntOffset|Rect)AsState\(""").containsMatchIn(it) }

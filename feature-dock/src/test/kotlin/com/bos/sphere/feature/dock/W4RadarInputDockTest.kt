@@ -273,18 +273,4 @@ class W4RadarInputDockTest {
         }
         assertTrue("the dock's dialogs are found (pages, menu, schedule, rail, style)", users >= 4)
     }
-
-    @Test fun INP_20_theRailsHelpDialogInstallsTheDialogHook() {
-        var installed = 0
-        DockInput.dialogHook = { DisposableEffect(Unit) { installed++; onDispose { installed-- } } }
-        rule.setContent { Rail(content("Alpha"), DockActions(), null) }
-        rule.waitForIdle()
-        assertEquals(0, installed)
-        // W25: the "i" button is gone; About is the last entry of the dock's long-press menu.
-        rule.onNodeWithContentDescription("Dock").performTouchInput { longClick(androidx.compose.ui.geometry.Offset(width - 4f, height / 2f)) }
-        rule.waitForIdle()
-        rule.onNodeWithText("About the dock").performClick()
-        rule.waitForIdle()
-        assertEquals(1, installed)
-    }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -91,12 +92,9 @@ class DockActions(
     val onAppInfo: (DockItem) -> Unit = {},
     val onReplace: (DockItem) -> Unit = {},
     val onAddApps: () -> Unit = {},
-    /** Null when the dock cannot be hidden from here (a desktop surface, or a landing that forces the rail). */
-    val onHide: (() -> Unit)? = null,
-    /** Null when the dock has no side to choose (portrait, or the surface decides its own edge). */
-    val onSetEdge: ((DockEdge) -> Unit)? = null,
-    /** W39: sets the dock style (standard, transparent, 3D); null when the host cannot store it. The long-press menu's "Dock style" entry needs it. */
-    val onSetStyle: ((com.bos.sphere.core.data.DockStyle) -> Unit)? = null,
+    /** W55 (dockSheet): a long press on the dock, the menu key, or the TalkBack action opens the dock's sheet; [onEditDock] opens it straight into edit. */
+    val onOpenOptions: () -> Unit = {},
+    val onEditDock: () -> Unit = {},
 )
 
 /**
@@ -122,14 +120,15 @@ fun DockRail(
     /** W39 (dockThemes): how the dock is drawn; [dark] picks the 3D slab's variant (default: the UI theme). */
     style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
     dark: Boolean = !com.bos.sphere.core.design.HyleTheme.isLight,
+    /** W55 (dockSheet): the dock is being edited in place (the sheet's Edit dock): icons wiggle, a drag reorders, an x removes, a plus adds. */
+    editing: Boolean = false,
+    /** W55: gets the rail's layout coordinates, so the sheet's host can leave exactly the dock touchable while editing. */
+    onCoordinates: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
     icon: @Composable (DockItem, Dp) -> Unit,
 ) {
     val horizontal = edge == DockEdge.Bottom
-    val collapsedBand = content.collapsed && !expanded
-    var helpOpen by remember { mutableStateOf(false) }
-    var editOpen by remember { mutableStateOf(false) }
-    var styleOpen by remember { mutableStateOf(false) }
-    // W25: the long-press menu: null, the dock's own (index -1) or one icon's; [menuPress] is where it opens, in window pixels.
+    val collapsedBand = content.collapsed && !expanded && !editing
+    // W25: an icon's long-press menu: null or the icon's index; [menuPress] is where it opens, in window pixels.
     var menuFor by remember { mutableIntStateOf(MENU_NONE) }
     var menuPress by remember { mutableStateOf(androidx.compose.ui.unit.IntOffset.Zero) }
     var railOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -144,8 +143,7 @@ fun DockRail(
         if (pendingFocus in requesters.indices) { requesters[pendingFocus].runCatching { requestFocus() }; pendingFocus = -1 }
     }
 
-    val dockEntries = DockMenuModel.dock(actions, edge, onEdit = { editOpen = true }, onAbout = { helpOpen = true }, onStyle = if (actions.onSetStyle != null) ({ styleOpen = true }) else null)
-    val openDockMenu = { at: Offset -> menuPress = androidx.compose.ui.unit.IntOffset(at.x.toInt(), at.y.toInt()); menuFor = MENU_DOCK }
+    val openDock = { if (!editing) actions.onOpenOptions() }
     val openItemMenu = { i: Int ->
         val b = slotBounds[i]
         val at = if (b != null) Offset(b.center.x, b.bottom) else railOrigin
@@ -177,32 +175,37 @@ fun DockRail(
 
     Box(
         modifier.then(surface)
-            .onGloballyPositioned { c -> railOrigin = c.positionInRoot(); railSize = c.size }
+            .onGloballyPositioned { c -> railOrigin = c.positionInRoot(); railSize = c.size; onCoordinates?.invoke(c) }
             // W25: a long press on the dock (an icon or the empty part) opens its options; the menu key and Shift+F10 do the same from the keyboard.
             .pointerInput(Unit) {
                 detectTapGestures(onLongPress = { p ->
                     val root = Offset(p.x + railOrigin.x, p.y + railOrigin.y)
                     val hit = slotBounds.entries.firstOrNull { it.value.contains(root) }?.key
-                    if (hit != null) openItemMenu(hit) else openDockMenu(root)
+                    if (hit != null) { if (!editing) openItemMenu(hit) } else openDock()
                 })
             }
             .onKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && isMenuKey(ev)) { openDockMenu(Offset(railOrigin.x + railSize.width / 2f, railOrigin.y + railSize.height.toFloat())); true } else false
+                if (ev.type == KeyEventType.KeyDown && isMenuKey(ev)) { openDock(); true } else false
             }
             .semantics {
                 contentDescription = L10n.tr("Dock")
                 stateDescription = DockStyleUi.stateText(style)
                 // TalkBack: every long-press action is also an action here.
-                customActions = dockEntries.map { e -> CustomAccessibilityAction(e.label) { e.run(); true } }
+                customActions = listOf(
+                    CustomAccessibilityAction(L10n.tr("Dock options")) { actions.onOpenOptions(); true },
+                    CustomAccessibilityAction(L10n.tr("Edit dock")) { actions.onEditDock(); true },
+                    CustomAccessibilityAction(L10n.tr("Workspaces and groups")) { actions.onOpenPanel(); true },
+                )
             },
     ) {
         Strip {
             WorkspaceChip(workspaceName, actions, graphBridge, style)
+            if (editing) DockAddTile(actions.onAddApps, graphBridge, style) // W55: the plus tile (first, so a long row never scrolls it out of reach) opens the app picker
             content.pinned.forEachIndexed { i, item ->
-                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, bridge = graphBridge, widget = widget, style = style, dark = dark,
+                DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, bridge = graphBridge, widget = widget, style = style, dark = dark, editing = editing,
                     onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE })
             }
-            if (content.showRecentSection && content.recent.isNotEmpty()) {
+            if (!editing && content.showRecentSection && content.recent.isNotEmpty()) {
                 SectionDivider(horizontal, style)
                 content.recent.forEachIndexed { j, item ->
                     val i = content.pinned.size + j
@@ -210,21 +213,16 @@ fun DockRail(
                         onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE })
                 }
             }
-            if (content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge, style)
+            if (!editing && content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge, style)
         }
     }
-    if (menuFor == MENU_DOCK) DockMenuPopup(menuPress, DockMenuModel.TAG_DOCK_MENU, dockEntries) { menuFor = MENU_NONE }
-    else if (menuFor >= 0) items.getOrNull(menuFor)?.let { item ->
+    if (menuFor >= 0 && !editing) items.getOrNull(menuFor)?.let { item ->
         val extra by androidx.compose.runtime.produceState(emptyList<DockMenuEntry>(), item) { value = runCatching { itemExtras(item) }.getOrDefault(emptyList()) }
         DockMenuPopup(menuPress, DockMenuModel.TAG_ITEM_MENU, DockMenuModel.item(item, menuFor, items.size, menuFor < content.pinned.size, actions, extra)) { menuFor = MENU_NONE }
     }
-    if (editOpen) EditDockDialog(content, actions) { editOpen = false }
-    if (styleOpen) actions.onSetStyle?.let { set -> DockStyleDialog(style, set) { styleOpen = false } }
-    if (helpOpen) HelpDialog { helpOpen = false }
 }
 
 private const val MENU_NONE = Int.MIN_VALUE
-private const val MENU_DOCK = -1
 
 /** The menu key, or Shift+F10 (the standard context-menu chord). */
 private fun isMenuKey(ev: androidx.compose.ui.input.key.KeyEvent): Boolean = ev.key == Key.Menu || (ev.key == Key.F10 && ev.isShiftPressed)
@@ -238,21 +236,6 @@ private fun Modifier.graphNode(id: String, bridge: DockInput.FocusBridge?): Modi
     return this
         .onGloballyPositioned { c -> val b = c.boundsInRoot(); bridge.register(id, b.left, b.top, b.right, b.bottom, requester) }
         .focusRequester(requester).onFocusChanged { bridge.onFocus(id, it.isFocused) }
-}
-
-@Composable
-private fun HelpDialog(onDismiss: () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
-        com.bos.sphere.feature.grid.OneUiDialog(
-            L10n.tr("About the dock"), onDismiss, cancelLabel = null, confirmLabel = L10n.tr("Done"), onConfirm = onDismiss,
-            body = L10n.tr(DockText.RECENCY_HELP),
-        ) {
-            androidx.compose.material3.Text(
-                L10n.tr("Alt with an arrow key, or a long press and drag, reorders pinned items."), color = HyleColors.InkDim, fontSize = 15.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
-            )
-        }
-    }
 }
 
 /** A thin rule between the pinned items and the recent ones; icons only, so no "Recent" text. */
@@ -342,6 +325,7 @@ private fun DockSlot(
     onDragBegin: () -> Unit = {},
     style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
     dark: Boolean = true,
+    editing: Boolean = false,
 ) {
     val slot = 52.dp
     // HOM-02: a pinned widget takes its span of slots along the rail and one slot across it.
@@ -357,6 +341,19 @@ private fun DockSlot(
     val desc = item.label + if (item.recentlyUsed) ", " + L10n.tr("used this session") else ""
     val shape = RoundedCornerShape(16.dp)
 
+    // W55 (dockSheet): while the dock is edited in place, a plain drag (no long press first) reorders, and every icon wiggles (not with reduced motion).
+    val wiggle = if (editing && reorderable) rememberDockWiggle(index) else 0f
+    val editDrag = Modifier.pointerInput(index, count, editing) {
+        detectDragGestures(
+            onDragStart = { drag = 0f },
+            onDragEnd = {
+                val to = DockReorder.targetIndex(index, drag, slotPx, count)
+                drag = 0f
+                if (to != index) actions.onReorder(index, to)
+            },
+            onDragCancel = { drag = 0f },
+        ) { change, amount -> change.consume(); drag += if (horizontal) amount.x else amount.y }
+    }
     val reorderDrag = Modifier.pointerInput(index, count) {
         detectDragGesturesAfterLongPress(
             onDragStart = { drag = 0f; onMenu() }, // W25: the long press opens the icon's options; moving on from it is a reorder and closes them
@@ -371,7 +368,7 @@ private fun DockSlot(
 
     Box(
         Modifier.size(boxW, boxH)
-            .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; alpha = if (item.unavailable) 0.4f else if (drag != 0f) 0.8f else 1f }
+            .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; rotationZ = wiggle; alpha = if (item.unavailable) 0.4f else if (drag != 0f) 0.8f else 1f }
             .clip(shape)
             .then(if (focused) Modifier.border(2.dp, HyleColors.Violet, shape) else Modifier)
             // INP-01: the slot is a node of the shared focus graph (arrows leave the rail into the home and back, the graph knows what has focus).
@@ -390,10 +387,10 @@ private fun DockSlot(
                     DockKeyAction.None -> false
                 }
             }
-            .then(if (reorderable) Modifier.clickable { actions.onLaunch(item, index) } else Modifier.combinedClickable(onLongClick = onMenu) { actions.onLaunch(item, index) }) // W25: a recent icon has no reorder drag, so its long press is the click's own
+            .then(if (editing) Modifier else if (reorderable) Modifier.clickable { actions.onLaunch(item, index) } else Modifier.combinedClickable(onLongClick = onMenu) { actions.onLaunch(item, index) }) // W25: a recent icon has no reorder drag, so its long press is the click's own
             // HOM-02: an icon slot starts a reorder with a long press anywhere on it. A widget slot does not: the hosted view takes the touches that
             // start on it (its own taps, scrolls and long-presses), so its reorder lives on the grip strip drawn above it.
-            .then(if (reorderable && !wide) reorderDrag else Modifier)
+            .then(if (editing && reorderable && !wide) editDrag else if (reorderable && !wide) reorderDrag else Modifier)
             .semantics {
                 contentDescription = desc
                 role = Role.Button
@@ -415,6 +412,7 @@ private fun DockSlot(
                 contentAlignment = Alignment.TopCenter,
             ) { Box(Modifier.padding(top = 4.dp).size(24.dp, 3.dp).clip(CircleShape).background(HyleColors.InkDim.copy(alpha = 0.7f))) }
         } else StyledIcon(style, dark, item, 40.dp, icon)
+        if (editing && reorderable) DockRemoveBadge(item, actions.onUnpin)
         // The active dot keeps its place in every style; over the wallpaper (Transparent) it gets a dark ring so it reads on a light one.
         if (item.recentlyUsed) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).size(8.dp).clip(CircleShape).background(HyleColors.Violet).then(if (style == com.bos.sphere.core.data.DockStyle.Transparent) Modifier.border(1.5.dp, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f), CircleShape) else Modifier).testTag("dock.activeDot"))
         if (showNumbers && index < 9) Text("${index + 1}", color = HyleColors.OnAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold,

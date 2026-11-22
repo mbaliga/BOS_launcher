@@ -40,7 +40,6 @@ import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.SphereTheme
 import com.bos.sphere.core.design.ThemeVariant
 import com.bos.sphere.feature.grid.SettingItem
-import com.bos.sphere.ui.DockStylePane
 import com.bos.sphere.ui.SettingsModel
 import com.bos.sphere.ui.SystemLinks
 import com.bos.sphere.ui.ThemeFiles
@@ -133,7 +132,8 @@ class ThemesW39Test {
         val look = cats.first { it.title == "Look" }.items
         assertTrue("Themes is a pane under Look", look.any { it.title == "Themes" && it is SettingItem.Pane })
         val home = cats.first { it.title == "Home screen" }.items
-        assertTrue("Dock style is a pane under Home screen", home.any { it.title == "Dock style" && it is SettingItem.Pane })
+        assertFalse("W55: Dock style left Home screen; it is chosen in the dock's sheet and on Desktop & dock > Dock", cats.flatMap { it.items }.any { it.title == "Dock style" })
+        assertTrue(home.isNotEmpty())
         assertEquals("one of each", 1, cats.flatMap { it.items }.count { it.title == "Themes" })
     }
 
@@ -273,9 +273,9 @@ class ThemesW39Test {
 
     // --- Dock style pane ----------------------------------------------------------------------------------------------------------------------
 
-    @Test fun DCK_04_style_40_theDockStylePaneStoresTheChoiceInTheDockSettings() {
+    @Test fun DCK_04_style_40_theDockSettingsPageStyleCardsStoreTheChoiceInTheDockSettings() {
         val manager = com.bos.sphere.feature.dock.WorkspaceManager(com.bos.sphere.feature.dock.InMemoryWorkspaceStore())
-        rule.setContent { Screen { DockStylePane(manager) } }
+        rule.setContent { Screen { com.bos.sphere.feature.dock.DockSettingsContent(manager, com.bos.sphere.core.capabilities.Tier.T2, emptyList()) } }
         assertEquals(DockStyle.Standard, manager.current.dock.style)
         rule.onNodeWithTag(com.bos.sphere.feature.dock.DockStyleUi.rowTag(DockStyle.Transparent)).performScrollTo().performClick(); rule.waitForIdle()
         assertEquals(DockStyle.Transparent, manager.current.dock.style)

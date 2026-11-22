@@ -17,7 +17,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.bos.sphere.core.capabilities.Tier
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.launch.AppGroup
@@ -30,7 +29,7 @@ import com.bos.sphere.feature.grid.OneUiPageFrame
 data class PanelApp(val key: String, val label: String, val packageName: String, val target: LaunchTarget)
 
 /** Where the dock panel's own navigation is. */
-enum class DockPanelPage { Dock, Workspaces, Groups }
+enum class DockPanelPage { Workspaces, Groups }
 
 object DockPanelTags {
     const val PAGE = "dockpanel.page"
@@ -44,14 +43,13 @@ object DockPanelTags {
 internal val DockDialogHook: @Composable () -> Unit = { DockDialogInput() }
 
 /**
- * Wave 41 (settingsPopups): the dock panel is no longer a floating card. It is a full page in the One UI chrome (back arrow, large
- * collapsing title, grouped rounded cards) with the same three pages the Ground Control "Desktop & dock" page holds: Dock, Workspaces
- * and App groups. Reached from the dock's menu and the workspace chip; nothing here is needed to use the dock.
+ * Wave 41 (settingsPopups): a full page in the One UI chrome (back arrow, large collapsing title, grouped rounded cards). W55 (dockSheet): it is the
+ * dock sheet's "Workspaces and groups" page: Workspaces first, with a row on to App groups. The dock's own options (style, position, mode, ...) are in
+ * the sheet and in Settings > Desktop & dock > Dock; nothing here is needed to use the dock.
  */
 @Composable
 fun DockPanel(
     manager: WorkspaceManager,
-    tier: Tier,
     apps: List<PanelApp>,
     displays: List<DisplayRef>,
     onRunGroup: (AppGroup) -> Unit,
@@ -64,22 +62,17 @@ fun DockPanel(
     /** Groups on the home as a shelf of chips (WSP-05). */
     groupShelfOn: Boolean = true,
     onGroupShelf: (Boolean) -> Unit = {},
-    /** Extra rows from other streams, drawn in their own card on the Dock page (the desktop's dock item, for one). */
-    extra: (@Composable () -> Unit)? = null,
 ) {
-    var page by remember { mutableStateOf(DockPanelPage.Dock) }
+    var page by remember { mutableStateOf(DockPanelPage.Workspaces) }
     val state by manager.state.collectAsState()
-    val back = { if (page != DockPanelPage.Dock) page = DockPanelPage.Dock else onDismiss() }
+    val back = { if (page != DockPanelPage.Workspaces) page = DockPanelPage.Workspaces else onDismiss() }
     Dialog(onDismissRequest = back, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         DockDialogInput() // INP-20: controller window hook and the shared focus layer
         DockPagesScope {
             Box(Modifier.fillMaxSize().background(HyleColors.Background)) {
                 when (page) {
-                    DockPanelPage.Dock -> OneUiPageFrame(L10n.tr("Dock"), onDismiss, tag = DockPanelTags.PAGE) {
-                        item(key = "dock") { Column { DockSettingsContent(manager, tier, apps, extra, onOpenWorkspaces = { page = DockPanelPage.Workspaces }, onOpenGroups = { page = DockPanelPage.Groups }) } }
-                    }
                     DockPanelPage.Workspaces -> OneUiPageFrame(L10n.tr("Workspaces"), back, subtitle = WorkspaceSummary.activeLine(state), tag = DockPanelTags.PAGE) {
-                        item(key = "ws") { Column { WorkspacesContent(manager, apps, paletteActionChoices) } }
+                        item(key = "ws") { Column { WorkspacesContent(manager, apps, paletteActionChoices, onOpenGroups = { page = DockPanelPage.Groups }) } }
                     }
                     DockPanelPage.Groups -> OneUiPageFrame(L10n.tr("App groups"), back, tag = DockPanelTags.PAGE) {
                         item(key = "groups") { Column { AppGroupsContent(manager, apps, displays, onRunGroup, onRestore, onSchedule, now, groupShelfOn, onGroupShelf) } }

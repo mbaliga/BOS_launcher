@@ -78,8 +78,8 @@ class DockIconsOnlyW25Test {
         onAppInfo = { ran += "info ${it.label}" },
         onReplace = { ran += "replace ${it.label}" },
         onAddApps = { ran += "add" },
-        onHide = { ran += "hide" },
-        onSetEdge = { ran += "edge $it" },
+        onOpenOptions = { ran += "options" },
+        onEditDock = { ran += "edit" },
     )
 
     private fun shoot(name: String) {
@@ -122,35 +122,15 @@ class DockIconsOnlyW25Test {
         assertEquals(listOf("launch Bravo"), ran)
     }
 
-    @Test fun DCK_01_longPressOnTheDockBackgroundOpensTheDockOptionsAndEachEntryRuns() {
+    @Test fun DCK_01_longPressOnTheDockBackgroundOpensTheDockSheetNotAMenu() {
+        // W55 (dockSheet): the dock's long press asks its host for the sheet (DockSheetW55Test drives the sheet itself); no popup menu any more.
         ran.clear()
         rule.setContent { Rail(content(), actions()) }
         longPressDockBackground()
         rule.waitForIdle()
-        rule.onNodeWithTag(DockMenuModel.TAG_DOCK_MENU).assertExists()
-        shoot("w25-dock-menu")
-        listOf("Edit dock", "Workspaces and groups", "Dock settings", "Hide dock", "About the dock").forEach { rule.onNodeWithText(it).assertExists() }
-        rule.onNodeWithText("Dock at the bottom").assertDoesNotExist() // it is already at the bottom
-        rule.onNodeWithText("Dock on the left").assertExists()
-        rule.onNodeWithText("Dock on the right").assertExists()
-        rule.onNodeWithText("Workspaces and groups").performClick()
-        rule.waitForIdle()
-        rule.onNodeWithTag(DockMenuModel.TAG_DOCK_MENU).assertDoesNotExist()
-        longPressDockBackground(); rule.waitForIdle(); rule.onNodeWithText("Dock settings").performClick()
-        longPressDockBackground(); rule.waitForIdle(); rule.onNodeWithText("Hide dock").performClick()
-        longPressDockBackground(); rule.waitForIdle(); rule.onNodeWithText("Dock on the left").performClick()
-        assertEquals(listOf("panel", "panel", "hide", "edge Left"), ran)
-        longPressDockBackground(); rule.waitForIdle(); rule.onNodeWithText("Edit dock").performClick(); rule.waitForIdle()
-        rule.onNodeWithText("Nothing is pinned to the dock yet.").assertDoesNotExist()
-        rule.onNodeWithText("Add apps").performClick()
-        assertEquals("add", ran.last())
-    }
-
-    @Test fun DCK_01_aboutIsAnEntryOfTheDockMenu() {
-        rule.setContent { Rail(content(), actions()) }
-        longPressDockBackground(); rule.waitForIdle()
-        rule.onNodeWithText("About the dock").performClick(); rule.waitForIdle()
-        rule.onNodeWithText("Alt with an arrow key, or a long press and drag, reorders pinned items.").assertExists()
+        assertEquals(listOf("options"), ran)
+        rule.onNodeWithTag(DockMenuModel.TAG_ITEM_MENU).assertDoesNotExist()
+        listOf("Edit dock", "Workspaces and groups", "Dock settings", "Hide dock", "About the dock").forEach { rule.onNodeWithText(it).assertDoesNotExist() }
     }
 
     @Test fun DCK_01_longPressOnAnIconOpensThatIconsOptionsAndEachEntryRuns() {
@@ -159,7 +139,6 @@ class DockIconsOnlyW25Test {
         rule.onNodeWithContentDescription("Bravo").performTouchInput { longClick() }
         rule.waitForIdle()
         rule.onNodeWithTag(DockMenuModel.TAG_ITEM_MENU).assertExists()
-        rule.onNodeWithTag(DockMenuModel.TAG_DOCK_MENU).assertDoesNotExist()
         shoot("w25-icon-menu")
         listOf("Shortcut one", "App info", "Move earlier", "Move later", "Replace with another app", "Remove from dock").forEach { rule.onNodeWithText(it).assertExists() }
         for (l in listOf("Shortcut one", "App info", "Move earlier", "Move later", "Replace with another app", "Remove from dock")) {
@@ -200,23 +179,18 @@ class DockIconsOnlyW25Test {
         ran.clear()
         rule.setContent { Rail(content(recent = true), actions()) }
         val dock = customLabels("Dock")
-        assertTrue(dock.toString(), dock.containsAll(listOf("Edit dock", "Workspaces and groups", "Dock settings", "Hide dock", "About the dock", "Dock on the left")))
+        assertEquals(listOf("Dock options", "Edit dock", "Workspaces and groups"), dock)
         val item = customLabels("Bravo")
         assertTrue(item.toString(), item.containsAll(listOf("Move earlier", "Move later", "Unpin", "Replace with another app", "App info", "Dock item options")))
         assertTrue(customLabels("Recent one").containsAll(listOf("Pin to dock", "Dock item options")))
         assertTrue(customLabels("Workspace Home").containsAll(listOf("Switch to the next workspace", "Switch to the previous workspace")))
         // And they run.
         rule.runOnUiThread {
-            rule.onNodeWithContentDescription("Dock").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Hide dock" }.action()
+            rule.onNodeWithContentDescription("Dock").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Dock options" }.action()
+            rule.onNodeWithContentDescription("Dock").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Edit dock" }.action()
             rule.onNodeWithContentDescription("Bravo").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Replace with another app" }.action()
             rule.onNodeWithContentDescription("Bravo").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "App info" }.action()
         }
-        assertEquals(listOf("hide", "replace Bravo", "info Bravo"), ran)
-    }
-
-    @Test fun DCK_01_theDockMenuLeavesOutHideAndPositionWhereTheHostCannotOfferThem() {
-        val a = DockActions(onOpenPanel = {})
-        val labels = DockMenuModel.dock(a, DockEdge.Bottom, {}, {}).map { it.label }
-        assertEquals(listOf("Edit dock", "Workspaces and groups", "Dock settings", "About the dock"), labels)
+        assertEquals(listOf("options", "edit", "replace Bravo", "info Bravo"), ran)
     }
 }

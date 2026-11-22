@@ -160,7 +160,7 @@ internal fun Modifier.glyphHalo(style: DockStyle, shape: Shape = CircleShape): M
     if (style == DockStyle.Transparent) background(Color.Black.copy(alpha = DockStyleTokens.HALO_ALPHA), shape) else this
 
 // ---------------------------------------------------------------------------------------------------------------------------------------
-// The chooser: three radio rows with a small preview each (Ground Control, and the dock's own long-press menu).
+// The style's preview (the art of its card in the dock sheet and in Settings): the dock's own drawing code in miniature.
 // ---------------------------------------------------------------------------------------------------------------------------------------
 
 object DockStyleUi {
@@ -184,46 +184,6 @@ fun DockStylePreview(style: DockStyle, modifier: Modifier = Modifier, dark: Bool
             listOf(Color(0xFF4F8CFF), Color(0xFFFF7A59), Color(0xFF3DDC84), Color(0xFFB36BFF)).forEachIndexed { i, col ->
                 Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
                     StyledIcon(style, dark, DockItem(DockItemRef.app("preview$i"), ""), 18.dp) { _, s -> Box(Modifier.size(s).clip(RoundedCornerShape(5.dp)).background(col)) }
-                }
-            }
-        }
-    }
-}
-
-/** Three radio rows (Standard, Transparent, 3D), each with its preview; [onSelect] gets the choice. 48 dp rows, one node per choice. */
-@Composable
-fun DockStyleChooser(current: DockStyle, onSelect: (DockStyle) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.semantics { contentDescription = L10n.tr("Dock style") }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        DockStyle.entries.forEach { s ->
-            val selected = s == current
-            val shape = RoundedCornerShape(14.dp)
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(shape)
-                    .background(if (selected) HyleColors.Violet.copy(alpha = 0.18f) else HyleColors.Hairline.copy(alpha = 0.06f))
-                    .then(if (selected) Modifier.border(1.5.dp, HyleColors.Violet, shape) else Modifier)
-                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(s) })
-                    .testTag(DockStyleUi.rowTag(s))
-                    .semantics(mergeDescendants = true) { contentDescription = L10n.tr(s.label); stateDescription = if (selected) L10n.tr("Selected") else L10n.tr("Not selected") }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DockStylePreview(s)
-                Spacer(Modifier.width(14.dp))
-                Text(L10n.tr(s.label), color = HyleColors.InkBright, fontSize = 15.sp, modifier = Modifier.weight(1f))
-            }
-        }
-        Text(L10n.tr("Transparent draws no panel: only the icons, with a soft halo. 3D is a glossy shelf with raised icons."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-    }
-}
-
-/** The dock's own long-press route to the same choice: a full page (wave 46), not a popup, because it holds a set of options. */
-@Composable
-internal fun DockStyleDialog(current: DockStyle, onSelect: (DockStyle) -> Unit, onDismiss: () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
-        com.bos.sphere.feature.grid.OneUiFullPage(onDismiss) {
-            com.bos.sphere.feature.grid.OneUiPageFrame(L10n.tr("Dock style"), onDismiss, tag = "dock.styleDialog") {
-                item(key = "style") {
-                    Column(Modifier.padding(horizontal = 18.dp)) { DockStyleChooser(current, onSelect = { onSelect(it); onDismiss() }) }
                 }
             }
         }

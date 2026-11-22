@@ -50,27 +50,12 @@ import com.bos.sphere.core.design.L10n
 class DockMenuEntry(val label: String, val run: () -> Unit)
 
 /**
- * W25 (owner item 4): the dock draws icons only, so everything the old "i" and "..." buttons held lives behind a long press. The
- * entry lists are pure so a test can check them; the rail draws them as a compact popup and also offers each as a TalkBack action.
+ * W25 (owner item 4): the dock draws icons only, so what the old "i" and "..." buttons held lives behind a long press. W55 (dockSheet): a long press
+ * on the dock itself opens the dock's sheet (DockSheet.kt); a long press on an icon still opens this small context menu. The entry list is pure so a
+ * test can check it; the rail draws it as a compact popup and also offers each entry as a TalkBack action.
  */
 object DockMenuModel {
-    const val TAG_DOCK_MENU = "dock.menu"
     const val TAG_ITEM_MENU = "dock.itemMenu"
-
-    /** Long press on the dock background (or the menu key on the home chip). */
-    fun dock(actions: DockActions, edge: DockEdge, onEdit: () -> Unit, onAbout: () -> Unit, onStyle: (() -> Unit)? = null): List<DockMenuEntry> = buildList {
-        add(DockMenuEntry(L10n.tr("Edit dock"), onEdit))
-        add(DockMenuEntry(L10n.tr("Workspaces and groups"), actions.onOpenPanel))
-        add(DockMenuEntry(L10n.tr("Dock settings"), actions.onOpenPanel))
-        onStyle?.let { add(DockMenuEntry(L10n.tr("Dock style"), it)) } // W39
-        actions.onSetEdge?.let { set ->
-            if (edge != DockEdge.Bottom) add(DockMenuEntry(L10n.tr("Dock at the bottom")) { set(DockEdge.Bottom) })
-            if (edge != DockEdge.Left) add(DockMenuEntry(L10n.tr("Dock on the left")) { set(DockEdge.Left) })
-            if (edge != DockEdge.Right) add(DockMenuEntry(L10n.tr("Dock on the right")) { set(DockEdge.Right) })
-        }
-        actions.onHide?.let { hide -> add(DockMenuEntry(L10n.tr("Hide dock"), hide)) }
-        add(DockMenuEntry(L10n.tr("About the dock"), onAbout))
-    }
 
     /** Long press on an icon: that icon's options. [extra] are the host's app entries (shortcuts and the open choices). */
     fun item(item: DockItem, index: Int, count: Int, reorderable: Boolean, actions: DockActions, extra: List<DockMenuEntry>): List<DockMenuEntry> = buildList {
@@ -112,8 +97,8 @@ internal fun DockMenuPopup(press: IntOffset, tag: String, entries: List<DockMenu
 }
 
 /**
- * "Edit dock" (wave 48: a full One UI page, not a dialog): the pinned items in one rounded card, each with a menu (move earlier, move
- * later, unpin), and a way to add apps; the old panel's pin editing without a drag. The back arrow (or Done) leaves; every change applies at once.
+ * The pinned items as a list page (wave 48): each with a menu (move earlier, move later, unpin), and a way to add apps. W55 (dockSheet): the dock's own
+ * Edit dock is now in place on the dock (DockSheet.kt); this list is the Settings > Dock page's "Edit dock" row, where there is no dock to drag.
  */
 @Composable
 internal fun EditDockDialog(content: DockContent, actions: DockActions, onDismiss: () -> Unit) {

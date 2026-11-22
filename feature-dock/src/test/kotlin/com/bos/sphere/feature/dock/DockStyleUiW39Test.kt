@@ -77,7 +77,6 @@ class DockStyleUiW39Test {
     private val tile = listOf(Color(0xFF4F8CFF), Color(0xFFFF7A59), Color(0xFF3DDC84), Color(0xFFE6B800), Color(0xFFB36BFF), Color(0xFF29C5D6))
     private fun actions() = DockActions(
         onLaunch = { i, _ -> ran += "launch ${i.label}" }, onOpenPanel = { ran += "panel" },
-        onSetStyle = { ran += "style ${it.id}" },
     )
 
     @Composable private fun Wallpaper(light: Boolean, flat: Color? = null, content: @Composable () -> Unit) {
@@ -159,22 +158,9 @@ class DockStyleUiW39Test {
     @Test fun DCK_04_style_13_transparentLongPressOnAnIconStillOpensItsMenu() = longPress(DockStyle.Transparent)
     @Test fun DCK_04_style_13_threeDLongPressOnAnIconStillOpensItsMenu() = longPress(DockStyle.ThreeD)
 
-    @Test fun DCK_04_style_14_theDockMenuHasDockStyleAndItOpensTheThreeChoicesAndStoresTheChosenOne() {
-        rule.setContent { Wallpaper(false) { Rail(DockStyle.Standard) } }
-        rule.onNodeWithContentDescription("Dock").performTouchInput { longClick(androidx.compose.ui.geometry.Offset(width - 4f, height / 2f)) }
-        rule.waitForIdle()
-        rule.onNodeWithText("Dock style").performClick(); rule.waitForIdle()
-        rule.onNodeWithTag("dock.styleDialog").assertExists()
-        DockStyle.entries.forEach { rule.onNodeWithTag(DockStyleUi.rowTag(it)).assertExists() }
-        rule.onNodeWithTag(DockStyleUi.rowTag(DockStyle.Standard)).assertIsSelected()
-        rule.onNodeWithTag(DockStyleUi.rowTag(DockStyle.Transparent)).performClick(); rule.waitForIdle()
-        assertEquals(listOf("style transparent"), ran)
-        rule.onNodeWithTag("dock.styleDialog").assertDoesNotExist()
-    }
-
-    @Test fun DCK_04_style_15_theChooserHasOneRadioRowPerStyleWithAPreviewAndTheCurrentOneSelected() {
-        var chosen = DockStyle.Transparent
-        rule.setContent { Wallpaper(false) { Box(Modifier.padding(16.dp)) { DockStyleChooser(chosen, { chosen = it }) } } }
+    @Test fun DCK_04_style_15_theStyleCardsHaveOneRadioCardPerStyleWithAPreviewAndTheCurrentOneSelected() {
+        val manager = WorkspaceManager(InMemoryWorkspaceStore()).also { it.setDock { d -> d.copy(style = DockStyle.Transparent) } }
+        rule.setContent { Wallpaper(false) { androidx.compose.foundation.layout.Column(Modifier.padding(16.dp)) { DockOptionsBody(manager, com.bos.sphere.core.capabilities.Tier.T2, DockOptionsScope()) } } }
         DockStyle.entries.forEach { s ->
             rule.onNodeWithTag(DockStyleUi.rowTag(s)).assertExists()
             rule.onNodeWithTag(DockStyleUi.previewTag(s), useUnmergedTree = true).assertExists()
@@ -184,7 +170,9 @@ class DockStyleUiW39Test {
         }
         rule.onNodeWithTag(DockStyleUi.rowTag(DockStyle.Transparent)).assertIsSelected()
         rule.onNodeWithTag(DockStyleUi.rowTag(DockStyle.ThreeD)).performClick()
-        assertEquals(DockStyle.ThreeD, chosen)
+        rule.waitForIdle()
+        assertEquals(DockStyle.ThreeD, manager.current.dock.style)
+        rule.onNodeWithTag(DockStyleUi.rowTag(DockStyle.ThreeD)).assertIsSelected()
     }
 
     // --- pixels: what makes each style what it is -------------------------------------------------------------------------------------------
@@ -288,10 +276,4 @@ class DockStyleUiW39Test {
     @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi") @Test fun DCK_04_style_31_screenshotTransparentLightLandscape() = photo("w39-dock-transparent-light-landscape", DockStyle.Transparent, true, DockEdge.Left)
     @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi") @Test fun DCK_04_style_31_screenshotThreeDDarkLandscape() = photo("w39-dock-3d-dark-landscape", DockStyle.ThreeD, false, DockEdge.Left)
     @Config(sdk = [35], qualifiers = "w891dp-h411dp-land-xhdpi") @Test fun DCK_04_style_31_screenshotThreeDLightLandscape() = photo("w39-dock-3d-light-landscape", DockStyle.ThreeD, true, DockEdge.Left)
-
-    @Test fun DCK_04_style_32_screenshotTheChooser() {
-        theme(false)
-        rule.setContent { Wallpaper(false) { Box(Modifier.padding(16.dp)) { DockStyleChooser(DockStyle.ThreeD, {}) } } }
-        shoot("w39-dock-style-chooser-dark")
-    }
 }

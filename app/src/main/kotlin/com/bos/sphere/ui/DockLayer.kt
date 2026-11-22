@@ -187,6 +187,7 @@ fun BoxScope.DockLayer(
     if (visible) GroupShelfSlot(wsState.groups, wsState.dock.groupShelf, wsState.dock.isEnabled(tierNow), bottomPlan?.shelfBottomDp, onRun = { g -> scope.launch { launcher.runGroup(g) } })
     if (visible) DockHost(
         alwaysShown = alwaysShown,
+        desktopPin = DockItemRef(ItemKind.Shortcut, DESKTOP_PIN_ID),
         unavailableApps = unavailableApps,
         apps = apps, launcher = launcher, controller = controller, refreshKey = homeSignal,
         onLaunchApp = onLaunch, onOpenPanel = { panelOpen = true }, onGoHome = onGoHome, inputIsKeyboard = keyboardMode,
@@ -238,10 +239,9 @@ fun DockPanelHost(
     val context = LocalContext.current
     val manager = remember { WorkspaceRepository.get(context) }
     val wsState by manager.state.collectAsState()
-    val tier = remember { CapabilityEvaluator.tier(launcher.inputs()) }
     val panelApps = remember(apps) { apps.map { PanelApp(it.key, it.label, it.packageName, launcher.targetOf(it)) } }
     DockPanel(
-        manager = manager, tier = tier, apps = panelApps, displays = launcher.displays(),
+        manager = manager, apps = panelApps, displays = launcher.displays(),
         onRunGroup = { g -> onRunGroup(g); onDismiss() },
         onRestore = { s -> onRestore(s); onDismiss() },
         onSchedule = { target, label, at -> scheduleFromPanel(context, manager, target, label, at) },
@@ -249,7 +249,6 @@ fun DockPanelHost(
         paletteActionChoices = PinnableActions.choices(),
         groupShelfOn = wsState.dock.groupShelf,
         onGroupShelf = { v -> manager.setDock { it.copy(groupShelf = v) } },
-        extra = { DesktopPinRow(manager) },
     )
 }
 

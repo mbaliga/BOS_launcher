@@ -276,7 +276,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                     hint = x("What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing"),
                 ) { v -> upd { it.copy(rightSide = v) } },
             )
-            add(dockStyleSettingItem()) // W39 (dockThemes): Standard, Transparent or 3D
             addAll(wallpaperSettings(p) { f -> upd(f) }) // HOM-16 (wave 26): Glance and Pages wallpaper, always listed
             run {
                 add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })

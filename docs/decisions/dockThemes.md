@@ -19,7 +19,7 @@ rest of the dock section; an older file without it reads as Standard, an unknown
   the styles only change what is drawn. The reflection is not a semantics node (cleared), so a screen reader hears each icon once.
 - The dock node's state description is "Dock style: X". The dock stays optional: nothing here turns it on or off, and with it off (or empty) no
   style draws anything.
-- Where to change it: the dock's long-press menu ("Dock style", a dialog with the three choices) and Ground Control, Home screen, "Dock style"
+- Where to change it (W55, docs/decisions/dockSheet.md: the two places below were replaced): the dock's sheet (Dock style cards) and Settings > Desktop & dock > Dock (cards under a live preview); the long-press menu entry and the Home screen row are gone. Was: the dock's long-press menu ("Dock style", a dialog with the three choices) and Ground Control, Home screen, "Dock style"
   (three radio rows, each with a small preview drawn by the dock's own code, so what the preview shows is what the dock gets).
 - Landscape side docks, RTL and large font scale: the rail's layout is unchanged; tested in the three styles.
 - Icon sizes and icon shapes: the dock draws the icon composable it is handed at 40 dp, as before; the styles do not touch them.

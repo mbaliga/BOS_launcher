@@ -169,13 +169,13 @@ class DockDialogsW24Test {
     @Test fun INP_20_theDockPanelIsAFullPageThatRaisesTheDialogLayerAndControllerBClosesIt() {
         val m = manager()
         var open by mutableStateOf(true)
-        show { if (open) DockPanel(m, Tier.T2, apps, emptyList(), {}, {}, { _, _, _ -> }, onDismiss = { open = false }) }
+        show { if (open) DockPanel(m, apps, emptyList(), {}, {}, { _, _, _ -> }, onDismiss = { open = false }) }
         assertEquals(1, showing().size)
         assertEquals("the dock dialog layer is raised while the panel shows", DockInput.DIALOG_LAYER, LauncherInput.focus.topLayer)
         val panel = top()
         assertTrue("the panel is a page: it holds no text field of its own", fields(panel).isEmpty())
         key(panel, KeyEvent.KEYCODE_BUTTON_B)
-        assertFalse("B at the Dock page closes the panel", open)
+        assertFalse("B at the Workspaces page closes the panel", open)
         settleDialogs()
         assertTrue(showing().isEmpty())
         assertEquals("the dialog layer is released", 0, LauncherInput.focus.topLayer)

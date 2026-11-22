@@ -243,7 +243,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         add(SettingItem.Action(x("Add a page after this"), Glyphs.Plus, "") { m.addPageAfter(m.pageIndex) })
         if (m.pages.size > 1 || page.keys.isNotEmpty()) add(SettingItem.Action(x("Delete this page"), Glyphs.Close, x("Items on it leave the home; they stay in the drawer")) { m.deletePage(m.pageIndex) })
     }
-    out += SettingCategory(x("Page %d", m.pageIndex + 1), Glyphs.Widget, pageItems)
+    out += SettingCategory(x("Pages"), Glyphs.Widget, pageItems) // wave 52: "Pages", not "Page 1" (the row opens the settings of the page you are on)
     }
 
     // --- Home --------------------------------------------------------------------------------
@@ -444,7 +444,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
 
     // --- Launchpad ---------------------------------------------------------------------------
     out += SettingCategory(
-        "Comms",
+        x("Side panel"), // wave 52: the right-hand panel holds Comms and widgets, so the row is named by what it is; the sections inside keep their names
         Glyphs.Bell,
         buildList {
             val leftPick: (com.bos.sphere.core.data.LeftPage) -> Unit = { v ->
@@ -581,6 +581,13 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Pane(x("Accent"), Glyphs.Palette, "") { ColorPicker(p.accentColor, { v -> upd { it.copy(accentColor = v) } }) })
             add(themesSettingItem()) // W39 (dockThemes): import, export, reset
             add(SettingItem.Pane(x("Wallpaper palette, density and text size"), Glyphs.Dial, "") { ThemingPane() })
+            add(
+                SettingItem.Choice(
+                    x("Font"), Glyphs.Dial, com.bos.sphere.core.design.FontCatalog.entries, com.bos.sphere.core.design.FontCatalog.entry(p.uiFont), { x(it.label) },
+                    hint = x("The font of Liftoff's own text: labels, Radar, sheets and the clock. Titles stay in Space Grotesk."),
+                    preview = { com.bos.sphere.feature.grid.FontChoice(p.uiFont) { v -> upd { it.copy(uiFont = v) } } },
+                ) { v -> upd { it.copy(uiFont = v.id) } },
+            )
             add(
                 SettingItem.Choice(
                     x("Icon shape"), Glyphs.Apps, IconShape.entries, p.iconShape, { x(it.label) },
@@ -739,6 +746,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
     m.hiddenApps?.let { out += hiddenAppsCategory(it) } // wave 38
     out += com.bos.sphere.ui.backupCategory()
+    out += com.bos.sphere.ui.workspacesCategory()
     out += com.bos.sphere.ui.desktopCategory()
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(
@@ -778,7 +786,8 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     out += SettingCategory(x("App drawer"), Glyphs.Widget, cat("Apps")?.items.orEmpty())
     built.firstOrNull { it.items.singleOrNull()?.title == x("Hidden apps") }?.let { out += it } // wave 38: its own row in the top-level list
     cat("Radar")?.let { out += it }
-    cat("Comms")?.let { out += it }
+    cat("Workspaces")?.let { out += it } // wave 52: its own top-level row
+    cat("Side panel")?.let { out += it }
     out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
     cat("Backup")?.let { out += it }
     cat("Desktop & dock")?.let { out += it }

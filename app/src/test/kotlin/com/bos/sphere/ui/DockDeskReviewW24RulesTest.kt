@@ -29,7 +29,7 @@ class DockDeskReviewW24RulesTest {
 
     @Test fun CFG_14_settingsSearchFindsTheDockPagesByWorkspacesAndGroups() {
         L10n.setLanguage("en")
-        val index = SettingsIndex.fromCategories(listOf(desktopCategory()))
+        val index = SettingsIndex.fromCategories(listOf(workspacesCategory(), desktopCategory())) // wave 52: Workspaces is its own category
         assertTrue("workspaces finds the Workspaces page", index.search("workspaces").any { it.title == "Workspaces" })
         assertTrue("groups finds the App groups page", index.search("groups").any { it.title == "App groups" })
         assertTrue("sessions finds the App groups page by its summary", index.search("sessions").any { it.title == "App groups" })

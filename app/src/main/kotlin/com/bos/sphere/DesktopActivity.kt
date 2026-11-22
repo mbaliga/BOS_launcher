@@ -67,6 +67,7 @@ class DesktopActivity : ComponentActivity() {
                 p.accentColor,
             )
             L10n.setLanguage(p.language.code)
+            com.bos.sphere.core.design.HyleFont.apply(p.uiFont)
         }
         setContent {
             SphereTheme { DesktopSurface(controller, { display?.displayId ?: ownerDisplayId }, identity, displayName, token) }

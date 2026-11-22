@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bos.sphere.core.catalog.Folder
@@ -416,6 +417,9 @@ class AppSmokeTest {
         rule.onNodeWithText("Home screen").performClick(); settle() // wave 40: Settings opens the root list; Home screen is its first-card row
         assertTrue("the Home category has the Glance switch", rule.onAllNodesWithText("Calm home screen (Glance)").fetchSemanticsNodes().isNotEmpty())
         assertTrue("and an Add page action", rule.onAllNodesWithText("Add page").fetchSemanticsNodes().isNotEmpty())
+        // wave 52: the list is lazy and the Order row sits at the very bottom edge of this window, so scroll the category page to it first
+        rule.onNode(androidx.compose.ui.test.hasScrollAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag(com.bos.sphere.feature.grid.OneUiTags.CATEGORY_PAGE)) or (androidx.compose.ui.test.hasScrollAction() and androidx.compose.ui.test.hasTestTag(com.bos.sphere.feature.grid.OneUiTags.CATEGORY_PAGE)))
+            .performScrollToNode(androidx.compose.ui.test.hasText("Order")); settle()
         assertTrue("and the order", rule.onAllNodesWithText("Order").fetchSemanticsNodes().isNotEmpty())
         assertTrue("no landing row any more", rule.onAllNodesWithText("HOME LANDING").fetchSemanticsNodes().isEmpty() && rule.onAllNodesWithText("Home landing").fetchSemanticsNodes().isEmpty())
     }

@@ -50,7 +50,7 @@ object OneUiSections {
             "Web results" to "Show in results",
             "Search folders" to "Sources",
         ),
-        "Comms" to listOf(
+        "Side panel" to listOf(
             "Left page" to "Appearance",
             "Default view" to "Reading",
             "Comms gestures" to "Rules and access",

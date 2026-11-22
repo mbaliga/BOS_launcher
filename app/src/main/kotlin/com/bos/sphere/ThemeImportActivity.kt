@@ -33,6 +33,7 @@ class ThemeImportActivity : ComponentActivity() {
         LauncherStores.get(this).prefs.prefs.value.let { p ->
             HyleTheme.apply(when (p.themeMode) { ThemeMode.Dark -> ThemeVariant.Dark; ThemeMode.Amoled -> ThemeVariant.Amoled; ThemeMode.Light -> ThemeVariant.Light }, p.accentColor)
             L10n.setLanguage(p.language.code)
+            com.bos.sphere.core.design.HyleFont.apply(p.uiFont)
         }
         val host = ThemeHost.of(this)
         setContent {

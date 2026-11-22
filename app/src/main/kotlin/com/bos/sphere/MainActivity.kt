@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
                 p.accentColor,
             )
             L10n.setLanguage(p.language.code)
+            com.bos.sphere.core.design.HyleFont.apply(p.uiFont)
         }
         setContent {
             SphereTheme {

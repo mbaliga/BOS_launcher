@@ -46,12 +46,23 @@ fun desktopCategory(): SettingCategory = SettingCategory(
     Glyphs.Apps,
     listOf(
         SettingItem.Pane(L10n.tr("Dock"), Glyphs.Apps, L10n.tr("Show, mode, position, apps"), bare = true) { DockSettingsPane(DockPaneKind.Dock) },
+        SettingItem.Pane(L10n.tr("App groups"), Glyphs.Apps, L10n.tr("Open several apps together, sessions, schedules"), bare = true) { DockSettingsPane(DockPaneKind.Groups) },
+        SettingItem.Pane(L10n.tr("Dock and external display"), Glyphs.Apps, L10n.tr("Offer, disconnect, per-display profiles"), bare = true) { DesktopPane() },
+    ),
+)
+
+/**
+ * Wave 52 (settingsFont): Workspaces is a top-level row of Settings (near the top), not a page buried under "Desktop & dock". The category is the one pane,
+ * so the row opens the Workspaces page itself, with the active workspace under its title.
+ */
+fun workspacesCategory(): SettingCategory = SettingCategory(
+    L10n.tr("Workspaces"),
+    Glyphs.Home,
+    listOf(
         SettingItem.Pane(
             L10n.tr("Workspaces"), Glyphs.Home, L10n.tr("Separate home setups to switch between"), bare = true,
             pageSubtitle = { WorkspaceSummary.activeLine(WorkspaceRepository.get(LocalContext.current).state.collectAsState().value) },
         ) { DockSettingsPane(DockPaneKind.Workspaces) },
-        SettingItem.Pane(L10n.tr("App groups"), Glyphs.Apps, L10n.tr("Open several apps together, sessions, schedules"), bare = true) { DockSettingsPane(DockPaneKind.Groups) },
-        SettingItem.Pane(L10n.tr("Dock and external display"), Glyphs.Apps, L10n.tr("Offer, disconnect, per-display profiles"), bare = true) { DesktopPane() },
     ),
 )
 

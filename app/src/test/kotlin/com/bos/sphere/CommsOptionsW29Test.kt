@@ -91,7 +91,7 @@ class CommsOptionsW29Test {
             system = SystemLinks({}, {}, {}, {}), lab = emptyList(),
         ),
     )
-    private fun comms() = cats().first { it.title == "Comms" }
+    private fun comms() = cats().first { it.title == "Side panel" } // wave 52: the category is the Side panel
     private fun row(title: String) = comms().items.firstOrNull { it.title == title } ?: throw AssertionError("no Comms row '$title'")
 
     @Test fun STR_01_w29_theCommsCategoryListsEveryMovedOptionOnce() {
@@ -142,7 +142,7 @@ class CommsOptionsW29Test {
         val d = androidx.compose.ui.platform.LocalDensity.current
         CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides Density(d.density, font), LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             val all = androidx.compose.runtime.remember { cats() }
-            SphereTheme { SettingsSpace(visible = true, categories = all, initialCategory = category ?: all.indexOfFirst { it.title == "Comms" }, sounds = null, onClose = {}, session = 0) }
+            SphereTheme { SettingsSpace(visible = true, categories = all, initialCategory = category ?: all.indexOfFirst { it.title == "Side panel" }, sounds = null, onClose = {}, session = 0) }
         }
     }
     private fun shoot(name: String) {
@@ -173,9 +173,9 @@ class CommsOptionsW29Test {
         for ((q, t) in listOf("comms size" to "Comms size", "default view" to "Default view", "read history" to "Read history", "groups and rules" to "Groups and rules",
             "mark all" to "Mark all as read", "clear all notifications" to "Clear all notifications", "delete history" to "Delete history")) {
             val hit = idx.search(q).firstOrNull { it.title == t }
-            assertNotNull("search '$q' finds '$t'", hit); assertEquals("Comms", hit!!.category)
+            assertNotNull("search '$q' finds '$t'", hit); assertEquals("Side panel", hit!!.category)
         }
-        assertTrue("the launchpad alias still lands in Comms", idx.search("launchpad").any { it.category == "Comms" })
+        assertTrue("the launchpad alias still lands in the Side panel", idx.search("launchpad").any { it.category == "Side panel" })
     }
 
     private fun rowsHold(font: Float, rtl: Boolean) {
@@ -229,7 +229,7 @@ class CommsOptionsW29Test {
         val d = androidx.compose.ui.platform.LocalDensity.current
         CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides Density(d.density, font)) {
             val all = androidx.compose.runtime.remember { cats() }
-            SphereTheme { SettingsSpace(visible = true, categories = all, initialCategory = all.indexOfFirst { it.title == "Comms" }, sounds = null, onClose = { closed[0]++ }, session = 0) }
+            SphereTheme { SettingsSpace(visible = true, categories = all, initialCategory = all.indexOfFirst { it.title == "Side panel" }, sounds = null, onClose = { closed[0]++ }, session = 0) }
         }
     }
     private fun openConfirm(title: String) {

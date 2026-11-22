@@ -204,6 +204,20 @@ fun rememberWidgetPicker(
 
 internal const val REQUEST_CONFIGURE = 0x5349
 
+/**
+ * Wave 52 (panelWidgets): opens the provider's own settings (its configure screen) for an already bound widget, through the host's public
+ * `startAppWidgetConfigureActivityForResult`. False when the widget has none or the system refuses. The result is not needed: a widget updates itself.
+ */
+fun reconfigureWidget(context: Context, host: LauncherWidgetHost, appWidgetId: Int): Boolean {
+    val info = host.providerInfo(appWidgetId) ?: return false
+    if (info.configure == null) return false
+    val activity = context.findActivity() ?: return false
+    return runCatching { host.host.startAppWidgetConfigureActivityForResult(activity, appWidgetId, 0, REQUEST_CONFIGURE, null) }.isSuccess
+}
+
+/** Wave 52: whether the provider of a bound widget has a configure screen to open ([reconfigureWidget]). */
+fun canReconfigureWidget(host: LauncherWidgetHost, appWidgetId: Int): Boolean = host.providerInfo(appWidgetId)?.configure != null
+
 private fun isConfigurationOptional(info: AppWidgetProviderInfo): Boolean {
     val f = info.widgetFeatures
     return f and AppWidgetProviderInfo.WIDGET_FEATURE_CONFIGURATION_OPTIONAL != 0 &&

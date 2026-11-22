@@ -56,11 +56,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+/** The mock-up's slot of a tab: the four old tabs keep theirs wherever they sit (wave 52: the Widgets tab has none, it is as wide as its label). */
+private fun slotDp(v: HubView): Float = PanelSections.BASE.indexOf(v).let { if (it < 0) 0f else CommsStyle.TAB_SLOTS_DP.getOrNull(it) ?: 0f }
+
 /**
  * Wave 27: the tab row of the owner's Comms mock-up: ALL UNREAD FILES TIMELINE in capitals with letter spacing, the selected one in the full ink
  * colour and the others grey (no underline, no options button: the options live in Ground Control). Wave 28: 17 sp labels 19 dp apart, 35 dp high; it scrolls when the labels do not fit.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HubSwitcher(state: HubState, modifier: Modifier = Modifier) {
     val lp = LocalLp.current
@@ -75,7 +78,7 @@ fun HubSwitcher(state: HubState, modifier: Modifier = Modifier) {
         val plan = with(density) {
             CommsTabFit.plan(
                 labelPx = labels.map { measurer.measure(it, labelStyle, maxLines = 1).size.width.toFloat() }, chars = labels.map { it.length },
-                slotPx = state.tabs.indices.map { (CommsStyle.TAB_SLOTS_DP.getOrNull(it) ?: 0f).dp.toPx() }, padPx = CommsStyle.TAB_PAD_DP.dp.toPx(),
+                slotPx = state.tabs.map { slotDp(it).dp.toPx() }, padPx = CommsStyle.TAB_PAD_DP.dp.toPx(),
                 fixedPx = (CommsStyle.H_PAD_DP - CommsStyle.TAB_PAD_DP + (CommsStyle.END_PAD_DP - CommsStyle.TAB_PAD_DP).coerceAtLeast(0f)).dp.toPx(),
                 availablePx = maxWidth.toPx(), spPx = 1.sp.toPx(), tabSp = CommsStyle.TAB_SP, targetPx = 48.dp.toPx(),
             )
@@ -90,7 +93,7 @@ fun HubSwitcher(state: HubState, modifier: Modifier = Modifier) {
                 val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
                 LaunchedEffect(sel, plan.scrolls) { if (sel) bring.bringIntoView() } // a view picked by a swipe or a link scrolls into sight
                 Box(
-                    Modifier.requiredHeight(maxOf(48.dp, commsTarget())).widthIn(min = if (plan.useSlots) (CommsStyle.TAB_SLOTS_DP.getOrNull(i) ?: 0f).dp else 48.dp).bringIntoViewRequester(bring).clickable { state.select(v) }
+                    Modifier.requiredHeight(maxOf(48.dp, commsTarget())).widthIn(min = if (plan.useSlots) slotDp(v).dp else 48.dp).bringIntoViewRequester(bring).clickable { state.select(v) }
                         .semantics { role = Role.Tab; selected = sel; contentDescription = L10n.tr(v.label) }.testTag("hub.view.${v.id}"),
                     Alignment.CenterStart,
                 ) {

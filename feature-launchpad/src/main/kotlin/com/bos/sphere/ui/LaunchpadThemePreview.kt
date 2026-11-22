@@ -33,3 +33,17 @@ fun LaunchpadThemePreview(theme: LaunchpadTheme, modifier: Modifier = Modifier) 
         }
     }
 }
+
+/** Wave 52: a tiny tab row of the Comms panel with the Widgets tab (the accent one) at [slot]; the card of the "Widgets position" choice. */
+@androidx.compose.runtime.Composable
+fun PanelSectionsPreview(slot: WidgetsSlot, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
+    val c = LpDark
+    Column(modifier.fillMaxSize().background(c.bg).padding(horizontal = 6.dp, vertical = 10.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp)) {
+            PanelSections.order(true, slot).forEach { v ->
+                Box(Modifier.weight(1f).height(6.dp).background(if (v == HubView.Widgets) BlueDark else c.dim, RoundedCornerShape(3.dp)))
+            }
+        }
+        Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(14.dp).background(c.surface, RoundedCornerShape(4.dp)))
+    }
+}

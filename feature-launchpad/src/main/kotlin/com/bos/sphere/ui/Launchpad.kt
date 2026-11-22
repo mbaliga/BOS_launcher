@@ -360,6 +360,8 @@ fun LaunchpadPanel(
         // The hub is on when the host supplies the Files and Timeline views (the app does); a bare panel keeps the live grouped list.
         val makeHub = { HubState(HubPrefs.of(ctx), com.bos.sphere.core.data.NotificationHistory.init(ctx), true, liveAll = true) }
         val hub = if (panelBody == null) null else androidx.compose.runtime.saveable.rememberSaveable(saver = hubStateSaver(makeHub)) { makeHub() } // wave 33: the tab and filter survive process death
+        // Wave 52: the Widgets section follows the Comms setting while the hub is open (the flow holds the stored value once CommsOptions.init has run).
+        if (hub != null) LaunchedEffect(hub) { kotlinx.coroutines.flow.combine(CommsOptions.widgetsSection, CommsOptions.widgetsSlot) { on, slot -> on to slot }.collect { (on, slot) -> if (CommsOptions.isInitialised) hub.applyWidgets(on, slot) } }
         if (hub != null) LaunchedEffect(hub) { LaunchpadHubNav.requests.collect { v -> if (v != null) { hub.select(v); LaunchpadHubNav.take() } } }
         LaunchpadContent(
             hub = hub, hubPanelBody = panelBody ?: {}, haptics = haptics, viewSwitcher = { if (hub != null) HubSwitcher(hub); viewSwitcher() },

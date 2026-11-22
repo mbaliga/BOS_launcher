@@ -103,6 +103,8 @@ fun HomePanelsBody(
     // Files is drawn with the dark panel palette, so it sits on its own surface whichever Launchpad theme is on. Wave 28: Timeline sits on the Comms
     // page itself (its usage block is drawn in the page's ink on the page's ground), so it follows the dark and light looks.
     val modifier = if (view == com.bos.sphere.ui.HubView.Timeline) Modifier.fillMaxSize() else Modifier.fillMaxSize().background(HyleColors.Surface)
+    // Wave 52: the Widgets section draws its own margins (the Comms page's), so it takes the whole body.
+    if (view == com.bos.sphere.ui.HubView.Widgets) { Box(Modifier.fillMaxSize()) { PanelWidgetsBody() }; return }
     Box(modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
         when (view) {
             com.bos.sphere.ui.HubView.Timeline -> TimelinePanel(history, appsByKey, onLaunch, onHide)

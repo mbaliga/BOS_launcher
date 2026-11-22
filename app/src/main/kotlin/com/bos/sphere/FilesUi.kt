@@ -51,6 +51,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -69,6 +72,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.semantics.heading
+import com.bos.sphere.core.catalog.ArrangedFiles
+import com.bos.sphere.core.catalog.FileSection
+import com.bos.sphere.core.catalog.FileSourceIds
+import com.bos.sphere.core.catalog.FilesSortText
+import com.bos.sphere.core.catalog.GroupKey
+import com.bos.sphere.core.catalog.ViewOptions
+import com.bos.sphere.core.input.FocusKind
+import com.bos.sphere.feature.grid.launcherItem
 import com.bos.sphere.core.catalog.FileFormat
 import com.bos.sphere.core.catalog.FileKind
 import com.bos.sphere.core.catalog.FileNames
@@ -99,10 +120,10 @@ internal fun kindColor(k: FileKind): Color = when (k) {
     FileKind.Text -> Color(0xFF8A94A6); FileKind.Other -> Color(0xFF7C8699)
 }
 
-private enum class Glyph { Page, Play, Note, Picture, Folder, Grid, List }
+internal enum class Glyph { Page, Play, Note, Picture, Folder, Grid, List, Clock, Download, Archive, Shot, Large, Plus, Sort, Back, Up, Down, Close, Calendar, Layers, Check }
 
 @Composable
-private fun GlyphIcon(g: Glyph, color: Color, modifier: Modifier = Modifier) {
+internal fun GlyphIcon(g: Glyph, color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val w = size.width; val h = size.height
         when (g) {
@@ -130,6 +151,48 @@ private fun GlyphIcon(g: Glyph, color: Color, modifier: Modifier = Modifier) {
             }
             Glyph.Grid -> for (i in 0..1) for (j in 0..1)
                 drawRoundRect(color, Offset(w * (.16f + i * .38f), h * (.16f + j * .38f)), Size(w * .30f, h * .30f), androidx.compose.ui.geometry.CornerRadius(w * .05f))
+            Glyph.Clock -> {
+                drawCircle(color, w * .4f, Offset(w * .5f, h * .5f), style = Stroke(w * .08f))
+                drawLine(color, Offset(w * .5f, h * .5f), Offset(w * .5f, h * .26f), w * .08f, StrokeCap.Round)
+                drawLine(color, Offset(w * .5f, h * .5f), Offset(w * .68f, h * .6f), w * .08f, StrokeCap.Round)
+            }
+            Glyph.Download -> {
+                drawLine(color, Offset(w * .5f, h * .14f), Offset(w * .5f, h * .62f), w * .09f, StrokeCap.Round)
+                drawPath(Path().apply { moveTo(w * .28f, h * .46f); lineTo(w * .5f, h * .7f); lineTo(w * .72f, h * .46f) }, color, style = Stroke(w * .09f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawLine(color, Offset(w * .2f, h * .86f), Offset(w * .8f, h * .86f), w * .09f, StrokeCap.Round)
+            }
+            Glyph.Archive -> {
+                drawRoundRect(color, Offset(w * .16f, h * .2f), Size(w * .68f, h * .64f), androidx.compose.ui.geometry.CornerRadius(w * .07f))
+                for (j in 0..3) drawRect(Color(0x66000000), Offset(w * (.44f + (j % 2) * .1f), h * (.2f + j * .1f)), Size(w * .1f, h * .07f))
+            }
+            Glyph.Shot -> {
+                drawRoundRect(color, Offset(w * .3f, h * .08f), Size(w * .4f, h * .84f), androidx.compose.ui.geometry.CornerRadius(w * .07f), style = Stroke(w * .07f))
+                drawRect(color.copy(alpha = .5f), Offset(w * .38f, h * .22f), Size(w * .24f, h * .5f))
+            }
+            Glyph.Large -> {
+                drawRoundRect(color.copy(alpha = .4f), Offset(w * .1f, h * .62f), Size(w * .8f, h * .22f), androidx.compose.ui.geometry.CornerRadius(w * .05f))
+                drawRoundRect(color.copy(alpha = .7f), Offset(w * .1f, h * .36f), Size(w * .8f, h * .22f), androidx.compose.ui.geometry.CornerRadius(w * .05f))
+                drawRoundRect(color, Offset(w * .1f, h * .1f), Size(w * .8f, h * .22f), androidx.compose.ui.geometry.CornerRadius(w * .05f))
+            }
+            Glyph.Plus -> {
+                drawLine(color, Offset(w * .5f, h * .2f), Offset(w * .5f, h * .8f), w * .1f, StrokeCap.Round)
+                drawLine(color, Offset(w * .2f, h * .5f), Offset(w * .8f, h * .5f), w * .1f, StrokeCap.Round)
+            }
+            Glyph.Sort -> for (j in 0..2) drawLine(color, Offset(w * .18f, h * (.28f + j * .22f)), Offset(w * (.82f - j * .2f), h * (.28f + j * .22f)), w * .09f, StrokeCap.Round)
+            Glyph.Back -> drawPath(Path().apply { moveTo(w * .62f, h * .2f); lineTo(w * .3f, h * .5f); lineTo(w * .62f, h * .8f) }, color, style = Stroke(w * .1f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            Glyph.Up -> drawPath(Path().apply { moveTo(w * .22f, h * .62f); lineTo(w * .5f, h * .34f); lineTo(w * .78f, h * .62f) }, color, style = Stroke(w * .1f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            Glyph.Down -> drawPath(Path().apply { moveTo(w * .22f, h * .38f); lineTo(w * .5f, h * .66f); lineTo(w * .78f, h * .38f) }, color, style = Stroke(w * .1f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            Glyph.Close -> {
+                drawLine(color, Offset(w * .26f, h * .26f), Offset(w * .74f, h * .74f), w * .09f, StrokeCap.Round)
+                drawLine(color, Offset(w * .74f, h * .26f), Offset(w * .26f, h * .74f), w * .09f, StrokeCap.Round)
+            }
+            Glyph.Calendar -> {
+                drawRoundRect(color, Offset(w * .14f, h * .22f), Size(w * .72f, h * .64f), androidx.compose.ui.geometry.CornerRadius(w * .08f), style = Stroke(w * .07f))
+                drawRect(color, Offset(w * .14f, h * .22f), Size(w * .72f, h * .18f))
+                for (i in 0..2) drawCircle(color, w * .04f, Offset(w * (.32f + i * .18f), h * .62f))
+            }
+            Glyph.Layers -> for (j in 0..2) drawRoundRect(color.copy(alpha = .4f + j * .3f), Offset(w * (.14f + j * .06f), h * (.14f + j * .16f)), Size(w * .6f, h * .3f), androidx.compose.ui.geometry.CornerRadius(w * .06f))
+            Glyph.Check -> drawPath(Path().apply { moveTo(w * .2f, h * .52f); lineTo(w * .43f, h * .74f); lineTo(w * .8f, h * .28f) }, color, style = Stroke(w * .11f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             Glyph.List -> for (j in 0..2) {
                 drawCircle(color, w * .045f, Offset(w * .2f, h * (.25f + j * .25f)))
                 drawRoundRect(color, Offset(w * .32f, h * (.25f + j * .25f) - h * .035f), Size(w * .52f, h * .07f), androidx.compose.ui.geometry.CornerRadius(w * .03f))
@@ -210,6 +273,7 @@ internal fun FilesViewToggle(mode: FilesViewMode, ink: Color, onToggle: () -> Un
     val state = L10n.tr(if (toGrid) "List view" else "Grid view")
     Box(
         Modifier.size(48.dp).testTag("files.viewToggle")
+            .filesFocus("files.viewToggle", onToggle)
             .semantics(mergeDescendants = true) { contentDescription = action; stateDescription = state }
             .clickable(role = Role.Button, onClick = onToggle),
         contentAlignment = Alignment.Center,
@@ -263,57 +327,189 @@ private fun FileGridCell(f: RecentFile, now: Long, bright: Color, dim: Color, on
     }
 }
 
+/** Thumbnail request sizes are rounded to 32 px steps so a few sizes share cache entries. */
+internal fun bucket(px: Float): Int = ((px / 32f).toInt() + 1) * 32
+
+/** One chip of the source switcher: All, a collection, or a folder. [id] is the source id (`all`, `b:documents`, `c:7f3a`, `f:<tree>`). */
+internal class FilesChip(val id: String, val label: String, val glyph: Glyph)
+
+/** A focus-graph node for a clickable (keyboard Enter and controller confirm do what a tap does). Put it directly before the clickable. */
+internal fun Modifier.filesFocus(id: String, onActivate: () -> Unit): Modifier = launcherItem(id, FocusKind.Item, focusable = false, onActivate = onActivate)
+
+/** The source switcher: a row of chips (All, the collections, the folders) that scrolls sideways and keeps the selected one in sight, and the Add tile, which stays put beside it. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FolderEntry(f: PinnedFolder, sub: String, grid: Boolean, bright: Color, dim: Color, onOpen: () -> Unit, onLong: () -> Unit) {
-    val tile = Modifier.background(Color.Transparent)
-    if (grid) Column(Modifier.fillMaxWidth().testTag("files.folder." + f.name).combinedClickable(onLongClick = onLong, role = Role.Button, onClick = onOpen).padding(4.dp)) {
-        TypeTile(FileKind.Other, "", Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(10.dp)), 12f, folder = true)
-        Text(f.name, color = bright, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-        Text(sub, color = dim, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    } else Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("files.folder." + f.name).combinedClickable(onLongClick = onLong, role = Role.Button, onClick = onOpen).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        TypeTile(FileKind.Other, "", tile.size(48.dp).clip(RoundedCornerShape(10.dp)), 9f, folder = true)
-        Column(Modifier.padding(start = 12.dp).weight(1f)) {
-            Text(f.name, color = bright, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(sub, color = dim, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+internal fun FilesSourceBar(chips: List<FilesChip>, selected: String, bright: Color, dim: Color, accent: Color, onSelect: (String) -> Unit, onAdd: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).testTag("files.sources"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            chips.forEach { c ->
+                val on = c.id == selected
+                val shape = RoundedCornerShape(50)
+                val inSight = remember { BringIntoViewRequester() }
+                if (on) LaunchedEffect(selected, chips.size) { inSight.bringIntoView() }
+                Box(
+                    Modifier.heightIn(min = 48.dp).bringIntoViewRequester(inSight).testTag("files.source." + c.id).filesFocus("files.src." + c.id) { onSelect(c.id) }
+                        .selectable(selected = on, role = Role.RadioButton, onClick = { onSelect(c.id) }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        Modifier.height(38.dp).background(if (on) accent.copy(alpha = .30f) else Color(0x14FFFFFF), shape).border(1.dp, if (on) accent else Color.Transparent, shape).padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        GlyphIcon(c.glyph, if (on) bright else dim, Modifier.size(16.dp))
+                        Text(c.label, color = if (on) bright else dim, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
+                    }
+                }
+            }
+        }
+        val addLabel = L10n.tr("Add a folder or a collection")
+        Box(
+            Modifier.padding(start = 8.dp).heightIn(min = 48.dp).testTag("files.add").filesFocus("files.add", onAdd)
+                .semantics { contentDescription = addLabel }.clickable(role = Role.Button, onClick = onAdd),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                Modifier.height(38.dp).border(1.dp, accent.copy(alpha = .7f), RoundedCornerShape(50)).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                GlyphIcon(Glyph.Plus, accent, Modifier.size(16.dp))
+                Text(L10n.tr("Add"), color = accent, fontSize = 13.sp, maxLines = 1)
+            }
         }
     }
 }
 
-/** Thumbnail request sizes are rounded to 32 px steps so a few sizes share cache entries. */
-internal fun bucket(px: Float): Int = ((px / 32f).toInt() + 1) * 32
+/** The words of the current sort and grouping ("Date modified, newest first, grouped by Date"), for the control's state description. */
+@Composable
+internal fun optionsSummary(o: ViewOptions): String {
+    val base = L10n.tr(FilesSortText.sortLabel(o.sort)) + ", " + L10n.tr(FilesSortText.orderLabel(o.sort, o.ascending))
+    return if (o.group == GroupKey.None) base else base + ", " + L10n.tr("Grouped by %s", L10n.tr(FilesSortText.groupLabel(o.group)))
+}
 
-/** The whole tab: header with the toggle, the folders, "Choose a folder", and the recent files, as a lazy list or a lazy grid. */
+@Composable
+private fun SectionHeader(s: FileSection, dim: Color, ground: Color, modifier: Modifier = Modifier) {
+    val title = if (s.literal) s.title else L10n.tr(s.title)
+    val spoken = title + ", " + (if (s.count == 1) L10n.tr("1 file") else L10n.tr("%d files", s.count))
+    Row(
+        modifier.fillMaxWidth().background(ground).heightIn(min = 32.dp).padding(top = 6.dp, bottom = 2.dp).testTag("files.section." + s.id)
+            .semantics(mergeDescendants = true) { heading(); contentDescription = spoken },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, color = dim, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Text(s.count.toString(), color = dim.copy(alpha = .8f), fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp).testTag("files.section.count." + s.id))
+    }
+}
+
+/** Why a source is empty and what to do about it: it names the next step (add a folder, edit the rules) and offers it as the coloured button. */
+@Composable
+private fun FilesEmptyState(hasFolders: Boolean, collection: Boolean, bright: Color, ink: Color, dim: Color, accent: Color, onChoose: () -> Unit, onAdd: () -> Unit, onEdit: (() -> Unit)?) {
+    val kind = if (!hasFolders) "nofolders" else if (collection) "nomatch" else "nofiles"
+    Column(Modifier.fillMaxWidth().padding(vertical = 24.dp, horizontal = 8.dp).testTag("files.empty").semantics { stateDescription = kind }, horizontalAlignment = Alignment.CenterHorizontally) {
+        GlyphIcon(if (!hasFolders) Glyph.Folder else Glyph.Layers, accent, Modifier.size(48.dp))
+        Text(
+            L10n.tr(if (!hasFolders) "No folder added yet" else if (collection) "Nothing matches this collection yet" else "No files here yet"),
+            color = bright, fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp).testTag("files.empty.title"),
+        )
+        Text(
+            L10n.tr(if (!hasFolders) "Choose a folder and its files show up here. Collections such as Recents and Documents are built from the folders you add; nothing else is read." else if (collection) "Files from your folders that fit the rules of this collection appear here. Add a folder, or change the rules." else "Files in this folder appear here once it has some."),
+            color = ink, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp).testTag("files.empty.hint"),
+        )
+        val primary: Pair<String, () -> Unit> = if (!hasFolders) "Choose a folder" to onChoose else if (collection && onEdit != null) "Edit the rules" to onEdit else "Choose a folder" to onChoose
+        PrimaryBox(L10n.tr(primary.first), accent, "files.empty.primary", Modifier.padding(top = 16.dp).fillMaxWidth(.8f), onClick = primary.second)
+        SecondaryText(L10n.tr(if (!hasFolders) "Browse collections" else if (collection && onEdit != null) "Choose a folder" else "Browse collections"), dim, "files.empty.secondary", onClick = if (!hasFolders || !(collection && onEdit != null)) onAdd else onChoose)
+    }
+}
+
+/** The dialog button pair every Files page uses: a coloured box for the main action, plain text for the other one below it. */
+@Composable
+internal fun PrimaryBox(text: String, accent: Color, tag: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        modifier.heightIn(min = 52.dp).testTag(tag).background(if (enabled) accent else accent.copy(alpha = .3f), RoundedCornerShape(16.dp))
+            .filesFocus("$tag.focus", { if (enabled) onClick() }).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, color = HyleColors.OnAccent, fontSize = 15.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+}
+
+@Composable
+internal fun SecondaryText(text: String, color: Color, tag: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Text(
+        text, color = color, fontSize = 14.sp, textAlign = TextAlign.Center,
+        modifier = modifier.heightIn(min = 48.dp).testTag(tag).filesFocus("$tag.focus", onClick).clickable(role = Role.Button, onClick = onClick).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 16.dp),
+    )
+}
+
+/**
+ * The whole tab: the source switcher, a line with the count and the sort and view buttons, and below them the files as a lazy list or a lazy grid, in
+ * sections when the view is grouped (sticky headers in the list, a pinned header in the grid). [arranged] null means still loading.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun FilesPanelContent(
-    folders: List<PinnedFolder>, files: List<RecentFile>, only: String?, mode: FilesViewMode, now: Long,
+    chips: List<FilesChip>, selected: String, arranged: ArrangedFiles?, indexing: Boolean, hasFolders: Boolean,
+    options: ViewOptions, mode: FilesViewMode, now: Long,
     bright: Color, ink: Color, dim: Color, accent: Color,
-    onToggle: () -> Unit, onChoose: () -> Unit, onFolderOpen: (PinnedFolder) -> Unit, onFolderLong: (PinnedFolder) -> Unit, onFileOpen: (RecentFile) -> Unit,
+    onSelect: (String) -> Unit, onAdd: () -> Unit, onToggle: () -> Unit, onSortGroup: () -> Unit, onChoose: () -> Unit,
+    onOpenFolder: (() -> Unit)?, onEdit: (() -> Unit)?, onFileOpen: (RecentFile) -> Unit,
+    ground: Color = HyleColors.Surface,
 ) {
     var preview by remember { mutableStateOf<RecentFile?>(null) }
     val grid = mode == FilesViewMode.Grid
-    fun folderSub(f: PinnedFolder) = if (only == f.uri) L10n.tr("Pinned folder") + " · " + L10n.tr("Showing only this folder (long-press it again for all)") else L10n.tr("Pinned folder")
-    val header: @Composable () -> Unit = {
+    val grouped = options.group != GroupKey.None
+    val isCollection = selected != FileSourceIds.ALL && !FileSourceIds.isFolder(selected)
+    Column(Modifier.fillMaxSize()) {
+        FilesSourceBar(chips, selected, bright, dim, accent, onSelect, onAdd)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(L10n.tr("Folders"), color = dim, fontSize = 11.sp, modifier = Modifier.weight(1f))
+            val total = arranged?.total ?: 0
+            val summary = when {
+                arranged == null -> L10n.tr(if (indexing) "Looking through your folders..." else "Loading...")
+                arranged.capped -> L10n.tr("Showing the first %d of %d files", arranged.shown, arranged.total)
+                total == 0 -> ""
+                total == 1 -> L10n.tr("1 file")
+                else -> L10n.tr("%d files", total)
+            }.let { if (arranged != null && indexing) (if (it.isEmpty()) "" else "$it · ") + L10n.tr("Updating...") else it }
+            Text(summary, color = dim, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("files.summary"))
+            if (onEdit != null) SecondaryText(L10n.tr("Edit"), accent, "files.edit", onClick = onEdit)
+            if (onOpenFolder != null) SecondaryText(L10n.tr("Open folder"), accent, "files.openFolder", onClick = onOpenFolder)
+            val sortLabel = L10n.tr("Sort and group")
+            val sortState = optionsSummary(options)
+            Box(
+                Modifier.size(48.dp).testTag("files.sortGroup").filesFocus("files.sortGroup", onSortGroup)
+                    .semantics(mergeDescendants = true) { contentDescription = sortLabel; stateDescription = sortState }.clickable(role = Role.Button, onClick = onSortGroup),
+                contentAlignment = Alignment.Center,
+            ) { GlyphIcon(Glyph.Sort, bright, Modifier.size(24.dp)) }
             FilesViewToggle(mode, bright, onToggle)
         }
-        if (folders.isEmpty()) Text(L10n.tr("No folder chosen yet. Pick one and its newest files show here; nothing else is read."), color = ink, fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
-    }
-    val choose: @Composable () -> Unit = {
-        Text(L10n.tr("Choose a folder"), color = accent, fontSize = 13.sp, modifier = Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onChoose).wrapContentHeight(Alignment.CenterVertically))
-        Text(L10n.tr("Recent files"), color = dim, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
-    }
-    if (grid) LazyVerticalGrid(GridCells.Adaptive(104.dp), Modifier.testTag("files.grid")) {
-        item(key = "hdr", span = { GridItemSpan(maxLineSpan) }) { Column { header() } }
-        items(folders, key = { "d" + it.uri }) { f -> FolderEntry(f, folderSub(f), true, bright, dim, { onFolderOpen(f) }, { onFolderLong(f) }) }
-        item(key = "choose", span = { GridItemSpan(maxLineSpan) }) { Column { choose() } }
-        items(files, key = { it.uri }) { f -> FileGridCell(f, now, bright, dim, { onFileOpen(f) }, { preview = f }) }
-    } else LazyColumn(Modifier.testTag("files.list")) {
-        item(key = "hdr") { Column { header() } }
-        items(folders, key = { "d" + it.uri }) { f -> FolderEntry(f, folderSub(f), false, bright, dim, { onFolderOpen(f) }, { onFolderLong(f) }) }
-        item(key = "choose") { Column { choose() } }
-        items(files, key = { it.uri }) { f -> FileListRow(f, now, bright, dim, { onFileOpen(f) }, { preview = f }) }
+        Box(Modifier.fillMaxSize().weight(1f)) {
+            when {
+                arranged == null -> Unit
+                arranged.total == 0 -> Column(Modifier.verticalScroll(rememberScrollState())) { FilesEmptyState(hasFolders, isCollection, bright, ink, dim, accent, onChoose, onAdd, onEdit) }
+                grid -> {
+                    val state = rememberLazyGridState()
+                    // Grid positions of the section headers, to pin the current one on top.
+                    val headerAt = remember(arranged, grouped) {
+                        val m = ArrayList<Pair<Int, FileSection>>(); var i = 0
+                        if (grouped) arranged.sections.forEach { m += i to it; i += 1 + it.files.size }
+                        m
+                    }
+                    LazyVerticalGrid(GridCells.Adaptive(104.dp), Modifier.fillMaxSize().testTag("files.grid"), state = state) {
+                        arranged.sections.forEach { sec ->
+                            if (grouped) item(key = "h:" + sec.id, span = { GridItemSpan(maxLineSpan) }) { SectionHeader(sec, dim, ground) }
+                            items(sec.files, key = { it.uri }) { f -> FileGridCell(f, now, bright, dim, { onFileOpen(f) }, { preview = f }) }
+                        }
+                    }
+                    if (grouped) {
+                        val pinned by remember(headerAt) { derivedStateOf { headerAt.lastOrNull { it.first <= state.firstVisibleItemIndex }?.takeIf { state.firstVisibleItemIndex > it.first || state.firstVisibleItemScrollOffset > 0 }?.second } }
+                        pinned?.let { SectionHeader(it, dim, ground, Modifier.align(Alignment.TopStart).testTag("files.pinned")) }
+                    }
+                }
+                else -> LazyColumn(Modifier.fillMaxSize().testTag("files.list")) {
+                    arranged.sections.forEach { sec ->
+                        if (grouped) stickyHeader(key = "h:" + sec.id) { SectionHeader(sec, dim, ground) }
+                        items(sec.files, key = { it.uri }) { f -> FileListRow(f, now, bright, dim, { onFileOpen(f) }, { preview = f }) }
+                    }
+                }
+            }
+        }
     }
     preview?.let { f -> FilePreviewDialog(f, bright, dim, accent, onOpen = { preview = null; onFileOpen(f) }, onDismiss = { preview = null }) }
 }

@@ -107,7 +107,7 @@ Max nesting actually reachable: Settings > Desktop & dock (1) > Workspaces (2) >
 - Wallpaper palette, density and text size (ThemingPane): Palette chips (Chosen here / From my wallpaper), Density slider 85-125% (steps 5), Text size slider 85-140% (steps 5).
 - Glow: preview (IndicatorPreview, level scrub), Glow: colours (Low / Middle / High / Idle swatches + picker).
 - Dock style: chooser Standard / Transparent / 3D (note: also reachable by long-press on the dock).
-- Home panels: Usage panel chips (Today / Last 7 days); Files panel chips (10 / 20 / 50 files); Folders the launcher may read (list, Remove); hint text.
+- Home panels: Usage panel chips (Today / Last 7 days); Folders the launcher may read (list, Remove); hint text.
 - Glance/Pages wallpaper pane: preview strip; Wallpaper type chips (Solid colour, Gradient, Signal wallpaper, System live wallpaper, Picture); Solid -> colour picker; Gradient -> From/To stop chips + picker + Angle chips (0,45,...,315); Signal wallpaper -> Preview signal chips (Live, No signal, Weak, Fair, Good, Excellent; pane-local, not stored), Slot 1 and Slot 2 pickers (None, Beam, Spire, Halo, Laser, Shaft living; Glow lines, Breathing dots, Bottom glow, Radar sweep effects; at most one living + one effect), Intensity chips (Subtle/Normal, shared by both surfaces); System live wallpaper -> "Choose live wallpaper" (opens system chooser) + Dim chips (0/25/50); Picture -> choose picture/GIF/video (200 MB video / 30 MB animated cap), Picture fit (Fill/Fit), Dim (0/25/50), Animation Playback (Still/Once/Continuous/Bounce), Loop style, Remove picture, "Animated wallpapers use more power" confirm dialog (stored powerOk). While Pages=same-as-Glance the Pages pane is only an info line.
 - Drawer shortcuts: slots 1..N (N = Ring segments) each -> radio page (Empty, App..., Radar first, then every CornerActionId except All apps); Reset to default.
 - Open with: Music, Messages, Browser, Email, Maps, Calendar, Gallery, Contacts, Calculator, Camera -> app picker (summary "Ask each time" or chosen app).
@@ -193,7 +193,7 @@ Also Look>Glow: "Glow: preview" pane (no setting, scrub only).
 | HS24 | Grid follows window size | Home>Home style | Switch | on/off | off | lp:adaptiveGrid | adaptive columns/rows | - | S |
 | HS25 | Home panels | Home>Home style | Pane | see HS26-27 | - | - | Files/usage panels | - | P |
 | HS26 | Usage panel range | Home panels pane | Chips | Today / Last 7 days | Today | home_state:panel.usage | Timeline usage block | - | - |
-| HS27 | Files panel: files per folder | Home panels pane | Chips | 10 / 20 / 50 | 20 | home_state:panel.files.count (clamped 5-50) | Files panel | - | - |
+| HS27 | (retired in wave 53: the Files tab shows up to 2000 files per source; the stored `panel.files.count` still sizes the Files home tile) | - | - | - | - | - | - | - | - |
 | HS28 | Grid density | Home>Home style | Slider | 50-200% | 100% | lp:gridDensity | adaptive grid | adaptive on | S |
 | HS29 | Default density | Home>Icons and grid | Rail | Roomy 3x5/4x2, Default 3x6/5x2, Dense 4x7/6x3, Packed 5x8/8x3, Custom | Default | lp:pCols,pRows,lCols,lRows | portrait/landscape grids | paged | S |
 | HS30 | Default density: Columns portrait | same (in rail preview) | Stepper | 2-10 | 3 | lp:pCols | | paged | - |
@@ -393,6 +393,9 @@ Comms-owned settings outside Settings (reachable from Comms itself): Groups mana
 | QS14 | Comms Group by / default tab "set default" | Comms menu | | | | launchpad_hub:grouping / defaultView | CM05 |
 | QS15 | Radar result size | Radar pinch / Ctrl+- | | | 1.15 | radar_ui:resultScale | none |
 | QS16 | Files panel view | Comms Files tab | List / Grid | | List | home_state:panel.files.view | none |
+| QS16a | Files sources: shown collections and their order | Comms Files tab, Add | cards, up/down, remove | 9 built-ins + custom | Recents, Documents, Images, Downloads | home_state:panel.files.collections | none |
+| QS16b | Files sort and group | Comms Files tab, sort button | cards | Name / Date modified / Date added (when known) / Size / Type; ascending or descending; None / Date / Type / Folder / Size band | Date modified, newest first, no grouping | home_state:panel.files.sort.default and :sort.by (per source) | none |
+| QS16c | Files: last source | Comms Files tab | chips | | All | home_state:panel.files.source | none |
 | QS17 | First-run onboarding: home style | Onboarding | chooser | | | lp:style, onboardingDone | HS21 |
 
 # C) Counts

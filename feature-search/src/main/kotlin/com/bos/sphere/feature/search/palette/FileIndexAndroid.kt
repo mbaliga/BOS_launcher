@@ -41,6 +41,23 @@ object FileIndexHolder {
     }
 }
 
+/** W53: one row of the file index as the Files collections read it (a plain copy, so the app module needs no search-engine types). */
+data class IndexedFileRow(val uri: String, val name: String, val mime: String, val size: Long, val modified: Long, val source: String, val folder: String)
+
+/** W53: the index as rows, for the Files collections. [FileIndexer.reconcile] fills it; nothing here reads the disk beyond the saved index. */
+object FileIndexRows {
+    fun all(context: Context): List<IndexedFileRow> = FileIndexHolder.get(context).all().map { IndexedFileRow(it.uri, it.name, it.mime.orEmpty(), it.size, it.modified, it.source, it.folder) }
+
+    /** A full incremental pass over the granted folders (and the media listing when permitted). Blocks: call it off the main thread. */
+    fun reindex(context: Context) { FileIndexer.reconcile(context) }
+
+    /** Granted folders the index has no listing for yet (the collections ask for a reconcile when this is not empty). */
+    fun unindexedTrees(context: Context): List<Uri> {
+        val have = FileIndexHolder.get(context).sources()
+        return FileGrants.trees(context).filter { "tree:$it" !in have }
+    }
+}
+
 /** Folders the user granted through the system picker; persisted by the system, so they survive reboot. No all-files access. */
 object FileGrants {
     fun pickerIntent(): Intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)

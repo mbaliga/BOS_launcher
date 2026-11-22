@@ -13,6 +13,10 @@ data class RecentFile(
     val source: String,
     /** Bytes, or -1 when the provider did not say (W31: shown in the Files tab's secondary line). */
     val sizeBytes: Long = -1,
+    /** W53: the name of the folder the file sits in (its own folder, or the granted folder's name at the top); "" when not known. */
+    val folder: String = "",
+    /** W53: when the file was added, or -1 when the provider has no such date (the folder grants give none, so Sort by Date added stays hidden). */
+    val addedMs: Long = -1,
 )
 
 data class PinnedFolder(val uri: String, val name: String)

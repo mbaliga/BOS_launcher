@@ -54,12 +54,6 @@ class HomePanelPrefs(context: Context) {
         set(v) { sp.edit().putString("panel.files.view", v.name).apply() }
 }
 
-object FilesView {
-    /** Files of [selectedSource] only, or all of them when it is null. */
-    fun filter(files: List<RecentFile>, selectedSource: String?): List<RecentFile> =
-        if (selectedSource == null) files else files.filter { it.source == selectedSource }
-}
-
 /** One row of the timeline list: the entry and whether it starts a new day group. */
 data class TimelineRow(
     val entry: TimelineEntry, val day: String, val header: Boolean,

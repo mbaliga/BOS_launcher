@@ -43,6 +43,9 @@ class FileIndex {
         }.sortedByDescending { it.second }.take(limit)
     }
 
+    /** A copy of every entry (W53: the Files collections query it off the main thread). */
+    @Synchronized fun all(): List<FileEntry> = byUri.values.toList()
+
     @Synchronized fun recent(limit: Int = 8): List<FileEntry> = byUri.values.sortedByDescending { it.modified }.take(limit)
 
     @Synchronized fun encode(): String = byUri.values.joinToString("\n") {

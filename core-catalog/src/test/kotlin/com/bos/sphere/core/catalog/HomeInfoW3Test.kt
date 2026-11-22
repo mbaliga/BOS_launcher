@@ -144,15 +144,6 @@ class HomeInfoW3Test {
     }
 
     @Test
-    fun HOM_15_filesCanBeNarrowedToOnePinnedFolder() {
-        val f = { u: String, s: String -> RecentFile(u, u, "", 1, s) }
-        val all = listOf(f("1", "A"), f("2", "B"), f("3", "A"))
-        assertEquals(3, FilesView.filter(all, null).size)
-        assertEquals(listOf("1", "3"), FilesView.filter(all, "A").map { it.uri })
-        assertTrue(FilesView.filter(all, "gone").isEmpty())
-    }
-
-    @Test
     fun HOM_17_weekRangeStartsSixDaysBeforeMidnightAndTodayAtMidnight() {
         val midnight = 10 * 86_400_000L
         assertEquals(midnight, UsageRange.Today.startMs(midnight))

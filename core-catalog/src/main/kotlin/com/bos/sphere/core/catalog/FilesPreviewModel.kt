@@ -17,7 +17,7 @@ enum class FileKind(val label: String, val previewable: Boolean) {
             add(Pdf, "pdf")
             add(Apk, "apk", "apks", "xapk")
             add(Archive, "zip", "rar", "7z", "tar", "gz", "bz2", "xz")
-            add(Document, "doc", "docx", "odt", "rtf", "pages")
+            add(Document, "doc", "docx", "odt", "odf", "odg", "rtf", "pages", "epub")
             add(Spreadsheet, "xls", "xlsx", "ods", "csv", "numbers")
             add(Slides, "ppt", "pptx", "odp", "key")
             add(Text, "txt", "md", "log", "json", "xml", "html", "htm")

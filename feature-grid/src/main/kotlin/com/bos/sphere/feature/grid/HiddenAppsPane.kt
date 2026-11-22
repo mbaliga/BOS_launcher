@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -72,7 +73,9 @@ fun ColumnScope.HiddenAppsPane(
     )
     if (rows.isEmpty()) Text(L10n.tr("No apps are hidden."), color = HyleColors.InkDim, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp).testTag("hid.empty"))
     else if (shown.isEmpty()) Text(L10n.tr("No hidden app matches."), color = HyleColors.InkDim, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp).testTag("hid.nomatch"))
-    shown.forEach { row ->
+    shown.forEachIndexed { rowIndex, row ->
+        // Wave 54: a hairline between rows (not under the last), starting where the label starts (after the icon and its gap).
+        if (rowIndex > 0) Box(Modifier.padding(start = 52.dp, end = 0.dp).fillMaxWidth().height(1.dp).background(HyleColors.Hairline).testTag(OneUiTags.DIVIDER))
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 4.dp).testTag("hid.row.${row.key}"), verticalAlignment = Alignment.CenterVertically) {
             icon(row)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {

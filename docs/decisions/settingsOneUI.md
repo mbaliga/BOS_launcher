@@ -1,5 +1,7 @@
 # settingsOneUI (wave 40, CFG-21)
 
+> **Wave 54 (settingsLines) supersedes every statement below about rounded cards, card corners, card gaps and rows "in cards": rows are flat on the page, separated by hairlines under small grey headers (`docs/decisions/settingsLines.md`). Read "card" below as "group of rows".**
+
 The owner asked for a simpler, more traditional settings area with the full list laid out up front, emulating Samsung One UI. Ground Control's category strip is gone; the settings are a list and pages.
 
 ## What it is

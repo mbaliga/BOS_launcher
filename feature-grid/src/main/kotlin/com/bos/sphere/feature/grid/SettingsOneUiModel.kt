@@ -3,9 +3,9 @@ package com.bos.sphere.feature.grid
 import com.bos.sphere.core.design.L10n
 
 /**
- * Wave 40 (settingsOneUI), CFG-21: the pure model of the One UI style settings: how the categories are grouped into the cards of
+ * Wave 40 (settingsOneUI), CFG-21: the pure model of the One UI style settings: how the categories are grouped into the groups of
  * the root list, the accent of each category's icon tile, the summary line when the app gives none, how the rows of a category
- * page are cut into cards and headed by small section titles, and the maths of the collapsing title. No Compose in here, so every
+ * page are cut into groups and headed by small section titles, and the maths of the collapsing title. No Compose in here, so every
  * rule is unit-tested on the JVM.
  */
 object OneUiModel {
@@ -15,8 +15,8 @@ object OneUiModel {
     fun twoPane(widthDp: Float, heightDp: Float): Boolean = widthDp >= TWO_PANE_MIN_DP && widthDp > heightDp
 
     /**
-     * The English names of the categories, in the order and the cards One UI would give them: look and home first, then the
-     * inputs, then notifications, then the system. A category that is not listed (a new one) lands in a card of its own before the last card.
+     * The English names of the categories, in the order and the groups One UI would give them: look and home first, then the
+     * inputs, then notifications, then the system. A category that is not listed (a new one) lands in a group of its own before the last group.
      */
     val GROUPS: List<List<String>> = listOf(
         listOf(PAGE, "Home screen", "Workspaces"),
@@ -51,7 +51,7 @@ object OneUiModel {
         return null
     }
 
-    /** The category indices of [categories] cut into the cards of the root list, in order; every index appears exactly once. */
+    /** The category indices of [categories] cut into the groups of the root list, in order; every index appears exactly once. */
     fun groups(categories: List<SettingCategory>): List<List<Int>> {
         val byKey = categories.indices.groupBy { key(categories[it].title) }
         val out = ArrayList<List<Int>>()
@@ -97,23 +97,23 @@ object OneUiModel {
 
     sealed interface Block {
         data class Header(val text: String) : Block
-        /** Indices (into the category's items) of the rows of one rounded card. */
-        data class Card(val rows: List<Int>) : Block
+        /** Indices (into the category's items) of the rows of one group. */
+        data class Group(val rows: List<Int>) : Block
     }
 
     private fun navigates(i: SettingItem) = i is SettingItem.Action || i is SettingItem.Pane
 
-    /** Rows that carry a row of live preview cards: they get their own card. */
+    /** Rows that carry a row of live preview cards: they get their own group. */
     fun isRail(i: SettingItem) = i is SettingItem.Choice<*> && i.preview != null
 
     /**
-     * Cuts [items] into cards: a new card starts at every [headers] entry (item index to header text, the header is emitted first), where
+     * Cuts [items] into groups: a new group starts at every [headers] entry (item index to header text, the header is emitted first), where
      * the rows change from controls (switches, choices, sliders) to links (actions, panes), and around a row of preview cards.
      */
     fun blocks(items: List<SettingItem>, headers: Map<Int, String> = emptyMap()): List<Block> {
         val out = ArrayList<Block>()
         var cur = ArrayList<Int>()
-        fun flush() { if (cur.isNotEmpty()) { out += Block.Card(cur); cur = ArrayList() } }
+        fun flush() { if (cur.isNotEmpty()) { out += Block.Group(cur); cur = ArrayList() } }
         items.forEachIndexed { i, it ->
             val h = headers[i]
             if (h != null) { flush(); out += Block.Header(h) }
@@ -127,8 +127,8 @@ object OneUiModel {
         return out
     }
 
-    /** The index in [blocks] of the card holding row [item], or -1. */
-    fun blockOf(blocks: List<Block>, item: Int): Int = blocks.indexOfFirst { it is Block.Card && item in it.rows }
+    /** The index in [blocks] of the group holding row [item], or -1. */
+    fun blockOf(blocks: List<Block>, item: Int): Int = blocks.indexOfFirst { it is Block.Group && item in it.rows }
 
     // ---- collapsing title ---------------------------------------------------------------------------------------------------------
 

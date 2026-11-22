@@ -75,13 +75,13 @@ class OneUiModelTest {
     @Test fun CFG_21_controlsAndLinksSplitIntoSeparateCards() {
         val items = listOf(toggle("a"), toggle("b"), action("c"), action("d"), toggle("e"))
         val b = OneUiModel.blocks(items)
-        assertEquals(listOf<OneUiModel.Block>(OneUiModel.Block.Card(listOf(0, 1)), OneUiModel.Block.Card(listOf(2, 3)), OneUiModel.Block.Card(listOf(4))), b)
+        assertEquals(listOf<OneUiModel.Block>(OneUiModel.Block.Group(listOf(0, 1)), OneUiModel.Block.Group(listOf(2, 3)), OneUiModel.Block.Group(listOf(4))), b)
     }
 
     @Test fun CFG_21_aSectionHeaderStartsANewCardUnderIt() {
         val items = listOf(toggle("a"), toggle("b"), toggle("c"))
         val b = OneUiModel.blocks(items, mapOf(0 to "First", 2 to "Second"))
-        assertEquals(listOf(OneUiModel.Block.Header("First"), OneUiModel.Block.Card(listOf(0, 1)), OneUiModel.Block.Header("Second"), OneUiModel.Block.Card(listOf(2))), b)
+        assertEquals(listOf(OneUiModel.Block.Header("First"), OneUiModel.Block.Group(listOf(0, 1)), OneUiModel.Block.Header("Second"), OneUiModel.Block.Group(listOf(2))), b)
         assertEquals(1, OneUiModel.blockOf(b, 1)); assertEquals(3, OneUiModel.blockOf(b, 2)); assertEquals(-1, OneUiModel.blockOf(b, 9))
     }
 

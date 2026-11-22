@@ -43,31 +43,31 @@ import com.bos.sphere.core.design.HyleColors
 fun OneUiPageFrame(title: String, onBack: () -> Unit, modifier: Modifier = Modifier, subtitle: String? = null, tag: String? = null, content: LazyListScope.() -> Unit) =
     OneUiPage(title = title, subtitle = subtitle, onBack = onBack, backLabel = com.bos.sphere.core.design.L10n.tr("Back"), modifier = modifier, tag = tag, content = content)
 
-/** A rounded card of [rowCount] rows (separate them with [OneUiRowDivider]). */
+/** A flat group of [rowCount] rows (separate them with [OneUiRowDivider]). */
 @Composable
-fun OneUiGroup(rowCount: Int, modifier: Modifier = Modifier, content: @Composable () -> Unit) = OneUiCard(rowCount, modifier, content)
+fun OneUiGroup(rowCount: Int, modifier: Modifier = Modifier, content: @Composable () -> Unit) = OneUiRows(rowCount, modifier, content)
 
 @Composable
 fun OneUiRowDivider(inset: androidx.compose.ui.unit.Dp = 20.dp) = OneUiDivider(inset)
 
-/** The small grey heading above a card. */
+/** The small grey heading above a group. */
 @Composable
 fun OneUiGroupTitle(text: String) = OneUiSectionHeader(text)
 
-/** Grey caption text under a card (the hint of the group above it). */
+/** Grey caption text under a group (the hint of the group above it). */
 @Composable
 fun OneUiCaption(text: String, modifier: Modifier = Modifier) {
-    Text(text, color = HyleColors.InkDim, fontSize = 13.sp, lineHeight = 18.sp, modifier = modifier.fillMaxWidth().padding(start = OneUi.Margin + 16.dp, end = OneUi.Margin + 16.dp, top = 8.dp, bottom = 4.dp))
+    Text(text, color = HyleColors.InkDim, fontSize = 13.sp, lineHeight = 18.sp, modifier = modifier.fillMaxWidth().padding(start = OneUi.RowPad, end = OneUi.RowPad, top = 8.dp, bottom = 4.dp))
 }
 
 @Composable
-fun OneUiGap() { Spacer(Modifier.size(OneUi.CardGap)) }
+fun OneUiGap() { Spacer(Modifier.size(OneUi.GroupGap)) }
 
-/** A card of plain explanation text (no rows). */
+/** A block of plain explanation text (no rows), flat on the page. */
 @Composable
 fun OneUiInfoCard(text: String, tag: String? = null) {
-    OneUiCard(1) {
-        Text(text, color = HyleColors.Ink, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp).then(if (tag != null) Modifier.testTag(tag) else Modifier))
+    OneUiRows(1) {
+        Text(text, color = HyleColors.Ink, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.padding(horizontal = OneUi.RowPad, vertical = 12.dp).then(if (tag != null) Modifier.testTag(tag) else Modifier))
     }
 }
 

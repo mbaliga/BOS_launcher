@@ -49,7 +49,7 @@ Look
             Wallpaper palette, density and text size (Pane, d2)
   [Icons]   Icon shape (Rail 5) | Icon colour (Page 3, d2) | Icon plate (switch)
   [Settings screen] Settings backdrop (Rail 2) | Backdrop dimming (slider, cond Wallpaper)
-  [Effects] Calm effect (Page 3, d2) | Alert effect (Page 3, d2) | Show (Page 2, d2)
+  [Effects] Calm style (cards: Off, Regular, Edge dots, Corner bloom, Bottom glow, Edge beam; d2) | Also show regular battery and signal (Switch, only beside an ambient style) | Show (Page 2, d2)
   [Glow]    Glow: intensity | Glow: speed | Glow: preview (Pane d2) | Glow: colours (Pane d2: 4 swatches + colour picker)
 Home screen
   [Pages]   Calm home screen (Glance) (switch) | Add page (link, cond Pages=Paginated) | Edit home (link, closes Settings) | Widgets, folders and icons (link, closes Settings)
@@ -153,8 +153,8 @@ Actions (not settings): Add a page after this; Delete this page (cond >1 page or
 | LK09 | Icon plate | Look>Icons | Switch | on/off | on | lp:iconPlate | tile behind transparent icons | - | S |
 | LK10 | Settings backdrop | Look>Settings screen | Rail | Background, dimmed / Pitch black | Background, dimmed | lp:settingsBackdrop | behind Settings pages | - | S |
 | LK11 | Backdrop dimming | Look>Settings screen | Slider | 20-95% | 70% | lp:settingsDim | Settings backdrop | backdrop = wallpaper (cond) | S |
-| LK12 | Calm effect | Look>Effects | Page | Off / Dot bloom / Animated dots | Animated dots | lp:indCalm | signal/battery background effect | - | S |
-| LK13 | Alert effect | Look>Effects | Page | Off / Coloured vignette / Comic-book lines | Off | lp:indAlert | alert effect when low | - | S |
+| LK12 | Calm style | Look>Effects | Cards | Off / Regular / Edge dots / Corner bloom / Bottom glow / Edge beam | automatic: Edge dots on a Signal wallpaper, Off on any other kind | lp:calmStyle (absent = automatic) | non-occluding signal/battery accent, or the regular indicators | - | S |
+| LK13 | Also show regular battery and signal | Look>Effects | Switch | on/off (shown only with an ambient style) | off | lp:calmRegular | battery glyph with percentage and signal bars at the top of the home beside the calm style | - | S |
 | LK14 | Show | Look>Effects | Page | Signal / Battery | Signal | lp:indMetric | what effects map to | - | S |
 | LK15 | Glow: intensity | Look>Glow | Slider | 0-100% | 60% | lp:indIntensity | effects | - | S |
 | LK16 | Glow: speed | Look>Glow | Slider | 0-100% | 50% | lp:indSpeed | effects | - | S |
@@ -433,7 +433,7 @@ lp:continuousColumns (pinch only), lp:appsOnHome (migration only, never user-set
 - Info rows that look tappable: Capabilities rows (no-op Action), About rows, "On this home".
 
 ## C5 Dead / retired preference keys (RetiredPrefKeys + store clean-ups)
-launcher_prefs (purged once per install, marker retired_pref_keys_w38; also dropped on import): bgKind, bgPreset, bgA, bgB, wallpaper, searchBackdrop, searchBdStyle, radarSweep, radarSignalView, radarComic (old background gallery; bgPicture is owned by DeviceBound), minimalHints, networkDots, switcherStyle, drawerShortcutsOn, drawerShortcuts, drawerShortcutsShown, indInvert, glanceWeather, suggestion, drawerStyle, drawerView, drawerSort, drawerRail, drawerRailVisible, drawerViewSwitch, clockPosition, clockLayout, clockSize, clockDate, clockDay, clockWeather, weatherF, strip, healthSource (34). palette: scopeMapping, prefixes (2). crash_loop: rapid (1). home_state: panel.timeline.depth, panel.timeline.scheduled (2). After migration only: indEffects (-> indCalm/indAlert), glanceContent (-> showMusic) (2). Removed by LauncherPrefsStore on write: homeLanding, landingChosen, homeScroll, pagesModeChosen (4; homeScroll/pagesModeChosen are read once to derive Pages). puck_actions:actions (migrated to slots). Total distinct retired keys: 45 (41 in RetiredPrefKeys + 4 in HomeModelMigration).
+launcher_prefs (purged once per install, marker retired_pref_keys_w38; also dropped on import): bgKind, bgPreset, bgA, bgB, wallpaper, searchBackdrop, searchBdStyle, radarSweep, radarSignalView, radarComic (old background gallery; bgPicture is owned by DeviceBound), minimalHints, networkDots, switcherStyle, drawerShortcutsOn, drawerShortcuts, drawerShortcutsShown, indInvert, glanceWeather, suggestion, drawerStyle, drawerView, drawerSort, drawerRail, drawerRailVisible, drawerViewSwitch, clockPosition, clockLayout, clockSize, clockDate, clockDay, clockWeather, weatherF, strip, healthSource (34). palette: scopeMapping, prefixes (2). crash_loop: rapid (1). home_state: panel.timeline.depth, panel.timeline.scheduled (2). After migration only: indEffects, indCalm, indAlert (-> calmStyle; wave 55), glanceContent (-> showMusic) (2). Removed by LauncherPrefsStore on write: homeLanding, landingChosen, homeScroll, pagesModeChosen (4; homeScroll/pagesModeChosen are read once to derive Pages). puck_actions:actions (migrated to slots). Total distinct retired keys: 45 (41 in RetiredPrefKeys + 4 in HomeModelMigration).
 
 ## C6 Naming inconsistencies (same thing, different names - or one name, different things)
 1. Product/screen: root title "Settings"; legacy "Ground Control" still shown (quick sheet row, a toast "Ground Control, Home screen, Right side"); corner/gesture action "Home settings" opens it; action "Settings" and row "Android settings" open Android's.
@@ -446,7 +446,7 @@ launcher_prefs (purged once per install, marker retired_pref_keys_w38; also drop
 8. Hotspots / hot corners / corners: Glance "Hotspots" + "%s hotspot", Corners "Hot corners with a mouse", "Corner style", corner slots.
 9. Sound: "Interface sounds" + "Volume" (UI tones) vs Comms "Sound and Vibration" (system streams, "Launcher vibration").
 10. Radar vs Search: category "Radar", rows "Search folders", "Search providers from other apps", "Search history and aliases", "Web engine", Access "Search your files", Files switch.
-11. Look vs Theme vs Indicator: built as Theme + Indicator, shown as Look; effect rows titled "Calm effect", "Alert effect", "Show", "Glow: intensity", "Glow: speed", "Glow: preview", "Glow: colours" (colon style used nowhere else; "Show" is vague).
+11. Look vs Theme vs Indicator: built as Theme + Indicator, shown as Look; effect rows titled "Calm style", "Also show regular battery and signal", "Show", "Glow: intensity", "Glow: speed", "Glow: preview", "Glow: colours" (colon style used nowhere else; "Show" is vague).
 12. Separator/style drift: "Page turning · portrait" (middle dot) vs "Columns · portrait" vs "Hotspots"; "Keyboard opens with Radar and drawer · landscape" has no hint while portrait does; sentence vs title case ("Add page", "Add a page after this", "Add workspace", "New group", "New app group"); "Unhide" vs "Show".
 13. Black: "Pitch black" (Settings backdrop) vs "True black" (Radar) vs "AMOLED" (theme).
 14. Clock: Glance clock (Clock style/format/colour/size/date) vs clock tile options (analog, 12/24, date) vs "Clock tile on this page" vs Page N. 15. "Order" (generic title for page/column order) and "Right side" (really Recents/dock rail/off).

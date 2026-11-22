@@ -5,24 +5,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IndicatorMathTest {
-    private val eps = 1e-2f
-
-    @Test fun falloffCentreIsOneAndCornersAreFloor() {
-        assertEquals(1f, IndicatorMath.falloff(0f, 0f), eps)
-        assertEquals(IndicatorMath.FLOOR, IndicatorMath.falloff(1f, 1f), eps)
-        assertTrue(IndicatorMath.falloff(1f, 0f) >= IndicatorMath.FLOOR)
-    }
-
-    @Test fun falloffIsMonotonicOutward() {
-        var prev = 2f
-        for (i in 0..20) {
-            val f = IndicatorMath.falloff(i / 20f, i / 20f)
-            assertTrue(f <= prev + 1e-6f)
-            assertTrue(f >= IndicatorMath.FLOOR - 1e-6f)
-            prev = f
-        }
-    }
-
     @Test fun ringWavePeaksAtCentre() {
         assertEquals(1f, IndicatorMath.ringWave(0.5f, 0.5f, 0.2f), 1e-6f)
         assertEquals(0f, IndicatorMath.ringWave(0.8f, 0.5f, 0.2f), 1e-6f)
@@ -34,38 +16,45 @@ class IndicatorMathTest {
         assertEquals(1.2f, IndicatorMath.ringCentre(1f, 0.2f), 1e-6f)
     }
 
-    @Test fun PAL_24_w35_urgentPulseIsAboutOnePointTwoSecondsAndStaysVisible() {
-        assertEquals(1.2f, IndicatorMath.URGENT_PERIOD_S, 0f)
-        assertEquals(IndicatorMath.pulse(0f, true, false), IndicatorMath.pulse(1.2f, true, false), 1e-4f)
-        assertTrue(IndicatorMath.pulse(0.6f, true, false) < IndicatorMath.pulse(0f, true, false))
-        for (i in 0..120) assertTrue(IndicatorMath.pulse(i / 50f, true, false) in 0.69f..1.001f)
-        assertEquals("reduced motion: one static full-strength frame", 1f, IndicatorMath.pulse(0.6f, true, true), 0f)
-        assertEquals("not urgent: no pulse", 1f, IndicatorMath.pulse(0.6f, false, false), 0f)
+    @Test fun PAL_24_w55_theUrgentPulseIsSlowAndStaysVisible() {
+        assertEquals("slow: a pulse takes more than three seconds", 3.2f, IndicatorMath.URGENT_PERIOD_S, 0f)
+        assertEquals(IndicatorMath.pulse(0f, true, false), IndicatorMath.pulse(3.2f, true, false), 1e-4f)
+        assertTrue(IndicatorMath.pulse(1.6f, true, false) < IndicatorMath.pulse(0f, true, false))
+        for (i in 0..320) assertTrue(IndicatorMath.pulse(i / 50f, true, false) in 0.79f..1.001f)
+        assertEquals("reduced motion: one static full-strength frame", 1f, IndicatorMath.pulse(1.6f, true, true), 0f)
+        assertEquals("not urgent: no pulse", 1f, IndicatorMath.pulse(1.6f, false, false), 0f)
     }
 
-    @Test fun PAL_24_w35_alertStrengthScalesWithSeverityAndUrgentIsFull() {
-        assertTrue(IndicatorMath.alertStrength(0.1f, false, 0.6f) < IndicatorMath.alertStrength(0.5f, false, 0.6f))
-        assertTrue(IndicatorMath.alertStrength(0.5f, false, 0.6f) < IndicatorMath.alertStrength(0.9f, false, 0.6f))
-        assertEquals(1f, IndicatorMath.alertStrength(1f, true, 0.2f), 0f)
-        assertEquals("zero intensity is off", 0f, IndicatorMath.alertStrength(1f, true, 0f), 0f)
+    @Test fun PAL_24_w55_strengthIsQuietWhenHealthyRisesWithSeverityAndUrgentIsFull() {
+        assertTrue(IndicatorMath.strength(0f, false) < IndicatorMath.strength(0.5f, false))
+        assertTrue(IndicatorMath.strength(0.5f, false) < IndicatorMath.strength(1f, false))
+        assertEquals(1f, IndicatorMath.strength(0.2f, true), 0f)
+        assertTrue("healthy is well under full strength", IndicatorMath.strength(0f, false) < 0.75f)
+        assertTrue(IndicatorMath.strength(1f, false) <= 1f)
     }
 
-    @Test fun PAL_24_w35_vignetteThickensAndComicLinesGetManyAndBoldAsSeverityRises() {
-        assertTrue(IndicatorMath.vignetteInner(1f) < IndicatorMath.vignetteInner(0.2f))
-        assertTrue(IndicatorMath.comicFraction(0.1f, false) < IndicatorMath.comicFraction(0.8f, false))
-        assertEquals(1f, IndicatorMath.comicFraction(1f, true), 0f)
-        assertTrue(IndicatorMath.comicWidth(0.1f, false) < IndicatorMath.comicWidth(0.9f, false))
-        assertTrue(IndicatorMath.comicWidth(0.9f, false) < IndicatorMath.comicWidth(1f, true))
+    @Test fun PAL_24_w55_breathIsSlowAndStillIsTheMiddle() {
+        assertEquals(0.5f, IndicatorMath.breath(3f, 6f, true), 0f)
+        assertEquals(0f, IndicatorMath.breath(0f, 6f, false), 1e-6f); assertEquals(1f, IndicatorMath.breath(3f, 6f, false), 1e-6f)
     }
 
-    @Test fun PAL_24_w35_comicLinesFractionThinsTheSameDeterministicRingEvenly() {
-        val full = ComicLines(); val few = ComicLines()
-        full.fill(400f, 800f, 0, true); few.fill(400f, 800f, 0, true, 0.25f)
-        fun n(l: ComicLines) = l.counts.sum() / 4
-        assertEquals(72, n(full)); assertEquals(18, n(few))
-        val again = ComicLines(); again.fill(400f, 800f, 0, true, 0.25f)
-        for (k in 0 until ComicLines.CLASSES) assertTrue(few.buffers[k].contentEquals(again.buffers[k]))
-        val unchanged = ComicLines(); unchanged.fill(400f, 800f, 0, true, 1f)
-        for (k in 0 until ComicLines.CLASSES) assertTrue("fraction 1 is the unchanged PAL-24 set", full.buffers[k].contentEquals(unchanged.buffers[k]))
+    @Test fun PAL_24_w55_theGlowStaysWithinSixPercentOfTheHeightAndFollowsTheValue() {
+        for (i in 0..10) assertTrue(IndicatorMath.glowHeightFraction(i / 10f) <= 0.06f + 1e-6f)
+        assertTrue(IndicatorMath.glowHeightFraction(0f) < IndicatorMath.glowHeightFraction(1f))
+    }
+
+    @Test fun PAL_24_w55_theEdgeDotsWalkTheRectangleEvenlyAndStayInsideTheEdgeBand() {
+        val w = 720f; val h = 1280f; val inset = 14f; val sp = 28f
+        val n = IndicatorMath.perimeterCount(sp, inset, w, h)
+        assertTrue(n > 100)
+        val a = FloatArray(2); val b = FloatArray(2)
+        for (i in 0 until n) {
+            IndicatorMath.perimeterPoint(i, sp, inset, w, h, a)
+            val onEdge = a[0] == inset || a[0] == w - inset || a[1] == inset || a[1] == h - inset
+            assertTrue("dot $i is on the inset rectangle (${a[0]}, ${a[1]})", onEdge)
+            assertTrue(a[0] in inset..(w - inset) && a[1] in inset..(h - inset))
+        }
+        IndicatorMath.perimeterPoint(0, sp, inset, w, h, a); IndicatorMath.perimeterPoint(1, sp, inset, w, h, b)
+        assertEquals("along a straight run the spacing is exact", sp, b[0] - a[0], 1e-3f)
     }
 }

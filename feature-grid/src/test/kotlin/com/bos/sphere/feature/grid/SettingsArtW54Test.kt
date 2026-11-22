@@ -8,8 +8,7 @@ import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.bos.sphere.core.catalog.UsageRange
-import com.bos.sphere.core.data.AlertEffect
-import com.bos.sphere.core.data.CalmEffect
+import com.bos.sphere.core.data.CalmStyle
 import com.bos.sphere.core.data.ClockFormat
 import com.bos.sphere.core.data.ClockSize
 import com.bos.sphere.core.data.ClockStyle
@@ -109,8 +108,7 @@ class SettingsArtW54Test {
         check("Icon shape", IconShape.entries, SettingsArtLook.iconShape)
         check("Icon colour", IconTint.entries, SettingsArtLook.iconTint)
         check("Settings backdrop", SettingsBackdrop.entries, SettingsArtLook.backdrop)
-        check("Calm effect", listOf<CalmEffect?>(null) + CalmEffect.entries, SettingsArtLook.calm)
-        check("Alert effect", listOf<AlertEffect?>(null) + AlertEffect.entries, SettingsArtLook.alert)
+        check("Calm style", CalmStyle.entries, SettingsArtLook.calm)
         check("Show", IndicatorMetric.entries, SettingsArtLook.metric)
         check("Web engine", WebEngine.entries, SettingsArtLook.webEngine, distinct = false)
         check("Wallpaper type", WallpaperKind.entries, SettingsArtLook.wallpaperKind)

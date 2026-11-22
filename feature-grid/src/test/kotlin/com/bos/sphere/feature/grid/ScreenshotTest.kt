@@ -30,7 +30,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.IndicatorColors
-import com.bos.sphere.core.data.CalmEffect
+import com.bos.sphere.core.data.CalmStyle
 import com.bos.sphere.core.data.IndicatorMetric
 import com.bos.sphere.core.data.ReadingKind
 import com.bos.sphere.core.data.IndicatorReading
@@ -108,14 +108,13 @@ class ScreenshotTest {
         corners: Map<Corner, CornerSlot> = DefaultCorners,
         rotation: Int = if (landscape) 1 else 0,
         status: IndicatorReading = IndicatorReading(ReadingKind.Live, 0.9f, ""),
-        calm: CalmEffect? = CalmEffect.AnimatedDots,
-        alert: com.bos.sphere.core.data.AlertEffect? = null,
+        calm: CalmStyle = CalmStyle.EdgeDots,
         prefs2: LauncherPrefs? = null,
     ) {
         val state = rememberGridHomeState()
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             IndicatorLayer(
-                status, calm, alert, IndicatorMetric.Signal,
+                status, calm, IndicatorMetric.Signal,
                 IndicatorColors.argb(status, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, false),
                 0.6f, 0.5f, Modifier.fillMaxSize(),
             )
@@ -220,7 +219,7 @@ class ScreenshotTest {
             Corner.TopRight to CornerSlot.Palette("Media", listOf(CornerActionId.Music, CornerActionId.Camera, CornerActionId.Gallery, CornerActionId.Flashlight).map(CornerItem::Action)),
             Corner.BottomLeft to CornerSlot.ComplicationCluster(listOf(ComplicationKind.Battery, ComplicationKind.Date, ComplicationKind.Ringer)),
         )
-        rule.setContent { Scene(prefs, landscape = false, pages = pages, corners = corners, status = IndicatorReading(ReadingKind.Live, 0.15f, ""), alert = com.bos.sphere.core.data.AlertEffect.Vignette) }
+        rule.setContent { Scene(prefs, landscape = false, pages = pages, corners = corners, status = IndicatorReading(ReadingKind.Live, 0.15f, ""), calm = CalmStyle.BottomGlow) }
         shoot("04-circle-bubbles-portrait")
     }
 
@@ -334,7 +333,7 @@ class ScreenshotTest {
         rule.setContent {
             Scene(
                 prefs, landscape = false, pages = pagesFor(prefs, false),
-                calm = CalmEffect.Bloom,
+                calm = CalmStyle.CornerBloom,
             )
         }
         shoot("08-big-clock-effects", settleMs = 2_000)

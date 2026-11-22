@@ -27,7 +27,7 @@ object OneUiSections {
             "Light / dark" to "Theme",
             "Icon shape" to "Icons",
             "Settings backdrop" to "Settings screen",
-            "Calm effect" to "Effects",
+            "Calm style" to "Effects",
             "Glow: intensity" to "Glow",
         ),
         "Corners" to listOf(

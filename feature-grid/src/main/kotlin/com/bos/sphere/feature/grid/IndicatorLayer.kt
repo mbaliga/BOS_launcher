@@ -7,15 +7,15 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.bos.sphere.core.data.AlertEffect
-import com.bos.sphere.core.data.CalmEffect
+import com.bos.sphere.core.data.CalmStyle
+import com.bos.sphere.core.data.CalmStyles
 import com.bos.sphere.core.data.IndicatorColors
 import com.bos.sphere.core.data.IndicatorMetric
 import com.bos.sphere.core.data.IndicatorReading
@@ -26,27 +26,41 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.hypot
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.min
 
-/** Pure geometry for [IndicatorLayer]; unit-tested on the JVM. */
+/** Pure geometry and timing for [IndicatorLayer]; unit-tested on the JVM. */
 internal object IndicatorMath {
-    /** Minimum dot weight at the screen edges so the lattice stays faintly visible. */
-    const val FLOOR = 0.15f
+    /** Seconds of one urgent pulse: slow, so even a lost signal stays calm (wave 55; it was 1.2 s). */
+    const val URGENT_PERIOD_S = 3.2f
 
-    private fun smoothstep(a: Float, b: Float, x: Float): Float {
-        val t = ((x - a) / (b - a)).coerceIn(0f, 1f)
-        return t * t * (3f - 2f * t)
-    }
+    /** Where the dots of Edge dots sit: this far in from the screen edge (dp) on the outer ring, and on the inner ring. */
+    const val OUTER_INSET_DP = 7f
+    const val INNER_INSET_DP = 16f
+    const val OUTER_SPACING_DP = 14f
+    const val INNER_SPACING_DP = 20f
 
-    /** Normalised distance from the centre: 0 at the centre, 1 in the corners. [nx], [ny] in -1..1. */
-    fun radial(nx: Float, ny: Float): Float = (hypot(nx, ny) / SQRT2).coerceIn(0f, 1f)
+    /** Corner bloom: dot spacing and the radius of the quarter disc (dp, never more than [CORNER_MAX_FRACTION] of the short side). */
+    const val CORNER_SPACING_DP = 12f
+    const val CORNER_RADIUS_DP = 52f
+    const val CORNER_MAX_FRACTION = 0.14f
 
-    /** Centre-weighted spotlight, 1 near the centre falling smoothly to [FLOOR] at the edges. */
-    fun falloff(nx: Float, ny: Float): Float {
-        val d = radial(nx, ny)
-        return FLOOR + (1f - FLOOR) * (1f - smoothstep(0.12f, 0.9f, d))
-    }
+    /** Bottom glow: the glow's height as a fraction of the window height for a reading [value] (never more than 6 percent). */
+    fun glowHeightFraction(value: Float): Float = 0.02f + 0.04f * value.coerceIn(0f, 1f)
+
+    /** Beam: the lit share of the track for a reading [value]; the track is the middle 76 percent of the edge. */
+    const val BEAM_TRACK_FRACTION = 0.76f
+    const val BEAM_INSET_DP = 3f
+    const val BEAM_WIDTH_DP = 2f
+
+    /** How strong the style is relative to its cap: a quiet 0.7 while healthy, rising to 1 as the value falls; urgent is full. */
+    fun strength(level: Float, urgent: Boolean): Float = if (urgent) 1f else 0.7f + 0.3f * level.coerceIn(0f, 1f)
+
+    /** Brightness factor 0.8..1 of the urgent pulse at clock [t] seconds; steady 1 when not urgent or when motion is reduced (the static frame is full strength). */
+    fun pulse(t: Float, urgent: Boolean, reduced: Boolean): Float =
+        if (!urgent || reduced) 1f else 0.8f + 0.2f * (0.5f + 0.5f * cos(t * TWO_PI / URGENT_PERIOD_S))
+
+    /** 0..1 breath of period [periodS] at [t]; 0.5 (the middle of the breath) when [still]. */
+    fun breath(t: Float, periodS: Float, still: Boolean): Float = if (still) 0.5f else 0.5f - 0.5f * cos(t * TWO_PI / periodS)
 
     /** Brightness 0..1 of a ring of half-[width] centred at [centre], at distance [d]. */
     fun ringWave(d: Float, centre: Float, width: Float): Float {
@@ -59,100 +73,45 @@ internal object IndicatorMath {
 
     fun wrap01(x: Float): Float = x - floor(x)
 
-    /** Seconds of one urgent pulse (the owner spec: about 1.2 s). */
-    const val URGENT_PERIOD_S = 1.2f
-
-    /** Brightness factor 0.7..1 of the urgent pulse at clock [t] seconds; steady 1 when not urgent or when motion is reduced (the static frame is full strength). */
-    fun pulse(t: Float, urgent: Boolean, reduced: Boolean): Float =
-        if (!urgent || reduced) 1f else 0.7f + 0.3f * (0.5f + 0.5f * cos(t * TWO_PI / URGENT_PERIOD_S))
-
-    /** Alpha multiplier of an alert effect: urgent is full strength whatever the slider says (unless it is at zero = off); otherwise it scales with the severity. */
-    fun alertStrength(level: Float, urgent: Boolean, intensity: Float): Float {
-        val k = intensity.coerceIn(0f, 1f)
-        if (k <= 0f) return 0f
-        return if (urgent) 1f else (k * (0.35f + 0.65f * level.coerceIn(0f, 1f))).coerceIn(0f, 1f)
+    /** Point [i] of an evenly spaced walk of [spacing] around the rectangle inset by [inset] inside a [w] x [h] window, as (x, y); the walk starts at the top-left and runs clockwise. */
+    fun perimeterPoint(i: Int, spacing: Float, inset: Float, w: Float, h: Float, out: FloatArray) {
+        val x0 = inset; val y0 = inset; val x1 = w - inset; val y1 = h - inset
+        val rw = x1 - x0; val rh = y1 - y0
+        var s = i * spacing
+        val per = 2f * (rw + rh)
+        s %= per
+        when {
+            s < rw -> { out[0] = x0 + s; out[1] = y0 }
+            s < rw + rh -> { out[0] = x1; out[1] = y0 + (s - rw) }
+            s < 2 * rw + rh -> { out[0] = x1 - (s - rw - rh); out[1] = y1 }
+            else -> { out[0] = x0; out[1] = y1 - (s - 2 * rw - rh) }
+        }
     }
 
-    /** Where the vignette's clear centre ends (fraction of the corner radius): the coloured band thickens from 20 percent to 70 percent of the way in as severity rises. */
-    fun vignetteInner(level: Float): Float = 0.80f - 0.50f * level.coerceIn(0f, 1f)
+    fun perimeterCount(spacing: Float, inset: Float, w: Float, h: Float): Int = (2f * ((w - 2 * inset) + (h - 2 * inset)) / spacing).toInt().coerceAtLeast(0)
 
-    /** The share of the comic lines drawn: a few when low, every one when lost. */
-    fun comicFraction(level: Float, urgent: Boolean): Float = if (urgent) 1f else 0.17f + 0.78f * level.coerceIn(0f, 1f)
-
-    /** Line width multiplier: thin when low, bold when lost. */
-    fun comicWidth(level: Float, urgent: Boolean): Float = if (urgent) 2.2f else 0.8f + 1.0f * level.coerceIn(0f, 1f)
-
-    private val SQRT2 = sqrt(2f)
     private const val TWO_PI = (2.0 * PI).toFloat()
 }
 
-private const val SIZE_BUCKETS = 4
-private const val LEVELS = 6
-private const val TWO_PI = (2.0 * PI).toFloat()
-
-/** Cached lattice + scratch buffers. Rebuilt only when the canvas size / density changes. */
-private class IndicatorCache {
-    var w = -1f
-    var h = -1f
-    var spacing = -1f
-    var n = 0
-    var xs = FloatArray(0)
-    var ys = FloatArray(0)
-    var weight = FloatArray(0)
-    var dist = FloatArray(0)
-    var bucket = ByteArray(0)
-    var level = ByteArray(0)
-    var scratch = FloatArray(0)
-    val comic = ComicLines()
-    var vignette: Brush? = null
-    var vigW = -1f
-    var vigH = -1f
-    var vigColor = 0
-    var vigInner = -1f
-    val paint = android.graphics.Paint().apply {
-        isAntiAlias = true
-        strokeCap = android.graphics.Paint.Cap.ROUND
-        style = android.graphics.Paint.Style.STROKE
-    }
-
-    fun ensure(width: Float, height: Float, spacingPx: Float) {
-        if (width == w && height == h && spacingPx == spacing) return
-        w = width; h = height; spacing = spacingPx
-        val cols = (width / spacingPx).toInt() + 1
-        val rows = (height / spacingPx).toInt() + 1
-        n = cols * rows
-        xs = FloatArray(n); ys = FloatArray(n); weight = FloatArray(n); dist = FloatArray(n)
-        bucket = ByteArray(n); level = ByteArray(n); scratch = FloatArray(n * 2)
-        val ox = (width - (cols - 1) * spacingPx) / 2f
-        val oy = (height - (rows - 1) * spacingPx) / 2f
-        var i = 0
-        for (r in 0 until rows) for (c in 0 until cols) {
-            val x = ox + c * spacingPx
-            val y = oy + r * spacingPx
-            val nx = (x - width / 2f) / (width / 2f)
-            val ny = (y - height / 2f) / (height / 2f)
-            xs[i] = x; ys[i] = y
-            weight[i] = IndicatorMath.falloff(nx, ny)
-            dist[i] = IndicatorMath.radial(nx, ny)
-            val wn = (weight[i] - IndicatorMath.FLOOR) / (1f - IndicatorMath.FLOOR)
-            bucket[i] = (wn * (SIZE_BUCKETS - 1) + 0.5f).toInt().coerceIn(0, SIZE_BUCKETS - 1).toByte()
-            i++
-        }
-    }
+/** The ink of a state: the ramp colour, the fixed urgent red when lost; null when nothing is drawn (a battery reading that is not live). */
+internal fun calmInk(reading: IndicatorReading, severity: IndicatorSeverity, rampArgb: Long): Color? = when {
+    severity.urgent -> Color(IndicatorColors.URGENT_RED.toInt())
+    reading.kind == ReadingKind.Off -> null
+    else -> Color(rampArgb.toInt())
 }
 
 /**
- * The background indicator (wave 35): a calm effect (Dot bloom or Animated dots, lit while the reading is healthy) and an alert effect
- * (Coloured vignette or Comic-book lines: the inverse, invisible while healthy, growing as the value falls, urgent when it is lost), painted in one Canvas.
- * [colorArgb] is the already-resolved ramp colour (see IndicatorColors.argb) for the calm effect; the alert colour comes from [low] / [mid] and the severity
- * ([IndicatorSeverity.of] for [metric] and [reading]); urgent is always red. Zero cost when healthy: the clock only runs for animated dots or an urgent alert,
- * and never under reduced motion (then urgent is one static, full-strength frame).
+ * The calm indicator (wave 55): one of four ambient styles drawn ON TOP of the wallpaper as edge, corner or line accents, never a fill, scrim, vignette or tint, and
+ * never above [CalmStyles.alphaCap] of [intensity] (at most [CalmStyles.MAX_ALPHA]) for any pixel. Healthy is a quiet low-contrast glow in the ramp colour; as the
+ * value falls ([IndicatorSeverity.of] for [metric] and [reading]) the accent grows stronger and moves toward the ramp's amber and red; lost (Signal: offline,
+ * Battery: 5 percent and not charging) it is full strength within the cap, red, with a slow pulse. [CalmStyle.None] and [CalmStyle.Regular] draw nothing.
+ * Motion is slow and the clock runs only while something moves: never under reduced motion, never in battery saver, never when the reading is idle (airplane
+ * mode), when the intensity is zero or when the style is off; then the layer paints one still frame.
  */
 @Composable
 fun IndicatorLayer(
     reading: IndicatorReading,
-    calm: CalmEffect?,
-    alert: AlertEffect?,
+    style: CalmStyle,
     metric: IndicatorMetric,
     colorArgb: Long,
     intensity: Float,
@@ -161,13 +120,11 @@ fun IndicatorLayer(
     low: Long = 0xFFFF4D4D,
     mid: Long = 0xFFFFB347,
 ) {
-    val live = reading.kind == ReadingKind.Live
-    // NFR-14: with system animations off the indicators draw one still frame.
-    val stillIndicators = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    if (!style.ambient) return
+    val still = com.bos.sphere.core.design.rememberMotionPrefs().reduced || rememberBatterySaver() // NFR-14: with system animations off, or in battery saver, one still frame
     val severity = IndicatorSeverity.of(metric, reading)
-    val alertShown = alert != null && severity.active
-    val dotsMove = calm != null && reading.kind != ReadingKind.Off && when (calm) { CalmEffect.AnimatedDots -> live; CalmEffect.Bloom -> true }
-    val needsClock = !stillIndicators && intensity > 0f && (dotsMove || (alertShown && severity.urgent))
+    val ink = calmInk(reading, severity, colorArgb)
+    val needsClock = !still && intensity > 0f && ink != null && reading.kind != ReadingKind.Idle
     val time = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(needsClock) {
         if (!needsClock) return@LaunchedEffect
@@ -177,24 +134,22 @@ fun IndicatorLayer(
             time.floatValue = ((indicatorFrameNanos() - start) / 1_000_000_000.0 % 3600.0).toFloat()
         }
     }
-    val cache = remember { IndicatorCache() }
-    val color = Color(colorArgb.toInt())
-    val alertColor = Color(IndicatorColors.alertArgb(severity, low, mid).toInt())
-
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Canvas(modifier) {
-        val k = intensity.coerceIn(0f, 1f)
-        if (k <= 0f) return@Canvas
+        val cap = CalmStyles.alphaCap(intensity)
+        if (cap <= 0f || ink == null) return@Canvas
         val raw = time.floatValue
-        val t = raw * (0.2f + 1.6f * speed.coerceIn(0f, 1f))
-        val steady = reading.kind == ReadingKind.Idle
-        if (calm != null && reading.kind != ReadingKind.Off) drawDots(cache, calm, color, k, t, steady)
-        if (alertShown) {
-            val strength = IndicatorMath.alertStrength(severity.level, severity.urgent, k) * IndicatorMath.pulse(raw, severity.urgent, stillIndicators)
-            when (alert) {
-                AlertEffect.Vignette -> drawVignette(cache, alertColor, severity.level, strength)
-                AlertEffect.ComicLines -> drawComic(cache, alertColor, severity, strength, raw, stillIndicators || !severity.urgent)
-                null -> Unit
-            }
+        val t = raw * (0.4f + 1.2f * speed.coerceIn(0f, 1f))
+        val s = IndicatorMath.strength(severity.level, severity.urgent) * IndicatorMath.pulse(raw, severity.urgent, still || reading.kind == ReadingKind.Idle)
+        val a = cap * s.coerceIn(0f, 1f)
+        val value = if (reading.kind == ReadingKind.Live) reading.value.let { if (it.isNaN()) 0f else it.coerceIn(0f, 1f) } else 0f
+        val moving = needsClock
+        when (style) {
+            CalmStyle.EdgeDots -> drawEdgeDots(ink, a, t, severity, moving)
+            CalmStyle.CornerBloom -> drawCornerBloom(ink, a, t, moving)
+            CalmStyle.BottomGlow -> drawBottomGlow(ink, a, t, value, severity.urgent, moving)
+            CalmStyle.Beam -> drawBeam(ink, a, t, value, severity.urgent, rtl, moving)
+            CalmStyle.None, CalmStyle.Regular -> Unit
         }
     }
 }
@@ -205,78 +160,80 @@ private suspend fun indicatorFrameNanos(): Long {
     return if (policy != null) policy.onInfiniteOperation { androidx.compose.runtime.withFrameNanos { it } } else androidx.compose.runtime.withFrameNanos { it }
 }
 
-private fun DrawScope.drawVignette(c: IndicatorCache, color: Color, level: Float, strength: Float) {
-    val argb = color.toArgb()
-    val inner = (IndicatorMath.vignetteInner(level) * 32f).toInt() / 32f
-    if (c.vignette == null || c.vigW != size.width || c.vigH != size.height || c.vigColor != argb || c.vigInner != inner) {
-        c.vigW = size.width; c.vigH = size.height; c.vigColor = argb; c.vigInner = inner
-        c.vignette = Brush.radialGradient(
-            0f to Color.Transparent,
-            inner to Color.Transparent,
-            1f to color.copy(alpha = 0.85f),
-            center = Offset(size.width / 2f, size.height / 2f),
-            radius = hypot(size.width, size.height) / 2f,
-        )
-    }
-    drawRect(c.vignette!!, alpha = strength, style = Fill)
-}
-
-private fun DrawScope.drawDots(
-    c: IndicatorCache, calm: CalmEffect, color: Color, k: Float, t: Float, steady: Boolean,
-) {
-    c.ensure(size.width, size.height, 22.dp.toPx())
-    val breathe = calm == CalmEffect.AnimatedDots
-    val bloom = calm == CalmEffect.Bloom
-    // ~4 s per breath at default speed; steady for Idle.
-    val glow = if (steady) 0.6f else if (breathe) 0.35f + 0.65f * (0.5f - 0.5f * cos(t * TWO_PI / 4f)) else 0.5f
-    val width = 0.16f
-    val centre = IndicatorMath.ringCentre(IndicatorMath.wrap01(t / 5f), width)
-    val n = c.n
-    for (i in 0 until n) {
-        val w = c.weight[i]
-        var a = w * glow
-        if (bloom) a += (0.5f + 0.5f * w) * IndicatorMath.ringWave(c.dist[i], centre, width)
-        a = (a * k).coerceIn(0f, 1f)
-        c.level[i] = (if (a < 0.02f) -1 else (a * LEVELS).toInt().coerceAtMost(LEVELS - 1)).toByte()
-    }
-    val paint = c.paint
-    paint.style = android.graphics.Paint.Style.STROKE
-    val base = color.toArgb()
-    val nc = drawContext.canvas.nativeCanvas
-    for (b in 0 until SIZE_BUCKETS) {
-        val radius = (1.0f + 1.4f * b / (SIZE_BUCKETS - 1)).dp.toPx()
-        paint.strokeWidth = radius * 2f
-        for (l in 0 until LEVELS) {
-            var cnt = 0
-            for (i in 0 until n) {
-                if (c.bucket[i].toInt() == b && c.level[i].toInt() == l) {
-                    c.scratch[cnt++] = c.xs[i]; c.scratch[cnt++] = c.ys[i]
-                }
-            }
-            if (cnt == 0) continue
-            val alpha = ((l + 0.5f) / LEVELS * 0.95f * 255f).toInt().coerceIn(0, 255)
-            paint.color = (base and 0x00FFFFFF) or (alpha shl 24)
-            nc.drawPoints(c.scratch, 0, cnt, paint)
+/** Edge dots: two rings of dots just inside the screen edge; a slow swell travels around them. */
+private fun DrawScope.drawEdgeDots(ink: Color, a: Float, t: Float, sev: IndicatorSeverity, moving: Boolean) {
+    val pt = FloatArray(2)
+    val rings = listOf(
+        Triple(IndicatorMath.OUTER_INSET_DP.dp.toPx(), IndicatorMath.OUTER_SPACING_DP.dp.toPx(), 1f),
+        Triple(IndicatorMath.INNER_INSET_DP.dp.toPx(), IndicatorMath.INNER_SPACING_DP.dp.toPx(), 0.6f),
+    )
+    val grow = 1f + sev.level
+    for ((inset, spacing, weight) in rings) {
+        val n = IndicatorMath.perimeterCount(spacing, inset, size.width, size.height)
+        for (i in 0 until n) {
+            IndicatorMath.perimeterPoint(i, spacing, inset, size.width, size.height, pt)
+            val swell = if (sev.urgent || !moving) 0.5f else IndicatorMath.breath(t - 6f * i / n.coerceAtLeast(1), 6f, false)
+            val alpha = a * weight * (0.45f + 0.55f * swell)
+            val r = (1.1f + 1.3f * swell * grow / 2f).dp.toPx()
+            drawCircle(ink.copy(alpha = alpha), r, Offset(pt[0], pt[1]))
         }
     }
 }
 
-/** Comic-book lines as the alert: the deterministic [ComicLines] set, thinned to a few thin lines when low and the full bold ring when lost; static unless [still] is false. */
-private fun DrawScope.drawComic(c: IndicatorCache, color: Color, sev: IndicatorSeverity, strength: Float, raw: Float, still: Boolean) {
-    val lines = c.comic
-    lines.fill(size.width, size.height, (raw * 1000f).toLong(), still, IndicatorMath.comicFraction(sev.level, sev.urgent))
-    val paint = c.paint
-    paint.style = android.graphics.Paint.Style.STROKE
-    paint.strokeCap = android.graphics.Paint.Cap.BUTT
-    val widthK = IndicatorMath.comicWidth(sev.level, sev.urgent)
-    val nc = drawContext.canvas.nativeCanvas
-    val base = color.toArgb()
-    for (cls in 0 until ComicLines.CLASSES) {
-        if (lines.counts[cls] == 0) continue
-        paint.strokeWidth = ComicLines.WIDTH_DP[cls].dp.toPx() * widthK
-        val alpha = ((0.55f + 0.45f * cls / (ComicLines.CLASSES - 1)) * strength * 255f).toInt().coerceIn(0, 255)
-        paint.color = (base and 0x00FFFFFF) or (alpha shl 24)
-        nc.drawLines(lines.buffers[cls], 0, lines.counts[cls], paint)
+/** Corner bloom: quarter discs of dots in the four corners; a ring of light travels slowly outward from each corner. */
+private fun DrawScope.drawCornerBloom(ink: Color, a: Float, t: Float, moving: Boolean) {
+    val spacing = IndicatorMath.CORNER_SPACING_DP.dp.toPx()
+    val radius = min(IndicatorMath.CORNER_RADIUS_DP.dp.toPx(), IndicatorMath.CORNER_MAX_FRACTION * min(size.width, size.height))
+    val width = 0.3f
+    val centre = IndicatorMath.ringCentre(IndicatorMath.wrap01(t / 7f), width)
+    val steps = (radius / spacing).toInt() + 1
+    for (cx in 0..1) for (cy in 0..1) {
+        for (i in 0 until steps) for (j in 0 until steps) {
+            val dx = (i + 0.5f) * spacing; val dy = (j + 0.5f) * spacing
+            val d = hypot(dx, dy)
+            if (d > radius) continue
+            val fall = 1f - d / radius * 0.5f
+            val wave = if (moving) IndicatorMath.ringWave(d / radius, centre, width) else 0.5f
+            val alpha = a * fall * (0.5f + 0.5f * wave)
+            val x = if (cx == 0) dx else size.width - dx
+            val y = if (cy == 0) dy else size.height - dy
+            drawCircle(ink.copy(alpha = alpha), (1.4f + 1.4f * wave).dp.toPx(), Offset(x, y))
+        }
     }
-    paint.strokeCap = android.graphics.Paint.Cap.ROUND
+}
+
+/** Bottom glow: a hair-thin bright line along the bottom edge with a low bloom above it; the bloom's height follows the reading and it breathes slowly. */
+private fun DrawScope.drawBottomGlow(ink: Color, a: Float, t: Float, value: Float, urgent: Boolean, moving: Boolean) {
+    val breathe = if (urgent) 0.5f else IndicatorMath.breath(t, 6f, !moving)
+    val h = size.height * IndicatorMath.glowHeightFraction(if (urgent) 0f else value) * (0.85f + 0.3f * breathe)
+    drawRect(
+        Brush.verticalGradient(0f to Color.Transparent, 1f to ink.copy(alpha = a * 0.7f), startY = size.height - h, endY = size.height),
+        topLeft = Offset(0f, size.height - h), size = Size(size.width, h),
+    )
+    val line = 1.5.dp.toPx()
+    drawRect(
+        Brush.horizontalGradient(0f to Color.Transparent, 0.2f to ink.copy(alpha = a * 0.5f), 0.8f to ink.copy(alpha = a * 0.5f), 1f to Color.Transparent),
+        topLeft = Offset(0f, size.height - line), size = Size(size.width, line),
+    )
+}
+
+/** Edge beam: a thin line down the trailing edge (the right edge, the left one in right-to-left layouts): a faint track and a lit part whose length is the reading, with a soft glow inside it. */
+private fun DrawScope.drawBeam(ink: Color, a: Float, t: Float, value: Float, urgent: Boolean, rtl: Boolean, moving: Boolean) {
+    val inset = IndicatorMath.BEAM_INSET_DP.dp.toPx()
+    val wd = IndicatorMath.BEAM_WIDTH_DP.dp.toPx()
+    val trackLen = size.height * IndicatorMath.BEAM_TRACK_FRACTION
+    val top = (size.height - trackLen) / 2f
+    val x = if (rtl) inset else size.width - inset - wd
+    drawRect(ink.copy(alpha = a * 0.25f), Offset(x, top), Size(wd, trackLen))
+    val frac = if (urgent) 1f else value
+    val lit = trackLen * frac
+    if (lit <= 0f) return
+    val breathe = if (urgent) 0.5f else IndicatorMath.breath(t, 6f, !moving)
+    val k = 0.7f + 0.3f * breathe
+    val glow = 9.dp.toPx()
+    val gx = if (rtl) x else x + wd - glow
+    val glowBrush = if (rtl) Brush.horizontalGradient(0f to ink.copy(alpha = a * 0.35f * k), 1f to Color.Transparent, startX = gx, endX = gx + glow)
+    else Brush.horizontalGradient(0f to Color.Transparent, 1f to ink.copy(alpha = a * 0.35f * k), startX = gx, endX = gx + glow)
+    drawRect(glowBrush, Offset(gx, top + trackLen - lit), Size(glow, lit))
+    drawRect(ink.copy(alpha = a * 0.6f * k), Offset(x, top + trackLen - lit), Size(wd, lit))
 }

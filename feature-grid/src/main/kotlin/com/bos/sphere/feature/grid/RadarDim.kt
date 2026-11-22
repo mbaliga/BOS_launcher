@@ -92,7 +92,7 @@ internal object RadarDim {
 @Composable
 internal fun RadarBackgroundLayer(prefs: LauncherPrefs, wheelZone: () -> Rect?, modifier: Modifier = Modifier) {
     if (prefs.radarBackground == RadarBackground.TrueBlack) {
-        return // W35: the user-selected Alert effect is drawn by the alertLayer slot of the Radar, over this layer
+        return
     }
     val reduced = rememberMotionPrefs().reduced
     val fade = remember { Animatable(if (reduced) 1f else 0f) }

@@ -22,8 +22,8 @@ import com.bos.sphere.core.data.ClockFormat
 import com.bos.sphere.core.data.CornerIconMode
 import com.bos.sphere.core.data.IconShape
 import com.bos.sphere.core.data.IconTint
-import com.bos.sphere.core.data.AlertEffect
-import com.bos.sphere.core.data.CalmEffect
+import com.bos.sphere.core.data.CalmStyle
+import com.bos.sphere.core.data.CalmStyles
 import com.bos.sphere.core.data.IndicatorMetric
 import com.bos.sphere.core.data.PageMode
 import com.bos.sphere.core.data.ThemeMode
@@ -643,23 +643,21 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Indicator"),
         Glyphs.Dial,
         buildList {
-            // Wave 35: one calm effect (Dot bloom or Animated dots) and one alert effect (Coloured vignette or Comic-book lines), each also Off; at most one of each pair.
+            // Wave 55: one calm style (four quiet ambient accents, Regular = the ordinary battery and signal, or Off) and, beside an ambient one, the regular indicators.
+            val shownStyle = CalmStyles.resolve(p.calmStyle, p.wallpaper(WallpaperSurface.Glance).kind)
             add(
                 SettingItem.Choice(
-                    x("Calm effect"), Glyphs.Dial, listOf<CalmEffect?>(null, *CalmEffect.entries.toTypedArray()), p.indicatorCalm, { if (it == null) x("Off") else x(it.label) },
-                    hint = x("Lit while the value is healthy: red, amber, green."),
-                ) { v -> upd { it.copy(indicatorCalm = v) } }.asCards({ SettingsArtLook.calm.art(it) }, "cfg.calm"),
+                    x("Calm style"), Glyphs.Dial, CalmStyle.entries, shownStyle, { x(it.label) },
+                    hint = x("Quiet accents at the screen edge that never cover your wallpaper, or the regular battery and signal indicators at the top."),
+                ) { v -> upd { it.copy(calmStyle = v) } }.asCards({ SettingsArtLook.calm.art(it) }, "cfg.calm"),
             )
-            add(
-                SettingItem.Choice(
-                    x("Alert effect"), Glyphs.Bolt, listOf<AlertEffect?>(null, *AlertEffect.entries.toTypedArray()), p.indicatorAlert, { if (it == null) x("Off") else x(it.label) },
-                    hint = x("Alert effects only appear when the value is low, and become urgent when it is lost."),
-                ) { v -> upd { it.copy(indicatorAlert = v) } }.asCards({ SettingsArtLook.alert.art(it) }, "cfg.alert"),
-            )
+            if (shownStyle.ambient) {
+                add(SettingItem.Toggle(x("Also show regular battery and signal"), Glyphs.Dial, p.calmAlsoRegular, x("The small battery with its percentage and the signal bars at the top of the home, beside the calm style.")) { v -> upd { it.copy(calmAlsoRegular = v) } })
+            }
             add(
                 SettingItem.Choice(
                     x("Show"), Glyphs.Dial, IndicatorMetric.entries, p.indicatorMetric, { x(it.label) },
-                    hint = x("What the effects map to: the signal level, or the battery (charging counts as healthy)."),
+                    hint = x("What the calm style shows: the signal level, or the battery (charging counts as healthy)."),
                 ) { v -> upd { it.copy(indicatorMetric = v) } }.asCards({ SettingsArtLook.metric.art(it) }, "cfg.metric"),
             )
             add(SettingItem.Slider(x("Glow: intensity"), Glyphs.Dial, p.indicatorIntensity, 0f..1f, pct(p.indicatorIntensity)) { v -> upd { it.copy(indicatorIntensity = v) } })

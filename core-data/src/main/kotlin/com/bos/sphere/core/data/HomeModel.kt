@@ -150,7 +150,7 @@ enum class AppsOnHome(val label: String) { Everything("All apps"), PinnedOnly("O
 /** One page or many. */
 enum class PageMode(val label: String) { Multiple("Multiple pages"), Single("One page") }
 
-/** What the signal effects read out (wave 35): the connectivity level or the battery level; every other old measurement migrates to [Signal]. */
+/** What the calm style reads out: the connectivity level or the battery level; every other old measurement migrates to [Signal]. */
 enum class IndicatorMetric(val label: String) {
     Signal("Signal"),
     Battery("Battery"),
@@ -348,10 +348,9 @@ data class LauncherPrefs(
 
     // --- indicator (the background dots and effects)
     val indicatorMetric: IndicatorMetric = IndicatorMetric.Signal,
-    /** Wave 35: the calm effect (healthy = lit) and the alert effect (inverse: appears when low, urgent when lost); each may be off, so an invalid pair cannot be stored. */
-    val indicatorCalm: CalmEffect? = CalmEffect.AnimatedDots,
-    val indicatorAlert: AlertEffect? = null,
-    /** ARGB colours for low / middle / high readings, plus idle (airplane / fixed). */
+    /** Wave 55: how signal and battery state shows: one calm style (null = never chosen, so the wallpaper decides, see [CalmStyles.resolve]) and, beside an ambient one, the regular indicators. */
+    val calmStyle: CalmStyle? = null,
+    val calmAlsoRegular: Boolean = false,
     val indicatorLow: Long = 0xFFFF4D4D,
     val indicatorMid: Long = 0xFFFFB347,
     val indicatorHigh: Long = 0xFF6BFF8F,

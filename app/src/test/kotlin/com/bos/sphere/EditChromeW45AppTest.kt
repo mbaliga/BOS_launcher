@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -147,12 +148,23 @@ class EditChromeW45AppTest : TourBase() {
         assertEquals("undo takes the page away again", 2, pages().size)
     }
 
-    @Test fun HOM_12_theAppsChipOpensThePickerAndAPickPlacesTheAppOnTheCurrentPage() {
+    @Test fun HOM_12_theAppsChipOpensTheCarouselInPlaceAndATapPlacesTheAppOnTheCurrentPage() {
         start(); enterEdit()
         rule.onNodeWithTag("edit.tray.apps", useUnmergedTree = true).performClick(); settle()
-        assertTrue("the app picker", textShown("Add an app"))
-        rule.onNodeWithText("App 07").performClick(); settle()
+        assertTrue("the carousel is open above the tray, one layer (no picker dialog)", tagShown("edit.browser") && !textShown("Add an app"))
+        rule.onNodeWithContentDescription("Filter apps").performTextInput("App 07"); settle()
+        rule.onNodeWithContentDescription("Add to home: App 07").performClick(); settle()
         assertTrue("placed", key(7) in pages()[0])
+    }
+
+    @Test fun HOM_12_theWidgetsChipOpensThePreviewCarouselDirectlyNotASheet() {
+        start(); enterEdit()
+        rule.onNodeWithTag("edit.tray.widgets", useUnmergedTree = true).performClick(); settle()
+        assertTrue("the widget carousel is open in place", tagShown("edit.browser") && tagShown("widget.browser"))
+        assertFalse("no second layer: the old picker dialog did not open", textShown("Add a widget"))
+        rule.onNodeWithTag("edit.browser.done", useUnmergedTree = true).performClick(); settle()
+        assertFalse("Done closes it", tagShown("edit.browser"))
+        assertTrue("and edit mode goes on", tagShown("edit.tray"))
     }
 
     @Test fun HOM_12_theTitleOpensThePageEditorAndTheOldBarComesBack() {

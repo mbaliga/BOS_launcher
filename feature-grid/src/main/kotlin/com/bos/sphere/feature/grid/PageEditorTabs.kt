@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,7 +107,7 @@ fun PageEditorContent(
     drag: AddCarouselDrag,
     focusRequester: FocusRequester?,
     onAddApp: (AppEntry) -> Unit,
-    onWidget: () -> Unit,
+    onWidget: (WidgetChoice) -> Unit,
     onFolder: () -> Unit,
     onShortcut: () -> Unit,
     onLink: () -> Unit,
@@ -115,6 +115,8 @@ fun PageEditorContent(
     onGroup: (() -> Unit)?,
     settings: PageEditorSettingsActions,
     modifier: Modifier = Modifier,
+    /** W51: where the Widgets tab gets its providers; the default loads the device's (tests pass a fixed list). */
+    widgetSource: @Composable () -> List<WidgetChoice>? = { rememberWidgetChoices() },
 ) {
     Box(modifier.semantics { contentDescription = L10n.tr("Add to home") }) {
         if (page == null && tab != EditorTab.Settings) {
@@ -123,10 +125,7 @@ fun PageEditorContent(
         }
         when (tab) {
             EditorTab.Apps -> AppsContent(apps, onHome, hasWork, isWork, drag, focusRequester, onAddApp)
-            EditorTab.Widgets -> Column(Modifier.padding(horizontal = 12.dp).verticalScrollable(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(L10n.tr("Widgets go on the page being edited."), color = HyleColors.InkDim, fontSize = 13.sp)
-                ActionTile(L10n.tr("Choose a widget"), onWidget)
-            }
+            EditorTab.Widgets -> WidgetBrowser(onPick = onWidget, choices = widgetSource()) // W51: the previews are the tab; a tap adds to the page being edited
             EditorTab.Folders -> Column(Modifier.padding(horizontal = 12.dp).verticalScrollable(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActionTile(L10n.tr("New folder"), onFolder)
                 ActionTile(L10n.tr("App shortcut"), onShortcut)
@@ -152,66 +151,82 @@ private fun ActionTile(label: String, onClick: () -> Unit) {
     ) { Text(label, color = HyleColors.InkBright, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) }
 }
 
+/**
+ * The Apps tab and the tray's Apps panel (W51): a filter field that never takes focus on its own (the keyboard rises only when it is tapped, and the host lifts
+ * the panel over the keyboard), and the apps as a sideways carousel of large icons, two rows when [AppsContent]'s height allows. [focusRequester] goes to the
+ * first icon (keyboard or controller focus on open), never to the field. A null [drag] means no drag-out (the tray: the page is edited directly).
+ */
 @Composable
-private fun AppsContent(
+internal fun AppsContent(
     apps: List<AppEntry>, onHome: Set<String>, hasWork: Boolean, isWork: (AppEntry) -> Boolean,
-    drag: AddCarouselDrag, focusRequester: FocusRequester?, onAddApp: (AppEntry) -> Unit,
+    drag: AddCarouselDrag?, focusRequester: FocusRequester?, onAddApp: (AppEntry) -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var scope by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            BasicTextField(
-                value = query, onValueChange = { query = it }, singleLine = true,
-                textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 14.sp), cursorBrush = SolidColor(HyleColors.Violet),
-                modifier = Modifier.weight(1f).defaultMinSize(minHeight = 40.dp).background(HyleColors.InkDim.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 10.dp)
-                    .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
-                    .semantics { contentDescription = L10n.tr("Filter apps") },
-                decorationBox = { inner -> Box { if (query.isEmpty()) Text(L10n.tr("Filter apps"), color = HyleColors.Ink, fontSize = 14.sp); inner() } },
-            )
-        }
-        if (hasWork) Row(Modifier.padding(horizontal = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf<Pair<Boolean?, String>>(null to "All", false to "Personal", true to "Work").forEach { (v, l) ->
-                val on = scope == v
-                Text(
-                    L10n.tr(l), fontSize = 12.sp, color = if (on) HyleColors.OnAccent else HyleColors.Ink,
-                    modifier = Modifier.background(if (on) HyleColors.Violet else HyleColors.InkDim.copy(alpha = 0.14f), RoundedCornerShape(50))
-                        .clickable { scope = v }.padding(horizontal = 12.dp, vertical = 8.dp).semantics { role = Role.Tab; selected = on },
+    val shown = remember(apps, onHome, query, scope) { AddCarouselModel.apps(apps, onHome, query, scope, isWork) }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().testTag("apps.browser")) {
+        val fieldH = 44.dp
+        val gridH = maxHeight - fieldH
+        val rows = if (gridH >= APP_TILE_H * 2 + 4.dp) 2 else 1
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                BasicTextField(
+                    value = query, onValueChange = { query = it }, singleLine = true,
+                    textStyle = TextStyle(color = HyleColors.InkBright, fontSize = 14.sp), cursorBrush = SolidColor(HyleColors.Violet),
+                    modifier = Modifier.weight(1f).height(40.dp).background(HyleColors.InkDim.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(horizontal = 14.dp)
+                        .testTag("apps.filter").semantics { contentDescription = L10n.tr("Filter apps") },
+                    decorationBox = { inner -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) { if (query.isEmpty()) Text(L10n.tr("Filter apps"), color = HyleColors.Ink, fontSize = 14.sp); inner() } },
                 )
+                if (hasWork) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf<Pair<Boolean?, String>>(null to "All", false to "Personal", true to "Work").forEach { (v, l) ->
+                        val on = scope == v
+                        Text(
+                            L10n.tr(l), fontSize = 12.sp, color = if (on) HyleColors.OnAccent else HyleColors.Ink,
+                            modifier = Modifier.defaultMinSize(minHeight = 40.dp).clip(RoundedCornerShape(50)).background(if (on) HyleColors.Violet else HyleColors.InkDim.copy(alpha = 0.14f))
+                                .clickable(role = Role.Tab) { scope = v }.padding(horizontal = 12.dp, vertical = 10.dp).semantics { role = Role.Tab; selected = on },
+                        )
+                    }
+                }
             }
-        }
-        val shown = remember(apps, onHome, query, scope) { AddCarouselModel.apps(apps, onHome, query, scope, isWork) }
-        if (shown.isEmpty()) {
-            Text(L10n.tr(if (apps.isEmpty()) "No apps to add" else "Nothing to add here"), color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp))
-        } else {
-            LazyVerticalGrid(GridCells.Adaptive(64.dp), Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
-                items(shown, key = { it.key }) { app -> EditorAppTile(app, onAddApp, drag) }
+            if (shown.isEmpty()) {
+                Text(L10n.tr(if (apps.isEmpty()) "No apps to add" else "Nothing to add here"), color = HyleColors.InkDim, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp))
+            } else {
+                androidx.compose.foundation.lazy.grid.LazyHorizontalGrid(
+                    androidx.compose.foundation.lazy.grid.GridCells.Fixed(rows), Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    itemsIndexed(shown, key = { _, a -> a.key }) { i, app -> EditorAppTile(app, onAddApp, drag, if (i == 0) focusRequester else null) }
+                }
             }
         }
     }
 }
 
+private val APP_TILE_H = 84.dp
+
 /** An app in the Apps tab: a tap adds it to the page being edited; a long press drags it onto a page card (the host hit-tests the drop). */
 @Composable
-private fun EditorAppTile(app: AppEntry, onAdd: (AppEntry) -> Unit, drag: AddCarouselDrag) {
+private fun EditorAppTile(app: AppEntry, onAdd: (AppEntry) -> Unit, drag: AddCarouselDrag?, focusRequester: FocusRequester?) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     Column(
-        Modifier.defaultMinSize(minHeight = 48.dp)
+        Modifier.width(76.dp).height(APP_TILE_H).clip(RoundedCornerShape(14.dp))
             .onGloballyPositioned { origin = it.positionInWindow() }
-            .pointerInput(app.key) {
+            .let { m -> if (drag == null) m else m.pointerInput(app.key) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { p -> drag.app = app; drag.pos = origin + p },
                     onDrag = { change, amount -> change.consume(); drag.pos += amount },
                     onDragEnd = { val at = drag.pos; drag.app = null; drag.onDrop?.invoke(app, at) },
                     onDragCancel = { drag.app = null },
                 )
-            }
+            } }
+            .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
+            .launcherItem("addbrowse.app.${app.key}", focusable = false, onActivate = { onAdd(app) }, ringRadiusDp = 14f)
             .clickable(onClickLabel = L10n.tr("Add to home")) { onAdd(app) }
             .padding(4.dp)
             .semantics { role = Role.Button; contentDescription = L10n.tr("Add to home") + ": " + app.label },
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        AppIcon(app, 44.dp)
+        AppIcon(app, 48.dp)
         Text(app.label, color = HyleColors.InkBright, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

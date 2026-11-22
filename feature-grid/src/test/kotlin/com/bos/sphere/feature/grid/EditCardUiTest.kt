@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -175,11 +177,11 @@ class EditCardUiTest {
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun HOM_04_tabsReachWidgetsFoldersAndShortcuts() {
         val c = Calls(); host(c, threePages, landscape = false)
-        rule.onNodeWithText("Widgets").performClick(); rule.onNodeWithText("Choose a widget").performClick()
+        rule.onNodeWithText("Widgets").performClick(); rule.onAllNodesWithText("Choose a widget").assertCountEquals(0); rule.onNodeWithTag(WidgetBrowserTags.BROWSER).assertIsDisplayed()
         rule.onNodeWithText("Folders").performClick(); rule.onNodeWithText("New folder").performClick()
         rule.onNodeWithText("Shortcuts").performClick(); rule.onNodeWithText("App shortcut").assertIsDisplayed(); rule.onNodeWithText("Web link").assertIsDisplayed(); rule.onNodeWithText("File").assertIsDisplayed()
         rule.onNodeWithText("App group").performClick(); assertEquals(1, c.group) // WSP-05
-        assertEquals(1, c.widget); assertEquals(1, c.folder)
+        assertEquals(1, c.folder)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

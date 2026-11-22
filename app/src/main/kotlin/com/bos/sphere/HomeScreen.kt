@@ -383,7 +383,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var showEditHint by remember { mutableStateOf(false) }
     LaunchedEffect(homeEdit.active) { showEditHint = if (homeEdit.active) editHintStore.registerEntry() else false } // the counter is written on entry (a handler), never in composition
     LaunchedEffect(pageEditorOn) { if (pageEditorOn) showEditHint = false }
-    var addAppOpen by remember { mutableStateOf(false) }
     val sounds = remember { UiSounds() }
     DisposableEffect(Unit) { onDispose { sounds.release() } }
     sounds.enabled = prefs.uiSounds
@@ -1868,27 +1867,26 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             state = chromeState,
             onUndo = { homeEdit.undo() }, onRedo = { homeEdit.redo() },
             onDone = { homeEdit.exit() }, onCancel = { homeEdit.cancel() },
-            onApps = { addAppOpen = true }, onWidgets = { homeItems.widgetRequest++ }, onFolders = { homeItems.folderOpen = true },
+            onFolders = { homeItems.folderOpen = true },
             onAddPage = { editCard.addPage() },
             onOpenPageEditor = { pageEditorOn = true },
             touchSignal = glanceWake.intValue,
+            // W51 (addBrowse): the tray's Apps and Widgets chips open the carousel in place; a tap places the app on the page being edited, a widget goes through the picker's bind and configure flow.
+            apps = apps,
+            onHome = remember(layout, extrasState) { layout.pages.flatMapTo(HashSet()) { it.keys } + extrasState.folders.values.flatMapTo(HashSet()) { it.keys } },
+            hasWork = remember(apps) { apps.any { it.user != android.os.Process.myUserHandle() } },
+            isWork = { it.user != android.os.Process.myUserHandle() },
+            onAddApp = { app ->
+                val at = (if (prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous) editCard.contSel.intValue else gridState.currentPage).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+                val placed = com.bos.sphere.core.data.AddCarouselModel.place(pages, app.key, at, capacityOf)
+                if (placed == null) android.widget.Toast.makeText(context, L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show()
+                else {
+                    stores.layout.replace(layout.copy(pages = com.bos.sphere.core.data.HomeLayoutMath.toStored(placed, layout.pages, preserve), removed = layout.removed - app.key, seeded = true))
+                    stores.layout.markExplicit()
+                }
+            },
+            onAddWidget = { homeItems.widgetChoice = it },
         )
-        if (addAppOpen) {
-            com.bos.sphere.feature.grid.AppPickerDialog(
-                title = L10n.tr("Add an app"), apps = apps, suggested = emptySet(),
-                onPick = { app ->
-                    addAppOpen = false
-                    val at = (if (prefs.homePages == com.bos.sphere.core.data.HomePages.Continuous) editCard.contSel.intValue else gridState.currentPage).coerceIn(0, (pages.size - 1).coerceAtLeast(0))
-                    val placed = com.bos.sphere.core.data.AddCarouselModel.place(pages, app.key, at, capacityOf)
-                    if (placed == null) android.widget.Toast.makeText(context, L10n.tr("Page full. Add a page or remove an item."), android.widget.Toast.LENGTH_SHORT).show()
-                    else {
-                        stores.layout.replace(layout.copy(pages = com.bos.sphere.core.data.HomeLayoutMath.toStored(placed, layout.pages, preserve), removed = layout.removed - app.key, seeded = true))
-                        stores.layout.markExplicit()
-                    }
-                },
-                onDismiss = { addAppOpen = false },
-            )
-        }
         if (!prefs.onboardingDone) {
             com.bos.sphere.ui.Onboarding(
                 prefs = prefs,

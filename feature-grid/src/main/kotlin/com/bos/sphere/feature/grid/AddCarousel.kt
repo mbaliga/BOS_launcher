@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,7 +75,7 @@ fun AddCarousel(
     hasWork: Boolean,
     isWork: (AppEntry) -> Boolean,
     onAddApp: (AppEntry) -> Unit,
-    onWidget: () -> Unit,
+    onWidget: (WidgetChoice) -> Unit,
     onFolder: () -> Unit,
     onShortcut: () -> Unit,
     onLink: () -> Unit,
@@ -134,7 +135,7 @@ fun AddCarousel(
                     }
                 }
             }
-            AddTab.Widgets -> ActionRow(listOf(L10n.tr("Choose a widget") to onWidget))
+            AddTab.Widgets -> Box(Modifier.fillMaxWidth().height(if (compact) 150.dp else 190.dp)) { WidgetBrowser(onPick = onWidget) }
             AddTab.Folders -> ActionRow(listOf(L10n.tr("New folder") to onFolder))
             AddTab.Shortcuts -> ActionRow(listOf(L10n.tr("App shortcut") to onShortcut, L10n.tr("Web link") to onLink, L10n.tr("File") to onFile) + listOfNotNull(onGroup?.let { L10n.tr("App group") to it }))
         }

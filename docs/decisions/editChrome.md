@@ -33,3 +33,6 @@ Portrait scale is exactly 0.88. The page is centred and eased down by half of wh
 
 ## Wave 47 (editIntegrate)
 The bar is `EditTopBar` (extracted) and the page editor draws it too; `HomeEditBar` is deleted. `EditGridState.update(rect)` is called by the handles' ghost and the page's drag. `EditCancelDialog` is shared with the page editor. See `editIntegrate.md`.
+
+## Wave 51 (addBrowse)
+The tray's Apps and Widgets chips no longer open dialogs: they open the in-place carousel above the tray (`addBrowse.md`).

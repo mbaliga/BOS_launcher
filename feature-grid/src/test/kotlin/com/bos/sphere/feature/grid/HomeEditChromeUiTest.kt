@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Color as AColor
 import android.view.KeyEvent as AKeyEvent
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -35,6 +37,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
@@ -85,10 +89,11 @@ class HomeEditChromeUiTest {
     @After fun reset() = ReducedMotionTesting.force(null)
 
     private class Calls {
-        var undo = 0; var redo = 0; var done = 0; var cancel = 0; var apps = 0; var widgets = 0; var folders = 0; var page = 0; var editor = 0
+        var undo = 0; var redo = 0; var done = 0; var cancel = 0; val addedApps = ArrayList<String>(); val addedWidgets = ArrayList<String>(); var folders = 0; var page = 0; var editor = 0
         val said = ArrayList<String>()
     }
     private var calls = Calls()
+    private val trayApps = listOf("Alpha", "Bravo", "Camera", "Dial", "Echo", "Files").map { l -> com.bos.sphere.core.data.AppEntry("demo.$l", android.content.ComponentName("demo.$l", "demo.$l.Main"), l, android.os.Process.myUserHandle()) { android.graphics.drawable.ColorDrawable(0xFF3070D0.toInt()) } }
     private var rtl = false
     private var hasChanges by mutableStateOf(false)
     private var showHint by mutableStateOf(true)
@@ -115,13 +120,15 @@ class HomeEditChromeUiTest {
                     // a clickable at the page's top-left corner stands for a hotspot
                     Box(Modifier.fillMaxSize().padding0(page)) { Box(Modifier.size(40.dp).testTag("hotspot").clickable { behindClicks++ }) }
                     Box(Modifier.align(Alignment.Center).size(60.dp).testTag("item").clickable { behindClicks += 100 })
+                    Box(Modifier.align(Alignment.TopCenter).offset(y = 150.dp).size(60.dp).testTag("item.top").clickable { behindClicks += 1000 })
                     EditFixedChromeShield(page)
                     HomeEditChrome(
                         visible = active, progress = prog, page = page, pageIndex = pageIndex, pageCount = 4,
                         undoCount = undoCount, redoCount = redoCount, canUndo = undoCount > 0, canRedo = redoCount > 0,
                         hasChanges = hasChanges, showHint = showHint, showAddPage = showAddPage, trayBottomDp = 8f, state = chromeState,
                         onUndo = { calls.undo++ }, onRedo = { calls.redo++ }, onDone = { calls.done++ }, onCancel = { calls.cancel++ },
-                        onApps = { calls.apps++ }, onWidgets = { calls.widgets++ }, onFolders = { calls.folders++ }, onAddPage = { calls.page++ },
+                        onFolders = { calls.folders++ }, onAddPage = { calls.page++ },
+                        apps = trayApps, onAddApp = { calls.addedApps += it.label }, onAddWidget = { calls.addedWidgets += it.label }, widgetSource = { fakeWidgets },
                         onOpenPageEditor = { calls.editor++ }, touchSignal = touch, announce = { calls.said += it },
                     )
                 }
@@ -270,12 +277,80 @@ class HomeEditChromeUiTest {
     // ---- tray
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
-    fun HOM_12_theTrayChipsOpenTheAppsWidgetsAndFoldersPickersAndAddAPage() {
+    fun HOM_12_theTrayChipsAreWideTargetsAndFoldersAndPageStillAct() {
         content()
         rule.onNodeWithTag(EditChromeTags.TRAY).assertIsDisplayed().assertHeightIsAtLeast(72.dp)
-        listOf(EditChromeTags.CHIP_APPS, EditChromeTags.CHIP_WIDGETS, EditChromeTags.CHIP_FOLDERS, EditChromeTags.CHIP_PAGE).forEach { rule.onNodeWithTag(it).assertHeightIsAtLeast(48.dp).performClick() }
-        assertEquals(1, calls.apps); assertEquals(1, calls.widgets); assertEquals(1, calls.folders); assertEquals(1, calls.page)
+        listOf(EditChromeTags.CHIP_APPS, EditChromeTags.CHIP_WIDGETS, EditChromeTags.CHIP_FOLDERS, EditChromeTags.CHIP_PAGE).forEach { rule.onNodeWithTag(it).assertHeightIsAtLeast(48.dp).assertIsDisplayed() }
+        rule.onNodeWithTag(EditChromeTags.CHIP_FOLDERS).performClick(); rule.onNodeWithTag(EditChromeTags.CHIP_PAGE).performClick()
+        assertEquals(1, calls.folders); assertEquals(1, calls.page)
         rule.onNodeWithContentDescription("Add page").assertHasClickAction()
+    }
+
+    // ---- W51 (addBrowse): the chips open the visual carousel in place, one layer, whatever the page holds
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_addBrowse01_theWidgetsChipOpensThePreviewCarouselDirectlyAboveTheTrayAndATapAddsTheWidget() {
+        content()
+        rule.onNodeWithTag(EditChromeTags.BROWSER).assertDoesNotExist()
+        rule.onNodeWithTag(EditChromeTags.CHIP_WIDGETS).performClick()
+        rule.onNodeWithTag(EditChromeTags.BROWSER).assertIsDisplayed()
+        // the previews are right there: no "Choose a widget" row, no sheet; each card says its name and its size
+        rule.onAllNodesWithText("Choose a widget").assertCountEquals(0)
+        rule.onNodeWithTag(WidgetBrowserTags.CARD_PREFIX + "0").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithText("Big clock").assertIsDisplayed(); rule.onNodeWithText("5x2").assertIsDisplayed()
+        // directly above the tray
+        assertTrue(rule.onNodeWithTag(EditChromeTags.BROWSER).getUnclippedBoundsInRoot().bottom <= rule.onNodeWithTag(EditChromeTags.TRAY).getUnclippedBoundsInRoot().top + 1.dp)
+        rule.onNodeWithTag(EditChromeTags.CHIP_WIDGETS).assertIsSelected()
+        rule.onNodeWithTag(WidgetBrowserTags.CARD_PREFIX + "0").performClick()
+        assertEquals(listOf("Big clock"), calls.addedWidgets)
+        shoot("addBrowse_tray_widgets")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_addBrowse02_theAppsChipOpensTheIconCarouselAndATapPlacesTheApp() {
+        content()
+        rule.onNodeWithTag(EditChromeTags.CHIP_APPS).performClick()
+        rule.onNodeWithTag(EditChromeTags.BROWSER).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Filter apps").assertIsNotFocused() // no keyboard on open
+        rule.onNodeWithContentDescription("Add to home: Camera").assertIsDisplayed().performClick()
+        assertEquals(listOf("Camera"), calls.addedApps)
+        shoot("addBrowse_tray_apps")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_addBrowse03_theChipsSwitchTheCarouselAndTheSameChipOrDoneClosesIt() {
+        content()
+        rule.onNodeWithTag(EditChromeTags.CHIP_APPS).performClick(); rule.onNodeWithText("Add apps").assertIsDisplayed()
+        rule.onNodeWithTag(EditChromeTags.CHIP_WIDGETS).performClick(); rule.onNodeWithText("Add widgets").assertIsDisplayed(); rule.onNodeWithText("Add apps").assertDoesNotExist()
+        rule.onNodeWithTag(EditChromeTags.CHIP_WIDGETS).performClick(); rule.onNodeWithTag(EditChromeTags.BROWSER).assertDoesNotExist()
+        rule.onNodeWithTag(EditChromeTags.CHIP_APPS).performClick()
+        rule.onNodeWithTag(EditChromeTags.BROWSER_DONE).assertHeightIsAtLeast(48.dp).performClick()
+        rule.onNodeWithTag(EditChromeTags.BROWSER).assertDoesNotExist()
+        assertEquals(0, calls.cancel) // closing the carousel is not leaving edit mode
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_addBrowse04_backClosesTheCarouselFirstAndATouchOutsideClosesItWithoutBlockingThePage() {
+        content()
+        rule.onNodeWithTag(EditChromeTags.CHIP_WIDGETS).performClick(); rule.onNodeWithTag(EditChromeTags.BROWSER).assertIsDisplayed()
+        back()
+        rule.onNodeWithTag(EditChromeTags.BROWSER).assertDoesNotExist(); assertEquals(0, calls.cancel)
+        rule.onNodeWithTag(EditChromeTags.CHIP_APPS).performClick(); rule.onNodeWithTag(EditChromeTags.BROWSER).assertIsDisplayed()
+        touch++; rule.waitForIdle() // the touch on the chip itself (inside the tray) bumps the home's signal: the carousel stays
+        rule.onNodeWithTag(EditChromeTags.BROWSER).assertIsDisplayed()
+        touch++ // the home's touch observer fires for a touch outside the tray: the carousel closes, the touch itself still reaches the page
+        rule.waitForIdle()
+        rule.onNodeWithTag(EditChromeTags.BROWSER).assertDoesNotExist()
+        rule.onNodeWithTag("item.top").performClick(); assertEquals(1000, behindClicks)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_addBrowse05_theChipsAreThereWithAFullPageAndTheCarouselLeavesTheItemsTouchable() {
+        // the stand-in page is full of items (the grid, the hotspots, an item in the middle): the tray and its chips are still shown, and the carousel opens
+        content(); rule.onNodeWithTag("item").assertIsDisplayed()
+        listOf(EditChromeTags.CHIP_APPS, EditChromeTags.CHIP_WIDGETS, EditChromeTags.CHIP_FOLDERS).forEach { rule.onNodeWithTag(it).assertIsDisplayed() }
+        rule.onNodeWithTag(EditChromeTags.CHIP_APPS).performClick()
+        rule.onNodeWithTag("item.top").performClick(); assertEquals(1000, behindClicks) // not behind a scrim: the page above the carousel takes touches as before
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

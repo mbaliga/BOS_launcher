@@ -78,12 +78,14 @@ object WidgetConfigureResults {
 }
 
 /** Handle returned by [rememberWidgetPicker]; [launch] opens the in-app widget picker. */
-class WidgetPickerLauncher internal constructor(private val onLaunch: () -> Unit) {
+class WidgetPickerLauncher internal constructor(private val onLaunch: () -> Unit, private val onChoose: (WidgetChoice) -> Unit = {}) {
     fun launch() = onLaunch()
+    /** W51: adds a widget chosen in an in-place browser ([WidgetBrowser]): allocate, bind, configure, then the same `onPicked` as the dialog. No second sheet. */
+    fun add(choice: WidgetChoice) = onChoose(choice)
 }
 
 /** One installed provider as shown in the picker. */
-internal data class WidgetChoice(
+data class WidgetChoice(
     val info: AppWidgetProviderInfo,
     val label: String,
     val appLabel: String,
@@ -196,7 +198,8 @@ fun rememberWidgetPicker(
         )
     }
 
-    return remember { WidgetPickerLauncher { showPicker = true } }
+    val latestBegin by rememberUpdatedState(::begin)
+    return remember { WidgetPickerLauncher({ showPicker = true }, { c -> latestBegin(c) }) }
 }
 
 internal const val REQUEST_CONFIGURE = 0x5349
@@ -320,25 +323,8 @@ private val PreviewH = 64.dp
 
 @Composable
 private fun WidgetChoiceRow(choice: WidgetChoice, onClick: () -> Unit) {
-    val context = LocalContext.current
     val info = choice.info
-    val dpi = context.resources.displayMetrics.densityDpi
-    val pxW = (PreviewW.value * context.resources.displayMetrics.density).roundToInt()
-    val pxH = (PreviewH.value * context.resources.displayMetrics.density).roundToInt()
-    val preview by produceState<ImageBitmap?>(null, info) {
-        value = withContext(Dispatchers.Default) {
-            runCatching {
-                val d = info.loadPreviewImage(context, dpi) ?: info.loadIcon(context, dpi) ?: return@runCatching null
-                val iw = d.intrinsicWidth.takeIf { it > 0 } ?: pxW
-                val ih = d.intrinsicHeight.takeIf { it > 0 } ?: pxH
-                val scale = min(pxW.toFloat() / iw, pxH.toFloat() / ih).coerceAtMost(1f)
-                d.toBitmap(
-                    (iw * scale).roundToInt().coerceAtLeast(1),
-                    (ih * scale).roundToInt().coerceAtLeast(1),
-                ).asImageBitmap()
-            }.getOrNull()
-        }
-    }
+    val preview = rememberWidgetPreview(info, PreviewW, PreviewH)
     val tileShape = RoundedCornerShape(12.dp)
     Row(
         Modifier
@@ -400,3 +386,42 @@ private fun sizeHint(info: AppWidgetProviderInfo): String =
     } else {
         ""
     }
+
+/** W51: the preview bitmap of a provider (its preview image, else its icon), loaded off the main thread and fitted into [w] x [h]; null while loading or when there is none. Shared by the dialog and [WidgetBrowser]. */
+@Composable
+internal fun rememberWidgetPreview(info: AppWidgetProviderInfo, w: androidx.compose.ui.unit.Dp, h: androidx.compose.ui.unit.Dp): ImageBitmap? {
+    val context = LocalContext.current
+    val dpi = context.resources.displayMetrics.densityDpi
+    val pxW = (w.value * context.resources.displayMetrics.density).roundToInt()
+    val pxH = (h.value * context.resources.displayMetrics.density).roundToInt()
+    val preview by produceState<ImageBitmap?>(null, info) {
+        value = withContext(Dispatchers.Default) {
+            runCatching {
+                val d = info.loadPreviewImage(context, dpi) ?: info.loadIcon(context, dpi) ?: return@runCatching null
+                val iw = d.intrinsicWidth.takeIf { it > 0 } ?: pxW
+                val ih = d.intrinsicHeight.takeIf { it > 0 } ?: pxH
+                val scale = min(pxW.toFloat() / iw, pxH.toFloat() / ih).coerceAtMost(1f)
+                d.toBitmap(
+                    (iw * scale).roundToInt().coerceAtLeast(1),
+                    (ih * scale).roundToInt().coerceAtLeast(1),
+                ).asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    return preview
+}
+
+/** W51: the provider's size in home cells, "5x2": its target cells when it declares them, else the usual (dp + 30) / 70 rule from its minimum size. */
+fun widgetCellsOf(info: AppWidgetProviderInfo): Pair<Int, Int> =
+    if (info.targetCellWidth > 0 && info.targetCellHeight > 0) info.targetCellWidth to info.targetCellHeight
+    else maxOf(1, (info.minWidth + 30) / 70) to maxOf(1, (info.minHeight + 30) / 70)
+
+/** Every home-screen widget the device offers, loaded once off the main thread; null while loading. */
+@Composable
+fun rememberWidgetChoices(): List<WidgetChoice>? {
+    val context = LocalContext.current
+    val choices by produceState<List<WidgetChoice>?>(null) {
+        value = withContext(Dispatchers.Default) { runCatching { loadWidgetChoices(context) }.getOrDefault(emptyList()) }
+    }
+    return choices
+}

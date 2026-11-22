@@ -53,9 +53,9 @@ import com.bos.sphere.feature.grid.Glyphs
 
 /**
  * What a long-press on the home screen opens. Wave 34 (homeSheet): styled like the Sound and Vibration sheet (docs/decisions/homeSheet.md): pure black,
- * large top radius, centred title, hairlines, 48 dp targets. It carries only the quick choices (Pages, Order, Hotspots, this page's
- * tools) and two plain rows, Wallpaper and Ground Control. Glance on/off, Add page, Edit home, Files and the item picker live in Ground Control, Comms
- * and the edit-home mode. [page] is null on homes without pages.
+ * large top radius, centred title, hairlines, 48 dp targets. Wave 51 (homeMenuVisual): every choice is a drawn card (HomeQuickSheetCards.kt) and three entry tiles (Add apps, Add widgets, Edit home) lead the sheet. It carries only the quick choices (Pages, Order, Hotspots, this page's
+ * tools) and two plain rows, Wallpaper and Ground Control. Glance on/off, Add page, Files and the item picker live in Ground Control, Comms
+ * and the edit-home mode; the Add apps, Add widgets and Edit home tiles call the same entry points as the edit tray. [page] is null on homes without pages.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,21 +67,22 @@ fun HomeQuickSheet(
     onDeletePage: () -> Unit,
     onWallpaper: () -> Unit,
     onGroundControl: () -> Unit,
+    onAddApps: () -> Unit = {},
+    onAddWidgets: () -> Unit = {},
+    onEditHome: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     // Wave 41: One UI's sheet shape (28 dp top corners and a grabber) through the shared sheet; the black look and the scrim stay.
     com.bos.sphere.feature.grid.OneUiSheet(onDismiss, containerColor = SheetBlack, scrimColor = Color.Black.copy(alpha = 0.62f)) {
-        HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl)
+        HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl, onAddApps, onAddWidgets, onEditHome)
     }
 }
 
 private val SheetBlack = Color.Black
 private val InkWhite = Color.White
 private val HairlineWhite = Color(0x33FFFFFF)
-private val OutlineWhite = Color(0x66FFFFFF)
 
 /** The sheet's content (separate from the window so screenshots can draw it directly). */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun HomeQuickSheetBody(
     prefs: LauncherPrefs,
@@ -91,6 +92,9 @@ internal fun HomeQuickSheetBody(
     onDeletePage: () -> Unit,
     onWallpaper: () -> Unit,
     onGroundControl: () -> Unit,
+    onAddApps: () -> Unit = {},
+    onAddWidgets: () -> Unit = {},
+    onEditHome: () -> Unit = {},
 ) {
     // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
     Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp).padding(bottom = 16.dp)) {
@@ -98,19 +102,27 @@ internal fun HomeQuickSheetBody(
             L10n.tr("Home"), color = InkWhite, fontSize = com.bos.sphere.core.design.PopupTokens.TitleSize, fontWeight = com.bos.sphere.core.design.PopupTokens.TitleWeight, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp).testTag("quick.sheet").semantics { heading() },
         )
-        // Wave 28: the Pages setting, exactly three values, and the order.
+        // Wave 51: three entry tiles first, so adding and editing is discoverable on any page, empty or not.
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            EntryTile(Glyphs.Apps, "Add apps", "quick.add.apps", Modifier.weight(1f), onAddApps)
+            EntryTile(Glyphs.Widget, "Add widgets", "quick.add.widgets", Modifier.weight(1f), onAddWidgets)
+            EntryTile(Glyphs.Sliders, "Edit home", "quick.edit", Modifier.weight(1f), onEditHome)
+        }
+        // Wave 28 / 51: Pages and Order, every value a drawn card.
         Heading(L10n.tr("Pages"))
-        ChipRow { for (m in com.bos.sphere.core.data.HomePages.entries) Chip(null, L10n.tr(m.label), prefs.homePages == m, tag = "quick.pages.${m.name}") { update { it.copy(homePages = m) } } }
+        CardRow { for (m in com.bos.sphere.core.data.HomePages.entries) OptionCard(m.label, prefs.homePages == m, "quick.pages.${m.name}", { update { it.copy(homePages = m) } }, pagesArt(m)) }
         Heading(L10n.tr("Order"))
-        ChipRow { for (o in com.bos.sphere.core.data.HomeOrder.entries) Chip(null, L10n.tr(o.label), prefs.homeOrder == o) { update { it.copy(homeOrder = o) } } }
+        CardRow { for (o in com.bos.sphere.core.data.HomeOrder.entries) OptionCard(o.label, prefs.homeOrder == o, "quick.order.${o.name}", { update { it.copy(homeOrder = o) } }, orderArt(o.rtl)) }
 
         run {
-            // W38: the hotspots are fixed chrome on every page, so their chips are always here.
+            // W38: the hotspots are fixed chrome on every page, so their cards are always here.
             Heading(L10n.tr("Hotspots"))
             val hc = com.bos.sphere.core.data.GlanceHotspots.presetOf(prefs.glanceHotspots)
-            ChipRow {
+            CardRow {
                 for (pr in com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }) {
-                    Chip(null, L10n.tr(pr.label), hc == pr) { update { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(pr) ?: it.glanceHotspots) } }
+                    val corners = com.bos.sphere.core.data.GlanceHotspots.preset(pr) ?: emptySet()
+                    OptionCard(pr.label, hc == pr, "quick.hotspots.${pr.name}", { update { it.copy(glanceHotspots = corners) } }, hotspotsArt(corners))
                 }
             }
         }
@@ -124,10 +136,12 @@ internal fun HomeQuickSheetBody(
                     transitions = PageTransition.entries.map { it.label to (prefs.pageTransition == it) },
                 ),
             )
-            fun glyphOf(k: SheetToggle) = when (k) {
-                SheetToggle.Time -> Glyphs.Clock; SheetToggle.Weather -> Glyphs.Sun; SheetToggle.Battery -> Glyphs.Battery
-                SheetToggle.AlignTop -> Glyphs.Up; SheetToggle.AlignBottom -> Glyphs.Down; SheetToggle.MakeHome -> Glyphs.Home
+            fun artOf(k: SheetToggle): androidx.compose.ui.graphics.drawscope.DrawScope.(androidx.compose.ui.geometry.Size) -> Unit = when (k) {
+                SheetToggle.AlignTop -> alignArt(true)
+                SheetToggle.AlignBottom -> alignArt(false)
+                else -> makeHomeArt()
             }
+            fun tagOf(k: SheetToggle) = when (k) { SheetToggle.AlignTop -> "quick.align.top"; SheetToggle.AlignBottom -> "quick.align.bottom"; else -> "quick.makehome" }
             fun flip(k: SheetToggle) = when (k) {
                 SheetToggle.AlignTop -> update { it.copy(gridBias = 0f) }
                 SheetToggle.AlignBottom -> update { it.copy(gridBias = 1f) }
@@ -135,16 +149,17 @@ internal fun HomeQuickSheetBody(
                 else -> Unit
             }
             Heading(L10n.tr("This page"))
-            ChipRow { rows.filterIsInstance<AppMenuEntry.Toggle>().filter { it.kind !in GONE }.forEach { t -> Chip(glyphOf(t.kind), t.label, t.on) { flip(t.kind) } } }
+            CardRow { rows.filterIsInstance<AppMenuEntry.Toggle>().filter { it.kind !in GONE }.forEach { t -> OptionCard(t.label, t.on, tagOf(t.kind), { flip(t.kind) }, artOf(t.kind)) } }
             Heading(L10n.tr("Transition"))
-            ChipRow {
+            CardRow {
                 rows.filterIsInstance<AppMenuEntry.Choice>().forEach { c ->
-                    Chip(null, c.option, c.selected) { PageTransition.entries.firstOrNull { it.label == c.option }?.let { t -> update { it.copy(pageTransition = t) } } }
+                    val t = PageTransition.entries.firstOrNull { it.label == c.option }
+                    if (t != null) OptionCard(c.option, c.selected, "quick.transition.${t.name}", { update { it.copy(pageTransition = t) } }, transitionArt(t))
                 }
             }
             rows.filterIsInstance<AppMenuEntry.Sheet>().firstOrNull { it.action == HomeSheetAction.DeletePage }?.let { r ->
-                Spacer(Modifier.height(10.dp))
-                ChipRow { Chip(Glyphs.Close, r.label, false, danger = true, onClick = onDeletePage) }
+                Spacer(Modifier.height(14.dp))
+                TextRow(Glyphs.Close, r.label, "quick.deletepage", onDeletePage, danger = true)
             }
         }
 
@@ -169,38 +184,15 @@ private fun Heading(text: String) {
 @Composable
 private fun Hairline() { Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineWhite)) }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChipRow(content: @Composable () -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) { content() }
-}
-
-/** A pill with a thin outline; selected is filled white with black text (the Sound sheet is white on black, it has no accent colour). 48 dp tall. */
-@Composable
-private fun Chip(glyph: ImageVector?, label: String, selected: Boolean, danger: Boolean = false, tag: String? = null, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(50)
-    val tint = if (selected) Color.Black else if (danger) Color(0xFFFF7A7A) else InkWhite
-    Row(
-        Modifier.then(if (tag != null) Modifier.testTag(tag) else Modifier).heightIn(min = 48.dp).clip(shape)
-            .background(if (selected) InkWhite else Color.Transparent)
-            .border(1.dp, if (selected) InkWhite else OutlineWhite, shape)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (glyph != null) { Icon(glyph, null, tint = tint, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
-        Text(L10n.tr(label), color = tint, fontSize = 16.sp)
-    }
-}
-
-@Composable
-private fun TextRow(glyph: ImageVector, label: String, tag: String, onClick: () -> Unit) {
+private fun TextRow(glyph: ImageVector, label: String, tag: String, onClick: () -> Unit, danger: Boolean = false) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(tag).clickable(role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(glyph, null, tint = InkWhite, modifier = Modifier.size(26.dp))
+        val ink = if (danger) Color(0xFFFF7A7A) else InkWhite
+        Icon(glyph, null, tint = ink, modifier = Modifier.size(26.dp))
         Spacer(Modifier.width(14.dp))
-        Text(L10n.tr(label), color = InkWhite, fontSize = 18.sp)
+        Text(L10n.tr(label), color = ink, fontSize = 18.sp)
     }
 }

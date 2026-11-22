@@ -1763,6 +1763,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onWallpaper = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) }, // HOM-16 (wave 26): the wallpaper rows are in Home screen
                 onGroundControl = { quickOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_ROOT) }, // wave 40: the root list of every category
                 onDismiss = { quickOpen = false },
+                // W51: the same entry points as the edit tray: Edit home, the app picker and the widget picker (Pages turned on first when they are off).
+                onEditHome = { quickOpen = false; editHome() },
+                onAddApps = { quickOpen = false; editHome(); addAppOpen = true },
+                onAddWidgets = { quickOpen = false; editHome(); homeItems.widgetRequest++ },
             )
         }
         if (homeItems.panelRequest >= 0) {

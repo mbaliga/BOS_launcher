@@ -36,19 +36,19 @@ import org.robolectric.annotation.GraphicsMode
 class HomeQuickSheetGlanceTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private class Seen { var prefs = LauncherPrefs(); var wallpaper = 0; var ground = 0; var delete = 0 }
+    private class Seen { var prefs = LauncherPrefs(); var wallpaper = 0; var ground = 0; var delete = 0; var apps = 0; var widgets = 0; var edit = 0 }
 
     private fun sheet(start: LauncherPrefs, seen: Seen, page: Int? = null, pages: Int = 1) = rule.setContent {
         var p by remember { mutableStateOf(start) }
-        HomeQuickSheetBody(p, { f -> p = f(p); seen.prefs = p }, page, pages, { seen.delete++ }, { seen.wallpaper++ }, { seen.ground++ })
+        HomeQuickSheetBody(p, { f -> p = f(p); seen.prefs = p }, page, pages, { seen.delete++ }, { seen.wallpaper++ }, { seen.ground++ }, { seen.apps++ }, { seen.widgets++ }, { seen.edit++ })
     }
 
     private fun gone(vararg texts: String) { for (t in texts) assertTrue("$t is not in the sheet", rule.onAllNodesWithText(t).fetchSemanticsNodes().isEmpty()) }
 
-    @Test fun HOM_22_w34_theSheetNoLongerHasTheGlanceTileBackgroundTimeWeatherBatteryAddPageEditHomeFilesOrItemPicker() {
+    @Test fun HOM_22_w34_theSheetNoLongerHasTheGlanceTileBackgroundTimeWeatherBatteryAddPageFilesOrItemPicker() {
         val seen = Seen(); sheet(LauncherPrefs(homePages = HomePages.Paginated), seen)
-        gone("Calm home screen (Glance)", "Background", "Weather", "Battery %", "Add page", "Edit home", "Files, usage and timeline", "Widgets, folders and icons")
-        assertTrue(rule.onAllNodes(hasTestTag("quick.glance") or hasTestTag("quick.addpage") or hasTestTag("quick.edit")).fetchSemanticsNodes().isEmpty())
+        gone("Calm home screen (Glance)", "Background", "Weather", "Battery %", "Add page", "Files, usage and timeline", "Widgets, folders and icons")
+        assertTrue(rule.onAllNodes(hasTestTag("quick.glance") or hasTestTag("quick.addpage")).fetchSemanticsNodes().isEmpty())
         rule.onNodeWithText("Home").assertIsDisplayed()
     }
 
@@ -72,9 +72,9 @@ class HomeQuickSheetGlanceTest {
         assertEquals(HomePages.Paginated, seen.prefs.homePages)
         rule.onNodeWithTag("quick.pages.Off").performClick()
         assertEquals(HomePages.Off, seen.prefs.homePages)
-        rule.onNodeWithText("Right to left").performClick()
+        rule.onNodeWithTag("quick.order.RightToLeft").performClick()
         assertEquals(HomeOrder.RightToLeft, seen.prefs.homeOrder)
-        rule.onNodeWithText("Left to right").performClick()
+        rule.onNodeWithTag("quick.order.LeftToRight").performClick()
         assertEquals(HomeOrder.LeftToRight, seen.prefs.homeOrder)
     }
 

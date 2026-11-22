@@ -50,9 +50,11 @@ fun SphereTheme(
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(base.density * dk, base.fontScale * fk),
     ) {
+        val family = rememberUiFontFamily()
+        val typography = androidx.compose.runtime.remember(family) { hyleTypography(family) }
         MaterialTheme(
             colorScheme = scheme,
-            typography = HyleTypography,
+            typography = typography,
             shapes = HyleShapes,
             content = content,
         )

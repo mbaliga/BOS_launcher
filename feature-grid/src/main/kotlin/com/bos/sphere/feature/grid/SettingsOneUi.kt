@@ -285,10 +285,9 @@ private fun OneUiTopBar(title: String, collapse: androidx.compose.runtime.State<
                 contentAlignment = Alignment.Center,
             ) { OneUiBackArrow() }
         } else Spacer(Modifier.width(52.dp))
-        if (smallShown) Text(
-            title, color = HyleColors.InkBright, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).testTag(OneUiTags.TITLE_SMALL).graphicsLayer { alpha = OneUiModel.smallTitleAlpha(collapse.value) },
-        ) else Spacer(Modifier.weight(1f))
+        if (smallShown) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            OneUiTitleText(title, Modifier.testTag(OneUiTags.TITLE_SMALL).graphicsLayer { alpha = OneUiModel.smallTitleAlpha(collapse.value) }, size = 18.sp, lineHeight = 22.sp, weight = FontWeight.SemiBold, maxLines = 1, heading = false)
+        } else Spacer(Modifier.weight(1f))
         Spacer(Modifier.width(52.dp))
     }
 }
@@ -333,13 +332,10 @@ internal fun OneUiPage(
                             layout(c.maxWidth, band) { p.place(0, OneUiModel.centredTop(band.toFloat(), p.height.toFloat()).roundToInt()) }
                         },
                 ) {
-                    Column {
-                        Text(
-                            title, color = HyleColors.InkBright, fontSize = 36.sp, fontWeight = FontWeight.Normal, lineHeight = 42.sp,
-                            modifier = Modifier.testTag(OneUiTags.TITLE_LARGE).semantics { heading() }.graphicsLayer { this.alpha = OneUiModel.largeTitleAlpha(collapse.value) },
-                        )
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        OneUiTitleText(title, Modifier.testTag(OneUiTags.TITLE_LARGE).graphicsLayer { this.alpha = OneUiModel.largeTitleAlpha(collapse.value) })
                         if (subtitle != null) Text(
-                            subtitle, color = HyleColors.InkDim, fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp).testTag(OneUiTags.SUBTITLE)
+                            subtitle, color = HyleColors.InkDim, fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp).testTag(OneUiTags.SUBTITLE)
                                 .graphicsLayer { this.alpha = OneUiModel.largeTitleAlpha(collapse.value) },
                         )
                     }
@@ -435,11 +431,14 @@ private fun OneUiCategoryPage(
             if (b >= 0) state.scrollToItem(b + 1)
         }
     }
-    OneUiPage(title = OneUiModel.displayTitle(category.title), onBack = onBack, backLabel = L10n.tr("Back"), modifier = modifier, state = state, tag = OneUiTags.CATEGORY_PAGE) {
-        val only = items.singleOrNull() as? SettingItem.Pane
-        if (only != null) { // a category that is one pane (Hidden apps) is that pane: no second level to tap through
+    val only = items.singleOrNull() as? SettingItem.Pane
+    // Wave 52: a category that is one pane carries the pane's live line under its title (the active workspace), like the page of a row does.
+    val onlySubtitle = only?.pageSubtitle?.invoke()
+    OneUiPage(title = OneUiModel.displayTitle(category.title), subtitle = onlySubtitle, onBack = onBack, backLabel = L10n.tr("Back"), modifier = modifier, state = state, tag = OneUiTags.CATEGORY_PAGE) {
+        if (only != null) { // a category that is one pane (Hidden apps, Workspaces) is that pane: no second level to tap through
             item(key = "pane") {
-                Box(Modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().clip(OneUi.CardShape).background(OneUi.Card).padding(horizontal = 16.dp, vertical = 8.dp)) { Column(Modifier.fillMaxWidth()) { only.content(this) } }
+                if (only.bare) Column(Modifier.fillMaxWidth()) { only.content(this) }
+                else Box(Modifier.padding(horizontal = OneUi.Margin).fillMaxWidth().clip(OneUi.CardShape).background(OneUi.Card).padding(horizontal = 16.dp, vertical = 8.dp)) { Column(Modifier.fillMaxWidth()) { only.content(this) } }
             }
             return@OneUiPage
         }

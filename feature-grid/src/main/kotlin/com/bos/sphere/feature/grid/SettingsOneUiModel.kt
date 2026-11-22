@@ -19,15 +19,22 @@ object OneUiModel {
      * inputs, then notifications, then the system. A category that is not listed (a new one) lands in a card of its own before the last card.
      */
     val GROUPS: List<List<String>> = listOf(
-        listOf(PAGE, "Look", "Home screen", "App drawer", "Desktop & dock"),
+        listOf(PAGE, "Home screen", "Workspaces"),
+        listOf("Look", "App drawer", "Desktop & dock"),
         listOf("Corners", "Gestures", "Radar"),
-        listOf("Comms"),
+        listOf(SIDE_PANEL),
         listOf("System & sound", "Hidden apps", "Backup", "Capabilities"),
         listOf("Lab", "About"),
     )
 
-    /** Stands for every "Page N" category (the one of the page under the finger). */
-    const val PAGE = "Page"
+    /** Stands for the page category of the home's pages (wave 52: the row says "Pages", not "Page 1"; it holds the settings of the page under the finger). */
+    const val PAGE = "Pages"
+
+    /**
+     * Wave 52: the settings of the right-hand panel. It was the "Comms" category; the panel can hold widgets too, so the row is named by what it is.
+     * The sections inside the panel keep their own names (Comms and so on).
+     */
+    const val SIDE_PANEL = "Side panel"
 
     private val COUNT_SUFFIX = Regex("""^(.*) · \d+$""")
 
@@ -39,10 +46,8 @@ object OneUiModel {
 
     private fun keyOf(title: String): String? {
         for (g in GROUPS) for (k in g) {
-            if (k == PAGE) continue
             if (title == k || title == L10n.tr(k)) return k
         }
-        if ((1..99).any { title == "Page $it" || title == L10n.tr("Page %d", it) }) return PAGE
         return null
     }
 
@@ -68,7 +73,8 @@ object OneUiModel {
         "Corners" -> 0xFFD9923A
         "Gestures" -> 0xFF58A55C
         "Radar" -> 0xFF2F8FBF
-        "Comms" -> 0xFFDE6A5E
+        SIDE_PANEL -> 0xFFDE6A5E
+        "Workspaces" -> 0xFF4FA38A
         "System & sound" -> 0xFF76859A
         "Hidden apps" -> 0xFF8C6CB4
         "Backup" -> 0xFF3F9E7A

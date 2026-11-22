@@ -144,13 +144,15 @@ object ThemeTexts {
         ThemeField.IconTint -> L10n.tr("Icon colour")
         ThemeField.DockStyle -> L10n.tr("Dock style")
         ThemeField.Wallpaper -> L10n.tr("Wallpaper")
+        ThemeField.Font -> L10n.tr("Font")
         ThemeField.Name -> L10n.tr("Name")
         ThemeField.Author -> L10n.tr("Author")
         ThemeField.Version -> L10n.tr("Version")
     }
 
     /** A value in a chip: colours are shown as hex, the rest through the setting's own label translated. */
-    fun value(c: ThemeChange, text: String): String = if (text.startsWith("#")) text else L10n.tr(text)
+    fun value(c: ThemeChange, text: String): String =
+        if (c.field == ThemeField.Font) L10n.tr(com.bos.sphere.core.design.FontCatalog.entry(text).label) else if (text.startsWith("#")) text else L10n.tr(text)
 }
 
 object ThemeTags {

@@ -11,7 +11,7 @@ class OneUiModelTest {
     private fun cat(title: String, vararg items: SettingItem) = SettingCategory(title, Glyphs.Apps, items.toList())
     private fun toggle(t: String) = SettingItem.Toggle(t, Glyphs.Apps, true) {}
     private fun action(t: String) = SettingItem.Action(t, Glyphs.Apps, "") {}
-    private val real = listOf("Page 1", "Home screen", "Look", "Corners", "Gestures", "App drawer", "Hidden apps", "Radar", "Comms", "System & sound", "Backup", "Desktop & dock", "Capabilities", "Lab", "About")
+    private val real = listOf("Pages", "Home screen", "Workspaces", "Look", "Corners", "Gestures", "App drawer", "Hidden apps", "Radar", "Side panel", "System & sound", "Backup", "Desktop & dock", "Capabilities", "Lab", "About")
         .map { cat(it, toggle("x")) }
 
     @Test fun CFG_21_everyCategoryIsInExactlyOneCardOfTheRootList() {
@@ -21,11 +21,13 @@ class OneUiModelTest {
 
     @Test fun CFG_21_theCardsFollowOneUiOrderLookAndHomeThenInputThenCommsThenSystem() {
         val g = OneUiModel.groups(real).map { card -> card.map { real[it].title } }
-        assertEquals(listOf("Page 1", "Look", "Home screen", "App drawer", "Desktop & dock"), g[0])
-        assertEquals(listOf("Corners", "Gestures", "Radar"), g[1])
-        assertEquals(listOf("Comms"), g[2])
-        assertEquals(listOf("System & sound", "Hidden apps", "Backup", "Capabilities"), g[3])
-        assertEquals(listOf("Lab", "About"), g[4])
+        // wave 52: Pages, Home screen and the top-level Workspaces row first; the panel is "Side panel"
+        assertEquals(listOf("Pages", "Home screen", "Workspaces"), g[0])
+        assertEquals(listOf("Look", "App drawer", "Desktop & dock"), g[1])
+        assertEquals(listOf("Corners", "Gestures", "Radar"), g[2])
+        assertEquals(listOf("Side panel"), g[3])
+        assertEquals(listOf("System & sound", "Hidden apps", "Backup", "Capabilities"), g[4])
+        assertEquals(listOf("Lab", "About"), g[5])
     }
 
     @Test fun CFG_21_aCategoryThatIsNotListedGetsACardBeforeTheLastOne() {
@@ -35,16 +37,16 @@ class OneUiModelTest {
     }
 
     @Test fun CFG_21_emptyGroupsAreSkippedSoNoCardIsEmpty() {
-        val g = OneUiModel.groups(listOf(cat("Comms", toggle("x"))))
+        val g = OneUiModel.groups(listOf(cat("Side panel", toggle("x"))))
         assertEquals(listOf(listOf(0)), g)
     }
 
     @Test fun CFG_21_everyKnownCategoryHasItsOwnMutedAccent() {
-        val titles = real.map { it.title }.filter { it != "Page 1" }
+        val titles = real.map { it.title }.filter { it != "Pages" }
         val colours = titles.map { OneUiModel.accent(it) }
         assertEquals("one accent per category", titles.size, colours.toSet().size)
         assertTrue("opaque", colours.all { (it shr 24) and 0xFF == 0xFFL })
-        assertEquals(OneUiModel.accent("Home screen"), OneUiModel.accent("Page 4"))
+        assertEquals(OneUiModel.accent("Home screen"), OneUiModel.accent("Pages"))
     }
 
     @Test fun CFG_21_theHiddenAppsTabTitleWithItsCountIsPlainHiddenAppsOnTheList() {
@@ -54,8 +56,11 @@ class OneUiModelTest {
         assertEquals(listOf(listOf(0)), OneUiModel.groups(listOf(cat("Hidden apps · 3", toggle("x")))).let { listOf(it.flatten()) })
     }
 
-    @Test fun CFG_21_pageCategoriesAreRecognisedByTheirNumber() {
-        assertEquals(OneUiModel.PAGE, OneUiModel.key("Page 7"))
+    @Test fun CFG_21_thePagesCategoryIsRecognisedByItsNameAndTheOldPageNumberTitleIsGone() {
+        assertEquals(OneUiModel.PAGE, OneUiModel.key("Pages"))
+        assertNull("wave 52: no row is called Page 1 any more", OneUiModel.key("Page 7"))
+        assertEquals(OneUiModel.SIDE_PANEL, OneUiModel.key("Side panel"))
+        assertNull("Comms is a section inside the panel, not a settings category", OneUiModel.key("Comms"))
         assertNull(OneUiModel.key("Nothing like it"))
     }
 

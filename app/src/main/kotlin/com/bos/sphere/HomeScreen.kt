@@ -764,6 +764,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             prefs.accentColor,
         )
         L10n.setLanguage(prefs.language.code)
+        com.bos.sphere.core.design.HyleFont.apply(prefs.uiFont)
     }
     com.bos.sphere.ui.ApplyTheming(prefs.themeMode, prefs.accentColor)
     val iconColors by stores.iconColors.colors.collectAsStateWithLifecycle()
@@ -1634,7 +1635,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
             previewDock = { SettingsPreviewDock(homeCapture) },
-            summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories),
+            summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories, pageIndex = settingsPage, workspaceCount = dockState.workspaces.size),
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {

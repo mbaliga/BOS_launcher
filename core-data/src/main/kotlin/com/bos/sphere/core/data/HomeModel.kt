@@ -366,6 +366,8 @@ data class LauncherPrefs(
     val iconTint: IconTint = IconTint.None,
     /** Draw a plate behind transparent icons. */
     val iconPlate: Boolean = true,
+    /** Wave 52: the font of the launcher's own UI text, by id (`space_grotesk` default, `system`, `inter`, ...; the families live in core-design `FontCatalog`). */
+    val uiFont: String = UiFonts.DEFAULT,
 
     // --- language
     val language: UiLanguage = UiLanguage.System,
@@ -920,3 +922,10 @@ object HomeLayoutMath {
 /** One recorded launch. [hourOfDay] is local time, captured at record time. */
 data class LaunchEvent(val key: String, val timeMillis: Long, val hourOfDay: Int)
 
+
+/** Wave 52 (settingsFont): the ids the stored `uiFont` can hold, kept here so the preference, the settings file and theme packs agree; core-design's `FontCatalog` maps each to a family (a test keeps the two lists equal). */
+object UiFonts {
+    const val DEFAULT = "space_grotesk"
+    val IDS: List<String> = listOf("space_grotesk", "system", "inter", "manrope", "dm_sans", "jetbrains_mono", "atkinson", "lexend")
+    fun normalize(id: String?): String = if (id != null && id in IDS) id else DEFAULT
+}

@@ -138,6 +138,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("iconShape", next.iconShape.name)
             .putString("iconTint", next.iconTint.name)
             .putBoolean("iconPlate", next.iconPlate)
+            .putString("uiFont", next.uiFont)
             .putString("language", next.language.name).putBoolean("searchLayoutPinned", next.searchLayoutPinned)
             .putBoolean("kbOpenP", next.keyboardOnOpenPortrait).putBoolean("kbOpenL", next.keyboardOnOpenLandscape)
             .putBoolean("cornersPerOri", next.cornersPerOrientation)
@@ -289,6 +290,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             iconShape = enumOr(sp.getString("iconShape", null), d.iconShape),
             iconTint = enumOr(sp.getString("iconTint", null), d.iconTint),
             iconPlate = sp.getBoolean("iconPlate", d.iconPlate),
+            uiFont = sp.getString("uiFont", null) ?: d.uiFont, // kept as stored; an unknown id is read as the default where it is used (UiFonts.normalize, FontCatalog)
             language = enumOr(sp.getString("language", null), d.language),
             searchLayoutPinned = sp.getBoolean("searchLayoutPinned", d.searchLayoutPinned),
             keyboardOnOpenPortrait = sp.getBoolean("kbOpenP", d.keyboardOnOpenPortrait),

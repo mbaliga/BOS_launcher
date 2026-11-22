@@ -113,7 +113,7 @@ class SettingsOneUiW40Test {
     @Test fun CFG_21_theSummariesAreLiveFromTheRowsAndTheModel() {
         val c = cats()
         val s = summaries(c)
-        assertEquals("Dark · Rounded icons", s["Look"])
+        assertEquals("Dark · Rounded icons · Space Grotesk", s["Look"]) // wave 52: the font is part of the Look line
         assertEquals("Paginated · 3 pages", s["Home screen"])
         assertEquals("2 hidden", s[c.first { OneUiModel.key(it.title) == "Hidden apps" }.title])
         assertEquals("No gestures assigned", s["Gestures"])

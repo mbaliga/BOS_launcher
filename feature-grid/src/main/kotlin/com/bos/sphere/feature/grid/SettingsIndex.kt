@@ -58,6 +58,7 @@ class SettingsIndex(val entries: List<SettingEntry>) {
             e.description.lowercase().contains(w) -> 30
             e.value.lowercase() == w -> 20
             e.category.lowercase().contains(w) -> 10
+            CATEGORY_KEYWORDS.any { (k, words) -> (e.category == k || e.category == com.bos.sphere.core.design.L10n.tr(k)) && words.contains(w) } -> 10
             else -> 0
         }
     }
@@ -67,6 +68,12 @@ class SettingsIndex(val entries: List<SettingEntry>) {
     companion object {
         /** Hidden search aliases: the product word before the rename ("Launchpad") still finds Comms. Never shown. */
         private val ALIASES = mapOf("launchpad" to "comms", "sessions" to "groups") // wave 41: sessions live on the App groups page
+
+        /**
+         * Wave 52: words that find every row of a category besides its title: the "Side panel" category was "Comms", and the panel's Comms section
+         * is still a word people type. Hidden, never shown. Keyed by the English category title.
+         */
+        private val CATEGORY_KEYWORDS = mapOf("Side panel" to "comms widgets right-hand panel", "Pages" to "page", "Workspaces" to "workspace")
 
         fun id(category: Int, item: Int) = "$category/$item"
 

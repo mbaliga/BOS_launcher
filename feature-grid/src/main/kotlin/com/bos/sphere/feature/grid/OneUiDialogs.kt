@@ -151,10 +151,9 @@ internal fun OneUiDialogCard(
                     .testTag(OneUiDialogTags.DIALOG).semantics { paneTitle = title },
             ) {
                 Column(Modifier.weight(1f, fill = false).then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)) {
-                    Text(
-                        title, color = HyleColors.InkBright, fontSize = OneUiDialogSpec.TITLE_SP.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, lineHeight = 26.sp,
-                        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = if (body == null && content == null) 20.dp else 12.dp)
-                            .testTag(OneUiDialogTags.TITLE).semantics { heading() },
+                    OneUiTitleText(
+                        title, size = OneUiDialogSpec.TITLE_SP.sp, lineHeight = 26.sp, weight = FontWeight.Medium,
+                        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = if (body == null && content == null) 20.dp else 12.dp).testTag(OneUiDialogTags.TITLE),
                     )
                     if (body != null) Text(
                         body, color = HyleColors.InkDim, fontSize = OneUiDialogSpec.BODY_SP.sp, lineHeight = 21.sp, textAlign = TextAlign.Center,

@@ -79,7 +79,7 @@ class SettingsOneUiUiTest {
     private var size by mutableStateOf(0.5f)
     private var count by mutableStateOf(3)
 
-    private fun titles() = listOf("Home screen", "Look", "App drawer", "Radar", "Comms", "System & sound", "Hidden apps", "About")
+    private fun titles() = listOf("Home screen", "Look", "App drawer", "Radar", "Side panel", "System & sound", "Hidden apps", "About")
 
     private fun categories(): List<SettingCategory> = listOf(
         SettingCategory(
@@ -100,7 +100,7 @@ class SettingsOneUiUiTest {
         ),
         SettingCategory("App drawer", Glyphs.Widget, listOf(SettingItem.Choice("Sort by", Glyphs.Apps, listOf("A-Z", "Recent"), "A-Z", { it }) { log += "sort=$it" })),
         SettingCategory("Radar", Glyphs.Radar, listOf(SettingItem.Toggle("Web results", Glyphs.Globe, true) {}, SettingItem.Toggle("Deep results", Glyphs.Search, true) {})),
-        SettingCategory("Comms", Glyphs.Bell, listOf(SettingItem.Toggle("Unread strip", Glyphs.Bell, true) {})),
+        SettingCategory("Side panel", Glyphs.Bell, listOf(SettingItem.Toggle("Unread strip", Glyphs.Bell, true) {})),
         SettingCategory("System & sound", Glyphs.Gear, listOf(SettingItem.Toggle("Interface sounds", Glyphs.Sliders, true) {})),
         SettingCategory("Hidden apps", Glyphs.Apps, listOf(SettingItem.Pane("Hidden apps", Glyphs.Apps, "2 hidden") { androidx.compose.material3.Text("HIDDEN BODY") })),
         SettingCategory("About", Glyphs.Info, listOf(SettingItem.Action("Version", Glyphs.Info, "1.0") {})),
@@ -146,8 +146,8 @@ class SettingsOneUiUiTest {
 
     @Test fun CFG_21_aCategoryWithoutAGivenSummaryShowsOneFromItsRows() {
         show()
-        rule.onNodeWithTag(OneUiTags.row("Comms")).assertIsDisplayed()
-        assertTrue("Comms and System & sound both fall back to their row value", rule.onAllNodesWithText("On").fetchSemanticsNodes().size >= 2)
+        rule.onNodeWithTag(OneUiTags.row("Side panel")).assertIsDisplayed()
+        assertTrue("Side panel and System & sound both fall back to their row value", rule.onAllNodesWithText("On").fetchSemanticsNodes().size >= 2)
     }
 
     @Test fun CFG_21_tappingACategoryOpensItsPageAndBackReturnsToTheRoot() {
@@ -400,7 +400,8 @@ class SettingsOneUiUiTest {
         assertEquals("the list takes about 40 percent", 0.4f, left.width.value / (left.width.value + right.width.value), 0.02f)
         // the first category's page is shown at the end without tapping
         rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).assertIsDisplayed()
-        rule.onNodeWithTag(OneUiTags.row("App drawer")).assertIsDisplayed() // the list keeps a short title band, so several categories show at once
+        rule.onNodeWithTag(OneUiTags.row("Home screen")).assertIsDisplayed() // the list keeps a short title band, so several categories show at once
+        rule.onNodeWithTag(OneUiTags.row("Look")).assertIsDisplayed() // (wave 52: Look is in the second card now, App drawer one row further down, no longer on the first 411 dp)
         rule.onNodeWithTag(OneUiTags.row("Look")).performClick(); rule.mainClock.advanceTimeBy(500); rule.waitForIdle()
         rule.onNodeWithText("Icon shape").assertIsDisplayed()
         rule.onNodeWithTag(OneUiTags.row("Look")).assertIsDisplayed() // the list is still there

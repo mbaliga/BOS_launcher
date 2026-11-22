@@ -21,16 +21,17 @@ data class LookSnapshot(
     val iconTint: IconTint,
     val dockStyle: DockStyle,
     val glanceWallpaper: Wallpaper,
+    val uiFont: String = UiFonts.DEFAULT,
 )
 
 /** Reading a look from the settings, describing a pack's effect, and applying it. All pure. */
 object ThemeLook {
     private val defaults = LauncherPrefs()
 
-    fun snapshot(p: LauncherPrefs, dock: DockStyle) = LookSnapshot(p.themeMode, p.accentColor, p.iconShape, p.iconTint, dock, p.rawWallpaper(WallpaperSurface.Glance))
+    fun snapshot(p: LauncherPrefs, dock: DockStyle) = LookSnapshot(p.themeMode, p.accentColor, p.iconShape, p.iconTint, dock, p.rawWallpaper(WallpaperSurface.Glance), p.uiFont)
 
     fun restore(p: LauncherPrefs, s: LookSnapshot): LauncherPrefs =
-        p.copy(themeMode = s.themeMode, accentColor = s.accent, iconShape = s.iconShape, iconTint = s.iconTint).withWallpaper(WallpaperSurface.Glance, s.glanceWallpaper)
+        p.copy(themeMode = s.themeMode, accentColor = s.accent, iconShape = s.iconShape, iconTint = s.iconTint, uiFont = s.uiFont).withWallpaper(WallpaperSurface.Glance, s.glanceWallpaper)
 
     /** The look a fresh install has. */
     fun defaultSnapshot() = snapshot(defaults, DockStyle.Standard)
@@ -43,7 +44,7 @@ object ThemeLook {
             WallpaperKind.Gradient -> w.gradient.normalised().let { ThemeWallpaper.Gradient(it.from, it.to, it.angle) }
             else -> null
         }
-        return ThemePack(name.take(ThemePacks.MAX_TEXT), author?.take(ThemePacks.MAX_TEXT), null, ThemeSettings(p.themeMode, p.accentColor or GradientSpec.OPAQUE, p.iconShape, p.iconTint, dock, wp))
+        return ThemePack(name.take(ThemePacks.MAX_TEXT), author?.take(ThemePacks.MAX_TEXT), null, ThemeSettings(p.themeMode, p.accentColor or GradientSpec.OPAQUE, p.iconShape, p.iconTint, dock, wp, p.uiFont))
     }
 
     /** The settings of [s] applied to [p] (the dock style is applied separately, it lives with the dock settings). The glance wallpaper is the one a pack sets; the pages follow it while they share it. */
@@ -53,6 +54,7 @@ object ThemeLook {
         s.accent?.let { out = out.copy(accentColor = it or GradientSpec.OPAQUE) }
         s.iconShape?.let { out = out.copy(iconShape = it) }
         s.iconTint?.let { out = out.copy(iconTint = it) }
+        s.uiFont?.let { out = out.copy(uiFont = UiFonts.normalize(it)) }
         when (val w = s.wallpaper) {
             is ThemeWallpaper.Solid -> out = out.withWallpaper(WallpaperSurface.Glance, out.rawWallpaper(WallpaperSurface.Glance).copy(kind = WallpaperKind.Solid, solid = w.color))
             is ThemeWallpaper.Gradient -> out = out.withWallpaper(WallpaperSurface.Glance, out.rawWallpaper(WallpaperSurface.Glance).copy(kind = WallpaperKind.Gradient, gradient = GradientSpec(w.from, w.to, w.angle)))
@@ -68,6 +70,7 @@ object ThemeLook {
         s.iconShape?.let { add(ThemeChange(ThemeField.IconShape, p.iconShape.label, it.label)) }
         s.iconTint?.let { add(ThemeChange(ThemeField.IconTint, p.iconTint.label, it.label)) }
         s.dockStyle?.let { add(ThemeChange(ThemeField.DockStyle, dock.label, it.label)) }
+        s.uiFont?.let { add(ThemeChange(ThemeField.Font, p.uiFont, it)) }
         s.wallpaper?.let { w ->
             val now = p.rawWallpaper(WallpaperSurface.Glance)
             val (bText, bCols) = when (now.kind) {

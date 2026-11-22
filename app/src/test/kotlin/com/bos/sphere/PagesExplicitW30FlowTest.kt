@@ -6,7 +6,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
@@ -66,9 +65,9 @@ class PagesExplicitW30FlowTest : TourBase() {
     }
 
     private fun swipePager(forward: Boolean) {
-        rule.onNodeWithTag("home.pager").performTouchInput { val y = height * 0.5f; val a = width * 0.75f; val b = width * 0.25f; swipe(Offset(if (forward) a else b, y), Offset(if (forward) b else a, y), 300) }; settle()
+        rule.onNodeWithTag("home.pager").performTouchInput { val y = height * (if (forward) 0.5f else 0.7f); val a = width * 0.75f; val b = width * 0.25f; swipe(Offset(if (forward) a else b, y), Offset(if (forward) b else a, y), 300) }; settle()
     }
-    private fun openQuickSheet(fy: Float = 0.3f) { longPressAt(0.5f, fy); if (!quickSheetShown()) { longPressAt(0.5f, 0.45f) } ; assertTrue("the quick sheet", quickSheetShown()) }
+    private fun openQuickSheet(fy: Float = 0.75f) { longPressAt(0.5f, fy); if (!quickSheetShown()) { longPressAt(0.5f, 0.65f) } ; assertTrue("the quick sheet", quickSheetShown()) }
     private fun toGlance() { if (!glanceShown()) { swipePager(false); if (!glanceShown()) swipePager(false) } }
 
     @Test fun PGX_pagesAreAddedOneEmptyPageAtATimeIconsAreOnlyThePlacedOnesAndDeleteRemovesThePageForGood() {

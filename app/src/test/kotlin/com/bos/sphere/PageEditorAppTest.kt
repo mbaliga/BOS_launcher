@@ -78,7 +78,7 @@ class PageEditorAppTest {
         // W34: the Home sheet no longer has an Edit home row; the way in is the long press on empty home space (the quick sheet), then Ground Control > Home screen > Edit home.
         // Wave 40: on a continuous home the same long press opens Ground Control itself (its root list), which now covers the home and takes the next touch like any screen.
         fun settingsOpen() = rule.onAllNodesWithContentDescription("Close settings", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        for (y in listOf(0.35f, 0.6f, 0.8f)) { // continuous puts items where the paginated home has space: try a few empty spots
+        for (y in listOf(0.65f, 0.8f, 0.35f)) { // continuous puts items where the paginated home has space: try a few empty spots
             if (rule.onAllNodesWithTag("quick.groundcontrol", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() || has("Page carousel") || settingsOpen()) break
             rule.onRoot().performTouchInput { longClick(Offset(width * 0.5f, height * y)) }; settle(300)
         }

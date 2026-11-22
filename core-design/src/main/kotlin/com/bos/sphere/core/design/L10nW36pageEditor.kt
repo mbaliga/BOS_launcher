@@ -4,7 +4,6 @@ package com.bos.sphere.core.design
 internal val L10nW36pageEditorEnglish: Set<String> = setOf(
     "Page editor tabs",
     "The Glance has no apps or widgets. Pick a page.",
-    "Widgets go on the page being edited.",
     "Move earlier",
     "Move later",
     "Move page %d earlier",
@@ -16,7 +15,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "es" to mapOf(
         "Page editor tabs" to "Pestañas del editor de páginas",
         "The Glance has no apps or widgets. Pick a page." to "El Glance no tiene apps ni widgets. Elige una página.",
-        "Widgets go on the page being edited." to "Los widgets van en la página que editas.",
         "Move earlier" to "Mover antes",
         "Move later" to "Mover después",
         "Move page %d earlier" to "Mover la página %d antes",
@@ -26,7 +24,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "fr" to mapOf(
         "Page editor tabs" to "Onglets de l'éditeur de pages",
         "The Glance has no apps or widgets. Pick a page." to "Le Glance n'a ni apps ni widgets. Choisissez une page.",
-        "Widgets go on the page being edited." to "Les widgets vont sur la page modifiée.",
         "Move earlier" to "Avancer",
         "Move later" to "Reculer",
         "Move page %d earlier" to "Avancer la page %d",
@@ -36,7 +33,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "de" to mapOf(
         "Page editor tabs" to "Tabs des Seiteneditors",
         "The Glance has no apps or widgets. Pick a page." to "Der Glance hat keine Apps oder Widgets. Wähle eine Seite.",
-        "Widgets go on the page being edited." to "Widgets kommen auf die Seite, die du bearbeitest.",
         "Move earlier" to "Nach vorn",
         "Move later" to "Nach hinten",
         "Move page %d earlier" to "Seite %d nach vorn",
@@ -46,7 +42,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "pt" to mapOf(
         "Page editor tabs" to "Abas do editor de páginas",
         "The Glance has no apps or widgets. Pick a page." to "O Glance não tem apps nem widgets. Escolha uma página.",
-        "Widgets go on the page being edited." to "Os widgets vão na página que você edita.",
         "Move earlier" to "Mover antes",
         "Move later" to "Mover depois",
         "Move page %d earlier" to "Mover a página %d antes",
@@ -56,7 +51,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "hi" to mapOf(
         "Page editor tabs" to "पेज एडिटर के टैब",
         "The Glance has no apps or widgets. Pick a page." to "Glance में ऐप या विजेट नहीं होते। कोई पेज चुनें।",
-        "Widgets go on the page being edited." to "विजेट उसी पेज पर जाते हैं जिसे आप बदल रहे हैं।",
         "Move earlier" to "पहले ले जाएँ",
         "Move later" to "बाद में ले जाएँ",
         "Move page %d earlier" to "पेज %d को पहले ले जाएँ",
@@ -66,7 +60,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "zh" to mapOf(
         "Page editor tabs" to "页面编辑器标签",
         "The Glance has no apps or widgets. Pick a page." to "Glance 上没有应用或小部件。请选择一个页面。",
-        "Widgets go on the page being edited." to "小部件会放在正在编辑的页面上。",
         "Move earlier" to "前移",
         "Move later" to "后移",
         "Move page %d earlier" to "将第 %d 页前移",
@@ -76,7 +69,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "ja" to mapOf(
         "Page editor tabs" to "ページエディタのタブ",
         "The Glance has no apps or widgets. Pick a page." to "Glance にはアプリもウィジェットも置けません。ページを選んでください。",
-        "Widgets go on the page being edited." to "ウィジェットは編集中のページに置かれます。",
         "Move earlier" to "前へ移動",
         "Move later" to "後ろへ移動",
         "Move page %d earlier" to "ページ %d を前へ移動",
@@ -86,7 +78,6 @@ internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
     "ar" to mapOf(
         "Page editor tabs" to "علامات تبويب محرر الصفحات",
         "The Glance has no apps or widgets. Pick a page." to "لا تحتوي شاشة Glance على تطبيقات أو أدوات. اختر صفحة.",
-        "Widgets go on the page being edited." to "تُوضع الأدوات في الصفحة التي تحررها.",
         "Move earlier" to "تحريك للأمام",
         "Move later" to "تحريك للخلف",
         "Move page %d earlier" to "تحريك الصفحة %d للأمام",

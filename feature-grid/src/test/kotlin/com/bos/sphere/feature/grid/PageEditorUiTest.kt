@@ -6,6 +6,11 @@ import android.graphics.Canvas
 import android.graphics.drawable.ColorDrawable
 import android.os.Process
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -78,7 +83,7 @@ import java.io.File
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+@OptIn(androidx.compose.ui.test.ExperimentalTestApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 class PageEditorUiTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val outDir = File(System.getProperty("user.dir"), "build/screenshots").apply { mkdirs() }
@@ -104,7 +109,7 @@ class PageEditorUiTest {
     private class Calls {
         val selected = ArrayList<Triple<Int, Float, Float>>(); val glance = ArrayList<Pair<Float, Float>>(); val added = ArrayList<Pair<Float, Float>>()
         val deleted = ArrayList<Int>(); val moved = ArrayList<Pair<Int, Int>>(); val addedApps = ArrayList<String>(); val dropped = ArrayList<Pair<String, Int>>()
-        var widget = 0; var folder = 0; var group = 0; var exit = 0
+        val widgets = ArrayList<String>(); var folder = 0; var group = 0; var exit = 0
         val reordered = ArrayList<Pair<Int, Int>>()
         var prefs = LauncherPrefs()
     }
@@ -117,10 +122,11 @@ class PageEditorUiTest {
     private fun host(
         c: Calls, pages: List<HomePage>, current: Int = 0, continuous: Boolean = false, landscape: Boolean = false, rtl: Boolean = false, orderRtl: Boolean = false,
         glanceOn: Boolean = true, glanceFocus: Boolean = false, swing: PageEditorGeometry.Swing = PageEditorGeometry.REST, onHome: Set<String> = emptySet(),
-        reduced: Boolean = false, fontScale: Float = 1f, topBar: (@androidx.compose.runtime.Composable () -> Unit)? = null,
+        reduced: Boolean = false, fontScale: Float = 1f, focusAdd: Boolean = false, keyboard: Boolean = false, topBar: (@androidx.compose.runtime.Composable () -> Unit)? = null,
     ) {
         drag = AddCarouselDrag()
         rule.setContent {
+            if (keyboard) { val im = androidx.compose.ui.platform.LocalInputModeManager.current; androidx.compose.runtime.SideEffect { im.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard) } }
             val dir = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             val base = androidx.compose.ui.platform.LocalDensity.current
             CompositionLocalProvider(LocalLayoutDirection provides dir, androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(base.density, fontScale)) {
@@ -140,9 +146,9 @@ class PageEditorUiTest {
                         swing = { swing }, appsByKey = byKey, prefs = c.prefs, isLandscape = landscape, apps = apps, onHome = onHome, hasWork = false, isWork = { false }, drag = drag,
                         onSelectPage = { i, dx, dy -> c.selected += Triple(i, dx, dy) }, onSelectGlance = { dx, dy -> c.glance += dx to dy }, onAddPage = { dx, dy -> c.added += dx to dy },
                         onDelete = { c.deleted += it }, onMove = { i, d -> c.moved += i to d }, onReorder = { f, t -> c.reordered += f to t }, onAddApp = { c.addedApps += it.label }, onDropApp = { a, p -> c.dropped += a.label to p },
-                        onWidget = { c.widget++ }, onFolder = { c.folder++ }, onShortcut = {}, onLink = {}, onFile = {}, onGroup = { c.group++ },
-                        onPrefs = { f -> c.prefs = f(c.prefs) }, notice = null, onNoticeDone = {}, focusAdd = false, onExit = { c.exit++ },
-                        topBar = topBar,
+                        onWidget = { c.widgets += it.label }, onFolder = { c.folder++ }, onShortcut = {}, onLink = {}, onFile = {}, onGroup = { c.group++ },
+                        onPrefs = { f -> c.prefs = f(c.prefs) }, notice = null, onNoticeDone = {}, focusAdd = focusAdd, onExit = { c.exit++ },
+                        topBar = topBar, widgetSource = { fakeWidgets },
                     )
                     // The live page, in the focus slot (the real home does this with the same frame).
                     if (!glanceFocus) Box(Modifier.fillMaxSize().editCardLayer { EditCardGeometry.frame(layout.target, state.value, false) }.background(Color(0xFF30406A))) { Text("LIVE", color = Color.White) }
@@ -208,7 +214,8 @@ class PageEditorUiTest {
     fun HOM_12_pe21_tabsSwitchContentAndSettingsNamesThePageAndShowsTheWallpaperAsGlobal() {
         val c = Calls(); host(c, fourPages)
         rule.onNodeWithText("Widgets").performClick(); rule.onNodeWithText("Widgets").assertIsSelected(); rule.onNodeWithText("Apps").assertIsNotSelected()
-        rule.onNodeWithText("Choose a widget").performClick(); assertEquals(1, c.widget)
+        // W51: the previews are the tab itself; there is no "Choose a widget" row and no second layer
+        rule.onAllNodesWithText("Choose a widget").assertCountEquals(0)
         rule.onNodeWithText("Folders").performClick(); rule.onNodeWithText("New folder").performClick(); assertEquals(1, c.folder)
         rule.onNodeWithText("App group").performScrollTo().performClick(); assertEquals(1, c.group)
         rule.onNodeWithText("App shortcut").assertExists()
@@ -221,6 +228,68 @@ class PageEditorUiTest {
         rule.onNodeWithText("Pages use the same wallpaper as Glance").performClick()
         assertTrue("the switch wrote the pref", !c.prefs.pagesSameAsGlance)
         shoot("settings_tab")
+    }
+
+    // ---- W51 (addBrowse): the Widgets tab is the browser, the Apps tab never raises the keyboard on its own
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_07_addBrowse10_theWidgetsTabShowsThePreviewsItselfAndATapAddsWithoutASecondLayer() {
+        val c = Calls(); host(c, fourPages)
+        rule.onNodeWithText("Widgets").performClick()
+        // one layer: the cards are in the tab, no "Choose a widget" row, no sheet, no dialog
+        rule.onAllNodesWithText("Choose a widget").assertCountEquals(0)
+        rule.onAllNodesWithText("Add a widget").assertCountEquals(0)
+        tag(WidgetBrowserTags.BROWSER).assertIsDisplayed()
+        tag(WidgetBrowserTags.CARD_PREFIX + "0").assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        rule.onNodeWithText("Big clock").assertIsDisplayed(); rule.onNodeWithText("5x2").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Add widget: Big clock, Clockwork, 5x2").assertHasClickAction()
+        // the search field does not take focus on its own
+        tag(WidgetBrowserTags.SEARCH).assertIsNotFocused()
+        rule.onNodeWithText("Big clock").performClick()
+        assertEquals(listOf("Big clock"), c.widgets)
+        shoot("addBrowse_widgets_tab")
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_07_addBrowse11_theWidgetsTabSearchesAndFiltersByApp() {
+        val c = Calls(); host(c, fourPages)
+        rule.onNodeWithText("Widgets").performClick()
+        tag(WidgetBrowserTags.SEARCH).performTextInput("radar")
+        rule.onNodeWithText("Rain radar").assertIsDisplayed(); rule.onAllNodesWithText("Alarm").assertCountEquals(0)
+        tag(WidgetBrowserTags.SEARCH).performTextInput("zzz")
+        rule.onNodeWithText("No widget matches").assertIsDisplayed()
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_07_addBrowse12_theAppChipsFilterTheCarouselByApp() {
+        val c = Calls(); host(c, fourPages)
+        rule.onNodeWithText("Widgets").performClick()
+        rule.onNodeWithText("Weatherly").performScrollTo().performClick()
+        rule.onNodeWithText("Forecast").assertIsDisplayed(); rule.onAllNodesWithText("Alarm").assertCountEquals(0)
+        rule.onNodeWithText("All").performClick(); rule.onNodeWithText("Alarm").assertIsDisplayed()
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_addBrowse13_theAppsTabDoesNotTakeFocusOrRaiseTheKeyboardOnOpenEvenWhenAskedToFocusTheAddStrip() {
+        val c = Calls(); host(c, fourPages, focusAdd = true, keyboard = true)
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription("Filter apps").assertIsNotFocused()
+        // the focus the empty-home hint asks for lands on the first app icon (keyboard and controller users), not on the field
+        rule.onNodeWithContentDescription("Add to home: Alpha").assertIsFocused()
+        // tapping the field is what raises the keyboard
+        rule.onNodeWithContentDescription("Filter apps").performClick()
+        rule.onNodeWithContentDescription("Filter apps").assertIsFocused()
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_addBrowse14_theAppsTabShowsLargerIconsInRowsAndATapStillAdds() {
+        val c = Calls(); host(c, fourPages)
+        val alpha = rule.onNodeWithContentDescription("Add to home: Alpha").assertIsDisplayed().assertHeightIsAtLeast(48.dp).getUnclippedBoundsInRoot()
+        val bravo = rule.onNodeWithContentDescription("Add to home: Bravo").getUnclippedBoundsInRoot()
+        assertTrue("tiles are at least 72 dp wide", alpha.width >= 72.dp)
+        assertTrue("the carousel runs sideways: Bravo is beside or under Alpha, not below a whole column", bravo.left >= alpha.left)
+        rule.onNodeWithContentDescription("Add to home: Camera").performClick(); assertEquals(listOf("Camera"), c.addedApps)
+        shoot("addBrowse_apps_tab")
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

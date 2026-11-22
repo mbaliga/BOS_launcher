@@ -60,6 +60,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.safeDrawing
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.Corner
@@ -124,7 +127,7 @@ fun PageEditorHost(
     onReorder: (Int, Int) -> Unit,
     onAddApp: (AppEntry) -> Unit,
     onDropApp: (AppEntry, Int) -> Unit,
-    onWidget: () -> Unit,
+    onWidget: (WidgetChoice) -> Unit,
     onFolder: () -> Unit,
     onShortcut: () -> Unit,
     onLink: () -> Unit,
@@ -138,6 +141,8 @@ fun PageEditorHost(
     modifier: Modifier = Modifier,
     /** INTEGRATION POINT: the edit chrome's top bar (Cancel, "Editing page N of M", Undo, Redo, Done) is drawn in the 56 dp slot at the top ([PageEditorGeometry.Layout.topBar]); null leaves the slot empty. */
     topBar: (@Composable () -> Unit)? = null,
+    /** W51: where the Widgets tab gets its providers (the default loads the device's; tests pass a fixed list). */
+    widgetSource: @Composable () -> List<WidgetChoice>? = { rememberWidgetChoices() },
 ) {
     fun alphaNow() = EditCardGeometry.frame(layout.target, progress.value, reduced).carouselAlpha
     val d = LocalDensity.current
@@ -147,7 +152,7 @@ fun PageEditorHost(
     var tab by rememberSaveable { mutableStateOf(EditorTab.Apps) }
     // The Glance has no apps or widgets: its card brings the Settings tab (its own options) forward.
     LaunchedEffect(glanceFocus) { if (glanceFocus) tab = EditorTab.Settings }
-    LaunchedEffect(focusAdd, show) { if (focusAdd && show) { tab = EditorTab.Apps; androidx.compose.runtime.withFrameNanos { }; runCatching { focus.requestFocus() } } }
+    LaunchedEffect(focusAdd, show) { if (focusAdd && show) { tab = EditorTab.Apps; repeat(3) { androidx.compose.runtime.withFrameNanos { } }; runCatching { focus.requestFocus() } } }
     var hostOrigin by remember { mutableStateOf(Offset.Zero) }
     val stripState = rememberLazyListState()
 
@@ -188,12 +193,14 @@ fun PageEditorHost(
                     // ---- the top bar's slot (the edit chrome draws there) ----
                     if (topBar != null) Box(Modifier.place(layout.topBar).testTag("page-editor-topbar-slot")) { topBar() }
                     // ---- tabs and their content ----
-                    Column(Modifier.place(layout.tabs).testTag("page-editor-tabs"), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                    // W51: with the keyboard up (a tapped search field) the panel rises over it, so the results stay visible above the keyboard.
+                    val imeLift = (WindowInsets.ime.getBottom(d) - WindowInsets.navigationBars.getBottom(d)).coerceAtLeast(0)
+                    Column(Modifier.place(layout.tabs).offset { androidx.compose.ui.unit.IntOffset(0, -imeLift) }.testTag("page-editor-tabs"), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                         PageEditorTabRow(tab, { tab = it }, modifier = Modifier.height(with(d) { layout.tabRow.height.toDp() }).padding(horizontal = 8.dp))
                         PageEditorContent(
                             tab = tab, page = if (glanceFocus) null else current, pageCount = pages.size, prefs = prefs, apps = apps, onHome = onHome, hasWork = hasWork, isWork = isWork,
                             drag = drag, focusRequester = focus, onAddApp = onAddApp, onWidget = onWidget, onFolder = onFolder, onShortcut = onShortcut, onLink = onLink, onFile = onFile, onGroup = onGroup,
-                            settings = PageEditorSettingsActions(onPrefs), modifier = Modifier.weight(1f).fillMaxSize(),
+                            settings = PageEditorSettingsActions(onPrefs), modifier = Modifier.weight(1f).fillMaxSize(), widgetSource = widgetSource,
                         )
                     }
                     // ---- the strip ----

@@ -90,7 +90,7 @@ fun EditCardHost(
     onMoveTo: (Int, Int) -> Unit,
     onAddPage: () -> Unit,
     onAddApp: (AppEntry) -> Unit,
-    onWidget: () -> Unit,
+    onWidget: (WidgetChoice) -> Unit,
     onFolder: () -> Unit,
     onShortcut: () -> Unit,
     onLink: () -> Unit,

@@ -108,8 +108,9 @@ class HomeItems internal constructor(
     internal var hiddenOpen by mutableStateOf(false)
     internal var iconFor by mutableStateOf<AppEntry?>(null)
     internal fun context(): Context = context
-    /** HOM-04: the add carousel opens the widget and file pickers through these counters (Overlays owns the launchers). */
-    internal var widgetRequest by mutableIntStateOf(0)
+    /** HOM-04: the add carousel opens the file picker through this counter (Overlays owns the launcher). */
+    /** W51: a widget chosen in an in-place browser (the page editor's Widgets tab, the tray's carousel); Overlays binds and places it through the picker's own flow. */
+    internal var widgetChoice by mutableStateOf<com.bos.sphere.feature.grid.WidgetChoice?>(null)
     internal var fileRequest by mutableIntStateOf(0)
     internal var restoreRev by mutableIntStateOf(0)
 
@@ -615,7 +616,7 @@ class HomeItems internal constructor(
                 addLink(uri.toString(), name, isFile = true)
             }
         }
-        LaunchedEffect(widgetRequest) { if (widgetRequest > 0) picker.launch() }
+        LaunchedEffect(widgetChoice) { widgetChoice?.let { widgetChoice = null; picker.add(it) } }
         LaunchedEffect(fileRequest) { if (fileRequest > 0) openDoc.launch(arrayOf("*/*")) }
         var pendingRebind by remember { mutableStateOf<SavedRebind?>(null) }
         val bindLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->

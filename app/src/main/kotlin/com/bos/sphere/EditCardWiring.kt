@@ -185,7 +185,7 @@ fun EditCardOverlay(
         onDropApp = { app, page ->
             if (addAppTo(app, page) && page != current) android.widget.Toast.makeText(homeItems.context(), L10n.tr("Added to page %d", page + 1), android.widget.Toast.LENGTH_SHORT).show()
         },
-        onWidget = { homeItems.widgetRequest++ },
+        onWidget = { homeItems.widgetChoice = it },
         onFolder = { homeItems.folderOpen = true },
         onShortcut = { homeItems.shortcutOpen = true },
         onLink = { homeItems.linkOpen = true },

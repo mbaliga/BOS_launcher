@@ -6,6 +6,12 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import com.bos.sphere.core.data.AppEntry
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -106,6 +112,8 @@ object EditChromeTags {
     const val CHIP_WIDGETS = "edit.tray.widgets"
     const val CHIP_FOLDERS = "edit.tray.folders"
     const val CHIP_PAGE = "edit.tray.page"
+    const val BROWSER = "edit.browser"
+    const val BROWSER_DONE = "edit.browser.done"
     const val SHIELD = "edit.fixed.shield"
 }
 
@@ -215,14 +223,20 @@ fun HomeEditChrome(
     onRedo: () -> Unit,
     onDone: () -> Unit,
     onCancel: () -> Unit,
-    onApps: () -> Unit,
-    onWidgets: () -> Unit,
     onFolders: () -> Unit,
     onAddPage: () -> Unit,
     onOpenPageEditor: () -> Unit,
     modifier: Modifier = Modifier,
     touchSignal: Int = 0,
     announce: (String) -> Unit = rememberAnnouncer(),
+    /** W51: the tray's Apps and Widgets chips open the visual carousel in place above the tray: these are its data and its two add paths (a tap places the item on the page being edited). */
+    apps: List<AppEntry> = emptyList(),
+    onHome: Set<String> = emptySet(),
+    hasWork: Boolean = false,
+    isWork: (AppEntry) -> Boolean = { false },
+    onAddApp: (AppEntry) -> Unit = {},
+    onAddWidget: (WidgetChoice) -> Unit = {},
+    widgetSource: @Composable () -> List<WidgetChoice>? = { rememberWidgetChoices() },
 ) {
     if (!visible) return
     val (n, m) = EditChromeText.titleArgs(pageIndex, pageCount)
@@ -238,10 +252,12 @@ fun HomeEditChrome(
     }
     val cancel = { state.requestCancel(hasChanges, onCancel) }
     BackHandler(enabled = visible) { cancel() }
+    var panel by remember { mutableStateOf(TrayPanel.None) }
+    BackHandler(enabled = panel != TrayPanel.None) { panel = TrayPanel.None } // registered last: Back closes the carousel before it cancels the edit
     val focus = remember { FocusRequester() }
     Box(
         modifier.fillMaxSize().testTag("edit.chrome")
-            .onKeyEvent { e -> if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) { cancel(); true } else false },
+            .onKeyEvent { e -> if (e.type == KeyEventType.KeyDown && e.key == Key.Escape) { if (panel != TrayPanel.None) panel = TrayPanel.None else cancel(); true } else false },
     ) {
         PageHairline(progress, page)
         // ---- top bar
@@ -256,7 +272,10 @@ fun HomeEditChrome(
         val safeTop = WindowInsets.safeDrawing.getTop(dens).toFloat()
         HintLine(showHint, touchSignal, reduced, progress, EditChromeGeometry.hintTopPx(page, safeTop, dens.density))
         // ---- tray
-        EditTray(progress, EditChromeGeometry.trayBottomDp(page, dens.density, trayBottomDp), showAddPage, onApps, onWidgets, onFolders, onAddPage)
+        EditTray(
+            progress, EditChromeGeometry.trayBottomDp(page, dens.density, trayBottomDp), showAddPage, panel, { panel = it }, touchSignal, onFolders, onAddPage,
+            apps, onHome, hasWork, isWork, onAddApp, onAddWidget, widgetSource,
+        )
     }
     EditCancelDialog(state, onCancel)
 }
@@ -388,31 +407,76 @@ private fun HintLine(show: Boolean, touchSignal: Int, reduced: Boolean, progress
     }
 }
 
+/** W51: which carousel the tray shows above its chips. */
+enum class TrayPanel { None, Apps, Widgets }
+
 @Composable
-private fun EditTray(progress: State<Float>, bottomDp: Float, showAddPage: Boolean, onApps: () -> Unit, onWidgets: () -> Unit, onFolders: () -> Unit, onAddPage: () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        Row(
+private fun EditTray(
+    progress: State<Float>, bottomDp: Float, showAddPage: Boolean, panel: TrayPanel, setPanel: (TrayPanel) -> Unit, touchSignal: Int, onFolders: () -> Unit, onAddPage: () -> Unit,
+    apps: List<AppEntry>, onHome: Set<String>, hasWork: Boolean, isWork: (AppEntry) -> Boolean, onAddApp: (AppEntry) -> Unit, onAddWidget: (WidgetChoice) -> Unit,
+    widgetSource: @Composable () -> List<WidgetChoice>?,
+) {
+    // A touch anywhere else closes the carousel (it never blocks the touch: the page still gets it, so a drag of an item starts at once). A touch inside the tray (the carousel or the chips) does not.
+    val inside = remember { booleanArrayOf(false) }
+    val first = remember { touchSignal }
+    LaunchedEffect(touchSignal) {
+        if (touchSignal != first && panel != TrayPanel.None && !inside[0]) setPanel(TrayPanel.None)
+        inside[0] = false
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        val panelH = (maxHeight.value * 0.40f).coerceIn(170f, 300f).dp // of the window the chrome really fills
+        Column(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)).padding(bottom = bottomDp.dp)
-                .height(EditChromeGeometry.TRAY_DP.dp).graphicsLayer { alpha = progress.value }
-                .testTag(EditChromeTags.TRAY) // the chips take their own touches; the gaps let the page dots and the page below them through
-                .semantics { isTraversalGroup = true },
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
+                .graphicsLayer { alpha = progress.value },
         ) {
-            Chip(L10n.tr("Apps"), EditChromeTags.CHIP_APPS, null, onApps)
-            Chip(L10n.tr("Widgets"), EditChromeTags.CHIP_WIDGETS, null, onWidgets)
-            Chip(L10n.tr("Folders"), EditChromeTags.CHIP_FOLDERS, null, onFolders)
-            if (showAddPage) Chip(L10n.tr("+ Page"), EditChromeTags.CHIP_PAGE, L10n.tr("Add page"), onAddPage)
+            // Only the carousel and the chips count as "inside" (the tray's gaps let touches through to what lies under them, as before).
+            val markInside = Modifier.pointerInput(Unit) { awaitEachGesture { awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial); inside[0] = true } }
+            if (panel != TrayPanel.None) {
+                val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 6.dp).height(panelH).clip(shape).background(Color(0xF2121520), shape).border(1.dp, HyleColors.Hairline, shape)
+                        .then(markInside).testTag(EditChromeTags.BROWSER).semantics { isTraversalGroup = true; paneTitle = L10n.tr(if (panel == TrayPanel.Apps) "Add apps" else "Add widgets") },
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            L10n.tr(if (panel == TrayPanel.Apps) "Add apps" else "Add widgets"), color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f).semantics { heading() },
+                        )
+                        Text(
+                            L10n.tr("Done"), color = HyleColors.InkBright, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.heightIn(min = EditChromeGeometry.BUTTON_DP.dp).defaultMinSize(minWidth = EditChromeGeometry.BUTTON_DP.dp).clip(RoundedCornerShape(50))
+                                .clickable(role = Role.Button) { setPanel(TrayPanel.None) }.padding(horizontal = 14.dp).wrapCentre().testTag(EditChromeTags.BROWSER_DONE),
+                        )
+                    }
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        if (panel == TrayPanel.Apps) AppsContent(apps, onHome, hasWork, isWork, null, null, onAddApp)
+                        else WidgetBrowser(onPick = onAddWidget, choices = widgetSource())
+                    }
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth().height(EditChromeGeometry.TRAY_DP.dp)
+                    .testTag(EditChromeTags.TRAY) // the chips take their own touches; the gaps let the page dots and the page below them through
+                    .semantics { isTraversalGroup = true },
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Chip(L10n.tr("Apps"), EditChromeTags.CHIP_APPS, null, panel == TrayPanel.Apps, markInside) { setPanel(if (panel == TrayPanel.Apps) TrayPanel.None else TrayPanel.Apps) }
+                Chip(L10n.tr("Widgets"), EditChromeTags.CHIP_WIDGETS, null, panel == TrayPanel.Widgets, markInside) { setPanel(if (panel == TrayPanel.Widgets) TrayPanel.None else TrayPanel.Widgets) }
+                Chip(L10n.tr("Folders"), EditChromeTags.CHIP_FOLDERS, null, false, markInside) { setPanel(TrayPanel.None); onFolders() }
+                if (showAddPage) Chip(L10n.tr("+ Page"), EditChromeTags.CHIP_PAGE, L10n.tr("Add page"), false, markInside) { onAddPage() }
+            }
         }
     }
 }
 
 @Composable
-private fun Chip(label: String, tag: String, description: String?, onClick: () -> Unit) {
+private fun Chip(label: String, tag: String, description: String?, on: Boolean, extra: Modifier, onClick: () -> Unit) {
     Text(
-        label, color = HyleColors.InkBright, fontSize = 14.sp, maxLines = 1,
-        modifier = Modifier.heightIn(min = EditChromeGeometry.BUTTON_DP.dp).clip(RoundedCornerShape(50)).background(Color(0xE6161922))
+        label, color = if (on) HyleColors.OnAccent else HyleColors.InkBright, fontSize = 14.sp, maxLines = 1,
+        modifier = Modifier.heightIn(min = EditChromeGeometry.BUTTON_DP.dp).then(extra).clip(RoundedCornerShape(50))
+            .background(if (on) HyleColors.Violet else Color(0xF2161922)).border(1.dp, if (on) HyleColors.Violet else Color(0x40FFFFFF), RoundedCornerShape(50))
             .clickable(role = Role.Button) { onClick() }.padding(horizontal = 18.dp).wrapCentre().testTag(tag)
-            .semantics { if (description != null) contentDescription = description },
+            .semantics { if (description != null) contentDescription = description; selected = on },
     )
 }
 

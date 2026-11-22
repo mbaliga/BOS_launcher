@@ -91,7 +91,7 @@ class SettingsVisualW54Test {
     @Test fun CFG_23_everySmallChoiceTheInventoryListsIsThere() {
         val titles = variants().flatMap { (_, p) -> choices(buildSettingsCategories(model(p))).map { it.second.title } }.toSet()
         for (t in listOf(
-            "Order", "Right side", "Clock style", "Clock format", "Clock colour", "Clock size", "Hotspots", "Icon colour", "Calm effect", "Alert effect", "Show",
+            "Order", "Right side", "Clock style", "Clock format", "Clock colour", "Clock size", "Hotspots", "Icon colour", "Calm style", "Show",
             "Wheel groups", "Ring segments", "Radar background", "Radar layout", "Web engine", "Default view", "Comms theme", "Page turning · portrait", "Page turning · landscape",
             "Scroll direction", "Corner style", "Icon type", "Light / dark", "Icon shape", "Style", "Pages", "Settings backdrop", "Left page", "Layout", "Default density", "Font",
         )) assertTrue("$t is a choice of cards", t in titles)

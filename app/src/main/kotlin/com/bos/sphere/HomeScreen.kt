@@ -65,6 +65,7 @@ import com.bos.sphere.core.data.GridSpec
 import com.bos.sphere.core.data.PageShape
 import com.bos.sphere.core.data.IndicatorColors
 import com.bos.sphere.core.data.IndicatorSource
+import com.bos.sphere.core.data.wallpaper
 import com.bos.sphere.core.data.PageMode
 import com.bos.sphere.core.data.ThemeMode
 import com.bos.sphere.core.data.UsageStats
@@ -777,26 +778,24 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         IconTheme(prefs.iconShape, prefs.iconTint, prefs.iconPlate, homeAccent, iconColors)
     }
 
-    // ---- indicator: the background dots / effects read out any measurement
-    val indicator = remember { IndicatorSource(context) }
-    LaunchedEffect(prefs.indicatorMetric) { indicator.setMetric(prefs.indicatorMetric) } // wave 35: Signal or Battery
-    val reading by indicator.reading.collectAsStateWithLifecycle()
+    // ---- indicator (wave 55): the calm style reads out the chosen metric, the regular indicators show both signal and battery. Each source runs only while something uses it.
+    val signalSource = remember { IndicatorSource(context).also { it.setMetric(com.bos.sphere.core.data.IndicatorMetric.Signal) } }
+    val batterySource = remember { IndicatorSource(context).also { it.setMetric(com.bos.sphere.core.data.IndicatorMetric.Battery) } }
+    val signalReading by signalSource.reading.collectAsStateWithLifecycle()
+    val batteryReading by batterySource.reading.collectAsStateWithLifecycle()
+    val reading = if (prefs.indicatorMetric == com.bos.sphere.core.data.IndicatorMetric.Battery) batteryReading else signalReading
+    val glanceStyle = com.bos.sphere.core.data.CalmStyles.resolve(prefs.calmStyle, prefs.wallpaper(com.bos.sphere.core.data.WallpaperSurface.Glance).kind)
+    val pagesStyle = com.bos.sphere.core.data.CalmStyles.resolve(prefs.calmStyle, prefs.wallpaper(com.bos.sphere.core.data.WallpaperSurface.Pages).kind)
+    val regularShown = com.bos.sphere.core.data.CalmStyles.showsRegular(glanceStyle, prefs.calmAlsoRegular)
+    val ambientNeeded = glanceStyle.ambient || pagesStyle.ambient
+    val needSignal = regularShown || (ambientNeeded && prefs.indicatorMetric == com.bos.sphere.core.data.IndicatorMetric.Signal)
+    val needBattery = regularShown || (ambientNeeded && prefs.indicatorMetric == com.bos.sphere.core.data.IndicatorMetric.Battery)
+    androidx.lifecycle.compose.LifecycleStartEffect(needSignal) { if (needSignal) signalSource.start(); onStopOrDispose { signalSource.stop() } }
+    androidx.lifecycle.compose.LifecycleStartEffect(needBattery) { if (needBattery) batterySource.start(); onStopOrDispose { batterySource.stop() } }
     val indicatorTarget = IndicatorColors.argb(reading, prefs.indicatorLow, prefs.indicatorMid, prefs.indicatorHigh, prefs.indicatorIdle, false)
     val indicatorColor by androidx.compose.animation.animateColorAsState(Color(indicatorTarget.toInt()), com.bos.sphere.core.design.rememberMotionPrefs().gate(androidx.compose.animation.core.tween(800)), label = "indicator")
 
     val mediaInfo by com.bos.sphere.feature.grid.rememberMediaInfo(com.bos.sphere.feature.grid.FixedHomeChrome.listensToMedia(prefs.showMusic)) // STR-06, HOM-23: W38: the media line and its controls are part of the fixed chrome on every page, no strip and nothing in the dock
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, e ->
-            if (e == Lifecycle.Event.ON_START) {
-                indicator.start()
-            }
-            if (e == Lifecycle.Event.ON_STOP) indicator.stop()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) indicator.start()
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); indicator.stop() }
-    }
 
     // ---- status bar: flush-to-top home (swipe down to peek)
     val view = LocalView.current
@@ -897,8 +896,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     fun BackdropIndicator() {
         IndicatorLayer(
             reading = reading,
-            calm = prefs.indicatorCalm,
-            alert = prefs.indicatorAlert,
+            style = com.bos.sphere.core.data.CalmStyles.resolve(prefs.calmStyle, prefs.wallpaper(com.bos.sphere.core.data.WallpaperSurface.Glance).kind),
             metric = prefs.indicatorMetric,
             colorArgb = indicatorColor.toArgb().toLong() and 0xFFFFFFFFL,
             intensity = prefs.indicatorIntensity,
@@ -1262,6 +1260,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     onAwake = { indicatorAwake++ },
                     corners = { Corners() },
                     topLeftHotspot = com.bos.sphere.core.data.Corner.TopLeft in glanceOn, topRightHotspot = com.bos.sphere.core.data.Corner.TopRight in glanceOn,
+                    regular = if (regularShown) signalReading to batteryReading else null, low = prefs.indicatorLow, // wave 55: the regular battery and signal indicators
                 )
                 if (glanceClockEditing) com.bos.sphere.feature.grid.GlanceClockEditShield() // wave 50: dimmed like the home editor does, and inert
             }
@@ -1439,14 +1438,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onRequestContactsPermission = { grantPrompter.ask(com.bos.sphere.core.design.GrantKind.Contacts) { contactsPermission.launch(android.Manifest.permission.READ_CONTACTS) } },
             onDismiss = { searchOpen = false },
             modifier = Modifier.fillMaxSize(),
-            // Wave 35: the signal alert (not the calm dots) also shows over Radar, whatever its background (Dimmed or True black).
-            alertLayer = {
-                if (prefs.indicatorAlert != null) IndicatorLayer(
-                    reading = reading, calm = null, alert = prefs.indicatorAlert, metric = prefs.indicatorMetric,
-                    colorArgb = 0L, intensity = prefs.indicatorIntensity, speed = prefs.indicatorSpeed,
-                    modifier = Modifier.fillMaxSize(), low = prefs.indicatorLow, mid = prefs.indicatorMid,
-                )
-            },
             settingsSource = settingsSource,
             initialQuery = typedQuery,
             initialCategory = radarScope,

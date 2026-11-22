@@ -22,10 +22,11 @@ object RetiredPrefKeys {
     )
 
     /**
-     * Wave 35: `indEffects` (the old effect set) is retired too, but it is the source of the one-time migration to `indCalm` / `indAlert`; it is only removed once
-     * those exist (the store migrates and removes it itself at start), so a purge that runs first never loses the user's choice.
+     * Wave 35: `indEffects` (the old effect set) is retired too, but it is the source of the one-time migration; wave 55: so are its successors `indCalm` and `indAlert` (the calm and
+     * alert effect pair), which map to the one `calmStyle`. Each is only removed once `calmStyle` exists (the store migrates and removes them itself at start), so a purge that runs
+     * first never loses the user's choice.
      */
-    val AFTER_MIGRATION: Map<String, Map<String, String>> = mapOf("launcher_prefs" to mapOf("indEffects" to "indCalm", "glanceContent" to "showMusic"))
+    val AFTER_MIGRATION: Map<String, Map<String, String>> = mapOf("launcher_prefs" to mapOf("indEffects" to "calmStyle", "indCalm" to "calmStyle", "indAlert" to "calmStyle", "glanceContent" to "showMusic"))
 
     /** Keys an imported settings file may still carry from those builds; they are dropped, never kept as unknown fields. */
     val DROPPED_ON_IMPORT: Set<String> = RetiredBackgroundKeys.KEYS + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert", "glanceWeather", "suggestion", "drawerStyle", "drawerView", "drawerSort", "drawerRail", "drawerRailVisible", "drawerViewSwitch") + ClockRetired.KEYS

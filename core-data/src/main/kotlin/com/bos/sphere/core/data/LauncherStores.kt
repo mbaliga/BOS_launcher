@@ -128,7 +128,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("appsOnHome", next.appsOnHome.name)
             .putString("pageMode", next.pageMode.name)
             .putString("indMetric", next.indicatorMetric.name)
-            .putString("indCalm", IndicatorMigration.store(next.indicatorCalm)).putString("indAlert", IndicatorMigration.store(next.indicatorAlert))
+            .putBoolean("calmRegular", next.calmAlsoRegular)
             .putLong("indLow", next.indicatorLow).putLong("indMid", next.indicatorMid)
             .putLong("indHigh", next.indicatorHigh).putLong("indIdle", next.indicatorIdle)
             .putFloat("indIntensity", next.indicatorIntensity)
@@ -156,7 +156,8 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         if (sp.contains("suggestion")) sp.edit().remove("suggestion").apply() // wave 38: the Suggested app slot is gone
         if (GlanceMusic.RETIRED_KEYS.any { sp.contains(it) }) sp.edit().also { e -> GlanceMusic.RETIRED_KEYS.forEach { e.remove(it) } }.apply() // wave 38: showMusic was just written from them
         if (HomeModelMigration.RETIRED_KEYS.any { sp.contains(it) }) sp.edit().also { e -> HomeModelMigration.RETIRED_KEYS.forEach { e.remove(it) } }.apply()
-        if (sp.contains("indEffects") || sp.contains("indInvert")) sp.edit().remove("indEffects").remove("indInvert").apply() // wave 35: the old effect set and the ramp flip
+        // Wave 55: the calm style; null (never chosen: automatic) is stored as no key at all, and the old effect keys go once the new one exists.
+        sp.edit().also { e -> if (next.calmStyle == null) e.remove("calmStyle") else e.putString("calmStyle", next.calmStyle.name) }.remove("indCalm").remove("indAlert").remove("indEffects").remove("indInvert").apply()
         // Wave 15: the keys of the removed background gallery are deleted once, so nothing of it lingers.
         if (RetiredBackgroundKeys.KEYS.any { it != "bgPicture" && sp.contains(it) }) {
             sp.edit().also { e -> RetiredBackgroundKeys.KEYS.forEach { e.remove(it) } }.apply()
@@ -164,23 +165,29 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         DeviceBound.writePrefs(sp, device, next.leftWidgetId)
     }
 
-    /** Wave 35: the calm / alert selections; the old `indEffects` set (read through [IndicatorMigration]) only when the new keys were never written. */
-    private fun readEffects(d: LauncherPrefs): IndicatorSelection {
-        val legacy = sp.getString("indEffects", null) // read (and so accounted for) on every path, so an import never carries it as an unknown field
-        return if (sp.contains("indCalm") || sp.contains("indAlert")) {
-            IndicatorSelection(
-                if (sp.contains("indCalm")) IndicatorMigration.parse<CalmEffect>(sp.getString("indCalm", null)) else d.indicatorCalm,
-                IndicatorMigration.parse<AlertEffect>(sp.getString("indAlert", null)),
-            )
-        } else IndicatorMigration.fromLegacy(legacy) ?: IndicatorSelection(d.indicatorCalm, d.indicatorAlert)
+    /**
+     * Wave 55: the calm style. The key `calmStyle` wins; with none, the wave 35 pair (`indCalm`, `indAlert`) or the older `indEffects` set map to the nearest style once
+     * (see [CalmStyles.fromW35], [IndicatorMigration.fromLegacy]); never stored at all means automatic (null). The old keys are read on every path, so an import never
+     * carries them as unknown fields.
+     */
+    private fun readCalmStyle(): CalmStyle? {
+        val calm = sp.getString("indCalm", null)
+        val alert = sp.getString("indAlert", null)
+        val legacy = sp.getString("indEffects", null)
+        return when {
+            sp.contains("calmStyle") -> CalmStyles.parse(sp.getString("calmStyle", null))
+            sp.contains("indCalm") || sp.contains("indAlert") -> CalmStyles.fromW35(calm, alert)
+            else -> IndicatorMigration.fromLegacy(legacy)
+        }
     }
 
-    /** Wave 35: persists the migrated selections once and drops the old `indEffects` / `indInvert` keys, so a later retired-key purge has nothing to lose. */
+    /** Wave 55: persists the migrated style once and drops the old `indCalm` / `indAlert` / `indEffects` / `indInvert` keys, so a later retired-key purge has nothing to lose. */
     private fun migrateEffects() {
-        if (!sp.contains("indEffects") && !sp.contains("indInvert")) return
-        val sel = readEffects(LauncherPrefs())
-        sp.edit().putString("indCalm", IndicatorMigration.store(sel.calm)).putString("indAlert", IndicatorMigration.store(sel.alert))
-            .remove("indEffects").remove("indInvert").apply()
+        if (!sp.contains("indCalm") && !sp.contains("indAlert") && !sp.contains("indEffects") && !sp.contains("indInvert")) return
+        val style = readCalmStyle()
+        val e = sp.edit()
+        if (style != null) e.putString("calmStyle", style.name)
+        e.remove("indCalm").remove("indAlert").remove("indEffects").remove("indInvert").apply()
     }
 
     private fun read(): LauncherPrefs {
@@ -188,7 +195,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         // Wave 15: any stored choice of the old background gallery is ignored; no stored slots means the default pair.
         val bg = BackgroundChoice.fromStored(sp.getString("bgSlot1", null), sp.getString("bgSlot2", null))
         val pagesBg = BackgroundChoice.fromStored(sp.getString("wpPagesSlot1", null), sp.getString("wpPagesSlot2", null))
-        val effects = readEffects(d)
         val migrated = HomeModelMigration.resolve(sp.getString("homeLanding", null), if (sp.contains("glanceEnabled")) sp.getBoolean("glanceEnabled", true) else null)
         // Wave 28: the Pages setting; the old Scroll / Paginated choice is read only when no homePages is stored (LauncherStores.migratePages settles the unchosen case with the layout).
         val pagesMode = HomeModelMigration.pagesMode(
@@ -280,7 +286,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             appsOnHome = enumOr(sp.getString("appsOnHome", null), if (sp.contains("style") || sp.contains("pCols")) AppsOnHome.Everything else AppsOnHome.PinnedOnly),
             pageMode = enumOr(sp.getString("pageMode", null), d.pageMode),
             indicatorMetric = enumOr(sp.getString("indMetric", null), d.indicatorMetric),
-            indicatorCalm = effects.calm, indicatorAlert = effects.alert,
+            calmStyle = readCalmStyle(), calmAlsoRegular = sp.getBoolean("calmRegular", d.calmAlsoRegular),
             indicatorLow = sp.getLong("indLow", d.indicatorLow), indicatorMid = sp.getLong("indMid", d.indicatorMid),
             indicatorHigh = sp.getLong("indHigh", d.indicatorHigh), indicatorIdle = sp.getLong("indIdle", d.indicatorIdle),
             indicatorIntensity = sp.getFloat("indIntensity", d.indicatorIntensity).coerceIn(0f, 1f),

@@ -9,8 +9,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.bos.sphere.core.catalog.UsageRange
-import com.bos.sphere.core.data.AlertEffect
-import com.bos.sphere.core.data.CalmEffect
+import com.bos.sphere.core.data.CalmStyle
 import com.bos.sphere.core.data.ClockFormat
 import com.bos.sphere.core.data.ClockSize
 import com.bos.sphere.core.data.ClockStyle
@@ -40,9 +39,8 @@ object SettingsArtLook {
     val iconShape = ArtSet(IconShape.entries) { iconShapeArt(it) }
     val iconTint = ArtSet(IconTint.entries) { iconTintArt(it) }
     val backdrop = ArtSet(SettingsBackdrop.entries) { backdropArt(it) }
-    /** Calm effect: off (null) plus each effect. */
-    val calm = ArtSet(listOf<CalmEffect?>(null) + CalmEffect.entries) { calmArt(it) }
-    val alert = ArtSet(listOf<AlertEffect?>(null) + AlertEffect.entries) { alertArt(it) }
+    /** Calm style (wave 55): Off, Regular and the four ambient styles. */
+    val calm = ArtSet(CalmStyle.entries) { calmArt(it) }
     val metric = ArtSet(IndicatorMetric.entries) { metricArt(it) }
     val webEngine = ArtSet(WebEngine.entries) { webEngineArt(it) }
     val wallpaperKind = ArtSet(WallpaperKind.entries) { wallpaperKindArt(it) }
@@ -203,44 +201,48 @@ object SettingsArtLook {
     private val Warn = Color(0xFFFFB703)
     private val Bad = Color(0xFFFF5252)
 
-    private fun calmArt(e: CalmEffect?): VisualArt = { ink ->
-        val box = phoneFrame(ink)
-        when (e) {
-            null -> { appGridIn(box, ink.faint, 2, 3); line(ink.strong, 0.58f, 0.4f, 0.76f, 0.6f, 2f); line(ink.strong, 0.76f, 0.4f, 0.58f, 0.6f, 2f) }
-            CalmEffect.Bloom -> {
-                val (o, sz) = box
-                val c = Offset(o.x + sz.width / 2f, o.y + sz.height * 0.55f)
-                for (k in 4 downTo 1) drawCircle(Healthy.copy(alpha = 0.1f + 0.07f * (5 - k)), sz.width * 0.14f * k, c)
-                drawCircle(Healthy, dp(3.2f), c)
-            }
-            CalmEffect.AnimatedDots -> {
-                for (r in 0 until 4) for (c in 0 until 3) {
-                    val d = ((r * 3 + c) % 5) / 4f
-                    dotIn(box, Healthy.copy(alpha = 0.35f + 0.65f * d), 0.24f + c * 0.26f, 0.2f + r * 0.2f, 1.4f + 1.8f * d)
-                }
-            }
-        }
-    }
-
-    private fun alertArt(e: AlertEffect?): VisualArt = { ink ->
+    private fun calmArt(e: CalmStyle): VisualArt = { ink ->
         val box = phoneFrame(ink)
         val (o, sz) = box
+        fun dotsAlong(xs: List<Pair<Float, Float>>) { for ((i, p) in xs.withIndex()) dotIn(box, Healthy.copy(alpha = 0.4f + 0.6f * ((i % 4) / 3f)), p.first, p.second, 1.2f + 1.0f * ((i % 4) / 3f)) }
         when (e) {
-            null -> { appGridIn(box, ink.faint, 2, 3); line(ink.strong, 0.58f, 0.4f, 0.76f, 0.6f, 2f); line(ink.strong, 0.76f, 0.4f, 0.58f, 0.6f, 2f) }
-            AlertEffect.Vignette -> {
-                for (k in 0 until 4) {
-                    val inset = dp(1.5f + k * 2.2f)
-                    drawRoundRect(Bad.copy(alpha = 0.7f - k * 0.17f), Offset(o.x + inset, o.y + inset), Size(sz.width - 2 * inset, sz.height - 2 * inset), CornerRadius(dp(4f)), style = Stroke(dp(2.4f)))
+            CalmStyle.None -> { appGridIn(box, ink.faint, 2, 3); lineIn(box, ink.strong, 0.3f, 0.35f, 0.7f, 0.65f, 2f); lineIn(box, ink.strong, 0.7f, 0.35f, 0.3f, 0.65f, 2f) }
+            CalmStyle.Regular -> {
+                appGridIn(box, ink.faint, 2, 3, top = 0.3f)
+                // signal bars and a small battery, as drawn at the top of the home
+                for (i in 0 until 4) {
+                    val bh = sz.height * (0.025f + i * 0.012f)
+                    drawRoundRect(if (i < 3) ink.strong else ink.faint, Offset(o.x + sz.width * (0.2f + i * 0.07f), o.y + sz.height * 0.17f - bh), Size(sz.width * 0.05f, bh), CornerRadius(dp(0.8f)))
                 }
-                drawCircle(Warn, dp(3f), Offset(o.x + sz.width / 2f, o.y + sz.height / 2f))
+                drawRoundRect(ink.strong, Offset(o.x + sz.width * 0.56f, o.y + sz.height * 0.115f), Size(sz.width * 0.24f, sz.height * 0.07f), CornerRadius(dp(1.5f)), style = Stroke(dp(1.1f)))
+                drawRoundRect(Healthy, Offset(o.x + sz.width * 0.595f, o.y + sz.height * 0.13f), Size(sz.width * 0.12f, sz.height * 0.04f), CornerRadius(dp(0.8f)))
             }
-            AlertEffect.ComicLines -> {
-                val c = Offset(o.x + sz.width / 2f, o.y + sz.height / 2f)
-                for (k in 0 until 14) {
-                    val a = (2 * PI * k / 14).toFloat()
-                    val r1 = sz.width * 0.28f; val r2 = if (k % 2 == 0) sz.width * 0.52f else sz.width * 0.42f
-                    drawLine(Bad.copy(alpha = 0.9f), Offset(c.x + r1 * cos(a), c.y + r1 * 1.4f * sin(a)), Offset(c.x + r2 * cos(a), c.y + r2 * 1.6f * sin(a)), dp(1.6f), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            CalmStyle.EdgeDots -> {
+                appGridIn(box, ink.faint, 2, 3)
+                val pts = ArrayList<Pair<Float, Float>>()
+                for (k in 0 until 9) { val f = 0.08f + k * 0.105f; pts += 0.07f to f; pts += 0.93f to f }
+                for (k in 0 until 4) { val f = 0.25f + k * 0.17f; pts += f to 0.04f; pts += f to 0.96f }
+                dotsAlong(pts)
+            }
+            CalmStyle.CornerBloom -> {
+                appGridIn(box, ink.faint, 2, 3)
+                // start angle of the quarter that points into the screen: top-left 0, top-right 90, bottom-right 180, bottom-left 270
+                for ((cx, cy, start) in listOf(Triple(0f, 0f, 0f), Triple(1f, 0f, 90f), Triple(1f, 1f, 180f), Triple(0f, 1f, 270f))) {
+                    val c = Offset(o.x + sz.width * cx, o.y + sz.height * cy)
+                    for (k in 1..3) { val r = sz.width * 0.11f * k; drawArc(Healthy.copy(alpha = 0.8f - k * 0.22f), start, 90f, false, Offset(c.x - r, c.y - r), Size(2 * r, 2 * r), style = Stroke(dp(1.3f))) }
+                    drawCircle(Healthy, dp(1.6f), c)
                 }
+            }
+            CalmStyle.BottomGlow -> {
+                appGridIn(box, ink.faint, 2, 3)
+                drawRect(Brush.verticalGradient(listOf(Color.Transparent, Healthy.copy(alpha = 0.55f)), startY = o.y + sz.height * 0.8f, endY = o.y + sz.height), Offset(o.x, o.y + sz.height * 0.8f), Size(sz.width, sz.height * 0.2f))
+                drawLine(Healthy, Offset(o.x + sz.width * 0.1f, o.y + sz.height - dp(1.2f)), Offset(o.x + sz.width * 0.9f, o.y + sz.height - dp(1.2f)), dp(1.6f))
+            }
+            CalmStyle.Beam -> {
+                appGridIn(box, ink.faint, 2, 3)
+                lineIn(box, ink.faint, 0.93f, 0.12f, 0.93f, 0.88f, 1.4f)
+                lineIn(box, Healthy, 0.93f, 0.4f, 0.93f, 0.88f, 2.2f)
+                drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Healthy.copy(alpha = 0.4f)), startX = o.x + sz.width * 0.8f, endX = o.x + sz.width * 0.93f), Offset(o.x + sz.width * 0.8f, o.y + sz.height * 0.4f), Size(sz.width * 0.13f, sz.height * 0.48f))
             }
         }
     }

@@ -1,3 +1,5 @@
+> **Superseded in wave 55 by [calmStyles.md](calmStyles.md):** the Calm and Alert effect pairs, the coloured vignette, the comic-book lines, the Alert row, the 1.2 s urgent pulse and the Radar alert layer are gone. Only the severity thresholds, the Signal or Battery metric, the colour ramp and the preview below still hold.
+
 # Wave 35 signalEffects: four signal effects in two opposite pairs
 
 Owner: "the signal effect can be a dot bloom, animated dots, comic book lines or a coloured vignette. Coloured vignette and comic book lines are for inverse functions: they flare up when connectivity is low, and become urgent when connectivity is lost. User can select to map this to battery or signal, and two things can be turned on at once, but it can only be opposite pairs: dot bloom OR animated dots AND coloured vignette OR comic book lines." Earlier: the comic-lines alert is "like a spider-sense". Nothing here was run on a device.

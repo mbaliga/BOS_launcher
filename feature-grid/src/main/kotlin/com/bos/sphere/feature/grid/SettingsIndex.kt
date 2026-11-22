@@ -67,7 +67,11 @@ class SettingsIndex(val entries: List<SettingEntry>) {
 
     companion object {
         /** Hidden search aliases: the product word before the rename ("Launchpad") still finds Comms. Never shown. */
-        private val ALIASES = mapOf("launchpad" to "comms", "sessions" to "groups") // wave 41: sessions live on the App groups page
+        private val ALIASES = mapOf(
+            "launchpad" to "comms", "sessions" to "groups", // wave 41: sessions live on the App groups page
+            // Wave 55: the names of the removed calm and alert effects still find the Calm style row.
+            "vignette" to "calm style", "comic" to "calm style", "alert" to "calm style", "bloom" to "calm style", "animated" to "calm style",
+        )
 
         /**
          * Wave 52: words that find every row of a category besides its title: the "Side panel" category was "Comms", and the panel's Comms section

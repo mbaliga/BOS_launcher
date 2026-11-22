@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.data.ControlsPop
 import com.bos.sphere.core.data.Corner
+import com.bos.sphere.core.data.IndicatorReading
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.design.rememberMotionPrefs
 import kotlinx.coroutines.delay
@@ -90,6 +91,9 @@ fun FixedHomeChrome(
     /** Whether a hotspot is drawn in the top-left and top-right screen corners; with neither, the music line runs edge to edge (owner request). */
     topLeftHotspot: Boolean = true,
     topRightHotspot: Boolean = true,
+    /** Wave 55: the regular battery and signal indicators ([RegularIndicators]), drawn under the music line (or in its place when nothing plays); null = not shown. */
+    regular: Pair<IndicatorReading, IndicatorReading>? = null,
+    low: Long = 0xFFFF4D4D,
 ) {
     val motion = rememberMotionPrefs()
     val reduced = motion.reduced
@@ -121,6 +125,9 @@ fun FixedHomeChrome(
                 if (playing && pop.visible) GlanceNotch.TITLE_PUSH_DP.dp else 0.dp,
                 if (reduced) snap() else spring(dampingRatio = 0.8f, stiffness = 420f), label = "chromeTitlePush",
             )
+            if (regular != null) {
+                RegularIndicators(regular.first, regular.second, dark, Modifier.align(Alignment.TopCenter).padding(top = RegularIndicatorGeometry.topDp(playing && media != null).dp).offset { IntOffset(0, push.roundToPx()) }, low = low)
+            }
             Box(Modifier.align(Alignment.TopCenter).padding(top = GlanceNotch.TITLE_TOP_DP.dp).offset { IntOffset(0, push.roundToPx()) }.height(40.dp).testTag("glance.title.slot")) {
                 if (playing && media != null) {
                     NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = FixedHomeChrome.titleWidthDp(w, topLeftHotspot, topRightHotspot).dp, edge = if (dark) Color.Black else Color(0xFFF3F3F6))

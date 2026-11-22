@@ -130,7 +130,7 @@ object GroupWaiting {
             val g = grouping.resolve(n).group
             if (onlyPriority && g?.priority != GroupPriority.Priority) return@filter false
             val pol = listOfNotNull(GroupLogic.effectivePolicy(n.packageName, g, policies))
-            g?.priority != GroupPriority.Quiet && !n.isOngoing && n.key !in readKeys &&
+            g?.priority != GroupPriority.Quiet && !NotificationClass.isPinned(n) && n.key !in readKeys &&
                 (g?.priority == GroupPriority.Priority || !LaunchpadLogic.isSilent(n, rules)) &&
                 !DeliveryLogic.isSilentHere(n, pol) && !DeliveryLogic.isHeld(n, pol, now, zone) &&
                 !SnoozeLogic.isSnoozed(n.key, snoozedUntil, now)

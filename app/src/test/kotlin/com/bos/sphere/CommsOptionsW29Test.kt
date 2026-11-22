@@ -33,6 +33,7 @@ import com.bos.sphere.feature.grid.SettingItem
 import com.bos.sphere.feature.grid.SettingsIndex
 import com.bos.sphere.feature.grid.SettingsSpace
 import com.bos.sphere.ui.CommsOptions
+import com.bos.sphere.ui.DefaultViewChoice
 import com.bos.sphere.ui.HubPrefs
 import com.bos.sphere.ui.HubState
 import com.bos.sphere.ui.HubView
@@ -101,12 +102,32 @@ class CommsOptionsW29Test {
     }
 
     @Test fun STR_01_w29_theDefaultViewRowPersistsAndCommsOpensOnIt() {
-        @Suppress("UNCHECKED_CAST") val r = row("Default view") as SettingItem.Choice<HubView>
-        assertEquals(listOf("All", "Unread", "Read", "Files", "Timeline"), r.options.map { r.label(it) })
-        r.onSelect(HubView.Timeline)
+        @Suppress("UNCHECKED_CAST") val r = row("Default view") as SettingItem.Choice<DefaultViewChoice>
+        // Wave 53: the three categories sit right below All.
+        assertEquals(listOf("All", "Messages", "Notifications", "Alerts", "Unread", "Read", "Files", "Timeline"), r.options.map { r.label(it) })
+        r.onSelect(DefaultViewChoice(HubView.Timeline))
         assertEquals(HubView.Timeline, HubPrefs.of(ctx).defaultView)
-        assertEquals("the row shows it live", HubView.Timeline, (row("Default view") as SettingItem.Choice<*>).selected)
+        assertEquals("the row shows it live", DefaultViewChoice(HubView.Timeline), (row("Default view") as SettingItem.Choice<*>).selected)
         assertEquals("Comms opens on it", HubView.Timeline, HubState(HubPrefs.of(ctx), store, true, liveAll = true).view)
+    }
+
+    @Test fun STR_17_theDefaultViewRowOffersTheCategoriesAndStoresTheChoiceWithTheExportedPrefs() {
+        @Suppress("UNCHECKED_CAST") val r = row("Default view") as SettingItem.Choice<DefaultViewChoice>
+        r.onSelect(DefaultViewChoice(HubView.All, com.bos.sphere.core.data.CommsCategory.Alerts))
+        assertEquals(com.bos.sphere.core.data.CommsCategory.Alerts, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.defaultCategory)
+        assertEquals(DefaultViewChoice(HubView.All, com.bos.sphere.core.data.CommsCategory.Alerts), (row("Default view") as SettingItem.Choice<*>).selected)
+        assertEquals("the hub still opens on All (the category filters it)", HubView.All, HubPrefs.of(ctx).defaultView)
+        (row("Default view") as SettingItem.Choice<DefaultViewChoice>).onSelect(DefaultViewChoice(HubView.All))
+        assertEquals(null, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.defaultCategory)
+    }
+
+    @Test fun STR_16_theShowPinnedAtTheTopRowIsOnByDefaultAndStoresItsChoice() {
+        val t = row("Show pinned at the top") as SettingItem.Toggle
+        assertEquals(true, t.checked)
+        t.onChange(false)
+        assertEquals(false, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.pinnedAtTop)
+        (row("Show pinned at the top") as SettingItem.Toggle).onChange(true)
+        assertEquals(true, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.pinnedAtTop)
     }
 
     @Test fun STR_01_w29_theCommsSizeRowChangesTheScale() {

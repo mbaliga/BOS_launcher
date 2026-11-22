@@ -27,7 +27,20 @@ enum class RuleAction {
     GroupApp,
     GroupSender,
     GroupConversation,
-    Flat;
+    Flat,
+    /** Wave 53: Comms treats matching notifications as Messages / Notifications / Alerts whatever their own signals say. */
+    AsMessages,
+    AsNotifications,
+    AsAlerts;
+
+    /** The category a Treat-as action sets; null for every other action. */
+    val category: CommsCategory?
+        get() = when (this) {
+            AsMessages -> CommsCategory.Messages
+            AsNotifications -> CommsCategory.Notifications
+            AsAlerts -> CommsCategory.Alerts
+            else -> null
+        }
 
     val isGrouping: Boolean get() = groupMode != null
 
@@ -101,6 +114,9 @@ data class Rule(
             RuleAction.GroupSender -> "Group $what by sender"
             RuleAction.GroupConversation -> "Group $what by conversation"
             RuleAction.Flat -> "Show $what as a flat list"
+            RuleAction.AsMessages -> "Treat $what as Messages"
+            RuleAction.AsNotifications -> "Treat $what as Notifications"
+            RuleAction.AsAlerts -> "Treat $what as Alerts"
         }
     }
 
@@ -131,6 +147,10 @@ data class LaunchpadPrefs(
     val defaultMode: GroupMode = GroupMode.AppConversation,
     /** Per-app (package name) grouping override. */
     val perApp: Map<String, GroupMode> = emptyMap(),
+    /** Wave 53: ongoing / persistent notifications (and rule-pinned ones) are drawn in a pinned block at the top of Comms. Default on. */
+    val pinnedAtTop: Boolean = true,
+    /** Wave 53: the category view Comms opens on (the Default view setting offers the three categories); null opens All. */
+    val defaultCategory: CommsCategory? = null,
 )
 
 data class DayGroup(val label: String, val items: List<HubNotification>)
@@ -311,7 +331,7 @@ object LaunchpadLogic {
         readKeys: Set<String>,
         now: Long,
     ): List<SourceCount> = countsBySource(
-        visible(list, rules, now).filter { !isSilent(it, rules) && !it.isOngoing && it.key !in readKeys },
+        visible(list, rules, now).filter { !isSilent(it, rules) && !NotificationClass.isPinned(it) && it.key !in readKeys },
     )
 
     fun unreadTotal(list: List<HubNotification>, rules: List<Rule>, readKeys: Set<String>, now: Long): Int =
@@ -362,6 +382,8 @@ object LaunchpadJson {
     fun encodePrefs(p: LaunchpadPrefs): String = JSONObject().apply {
         put("default", p.defaultMode.name)
         put("perApp", JSONObject().also { o -> p.perApp.forEach { (k, v) -> o.put(k, v.name) } })
+        if (!p.pinnedAtTop) put("pinnedAtTop", false) // absent means on, so older exports stay as they were
+        p.defaultCategory?.let { put("defaultCategory", it.id) }
     }.toString()
 
     fun decodePrefs(json: String?): LaunchpadPrefs {
@@ -376,6 +398,8 @@ object LaunchpadJson {
             LaunchpadPrefs(
                 runCatching { GroupMode.valueOf(o.optString("default")) }.getOrDefault(GroupMode.Time),
                 map,
+                pinnedAtTop = o.optBoolean("pinnedAtTop", true),
+                defaultCategory = CommsCategory.fromId(o.optString("defaultCategory").ifEmpty { null }),
             )
         }.getOrDefault(LaunchpadPrefs())
     }
@@ -545,6 +569,10 @@ object LaunchpadSettings {
     }
 
     fun setDefaultMode(mode: GroupMode) = savePrefs(_prefs.value.copy(defaultMode = mode))
+    /** Wave 53: Show pinned at the top (default on). */
+    fun setPinnedAtTop(on: Boolean) = savePrefs(_prefs.value.copy(pinnedAtTop = on))
+    /** Wave 53: the category Comms opens on; null opens All. */
+    fun setDefaultCategory(c: CommsCategory?) = savePrefs(_prefs.value.copy(defaultCategory = c))
 
     /** Per-app override; null clears it. */
     fun setAppMode(packageName: String, mode: GroupMode?) {

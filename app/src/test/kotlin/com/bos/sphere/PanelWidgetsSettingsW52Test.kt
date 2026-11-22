@@ -5,6 +5,7 @@ import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.LauncherPrefs
 import com.bos.sphere.feature.grid.SettingItem
 import com.bos.sphere.ui.CommsOptions
+import com.bos.sphere.ui.DefaultViewChoice
 import com.bos.sphere.ui.HubView
 import com.bos.sphere.ui.SettingsModel
 import com.bos.sphere.ui.SystemLinks
@@ -52,6 +53,6 @@ class PanelWidgetsSettingsW52Test {
         assertNotNull(pos.preview)
         @Suppress("UNCHECKED_CAST") (pos as SettingItem.Choice<WidgetsSlot>).onSelect(WidgetsSlot.First)
         assertEquals(WidgetsSlot.First, CommsOptions.widgetsSlot.value)
-        assertTrue("the Default view choice now offers Widgets", HubView.Widgets in (items().first { it.title == "Default view" } as SettingItem.Choice<*>).options)
+        assertTrue("the Default view choice now offers Widgets", DefaultViewChoice(HubView.Widgets) in (items().first { it.title == "Default view" } as SettingItem.Choice<*>).options)
     }
 }

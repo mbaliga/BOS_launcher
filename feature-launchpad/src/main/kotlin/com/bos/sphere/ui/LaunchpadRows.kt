@@ -103,11 +103,13 @@ internal class RowHandlers(
     /** Wave 29: the buttons of a row that is only in the history (its notification left the shade). */
     val onToggleRead: () -> Unit = {},
     val onDeleteFromHistory: () -> Unit = {},
+    /** Wave 53: a slide or the Delete key on a pinned (ongoing) row: nothing is dismissed, the row says why. */
+    val onLocked: () -> Unit = {},
 )
 
 internal fun menuContextFor(n: HubNotification, replyAvailable: Boolean, unread: Boolean) = RowMenuContext(
     hasContentIntent = n.contentIntent != null,
-    canDismiss = !n.isOngoing,
+    canDismiss = !com.bos.sphere.core.data.NotificationClass.isPinned(n), // wave 53: a pinned notification is kept by the system, so it offers no Dismiss
     unread = unread,
     hasSender = LaunchpadLogic.senderOf(n).isNotBlank() && n.packageName.isNotBlank(),
     hasPackage = n.packageName.isNotBlank(),
@@ -153,6 +155,7 @@ internal fun SectionHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (accent != null) Box(Modifier.padding(end = 8.dp).size(10.dp).background(accent, CircleShape))
+            if (sec.pinned && sec.key == LaunchpadLogic.PINNED_KEY) PinGlyph(LocalLp.current.dim, 13f, Modifier.padding(end = 8.dp).testTag("lp.pinned.glyph"))
             val lead = sec.items.firstOrNull()
             if (lead != null && sec.key != LaunchpadLogic.FLAT_KEY && !sec.pinned && (sec.key.startsWith("app:") || sec.key.startsWith("appconv:"))) {
                 AppIcon(lead.packageName, sec.subtitle.ifBlank { sec.title }, 20, Modifier.padding(end = 8.dp))
@@ -231,6 +234,13 @@ internal fun NotificationRow(
     actionsOpen: Boolean = false,
     /** Wave 29 (commsRead): the notification is no longer in the shade, only in the history: it has no actions of its own, no swipe-to-dismiss, and offers read/unread and delete from history. */
     historyOnly: Boolean = false,
+    /** Wave 53: why the row is in the pinned block (the system keeps it, or the owner's Pin rule), null elsewhere. */
+    pinKind: PinKind? = null,
+    /** Wave 53: the system keeps this notification (ongoing, no-clear or a service): no swipe, no Delete key, no dismiss in the menu. */
+    locked: Boolean = false,
+    /** Wave 53: the category Comms shows the row under, and the owner's way of changing it (the "Make this an Alert" chips). */
+    category: com.bos.sphere.core.data.CommsCategory? = null,
+    onMakeCategory: ((com.bos.sphere.core.data.CommsCategory) -> Unit)? = null,
 ) {
     var dx by remember { mutableFloatStateOf(0f) }
     var base by remember { mutableFloatStateOf(0f) } // 0, or the palette's width while it is held open
@@ -250,13 +260,13 @@ internal fun NotificationRow(
     )
     val cellPx = minOf(with(density) { 72.dp.toPx() }, widthPx * 0.9f / cells.size)
     val paletteW = cellPx * cells.size
-    val canSwipeLeft = leftAction != LaunchpadAction.None && !historyOnly
+    val canSwipeLeft = leftAction != LaunchpadAction.None && !historyOnly && !locked
     // With no primary action there is nothing behind a left slide, so the row does not move that way.
     val offsetPx = (base + dx).coerceIn(if (canSwipeLeft) -widthPx else 0f, paletteW * 1.1f)
     val showButtons = hovered || focused
     val primaryLabel = L10n.tr(leftAction.label)
     val a11yActions = buildList {
-        if (!historyOnly) add(CustomAccessibilityAction(primaryLabel) { handlers.onPrimary(); true })
+        if (!historyOnly && !locked) add(CustomAccessibilityAction(primaryLabel) { handlers.onPrimary(); true })
         add(CustomAccessibilityAction(L10n.tr("Actions")) { handlers.onMenu(); true })
         if (historyOnly) {
             add(CustomAccessibilityAction(L10n.tr(if (unread) "Mark as read" else "Mark as unread")) { handlers.onToggleRead(); true })
@@ -293,13 +303,14 @@ internal fun NotificationRow(
                 .offset { IntOffset(offsetPx.roundToInt(), 0) }
                 .background(LocalLp.current.bg)
                 .testTag("lp.focus.${n.key}")
-                .semantics { customActions = a11yActions; stateDescription = L10n.tr(if (unread) "Unread" else "Read") }
+                .semantics { customActions = a11yActions; stateDescription = L10n.tr(if (locked) "Pinned, can't be dismissed" else if (pinKind == PinKind.Rule) "Pinned by a rule" else if (unread) "Unread" else "Read") }
                 .pointerInput(n.key, leftAction) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             val total = base + dx
                             dx = 0f
                             if (total < -widthPx * 0.3f && canSwipeLeft) { base = 0f; handlers.onPrimary() }
+                            else if (total < -widthPx * 0.3f && locked) { base = 0f; handlers.onLocked() }
                             else if (total > paletteW * 0.4f) base = paletteW
                             else base = 0f
                         },
@@ -311,7 +322,7 @@ internal fun NotificationRow(
                 .onKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                     when (com.bos.sphere.core.data.RowKeys.map(e.key.nativeKeyCode, e.isShiftPressed)) {
-                        com.bos.sphere.core.data.RowKeys.Result.Primary -> { if (canSwipeLeft) handlers.onPrimary(); canSwipeLeft }
+                        com.bos.sphere.core.data.RowKeys.Result.Primary -> { if (canSwipeLeft) handlers.onPrimary() else if (locked) handlers.onLocked(); canSwipeLeft || locked }
                         com.bos.sphere.core.data.RowKeys.Result.Palette -> { handlers.onMenu(); true }
                         com.bos.sphere.core.data.RowKeys.Result.Activate -> { handlers.onOpen(); true }
                         else -> onKeyOther(e)
@@ -334,7 +345,7 @@ internal fun NotificationRow(
                 pkg = n.packageName, appLabel = n.appLabel.ifBlank { n.title }, iconTag = "lp.badge.${n.key}",
                 headline = headline, unread = unread, quiet = silent, dotTag = "lp.row.unreadDot.${n.key}", titleTag = "lp.title.${n.key}",
                 second = second, previewTag = "lp.preview.${n.key}", stamp = formatStamp(n.timestamp, now, is24, zone), timeTag = "lp.time.${n.key}",
-                dot = pinned || important, modifier = Modifier.weight(1f).fillMaxHeight(),
+                dot = (pinned && pinKind == null) || important, pinKind = pinKind, pinTag = "lp.pin.${n.key}", modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
                 if (showButtons) {
                     // Buttons for both gestures, shown on hover and on focus (STR-03 equivalents).
@@ -368,6 +379,17 @@ internal fun NotificationRow(
         } else if (actionsOpen) {
             Row(Modifier.fillMaxWidth().testTag("lp.chips.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp, bottom = 8.dp)) {
                 ActionChip(L10n.tr("Actions"), false) { handlers.onMenu() }
+            }
+        }
+        if (actionsOpen && category != null && onMakeCategory != null) {
+            // Wave 53: the owner's override: the two other categories, as chips under the row's own actions.
+            Row(
+                Modifier.fillMaxWidth().testTag("lp.chips.cat.${n.key}").padding(start = HubStyle.TEXT_START_DP.dp, end = CommsStyle.END_PAD_DP.dp, bottom = 8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                com.bos.sphere.core.data.CommsCategory.entries.filter { it != category }.forEach { c ->
+                    ActionChip(categoryChipLabel(c), false, Modifier.testTag("lp.chip.make.${c.id}.${n.key}")) { onMakeCategory(c) }
+                }
             }
         }
         if (replyOpen && reply != null) {
@@ -535,6 +557,8 @@ internal fun CommsRowContent(
     modifier: Modifier = Modifier, dot: Boolean = false, expanded: Boolean = false,
     /** Wave 30 (commsPolish): the read state: an unread row has the heavier full-ink headline, the accent time, the full icon and a dot in the left margin ([dotTag]); a read row is muted. [quiet]: a silenced unread row keeps the second ink. */
     unread: Boolean = false, quiet: Boolean = false, dotTag: String = "",
+    /** Wave 53: a pin (and "Rule") before the time of a row in the pinned block. */
+    pinKind: PinKind? = null, pinTag: String = "",
     trailing: @Composable () -> Unit = {},
 ) {
     val lp = LocalLp.current
@@ -542,6 +566,7 @@ internal fun CommsRowContent(
     // With big system fonts the mock-up's baselines (headline and second line 19.5 dp apart) would overlap: stack the lines instead.
     val stacked = expanded || LocalDensity.current.fontScale > 1.3f
     Box(modifier) {
+    if (pinKind == PinKind.Ongoing || (pinKind == PinKind.Rule && !unread)) PinMargin(pinTag.ifEmpty { "lp.pin" }, Modifier.align(Alignment.TopStart).offset(y = (CommsStyle.ICON_TOP_DP + CommsStyle.ICON_DP / 2f - 6f).dp))
     if (unread) UnreadDot(dotTag.ifEmpty { "lp.row.unreadDot" }, Modifier.align(Alignment.TopStart).offset(y = (CommsStyle.ICON_TOP_DP + CommsStyle.ICON_DP / 2f - CommsStyle.UNREAD_DOT_DP / 2f).dp))
     Row(Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp)) {
         AppIcon(pkg, appLabel, CommsStyle.ICON_DP, Modifier.padding(top = CommsStyle.ICON_TOP_DP.dp).testTag(iconTag), alpha = tone.iconAlpha)
@@ -559,6 +584,10 @@ internal fun CommsRowContent(
                     modifier = Modifier.weight(1f).then(if (baselineAligned) Modifier.paddingFromBaseline(top = CommsStyle.SUB_BASELINE_DP.dp) else Modifier).testTag(previewTag),
                 )
                 Spacer(Modifier.width(8.dp))
+                if (pinKind == PinKind.Rule) Text(
+                    L10n.tr("Rule"), color = tone.time, fontSize = 10.sp, maxLines = 1,
+                    modifier = Modifier.padding(end = 6.dp).then(if (baselineAligned) Modifier.paddingFromBaseline(top = CommsStyle.TIME_BASELINE_DP.dp) else Modifier).testTag(pinTag.ifEmpty { "lp.pin" } + ".rule"),
+                )
                 if (dot) Box(Modifier.padding(end = 6.dp, top = (CommsStyle.TIME_BASELINE_DP - 8f).dp).size(6.dp).background(BlueLight, CircleShape))
                 Text(
                     stamp, color = tone.time, fontSize = CommsStyle.TIME_SP.sp, maxLines = 1,

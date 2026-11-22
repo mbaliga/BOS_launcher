@@ -163,7 +163,8 @@ fun HubBody(
         if (!state.view.history) { Box(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding().testTag("hub.panel.${state.view.id}")) { panelBody(state.view) }; return@Column }
         val flow = remember(state.store) { state.store?.entries ?: MutableStateFlow(emptyList()) }
         val all by flow.collectAsState()
-        val shown = remember(all, state.view, state.filters(), now) { HubLogic.query(all, state.view, state.filters(), now, zone) }
+        val rules by com.bos.sphere.core.data.LaunchpadSettings.rules.collectAsState()
+        val shown = remember(all, state.view, state.filters(), now, rules) { HubLogic.query(all, state.view, state.filters(), now, zone, rules) }
         var expanded by remember { mutableStateOf<String?>(null) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (shown.isEmpty()) {

@@ -56,6 +56,9 @@ private fun actionLabel(a: RuleAction) = when (a) {
     RuleAction.GroupSender -> L10n.tr("Group by sender")
     RuleAction.GroupConversation -> L10n.tr("Group by conversation")
     RuleAction.Flat -> L10n.tr("Flat list")
+    RuleAction.AsMessages -> L10n.tr("Treat as Messages")
+    RuleAction.AsNotifications -> L10n.tr("Treat as Notifications")
+    RuleAction.AsAlerts -> L10n.tr("Treat as Alerts")
 }
 
 private fun modeLabel(m: GroupMode) = when (m) {

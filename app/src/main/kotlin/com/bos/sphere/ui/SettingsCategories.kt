@@ -490,10 +490,12 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             val comms = com.bos.sphere.ui.CommsOptions
             add(
                 SettingItem.Choice(
-                    x("Default view"), Glyphs.Bell, comms.selectableViews(), comms.defaultView.value, { x(it.label) },
-                    hint = x("What Comms shows first when it opens."), stepped = true,
-                ) { v -> comms.setDefaultView(v) },
+                    x("Default view"), Glyphs.Bell, comms.defaultChoices(), comms.defaultChoice(), { x(it.label) },
+                    hint = x("What Comms shows first when it opens. Messages, Notifications and Alerts open All with that category."), stepped = true,
+                ) { v -> comms.setDefaultChoice(v) },
             )
+            // Wave 53 (commsCategories): the pinned block (ongoing notifications and Pin-by-rule rows) at the top of Comms; stored with the exported Comms prefs.
+            add(SettingItem.Toggle(x("Show pinned at the top"), Glyphs.Bell, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.pinnedAtTop, x("Ongoing notifications such as music, calls, timers, navigation and downloads, and senders you pinned, stay in a block at the top of Comms. Off lists them with the others. They never count as unread and cannot be dismissed.")) { v -> com.bos.sphere.core.data.LaunchpadSettings.setPinnedAtTop(v) })
             // Wave 52 (panelWidgets): the fifth section, off until chosen; its place in the tab row is a visual card choice.
             add(SettingItem.Toggle(x("Widgets section"), Glyphs.Bell, comms.widgetsSection.value, x("Adds a Widgets section to this panel, where you can put real widgets instead of on the right side. Off keeps the four sections.")) { v -> comms.setWidgetsSection(v) })
             if (comms.widgetsSection.value) add(

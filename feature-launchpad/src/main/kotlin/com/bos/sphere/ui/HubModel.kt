@@ -59,7 +59,11 @@ enum class HubGrouping(val label: String) {
 enum class HubRange(val label: String, val days: Int) { Any("All time", 0), Today("Today", 1), Week("7 days", 7) }
 
 /** The quick filters of one view. */
-data class HubFilters(val app: String? = null, val sender: String? = null, val range: HubRange = HubRange.Any, val unreadOnly: Boolean = false) {
+data class HubFilters(
+    val app: String? = null, val sender: String? = null, val range: HubRange = HubRange.Any, val unreadOnly: Boolean = false,
+    /** Wave 53: the Messages / Notifications / Alerts view of the Show list (see [com.bos.sphere.core.data.NotificationClass]). */
+    val category: com.bos.sphere.core.data.CommsCategory? = null,
+) {
     val active: Boolean get() = this != HubFilters()
 }
 
@@ -70,14 +74,19 @@ object HubLogic {
     fun showsGroupHeader(g: HubGrouping, count: Int) = g != HubGrouping.Flat && (g == HubGrouping.Day || count >= 2)
 
     /** The history rows of [view], newest first, with its quick filters applied. */
-    fun query(entries: List<HistoryEntry>, view: HubView, f: HubFilters, now: Long, zone: ZoneId): List<HistoryEntry> {
+    fun query(
+        entries: List<HistoryEntry>, view: HubView, f: HubFilters, now: Long, zone: ZoneId,
+        /** Wave 53: the owner's Treat-as rules, for the category filter. */
+        rules: List<com.bos.sphere.core.data.Rule> = com.bos.sphere.core.data.LaunchpadSettings.rules.value,
+    ): List<HistoryEntry> {
         if (!view.history) return emptyList()
         val since = if (f.range == HubRange.Any) Long.MIN_VALUE
         else Instant.ofEpochMilli(now).atZone(zone).toLocalDate().minusDays((f.range.days - 1).toLong()).atStartOfDay(zone).toInstant().toEpochMilli()
         return entries.filter { e ->
             (view != HubView.Unread || !e.read) && (view != HubView.Read || e.read) &&
                 (!f.unreadOnly || !e.read) && e.timeMillis >= since &&
-                (f.app == null || e.packageName == f.app) && (f.sender == null || e.who == f.sender)
+                (f.app == null || e.packageName == f.app) && (f.sender == null || e.who == f.sender) &&
+                (f.category == null || com.bos.sphere.core.data.NotificationClass.categoryOf(CommsRead.fromEntry(e), rules) == f.category)
         }.sortedByDescending { it.timeMillis }
     }
 
@@ -162,6 +171,28 @@ object LaunchpadHubNav {
 }
 
 /**
+ * Wave 53: one entry of the Default view choice: a hub view, or one of the three categories (which open All, filtered). The categories sit right
+ * below All, as in the menu.
+ */
+data class DefaultViewChoice(val view: HubView, val category: com.bos.sphere.core.data.CommsCategory? = null) {
+    val label: String get() = category?.let { categoryLabelEn(it) } ?: view.label
+    companion object {
+        fun options(views: List<HubView>): List<DefaultViewChoice> = buildList {
+            views.forEach { v ->
+                add(DefaultViewChoice(v))
+                if (v == HubView.All) com.bos.sphere.core.data.CommsCategory.entries.forEach { add(DefaultViewChoice(HubView.All, it)) }
+            }
+        }
+    }
+}
+
+internal fun categoryLabelEn(c: com.bos.sphere.core.data.CommsCategory) = when (c) {
+    com.bos.sphere.core.data.CommsCategory.Messages -> "Messages"
+    com.bos.sphere.core.data.CommsCategory.Notifications -> "Notifications"
+    com.bos.sphere.core.data.CommsCategory.Alerts -> "Alerts"
+}
+
+/**
  * Wave 29: the Comms options that used to live in the Comms menu panel, as plain operations for Ground Control. One source of truth: the same
  * stores as before (the hub's own pref file, the history store, the notification feed); the hub reads them live when Comms opens.
  */
@@ -200,6 +231,13 @@ object CommsOptions {
     /** The views the Default view choice offers: the Widgets section only while it exists. */
     fun selectableViews(): List<HubView> = HubView.entries.filter { it != HubView.Widgets || _widgetsSection.value }
     fun setDefaultView(v: HubView) { val p = prefs; if (p != null) p.defaultView = v else _defaultView.value = v }
+    /** Wave 53: the Default view choice including the three categories. The category lives with the exported Comms prefs (LaunchpadPrefs). */
+    fun defaultChoice(): DefaultViewChoice = DefaultViewChoice(_defaultView.value, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.defaultCategory.takeIf { _defaultView.value == HubView.All })
+    fun defaultChoices(): List<DefaultViewChoice> = DefaultViewChoice.options(selectableViews())
+    fun setDefaultChoice(c: DefaultViewChoice) {
+        setDefaultView(c.view)
+        com.bos.sphere.core.data.LaunchpadSettings.setDefaultCategory(c.category)
+    }
 
     /** Every live notification and every history entry becomes read. */
     fun markAllRead() {

@@ -51,6 +51,14 @@ data class HubNotification(
     val style: String? = null,
     /** W42: the conversation shortcut the app published for this notification (Notification.getShortcutId), the deep link when the intent is gone. */
     val shortcutId: String? = null,
+    /** Wave 53: the channel importance from the ranking (IMPORTANCE_HIGH is 4); 0 when unknown. */
+    val importance: Int = 0,
+    /** Wave 53: the notification names people (Notification.EXTRA_PEOPLE_LIST), i.e. it is about someone. */
+    val hasPeople: Boolean = false,
+    /** Wave 53: the app marked it time-sensitive: it carries a full-screen intent or FLAG_INSISTENT. */
+    val timeSensitive: Boolean = false,
+    /** Wave 53: this row is rebuilt from the history; the notification itself has left the shade. */
+    val fromHistory: Boolean = false,
 )
 
 data class HubAction(
@@ -234,11 +242,17 @@ class SphereNotificationListener : NotificationListenerService() {
     private fun parseNotification(sbn: StatusBarNotification): HubNotification? {
         val n = sbn.notification ?: return null
         val pkg = sbn.packageName
-        val ongoing = n.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE) != 0
+        // Wave 53: FLAG_NO_CLEAR counts as ongoing too (the user cannot swipe it away); Comms pins them all (see NotificationClass.isPinned).
+        val ongoing = n.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE or Notification.FLAG_NO_CLEAR) != 0
         val cat = n.category
+        val importance = runCatching {
+            val r = Ranking()
+            if (currentRanking.getRanking(sbn.key, r)) r.importance else 0
+        }.getOrDefault(0)
         if (ongoing) {
             if (pkg == packageName) return null
-            if (cat !in KEEP_ONGOING_CATEGORIES && !hasProgress(n)) return null
+            // Wave 53: only a minimised service notification (IMPORTANCE_MIN, the system's own "app is running" line) is left out now; the rest is pinned.
+            if (importance in 1..android.app.NotificationManager.IMPORTANCE_MIN && cat !in KEEP_ONGOING_CATEGORIES && !hasProgress(n)) return null
         }
         val ex = n.extras
         val titleRaw = (ex.getCharSequence(Notification.EXTRA_TITLE)
@@ -303,6 +317,9 @@ class SphereNotificationListener : NotificationListenerService() {
             progress = hasProgress(n),
             style = style,
             shortcutId = n.shortcutId?.ifBlank { null },
+            importance = importance,
+            hasPeople = !n.extras.getParcelableArrayList<android.os.Parcelable>(Notification.EXTRA_PEOPLE_LIST).isNullOrEmpty(),
+            timeSensitive = n.fullScreenIntent != null || (n.flags and Notification.FLAG_INSISTENT) != 0,
         )
     }
 

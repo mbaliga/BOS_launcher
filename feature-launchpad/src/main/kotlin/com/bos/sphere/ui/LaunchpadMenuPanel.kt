@@ -123,6 +123,10 @@ internal class MenuActions(
     val onFilter: (String?) -> Unit,
     /** The Comms size the menu is drawn at (the stepper itself is a Ground Control row since wave 29). */
     val scalePercent: Int = CommsScale.DEFAULT,
+    /** Wave 53: the category view that is on (Messages, Notifications, Alerts), null for none; [categoryUnread] is each one's unread count (pinned rows excluded). */
+    val category: com.bos.sphere.core.data.CommsCategory? = null,
+    val categoryUnread: Map<com.bos.sphere.core.data.CommsCategory, Int> = emptyMap(),
+    val onCategory: (com.bos.sphere.core.data.CommsCategory?) -> Unit = {},
 )
 
 internal fun groupModeText(m: GroupMode) = when (m) {
@@ -138,7 +142,7 @@ internal fun groupModeText(m: GroupMode) = when (m) {
  * The scrim over the shifted list and the panel itself, laid over the notifications layer; the panel is on the physical left (right in RTL).
  * Wave 27 (the owner's Comms menu mock-up): 58 percent wide, #1A1A1A in the dark look; GROUP BY is an icons-only 3 x 2 grid (the labels are
  * only the cells' accessibility descriptions), then "Show" with a row per app (its real coloured icon, the name, the count right-aligned; All Comms
- * first) (wave 29: the Options moved to Ground Control, the menu is these two sections only). A tap on a grouping or an app applies it and closes the panel.
+ * first, then (wave 53) Messages, Notifications and Alerts) (wave 29: the Options moved to Ground Control, the menu is these two sections only). A tap on a grouping or an app applies it and closes the panel.
  */
 @Composable
 internal fun androidx.compose.foundation.layout.BoxScope.LaunchpadMenuLayer(menu: LaunchpadMenuState, rtl: Boolean, actions: MenuActions, onClose: () -> Unit) {
@@ -169,7 +173,11 @@ internal fun androidx.compose.foundation.layout.BoxScope.LaunchpadMenuLayer(menu
                 item { MenuLabel(L10n.tr("Group by").uppercase(), CommsStyle.GROUP_BY_BASELINE_DP, CommsStyle.GRID_TOP_DP - CommsStyle.GROUP_BY_BASELINE_DP, "lp.menu.label.groupBy") }
                 item { GroupGrid(actions) }
                 item { MenuLabel(L10n.tr("Show").uppercase(), CommsStyle.SHOW_BASELINE_FROM_GRID_DP, CommsStyle.SHOW_BELOW_BASELINE_DP, "lp.menu.label.show") }
-                item { ShowRow(L10n.tr("All Comms"), selected = actions.filter == null, tag = "lp.menu.show.all", count = actions.counts.sumOf { it.count }, pkg = null) { actions.onFilter(null) } }
+                item { ShowRow(L10n.tr("All Comms"), selected = actions.filter == null && actions.category == null, tag = "lp.menu.show.all", count = actions.counts.sumOf { it.count }, pkg = null) { actions.onCategory(null); actions.onFilter(null) } }
+                // Wave 53 (STR-17): below All, the three categories, each with its one-line definition and its unread count.
+                items(com.bos.sphere.core.data.CommsCategory.entries, key = { "cat:" + it.id }) { c ->
+                    CategoryShowRow(c, selected = actions.category == c, unread = actions.categoryUnread[c] ?: 0) { actions.onCategory(c) }
+                }
                 items(actions.counts, key = { "src:" + it.packageName }) { c ->
                     ShowRow(c.appLabel, selected = actions.filter == c.packageName, tag = "lp.menu.show.${c.packageName}", count = c.count, pkg = c.packageName) { actions.onFilter(c.packageName) }
                 }

@@ -297,7 +297,7 @@ object WaitingLogic {
         items: List<HubNotification>, rules: List<Rule>, policies: List<AppPolicy>, readKeys: Set<String>,
         snoozedUntil: Map<String, Long>, now: Long, zone: ZoneId = ZoneId.systemDefault(),
     ): List<HubNotification> = LaunchpadLogic.visible(items, rules, now).filter {
-        !it.isOngoing && it.key !in readKeys && !LaunchpadLogic.isSilent(it, rules) &&
+        !NotificationClass.isPinned(it) && it.key !in readKeys && !LaunchpadLogic.isSilent(it, rules) &&
             !DeliveryLogic.isSilentHere(it, policies) && !DeliveryLogic.isHeld(it, policies, now, zone) &&
             !SnoozeLogic.isSnoozed(it.key, snoozedUntil, now)
     }

@@ -134,6 +134,8 @@ import com.bos.sphere.core.data.Section
 import com.bos.sphere.core.data.SphereNotificationListener
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
+import com.bos.sphere.core.data.CommsCategory
+import com.bos.sphere.core.data.NotificationClass
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -414,6 +416,8 @@ private sealed interface Entry {
     /** STR-02: "+N more" (or "Show fewer") under a conversation's latest message; expanding is the user's choice. */
     data class More(val id: String, val hidden: Int, val expanded: Boolean) : Entry { override val key get() = "m:$id" }
     data class Held(val count: Int, val at: Long?) : Entry { override val key get() = "held" }
+    /** Wave 53: the pinned block's compact row (more than three pinned): icons, the count, Show all / Show fewer. */
+    data class PinnedCompact(val items: List<HubNotification>, val expanded: Boolean) : Entry { override val key get() = "pinned.compact" }
 }
 
 /**
@@ -505,7 +509,19 @@ fun LaunchpadContent(
     var groupFor by remember { mutableStateOf<HubNotification?>(null) }
     var ruleFrom by remember { mutableStateOf<HubNotification?>(null) }
     var groupsOpen by remember { mutableStateOf(false) } // wave 24: the Groups manager inside Launchpad
-    val shown = remember(merged, readFilter) { CommsRead.filter(merged.items, effRead, readFilter) }
+    // Wave 53 (commsCategories): the category view (Messages, Notifications, Alerts; null = All Comms), the category of each row (one memo per post, so the
+    // heuristics run once), and the pinned block: ongoing notifications pulled out of the list. Pinned rows are never unread and ignore the read filter.
+    var category by remember { mutableStateOf(if (hub == null || hub.view == HubView.All) prefs.defaultCategory else null) }
+    val catCache = remember(rules) { HashMap<String, CommsCategory>() }
+    fun catOf(n: HubNotification): CommsCategory = catCache.getOrPut(n.key + "@" + n.timestamp) { NotificationClass.categoryOf(n, rules) }
+    val pinOn = prefs.pinnedAtTop
+    val pinnedAll = remember(merged, rules, now, snoozed, pinOn) { NotificationClass.splitPinned(merged.items, rules, now, pinOn, snoozed).first }
+    val pinnedKeys = remember(pinnedAll) { pinnedAll.mapTo(HashSet()) { it.key } }
+    val effReadP = remember(effRead, pinnedKeys) { if (pinnedKeys.isEmpty()) effRead else effRead + pinnedKeys }
+    var pinnedOpen by remember { mutableStateOf(false) }
+    val shown = remember(merged, readFilter, pinnedKeys, category, rules) {
+        CommsRead.filter(merged.items.filter { it.key !in pinnedKeys }, effRead, readFilter).let { l -> if (category == null) l else l.filter { catOf(it) == category } }
+    }
     val toast = remember { mutableStateOf<String?>(null) }
     LaunchedEffect(toast.value) { if (toast.value != null) { delay(1400); toast.value = null } }
     val tracker = remember { InputModeTracker() }
@@ -526,10 +542,10 @@ fun LaunchpadContent(
             com.bos.sphere.core.data.LaunchpadAction.CollapseAll ->
                 collapsed = if (collapsed.size >= sections.size) emptySet() else sections.map { it.key }.toSet()
             com.bos.sphere.core.data.LaunchpadAction.ClearAll -> onClearAll()
-            com.bos.sphere.core.data.LaunchpadAction.Dismiss -> n?.takeIf { !it.isOngoing }?.let { // W32: in a persistent store, dismiss = mark as read (it leaves the places of importance: the Unread view and the unread styling), and it clears the shade; the row stays as history
+            com.bos.sphere.core.data.LaunchpadAction.Dismiss -> if (n != null && NotificationClass.isPinned(n)) toast.value = L10n.tr("Pinned notifications stay until the app ends them") else n?.let { // W32: in a persistent store, dismiss = mark as read (it leaves the places of importance: the Unread view and the unread styling), and it clears the shade; the row stays as history
                 LaunchpadSettings.markRead(it.key); onDismissItem(it); toast.value = L10n.tr("Marked as read")
             }
-            com.bos.sphere.core.data.LaunchpadAction.MarkRead -> n?.let { LaunchpadSettings.markRead(it.key); toast.value = L10n.tr("Marked as read") }
+            com.bos.sphere.core.data.LaunchpadAction.MarkRead -> if (n != null && NotificationClass.isPinned(n)) toast.value = L10n.tr("Pinned notifications stay until the app ends them") else n?.let { LaunchpadSettings.markRead(it.key); toast.value = L10n.tr("Marked as read") }
             com.bos.sphere.core.data.LaunchpadAction.OpenApp -> if (pkg.isNotBlank()) {
                 if (openApp == null) onOpenApp(pkg) else if (!openApp(pkg)) toast.value = L10n.tr("Couldn't open %s", n?.appLabel?.ifBlank { pkg } ?: pkg)
             }
@@ -542,7 +558,9 @@ fun LaunchpadContent(
 
     // Counts for the filter menu reflect what the user can actually see.
     val visible = remember(merged, rules, now) { LaunchpadLogic.visible(merged.items, rules, now) }
-    val counts = remember(visible, effRead, readFilter) { CommsRead.counts(visible, effRead, readFilter) }
+    val counts = remember(visible, effReadP, readFilter) { CommsRead.counts(visible, effReadP, readFilter) }
+    // Wave 53: the unread badge of each category in the menu (pinned rows are never unread).
+    val categoryUnread = remember(visible, effReadP, rules) { visible.filter { it.key !in effReadP }.groupingBy { catOf(it) }.eachCount() }
     val activeFilter = filter?.takeIf { f -> counts.any { it.packageName == f } }
     val digestLabel = L10n.tr("Digest")
     val todayLabel = L10n.tr("Today"); val yesterdayLabel = L10n.tr("Yesterday"); val pinnedLabel = L10n.tr("Pinned"); val flatLabel = L10n.tr("All")
@@ -560,8 +578,16 @@ fun LaunchpadContent(
     }
     val loadingGroups = resolver != null && groupedView == null
     val view = plainView ?: groupedView ?: LaunchpadView(emptyList(), emptyList(), null, emptySet())
-    val sections = remember(view, fallbackTitle) { if (view.grouped.isEmpty()) view.sections else GroupColumn.sections(view.grouped, fallbackTitle) }
-    val entries = remember(view, sections, collapsed, expandedConvs) {
+    val baseSections = remember(view, fallbackTitle) { if (view.grouped.isEmpty()) view.sections else GroupColumn.sections(view.grouped, fallbackTitle) }
+    // Wave 53: the pinned block leads. Without groups the owner's Pin-by-rule rows join it (one "Pinned" section, a Rule badge on theirs); with groups
+    // those stay at the top of their own group and the block holds the ongoing ones.
+    val pinnedShown = remember(pinnedAll, activeFilter, category, rules) { pinnedAll.filter { (activeFilter == null || it.packageName == activeFilter) && (category == null || catOf(it) == category) } }
+    val sections = remember(baseSections, pinnedShown, view) {
+        val ruleSec = if (view.grouped.isEmpty()) baseSections.firstOrNull { it.pinned && it.key == LaunchpadLogic.PINNED_KEY } else null
+        val block = (pinnedShown + ruleSec?.items.orEmpty()).distinctBy { it.key }
+        if (block.isEmpty()) baseSections else listOf(Section(pinnedLabel, LaunchpadLogic.PINNED_KEY, block, pinned = true)) + baseSections.filter { it !== ruleSec }
+    }
+    val entries = remember(view, sections, collapsed, expandedConvs, pinnedOpen) {
         buildList<Entry> {
             if (view.held.isNotEmpty()) add(Entry.Held(view.held.size, view.nextRelease))
             // One list, every section and every notification in it (STR-02); a conversation folds only behind its own "+N more".
@@ -579,7 +605,11 @@ fun LaunchpadContent(
                 if (headed) add(Entry.Head(sec, isCollapsed, first = i == 0 && view.held.isEmpty()))
                 if (!isCollapsed) {
                     val gs = view.grouped.firstOrNull { it.key == sec.key }
-                    if (gs == null) addRows(sec, sec.key, sec.items, sec.pinned)
+                    if (sec.pinned && sec.key == LaunchpadLogic.PINNED_KEY && sec.items.size > NotificationClass.PINNED_COMPACT_AFTER) {
+                        // Wave 53: many pinned notifications fold into one compact row until the owner asks to see them all.
+                        if (pinnedOpen) addRows(sec, sec.key, sec.items, true)
+                        add(Entry.PinnedCompact(sec.items, pinnedOpen))
+                    } else if (gs == null) addRows(sec, sec.key, sec.items, sec.pinned)
                     else gs.sections.forEach { inner ->
                         if (GroupColumn.showSubHeads(gs) && GroupColumn.showsHeader(inner.key, inner.items.size)) add(Entry.Sub(inner.title, inner.key))
                         addRows(sec, inner.key, inner.items, inner.pinned)
@@ -695,7 +725,7 @@ fun LaunchpadContent(
 
     // Wave 25: "mark what is visible as read" for the hub: the live list marks its unread rows, a history view uses the store (with undo).
     // Only what is on screen: not what a filter, the app filter or a rule hides (marking everything under "Read only" would read what the user never saw).
-    val visibleNow = androidx.compose.runtime.rememberUpdatedState(CommsRead.filter(LaunchpadLogic.filter(visible, activeFilter), effRead, readFilter) to effRead)
+    val visibleNow = androidx.compose.runtime.rememberUpdatedState(CommsRead.filter(LaunchpadLogic.filter(visible, activeFilter).filter { it.key !in pinnedKeys && (category == null || catOf(it) == category) }, effRead, readFilter) to effRead)
     val liveNow = visibleNow
     val hubMarkRead: () -> Unit = {
         if (hub != null) {
@@ -730,12 +760,22 @@ fun LaunchpadContent(
         mode = if (historyGrouping && hub != null) hub.grouping.toMode() else prefs.defaultMode, filter = activeFilter, counts = counts,
         onMode = { m -> if (historyGrouping && hub != null) hub.chooseGrouping(HubGrouping.of(m)) else onSetDefaultMode(m); menu.open = false },
         onFilter = { f ->
-            filter = f
+            filter = f; category = null
             // The app filter follows into the history views, so Show means the same on every tab.
-            hub?.let { h -> HubView.entries.filter { it.history }.forEach { v -> h.setFilters(h.filters(v).copy(app = f), v) } }
+            hub?.let { h -> HubView.entries.filter { it.history }.forEach { v -> h.setFilters(h.filters(v).copy(app = f, category = null), v) } }
             menu.open = false
         },
         scalePercent = commsScalePercent,
+        category = category, categoryUnread = categoryUnread,
+        onCategory = { c ->
+            // Wave 53: a category and an app are two choices of the one Show list: picking one clears the other. The category follows into the history tabs too.
+            category = c; if (c != null) filter = null
+            hub?.let { h ->
+                HubView.entries.filter { it.history }.forEach { v -> h.setFilters(h.filters(v).copy(category = c, app = if (c != null) null else h.filters(v).app), v) }
+                if (c != null && !h.view.history && HubView.All in h.views) h.select(HubView.All)
+            }
+            menu.open = false
+        },
     )
     // Wave 25 (STR-01): the notifications layer shifts away by the panel's width while the menu is open.
     Box(Modifier.fillMaxSize().graphicsLayer {
@@ -785,7 +825,7 @@ fun LaunchpadContent(
       CommsScaleHost(commsScalePercent) {
       Column(Modifier.fillMaxSize()) {
         LaunchpadHeader(
-            filterLabel = activeFilter?.let { f -> counts.firstOrNull { it.packageName == f }?.appLabel },
+            filterLabel = activeFilter?.let { f -> counts.firstOrNull { it.packageName == f }?.appLabel } ?: category?.let { categoryLabel(it) },
             onMenu = { menu.open = true }, onOpenSound = { onOpenSound(); soundSheet.show() },
             snapshot = systemState, now = now, is24 = is24, zone = zone, onOpenPanel = { k -> if (k == SystemTileKind.Connectivity) connectivitySheet.show() else onOpenSystemPanel(k) },
             onDoubleTap = { perform(gestures[com.bos.sphere.core.data.LaunchpadGesture.DoubleTapHeader] ?: com.bos.sphere.core.data.LaunchpadAction.None, null, sections) },
@@ -831,7 +871,7 @@ fun LaunchpadContent(
                             val target = FocusTarget.Group(sec.key)
                             val grp = view.grouped.firstOrNull { it.key == sec.key }?.group
                             SectionHeader(
-                                sec, e.collapsed, unreadAny = (e.collapsed || sec.key == LaunchpadView.DIGEST_KEY) && sec.items.any { it.key !in effRead }, title = HubStyle.dayHeader(sec.key, sec.title), first = e.first, onToggle = { if (e.collapsed) toggleGroup(sec.key, true) },
+                                sec, e.collapsed, unreadAny = (e.collapsed || sec.key == LaunchpadView.DIGEST_KEY) && sec.items.any { it.key !in effReadP }, title = HubStyle.dayHeader(sec.key, sec.title), first = e.first, onToggle = { if (e.collapsed) toggleGroup(sec.key, true) },
                                 accent = grp?.let { g -> g.colorArgb?.let { Color(it) } ?: if (g.priority == GroupPriority.Priority) BlueLight else null },
                                 badge = grp?.takeIf { it.priority != GroupPriority.Normal }?.let { GroupTexts.priorityLabel(it.priority) }.orEmpty(),
                                 showRing = inputMode == InputMode.Keyboard, requester = req(target), onFocused = { focus = target },
@@ -848,6 +888,7 @@ fun LaunchpadContent(
                                 modifier = Modifier.fillMaxWidth().padding(start = CommsStyle.H_PAD_DP.dp, end = CommsStyle.END_PAD_DP.dp, top = 10.dp).testTag("lp.sub.${e.id}"),
                             )
                         }
+                        is Entry.PinnedCompact -> PinnedCompactRow(e.items, e.expanded) { pinnedOpen = !pinnedOpen }
                         is Entry.More -> MoreLine(e.hidden, e.expanded, e.id) {
                             expandedConvs = if (e.expanded) expandedConvs - e.id else expandedConvs + e.id
                         }
@@ -857,13 +898,18 @@ fun LaunchpadContent(
                             val globalLeft = gestures[com.bos.sphere.core.data.LaunchpadGesture.SwipeItemLeft] ?: com.bos.sphere.core.data.LaunchpadAction.Dismiss
                             val leftAction = DeliveryLogic.primaryFor(n.packageName, policies, globalLeft)
                             NotificationRow(
-                                n = n, unread = n.key !in effRead, now = now, is24 = is24, zone = zone,
+                                n = n, unread = n.key !in effReadP && !NotificationClass.isPinned(n), now = now, is24 = is24, zone = zone,
                                 important = LaunchpadLogic.isImportant(n, rules),
                                 pinned = e.pinned,
+                                pinKind = if (NotificationClass.isPinned(n)) PinKind.Ongoing else if (e.pinned) PinKind.Rule else null,
+                                locked = NotificationClass.isPinned(n),
+                                category = catOf(n),
+                                onMakeCategory = { c -> onAddRule(NotificationClass.ruleFor(n, c)); toast.value = categoryToast(c) },
                                 silent = n.key in view.silentKeys,
                                 leftAction = leftAction,
                                 handlers = RowHandlers(
                                     onOpen = { open(n) },
+                                    onLocked = { toast.value = L10n.tr("Pinned notifications stay until the app ends them") },
                                     onPrimary = { perform(leftAction, n, sections) },
                                     onCommand = { command(it, n) },
                                     onMenu = { menuFor = n; menuExpand = null },

@@ -1551,6 +1551,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val commsWidgetsSlot by com.bos.sphere.ui.CommsOptions.widgetsSlot.collectAsState()
         val commsScalePct by com.bos.sphere.core.data.CommsScaleSettings.percent.collectAsState() // wave 28: the Comms size row shows the live value
         remember(context) { com.bos.sphere.core.data.LaunchpadSettings.init(context); true }
+        val commsPrefs by com.bos.sphere.core.data.LaunchpadSettings.prefs.collectAsState() // wave 53: Show pinned at the top and the default category show the live values
         val commsHideRules by com.bos.sphere.core.data.LaunchpadSettings.rules.collectAsState() // wave 38: Hidden apps also lists the Comms Hide rules
         val hiddenAppsAccess = remember(allApps, hidden, commsHideRules) {
             com.bos.sphere.ui.HiddenAppsAccess(
@@ -1558,7 +1559,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 hiddenKeys = hiddenStore.hidden, allApps = allApps, setHidden = hiddenStore::setHidden,
             )
         }
-        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels) {
+        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsPrefs, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels) {
             buildSettingsCategories(
             SettingsModel(
                 hiddenApps = hiddenAppsAccess,

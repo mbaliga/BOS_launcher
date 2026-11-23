@@ -19,7 +19,7 @@ class SettingsCoreW56Test {
             SettingItem.Choice("Light / dark", g, listOf("Dark", "Light"), "Dark", { it }) {}.keywords("night", "amoled", "theme"),
             SettingItem.Toggle("Quiet mode", g, false, "Also hides the night clock") {},
             SettingItem.Toggle("Interface sounds", g, true) {}.keywords("click", "tones", "vibration"),
-            SettingItem.Pane("Export, import and restore", g, "One file").paneEntries(
+            SettingItem.Pane("Export, import and restore", g, "One file") {}.paneEntries(
                 PaneEntry("backup.snapshot", "Take a snapshot now", listOf("restore point", "undo")),
                 PaneEntry("backup.import", "Import setup…", listOf("load", "file")),
             ),
@@ -166,7 +166,7 @@ class SettingsCoreW56Test {
 
     @Test fun CFG_31_aDisabledRowIsStillFoundByTheSearchAndSaysWhy() {
         val idx = SettingsIndex.fromCategories(listOf(SettingCategory("Home screen", g, listOf(
-            SettingItem.Stepper("Rings", g, 2, 1..3).disabledUnless(false, "Needs Circle layout"),
+            SettingItem.Stepper("Rings", g, 2, 1..3) {}.disabledUnless(false, "Needs Circle layout"),
         ))))
         val hit = idx.search("rings").single()
         assertEquals("Needs Circle layout", hit.disabledReason)

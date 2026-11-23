@@ -2,6 +2,7 @@ package com.bos.sphere.feature.grid
 
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -135,14 +136,14 @@ class SettingsCoreW56UiTest {
 
     @Test fun CFG_29_aSliderShowsItsDefaultTickAndAFlatDefaultActionThatPutsTheDefaultBack() {
         show(0)
-        rule.onNodeWithTag(OneUiTags.SLIDER_TICK).assertIsDisplayed()
+        rule.onNodeWithTag(OneUiTags.SLIDER_TICK, useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithTag(OneUiTags.SLIDER_DEFAULT).assertIsDisplayed()
         rule.onNodeWithTag(OneUiTags.SLIDER_READOUT).assertTextEquals("70%")
         shoot("slider-default-tick")
         rule.onNodeWithTag(OneUiTags.SLIDER_DEFAULT).performClick(); rule.waitForIdle()
         assertEquals(0.82f, iconSize, 0.011f)
         rule.onAllNodesWithTag(OneUiTags.SLIDER_DEFAULT).assertCountEquals(0) // at the default the action goes away
-        rule.onNodeWithTag(OneUiTags.SLIDER_TICK).assertIsDisplayed()
+        rule.onNodeWithTag(OneUiTags.SLIDER_TICK, useUnmergedTree = true).assertIsDisplayed()
     }
 
     // ---- disabled rows -------------------------------------------------------------------------------------------------------------
@@ -167,7 +168,7 @@ class SettingsCoreW56UiTest {
 
     @Test fun CFG_30_resetThisPageAsksTakesASnapshotThenOffersUndo() {
         show(0)
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
+        rule.onAllNodes(hasScrollAction())[0].performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
         rule.onNodeWithTag(OneUiTags.RESET_ROW).assertIsDisplayed().performClick(); rule.waitForIdle()
         // the confirmation: the primary action is a box on top, Cancel plain text below it
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).assertIsDisplayed()
@@ -188,9 +189,28 @@ class SettingsCoreW56UiTest {
         rule.waitUntil(5_000) { rule.onAllNodesWithText("Settings restored.").fetchSemanticsNodes().isNotEmpty() }
     }
 
+    /** The dialog lives in its own window, which a view capture does not include: the same card, drawn on the page. */
+    @Test fun CFG_30_theConfirmCardStacksThePrimaryBoxAboveThePlainCancel() {
+        rule.setContent {
+            SphereTheme {
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(OneUi.Page), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    OneUiDialogCard(
+                        title = SettingsResetFlow.PAGE_TITLE, body = SettingsResetFlow.PAGE_BODY, confirmLabel = SettingsResetFlow.CONFIRM, onDismiss = {}, onConfirm = {}, destructive = true,
+                    )
+                }
+            }
+        }
+        rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
+        val confirm = rule.onNodeWithTag(OneUiDialogTags.CONFIRM).fetchSemanticsNode().boundsInRoot
+        val cancel = rule.onNodeWithTag(OneUiDialogTags.CANCEL).fetchSemanticsNode().boundsInRoot
+        assertTrue("primary above secondary", confirm.top < cancel.top)
+        assertEquals("one column, not side by side", confirm.left, cancel.left, 2f)
+        shoot("reset-confirm-card")
+    }
+
     @Test fun CFG_30_cancelLeavesEverythingAlone() {
         show(0)
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
+        rule.onAllNodes(hasScrollAction())[0].performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
         rule.onNodeWithTag(OneUiTags.RESET_ROW).performClick(); rule.waitForIdle()
         rule.onNodeWithTag(OneUiDialogTags.CANCEL).performClick(); rule.waitForIdle()
         assertEquals(0, resets); assertTrue(snaps.log.isEmpty())

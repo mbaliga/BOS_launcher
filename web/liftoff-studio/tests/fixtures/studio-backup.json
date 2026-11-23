@@ -1,0 +1,210 @@
+{
+  "format": "liftoff-state",
+  "schemaVersion": 3,
+  "exportedAt": 1700000000000,
+  "app": "liftoff-studio",
+  "settings": {
+    "format": "liftoff-settings",
+    "settingsVersion": 2,
+    "prefs": {
+      "accent": 4279312947,
+      "adaptiveGrid": false,
+      "alwaysKeyboard": false,
+      "appsOnHome": "Everything",
+      "badgeCount": true,
+      "badgesOn": true,
+      "bgSlot1": "spire",
+      "bgSlot2": "breathing-dots",
+      "calmRegular": false,
+      "calmStyle": "Beam",
+      "clockFormat": "System",
+      "clockStyle": "AnalogMinimal",
+      "clockTileAnalog": false,
+      "clockTileDate": true,
+      "clockTileFormat": "System",
+      "contCols": 4,
+      "cornerIconMode": "Glyph",
+      "cornerIconSize": 32,
+      "cornerStyle": "Glyph",
+      "cornersFollow": true,
+      "cornersPerOri": false,
+      "glanceClockAccent": false,
+      "glanceClockDate": false,
+      "glanceClockSize": "Large",
+      "glanceClockX": 0.35,
+      "glanceClockXLand": 0.5,
+      "glanceClockY": 0.14,
+      "glanceClockYLand": 0.14,
+      "glanceControlsSec": 4,
+      "glanceEnabled": true,
+      "glanceHotspots": "BottomRight,BottomLeft",
+      "glanceIndicator": true,
+      "gridBias": 0.4,
+      "gridDensity": 1,
+      "gridInsetBottom": 0,
+      "gridInsetTop": 0,
+      "gridInsetX": 0,
+      "hideStatusBar": true,
+      "homeOrder": "LeftToRight",
+      "homePage": 0,
+      "homePages": "Continuous",
+      "hotCornerDwell": 150,
+      "hotCornersOn": true,
+      "iconPlate": true,
+      "iconScale": 0.82,
+      "iconShape": "Rounded",
+      "iconSpacing": 0,
+      "iconTint": "None",
+      "indHigh": 4285267855,
+      "indIdle": 4287270809,
+      "indIntensity": 0.6,
+      "indLow": 4294921549,
+      "indMetric": "Signal",
+      "indMid": 4294947655,
+      "indSpeed": 0.5,
+      "kbOpenL": false,
+      "kbOpenP": false,
+      "lCols": 5,
+      "lPaging": "Horizontal",
+      "lRows": 2,
+      "labelScale": 1,
+      "labels": false,
+      "language": "System",
+      "launchpadRail": true,
+      "leftPage": "Launchpad",
+      "lpTheme": "Dark",
+      "motion": true,
+      "motionBg": false,
+      "motionSens": 0.5,
+      "pCols": 3,
+      "pPaging": "Horizontal",
+      "pRows": 6,
+      "pageMode": "Multiple",
+      "pageTransition": "Slide",
+      "radarBackground": "Dimmed",
+      "radarIntensity": "Normal",
+      "radarSignalForce": "Live",
+      "recentsLimit": 24,
+      "recentsUsage": true,
+      "restoreSurfaces": false,
+      "rightSide": "RecentsPanel",
+      "scrollAxis": "Long",
+      "searchActions": true,
+      "searchContacts": true,
+      "searchDeep": true,
+      "searchFiles": true,
+      "searchLayout": "Filmstrip",
+      "searchLayoutPinned": false,
+      "searchMotion": true,
+      "searchWeb": true,
+      "settingsBackdrop": "Wallpaper",
+      "settingsDim": 0.7,
+      "showMusic": true,
+      "spacingV": -1,
+      "studioKeptField": {
+        "note": "unknown fields survive"
+      },
+      "style": "Grid",
+      "themeMode": "Light",
+      "uiFont": "lexend",
+      "uiSoundVolume": 0.4,
+      "uiSounds": true,
+      "webEngine": "DuckDuckGo",
+      "webSuggestions": true,
+      "wheelGrouping": "Letter",
+      "wheelWorkOnly": false,
+      "wpGlanceAngle": 90,
+      "wpGlanceFrom": 4280954731,
+      "wpGlanceKind": "gradient",
+      "wpGlancePicDim": 0,
+      "wpGlancePicFit": "fill",
+      "wpGlancePicGif": "still",
+      "wpGlanceSolid": 4279637532,
+      "wpGlanceSysDim": 0,
+      "wpGlanceTo": 4278913808,
+      "wpPagesAngle": 90,
+      "wpPagesFrom": 4280954731,
+      "wpPagesKind": "live",
+      "wpPagesPicDim": 0,
+      "wpPagesPicFit": "fill",
+      "wpPagesPicGif": "still",
+      "wpPagesSame": true,
+      "wpPagesSlot1": "spire",
+      "wpPagesSlot2": "breathing-dots",
+      "wpPagesSolid": 4279637532,
+      "wpPagesSysDim": 0,
+      "wpPagesTo": 4278913808
+    }
+  },
+  "dock": {
+    "settings": {
+      "enabled": false,
+      "style": "3d",
+      "mode": "PinnedPlusRecent",
+      "edge": "Left",
+      "groupShelf": true
+    }
+  },
+  "shortcuts": {
+    "corners": {
+      "TopLeft": {
+        "t": "single",
+        "i": "action:Flashlight"
+      },
+      "TopRight": {
+        "t": "single",
+        "i": "action:Music"
+      },
+      "BottomRight": {
+        "t": "single",
+        "i": "action:Search"
+      },
+      "BottomLeft": {
+        "t": "single",
+        "i": "action:AllApps"
+      }
+    },
+    "gestures": {
+      "PinchIn": "action:Search",
+      "PinchOut": "action:Search",
+      "SwipeUp": "action:AllApps",
+      "SwipeDown": "action:Notifications",
+      "SwipeLeft": "action:Search",
+      "SwipeRight": "",
+      "DoubleTap": "",
+      "LongPress": "",
+      "Shake": "action:RingerVibrate",
+      "DoubleFlick": "action:RingerSilent",
+      "DoubleFlip": "action:Flashlight",
+      "FaceDown": ""
+    }
+  },
+  "prefFiles": {
+    "puck_actions": {
+      "segments": {
+        "t": "i",
+        "v": 6
+      },
+      "labels": {
+        "t": "b",
+        "v": false
+      },
+      "slots": {
+        "t": "s",
+        "v": "a:Flashlight\na:Clock\na:Notifications\na:DoNotDisturb\na:Search\na:Camera\na:Calculator\na:SystemSettings"
+      }
+    },
+    "comms_scale": {
+      "pct": {
+        "t": "i",
+        "v": 115
+      }
+    },
+    "launcher_haptics": {
+      "strength": {
+        "t": "s",
+        "v": "strong"
+      }
+    }
+  }
+}

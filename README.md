@@ -56,6 +56,7 @@ syntax, the bottom search field, and the full-screen portrait Comms.
 - **App management:** long-press → App info / Hide-Unhide / Uninstall.
 - **Hyle identity:** theme, the named motion curves, dot-grid substrate, ambient chrome
   (clock / weather / battery / now-playing / settings gear).
+- **Liftoff Studio (`web/liftoff-studio/`, wave 56):** a static browser page that edits a Liftoff configuration off the device with a live drawing of the home (Glance, pages, Radar, the drawer disc, Comms, Recents) beside the six settings tabs, keeps named profiles in the browser, and reads and writes the files the app's Backup uses. No build step, no external request; not yet published (see `web/liftoff-studio/README.md`).
 
 ## Pages home (default style)
 

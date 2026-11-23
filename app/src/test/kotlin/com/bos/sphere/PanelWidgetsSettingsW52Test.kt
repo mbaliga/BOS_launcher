@@ -43,7 +43,7 @@ class PanelWidgetsSettingsW52Test {
     @Test fun STR_15_theSwitchIsThereDefaultsOffAndHidesThePositionChoice() {
         val sw = items().first { it.title == "Widgets section" } as SettingItem.Toggle
         assertFalse(sw.checked)
-        assertFalse("no position row while it is off", items().any { it.title == "Widgets position" })
+        assertNotNull("the position row stays while it is off, dimmed with the reason (wave 56)", items().first { it.title == "Widgets position" }.meta.disabledReason)
     }
 
     @Test fun STR_15_turningItOnStoresItAndOffersThePositionChoiceWhichStoresTheSlot() {

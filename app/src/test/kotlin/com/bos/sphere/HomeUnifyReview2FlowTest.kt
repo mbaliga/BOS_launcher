@@ -75,7 +75,7 @@ class HomeUnifyReview2FlowTest : TourBase() {
         longPressAt(0.5f, 0.75f); assertTrue(quickSheetShown())
         assertFalse("the quick sheet has no Add page any more (wave 34)", tagShown("quick.addpage"))
         openGroundControlHome()
-        assertFalse("with Pages Off Ground Control has no Add page either (the Pages chips turn pages on)", textShown("Add page"))
+        assertTrue("with Pages Off Ground Control shows Add page dimmed with its reason (wave 56)", textShown("Pages is Off"))
         back(); back(); assertFalse(settingsShown()) // wave 40: the page goes back to the root list first
         stores.prefs.update { it.copy(homePages = HomePages.Paginated) }; settle()
         backwardToGlance()

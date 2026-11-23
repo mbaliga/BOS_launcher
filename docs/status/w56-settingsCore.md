@@ -15,13 +15,14 @@ See `docs/decisions/settingsCore.md` for the decisions.
 
 ## Changed old tests
 - `HomeUnifyRowsTest.HOM_01_w28_addPage...`: Add page is now present for Off and Continuous but dimmed with a reason (CFG-31), so it asserts the reason instead of absence.
+- `WallpaperRowsW26Test`, `PanelWidgetsSettingsW52Test`, `GlanceFixedW38SmokeTest` (GFX_41), `HomeUnifyReview2FlowTest`: the row is there and dimmed with its reason instead of absent.
 - `SettingsOneUiW40Test` (section table rows exist): matches a row by id first, then title.
 
 ## Tests added
 `SettingsCoreW56Test` and `SettingsCoreW56UiTest` (feature-grid), `PrefsResetW56Test` (core-data), `SettingsCoreW56AppTest` and `SettingsCoreW56ShotsTest` (app). Strings: `L10nW56settingsCore.kt` (36, 8 languages; hidden search synonyms are English only).
 
 ## Results
-RESULTS_PLACEHOLDER
+core-data 739, feature-grid 1682, core-quality 220 green. app 687: five failed on the first full run; four encoded vanishing rows and were updated (WallpaperRowsW26Test, PanelWidgetsSettingsW52Test, GlanceFixedW38SmokeTest GFX_41, HomeUnifyReview2FlowTest; reason: CFG-31 keeps the rows dimmed) and `DrawerRevertW29Test.HOM_01_w29_theAppsHotspotOnAPageOpensTheWheelDisc` failed under machine load and passed alone on rerun (not related to the settings). The five were rerun and pass; the full app suite was not rerun after those edits. core-design TranslationCoverage green. Full `assembleRelease` not run.
 
 ## Help diet report (CFG-33, nothing fails)
 rows: 158

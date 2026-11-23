@@ -61,7 +61,7 @@ fun DockLivePreview(manager: WorkspaceManager, apps: List<PanelApp>, landscape: 
         ) {
             DockRail(
                 content, edge, state.active.name, expanded = false, focusRequest = 0, showNumbers = false, actions = DockActions(), graphBridge = null,
-                modifier = Modifier.padding(10.dp), style = state.dock.style, dark = !HyleTheme.isLight,
+                modifier = Modifier.padding(10.dp), style = state.dock.style, dark = !HyleTheme.isLight, magnify = state.dock.magnifyStrength.takeIf { state.dock.magnify },
             ) { item, size -> PreviewTile(item, size) }
         }
     }

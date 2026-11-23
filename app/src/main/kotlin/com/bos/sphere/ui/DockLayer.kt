@@ -214,10 +214,12 @@ fun BoxScope.DockLayer(
             launcherDropTarget { r -> pinDropped(r).also { n -> if (n > 0) android.widget.Toast.makeText(ctx, L10n.tr("Pinned %d to dock", n), android.widget.Toast.LENGTH_SHORT).show() } > 0 }
         },
         modifier = { edge ->
+            // W56 (dockMagnify): the margins keep the dock clear of the corner hotspots; with magnification on the dock gets more room to spread in (it still only widens while it is touched).
+            val m = if (wsState.dock.magnify) 20.dp else 76.dp
             when (edge) {
-                DockEdge.Bottom -> Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 76.dp, end = 76.dp, bottom = (bottomPlan?.railBottomDp ?: 8f).dp)
-                DockEdge.Left -> Modifier.align(Alignment.CenterStart).safeDrawingPadding().padding(start = 12.dp, top = 76.dp, bottom = 76.dp)
-                DockEdge.Right -> Modifier.align(Alignment.CenterEnd).safeDrawingPadding().padding(end = 12.dp, top = 76.dp, bottom = 76.dp)
+                DockEdge.Bottom -> Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = m, end = m, bottom = (bottomPlan?.railBottomDp ?: 8f).dp)
+                DockEdge.Left -> Modifier.align(Alignment.CenterStart).safeDrawingPadding().padding(start = 12.dp, top = m, bottom = m)
+                DockEdge.Right -> Modifier.align(Alignment.CenterEnd).safeDrawingPadding().padding(end = 12.dp, top = m, bottom = m)
             }
         },
     )

@@ -27,6 +27,11 @@ import androidx.compose.foundation.focusable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.foundation.layout.absolutePadding
+import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -120,6 +125,8 @@ fun DockRail(
     /** W39 (dockThemes): how the dock is drawn; [dark] picks the 3D slab's variant (default: the UI theme). */
     style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
     dark: Boolean = !com.bos.sphere.core.design.HyleTheme.isLight,
+    /** W56 (dockMagnify): icons grow around the finger, mouse or focus by this strength; null = off. Never while [editing]. */
+    magnify: MagnifyStrength? = null,
     /** W55 (dockSheet): the dock is being edited in place (the sheet's Edit dock): icons wiggle, a drag reorders, an x removes, a plus adds. */
     editing: Boolean = false,
     /** W55: gets the rail's layout coordinates, so the sheet's host can leave exactly the dock touchable while editing. */
@@ -152,6 +159,7 @@ fun DockRail(
     val shape = RoundedCornerShape(22.dp)
     val surface = Modifier.dockSurface(style, dark, edge, shape)
     val glyph = glyphColor(style, HyleColors.InkDim)
+    val threeD = style == com.bos.sphere.core.data.DockStyle.ThreeD
 
     if (collapsedBand) {
         // The collapsed band: a slim grab strip that expands the dock on tap, Enter or the dock-focus shortcut.
@@ -167,20 +175,69 @@ fun DockRail(
         return
     }
 
-    val pad = Modifier.padding(10.dp)
+    // W56 (dockMagnify): one pointer state for the whole row (a finger, a mouse or the focus), read only by layers; the tooltip is on for the 3D look and with magnification.
+    val magnifyOn = magnify != null && !editing
+    val field = if (magnifyOn || (threeD && !editing)) remember { MagnifyField() } else null
+    val dens = LocalDensity.current.density
+    var availMain by remember { mutableIntStateOf(0) }
+    var restMain by remember { mutableIntStateOf(0) }
+    var engaged by remember { mutableStateOf(false) }
+    val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    if (field != null) {
+        SideEffect {
+            field.density = dens; field.horizontal = horizontal; field.edge = edge; field.factor = if (magnifyOn) magnify!!.factor else 1f
+            field.pitch = DockMagnify.PITCH_DP * dens; field.gapHalf = (DockMagnify.PITCH_DP - DockMagnify.SLOT_DP) / 2f * dens
+            field.lo = 0f; field.hi = (if (horizontal) railSize.width else railSize.height).toFloat()
+        }
+        LaunchedEffect(field) { snapshotFlow { field.engaged }.collect { engaged = it } }
+        LaunchedEffect(field, reduced) {
+            snapshotFlow { if (field.wantsMagnify) 1f else 0f }.collectLatest { target ->
+                if (reduced) field.amount = target
+                else androidx.compose.animation.core.animate(field.amount, target, animationSpec = androidx.compose.animation.core.spring(if (target > 0f) 0.72f else 0.8f, 420f)) { v, _ -> field.amount = v }
+            }
+        }
+        LaunchedEffect(field, reduced) {
+            // Keyboard or D-pad focus moves the effect along the row: the pointer follows the focused icon.
+            snapshotFlow { field.focusId to field.pointerDown }.collectLatest { (fid, down) ->
+                val target = if (down || fid == MagnifyField.NONE) null else field.focusTarget()
+                if (target != null) {
+                    if (reduced || field.amount < 0.01f) field.pointer = target
+                    else androidx.compose.animation.core.animate(field.pointer, target, animationSpec = androidx.compose.animation.core.spring(0.85f, 500f)) { v, _ -> field.pointer = v }
+                }
+            }
+        }
+    }
+    // While it is touched the rail asks for room: the spread has somewhere to go at the ends (never more than the parent allows) and the grown icons have headroom.
+    val padded = magnifyOn && engaged
+    val slackDp = if (padded) (minOf(DockMagnify.slackDp(magnify!!) * dens, maxOf(0f, (availMain - restMain) / 2f))) / dens else 0f
+    val headDp = if (padded) DockMagnify.headDp(magnify!!) else 0f
+    val base = 10f
+    val shelfSide = if (threeD) DockStyleTokens.shelfSidePad(base) else base
+    val padL = when (edge) { DockEdge.Bottom -> base + slackDp; DockEdge.Left -> shelfSide; DockEdge.Right -> base + headDp }
+    val padR = when (edge) { DockEdge.Bottom -> base + slackDp; DockEdge.Left -> base + headDp; DockEdge.Right -> shelfSide }
+    val padT = when (edge) { DockEdge.Bottom -> base + headDp; else -> base + slackDp }
+    val padB = when (edge) { DockEdge.Bottom -> shelfSide; else -> base + slackDp }
+    val pad = Modifier.absolutePadding(padL.dp, padT.dp, padR.dp, padB.dp)
+    val seatAlign = when (edge) { DockEdge.Left -> Alignment.End; DockEdge.Right -> Alignment.Start; else -> Alignment.CenterHorizontally }
     @Composable fun Strip(body: @Composable () -> Unit) {
-        if (horizontal) Row(Modifier.horizontalScroll(rememberScrollState()).then(pad), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { body() }
-        else Column(Modifier.verticalScroll(rememberScrollState()).then(pad), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) { body() }
+        if (horizontal) Row(Modifier.horizontalScroll(rememberScrollState()).then(pad), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = if (threeD) Alignment.Top else Alignment.CenterVertically) { body() }
+        else Column(Modifier.verticalScroll(rememberScrollState()).then(pad), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = seatAlign) { body() }
     }
 
     Box(
-        modifier.then(surface)
-            .onGloballyPositioned { c -> railOrigin = c.positionInRoot(); railSize = c.size; onCoordinates?.invoke(c) }
+        modifier.then(if (field != null) Modifier.layout { m, c -> availMain = if (horizontal) c.maxWidth else c.maxHeight; val p = m.measure(c); layout(p.width, p.height) { p.place(0, 0) } } else Modifier)
+            .onGloballyPositioned { c ->
+                railOrigin = c.positionInRoot(); railSize = c.size; onCoordinates?.invoke(c)
+                field?.viewport = c; field?.refreshAll()
+                if (!padded) restMain = if (horizontal) c.size.width else c.size.height
+            }
+            .then(if (field != null) Modifier.pointerInput(field) { trackMagnify(field) } else Modifier)
             // W25: a long press on the dock (an icon or the empty part) opens its options; the menu key and Shift+F10 do the same from the keyboard.
             .pointerInput(Unit) {
                 detectTapGestures(onLongPress = { p ->
                     val root = Offset(p.x + railOrigin.x, p.y + railOrigin.y)
-                    val hit = slotBounds.entries.firstOrNull { it.value.contains(root) }?.key
+                    val magnified = if (field != null && field.amount > 0.05f) field.result.value.let { r -> r.indexAt(if (horizontal) p.x else p.y).let { k -> if (k >= 0) r.ids[k] - 1 else -1 } }.takeIf { it in items.indices } else null
+                    val hit = magnified ?: slotBounds.entries.firstOrNull { it.value.contains(root) }?.key
                     if (hit != null) { if (!editing) openItemMenu(hit) } else openDock()
                 })
             }
@@ -198,23 +255,39 @@ fun DockRail(
                 )
             },
     ) {
+        // The dock's own surface (the pill, nothing, or the glass shelf) behind the row. It grows with the spread so the icons never leave it.
+        Box(
+            Modifier.matchParentSize().absolutePadding(if (edge == DockEdge.Bottom) slackDp.dp else if (edge == DockEdge.Right) headDp.dp else 0.dp, if (edge == DockEdge.Bottom) headDp.dp else slackDp.dp, if (edge == DockEdge.Bottom) slackDp.dp else if (edge == DockEdge.Left) headDp.dp else 0.dp, if (edge == DockEdge.Bottom) 0.dp else slackDp.dp)
+                .then(if (field != null && magnifyOn) Modifier.graphicsLayer {
+                    val r = field.result.value
+                    if (r.size > 0 && field.amount != 0f) {
+                        val gs = if (r.baseStart < 0f) 0f else (r.baseStart - r.start).coerceAtLeast(0f)
+                        val ge = if (r.baseEnd > (if (horizontal) railSize.width else railSize.height).toFloat()) 0f else (r.end - r.baseEnd).coerceAtLeast(0f)
+                        val len = if (horizontal) size.width else size.height
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        if (horizontal) { scaleX = (len + gs + ge) / len; translationX = -gs } else { scaleY = (len + gs + ge) / len; translationY = -gs }
+                    }
+                } else Modifier)
+                .then(surface),
+        )
         Strip {
-            WorkspaceChip(workspaceName, actions, graphBridge, style)
+            WorkspaceChip(workspaceName, actions, graphBridge, style, edge, field)
             if (editing) DockAddTile(actions.onAddApps, graphBridge, style) // W55: the plus tile (first, so a long row never scrolls it out of reach) opens the app picker
             content.pinned.forEachIndexed { i, item ->
                 DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, bridge = graphBridge, widget = widget, style = style, dark = dark, editing = editing,
-                    onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE })
+                    onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE }, edge = edge, field = field)
             }
             if (!editing && content.showRecentSection && content.recent.isNotEmpty()) {
-                SectionDivider(horizontal, style)
+                SectionDivider(horizontal, style, edge, field)
                 content.recent.forEachIndexed { j, item ->
                     val i = content.pinned.size + j
                     DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = {}, reorderable = false, bridge = graphBridge, style = style, dark = dark,
-                        onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE })
+                        onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE }, edge = edge, field = field)
                 }
             }
-            if (!editing && content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge, style)
+            if (!editing && content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge, style, edge, field)
         }
+        if (field != null && menuFor < 0) DockTooltipLayer(field, { railOrigin.x }, { railOrigin.y })
     }
     if (menuFor >= 0 && !editing) items.getOrNull(menuFor)?.let { item ->
         val extra by androidx.compose.runtime.produceState(emptyList<DockMenuEntry>(), item) { value = runCatching { itemExtras(item) }.getOrDefault(emptyList()) }
@@ -223,6 +296,16 @@ fun DockRail(
 }
 
 private const val MENU_NONE = Int.MIN_VALUE
+private const val CHIP_ID = 0
+private const val DIVIDER_ID = 500
+private const val ENABLE_ID = 1000
+
+/** W56: in the 3D look every member of the row stands on the shelf: its seat is the slot's icon margin, measured from the side away from the shelf ([extra] lowers it further). */
+private fun Modifier.seat(style: com.bos.sphere.core.data.DockStyle, edge: DockEdge, extra: Dp = 0.dp): Modifier {
+    if (style != com.bos.sphere.core.data.DockStyle.ThreeD) return this
+    val m = (DockStyleTokens.SLOT_MARGIN_DP).dp + extra
+    return when (edge) { DockEdge.Bottom -> padding(top = m); DockEdge.Left -> absolutePadding(right = m); DockEdge.Right -> absolutePadding(left = m) }
+}
 
 /** The menu key, or Shift+F10 (the standard context-menu chord). */
 private fun isMenuKey(ev: androidx.compose.ui.input.key.KeyEvent): Boolean = ev.key == Key.Menu || (ev.key == Key.F10 && ev.isShiftPressed)
@@ -240,18 +323,18 @@ private fun Modifier.graphNode(id: String, bridge: DockInput.FocusBridge?): Modi
 
 /** A thin rule between the pinned items and the recent ones; icons only, so no "Recent" text. */
 @Composable
-private fun SectionDivider(horizontal: Boolean, style: com.bos.sphere.core.data.DockStyle) {
-    val desc = Modifier.semantics { contentDescription = L10n.tr("Recent apps") }
+private fun SectionDivider(horizontal: Boolean, style: com.bos.sphere.core.data.DockStyle, edge: DockEdge, field: MagnifyField?) {
+    val desc = Modifier.seat(style, edge, 6.dp).magnifyMember(field, DIVIDER_ID, "", magnifiable = false, outerFrac = 1f).semantics { contentDescription = L10n.tr("Recent apps") }
     if (style == com.bos.sphere.core.data.DockStyle.Transparent) {
         // Over the wallpaper a thin white rule would vanish on a light one: it sits on a dark halo strip.
         Box(
-            Modifier.then(if (horizontal) Modifier.width(5.dp).height(30.dp) else Modifier.width(30.dp).height(5.dp)).clip(CircleShape)
-                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = DockStyleTokens.HALO_ALPHA)).then(desc),
+            Modifier.then(desc).then(if (horizontal) Modifier.width(5.dp).height(30.dp) else Modifier.width(30.dp).height(5.dp)).clip(CircleShape)
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = DockStyleTokens.HALO_ALPHA)),
             contentAlignment = Alignment.Center,
         ) { Box(Modifier.then(if (horizontal) Modifier.width(1.dp).height(26.dp) else Modifier.width(26.dp).height(1.dp)).background(androidx.compose.ui.graphics.Color(DockStyleTokens.GLYPH))) }
         return
     }
-    Box(Modifier.then(if (horizontal) Modifier.width(1.dp).height(28.dp) else Modifier.width(28.dp).height(1.dp)).background(HyleColors.Hairline).then(desc))
+    Box(Modifier.then(desc).then(if (horizontal) Modifier.width(1.dp).height(28.dp) else Modifier.width(28.dp).height(1.dp)).background(HyleColors.Hairline))
 }
 
 /**
@@ -260,10 +343,10 @@ private fun SectionDivider(horizontal: Boolean, style: com.bos.sphere.core.data.
  * reach that. TalkBack gets the same two switches as actions. The name is only its description.
  */
 @Composable
-private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.FocusBridge?, style: com.bos.sphere.core.data.DockStyle) {
+private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.FocusBridge?, style: com.bos.sphere.core.data.DockStyle, edge: DockEdge, field: MagnifyField?) {
     val tint = glyphColor(style, HyleColors.InkBright)
     Box(
-        Modifier.size(40.dp).clip(CircleShape).glyphHalo(style).background(HyleColors.Violet.copy(alpha = 0.22f))
+        Modifier.seat(style, edge).size(40.dp).magnifyMember(field, CHIP_ID, L10n.tr("Home"), outerFrac = 1f).clip(CircleShape).glyphHalo(style).background(HyleColors.Violet.copy(alpha = 0.22f))
             .pointerInput(Unit) {
                 var total = 0f
                 detectHorizontalDragGestures(onDragStart = { total = 0f }, onDragEnd = { if (total > 40f) actions.onSwitchWorkspace(-1) else if (total < -40f) actions.onSwitchWorkspace(1) }) { _, d -> total += d }
@@ -289,10 +372,10 @@ private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.
 
 /** Asks for usage access (so Recent can fill): an icon button, a ring with a plus, instead of a sentence. */
 @Composable
-private fun EnableButton(onClick: () -> Unit, bridge: DockInput.FocusBridge?, style: com.bos.sphere.core.data.DockStyle) {
+private fun EnableButton(onClick: () -> Unit, bridge: DockInput.FocusBridge?, style: com.bos.sphere.core.data.DockStyle, edge: DockEdge, field: MagnifyField?) {
     val tint = glyphColor(style, HyleColors.Ink)
     Box(
-        Modifier.size(40.dp).clip(CircleShape).glyphHalo(style).border(1.dp, if (style == com.bos.sphere.core.data.DockStyle.Transparent) tint else HyleColors.Hairline, CircleShape).graphNode("dock.enable", bridge).clickable(onClick = onClick)
+        Modifier.seat(style, edge).size(40.dp).magnifyMember(field, ENABLE_ID, L10n.tr(DockText.ENABLE_ROW), outerFrac = 1f).clip(CircleShape).glyphHalo(style).border(1.dp, if (style == com.bos.sphere.core.data.DockStyle.Transparent) tint else HyleColors.Hairline, CircleShape).graphNode("dock.enable", bridge).clickable(onClick = onClick)
             .semantics { role = Role.Button; contentDescription = L10n.tr(DockText.ENABLE_ROW) }
             .drawBehind {
                 val c = Offset(size.width / 2, size.height / 2); val r = size.width * 0.2f
@@ -326,13 +409,19 @@ private fun DockSlot(
     style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
     dark: Boolean = true,
     editing: Boolean = false,
+    edge: DockEdge = DockEdge.Bottom,
+    field: MagnifyField? = null,
 ) {
     val slot = 52.dp
     // HOM-02: a pinned widget takes its span of slots along the rail and one slot across it.
     val wide = item.ref.kind == ItemKind.Widget && widget != null
     val along = if (wide) DockWidgetSlot.lengthDp(item.span).dp else slot
-    val boxW = if (horizontal) along else slot
-    val boxH = if (horizontal) slot else along
+    val threeD = style == com.bos.sphere.core.data.DockStyle.ThreeD && !wide
+    val extra = if (threeD) DockStyleTokens.SLOT_EXTRA_DP.dp else 0.dp // 3D: floor room for the reflection, on the shelf's side
+    val boxW = if (horizontal) along else slot + extra
+    val boxH = if (horizontal) slot + extra else along
+    val memberId = index + 1
+    val outerFrac = if (threeD) (DockStyleTokens.SLOT_MARGIN_DP + DockStyleTokens.ICON_DP) / (DockStyleTokens.SLOT_DP + DockStyleTokens.SLOT_EXTRA_DP) else DockMagnify.OUTER_FRAC
     val slotPx = with(LocalDensity.current) { (slot + 8.dp).toPx() }
     var drag by remember { mutableFloatStateOf(0f) }
     var focused by remember { mutableStateOf(false) }
@@ -366,14 +455,17 @@ private fun DockSlot(
         ) { change, amount -> change.consume(); drag += if (horizontal) amount.x else amount.y; if (drag != 0f) onDragBegin() }
     }
 
+    val noRippleSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val motion = remember(field, memberId) { field?.let { f -> IconMotion({ f.scaleOf(memberId) }, { f.liftPx(memberId) }) } }
     Box(
         Modifier.size(boxW, boxH)
+            .magnifyMember(field, memberId, desc, magnifiable = !wide && !editing, outerFrac = outerFrac)
             .graphicsLayer { if (horizontal) translationX = drag else translationY = drag; rotationZ = wiggle; alpha = if (item.unavailable) 0.4f else if (drag != 0f) 0.8f else 1f }
             .clip(shape)
             .then(if (focused) Modifier.border(2.dp, HyleColors.Violet, shape) else Modifier)
             // INP-01: the slot is a node of the shared focus graph (arrows leave the rail into the home and back, the graph knows what has focus).
             .onGloballyPositioned { c -> val b = c.boundsInRoot(); onBounds(b); bridge?.register(nodeId, b.left, b.top, b.right, b.bottom, requester) }
-            .focusRequester(requester).onFocusChanged { focused = it.isFocused; bridge?.onFocus(nodeId, it.isFocused) }.focusable()
+            .focusRequester(requester).onFocusChanged { focused = it.isFocused; bridge?.onFocus(nodeId, it.isFocused); field?.let { f -> if (it.isFocused) f.focusId = memberId else if (f.focusId == memberId) f.focusId = MagnifyField.NONE } }.focusable()
             .onPreviewKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (isMenuKey(ev)) { onMenu(); return@onPreviewKeyEvent true }
@@ -387,7 +479,11 @@ private fun DockSlot(
                     DockKeyAction.None -> false
                 }
             }
-            .then(if (editing) Modifier else if (reorderable) Modifier.clickable { actions.onLaunch(item, index) } else Modifier.combinedClickable(onLongClick = onMenu) { actions.onLaunch(item, index) }) // W25: a recent icon has no reorder drag, so its long press is the click's own
+            .then(if (editing) Modifier else if (reorderable) {
+                // W56: in the 3D look the press feedback is the lifted icon and its tooltip (a ripple over the whole slot reads as a dark box on glass)
+                if (threeD) Modifier.clickable(interactionSource = noRippleSource, indication = null) { actions.onLaunch(item, index) } else Modifier.clickable { actions.onLaunch(item, index) }
+            } else if (threeD) Modifier.combinedClickable(interactionSource = noRippleSource, indication = null, onLongClick = onMenu) { actions.onLaunch(item, index) }
+            else Modifier.combinedClickable(onLongClick = onMenu) { actions.onLaunch(item, index) }) // W25: a recent icon has no reorder drag, so its long press is the click's own
             // HOM-02: an icon slot starts a reorder with a long press anywhere on it. A widget slot does not: the hosted view takes the touches that
             // start on it (its own taps, scrolls and long-presses), so its reorder lives on the grip strip drawn above it.
             .then(if (editing && reorderable && !wide) editDrag else if (reorderable && !wide) reorderDrag else Modifier)
@@ -401,7 +497,7 @@ private fun DockSlot(
                     CustomAccessibilityAction(L10n.tr("Replace with another app")) { actions.onReplace(item); true },
                 ) + (if (item.ref.kind == ItemKind.App) listOf(CustomAccessibilityAction(L10n.tr("App info")) { actions.onAppInfo(item); true }) else emptyList()) + CustomAccessibilityAction(L10n.tr("Dock item options")) { onMenu(); true } else customActions = listOf(CustomAccessibilityAction(L10n.tr("Pin to dock")) { actions.onPin(item); true }, CustomAccessibilityAction(L10n.tr("Dock item options")) { onMenu(); true })
             },
-        contentAlignment = Alignment.Center,
+        contentAlignment = if (!threeD) Alignment.Center else when (edge) { DockEdge.Bottom -> Alignment.TopCenter; DockEdge.Left -> Alignment.CenterEnd; DockEdge.Right -> Alignment.CenterStart },
     ) {
         if (wide) {
             widget!!(item, boxW, boxH)
@@ -411,10 +507,11 @@ private fun DockSlot(
                     .semantics { contentDescription = L10n.tr("Drag to reorder") }.then(reorderDrag),
                 contentAlignment = Alignment.TopCenter,
             ) { Box(Modifier.padding(top = 4.dp).size(24.dp, 3.dp).clip(CircleShape).background(HyleColors.InkDim.copy(alpha = 0.7f))) }
-        } else StyledIcon(style, dark, item, 40.dp, icon)
+        } else Box(if (threeD) Modifier.seat(style, edge) else Modifier) { StyledIcon(style, dark, item, 40.dp, edge, DockStyleTokens.REFLECT_DP.dp, motion, icon) }
         if (editing && reorderable) DockRemoveBadge(item, actions.onUnpin)
         // The active dot keeps its place in every style; over the wallpaper (Transparent) it gets a dark ring so it reads on a light one.
-        if (item.recentlyUsed) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).size(8.dp).clip(CircleShape).background(HyleColors.Violet).then(if (style == com.bos.sphere.core.data.DockStyle.Transparent) Modifier.border(1.5.dp, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f), CircleShape) else Modifier).testTag("dock.activeDot"))
+        if (item.recentlyUsed && threeD) ShelfDot(edge, dark, motion, Modifier.align(when (edge) { DockEdge.Bottom -> Alignment.BottomCenter; DockEdge.Left -> Alignment.CenterStart; DockEdge.Right -> Alignment.CenterEnd }))
+        else if (item.recentlyUsed) Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).size(8.dp).clip(CircleShape).background(HyleColors.Violet).then(if (style == com.bos.sphere.core.data.DockStyle.Transparent) Modifier.border(1.5.dp, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f), CircleShape) else Modifier).testTag("dock.activeDot"))
         if (showNumbers && index < 9) Text("${index + 1}", color = HyleColors.OnAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.TopStart).padding(2.dp).clip(CircleShape).background(HyleColors.Violet).padding(horizontal = 5.dp))
     }
@@ -423,3 +520,21 @@ private fun DockSlot(
 /** HOM-02: height of the reorder grip over a widget slot, and its test tag. */
 internal val WIDGET_GRIP = 16.dp
 fun widgetGripTag(encodedRef: String) = "dock.widgetGrip.$encodedRef"
+
+/** W56: the running dot of the 3D look: a small light dot on the shelf's lip under the icon, kept at its place on the lip while the icon grows and lifts. */
+@Composable
+private fun ShelfDot(edge: DockEdge, dark: Boolean, motion: IconMotion?, modifier: Modifier) {
+    val d = 13f // from the icon's foot to the dot, dp
+    Box(
+        modifier.then(when (edge) { DockEdge.Bottom -> Modifier.padding(bottom = 1.dp); DockEdge.Left -> Modifier.padding(start = 1.dp); DockEdge.Right -> Modifier.padding(end = 1.dp) })
+            .size(4.dp).testTag("dock.activeDot")
+            .graphicsLayer {
+                val s = motion?.scale?.invoke() ?: 1f
+                val lift = motion?.lift?.invoke() ?: 0f
+                val shift = ((d * density + lift) / s - d * density)
+                scaleX = 1f / s; scaleY = 1f / s
+                when (edge) { DockEdge.Bottom -> translationY = shift; DockEdge.Left -> translationX = -shift; DockEdge.Right -> translationX = shift }
+            }
+            .clip(CircleShape).background(if (dark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.92f) else androidx.compose.ui.graphics.Color(0xFF283044)),
+    )
+}

@@ -258,7 +258,7 @@ fun DockHost(
         onDismiss = { adding = false })
     DockRail(
         itemExtras = { item -> DockAppOptions.entries(context, launcher, manager, byKey[item.ref.id].takeIf { item.ref.kind == ItemKind.App }) },
-        style = state.dock.style, editing = editing, onCoordinates = sheet?.let { s -> { c -> s.dockCoords = c } },
+        style = state.dock.style, magnify = state.dock.magnifyStrength.takeIf { state.dock.magnify }, editing = editing, onCoordinates = sheet?.let { s -> { c -> s.dockCoords = c } },
         content = content, edge = edge, workspaceName = state.active.name, expanded = expanded || !content.collapsed,
         focusRequest = controller.focusRequest - focusBase, showNumbers = inputIsKeyboard, actions = actions, modifier = modifier(edge).railModifier(), widget = widgetOther,
         graphBridge = if (forceEnabled) null else DockInput.bridge, // the desktop surface's rail stays out of the phone home's graph

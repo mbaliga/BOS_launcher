@@ -159,3 +159,28 @@ internal fun modeArt(mode: DockMode, ink: Color, accent: Color): DrawScope.(Size
         }
     }
 }
+
+/**
+ * W56 (dockMagnify): a strength card's art: a shelf line with a row of icons, the middle one under the pointer, grown by the card's factor with the
+ * same raised-cosine falloff and spread the dock uses (the same [DockMagnify] functions), so the card shows what the dock will do.
+ */
+internal fun strengthArt(strength: MagnifyStrength, ink: Color, accent: Color): DrawScope.(Size) -> Unit = { s ->
+    val n = 7
+    val pitch = s.width * 0.86f / n
+    val r = DockMagnify.radius(pitch)
+    val a = strength.factor - 1f
+    val baseline = s.height * 0.80f
+    val x0 = (s.width - pitch * n) / 2f + pitch / 2f
+    val pointer = x0 + pitch * 3
+    drawRoundRect(ink.copy(alpha = 0.5f), Offset(s.width * 0.06f, baseline + px(2.5f)), Size(s.width * 0.88f, px(2.5f)), CornerRadius(px(1.5f)))
+    for (i in 0 until n) {
+        val c = x0 + pitch * i
+        val x = c - pointer
+        val sc = 1f + a * DockMagnify.weight(x, r)
+        val side = pitch * 0.62f * sc
+        val cx = c + a * DockMagnify.displacement(x, r)
+        val lift = px(1.5f) * (sc - 1f) / a.coerceAtLeast(0.01f)
+        val mid = i == 3
+        drawRoundRect(if (mid) accent else ink.copy(alpha = 0.55f), Offset(cx - side / 2f, baseline - side - lift), Size(side, side), CornerRadius(side * 0.24f))
+    }
+}

@@ -29,29 +29,26 @@ class DockStyleTokensW39Test {
         assertTrue("the rim (${DockStyleTokens.ICON_DP * DockStyleTokens.HALO_RADIUS} dp) is inside the ${DockStyleTokens.SLOT_DP} dp slot, so the slot never cuts it", DockStyleTokens.ICON_DP * DockStyleTokens.HALO_RADIUS <= DockStyleTokens.SLOT_DP / 2)
     }
 
-    @Test fun DCK_04_style_02_theSlabHasLightAndDarkVariantsWithAVisibleTopHighlightAndBevel() {
-        val d = DockStyleTokens.slab(true); val l = DockStyleTokens.slab(false)
-        assertTrue("dark face is dark", DockStyleTokens.luminance(d.faceTop) < 0.12); assertTrue("light face is light", DockStyleTokens.luminance(l.faceTop) > 0.7)
+    @Test fun DCK_04_style_02_theShelfHasLightAndDarkGlassWithABrightBevelAndADarkerLip() {
+        val d = DockStyleTokens.shelf(true); val l = DockStyleTokens.shelf(false)
+        fun a(c: Int) = c ushr 24
         listOf(d, l).forEach { s ->
-            assertTrue("face gets darker towards the bottom", DockStyleTokens.luminance(s.faceBottom) < DockStyleTokens.luminance(s.faceTop))
-            assertTrue("highlight is translucent white", (s.highlight ushr 24) in 0x40..0xFF && (s.highlight and 0xFFFFFF) == 0xFFFFFF)
-            assertTrue("bevel dark edge is dark", (s.bevelDark and 0xFFFFFF) == 0 && (s.bevelDark ushr 24) >= 0x44)
-            assertTrue("contact shadow and icon shadow are black", (s.contactShadow and 0xFFFFFF) == 0 && (s.iconShadow and 0xFFFFFF) == 0)
+            assertTrue("the glass is translucent so the wallpaper shows through", a(s.floorBack) in 0x30..0xE0 && a(s.floorFront) in 0x20..0xE0)
+            assertTrue("the floor is lighter at the back than at the front (it recedes)", a(s.floorBack) > a(s.floorFront))
+            assertTrue("the bevel line along the back edge is bright white", (s.topLine and 0xFFFFFF) == 0xFFFFFF && a(s.topLine) >= 0xC0)
+            assertTrue("the lip is darker than the floor's glass", DockStyleTokens.luminance(DockStyleTokens.blend(s.lipBottom, 0xFF808080.toInt(), a(s.lipBottom) / 255.0)) < DockStyleTokens.luminance(DockStyleTokens.blend(s.floorFront, 0xFF808080.toInt(), a(s.floorFront) / 255.0)))
+            assertTrue("shadows are black", (s.shadow and 0xFFFFFF) == 0 && (s.iconShadow and 0xFFFFFF) == 0)
         }
-        assertNotEquals(d.faceTop, l.faceTop)
+        assertNotEquals("the light and dark glass differ", d.floorBack, l.floorBack)
+        assertTrue("the light shelf reads lighter than the dark one over the same wallpaper", DockStyleTokens.luminance(DockStyleTokens.blend(l.floorBack, 0xFF607090.toInt(), (l.floorBack ushr 24) / 255.0)) > DockStyleTokens.luminance(DockStyleTokens.blend(d.floorBack, 0xFF607090.toInt(), (d.floorBack ushr 24) / 255.0)) - 0.0001)
     }
 
-    @Test fun DCK_04_style_02_iconsOnTheSlabKeepContrastWithItsFace() {
-        // the rail's own glyphs (home glyph, ring) use the theme ink: bright on the dark slab, dark on the light slab
-        assertTrue(DockStyleTokens.ratio(0xFFE7E9F0.toInt(), DockStyleTokens.slab(true).faceBottom) >= 7.0)
-        assertTrue(DockStyleTokens.ratio(0xFF0E1018.toInt(), DockStyleTokens.slab(false).faceBottom) >= 7.0)
-    }
-
-    @Test fun DCK_04_style_02_theContactShadowFallsDownForTheBottomDockAndInwardForASideDock() {
-        assertEquals(0f to 1f, DockStyleTokens.shadowDirection(DockEdge.Bottom))
-        assertTrue(DockStyleTokens.shadowDirection(DockEdge.Left).first > 0f); assertTrue(DockStyleTokens.shadowDirection(DockEdge.Right).first < 0f)
-        val total = (0..<DockStyleTokens.CONTACT_LAYERS).sumOf { DockStyleTokens.contactLayerAlpha(it, 0.4f).toDouble() }
-        assertTrue("layers add up to a soft shadow, not a black slab: $total", total in 0.2..0.6)
+    @Test fun DCK_04_style_02_theShelfGeometryLeavesTheReflectionFloorAndTheRailNoTaller() {
+        assertEquals("a slot gives the shelf side exactly the rail's dropped padding", 10f, DockStyleTokens.SLOT_EXTRA_DP)
+        assertEquals(0f, DockStyleTokens.shelfSidePad(10f))
+        assertEquals("the rail keeps its 72 dp thickness: 10 + 62 + 0", 72f, 10f + DockStyleTokens.SLOT_DP + DockStyleTokens.SLOT_EXTRA_DP + DockStyleTokens.shelfSidePad(10f))
+        assertTrue("the reflection fits on the floor between the icon's foot and the lip", DockStyleTokens.REFLECT_DP > 4f && DockStyleTokens.REFLECT_DP <= DockStyleTokens.SHELF_DEPTH_DP - DockStyleTokens.LIP_DP)
+        assertTrue("the back edge is narrower than the front", DockStyleTokens.BACK_INSET > 0.2f && DockStyleTokens.BACK_INSET < 0.7f)
     }
 
     @Test fun DCK_04_style_03_onlyTransparentHasNoSurfaceAndNothingChangesATouchTarget() {

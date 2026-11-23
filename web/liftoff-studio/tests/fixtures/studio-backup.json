@@ -142,7 +142,9 @@
       "style": "3d",
       "mode": "PinnedPlusRecent",
       "edge": "Left",
-      "groupShelf": true
+      "groupShelf": true,
+      "magnify": false,
+      "magnifyStrength": "medium"
     }
   },
   "shortcuts": {

@@ -1501,6 +1501,33 @@ window.LIFTOFF_SCHEMA = {
       "scene": "dock"
     },
     {
+      "key": "dock.magnify",
+      "label": "Magnify icons",
+      "tab": "home",
+      "group": "Dock",
+      "type": "bool",
+      "scope": "dock",
+      "default": false,
+      "scene": "dock",
+      "note": "Icons grow under the finger or pointer, like the classic Mac dock."
+    },
+    {
+      "key": "dock.magnifyStrength",
+      "label": "Magnify strength",
+      "tab": "home",
+      "group": "Dock",
+      "type": "enum",
+      "scope": "dock",
+      "options": [
+        {"id": "subtle", "label": "Subtle (1.3x)"},
+        {"id": "medium", "label": "Medium (1.6x)"},
+        {"id": "large", "label": "Large (2.0x)"}
+      ],
+      "default": "medium",
+      "scene": "dock",
+      "note": "Only read while Magnify icons is on."
+    },
+    {
       "key": "themeMode",
       "label": "Theme",
       "tab": "look",

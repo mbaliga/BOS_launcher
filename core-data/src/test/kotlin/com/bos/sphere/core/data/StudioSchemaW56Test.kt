@@ -183,6 +183,9 @@ class StudioSchemaW56Test {
             Fd("dock.mode", "Dock content", home, "Dock", "enum", scope = "dock", scene = "dock", options = dockEnum("DockMode")),
             Fd("dock.edge", "Dock position", home, "Dock", "enum", scope = "dock", scene = "dock", options = dockEnum("DockEdge"), note = "Landscape only; portrait is always the bottom."),
             Fd("dock.groupShelf", "App group chips", home, "Dock", "bool", scope = "dock", scene = "dock"),
+            Fd("dock.magnify", "Magnify icons", home, "Dock", "bool", scope = "dock", scene = "dock", note = "Icons grow under the finger or pointer, like the classic Mac dock."),
+            Fd("dock.magnifyStrength", "Magnify strength", home, "Dock", "enum", scope = "dock", scene = "dock",
+                options = listOf(Opt("subtle", "Subtle (1.3x)"), Opt("medium", "Medium (1.6x)"), Opt("large", "Large (2.0x)")), note = "Only read while Magnify icons is on."),
         )
 
         // ---- LOOK > Theme
@@ -329,7 +332,8 @@ class StudioSchemaW56Test {
         val lit = dockFields()[name] ?: error("DockSettings has no $name")
         return when (name) {
             "enabled" -> if (lit == "null") "auto" else if (lit == "true") "on" else "off"
-            "groupShelf" -> lit.toBooleanStrict()
+            "groupShelf", "magnify" -> lit.toBooleanStrict()
+            "magnifyStrength" -> lit.substringAfterLast('.').lowercase()
             "style" -> DockStyle.valueOf(lit.substringAfterLast('.')).id
             else -> lit.substringAfterLast('.')
         }
@@ -506,7 +510,7 @@ class StudioSchemaW56Test {
     }
 
     @Test fun CFG_34_theEnumOptionsAreTheIdsTheAppStoresAndTheDockKeysAreTheDockSettingsFields() {
-        assertEquals(setOf("enabled", "mode", "edge", "groupShelf", "style"), dockFields().keys)
+        assertEquals(setOf("enabled", "mode", "edge", "groupShelf", "style", "magnify", "magnifyStrength"), dockFields().keys)
         assertEquals(dockFields().keys.map { "dock.$it" }.toSet(), fields().filter { it.scope == "dock" }.map { it.key }.toSet())
         assertEquals(listOf("Collapsed", "PinnedPlusRecent"), dockEnum("DockMode").map { it.id })
         assertEquals(listOf("Bottom", "Left", "Right"), dockEnum("DockEdge").map { it.id })

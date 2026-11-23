@@ -427,6 +427,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Toggle(x("Separate corners for landscape"), Glyphs.Flip, p.cornersPerOrientation, x("Landscape keeps its own set; edits below apply to the orientation you are in")) { v -> upd { it.copy(cornersPerOrientation = v) } })
             add(SettingItem.Toggle(x("Hot corners with a mouse"), Glyphs.Pinch, p.hotCornersOn, x("Rest the pointer in a corner to reveal its action, click to run it")) { v -> upd { it.copy(hotCornersOn = v) } })
             if (p.hotCornersOn) add(SettingItem.Slider(x("Hot corner delay"), Glyphs.Dial, p.hotCornerDwellMs.toFloat(), 50f..600f, "${p.hotCornerDwellMs} ms", step = 10f) { v -> upd { it.copy(hotCornerDwellMs = v.roundToInt()) } })
+            if (p.hotCornersOn) add(hotCornerTryItem(p, m.updatePrefs)) // W56: Try it
             Corner.entries.forEach { c ->
                 add(SettingItem.Action(x(c.label), Glyphs.Palette, slotSummary(m.corners[c] ?: CornerSlot.Empty, m.appsByKey), navigates = true) { m.editCorner(c) })
             }
@@ -561,6 +562,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Toggle(x("Motion gestures"), Glyphs.Shake, p.motionEnabled, if (!m.motionAvailable) x("No motion sensor on this device") else null) { v -> upd { it.copy(motionEnabled = v) } })
             add(SettingItem.Toggle(x("When home isn't showing"), Glyphs.Bolt, p.motionInBackground) { v -> upd { it.copy(motionInBackground = v) } })
             add(SettingItem.Slider(x("Motion sensitivity"), Glyphs.Dial, p.motionSensitivity, 0f..1f, pct(p.motionSensitivity), x("Higher reacts to lighter movements (and more false triggers).")) { v -> upd { it.copy(motionSensitivity = v) } })
+            add(motionTryItem(p, m.updatePrefs)) // W56: Try it
             HomeGesture.entries.filter { it.kind == GestureKind.Motion }.forEach { g ->
                 add(SettingItem.Action(x(g.label), Glyphs.forGesture(g), m.gestures[g]?.let { itemLabel(it, m.appsByKey) } ?: x("Nothing"), navigates = true) { m.editGesture(g) })
             }
@@ -572,6 +574,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         x("Theme"),
         Glyphs.Palette,
         buildList {
+            add(looksRailItem(p)) // W56 (looksPresets): whole looks in one tap
             add(
                 SettingItem.Choice(
                     x("Light / dark"), Glyphs.Moon, ThemeMode.entries, p.themeMode, { x(it.label) },
@@ -821,5 +824,6 @@ internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherP
         add(SettingItem.Toggle(x("%s hotspot", x(c.label)), Glyphs.Dial, c in p.glanceHotspots) { on -> upd { it.copy(glanceHotspots = if (on) it.glanceHotspots + c else it.glanceHotspots - c) } })
     }
     add(SettingItem.Stepper(x("Controls hide after (seconds)"), Glyphs.Clock, p.glanceControlsSeconds, com.bos.sphere.core.data.GlanceControls.MIN_SECONDS..com.bos.sphere.core.data.GlanceControls.MAX_SECONDS, x("The music controls pop out after this long without a touch")) { v -> upd { it.copy(glanceControlsSeconds = com.bos.sphere.core.data.GlanceControls.clampSeconds(v)) } })
+    add(controlsTryItem(p, upd)) // W56: Try it
     add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("A small row at the bottom: Comms, home and the right-hand panel")) { v -> upd { it.copy(glanceIndicator = v) } })
 }

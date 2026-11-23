@@ -27,7 +27,7 @@ class MotionGestureDetector(
         set(value) { field = value.coerceIn(0f, 1f) }
 
     // Thresholds interpolate from firm (s=0) to light (s=1).
-    private val shakeThreshold get() = lerp(17f, 9f, sensitivity) // m/s² above gravity
+    private val shakeThreshold get() = Calibrators.shakeThreshold(sensitivity) // m/s² above gravity (firm 17 .. light 9); the Settings shake calibrator reads the same function
     private val twistThreshold get() = lerp(7.5f, 4f, sensitivity) // rad/s
 
     private var lastFireNs = Long.MIN_VALUE / 2

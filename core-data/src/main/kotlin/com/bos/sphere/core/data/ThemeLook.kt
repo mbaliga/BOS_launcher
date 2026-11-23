@@ -22,16 +22,19 @@ data class LookSnapshot(
     val dockStyle: DockStyle,
     val glanceWallpaper: Wallpaper,
     val uiFont: String = UiFonts.DEFAULT,
+    /** Wave 56: a Look also sets these two; null calm style = automatic. */
+    val calmStyle: CalmStyle? = null,
+    val iconPlate: Boolean = true,
 )
 
 /** Reading a look from the settings, describing a pack's effect, and applying it. All pure. */
 object ThemeLook {
     private val defaults = LauncherPrefs()
 
-    fun snapshot(p: LauncherPrefs, dock: DockStyle) = LookSnapshot(p.themeMode, p.accentColor, p.iconShape, p.iconTint, dock, p.rawWallpaper(WallpaperSurface.Glance), p.uiFont)
+    fun snapshot(p: LauncherPrefs, dock: DockStyle) = LookSnapshot(p.themeMode, p.accentColor, p.iconShape, p.iconTint, dock, p.rawWallpaper(WallpaperSurface.Glance), p.uiFont, p.calmStyle, p.iconPlate)
 
     fun restore(p: LauncherPrefs, s: LookSnapshot): LauncherPrefs =
-        p.copy(themeMode = s.themeMode, accentColor = s.accent, iconShape = s.iconShape, iconTint = s.iconTint, uiFont = s.uiFont).withWallpaper(WallpaperSurface.Glance, s.glanceWallpaper)
+        p.copy(themeMode = s.themeMode, accentColor = s.accent, iconShape = s.iconShape, iconTint = s.iconTint, uiFont = s.uiFont, calmStyle = s.calmStyle, iconPlate = s.iconPlate).withWallpaper(WallpaperSurface.Glance, s.glanceWallpaper)
 
     /** The look a fresh install has. */
     fun defaultSnapshot() = snapshot(defaults, DockStyle.Standard)
@@ -55,6 +58,8 @@ object ThemeLook {
         s.iconShape?.let { out = out.copy(iconShape = it) }
         s.iconTint?.let { out = out.copy(iconTint = it) }
         s.uiFont?.let { out = out.copy(uiFont = UiFonts.normalize(it)) }
+        s.calmStyle?.let { out = out.copy(calmStyle = it) }
+        s.iconPlate?.let { out = out.copy(iconPlate = it) }
         when (val w = s.wallpaper) {
             is ThemeWallpaper.Solid -> out = out.withWallpaper(WallpaperSurface.Glance, out.rawWallpaper(WallpaperSurface.Glance).copy(kind = WallpaperKind.Solid, solid = w.color))
             is ThemeWallpaper.Gradient -> out = out.withWallpaper(WallpaperSurface.Glance, out.rawWallpaper(WallpaperSurface.Glance).copy(kind = WallpaperKind.Gradient, gradient = GradientSpec(w.from, w.to, w.angle)))
@@ -71,6 +76,8 @@ object ThemeLook {
         s.iconTint?.let { add(ThemeChange(ThemeField.IconTint, p.iconTint.label, it.label)) }
         s.dockStyle?.let { add(ThemeChange(ThemeField.DockStyle, dock.label, it.label)) }
         s.uiFont?.let { add(ThemeChange(ThemeField.Font, p.uiFont, it)) }
+        s.calmStyle?.let { add(ThemeChange(ThemeField.CalmStyle, CalmStyles.resolve(p.calmStyle, p.rawWallpaper(WallpaperSurface.Glance).kind).label, it.label)) }
+        s.iconPlate?.let { add(ThemeChange(ThemeField.IconPlate, if (p.iconPlate) "On" else "Off", if (it) "On" else "Off")) }
         s.wallpaper?.let { w ->
             val now = p.rawWallpaper(WallpaperSurface.Glance)
             val (bText, bCols) = when (now.kind) {
@@ -113,7 +120,11 @@ class ThemeApplier(
         pack.settings.dockStyle?.let(setDockStyle)
     }
 
-    fun reset() = restoreTo(ThemeLook.defaultSnapshot(), remember = true)
+    /** Applies a built-in Look through the theme path (one undo, the same "Undo last theme change"); it never replaces a wallpaper that is not a Solid or Gradient. */
+    fun applyLook(preset: LookPreset) = apply(ThemePack(preset.name, preset.pack.author, preset.pack.version, LookPresets.settingsFor(preset, prefs())))
+
+    /** The default look; a reset leaves the calm style and the icon plate as they are (they are not part of the wave 39 default look). */
+    fun reset() = current().let { now -> restoreTo(ThemeLook.defaultSnapshot().copy(calmStyle = now.calmStyle, iconPlate = now.iconPlate), remember = true) }
 
     /** Restores the remembered look; false when there is none. */
     fun undo(): Boolean {

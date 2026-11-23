@@ -9,6 +9,7 @@ import org.json.JSONObject
  * { "format": "liftoff-theme", "formatVersion": 1, "name": "Dusk", "author": "Someone", "version": "1.0",
  *   "settings": { "themeMode": "dark|amoled|light", "accent": "#RRGGBB", "iconShape": "original|rounded|squircle|circle|square",
  *                 "iconTint": "none|accent|mono", "dockStyle": "standard|transparent|3d", "uiFont": "space_grotesk|system|inter|manrope|dm_sans|jetbrains_mono|atkinson|lexend" (optional),
+ *                 "calmStyle": "none|regular|edgedots|cornerbloom|bottomglow|beam" (optional), "iconPlate": true|false (optional),
  *                 "wallpaper": { "kind": "solid", "color": "#RRGGBB" } | { "kind": "gradient", "from": "#RRGGBB", "to": "#RRGGBB", "angle": 90 } } }
  * ```
  *
@@ -33,8 +34,11 @@ data class ThemeSettings(
     val wallpaper: ThemeWallpaper? = null,
     /** Wave 52: the UI font (a [UiFonts] id); an optional field, a pack without it leaves the font alone. */
     val uiFont: String? = null,
+    /** Wave 56 (looksPresets): the calm style and the icon plate, optional additions (a pack without them leaves both alone; the built-in Looks set them). */
+    val calmStyle: CalmStyle? = null,
+    val iconPlate: Boolean? = null,
 ) {
-    val isEmpty: Boolean get() = themeMode == null && accent == null && iconShape == null && iconTint == null && dockStyle == null && wallpaper == null && uiFont == null
+    val isEmpty: Boolean get() = themeMode == null && accent == null && iconShape == null && iconTint == null && dockStyle == null && wallpaper == null && uiFont == null && calmStyle == null && iconPlate == null
 }
 
 data class ThemePack(
@@ -48,7 +52,7 @@ data class ThemePack(
 /** The pack fields errors and the preview talk about; [label] is the English text (translated by the screen). */
 enum class ThemeField(val label: String) {
     Name("name"), Author("author"), Version("version"), Mode("light / dark mode"), Accent("accent colour"), IconShape("icon shape"),
-    IconTint("icon colour"), DockStyle("dock style"), Wallpaper("wallpaper"), Font("font"),
+    IconTint("icon colour"), DockStyle("dock style"), Wallpaper("wallpaper"), Font("font"), CalmStyle("calm style"), IconPlate("icon plate"),
 }
 
 /** Why a file was refused; [english] is the message (a `%s` is the field's label), translated by the screen. */
@@ -137,6 +141,8 @@ object ThemePacks {
             val tint = choice("iconTint", ThemeField.IconTint, IconTint.entries) { it.name }
             val dock = choice("dockStyle", ThemeField.DockStyle, DockStyle.entries) { it.id }
             val font = choice("uiFont", ThemeField.Font, UiFonts.IDS) { it }
+            val calm = choice("calmStyle", ThemeField.CalmStyle, CalmStyle.entries) { it.name }
+            val plate = if (sObj.has("iconPlate") && !sObj.isNull("iconPlate")) (sObj.opt("iconPlate") as? Boolean).also { if (it == null) err(ThemeErrorCode.BadValue, ThemeField.IconPlate) } else null
             var wp: ThemeWallpaper? = null
             if (sObj.has("wallpaper") && !sObj.isNull("wallpaper")) {
                 val w = sObj.opt("wallpaper") as? JSONObject
@@ -155,7 +161,7 @@ object ThemePacks {
                     else -> err(ThemeErrorCode.BadWallpaper, ThemeField.Wallpaper) // pictures, videos, files, system and live wallpapers are never carried
                 }
             }
-            settings = ThemeSettings(mode, accent, shape, tint, dock, wp, font)
+            settings = ThemeSettings(mode, accent, shape, tint, dock, wp, font, calm, plate)
             if (errors.isEmpty() && settings.isEmpty) err(ThemeErrorCode.NothingToApply)
         }
         if (errors.isNotEmpty() || name == null) return ThemeParse.Failed(errors.ifEmpty { listOf(ThemeError(ThemeErrorCode.Missing, ThemeField.Name)) })
@@ -181,6 +187,8 @@ object ThemePacks {
             s.iconTint?.let { o.put("iconTint", it.name.lowercase()) }
             s.dockStyle?.let { o.put("dockStyle", it.id) }
             s.uiFont?.let { o.put("uiFont", it) }
+            s.calmStyle?.let { o.put("calmStyle", it.name.lowercase()) }
+            s.iconPlate?.let { o.put("iconPlate", it) }
             when (val w = s.wallpaper) {
                 is ThemeWallpaper.Solid -> o.put("wallpaper", JSONObject().put("kind", "solid").put("color", colourText(w.color)))
                 is ThemeWallpaper.Gradient -> o.put("wallpaper", JSONObject().put("kind", "gradient").put("from", colourText(w.from)).put("to", colourText(w.to)).put("angle", w.angle))

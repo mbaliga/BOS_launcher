@@ -9,7 +9,7 @@ import java.io.File
 import kotlin.math.abs
 
 /**
- * Wave 56 (studio), CFG-26: the Liftoff Studio (web/liftoff-studio, a static page that edits a configuration off the device) reads
+ * Wave 56 (studio), CFG-34: the Liftoff Studio (web/liftoff-studio, a static page that edits a configuration off the device) reads
  * `schema.json` / `schema.js`. This test is both the GENERATOR and the GUARD of those two files:
  *
  *  - the field list below carries only the editorial parts (label, tab, group, preview scene, ranges that the settings screens use);
@@ -455,7 +455,7 @@ class StudioSchemaW56Test {
     // Tests
     // ---------------------------------------------------------------------------------------------------------------
 
-    @Test fun CFG_26_schemaJsonAndSchemaJsAreExactlyWhatTheCodeGenerates() {
+    @Test fun CFG_34_schemaJsonAndSchemaJsAreExactlyWhatTheCodeGenerates() {
         val j = json()
         if (System.getenv("STUDIO_REGEN") == "1") {
             studio.mkdirs()
@@ -468,13 +468,13 @@ class StudioSchemaW56Test {
         assertEquals("schema.js is out of date with the code: run with STUDIO_REGEN=1 and commit it", js(j), File(studio, "schema.js").readText())
     }
 
-    @Test fun CFG_26_everyKeyTheSettingsExportCarriesIsInTheSchema() {
+    @Test fun CFG_34_everyKeyTheSettingsExportCarriesIsInTheSchema() {
         val exported = exportedDefaults().keys + "calmStyle"
         val inSchema = fields().filter { it.scope == "settings" }.map { it.key }.toSet()
         assertEquals("exported by the app but missing from the Studio schema", emptyList<String>(), (exported - inSchema).sorted())
     }
 
-    @Test fun CFG_26_everySchemaKeyOfTheSettingsDocumentIsARealKeyOrADeviceBoundOne() {
+    @Test fun CFG_34_everySchemaKeyOfTheSettingsDocumentIsARealKeyOrADeviceBoundOne() {
         val exported = exportedDefaults().keys + "calmStyle"
         val bound = StateSchema.DEVICE_BOUND_PREF_KEYS
         for (f in fields().filter { it.scope == "settings" }) {
@@ -488,7 +488,7 @@ class StudioSchemaW56Test {
         for (k in flagged) assertTrue("$k never reaches the file", k !in exported)
     }
 
-    @Test fun CFG_26_theSchemaDefaultsAreTheAppDefaultsAndEveryValueIsInsideItsRangeOrOptions() {
+    @Test fun CFG_34_theSchemaDefaultsAreTheAppDefaultsAndEveryValueIsInsideItsRangeOrOptions() {
         val d = exportedDefaults()
         for (f in fields().filter { !it.deviceBound }) {
             val v = defaultOf(f, d)
@@ -505,7 +505,7 @@ class StudioSchemaW56Test {
         }
     }
 
-    @Test fun CFG_26_theEnumOptionsAreTheIdsTheAppStoresAndTheDockKeysAreTheDockSettingsFields() {
+    @Test fun CFG_34_theEnumOptionsAreTheIdsTheAppStoresAndTheDockKeysAreTheDockSettingsFields() {
         assertEquals(setOf("enabled", "mode", "edge", "groupShelf", "style"), dockFields().keys)
         assertEquals(dockFields().keys.map { "dock.$it" }.toSet(), fields().filter { it.scope == "dock" }.map { it.key }.toSet())
         assertEquals(listOf("Collapsed", "PinnedPlusRecent"), dockEnum("DockMode").map { it.id })
@@ -518,7 +518,7 @@ class StudioSchemaW56Test {
         for (f in fields().filter { it.scope == "settings" && it.type == "enum" && !it.deviceBound && !it.optional }) assertTrue("${f.key} = ${d[f.key]}", f.options.any { it.id == d[f.key] })
     }
 
-    @Test fun CFG_26_thePrefFileAndShortcutKeysAreTheOnesTheExportAllowsAndSixTabsHoldEveryField() {
+    @Test fun CFG_34_thePrefFileAndShortcutKeysAreTheOnesTheExportAllowsAndSixTabsHoldEveryField() {
         for (f in fields().filter { it.scope == "prefFile" }) assertTrue("${f.file} is not in the export allow-list", f.file in PrefFilesSource.ALLOWED)
         assertEquals(Corner.entries.map { "corners." + it.name }, fields().filter { it.key.startsWith("corners.") }.map { it.key })
         assertEquals(HomeGesture.entries.map { "gestures." + it.name }, fields().filter { it.key.startsWith("gestures.") }.map { it.key })
@@ -530,12 +530,12 @@ class StudioSchemaW56Test {
         assertEquals("duplicate keys", emptyList<String>(), fields().groupBy { it.key }.filterValues { it.size > 1 }.keys.toList())
     }
 
-    @Test fun CFG_26_theSampleFilesTheNodeTestsReadAreWhatTheAppsOwnCodecWrites() {
+    @Test fun CFG_34_theSampleFilesTheNodeTestsReadAreWhatTheAppsOwnCodecWrites() {
         regenOr("sample-settings.json", sampleSettings())
         regenOr("sample-backup.json", sampleBackup())
     }
 
-    @Test fun CFG_26_theFilesStudioWritesAreReadByTheAppsOwnCodec() {
+    @Test fun CFG_34_theFilesStudioWritesAreReadByTheAppsOwnCodec() {
         // Written by web/liftoff-studio/tests/make-fixtures.js from a profile with known values; the app's decoder must see exactly those values.
         val settingsText = File(studio, "tests/fixtures/studio-settings.json").readText()
         val backupText = File(studio, "tests/fixtures/studio-backup.json").readText()

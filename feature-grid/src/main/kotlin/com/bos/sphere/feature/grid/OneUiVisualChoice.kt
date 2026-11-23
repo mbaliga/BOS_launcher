@@ -270,5 +270,5 @@ fun <T> SettingItem.Choice<T>.asCards(art: (T) -> VisualArt, tag: String, id: (T
         src.title, src.glyph, src.options, src.selected, src.label, hint = src.hint,
         preview = { OneUiVisualChoice(src.options, src.selected, src.onSelect, src.label, art, tag, id = id) },
         stepped = false, onSelect = src.onSelect,
-    )
+    ).also { it.meta.copyFrom(src.meta) }
 }

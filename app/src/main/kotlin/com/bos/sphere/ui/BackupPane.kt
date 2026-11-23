@@ -41,6 +41,9 @@ import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.SettingCategory
 import com.bos.sphere.feature.grid.SettingItem
 import com.bos.sphere.feature.grid.TextButtonPill
+import com.bos.sphere.feature.grid.SettingsResetFlow
+import com.bos.sphere.feature.grid.keywords
+import com.bos.sphere.feature.grid.snapshotFirst
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -49,12 +52,17 @@ import java.text.DateFormat
 import java.util.Date
 
 /** CFG-01 / CFG-02 / CFG-04 / CFG-11: the Backup category of Ground Control. */
-fun backupCategory(): SettingCategory = SettingCategory(
+fun backupCategory(resetAll: (() -> Unit)? = null): SettingCategory = SettingCategory(
     L10n.tr("Backup"),
     Glyphs.Info,
-    listOf(
+    listOfNotNull(
         SettingItem.Pane(L10n.tr("Export, import and restore"), Glyphs.Info, L10n.tr("One file, or the last five snapshots")) { BackupPane { reloadAfterStateChange(it) } },
         crashReportsItem(),
+        // Wave 56 (CFG-30): every preference back to its default; the host takes a snapshot first and offers Undo. User data (layout, hidden apps, shortcuts, rules) stays.
+        resetAll?.let { r ->
+            SettingItem.Action(SettingsResetFlow.ALL_TITLE, Glyphs.Sliders, "", confirm = SettingsResetFlow.ALL_BODY, confirmLabel = SettingsResetFlow.CONFIRM, onClick = r)
+                .snapshotFirst().keywords("restore defaults", "factory", "default", "clear settings")
+        },
     ),
 )
 

@@ -121,13 +121,15 @@ class GlanceFixedW38SmokeTest : TourBase() {
     }
 
     @Test fun GFX_41_theClockSettingsAreStyleFormatDateColourAndSizeAndNothingWhenOff() {
-        val a = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.AnalogClassic)) { }.map { it.title }
+        // Wave 56 (CFG-31): the options stay on the page; what cannot be used right now is dimmed with a reason.
+        fun usable(style: com.bos.sphere.core.data.ClockStyle) = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = style)) { }.filter { it.meta.disabledReason == null }.map { it.title }
+        val a = usable(com.bos.sphere.core.data.ClockStyle.AnalogClassic)
         assertTrue("Clock style" in a); assertFalse("Clock format" in a)
         for (t in listOf("Show date under the clock", "Clock colour", "Clock size")) assertTrue(t, t in a)
-        val d = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.BigDigitalLine)) { }.map { it.title }
-        assertTrue("Clock format" in d)
-        val off = com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.Off)) { }.map { it.title }
+        assertTrue("Clock format" in usable(com.bos.sphere.core.data.ClockStyle.BigDigitalLine))
+        val off = usable(com.bos.sphere.core.data.ClockStyle.Off)
         assertTrue("Clock style" in off); for (t in listOf("Clock format", "Show date under the clock", "Clock colour", "Clock size")) assertFalse(t, t in off)
+        assertEquals(5, com.bos.sphere.ui.glanceSettings(LauncherPrefs(clockStyle = com.bos.sphere.core.data.ClockStyle.Off)) { }.count { it.title.startsWith("Clock") || it.title.startsWith("Show date") })
     }
 
     @Test fun GFX_38_theMusicToggleHidesTheLineOnEveryPage() {

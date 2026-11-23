@@ -10,6 +10,7 @@ import com.bos.sphere.ui.buildSettingsCategories
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,9 +44,10 @@ class HomeUnifyRowsTest {
         assertTrue("the old Scroll or Paginated row is gone", items(prefs).none { it.title == "Pages after Glance" })
     }
 
-    @Test fun HOM_01_w28_addPageIsOfferedOnlyForPaginatedAndEditHomeForEveryValue() {
-        assertNotNull("Add page with Paginated", items(LauncherPrefs(homePages = HomePages.Paginated)).firstOrNull { it.title == "Add page" })
-        for (m in listOf(HomePages.Off, HomePages.Continuous)) assertFalse("no Add page with $m: the Pages setting is the switch", items(LauncherPrefs(homePages = m)).any { it.title == "Add page" })
+    @Test fun HOM_01_w28_addPageIsUsableOnlyForPaginatedAndEditHomeForEveryValue() {
+        // Wave 56 (CFG-31): the row stays on the page for every value, dimmed with the reason, instead of vanishing.
+        assertNull("Add page is usable with Paginated", items(LauncherPrefs(homePages = HomePages.Paginated)).first { it.title == "Add page" }.meta.disabledReason)
+        for (m in listOf(HomePages.Off, HomePages.Continuous)) assertNotNull("Add page is off with $m: the Pages setting is the switch", items(LauncherPrefs(homePages = m)).first { it.title == "Add page" }.meta.disabledReason)
         for (m in HomePages.entries) {
             assertNotNull("Edit home with $m", items(LauncherPrefs(homePages = m)).firstOrNull { it.title == "Edit home" })
             assertFalse(items(LauncherPrefs(homePages = m)).any { it.title == "Edit home pages" })

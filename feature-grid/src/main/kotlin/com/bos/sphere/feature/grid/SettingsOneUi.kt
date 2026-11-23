@@ -86,6 +86,7 @@ import com.bos.sphere.core.design.L10n
 import com.bos.sphere.core.design.predictiveBackLayer
 import com.bos.sphere.core.design.rememberMotionPrefs
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
 /** Test tags of the One UI settings. */
@@ -106,6 +107,15 @@ object OneUiTags {
     const val GROUP = "oneui.group"
     const val DIVIDER = "oneui.divider"
     const val FOCUS_RING = "oneui.focusRing"
+    /** Wave 56: a row that is on the page but off right now, the reason line under its title, and the parts of a slider row (default tick, "Default" action, readout). */
+    const val DISABLED_ROW = "oneui.disabledRow"
+    const val DISABLED_REASON = "oneui.disabledReason"
+    const val SLIDER_TICK = "oneui.sliderTick"
+    const val SLIDER_DEFAULT = "oneui.sliderDefault"
+    const val SLIDER_READOUT = "oneui.sliderReadout"
+    /** Wave 56: "Reset this page to defaults", its undo line and the Finish setup row of the root. */
+    const val RESET_ROW = "oneui.resetRow"
+    const val UNDO_ROW = "oneui.undoRow"
     /** Wave 46: the band of the large title (the title is centred in it). */
     const val TITLE_BAND = "oneui.titleBand"
     fun row(category: String) = "oneui.row.$category"
@@ -122,6 +132,9 @@ private class ItemHost(
     val confirm: (SettingItem.Action) -> Unit,
 )
 
+/** Wave 56 (CFG-30): the line of the last reset, shown at the bottom for a few seconds with its Undo. */
+private const val UNDO_SHOWN_MS = 9_000L
+
 /**
  * Wave 40 (settingsOneUI), CFG-21: the settings as One UI lays them out. The root is one plain list of every category (grouped
  * into rounded cards, an icon tile, a title and a live grey summary each) under a large collapsing title and a search field; a
@@ -136,6 +149,8 @@ internal fun OneUiSettingsHost(
     initialCategory: Int,
     sounds: UiSounds?,
     onClose: () -> Unit,
+    /** Wave 56 (CFG-30): the snapshots a reset takes first and Undo restores; null = resets just run (tests, no state service). */
+    snapshots: SettingsSnapshots? = null,
 ) {
     val haptics = rememberLauncherHaptics()
     val latest by rememberUpdatedState(categories)
@@ -143,6 +158,9 @@ internal fun OneUiSettingsHost(
     var query by remember { mutableStateOf("") }
     var highlight by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var confirming by remember { mutableStateOf<SettingItem.Action?>(null) }
+    var resetResult by remember { mutableStateOf<ResetResult?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var paneFlash by remember { mutableStateOf<String?>(null) }
     val rootFocus = remember { FocusRequester() }
     val backProgress = remember { mutableFloatStateOf(0f) }
     val customBackdrop = LocalSettingsBackdrop.current
@@ -154,6 +172,10 @@ internal fun OneUiSettingsHost(
         if (c >= 0 && want in 0 until (latest.getOrNull(c)?.items?.size ?: 0)) highlight = c to want
     }
     LaunchedEffect(highlight) { if (highlight != null) { delay(2200); highlight = null } }
+    LaunchedEffect(paneFlash) { if (paneFlash != null) { delay(1600); paneFlash = null } }
+    LaunchedEffect(resetResult) { if (resetResult != null) { delay(UNDO_SHOWN_MS); resetResult = null } }
+    // The Finish setup page goes away once everything is done: a page that no longer exists closes to the root.
+    LaunchedEffect(latest.size) { if (nav.category >= latest.size) nav = OneUiModel.Nav() }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val twoPane = OneUiModel.twoPane(maxWidth.value, maxHeight.value)
@@ -192,9 +214,15 @@ internal fun OneUiSettingsHost(
             )
         }
         fun openCategory(i: Int) { sounds?.play(UiSound.Select); nav = OneUiModel.Nav(i); highlight = null }
-        fun openResult(e: SettingEntry) { sounds?.play(UiSound.Select); nav = OneUiModel.Nav(e.categoryIndex); highlight = e.categoryIndex to e.itemIndex }
+        fun openResult(e: SettingEntry) {
+            sounds?.play(UiSound.Select)
+            // A hit on a row inside a pane opens the pane's page and flashes that row (CFG-28); any other hit opens its category and lights the row.
+            nav = if (e.paneEntryId != null) OneUiModel.Nav(e.categoryIndex, e.itemIndex) else OneUiModel.Nav(e.categoryIndex)
+            highlight = e.categoryIndex to e.itemIndex
+            paneFlash = e.paneEntryId
+        }
 
-        CompositionLocalProvider(LocalPreviewTop provides (topInset.value + 56f + 8f)) {
+        CompositionLocalProvider(LocalPreviewTop provides (topInset.value + 56f + 8f), LocalPaneFlash provides paneFlash) {
           Box(
             Modifier
                 .fillMaxSize()
@@ -239,9 +267,19 @@ internal fun OneUiSettingsHost(
             confirming?.let { a ->
                 OneUiConfirmDialog(
                     title = L10n.tr(a.title), body = L10n.tr(a.confirm ?: ""), confirmLabel = L10n.tr(a.confirmLabel),
-                    onConfirm = { confirming = null; a.onClick() }, onDismiss = { confirming = null },
+                    onConfirm = {
+                        confirming = null
+                        // A reset (a row that changes settings in bulk) takes a snapshot first and offers Undo afterwards (CFG-30).
+                        if (a.meta.snapshotFirst) scope.launch { resetResult = SettingsResetFlow.run(snapshots, "before " + a.title.lowercase()) { a.onClick() } } else a.onClick()
+                    },
+                    onDismiss = { confirming = null },
                     destructive = true, bodyTag = "gc.confirm.text",
                 )
+            }
+            resetResult?.let { r ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                    OneUiUndoRow(r, onUndo = { scope.launch { resetResult = SettingsResetFlow.undo(snapshots, r) } }, modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)))
+                }
             }
           }
         }
@@ -367,6 +405,7 @@ private fun OneUiRootPage(
     modifier: Modifier = Modifier,
 ) {
     val groups = remember(categories.map { it.title }) { OneUiModel.groups(categories) }
+    val finish = OneUiModel.finishSetupIndex(categories)
     val searching = query.isNotBlank()
     val results = if (searching) SettingsIndex.fromCategories(categories).search(query) else emptyList()
     OneUiPage(
@@ -381,15 +420,30 @@ private fun OneUiRootPage(
                     results.forEachIndexed { i, e ->
                         if (i > 0) OneUiDivider(20.dp)
                         OneUiRowFrame(
-                            e.title, summary = listOf(e.category, e.value).filter { it.isNotBlank() }.joinToString(" › "),
+                            e.title, summary = listOf(e.category, e.parent, e.disabledReason ?: e.value).filter { it.isNotBlank() }.joinToString(" › "),
                             onClick = { onResult(e) },
-                            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${e.title}, ${e.category}" },
+                            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${e.title}, ${e.category}" + (e.disabledReason?.let { ", $it" } ?: "") },
                             trailing = { OneUiChevron() },
                         )
                     }
                 }
             }
         } else {
+            if (finish >= 0) item(key = "finish") {
+                // Wave 56 (CFG-32): one flat row above the groups while something is unfinished; it is gone once everything is done.
+                val c = categories[finish]
+                Column(Modifier.padding(bottom = OneUi.GroupGap)) {
+                    OneUiRows(1) {
+                        OneUiRowFrame(
+                            L10n.tr(OneUiModel.FINISH_SETUP), summary = (c.items.firstOrNull() as? SettingItem.Pane)?.value.orEmpty(), min = OneUi.RootRowMin, selected = finish == selected,
+                            leading = { OneUiIconTile(c.glyph, Color(OneUiModel.accent(OneUiModel.FINISH_SETUP))) },
+                            onClick = { onOpen(finish) },
+                            modifier = Modifier.testTag(SetupTags.ROW).semantics(mergeDescendants = true) {},
+                            trailing = { OneUiChevron() },
+                        )
+                    }
+                }
+            }
             groups.forEachIndexed { gi, idx ->
                 item(key = "group$gi") {
                     Column {
@@ -462,6 +516,8 @@ private fun OneUiCategoryPage(
                 }
             }
         }
+        // Wave 56 (CFG-30): the last line of a page whose settings can be reset.
+        SettingsResetFlow.pageAction(category)?.let { a -> item(key = "reset") { OneUiResetRow { host.play(UiSound.Select); host.confirm(a) } } }
     }
 }
 

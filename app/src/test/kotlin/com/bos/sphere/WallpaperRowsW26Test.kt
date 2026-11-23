@@ -77,7 +77,8 @@ class WallpaperRowsW26Test {
             assertNotNull("$name: Glance wallpaper row", items.firstOrNull { it.title == "Glance wallpaper" && it is SettingItem.Pane })
             val toggle = items.firstOrNull { it.title == "Pages use the same wallpaper as Glance" } as? SettingItem.Toggle
             assertNotNull("$name: the switch", toggle); assertEquals(name, p.pagesSameAsGlance, toggle!!.checked)
-            assertEquals("$name: the Pages row exists exactly when the switch is off", !p.pagesSameAsGlance, items.any { it.title == "Pages wallpaper" })
+            // wave 56 (CFG-31): the row stays and is dimmed while the switch is on
+            assertEquals("$name: the Pages row is usable exactly when the switch is off", !p.pagesSameAsGlance, items.first { it.title == "Pages wallpaper" }.meta.disabledReason == null)
             assertTrue("$name: the signal wallpaper is named in the summary", (items.first { it.title == "Glance wallpaper" } as SettingItem.Pane).value.contains("Signal wallpaper"))
         }
     }

@@ -23,6 +23,18 @@ object SettingsMath {
         return (range.start + n * step).coerceIn(range.start, range.endInclusive)
     }
 
+    /** Whether [a] and [b] are the same value on the slider: within half a step. */
+    fun sameValue(a: Float, b: Float, range: ClosedFloatingPointRange<Float>, step: Float = autoStep(range)): Boolean {
+        val half = (if (step > 0f) step else 0.001f) / 2f
+        return kotlin.math.abs(a - b) < half
+    }
+
+    /** The fraction (0..1) of the range at which [value] sits, for the default tick. */
+    fun fraction(value: Float, range: ClosedFloatingPointRange<Float>): Float {
+        val span = range.endInclusive - range.start
+        return if (span <= 0f) 0f else ((value - range.start) / span).coerceIn(0f, 1f)
+    }
+
     /** Which of [ticks] equal bands of the range [value] sits in — a haptic tick fires when this changes. */
     fun tickBand(value: Float, range: ClosedFloatingPointRange<Float>, ticks: Int = 20): Int {
         val span = range.endInclusive - range.start

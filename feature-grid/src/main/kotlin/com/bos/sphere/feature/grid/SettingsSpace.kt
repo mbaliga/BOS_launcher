@@ -103,10 +103,13 @@ sealed interface SettingItem {
     val title: String
     val glyph: ImageVector
     val value: String
+    /** Wave 56: the hidden side of the row (id, search keywords, why it is off); see [ItemMeta]. */
+    val meta: ItemMeta
 
     /** A switch on the row; tapping anywhere on the row flips it. */
     data class Toggle(override val title: String, override val glyph: ImageVector, val checked: Boolean, val hint: String? = null, val onChange: (Boolean) -> Unit) : SettingItem {
         override val value: String get() = if (checked) "On" else "Off"
+        override val meta = ItemMeta()
     }
 
     /** Title and current value on one line, the slider beneath. [step] 0 = automatic (1% for fractions, whole numbers otherwise). */
@@ -118,9 +121,19 @@ sealed interface SettingItem {
         val valueText: String,
         val hint: String? = null,
         val step: Float = 0f,
+        /** Wave 56 (CFG-29): where the default sits; a small tick is drawn there and a "Default" text action shows while [amount] differs. Null = no default known. */
+        val default: Float? = null,
+        /** Wave 56 (CFG-29): the preference is derived (it follows something) and [valueText] says so ("Auto"); the "Default" action is then not offered. */
+        val auto: Boolean = false,
         val onChange: (Float) -> Unit,
     ) : SettingItem {
         override val value: String get() = valueText
+        override val meta = ItemMeta()
+        /** The same slider with a default and a readout that has its unit (the central table of the app fills these in). */
+        fun with(default: Float? = this.default, valueText: String = this.valueText, auto: Boolean = this.auto): Slider =
+            Slider(title, glyph, amount, range, valueText, hint, step, default, auto, onChange).also { it.meta.copyFrom(meta) }
+        /** Whether the "Default" action shows: a default is known, the value is not it, and the preference is not derived. */
+        val offersDefault: Boolean get() = !auto && default != null && !SettingsMath.sameValue(amount, default, range, if (step > 0f) step else SettingsMath.autoStep(range))
     }
 
     /** The current value on the row with up / down arrows that step through [options] (wrapping); more than 6 options open a menu. */
@@ -138,6 +151,7 @@ sealed interface SettingItem {
         val onSelect: (T) -> Unit,
     ) : SettingItem {
         override val value: String get() = label(selected)
+        override val meta = ItemMeta()
     }
 
     /** − value + for small whole numbers. */
@@ -148,6 +162,7 @@ sealed interface SettingItem {
         val onChange: (Int) -> Unit,
     ) : SettingItem {
         override val value: String get() = valueText ?: count.toString()
+        override val meta = ItemMeta()
         /** The value a screen reader's set-progress asks for: snapped to [step] from the range start and kept inside the range. */
         fun fromProgress(v: Float): Int = (Math.floor(((v - range.first) / step).toDouble() + 0.5).toInt() * step + range.first).coerceIn(range.first, range.last)
     }
@@ -157,7 +172,9 @@ sealed interface SettingItem {
         /** Wave 29: a destructive action asks first: this text in a confirmation sheet whose confirm button is [confirmLabel]. */
         val confirm: String? = null, val confirmLabel: String = "Confirm",
         /** Wave 29: the summary line under the title, like every other row. */
-        val hint: String? = null, val onClick: () -> Unit) : SettingItem
+        val hint: String? = null, val onClick: () -> Unit) : SettingItem {
+        override val meta = ItemMeta()
+    }
 
     /** Opens a full-screen page with its own controls; the row shows the current value and a chevron. */
     class Pane(
@@ -170,11 +187,16 @@ sealed interface SettingItem {
         val pageSubtitle: (@Composable () -> String)? = null,
         val content: @Composable ColumnScope.() -> Unit,
     ) : SettingItem {
+        override val meta = ItemMeta()
         constructor(title: String, glyph: ImageVector, value: String, content: @Composable ColumnScope.() -> Unit) : this(title, glyph, value, false, null, content)
     }
 }
 
-data class SettingCategory(val title: String, val glyph: ImageVector, val items: List<SettingItem>)
+/**
+ * [reset] (wave 56, CFG-30): puts the preferences of this page back to their defaults; null = the page has nothing of its own to reset (it only
+ * holds the user's data or actions). The page shows "Reset this page to defaults" at its bottom when it is set; the host asks first and takes a snapshot.
+ */
+data class SettingCategory(val title: String, val glyph: ImageVector, val items: List<SettingItem>, val reset: (() -> Unit)? = null)
 
 /**
  * The settings space ("Ground Control"), wave 40: laid out as One UI lays out its settings. A plain root list of every category
@@ -198,6 +220,8 @@ fun SettingsSpace(
     previewDock: (@Composable androidx.compose.foundation.layout.BoxScope.() -> Unit)? = null,
     /** CFG-21: the live grey line under each category on the root list, by category title; missing ones are derived from the category's rows. */
     summaries: Map<String, String> = emptyMap(),
+    /** CFG-30 (wave 56): the snapshots a reset takes first and its Undo restores (the state service in the app). */
+    snapshots: SettingsSnapshots? = null,
 ) {
     // NFR-14: the fade becomes quicker when animations are off.
     val reducedMotion = com.bos.sphere.core.design.rememberMotionPrefs().reduced
@@ -209,7 +233,7 @@ fun SettingsSpace(
     ) {
         androidx.compose.runtime.CompositionLocalProvider(LocalSettingsBackdrop provides backdrop) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                androidx.compose.runtime.key(session) { OneUiSettingsHost(categories, summaries, initialCategory, sounds, onClose) }
+                androidx.compose.runtime.key(session) { OneUiSettingsHost(categories, summaries, initialCategory, sounds, onClose, snapshots) }
                 previewDock?.invoke(this)
             }
         }

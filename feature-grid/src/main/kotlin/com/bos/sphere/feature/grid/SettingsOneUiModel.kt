@@ -36,6 +36,12 @@ object OneUiModel {
      */
     const val SIDE_PANEL = "Side panel"
 
+    /**
+     * Wave 56 (CFG-32): the page of what is still unfinished (default home, notification and usage access, Do Not Disturb access). It is a category of the
+     * list (so a search and the back stack treat it like any page) but it is not a row of the groups: the root shows it as one flat row above them, only while it exists.
+     */
+    const val FINISH_SETUP = "Finish setup"
+
     private val COUNT_SUFFIX = Regex("""^(.*) · \d+$""")
 
     /** The title to show: the tab-era "Hidden apps · 2" is plain "Hidden apps" (the count is in the summary line now). */
@@ -45,13 +51,17 @@ object OneUiModel {
     fun key(title: String): String? = keyOf(displayTitle(title))
 
     private fun keyOf(title: String): String? {
+        if (title == FINISH_SETUP || title == L10n.tr(FINISH_SETUP)) return FINISH_SETUP
         for (g in GROUPS) for (k in g) {
             if (title == k || title == L10n.tr(k)) return k
         }
         return null
     }
 
-    /** The category indices of [categories] cut into the groups of the root list, in order; every index appears exactly once. */
+    /** The index of the Finish setup page in [categories], or -1 while nothing is unfinished. */
+    fun finishSetupIndex(categories: List<SettingCategory>): Int = categories.indexOfFirst { key(it.title) == FINISH_SETUP }
+
+    /** The category indices of [categories] cut into the groups of the root list, in order; every index appears exactly once, except the Finish setup page (it has its own row above the groups). */
     fun groups(categories: List<SettingCategory>): List<List<Int>> {
         val byKey = categories.indices.groupBy { key(categories[it].title) }
         val out = ArrayList<List<Int>>()
@@ -81,6 +91,7 @@ object OneUiModel {
         "Capabilities" -> 0xFFC48A2E
         "Lab" -> 0xFFB45F8C
         "About" -> 0xFF6D7C8C
+        FINISH_SETUP -> 0xFF8E7BFF
         else -> 0xFF6D7C8C
     }
 

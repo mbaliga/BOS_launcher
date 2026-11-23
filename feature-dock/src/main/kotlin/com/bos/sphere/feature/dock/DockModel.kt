@@ -72,6 +72,10 @@ data class DockSettings(
     val groupShelf: Boolean = true,
     /** Wave 39 (dockThemes): how the dock is drawn (standard pill, transparent, 3D shelf). */
     val style: com.bos.sphere.core.data.DockStyle = com.bos.sphere.core.data.DockStyle.Standard,
+    /** Wave 56 (dockMagnify): icons grow around the finger or pointer like the classic Mac dock. Off by default. */
+    val magnify: Boolean = false,
+    /** Wave 56: how far they grow (1.3x, 1.6x, 2.0x). Only read while [magnify] is on. */
+    val magnifyStrength: MagnifyStrength = MagnifyStrength.Medium,
 ) {
     /** Off by default in T1, on by default in T2 and T3 (spec section 9). */
     fun isEnabled(tier: Tier): Boolean = enabled ?: (tier != Tier.T1)

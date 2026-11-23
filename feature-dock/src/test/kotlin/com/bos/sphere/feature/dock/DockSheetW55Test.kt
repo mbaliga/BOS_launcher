@@ -38,6 +38,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.down
+import androidx.compose.ui.test.moveBy
+import androidx.compose.ui.test.up
+import androidx.compose.ui.unit.width
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -195,6 +199,22 @@ class DockSheetW55Test {
         assertTrue("moving (still between start $before and rest $rest): $mid", mid < before && mid > rest)
         assertEquals(before.value - sheet().height.value, rest.value, 1.5f)
         assertEquals("the sheet rests on the bottom edge", rule.onRoot().getBoundsInRoot().bottom.value, sheet().bottom.value, 1f)
+    }
+
+    @Test fun DCK_04_sheet_05_theSheetOffersMagnifyIconsAndTheDockAboveMagnifiesWhileTheSheetIsOpen() {
+        rule.setContent { Screen() }
+        openSheet()
+        rule.onNodeWithTag(DockOptionTags.MAGNIFY).performScrollTo().assertExists()
+        assertFalse(manager.current.dock.magnify)
+        rule.onNodeWithTag(DockOptionTags.MAGNIFY).performScrollTo().performClick(); settle()
+        assertTrue(manager.current.dock.magnify)
+        MagnifyStrength.entries.forEach { rule.onNodeWithTag(DockOptionTags.strength(it)).performScrollTo().assertExists() }
+        val rest = rule.onNodeWithContentDescription("Bravo").getBoundsInRoot().width.value
+        rule.onNodeWithContentDescription("Bravo").performTouchInput { down(center); moveBy(Offset(8f, 0f)) }
+        settle()
+        assertTrue("the real dock above the sheet magnifies live (${rule.onNodeWithContentDescription("Bravo").getBoundsInRoot().width.value} vs $rest)", rule.onNodeWithContentDescription("Bravo").getBoundsInRoot().width.value > rest * 1.15f)
+        assertTrue("and nothing launched", log.none { it.startsWith("launch") })
+        rule.onNodeWithContentDescription("Bravo").performTouchInput { up() }
     }
 
     // ---- live (WYSIWYG) --------------------------------------------------------------------------------------------------------------------

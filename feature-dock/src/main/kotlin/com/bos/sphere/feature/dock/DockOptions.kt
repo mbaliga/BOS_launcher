@@ -24,6 +24,8 @@ object DockOptionTags {
     fun position(e: DockEdge) = "dock.position.${e.name}"
     fun mode(m: DockMode) = "dock.modeCard.${m.name}"
     fun style(s: DockStyle) = DockStyleUi.rowTag(s)
+    const val MAGNIFY = "dock.magnify"
+    fun strength(s: MagnifyStrength) = "dock.magnify.${s.id}"
 }
 
 /** What a surface offers of the dock options: the sheet and the settings page show the same body, each with what its host can do. */
@@ -57,7 +59,29 @@ internal fun DockOptionsBody(manager: WorkspaceManager, tier: Tier, scope: DockO
             }
         }
     }
-    OneUiCaption(L10n.tr("Transparent draws no panel: only the icons, with a soft halo. 3D is a glossy shelf with raised icons."))
+    OneUiCaption(L10n.tr("Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it."))
+
+    OneUiGap()
+    OneUiGroupTitle(L10n.tr("Magnify icons"))
+    OneUiGroup(1) {
+        OneUiSwitchRow(
+            L10n.tr("Magnify icons"), dock.magnify, { v -> manager.setDock { it.copy(magnify = v) } },
+            summary = L10n.tr("Icons grow around your finger or pointer, like the Mac dock."), modifier = Modifier.testTag(DockOptionTags.MAGNIFY),
+        )
+    }
+    if (dock.magnify) {
+        OneUiGap()
+        OneUiGroup(1) {
+            DockCardRow {
+                MagnifyStrength.entries.forEach { m ->
+                    DockOptionCard(L10n.tr(m.label) + " " + m.factor.toString() + "x", dock.magnifyStrength == m, DockOptionTags.strength(m), { manager.setDock { it.copy(magnifyStrength = m) } }, width = DockCardTokens.StyleWidth) { mod ->
+                        androidx.compose.foundation.Canvas(mod) { strengthArt(m, ink, accent)(this, size) }
+                    }
+                }
+            }
+        }
+        OneUiCaption(L10n.tr("Drag along the dock to see it. Edit dock turns it off while you rearrange."))
+    }
 
     if (!scope.edgeFixed) {
         OneUiGap()

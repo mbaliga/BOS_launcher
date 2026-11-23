@@ -27,34 +27,46 @@ object DockStyleTokens {
     /** WCAG 1.4.11: an icon or glyph needs 3:1 against what is behind it. */
     const val MIN_CONTRAST = 3.0
 
-    // --- 3D: a raised icon with its own small shadow and a faint reflection on the shelf.
-    const val ICON_RAISE_DP = 4f
-    const val REFLECTION_ALPHA = 0.3f
+    // --- 3D (wave 56): the classic glass shelf. Geometry in dp; the shelf is drawn in a canonical frame (see DockStyleDraw.shelf).
+    /** How deep the shelf is (floor plus lip), measured from the dock's edge inwards. */
+    const val SHELF_DEPTH_DP = 30f
+    /** The darker front face. */
+    const val LIP_DP = 6f
+    /** How far the back edge is pulled in at each end, as a fraction of the floor's depth: the perspective. */
+    const val BACK_INSET = 0.42f
+    /** Extra room a slot gets on the shelf side in 3D, so the reflection has floor to fall on (the rail's padding on that side is dropped by the same amount, so the rail is no taller). */
+    const val SLOT_EXTRA_DP = 10f
+    /** The slot margin around the icon. */
+    const val SLOT_MARGIN_DP = (SLOT_DP - ICON_DP) / 2f
+    const val REFLECTION_ALPHA = 0.42f
     const val REFLECTION_GAP_DP = 1f
-    /** How much of the mirrored icon shows under the raised one: the slot's margin below the icon, less the gap; the fade runs over all of it. */
-    const val REFLECTION_VISIBLE_DP = (SLOT_DP - ICON_DP) / 2f + ICON_RAISE_DP - REFLECTION_GAP_DP
-    const val CONTACT_LAYERS = 6
-    const val CONTACT_DP = 7f
+    /** How much of the mirrored icon shows on the floor: the room from the icon's foot to the lip. */
+    const val REFLECT_DP = SLOT_MARGIN_DP + SLOT_EXTRA_DP - LIP_DP - REFLECTION_GAP_DP
 
-    class Slab(
-        val faceTop: Int, val faceBottom: Int,
-        /** The bright line along the top edge, fading out by [HIGHLIGHT_REACH]. */
-        val highlight: Int,
-        val bevelLight: Int, val bevelDark: Int,
-        val innerShadow: Int,
-        /** Total opacity of the contact shadow beneath the shelf (the layers add up to about this). */
-        val contactShadow: Int,
-        val iconShadow: Int,
+    class Shelf(
+        /** The floor's glass, at the back edge and at the front. */
+        val floorBack: Int, val floorFront: Int,
+        /** The lip's face, top and bottom. */
+        val lipTop: Int, val lipBottom: Int,
+        /** The bright bevel along the back edge, on the slanted ends, and where the floor turns into the lip; the lip's lower edge. */
+        val topLine: Int, val sideLine: Int, val junction: Int, val lipEdge: Int,
+        val glow: Int, val innerShadow: Int,
+        /** The shelf's own shadow below it, and the oval where an icon stands. */
+        val shadow: Int, val iconShadow: Int,
     )
-    const val HIGHLIGHT_REACH = 0.45f
 
-    fun slab(dark: Boolean): Slab = if (dark) Slab(
-        faceTop = 0xFF3A3F50.toInt(), faceBottom = 0xFF1B1E29.toInt(), highlight = 0x66FFFFFF, bevelLight = 0x55FFFFFF, bevelDark = 0xAA000000.toInt(),
-        innerShadow = 0x40000000, contactShadow = 0x66000000, iconShadow = 0x99000000.toInt(),
-    ) else Slab(
-        faceTop = 0xFFFAFBFE.toInt(), faceBottom = 0xFFD3D7E3.toInt(), highlight = 0xCCFFFFFF.toInt(), bevelLight = 0xFFFFFFFF.toInt(), bevelDark = 0x66000000,
-        innerShadow = 0x22000000, contactShadow = 0x44000000, iconShadow = 0x66000000,
+    fun shelf(dark: Boolean): Shelf = if (dark) Shelf(
+        floorBack = 0x70DCE4FF, floorFront = 0x30AEBBF0, lipTop = 0x70161A2C, lipBottom = 0xA00A0C16.toInt(),
+        topLine = 0xE6FFFFFF.toInt(), sideLine = 0x80FFFFFF.toInt(), junction = 0x66FFFFFF, lipEdge = 0x55FFFFFF,
+        glow = 0x40FFFFFF, innerShadow = 0x40000000, shadow = 0x55000000, iconShadow = 0xAA000000.toInt(),
+    ) else Shelf(
+        floorBack = 0xD8FFFFFF.toInt(), floorFront = 0x80F0F3FA.toInt(), lipTop = 0x889AA2B8.toInt(), lipBottom = 0xB0646C86.toInt(),
+        topLine = 0xFFFFFFFF.toInt(), sideLine = 0xCCFFFFFF.toInt(), junction = 0xAAFFFFFF.toInt(), lipEdge = 0x66FFFFFF,
+        glow = 0x66FFFFFF, innerShadow = 0x26000000, shadow = 0x40000000, iconShadow = 0x77000000,
     )
+
+    /** The cross-axis padding a rail drops on the shelf side in 3D (dp): 10 dp became slot room. */
+    fun shelfSidePad(base: Float): Float = (base - SLOT_EXTRA_DP).coerceAtLeast(0f)
 
     fun hasSurface(style: DockStyle): Boolean = style != DockStyle.Transparent
 
@@ -78,16 +90,6 @@ object DockStyleTokens {
 
     /** Contrast of a white icon outline against the wallpaper at the icon's edge, with the halo over it. */
     fun iconEdgeContrast(wallpaper: Int): Double = ratio(GLYPH, iconEdgeBackdrop(wallpaper))
-
-    /** The unit direction the 3D shelf's contact shadow falls: down for the bottom dock, towards the screen's inside for a side dock. */
-    fun shadowDirection(edge: DockEdge): Pair<Float, Float> = when (edge) {
-        DockEdge.Bottom -> 0f to 1f
-        DockEdge.Left -> 1f to 0.35f
-        DockEdge.Right -> -1f to 0.35f
-    }
-
-    /** Opacity of layer [i] (0-based) of the contact shadow: they add up to [Slab.contactShadow]'s alpha and fade outwards. */
-    fun contactLayerAlpha(i: Int, total: Float): Float = total / CONTACT_LAYERS * (1f - i.toFloat() / (CONTACT_LAYERS + 1)) * 1.4f
 
     // --- WCAG maths (the same as core-quality's Contrast, kept here so the dock module needs no extra dependency)
     private fun channel(c: Int): Double { val s = c / 255.0; return if (s <= 0.03928) s / 12.92 else ((s + 0.055) / 1.055).pow(2.4) }

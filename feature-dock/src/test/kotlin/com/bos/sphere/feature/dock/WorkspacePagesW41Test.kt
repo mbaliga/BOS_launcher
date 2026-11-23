@@ -413,12 +413,15 @@ class WorkspacePagesW41Test {
     }
 
     @Test fun DCK_04_page_34_everyDockSettingHasAControlOnTheDockPageAndInTheSheet() {
-        // The audit the owner asked for: the dock model's persisted settings are exactly these five, and each has a card or switch (a new field fails here until it has one).
+        // The audit the owner asked for: the dock model's persisted settings are exactly these seven (W56 added magnify and its strength), and each has a card or switch (a new field fails here until it has one).
         val fields = DockSettings::class.java.declaredFields.filter { !it.isSynthetic && !java.lang.reflect.Modifier.isStatic(it.modifiers) }.map { it.name }.toSet()
-        assertEquals(setOf("enabled", "mode", "edge", "groupShelf", "style"), fields)
+        assertEquals(setOf("enabled", "mode", "edge", "groupShelf", "style", "magnify", "magnifyStrength"), fields)
         val m = manager(); showDock(m)
-        val tags = listOf(DockPageTags.SHOW_DOCK, DockOptionTags.GROUP_SHELF) + DockStyle.entries.map { DockStyleUi.rowTag(it) } + DockEdge.entries.map { DockOptionTags.position(it) } + DockMode.entries.map { DockOptionTags.mode(it) }
+        val tags = listOf(DockPageTags.SHOW_DOCK, DockOptionTags.GROUP_SHELF, DockOptionTags.MAGNIFY) + DockStyle.entries.map { DockStyleUi.rowTag(it) } + DockEdge.entries.map { DockOptionTags.position(it) } + DockMode.entries.map { DockOptionTags.mode(it) }
         tags.forEach { rule.onNodeWithTag(it).performScrollTo().assertExists() }
+        // W56: the strength cards appear with the switch (the seventh field's control)
+        rule.onNodeWithTag(DockOptionTags.MAGNIFY).performScrollTo().performClick(); settle()
+        MagnifyStrength.entries.forEach { rule.onNodeWithTag(DockOptionTags.strength(it)).performScrollTo().assertExists() }
     }
 
     @Test fun DCK_04_page_32_addAppsOpensTheCheckListAndPinsThePicked() {

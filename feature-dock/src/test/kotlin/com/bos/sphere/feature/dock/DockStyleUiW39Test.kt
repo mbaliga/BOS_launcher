@@ -190,7 +190,10 @@ class DockStyleUiW39Test {
     private fun pillPixel(s: DockStyle): Int { rule.setContent { Wallpaper(true, flat) { Rail(s, light = true) } }; return padPixel(capture()) }
     @Test fun DCK_04_style_20_transparentDrawsNoPanelAtAllNotEvenABorder() = assertEquals("the wallpaper itself", flat.toArgb(), pillPixel(DockStyle.Transparent))
     @Test fun DCK_04_style_20_standardHasItsPill() = assertNotEquals(flat.toArgb(), pillPixel(DockStyle.Standard))
-    @Test fun DCK_04_style_20_threeDHasItsSlab() = assertNotEquals(flat.toArgb(), pillPixel(DockStyle.ThreeD))
+    @Test fun DCK_04_style_20_threeDHasNoPanelBehindTheIconsOnlyAShelfUnderThem() {
+        // W56: the old rounded slab is gone; the icons stand free above a glass shelf
+        assertEquals("above the shelf: the wallpaper itself", flat.toArgb(), pillPixel(DockStyle.ThreeD))
+    }
 
     private fun Color.toArgb() = android.graphics.Color.argb((alpha * 255).toInt(), (red * 255).toInt(), (green * 255).toInt(), (blue * 255).toInt())
 
@@ -208,33 +211,59 @@ class DockStyleUiW39Test {
         assertTrue("so a white icon outline reads against it (${DockStyleTokens.ratio(inside, sample)})", DockStyleTokens.ratio(inside, sample) >= 2.0)
     }
 
-    @Test fun DCK_04_style_22_threeDHasAHighlightAGradientFaceAndAContactShadowBeneathTheSlab() {
-        theme(true)
-        rule.setContent { Wallpaper(true, flat) { Rail(DockStyle.ThreeD, light = true) } }
-        val b = capture()
-        val r = rule.onNodeWithContentDescription("Dock").getBoundsInRoot()
-        val d = rule.activity.resources.displayMetrics.density
-        val cx = ((r.left.value + r.right.value) / 2 * d).toInt()
-        val top = b.getPixel(cx, ((r.top.value + 2f) * d).toInt())
-        val mid = b.getPixel(cx, ((r.top.value + 6f) * d).toInt())
-        val bottomFace = b.getPixel(cx, ((r.bottom.value - 3f) * d).toInt())
-        assertNotEquals("the face is a gradient, not one flat colour", mid, bottomFace)
-        assertTrue("the bottom of the face is darker than the top (${Integer.toHexString(mid)} vs ${Integer.toHexString(bottomFace)})", lum(bottomFace) < lum(mid))
-        assertTrue("a highlight edge differs from the face below it", top != mid)
-        // beneath the slab (inside the screen's bottom padding) the wallpaper is darkened by the contact shadow
-        val below = b.getPixel(cx, ((r.bottom.value + 2f) * d).toInt())
-        assertTrue("contact shadow beneath: ${Integer.toHexString(below)} darker than ${Integer.toHexString(flat.toArgb())}", lum(below) < lum(flat.toArgb()) - 0.01)
+    /** Pixels of the 3D shelf: (x dp from the rail's left, y dp above its bottom edge) over [flat]. */
+    private class Shelf(val b: Bitmap, val left: Float, val right: Float, val bottom: Float, val d: Float) {
+        fun at(x: Float, yAboveBottom: Float) = b.getPixel(((left + x) * d).toInt(), ((bottom - yAboveBottom) * d).toInt())
+        val width get() = right - left
     }
-
-    private fun slabFace(light: Boolean): Int {
+    private fun shelf(light: Boolean, wallpaper: Color = flat): Shelf {
         theme(light)
-        rule.setContent { Wallpaper(light, flat) { Rail(DockStyle.ThreeD, light = light) } }
+        rule.setContent { Wallpaper(light, wallpaper) { Rail(DockStyle.ThreeD, light = light) } }
         val b = capture()
         val r = rule.onNodeWithContentDescription("Dock").getBoundsInRoot(); val d = rule.activity.resources.displayMetrics.density
-        return b.getPixel(((r.left.value + r.right.value) / 2 * d).toInt(), ((r.top.value + 7f) * d).toInt())
+        return Shelf(b, r.left.value, r.right.value, r.bottom.value, d)
     }
-    @Test fun DCK_04_style_23_threeDDarkSlabIsDark() = assertTrue(lum(slabFace(false)) < 0.2)
-    @Test fun DCK_04_style_23_threeDLightSlabIsLight() = assertTrue(lum(slabFace(true)) > 0.5)
+
+    @Test fun DCK_04_style_22_threeDShelfHasABrightBackEdgeAGlassFloorADarkerLipAndAShadowBelow() {
+        val sh = shelf(false)
+        val mid = 54f // the 8 dp gap between the home glyph and the first icon: nothing but the shelf there
+        val backEdge = sh.at(mid, DockStyleTokens.SHELF_DEPTH_DP - 0.75f)
+        val floor = sh.at(mid, DockStyleTokens.SHELF_DEPTH_DP - 9f)
+        val lip = sh.at(mid, 2.5f)
+        assertTrue("the bevel line along the back edge is brighter than the glass below it (${Integer.toHexString(backEdge)} vs ${Integer.toHexString(floor)})", lum(backEdge) > lum(floor))
+        assertNotEquals("the floor is glass, not the bare wallpaper", flat.toArgb(), floor)
+        assertTrue("the front lip is darker than the floor", lum(lip) < lum(floor))
+        val below = sh.at(mid, -2.5f)
+        assertTrue("the shelf's shadow darkens the wallpaper under it (${Integer.toHexString(below)})", lum(below) < lum(flat.toArgb()) - 0.005)
+    }
+
+    @Test fun DCK_04_style_22_threeDShelfIsNarrowerAtTheBackThanAtTheFrontThePerspective() {
+        val sh = shelf(false, Color(0xFF1B2A55))
+        val wall = Color(0xFF1B2A55).toArgb()
+        val x = 4f // dp in from the rail's left edge
+        val front = sh.at(x, 9f)
+        val back = sh.at(x, DockStyleTokens.SHELF_DEPTH_DP - 3f)
+        assertNotEquals("at the front the shelf already covers this x", wall, front)
+        assertEquals("at the back the slanted end has not reached this x yet: still the wallpaper", wall, back)
+    }
+
+    @Test fun DCK_04_style_22_threeDShowsAReflectionOfTheIconOnTheFloorUnderIt() {
+        theme(false)
+        rule.setContent { Wallpaper(false, Color(0xFF1B2A55)) { Rail(DockStyle.ThreeD, light = false, icon = { Color.White }) } }
+        val b = capture()
+        val r = rule.onNodeWithContentDescription("Maps").getBoundsInRoot(); val dock = rule.onNodeWithContentDescription("Dock").getBoundsInRoot(); val d = rule.activity.resources.displayMetrics.density
+        val cx = ((r.left.value + r.width.value / 2) * d).toInt()
+        // the icon is 40 dp tall with 6 dp above it; its foot is 46 dp below the slot's top. The reflection starts 1 dp under the foot.
+        val foot = r.top.value + 46f
+        val under = b.getPixel(cx, ((foot + 3f) * d).toInt())
+        val gap = b.getPixel(((r.left.value + 4f) * d).toInt(), ((foot + 3f) * d).toInt()) // between two icons at the same height: floor only
+        assertTrue("the white icon's reflection lightens the floor under it (${Integer.toHexString(under)} vs ${Integer.toHexString(gap)})", lum(under) > lum(gap) + 0.01)
+        assertTrue("and it stays above the front edge of the shelf", foot + 3f < dock.bottom.value)
+    }
+
+    private fun lumAt(light: Boolean, aboveBottom: Float): Double = lum(shelf(light).at(150f, aboveBottom))
+    @Test fun DCK_04_style_23_threeDDarkThemeHasADarkSmokedLip() = assertTrue(lumAt(false, 2.5f) < 0.35)
+    @Test fun DCK_04_style_23_threeDLightThemeHasAWhiteFrostedFloor() = assertTrue(lumAt(true, 14f) > 0.5)
 
     private fun rtl(s: DockStyle) {
         rule.setContent { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { Wallpaper(false) { Rail(s) } } }

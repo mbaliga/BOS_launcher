@@ -145,6 +145,8 @@ object ThemeTexts {
         ThemeField.DockStyle -> L10n.tr("Dock style")
         ThemeField.Wallpaper -> L10n.tr("Wallpaper")
         ThemeField.Font -> L10n.tr("Font")
+        ThemeField.CalmStyle -> L10n.tr("Calm style")
+        ThemeField.IconPlate -> L10n.tr("Icon plate")
         ThemeField.Name -> L10n.tr("Name")
         ThemeField.Author -> L10n.tr("Author")
         ThemeField.Version -> L10n.tr("Version")

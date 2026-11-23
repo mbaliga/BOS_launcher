@@ -74,7 +74,7 @@ class SettingsVisualW54Test {
     )
 
     private fun choices(cats: List<SettingCategory>): List<Pair<String, SettingItem.Choice<*>>> =
-        cats.flatMap { c -> c.items.filterIsInstance<SettingItem.Choice<*>>().map { c.title to it } }
+        cats.flatMap { c -> c.items.filterIsInstance<SettingItem.Choice<*>>().filter { it.title != "Looks" && !it.title.startsWith("Try it") }.map { c.title to it } } // wave 56: the Looks rail and the Try it areas are rail rows of their own, covered by LooksCalibratorsW56Test
 
     @Test fun CFG_23_noChoiceOfTheSettingsIsLeftAsATextRadioPage() {
         var rails = 0

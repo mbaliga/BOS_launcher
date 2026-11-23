@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -51,7 +52,10 @@ import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.collectionInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
@@ -153,6 +157,8 @@ internal fun OneUiRowFrame(
     leading: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     role: Role? = Role.Button,
+    /** Wave 56 (CFG-31): the row stays on the page but cannot be used right now; the reason replaces the summary line and the row is dimmed and does not react. */
+    disabledReason: String? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     below: (@Composable () -> Unit)? = null,
 ) {
@@ -173,18 +179,21 @@ internal fun OneUiRowFrame(
             .semantics { if (highlighted) this.selected = true }
             .background(fill)
             .then(if (focused) Modifier.border(2.dp, HyleColors.Violet).testTag(OneUiTags.FOCUS_RING) else Modifier)
-            .then(if (onClick != null) Modifier.onFocusChanged { focused = it.isFocused }.clickable(role = role, onClick = onClick) else Modifier)
+            .then(if (onClick != null && disabledReason == null) Modifier.onFocusChanged { focused = it.isFocused }.clickable(role = role, onClick = onClick) else Modifier)
+            .then(if (disabledReason != null) Modifier.testTag(OneUiTags.DISABLED_ROW).semantics { disabled(); stateDescription = disabledReason } else Modifier)
             .padding(horizontal = OneUi.RowPad, vertical = 10.dp),
     ) {
+        val dim = if (disabledReason != null) Modifier.graphicsLayer { alpha = Disabled.ALPHA } else Modifier
         Row(Modifier.heightIn(min = min - 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (leading != null) { leading(); Spacer(Modifier.size(16.dp)) }
+            if (leading != null) { Box(dim) { leading() }; Spacer(Modifier.size(16.dp)) }
             Column(Modifier.weight(1f)) {
-                Text(title, color = HyleColors.InkBright, fontSize = 17.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                if (!summary.isNullOrEmpty()) Text(summary, color = HyleColors.InkDim, fontSize = 13.sp, maxLines = if (leading != null && !big) 1 else 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                Text(title, color = HyleColors.InkBright, fontSize = 17.sp, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = dim)
+                val line = disabledReason ?: summary
+                if (!line.isNullOrEmpty()) Text(line, color = HyleColors.InkDim, fontSize = 13.sp, maxLines = if (leading != null && !big) 1 else 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp).testTag(if (disabledReason != null) OneUiTags.DISABLED_REASON else "oneui.summary"))
             }
-            if (trailing != null) { Spacer(Modifier.size(12.dp)); trailing() }
+            if (trailing != null) { Spacer(Modifier.size(12.dp)); Box(dim) { Row(verticalAlignment = Alignment.CenterVertically) { trailing() } } }
         }
-        below?.invoke()
+        if (below != null) Box(dim) { below() }
     }
 }
 
@@ -213,30 +222,51 @@ internal fun OneUiSwitch(checked: Boolean) {
     }
 }
 
+/** What a screen reader says for a row: the title and its value, or, while the row is off, the title, that it is unavailable and why. */
+internal fun rowDescription(title: String, value: String, reason: String?): String =
+    if (reason == null) "$title, $value" else Disabled.description(title, reason, L10n.tr("Unavailable"))
+
 @Composable
 internal fun OneUiToggleRow(item: SettingItem.Toggle, highlighted: Boolean, onToggle: (Boolean) -> Unit) {
+    val off = item.meta.disabledReason
     OneUiRowFrame(
         item.title, summary = item.hint, highlighted = highlighted,
-        role = Role.Switch,
+        role = Role.Switch, disabledReason = off,
         onClick = { onToggle(!item.checked) },
         modifier = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = "${item.title}, ${item.value}"
-            stateDescription = item.value
+            contentDescription = rowDescription(item.title, item.value, off)
+            stateDescription = off ?: item.value
             toggleableState = ToggleableState(item.checked)
         },
         trailing = { OneUiSwitch(item.checked) },
     )
 }
 
+/**
+ * A slider row: the title and the live readout (with its unit), the slider beneath. Wave 56 (CFG-29): a small tick on the track marks the
+ * default, a flat "Default" text action shows while the value differs from it (no box), and a derived preference reads "Auto" and offers no default.
+ */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun OneUiSliderRow(item: SettingItem.Slider, highlighted: Boolean, onTick: () -> Unit) {
     val step = if (item.step > 0f) item.step else SettingsMath.autoStep(item.range)
     var band by remember { mutableIntStateOf(SettingsMath.tickBand(item.amount, item.range)) }
     val span = (item.range.endInclusive - item.range.start).coerceAtLeast(1e-6f)
+    val off = item.meta.disabledReason
+    val defaultAt = item.default?.takeIf { !item.auto }
     OneUiRowFrame(
-        item.title, summary = item.hint, highlighted = highlighted,
-        trailing = { Text(item.valueText, color = HyleColors.InkDim, fontSize = 15.sp) },
+        item.title, summary = item.hint, highlighted = highlighted, disabledReason = off,
+        trailing = {
+            if (item.offersDefault && off == null) {
+                Text(
+                    L10n.tr("Default"), color = HyleColors.Violet, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.testTag(OneUiTags.SLIDER_DEFAULT).heightIn(min = 48.dp)
+                        .clickable(role = Role.Button, onClickLabel = L10n.tr("Reset %s to its default", item.title)) { item.default?.let { d -> item.onChange(SettingsMath.snap(d, item.range, step)); onTick() } }
+                        .padding(horizontal = 10.dp, vertical = 14.dp),
+                )
+            }
+            Text(item.valueText, color = HyleColors.InkDim, fontSize = 15.sp, modifier = Modifier.testTag(OneUiTags.SLIDER_READOUT))
+        },
         below = {
             Slider(
                 value = item.amount.coerceIn(item.range.start, item.range.endInclusive),
@@ -246,13 +276,24 @@ internal fun OneUiSliderRow(item: SettingItem.Slider, highlighted: Boolean, onTi
                     if (b != band) { band = b; onTick() }
                     if (v != item.amount) item.onChange(v)
                 },
+                enabled = off == null,
                 valueRange = item.range,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = "${item.title}, ${item.valueText}"; stateDescription = item.valueText },
-                thumb = { Box(Modifier.size(22.dp).clip(CircleShape).background(Color.White).padding(3.dp).clip(CircleShape).background(HyleColors.Violet)) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
+                    val d = if (item.auto) L10n.tr("Auto") else item.valueText
+                    contentDescription = rowDescription(item.title, d, off); stateDescription = off ?: d
+                },
+                thumb = { Box(Modifier.size(22.dp).clip(CircleShape).background(Color.White).padding(3.dp).clip(CircleShape).background(HyleColors.Violet.copy(alpha = if (item.auto) 0.5f else 1f))) },
                 track = { st ->
                     val f = ((st.value - item.range.start) / span).coerceIn(0f, 1f)
-                    Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(OneUi.Track)) {
-                        Box(Modifier.fillMaxWidth(f).height(4.dp).background(HyleColors.Violet))
+                    BoxWithConstraints(Modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.CenterStart) {
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(OneUi.Track)) {
+                            Box(Modifier.fillMaxWidth(f).height(4.dp).background(HyleColors.Violet))
+                        }
+                        if (defaultAt != null) {
+                            // The default tick: a thin mark where the default sits, drawn between the thumb centres at both ends of the range.
+                            val x = 11.dp + (maxWidth - 22.dp) * SettingsMath.fraction(defaultAt, item.range) - 1.dp
+                            Box(Modifier.offset(x = x).size(width = 2.dp, height = 12.dp).clip(CircleShape).background(HyleColors.InkDim).testTag(OneUiTags.SLIDER_TICK))
+                        }
                     }
                 },
                 colors = SliderDefaults.colors(thumbColor = HyleColors.Violet, activeTrackColor = HyleColors.Violet, inactiveTrackColor = OneUi.Track),
@@ -263,8 +304,9 @@ internal fun OneUiSliderRow(item: SettingItem.Slider, highlighted: Boolean, onTi
 
 @Composable
 internal fun OneUiStepperRow(item: SettingItem.Stepper, highlighted: Boolean, onTick: () -> Unit) {
-    val canDown = item.count > item.range.first
-    val canUp = item.count < item.range.last
+    val off = item.meta.disabledReason
+    val canDown = item.count > item.range.first && off == null
+    val canUp = item.count < item.range.last && off == null
     val control: @Composable () -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically) {
             StepButton("−", L10n.tr("Previous %s", item.title), canDown) { onTick(); item.onChange((item.count - item.step).coerceAtLeast(item.range.first)) }
@@ -274,12 +316,13 @@ internal fun OneUiStepperRow(item: SettingItem.Stepper, highlighted: Boolean, on
     }
     val big = LocalDensity.current.fontScale >= 1.5f
     val sem = Modifier.semantics {
-        stateDescription = item.value
+        stateDescription = off ?: item.value
+        if (off != null) contentDescription = rowDescription(item.title, item.value, off)
         progressBarRangeInfo = ProgressBarRangeInfo(item.count.toFloat(), item.range.first.toFloat()..item.range.last.toFloat(), 0)
-        setProgress { v -> item.onChange(item.fromProgress(v)); true }
+        if (off == null) setProgress { v -> item.onChange(item.fromProgress(v)); true }
     }
     OneUiRowFrame(
-        item.title, summary = item.hint, highlighted = highlighted, modifier = sem,
+        item.title, summary = item.hint, highlighted = highlighted, modifier = sem, disabledReason = off,
         trailing = if (big) null else ({ control() }),
         below = if (big) ({ Box(Modifier.fillMaxWidth().padding(top = 6.dp), contentAlignment = Alignment.CenterEnd) { control() } }) else null,
     )
@@ -302,9 +345,10 @@ private fun StepButton(glyph: String, label: String, enabled: Boolean, onClick: 
 /** A choice without cards: the title, its hint, and the current value in grey at the end with a chevron; a tap opens its full radio page. */
 @Composable
 internal fun OneUiChoiceRow(item: SettingItem.Choice<*>, highlighted: Boolean, onOpen: () -> Unit) {
+    val off = item.meta.disabledReason
     OneUiRowFrame(
-        item.title, summary = item.hint, highlighted = highlighted, onClick = onOpen,
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${item.title}, ${item.value}" },
+        item.title, summary = item.hint, highlighted = highlighted, onClick = onOpen, disabledReason = off,
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDescription(item.title, item.value, off) },
         trailing = {
             Text(item.value, color = HyleColors.InkDim, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End, modifier = Modifier.widthIn(max = 150.dp))
             Spacer(Modifier.size(4.dp)); OneUiChevron()
@@ -319,30 +363,37 @@ internal fun OneUiChoiceRow(item: SettingItem.Choice<*>, highlighted: Boolean, o
  */
 @Composable
 internal fun OneUiRailRow(item: SettingItem.Choice<*>, highlighted: Boolean) {
+    val off = item.meta.disabledReason
     Column(Modifier.fillMaxWidth().background(if (highlighted) OneUi.Highlight else Color.Transparent).padding(bottom = 12.dp).testTag(OneUiTags.RAIL)) {
         OneUiRowFrame(
-            item.title, summary = item.hint, role = null,
-            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${item.title}, ${item.value}" },
+            item.title, summary = item.hint, role = null, disabledReason = off,
+            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDescription(item.title, item.value, off) },
         )
-        CompositionLocalProvider(LocalRailInset provides 0.dp) { Column(Modifier.fillMaxWidth().padding(horizontal = OneUi.Margin)) { item.preview?.invoke(this) } }
+        // A rail that is off keeps its cards on the page, dimmed and out of reach: a transparent layer over them takes the touches.
+        Box(if (off != null) Modifier.graphicsLayer { alpha = Disabled.ALPHA } else Modifier) {
+            CompositionLocalProvider(LocalRailInset provides 0.dp) { Column(Modifier.fillMaxWidth().padding(horizontal = OneUi.Margin)) { item.preview?.invoke(this) } }
+            if (off != null) Box(Modifier.matchParentSize().pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() } } }.clearAndSetSemantics { })
+        }
     }
 }
 
 @Composable
 internal fun OneUiActionRow(item: SettingItem.Action, highlighted: Boolean, onClick: () -> Unit) {
     val sub = listOfNotNull(item.value.takeIf { it.isNotEmpty() }, item.hint?.takeIf { it.isNotEmpty() }).joinToString(" · ")
+    val off = item.meta.disabledReason
     OneUiRowFrame(
-        item.title, summary = sub, highlighted = highlighted, onClick = onClick,
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${item.title}, ${item.value}" },
+        item.title, summary = sub, highlighted = highlighted, onClick = onClick, disabledReason = off,
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDescription(item.title, item.value, off) },
         trailing = if (item.navigates) ({ OneUiChevron() }) else null,
     )
 }
 
 @Composable
 internal fun OneUiPaneRow(item: SettingItem.Pane, highlighted: Boolean, onClick: () -> Unit) {
+    val off = item.meta.disabledReason
     OneUiRowFrame(
-        item.title, summary = item.value.takeIf { it.isNotEmpty() }, highlighted = highlighted, onClick = onClick,
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${item.title}, ${item.value}" },
+        item.title, summary = item.value.takeIf { it.isNotEmpty() }, highlighted = highlighted, onClick = onClick, disabledReason = off,
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = rowDescription(item.title, item.value, off) },
         trailing = { OneUiChevron() },
     )
 }

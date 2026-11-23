@@ -1561,9 +1561,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 hiddenKeys = hiddenStore.hidden, allApps = allApps, setHidden = hiddenStore::setHidden,
             )
         }
-        val categories = remember(hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsPrefs, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels) {
+        val setupState = com.bos.sphere.ui.rememberSetupState(corners, gestures, active = settingsOpen) // wave 56 (CFG-26): the Finish setup row
+        val categories = remember(setupState, hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsPrefs, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels) {
             buildSettingsCategories(
             SettingsModel(
+                setup = setupState,
                 hiddenApps = hiddenAppsAccess,
                 puckSegments = puckSegments,
                 setPuckSegments = { n -> com.bos.sphere.core.data.PuckActionsStore.get(context).setSegments(n) },
@@ -1625,6 +1627,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     },
                     androidSettings = { runner.run(CornerActionId.SystemSettings) },
+                    usageAccess = { com.bos.sphere.core.design.GrantHooks.ask(com.bos.sphere.core.design.GrantKind.UsageAccess) { runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
                 ),
             ),
             )
@@ -1639,6 +1642,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
             previewDock = { SettingsPreviewDock(homeCapture) },
+            snapshots = remember(context) { com.bos.sphere.ui.StateSnapshots(context) },
             summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories, pageIndex = settingsPage, workspaceCount = dockState.workspaces.size,
                 sidePanelWidgets = runCatching { com.bos.sphere.ui.HubPrefs.of(context).let { if (it.widgetsSection) it.widgetList.size else 0 } }.getOrDefault(0)),
             backdrop = {

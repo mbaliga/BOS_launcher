@@ -131,7 +131,7 @@ class SettingsOneUiW40Test {
         for ((cat, rows) in OneUiSections.TABLE) {
             val category = c.firstOrNull { OneUiModel.key(it.title) == cat }
             if (category == null) { missing += "category $cat"; continue }
-            for ((row, _) in rows) if (category.items.none { it.title == row }) missing += "$cat / $row"
+            for ((row, _) in rows) if (OneUiSections.find(category.items, row) < 0) missing += "$cat / $row" // wave 56: by row id, else by title
         }
         assertTrue("section table rows that no longer exist: $missing", missing.isEmpty())
     }

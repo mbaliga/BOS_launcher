@@ -114,12 +114,15 @@ fun ActionRow(
     glyph: ImageVector? = null,
     leading: (@Composable () -> Unit)? = null,
     selected: Boolean = false,
+    /** Wave 56 (CFG-28): the stable id a settings search hit names; the row lights for a moment when the hit opened this page for it. */
+    flashId: String? = null,
     onClick: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .paneFlash(flashId)
             .background(if (selected) HyleColors.Violet.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 11.dp),

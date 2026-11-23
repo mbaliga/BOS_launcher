@@ -4,24 +4,28 @@ import com.bos.sphere.core.design.L10n
 
 /**
  * Wave 40 (settingsOneUI): the small grey section titles of the long category pages. The category model is a flat list of rows, so
- * the sections are named here by the English title of the row each one starts at; a row that is not found (renamed, hidden by a
- * state) simply starts no section, and the page still splits into cards where the kind of row changes. An app-level test checks
- * that every row named here still exists in the real categories.
+ * the sections are named here by the row each one starts at.
+ *
+ * Wave 56 (settingsCore), CFG-31: a section starts at a row **id** ([ItemMeta.id], set where the row is built or by the app's one id table),
+ * not at the English title of the row, so a rename or a translation cannot lose a header. A key that is no id still matches a row by its
+ * (English or translated) title, which keeps the rows that have no id yet working. Rows that are not usable right now stay on the page
+ * dimmed ([disabled]) instead of vanishing, so a section never loses its header because its first row is conditional. An app-level test
+ * checks that every row named here exists in the real categories.
  */
 object OneUiSections {
-    /** Category English name, to (English title of the first row of a section, English section title). */
+    /** Category English name, to (id of the first row of a section, English section title). */
     val TABLE: Map<String, List<Pair<String, String>>> = mapOf(
         "Home screen" to listOf(
-            "Calm home screen (Glance)" to "Pages",
-            "Order" to "Layout",
-            "Glance wallpaper" to "Wallpaper",
-            "Recent apps shown" to "Recent apps",
-            "Clock style" to "Glance",
-            "Style" to "Home style",
-            "Default density" to "Icons and grid",
-            "Page turning · portrait" to "Page turning",
-            "Always-on keyboard" to "Keyboard",
-            "Hide status bar" to "Behaviour",
+            "home.glance" to "Pages",
+            "home.order" to "Layout",
+            "home.glanceWallpaper" to "Wallpaper",
+            "home.recentsLimit" to "Recent apps",
+            "home.clockStyle" to "Glance",
+            "home.style" to "Home style",
+            "home.defaultDensity" to "Icons and grid",
+            "home.pagingPortrait" to "Page turning",
+            "home.alwaysKeyboard" to "Keyboard",
+            "home.hideStatusBar" to "Behaviour",
         ),
         "Look" to listOf(
             "Light / dark" to "Theme",
@@ -63,13 +67,20 @@ object OneUiSections {
         ),
     )
 
+    /** The index in [items] of the row [key] names: by id first, then by (English or translated) title. */
+    fun find(items: List<SettingItem>, key: String): Int {
+        val byId = items.indexOfFirst { it.meta.id == key }
+        if (byId >= 0) return byId
+        return items.indexOfFirst { it.title == key || it.title == L10n.tr(key) }
+    }
+
     /** Item index to (translated) section title for the category named [categoryTitle] whose rows are [items]. */
     fun headers(categoryTitle: String, items: List<SettingItem>): Map<Int, String> {
         val key = OneUiModel.key(categoryTitle) ?: return emptyMap()
         val rows = TABLE[key] ?: return emptyMap()
         val out = LinkedHashMap<Int, String>()
-        for ((rowTitle, header) in rows) {
-            val i = items.indexOfFirst { it.title == rowTitle || it.title == L10n.tr(rowTitle) }
+        for ((rowKey, header) in rows) {
+            val i = find(items, rowKey)
             if (i >= 0) out[i] = L10n.tr(header)
         }
         return out

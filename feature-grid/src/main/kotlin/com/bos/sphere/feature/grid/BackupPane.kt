@@ -150,11 +150,11 @@ fun ColumnScope.BackupPane(onStateChanged: (Context) -> Unit = {}) {
 
     Column(Modifier.padding(horizontal = 4.dp)) {
         note(L10n.tr("Your whole setup is one file: layout, settings, corners, gestures, Comms rules, workspaces, sessions, shortcuts and palette aliases. Notifications, usage history, search indexes and contacts are never included."))
-        ActionRow(L10n.tr("Export setup…"), L10n.tr("Everything in one file"), Glyphs.Info) { exportAll.launch("liftoff-setup.json") }
-        ActionRow(L10n.tr("Export settings only…"), L10n.tr("A separate settings document"), Glyphs.Info) { exportSettings.launch("liftoff-settings.json") }
-        ActionRow(L10n.tr("Import setup…"), L10n.tr("From a Liftoff file; snapshots first"), Glyphs.Info) { pick.launch(arrayOf("application/json", "text/plain", "*/*")) }
+        ActionRow(L10n.tr("Export setup…"), L10n.tr("Everything in one file"), Glyphs.Info, flashId = "backup.export") { exportAll.launch("liftoff-setup.json") }
+        ActionRow(L10n.tr("Export settings only…"), L10n.tr("A separate settings document"), Glyphs.Info, flashId = "backup.exportSettings") { exportSettings.launch("liftoff-settings.json") }
+        ActionRow(L10n.tr("Import setup…"), L10n.tr("From a Liftoff file; snapshots first"), Glyphs.Info, flashId = "backup.import") { pick.launch(arrayOf("application/json", "text/plain", "*/*")) }
 
-        ActionRow(L10n.tr("Import layout from another launcher…"), L10n.tr("A Launcher3-style database or a backup zip that holds one; apps only"), Glyphs.Info) {
+        ActionRow(L10n.tr("Import layout from another launcher…"), L10n.tr("A Launcher3-style database or a backup zip that holds one; apps only"), Glyphs.Info, flashId = "backup.importLayout") {
             pickLauncher.launch(arrayOf("application/octet-stream", "application/zip", "application/x-sqlite3", "*/*"))
         }
         launcherImport?.let { r ->
@@ -211,7 +211,7 @@ fun ColumnScope.BackupPane(onStateChanged: (Context) -> Unit = {}) {
 
         Text(L10n.tr("Snapshots"), color = HyleColors.Ink, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp))
         note(L10n.tr("The last 5 are kept on this device: before every import, before deleting a page, and after each stable start."))
-        ActionRow(L10n.tr("Take a snapshot now"), null, Glyphs.Plus) {
+        ActionRow(L10n.tr("Take a snapshot now"), null, Glyphs.Plus, flashId = "backup.snapshot") {
             scope.launch {
                 val s = withContext(Dispatchers.IO) { service.snapshot("manual", force = true) }
                 snapshots = service.snapshots.list()

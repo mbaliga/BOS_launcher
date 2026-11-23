@@ -15,6 +15,14 @@ data class SettingEntry(
     val description: String,
     /** The current value as shown on the row ("On", "Rounded"). */
     val value: String,
+    /** Wave 56 (CFG-22): hidden synonyms ("vibration" for haptics); never shown, scored below the hint. */
+    val keywords: List<String> = emptyList(),
+    /** Wave 56 (CFG-25): why the row cannot be used right now ("Needs Circle layout"); the row is still found. */
+    val disabledReason: String? = null,
+    /** Wave 56 (CFG-22): set when the hit is a row inside a pane: its stable id. Opening the hit opens the pane's page and flashes that row. */
+    val paneEntryId: String? = null,
+    /** The title of the pane a [paneEntryId] row lives in (empty for a row of a category page). */
+    val parent: String = "",
 )
 
 /**
@@ -56,6 +64,7 @@ class SettingsIndex(val entries: List<SettingEntry>) {
             t.split(' ', '-', '·').any { it.startsWith(w) } -> 80
             t.contains(w) -> 60
             e.description.lowercase().contains(w) -> 30
+            e.keywords.any { k -> k.lowercase().split(' ', '-', '/').any { it.startsWith(w) } } -> KEYWORD_SCORE
             e.value.lowercase() == w -> 20
             e.category.lowercase().contains(w) -> 10
             CATEGORY_KEYWORDS.any { (k, words) -> (e.category == k || e.category == com.bos.sphere.core.design.L10n.tr(k)) && words.contains(w) } -> 10
@@ -79,12 +88,23 @@ class SettingsIndex(val entries: List<SettingEntry>) {
          */
         private val CATEGORY_KEYWORDS = mapOf("Side panel" to "comms widgets right-hand panel", "Pages" to "page", "Workspaces" to "workspace")
 
+        /** Wave 56: a hidden synonym scores above the value and the category, below the hint. */
+        const val KEYWORD_SCORE = 25
+
         fun id(category: Int, item: Int) = "$category/$item"
+        /** The id of a row inside a pane: the pane's own id plus the stable string of the row. */
+        fun paneId(category: Int, item: Int, entry: String) = "$category/$item/$entry"
 
         /** An index of every row of every category, built from the live list so no setting can be missing. */
         fun fromCategories(categories: List<SettingCategory>): SettingsIndex = SettingsIndex(
             categories.flatMapIndexed { ci, c ->
-                c.items.mapIndexed { ii, item -> SettingEntry(id(ci, ii), ci, ii, c.title, item.title, item.description().orEmpty(), item.value) }
+                c.items.flatMapIndexed { ii, item ->
+                    val own = SettingEntry(id(ci, ii), ci, ii, c.title, item.title, item.description().orEmpty(), item.value, item.meta.keywords, item.meta.disabledReason)
+                    // Wave 56: the rows a pane holds are entries of their own, found by their stable id; a hit opens the pane's page.
+                    listOf(own) + item.meta.entries.map { e ->
+                        SettingEntry(paneId(ci, ii, e.id), ci, ii, c.title, e.title, e.summary, "", e.keywords, item.meta.disabledReason, paneEntryId = e.id, parent = item.title)
+                    }
+                }
             },
         )
     }

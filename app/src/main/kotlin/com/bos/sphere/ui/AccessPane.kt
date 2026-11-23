@@ -42,7 +42,7 @@ fun AccessPane() {
     Column {
         Text(L10n.tr(AccessLogic.INTRO), color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(bottom = 6.dp))
         rows.forEach { row ->
-            ActionRow(label = L10n.tr(row.title), summary = L10n.tr(row.state) + " · " + L10n.tr(row.action)) {
+            ActionRow(label = L10n.tr(row.title), summary = L10n.tr(row.state) + " · " + L10n.tr(row.action), flashId = SettingsRowMeta.PaneIds.access(row.kind)) {
                 prompter.ask(row.kind) {
                     GrantSupport.markAsked(ctx, row.kind)
                     when (row.kind) {

@@ -1,8 +1,6 @@
 package com.bos.sphere.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.LauncherHapticSettings
@@ -16,19 +14,27 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Wave 57 (profiles, CFG-47): what the offline app group suggester knows about each launcher app: the category the app declares
- * (`ApplicationInfo.category`, read through the launcher's own package queries) and whether it belongs to the work profile.
- * Read off the main thread; until it is read the apps are offered with their names only.
+ * (`ApplicationInfo.category`, read through the launcher's own `LauncherApps`, an in-memory system call, no file) and whether it belongs to
+ * the work profile. Read once per app and cached for the process. It is read during composition on purpose: a background read that wrote into
+ * the composition later left pending work behind when the page was already gone (seen in the shared Robolectric sandbox).
  */
 @Composable
 fun rememberSuggestFacts(apps: List<AppEntry>): List<SuggestApp> {
     val context = LocalContext.current
-    val plain = apps.map { SuggestApp(it.key, it.packageName, it.label) }
-    val facts by produceState(plain, apps) { value = withContext(Dispatchers.IO) { suggestFacts(context, apps) } }
-    return facts
+    return androidx.compose.runtime.remember(apps) { SuggestFactsCache.of(context.applicationContext, apps) }
+}
+
+object SuggestFactsCache {
+    private val known = java.util.concurrent.ConcurrentHashMap<String, SuggestApp>()
+
+    fun of(context: android.content.Context, apps: List<AppEntry>): List<SuggestApp> {
+        val missing = apps.filter { !known.containsKey(it.key) }
+        if (missing.isNotEmpty()) runCatching { suggestFacts(context, missing) }.getOrDefault(emptyList()).forEach { known[it.key] = it }
+        return apps.map { known[it.key] ?: SuggestApp(it.key, it.packageName, it.label) }
+    }
 }
 
 fun suggestFacts(context: android.content.Context, apps: List<AppEntry>): List<SuggestApp> {

@@ -3,7 +3,6 @@ package com.bos.sphere.ui
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -124,7 +123,6 @@ internal fun ColumnScope.DockSettingsPane(kind: DockPaneKind) {
     val scope = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate) }
     DockInputWiring.Install(withBridge = false)
     val manager = remember { WorkspaceRepository.get(context) }
-    DisposableEffect(Unit) { ProfileSettingsSync.ensure(context); onDispose { } }
     val repo = remember { com.bos.sphere.core.data.LauncherAppsAppRepository(context) }
     val apps by repo.apps.collectAsState(initial = emptyList())
     val launcher = remember { com.bos.sphere.feature.dock.AppLauncher(context, rootView = { view }) }

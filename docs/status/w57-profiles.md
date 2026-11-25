@@ -37,5 +37,9 @@ Owner answer (Q2): "Named switchable setting profiles like Work, Calm, Desk are 
 - Studio has the round-trip functions but no page UI for phone profiles.
 - Shared files with the parallel Settings stream: the Profiles row lives in `DesktopSettingsPane.kt` (`profilesCategory`); `SettingsCategories.kt` (two lines), `SettingsOneUiModel.kt` (two words) and `SettingsOneUiSummaries.kt` (one line) change "Workspaces" to "Profiles". A merge with the six-tab restructure must keep the category key "Profiles".
 
+## Found by the full app run
+Reading the app categories on a background coroutine (and then a thread) that wrote into the composition later made `DockWiringTest` and `DockDialogsW24Test` fail when they ran in the same sandbox after the dock panel test (the base commit passes them; reproduced 3 times). The facts are now read once per app during composition and cached for the process (`SuggestFactsCache`; `LauncherApps.getApplicationInfo` is an in-memory system call, no file). On a phone with many apps the first opening of the Profiles page makes one such call per app on the main thread (device-only cost, not measured).
+The Counts line of `docs/SPEC_STATUS.md` was already stale on the base commit (167 counted, 170 rows); it now matches the 175 rows.
+
 ## Device-only
 The toast and TalkBack announcement, the feel of a switch (several stores change in one frame), `LauncherApps.getApplicationInfo` categories on real apps and work profiles, a Backup moved between two phones, the chip rows on a small screen with long names.

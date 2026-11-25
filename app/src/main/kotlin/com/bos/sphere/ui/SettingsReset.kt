@@ -13,40 +13,42 @@ import com.bos.sphere.feature.grid.SettingsSnapshots
  *
  * Only preferences, only those of [LauncherPrefs] (see [PrefsReset]). **User data is never reset from here**: the home layout and its pages,
  * the hidden apps, the corner and gesture assignments (shortcuts), the Comms groups and rules, the workspaces, themes and the dock's own
- * stores are not touched by any page reset; they have their own screens (delete a page, unhide, Hide rules ...). So the Corners page puts back
- * the corner style, size and behaviour but keeps what each corner does, and the Gestures page puts back the motion settings, not the bindings.
+ * stores are not touched by any page reset; they have their own screens (delete a page, unhide, Hide rules ...). So the Home tab puts back
+ * the corner style, size and behaviour but keeps what each corner does, and the motion settings, not the gesture bindings.
  *
  * The per-page lists below are written out, and a test derives the fields each page's rows really change (it calls every row's setter against a
  * recording model) and requires them to be inside the page's list; a second test requires every field of [LauncherPrefs] to be in a page list or in
  * [EXCLUDED] with its reason, so a preference added later cannot be forgotten.
  */
 internal object SettingsReset {
-    /** English category key to the [LauncherPrefs] fields its page resets. */
+    /**
+     * English tab key to the [LauncherPrefs] fields its "Reset this page to defaults" puts back (wave 57: a page is one of the six tabs; the
+     * wallpaper moved to Look, the keyboard-with-Radar rows to Radar, the right side and the recents panel to Side panel, Restore open screens to System).
+     */
     val PAGES: Map<String, Set<String>> = mapOf(
-        "Home screen" to setOf(
-            "glanceEnabled", "homeOrder", "rightSide", "showMusic", "glanceHotspots", "glanceControlsSeconds", "glanceIndicator",
-            "recentsLimit", "recentsUseUsageAccess",
+        "Home" to setOf(
+            "glanceEnabled", "homeOrder", "showMusic", "glanceHotspots", "glanceControlsSeconds", "glanceIndicator",
             "clockStyle", "clockFormat", "glanceClockDate", "glanceClockAccent", "glanceClockSize",
-            "glanceWallpaperKind", "glanceSolid", "glanceGradFrom", "glanceGradTo", "glanceGradAngle", "backgroundSlot1", "backgroundSlot2", "glanceSystemDim",
-            "pagesSameAsGlance", "pagesWallpaperKind", "pagesSolid", "pagesGradFrom", "pagesGradTo", "pagesGradAngle", "pagesSlot1", "pagesSlot2", "pagesSystemDim",
             "homeStyle", "homePages", "scrollAxis", "continuousColumns", "adaptiveGrid", "gridDensity", "portraitGrid", "landscapeGrid",
             "iconScale", "iconSpacing", "spacingV", "gridBias", "gridInsetX", "gridInsetTop", "gridInsetBottom", "labelScale", "showLabels",
             "badgesOn", "badgeCount", "portraitPaging", "landscapePaging", "pageTransition",
-            "alwaysKeyboard", "keyboardOnOpenPortrait", "keyboardOnOpenLandscape", "hideStatusBar", "restoreOpenSurfaces",
+            "alwaysKeyboard", "hideStatusBar",
+            "cornerStyle", "cornerIconSize", "cornerIconMode", "cornersFollowDevice", "cornersPerOrientation", "hotCornersOn", "hotCornerDwellMs",
+            "motionEnabled", "motionInBackground", "motionSensitivity",
         ),
         "Look" to setOf(
             "themeMode", "accentColor", "uiFont", "iconShape", "iconTint", "iconPlate", "settingsBackdrop", "settingsDim",
             "calmStyle", "calmAlsoRegular", "indicatorMetric", "indicatorIntensity", "indicatorSpeed", "indicatorLow", "indicatorMid", "indicatorHigh", "indicatorIdle",
+            "glanceWallpaperKind", "glanceSolid", "glanceGradFrom", "glanceGradTo", "glanceGradAngle", "backgroundSlot1", "backgroundSlot2", "glanceSystemDim",
+            "pagesSameAsGlance", "pagesWallpaperKind", "pagesSolid", "pagesGradFrom", "pagesGradTo", "pagesGradAngle", "pagesSlot1", "pagesSlot2", "pagesSystemDim",
         ),
-        "Corners" to setOf("cornerStyle", "cornerIconSize", "cornerIconMode", "cornersFollowDevice", "cornersPerOrientation", "hotCornersOn", "hotCornerDwellMs"),
-        "Gestures" to setOf("motionEnabled", "motionInBackground", "motionSensitivity"),
-        "App drawer" to setOf("wheelGrouping", "wheelWorkOnly", "pageMode", "appsOnHome"),
+        "Apps" to setOf("wheelGrouping", "wheelWorkOnly", "pageMode", "appsOnHome"),
         "Radar" to setOf(
             "searchLayout", "searchLayoutPinned", "radarBackground", "radarIntensity", "searchMotion", "webEngine", "searchWeb", "webSuggestions",
-            "searchActions", "searchFiles", "searchDeep", "searchContacts",
+            "searchActions", "searchFiles", "searchDeep", "searchContacts", "keyboardOnOpenPortrait", "keyboardOnOpenLandscape",
         ),
-        "Side panel" to setOf("leftPage", "launchpadRail", "launchpadTheme"),
-        "System & sound" to setOf("uiSounds", "uiSoundVolume", "language"),
+        "Side panel" to setOf("leftPage", "launchpadRail", "launchpadTheme", "rightSide", "recentsLimit", "recentsUseUsageAccess"),
+        "System" to setOf("uiSounds", "uiSoundVolume", "language", "restoreOpenSurfaces"),
     )
 
     /** [LauncherPrefs] fields no page puts back, each with the reason. A reset never touches them, "Reset all settings" included. */
@@ -66,7 +68,7 @@ internal object SettingsReset {
         "radarSignalForce" to "Lab override for testing, not a setting",
     )
 
-    /** The page resets by English category key; categories not listed (Pages, Workspaces, Hidden apps, Backup, Desktop & dock, Capabilities, Lab, About) hold data or actions only. */
+    /** The page resets by English tab key (every one of the six tabs has one). */
     fun fieldsFor(categoryKey: String?): Set<String>? = categoryKey?.let { PAGES[it] }
 
     /** Every field "Reset all settings" puts back: the union of the pages. */

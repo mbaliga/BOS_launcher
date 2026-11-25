@@ -71,12 +71,13 @@ abstract class TourBase {
     /** Wave 34: the long-press Home sheet no longer has Edit home, Add page, the Glance switch or the item picker; they are rows in Ground Control, Home screen, one tap from the sheet's Ground Control row. */
     protected fun quickGoTo(row: String) {
         openGroundControlHome()
-        rule.onNodeWithText(row, useUnmergedTree = true).performScrollTo().performClick(); settle()
+        SettingsTestNav.open(rule, "Home screen", row); settle(300)
+        rule.onNodeWithText(row, useUnmergedTree = true).performClick(); settle()
     }
-    /** Wave 40: the sheet's Ground Control row opens the root list of every category; the Home screen row opens that category's page. */
+    /** Wave 57: the sheet's Settings row opens Settings on the tab shown last; this then selects the Home tab. */
     protected fun openGroundControlHome() {
         rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick(); settle()
-        rule.onNodeWithTag("oneui.row.Home screen", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        SettingsTestNav.goTo(rule, "Home"); settle(300)
     }
     /** Wave 26: Glance is the surface on screen (its deck dots are drawn only there); otherwise the pages are. */
     /** Glance is on screen when its title slot is inside the window: the one pager may keep a neighbouring stop composed off screen (wave 28). */

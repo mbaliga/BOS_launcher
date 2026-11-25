@@ -1,5 +1,7 @@
 # Wave 56: settingsCore (CFG-28 to CFG-33)
 
+> **Wave 57 (settingsTabs) supersedes decision 2's section table keyed by row id and decision 9's "row above the groups": the sections come from the tab placement table and Finish setup sits above the tabs; the page resets are per tab (`docs/decisions/settingsTabs.md`).**
+
 Source: the owner asked "Look at clackpad and emulate the settings (Clackpad config) from there for our settings"; the study is `docs/handoff/clackpad_vs_liftoff_settings.md`. This wave builds its items 2, 3, 4, 10 and 11 (search, sliders, reset, rows that are off, Finish setup) and the report-only half of item 5. The Looks rail (item 1) and the calibrators (item 9) belong to other streams.
 
 ## What was ported, what was not

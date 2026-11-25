@@ -63,7 +63,7 @@ class SettingsVisualW54ShotsTest {
     private fun page(name: String, title: String, p: LauncherPrefs = LauncherPrefs(homeStyle = HomeStyle.Grid, homePages = HomePages.Paginated), light: Boolean = false) {
         HyleTheme.apply(if (light) ThemeVariant.Light else ThemeVariant.Dark, 0xFF8E7BFF)
         val cats = buildSettingsCategories(model(p))
-        val idx = cats.indexOfFirst { it.title == title }
+        val idx = cats.indexOfFirst { it.title == SettingsTestNav.tabOf(title) } // wave 57: the old page is a section of a tab
         assertTrue("category $title exists in ${cats.map { it.title }}", idx >= 0)
         rule.mainClock.autoAdvance = false
         rule.setContent { SphereTheme { SettingsSpace(visible = true, categories = cats, initialCategory = idx, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) } }

@@ -9,6 +9,7 @@ import com.bos.sphere.feature.grid.ArtSet
 import com.bos.sphere.feature.grid.VisualArt
 import com.bos.sphere.feature.grid.dot
 import com.bos.sphere.feature.grid.dotIn
+import com.bos.sphere.feature.grid.digits2
 import com.bos.sphere.feature.grid.dp
 import com.bos.sphere.feature.grid.inBox
 import com.bos.sphere.feature.grid.line
@@ -72,5 +73,28 @@ object SettingsArtApp {
             }
             HubView.Widgets -> { inBox(box, ink.soft, 0.14f, 0.14f, 0.72f, 0.32f, 0.15f); inBox(box, ink.strong, 0.14f, 0.54f, 0.34f, 0.3f, 0.15f); inBox(box, ink.soft, 0.52f, 0.54f, 0.34f, 0.3f, 0.15f) }
         }
+    }
+
+    /** Wave 57 (CFG-43): the launcher's own vibration, as bars that grow with the strength (Off: one faint bar crossed). */
+    val haptic = ArtSet(com.bos.sphere.core.data.HapticStrength.entries) { hapticArt(it) }
+
+    private fun hapticArt(h: com.bos.sphere.core.data.HapticStrength): VisualArt = { ink ->
+        val n = h.ordinal
+        for (i in 0 until 3) {
+            val hh = 0.22f + i * 0.18f
+            rect(if (i < n) ink.strong else ink.faint, 0.24f + i * 0.2f, 0.78f - hh, 0.12f, hh, 0.3f)
+        }
+        if (n == 0) line(ink.soft, 0.2f, 0.8f, 0.8f, 0.2f, 1.6f)
+    }
+
+    /** Wave 57 (CFG-44): page [i] of [count]: a phone with the page number and the row of page dots, this page's dot picked out. */
+    fun pageOf(i: Int, count: Int): VisualArt = { ink ->
+        val box = phoneFrame(ink)
+        val (o, sz) = box
+        val w = sz.width * 0.22f; val dh = sz.height * 0.26f
+        digits2(i + 1, o.x + sz.width / 2f, o.y + sz.height * 0.24f, w, dh, dp(2f), ink.strong)
+        val n = count.coerceIn(1, 9)
+        val step = 0.6f / n
+        for (k in 0 until n) dotIn(box, if (k == i) ink.accent else ink.faint, 0.2f + step * (k + 0.5f), 0.82f, if (k == i) 2.2f else 1.6f)
     }
 }

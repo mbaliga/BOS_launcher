@@ -123,7 +123,7 @@ class SettingsVisualW54Test {
     private val radios = SemanticsMatcher("a radio button") { it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton }
 
     /** Choices whose change does not land in the preferences (the page layout, the ring, Comms' own store) are checked by their own recorders below. */
-    private val notInPrefs = setOf("Layout", "Ring segments", "Default view", "Widgets position", "Font")
+    private val notInPrefs = setOf("Layout", "Ring segments", "Default view", "Widgets position", "Font", "Page", "Launcher vibration") // wave 57: the page list (host state) and the vibration store
 
     @Test fun CFG_23_everyCardGroupShowsItsLabelsAtLeast48DpAndOnePickedAndATapSetsTheSetting() {
         rule.setContent { SphereTheme { Column(Modifier.width(300.dp)) { shown?.preview?.invoke(this) } } }

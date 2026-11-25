@@ -58,7 +58,7 @@ class DrawerRingW38Test {
             system = SystemLinks({}, {}, {}, {}), lab = emptyList(),
             puckSegments = store.segments.value, setPuckSegments = store::setSegments, puckLabels = store.showLabels.value, setPuckLabels = store::setShowLabels,
         ),
-    ).first { it.title == "App drawer" }.items
+    ).first { it.title == "Apps" }.items // wave 57: the Apps tab
 
     @Test fun CFG_15_w38_theAppDrawerCategoryOffersRingSegmentsSixSevenOrEightWritingTheStore() {
         @Suppress("UNCHECKED_CAST")

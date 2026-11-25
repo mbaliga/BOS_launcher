@@ -21,6 +21,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontFamily
@@ -113,12 +115,12 @@ class SettingsTitleFontW52Test {
         assertEquals("equal space above ($gapAbove) and below ($gapBelow)", gapAbove, gapBelow, 1.5f)
     }
 
-    @Test fun CFG_21_aCategoryPageTitleIsCentredAndInCapitalsToo() {
+    @Test fun CFG_41_theSectionTabsAreCapitalsToo() {
+        // Wave 57: a section has no page title of its own any more; its tab carries the name, in the same capitals.
         show(initial = 1)
-        val title = rule.onNodeWithTag(OneUiTags.TITLE_LARGE).getUnclippedBoundsInRoot()
-        val page = rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).getUnclippedBoundsInRoot()
-        assertEquals((page.left.value + page.right.value) / 2f, (title.left.value + title.right.value) / 2f, 1f)
-        assertEquals("LOOK", shown(OneUiTags.TITLE_LARGE))
+        rule.onNodeWithText("LOOK", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithText("HOME SCREEN", useUnmergedTree = true).assertIsDisplayed()
+        assertEquals("SETTINGS", shown(OneUiTags.TITLE_LARGE))
     }
 
     @Test fun CFG_21_titlesAreCapitalsButTheScreenReaderStillReadsTheWords() {
@@ -132,11 +134,12 @@ class SettingsTitleFontW52Test {
 
     @Test fun CFG_21_theCollapsedSmallTitleIsCapitalsAndCentredToo() {
         show(initial = 0)
-        rule.onAllNodes(hasScrollAction())[0].performScrollToNode(hasText("Home option 19"))
+        // Wave 57: the title band scrolls away with a drag of the section's list; the bar's small title takes over.
+        repeat(3) { rule.onNodeWithTag(SettingsTabTags.list("Home screen")).performTouchInput { swipeUp() }; rule.mainClock.advanceTimeBy(400) }
         rule.waitForIdle()
-        assertEquals("HOME SCREEN", shown(OneUiTags.TITLE_SMALL))
+        assertEquals("SETTINGS", shown(OneUiTags.TITLE_SMALL))
         val t = rule.onNodeWithTag(OneUiTags.TITLE_SMALL).getUnclippedBoundsInRoot()
-        val page = rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).getUnclippedBoundsInRoot()
+        val page = rule.onNodeWithTag(OneUiTags.ROOT).getUnclippedBoundsInRoot()
         assertEquals((page.left.value + page.right.value) / 2f, (t.left.value + t.right.value) / 2f, 1f)
     }
 

@@ -151,21 +151,9 @@ class SettingsLinesW54Test {
     private fun dividersIn(group: Int) = rule.onAllNodes(hasTestTag(OneUiTags.DIVIDER) and hasAnyAncestor(hasTestTag(OneUiTags.GROUP))).fetchSemanticsNodes()
         .filter { d -> groupsOf()[group].fetchSemanticsNode().boundsInRoot.let { b -> d.boundsInRoot.top >= b.top && d.boundsInRoot.bottom <= b.bottom } }.size
 
-    @Test fun CFG_21_w54_dividersSitBetweenRowsAndNotAfterTheLastOne_root() {
-        show()
-        val sizes = OneUiModel.groups(categories()).map { it.size }
-        val nodes = groupsOf().fetchSemanticsNodes()
-        assertEquals(sizes.size, nodes.size)
-        sizes.forEachIndexed { g, rows ->
-            val info = nodes[g].config.getOrNull(SemanticsProperties.CollectionInfo)
-            assertEquals("a group is still a semantic list of its rows", rows, info?.rowCount)
-            assertEquals("group $g of $rows rows has ${rows - 1} dividers", rows - 1, dividersIn(g))
-        }
-    }
-
     @Test fun CFG_21_w54_dividersSitBetweenRowsAndNotAfterTheLastOne_category() {
         show(initial = 1)
-        val blocks = OneUiModel.blocks(categories()[1].items, OneUiSections.headers("Look", categories()[1].items)).filterIsInstance<OneUiModel.Block.Group>()
+        val blocks = OneUiModel.blocks(categories()[1].items, OneUiSections.headers(categories()[1])).filterIsInstance<OneUiModel.Block.Group>()
         blocks.forEachIndexed { g, b -> assertEquals(b.rows.size - 1, dividersIn(g)) }
     }
 
@@ -183,15 +171,6 @@ class SettingsLinesW54Test {
         val t = rule.onNode(hasText("Plate"), useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertEquals("RTL: divider start (the right edge) equals the text start", t.right.value, d.right.value, 0.6f)
         assertTrue("it runs to the end margin", d.left.value < 40f)
-    }
-
-    @Test fun CFG_21_w54_theRootDividerStartsAtTheTextNotTheIconTile() {
-        show()
-        val d = rule.onAllNodesWithTag(OneUiTags.DIVIDER).onFirst().getUnclippedBoundsInRoot()
-        val title = rule.onNode(hasText("Look", ignoreCase = true) and hasAnyAncestor(hasTestTag(OneUiTags.ROOT)), useUnmergedTree = true)
-        val tb = title.getUnclippedBoundsInRoot()
-        assertEquals(tb.left.value, d.left.value, 0.6f)
-        assertTrue("the divider is hairline", d.bottom - d.top <= 1.dp)
     }
 
     @Test fun CFG_21_w54_theDividerIsTheHairlineColourAndAtMostOneDp() {

@@ -56,7 +56,7 @@ class SettingsCoreW56ShotsTest {
 
     private fun page(name: String, title: String?, p: LauncherPrefs, setup: SetupState = SetupState.Complete) {
         val cats = buildSettingsCategories(model(p, setup))
-        val idx = if (title == null) -1 else cats.indexOfFirst { it.title == title }
+        val idx = if (title == null) -1 else cats.indexOfFirst { it.title == SettingsTestNav.tabOf(title) } // wave 57: the old page is a section of a tab
         assertTrue("category $title exists", title == null || idx >= 0)
         rule.mainClock.autoAdvance = false
         rule.setContent { SphereTheme { SettingsSpace(visible = true, categories = cats, initialCategory = idx, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) } }

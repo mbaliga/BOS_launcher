@@ -23,6 +23,7 @@ import com.bos.sphere.core.design.ThemeVariant
 import com.bos.sphere.feature.grid.OneUiModel
 import com.bos.sphere.feature.grid.OneUiSections
 import com.bos.sphere.feature.grid.OneUiTags
+import com.bos.sphere.feature.grid.SettingsTabTags
 import com.bos.sphere.feature.grid.SettingCategory
 import com.bos.sphere.feature.grid.SettingsSpace
 import com.bos.sphere.ui.CATEGORY_APP_DRAWER
@@ -33,7 +34,6 @@ import com.bos.sphere.ui.SettingsModel
 import com.bos.sphere.ui.SystemLinks
 import com.bos.sphere.ui.buildSettingsCategories
 import com.bos.sphere.ui.settingsCategoryIndex
-import com.bos.sphere.ui.settingsSummaries
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -47,9 +47,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Wave 40 (settingsOneUI), CFG-21: the One UI style settings over the real categories: the root lists every category with its live
- * summary, the deep links (the Home sheet's Ground Control button, "Edit home", the App drawer, Hidden apps) land where they did, every
- * section title still names a row that exists, and screenshots of the real content.
+ * Wave 40 (settingsOneUI), CFG-21, over the real rows; wave 57 (settingsTabs): the six tabs replace the root list, so these check that the deep links
+ * (the Home sheet's Settings button, "Edit home", the App drawer, Hidden apps) still land where they should, in their tab.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -76,10 +75,8 @@ class SettingsOneUiW40Test {
         ),
     )
 
-    private fun summaries(c: List<SettingCategory>, pages: HomePages = HomePages.Paginated) = settingsSummaries(pages, 3, 0, 2, c)
-
     private fun show(initial: Int, c: List<SettingCategory> = cats()) {
-        rule.setContent { SphereTheme { SettingsSpace(visible = true, categories = c, initialCategory = initial, sounds = null, onClose = {}, summaries = summaries(c), modifier = Modifier.fillMaxSize()) } }
+        rule.setContent { SphereTheme { SettingsSpace(visible = true, categories = c, initialCategory = initial, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) } }
         rule.mainClock.advanceTimeBy(700); rule.waitForIdle()
     }
 
@@ -91,115 +88,68 @@ class SettingsOneUiW40Test {
         File(outDir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test fun CFG_21_theRealCategoriesAllLandInTheCardsOfTheRootList() {
-        val c = cats()
-        val groups = OneUiModel.groups(c)
-        assertEquals(c.indices.toList(), groups.flatten().sorted())
-        val unknown = c.filter { OneUiModel.key(it.title) == null }.map { it.title }
-        assertTrue("a category the grouping does not know: $unknown", unknown.isEmpty())
-    }
+    // Wave 57 (settingsTabs): the root list of categories, its summary lines and the category pages are gone (six tabs replace them). The tests of
+    // the cards, the summaries, the section table and the root screenshots were replaced by SettingsTabsW57ModelTest and SettingsTabsW57ShotsTest;
+    // what still holds of wave 40 over the real rows is below.
 
-    @Test fun CFG_21_theRootShowsEveryRealCategoryUpFront() {
+    @Test fun CFG_21_everyTabIsInTheTabRowUpFront() {
         val c = cats()
         show(CATEGORY_ROOT)
-        // the first cards are on screen; the rest are one scroll away in the same plain list (no strip, no tabs)
-        for (t in listOf("Look", "Home screen", "App drawer")) rule.onNodeWithTag(OneUiTags.row(t)).assertIsDisplayed()
-        for (t in c.map { OneUiModel.displayTitle(it.title) }.filter { !it.startsWith("Page") }) {
-            rule.onAllNodes(hasScrollAction())[0].performScrollToNode(androidx.compose.ui.test.hasTestTag(OneUiTags.row(t)))
-            rule.onNodeWithTag(OneUiTags.row(t)).assertIsDisplayed()
-        }
+        for (t in c.map { it.title }) rule.onNodeWithTag(SettingsTabTags.tab(t), useUnmergedTree = true).assertExists()
     }
 
-    @Test fun CFG_21_theSummariesAreLiveFromTheRowsAndTheModel() {
-        val c = cats()
-        val s = summaries(c)
-        assertEquals("Dark · Rounded icons · Space Grotesk", s["Look"]) // wave 52: the font is part of the Look line
-        assertEquals("Paginated · 3 pages", s["Home screen"])
-        assertEquals("2 hidden", s[c.first { OneUiModel.key(it.title) == "Hidden apps" }.title])
-        assertEquals("No gestures assigned", s["Gestures"])
-        assertEquals("Glance only", settingsSummaries(HomePages.Off, 3, 0, 2, c)["Home screen"])
-        assertEquals("Nothing hidden", settingsSummaries(HomePages.Paginated, 3, 0, 0, c)[c.first { OneUiModel.key(it.title) == "Hidden apps" }.title])
-        assertEquals("1 page", settingsSummaries(HomePages.Paginated, 1, 0, 0, c)["Home screen"]?.substringAfter(" · "))
-        assertEquals("3 gestures assigned", settingsSummaries(HomePages.Paginated, 3, 3, 0, c)["Gestures"])
-        assertTrue("every category has a line", c.all { !s[it.title].isNullOrBlank() })
-        assertTrue("Radar shows its layout and engine: ${s["Radar"]}", s["Radar"]!!.contains(" · "))
+    @Test fun CFG_21_theBigTabsAreCutIntoSectionsWithHeaders() {
+        val home = SettingsTestNav.tab(cats(), "Home")
+        val headers = OneUiSections.headers(home)
+        assertTrue("Home has several sections: $headers", headers.size >= 8)
+        assertEquals("Glance", headers[0])
     }
 
-    @Test fun CFG_21_everyRowNamedInTheSectionTableStillExistsInTheRealCategories() {
-        val c = cats()
-        val missing = ArrayList<String>()
-        for ((cat, rows) in OneUiSections.TABLE) {
-            val category = c.firstOrNull { OneUiModel.key(it.title) == cat }
-            if (category == null) { missing += "category $cat"; continue }
-            for ((row, _) in rows) if (OneUiSections.find(category.items, row) < 0) missing += "$cat / $row" // wave 56: by row id, else by title
-        }
-        assertTrue("section table rows that no longer exist: $missing", missing.isEmpty())
-    }
-
-    @Test fun CFG_21_theBigCategoriesAreCutIntoSectionsWithHeaders() {
-        val c = cats()
-        val home = c.first { it.title == "Home screen" }
-        val headers = OneUiSections.headers(home.title, home.items)
-        assertTrue("Home screen has several sections: $headers", headers.size >= 8)
-        assertEquals("Pages", headers[0])
-    }
-
-    @Test fun CFG_21_theHomeSheetsGroundControlButtonOpensTheRoot() {
+    @Test fun CFG_21_theHomeSheetsSettingsButtonOpensSettingsHome() {
         val c = cats()
         assertEquals(-1, settingsCategoryIndex(c, CATEGORY_ROOT))
         show(settingsCategoryIndex(c, CATEGORY_ROOT))
         rule.onNodeWithTag(OneUiTags.ROOT).assertIsDisplayed()
+        rule.onNodeWithTag(SettingsTabTags.ROW).assertIsDisplayed()
     }
 
-    @Test fun CFG_21_theOtherDeepLinksStillOpenTheirCategoryPage() {
+    @Test fun CFG_21_theOtherDeepLinksOpenTheirTab() {
         val c = cats()
         val home = settingsCategoryIndex(c, CATEGORY_HOME)
-        assertEquals("Home screen", c[home].title)
-        assertEquals("App drawer", c[settingsCategoryIndex(c, CATEGORY_APP_DRAWER)].title)
-        show(home)
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).assertIsDisplayed()
+        assertEquals("Home", c[home].title)
+        assertEquals("Apps", c[settingsCategoryIndex(c, CATEGORY_APP_DRAWER)].title)
+        show(settingsCategoryIndex(c, CATEGORY_APP_DRAWER))
+        assertTrue(SettingsTestNav.tabShown(rule, "Apps"))
     }
 
     @Test fun CFG_21_editHomeAndTheItemPickerStillRunThroughTheirRows() {
         val c = cats()
         show(settingsCategoryIndex(c, CATEGORY_HOME))
+        SettingsTestNav.goTo(rule, "Home", "Edit home")
         rule.onNodeWithText("Edit home").performClick(); rule.waitForIdle()
+        SettingsTestNav.goTo(rule, "Home", "Widgets, folders and icons")
         rule.onNodeWithText("Widgets, folders and icons").performClick(); rule.waitForIdle()
         assertEquals(listOf("editHome", "addItems"), log)
     }
 
-    @Test fun CFG_21_hiddenAppsOpensFromTheRootAndShowsItsCount() {
+    @Test fun CFG_21_hiddenAppsOpensFromTheAppsTabAndShowsItsCount() {
         val c = cats()
         show(CATEGORY_ROOT, c)
-        rule.onAllNodes(hasScrollAction())[0].performScrollToNode(androidx.compose.ui.test.hasTestTag(OneUiTags.row("Hidden apps")))
+        SettingsTestNav.goTo(rule, "Apps", "Hidden apps")
         rule.onNodeWithText("2 hidden").assertIsDisplayed()
-        rule.onNodeWithTag(OneUiTags.row("Hidden apps")).performClick(); rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).assertIsDisplayed()
+        rule.onNodeWithText("2 hidden").performClick(); rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
+        rule.onNodeWithTag(OneUiTags.SUB_PAGE).assertIsDisplayed()
         rule.onNodeWithText("No apps are hidden", substring = true).assertIsDisplayed()
     }
 
-    @Test fun CFG_21_aSearchResultOpensTheRealRowOnItsPage() {
+    @Test fun CFG_21_aSearchResultOpensTheRealRowInItsTab() {
         val c = cats()
         show(CATEGORY_ROOT, c)
-        rule.onNodeWithTag(OneUiTags.SEARCH).performTextInputCompat("hotspot")
+        rule.onNodeWithTag(SettingsTabTags.tab("Look"), useUnmergedTree = true).performClick(); rule.mainClock.advanceTimeBy(700); rule.waitForIdle()
+        rule.onNodeWithTag(OneUiTags.SEARCH).performTextInput("hotspot")
         rule.waitForIdle()
         rule.onAllNodes(hasText("Top left hotspot", substring = true))[0].performClick(); rule.mainClock.advanceTimeBy(700); rule.waitForIdle()
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).assertIsDisplayed()
+        assertTrue("the hit switched to the Home tab", SettingsTestNav.tabShown(rule, "Home"))
+        rule.onNodeWithText("Top left hotspot").assertIsDisplayed()
     }
-
-    private fun androidx.compose.ui.test.SemanticsNodeInteraction.performTextInputCompat(t: String) = performTextInput(t)
-
-    @Test fun CFG_21_screenshotRealRootDark() { show(CATEGORY_ROOT); shoot("cfg21-real-root-dark") }
-    @Test fun CFG_21_screenshotRealRootLight() { HyleTheme.apply(ThemeVariant.Light, 0xFF6D5BFF); show(CATEGORY_ROOT); shoot("cfg21-real-root-light") }
-    @Test fun CFG_21_screenshotRealHomeScreenPageDark() { val c = cats(); show(settingsCategoryIndex(c, CATEGORY_HOME)); shoot("cfg21-real-home-dark") }
-    @Test fun CFG_21_screenshotRealHomeScreenPageScrolledLight() {
-        HyleTheme.apply(ThemeVariant.Light, 0xFF6D5BFF)
-        val c = cats(); show(settingsCategoryIndex(c, CATEGORY_HOME))
-        rule.onAllNodes(hasScrollAction())[0].performScrollToNode(hasText("Default density", substring = true)); rule.waitForIdle()
-        shoot("cfg21-real-home-scrolled-light")
-    }
-    @Test fun CFG_21_screenshotRealLookPageDark() { val c = cats(); show(c.indexOfFirst { it.title == "Look" }); shoot("cfg21-real-look-dark") }
-
-    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
-    fun CFG_21_screenshotRealTwoPaneDark() { val c = cats(); show(c.indexOfFirst { it.title == "Look" }); shoot("cfg21-real-twopane-dark") }
 }

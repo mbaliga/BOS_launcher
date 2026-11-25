@@ -164,7 +164,8 @@ internal fun OneUiRowFrame(
 ) {
     var focused by remember { mutableStateOf(false) }
     val reveal = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
-    LaunchedEffect(highlighted) { if (highlighted) runCatching { reveal.bringIntoView() } }
+    // Wave 57: two frames later, so the list's own jump to the row's group (a deep link into a tab) has landed first and the row then comes fully into sight.
+    LaunchedEffect(highlighted) { if (highlighted) { repeat(2) { androidx.compose.runtime.withFrameNanos { } }; runCatching { reveal.bringIntoView() } } }
     val big = LocalDensity.current.fontScale >= 1.5f
     val fill = when {
         highlighted -> OneUi.Highlight
@@ -430,13 +431,19 @@ internal fun OneUiSearchField(query: String, onQuery: (String) -> Unit, hint: St
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Glyphs.Search, null, tint = HyleColors.InkDim, modifier = Modifier.size(22.dp))
-        Box(Modifier.weight(1f).padding(start = 12.dp, top = 12.dp, bottom = 12.dp)) {
-            if (query.isEmpty()) Text(hint, color = HyleColors.InkDim, fontSize = 16.sp, maxLines = 1)
+        // Wave 57: the field itself is the whole 48 dp height of the row (it is always on Settings home now), so a tap anywhere on it focuses it.
+        Box(Modifier.weight(1f).padding(start = 12.dp)) {
             androidx.compose.foundation.text.BasicTextField(
                 value = query, onValueChange = onQuery, singleLine = true,
                 textStyle = androidx.compose.ui.text.TextStyle(color = HyleColors.InkBright, fontSize = 16.sp),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(HyleColors.Violet),
-                modifier = Modifier.fillMaxWidth().then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier).testTag(OneUiTags.SEARCH).semantics { contentDescription = hint },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier).testTag(OneUiTags.SEARCH).semantics { contentDescription = hint },
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) Text(hint, color = HyleColors.InkDim, fontSize = 16.sp, maxLines = 1)
+                        inner()
+                    }
+                },
             )
         }
         if (query.isNotEmpty()) {

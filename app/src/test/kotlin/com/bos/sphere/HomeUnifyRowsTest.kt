@@ -31,7 +31,7 @@ class HomeUnifyRowsTest {
             pickLeftWidget = {}, leftWidgetLabel = null, pickAppFor = {}, motionAvailable = false, editCorner = {}, editGesture = {},
             system = SystemLinks({}, {}, {}, {}), lab = emptyList(),
         ),
-    ).first { it.title == "Home screen" }.items
+    ).first { it.title == "Home" }.items // wave 57: the Home tab
 
     @Test fun HOM_01_w28_groundControlHasOnePagesRowWithExactlyOffPaginatedContinuousAndItWritesThePref() {
         prefs = LauncherPrefs()
@@ -68,7 +68,7 @@ class HomeUnifyRowsTest {
                 pickLeftWidget = {}, leftWidgetLabel = null, pickAppFor = {}, motionAvailable = false, editCorner = {}, editGesture = {},
                 system = SystemLinks({}, {}, {}, {}), lab = emptyList(), addHomeItems = { picker++ },
             ),
-        ).first { it.title == "Home screen" }.items
+        ).first { it.title == "Home" }.items // wave 57: the Home tab
         (rows.single { it.title == "Widgets, folders and icons" } as SettingItem.Action).onClick(); assertEquals(1, picker)
     }
 }

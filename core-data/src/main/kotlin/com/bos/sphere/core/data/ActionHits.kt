@@ -28,7 +28,7 @@ object ActionHits {
         CornerActionId.RingerSilent to listOf("silent", "mute", "quiet", "silence"),
         CornerActionId.DoNotDisturb to listOf("do not disturb", "dnd", "focus", "quiet", "sleep"),
         CornerActionId.SystemSettings to listOf("settings", "wifi", "wi-fi", "bluetooth", "network", "battery", "display", "brightness", "system"),
-        CornerActionId.LauncherSettings to listOf("home settings", "launcher", "settings", "preferences", "customize", "layout"),
+        CornerActionId.LauncherSettings to listOf("home settings", "launcher", "settings", "preferences", "customize", "layout", "ground control"), // wave 57: the old name, hidden
         CornerActionId.AllApps to listOf("all apps", "apps", "drawer", "applications"),
         CornerActionId.Notifications to listOf("notifications", "alerts", "shade", "notices"),
     )

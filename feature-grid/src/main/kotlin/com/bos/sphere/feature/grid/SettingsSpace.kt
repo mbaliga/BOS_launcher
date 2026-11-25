@@ -196,13 +196,16 @@ sealed interface SettingItem {
  * [reset] (wave 56, CFG-30): puts the preferences of this page back to their defaults; null = the page has nothing of its own to reset (it only
  * holds the user's data or actions). The page shows "Reset this page to defaults" at its bottom when it is set; the host asks first and takes a snapshot.
  */
-data class SettingCategory(val title: String, val glyph: ImageVector, val items: List<SettingItem>, val reset: (() -> Unit)? = null)
+data class SettingCategory(
+    val title: String, val glyph: ImageVector, val items: List<SettingItem>, val reset: (() -> Unit)? = null,
+    /** Wave 57 (CFG-40): the grey section headers of the page: item index to the translated header shown above that row. */
+    val headers: Map<Int, String> = emptyMap(),
+)
 
 /**
- * The settings space ("Ground Control"), wave 40: laid out as One UI lays out its settings. A plain root list of every category
- * (see [OneUiSettingsHost]), a full page per category that slides in from the end, and a two-pane layout on wide landscape windows.
- * Every change still clicks with the console tones ([UiSounds]) and a haptic tick. [initialCategory] below zero opens the root list;
- * a category index opens that page (Back then returns to the root). [summaries] are the grey lines under the category titles, by title.
+ * Settings, wave 57 (settingsTabs): six sections behind Liftoff's text tabs (see [OneUiSettingsHost]); every category is one tab, except the
+ * Finish setup page (a row above the tabs). Every change still clicks with the console tones ([UiSounds]) and a haptic tick. [initialCategory]
+ * names the tab to open (a category index; below zero = the tab shown last, [tabMemory]); [initialRow] is a row of it to scroll to and flash.
  */
 @Composable
 fun SettingsSpace(
@@ -218,10 +221,12 @@ fun SettingsSpace(
     backdrop: (@Composable () -> Unit)? = null,
     /** CFG-18: the always-visible live preview of the home (see [SettingsPreviewDock]). */
     previewDock: (@Composable androidx.compose.foundation.layout.BoxScope.() -> Unit)? = null,
-    /** CFG-21: the live grey line under each category on the root list, by category title; missing ones are derived from the category's rows. */
-    summaries: Map<String, String> = emptyMap(),
     /** CFG-30 (wave 56): the snapshots a reset takes first and its Undo restores (the state service in the app). */
     snapshots: SettingsSnapshots? = null,
+    /** Wave 57: the row of [initialCategory] a deep link lands on (scrolled to and flashed); -1 = none. */
+    initialRow: Int = -1,
+    /** Wave 57: where the last section shown is kept (the app passes its preference-backed one). */
+    tabMemory: SettingsTabMemory = androidx.compose.runtime.remember { SettingsTabMemory.Local() },
 ) {
     // NFR-14: the fade becomes quicker when animations are off.
     val reducedMotion = com.bos.sphere.core.design.rememberMotionPrefs().reduced
@@ -233,7 +238,7 @@ fun SettingsSpace(
     ) {
         androidx.compose.runtime.CompositionLocalProvider(LocalSettingsBackdrop provides backdrop) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                androidx.compose.runtime.key(session) { OneUiSettingsHost(categories, summaries, initialCategory, sounds, onClose, snapshots) }
+                androidx.compose.runtime.key(session) { OneUiSettingsHost(categories, initialCategory, sounds, onClose, snapshots, initialRow, tabMemory) }
                 previewDock?.invoke(this)
             }
         }

@@ -34,7 +34,7 @@ data class KeyChord(val keyCode: Int, val ctrl: Boolean = false, val alt: Boolea
 
 /** Everything a shortcut can do, matching the default set in INP-05. */
 enum class LauncherCommand(val label: String) {
-    OpenPalette("Open Radar"), OpenDrawer("Open all apps"), OpenSettings("Open Ground Control"), EditMode("Edit home"),
+    OpenPalette("Open Radar"), OpenDrawer("Open all apps"), OpenSettings("Open Settings"), EditMode("Edit home"),
     OpenLaunchpad("Open Comms"), OpenPuck("Open the puck"), ShortcutSheet("Show shortcuts"),
     NextWorkspace("Next workspace"), PreviousWorkspace("Previous workspace"), FocusDock("Focus the dock"),
     Dock1("Dock item 1"), Dock2("Dock item 2"), Dock3("Dock item 3"), Dock4("Dock item 4"), Dock5("Dock item 5"),
@@ -170,7 +170,7 @@ enum class SheetToggle(val label: String) {
 
 /** HOM-21: the plain action rows of the home's long-press sheet. */
 enum class HomeSheetAction(val label: String) {
-    EditHome("Edit home"), Panels("Files, usage and timeline"), Wallpaper("Wallpaper"), GroundControl("Ground Control"),
+    EditHome("Edit home"), Panels("Files, usage and timeline"), Wallpaper("Wallpaper"), GroundControl("Settings") /* wave 57: the name the UI uses; "ground control" stays a hidden search word */,
     HomeItems("Widgets, folders and icons"), AddPage("Add page"), DeletePage("Delete page"),
 }
 

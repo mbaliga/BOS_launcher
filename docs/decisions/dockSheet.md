@@ -1,5 +1,7 @@
 # The dock sheet and the Settings Dock page (wave 55)
 
+> **Wave 57 (settingsTabs): "Settings > Desktop & dock > Dock" below is now Settings > Home > Dock; App groups moved to Apps (`docs/decisions/settingsTabs.md`).**
+
 Owner request: "The dock' popup options should instead be like the sharesheet style, pushing up the screen so the top is outside the viewframe, and you get a wysiwyg editor. The settings does not have the dock style and some other options visible there."
 
 ## What replaces what

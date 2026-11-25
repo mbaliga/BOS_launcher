@@ -19,8 +19,8 @@ import com.bos.sphere.core.input.LauncherCommand
 internal object FocusDockRouting {
     /** Why the home would show no rail after its overlays close. */
     enum class NoDock(val message: String) {
-        Off("The dock is off. Turn it on in Ground Control, Desktop & dock."),
-        Landing("This home landing shows no dock. On Glance, set Ground Control, Home screen, Right side to Dock rail."),
+        Off("The dock is off. Turn it on in Settings, Home, Dock."),
+        Landing("This home landing shows no dock. On Glance, set Settings, Side panel, Right side to Dock rail."),
         /** Wave 24 review: the rail steps aside while the home is being edited (DockLayer's visible flag), so "focus" found nothing. */
         Editing("Finish editing the home first: the dock steps aside while you edit."),
     }

@@ -51,6 +51,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.ui.focus.FocusRequester
@@ -92,7 +98,6 @@ import kotlin.coroutines.cancellation.CancellationException
 /** Test tags of the One UI settings. */
 object OneUiTags {
     const val ROOT = "oneui.root"
-    const val CATEGORY_PAGE = "oneui.category"
     const val SUB_PAGE = "oneui.sub"
     const val BACK = "oneui.back"
     const val TITLE_LARGE = "oneui.titleLarge"
@@ -118,7 +123,6 @@ object OneUiTags {
     const val UNDO_ROW = "oneui.undoRow"
     /** Wave 46: the band of the large title (the title is centred in it). */
     const val TITLE_BAND = "oneui.titleBand"
-    fun row(category: String) = "oneui.row.$category"
 }
 
 /** Where the floating preview window's default anchor sits (dp from the top of the settings): under the app bar. */
@@ -136,27 +140,36 @@ private class ItemHost(
 private const val UNDO_SHOWN_MS = 9_000L
 
 /**
- * Wave 40 (settingsOneUI), CFG-21: the settings as One UI lays them out. The root is one plain list of every category (grouped
- * into rounded cards, an icon tile, a title and a live grey summary each) under a large collapsing title and a search field; a
- * category opens as a full page that slides in from the end, with its rows grouped into cards under small section titles; a row that
- * has a page of its own (a choice's radio list, a pane) opens one level deeper. On a wide landscape window the list stays at the
- * start and the category page fills the end.
+ * Wave 57 (settingsTabs), CFG-40 / CFG-41: Settings as six sections behind Liftoff's own text tabs. The home of Settings is the large centred title,
+ * the search field, the Finish setup row while something is unfinished, then the tab row (pinned under the bar once the title has scrolled away)
+ * and the selected section's rows (flat, hairlines, grey section headers, drawn cards). A swipe sideways moves to the next section and the tab
+ * line follows it; the last section shown is remembered ([memory]). A row with a page of its own (a choice's list, a pane) opens over everything
+ * and Back returns to the tab. On a wide landscape window the tabs are a vertical list in the start pane and the section fills the end pane.
+ * Ctrl+Tab, Ctrl+Shift+Tab and the controller's L1 / R1 switch sections. Wave 40's root list of categories and the category pages are gone.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun OneUiSettingsHost(
     categories: List<SettingCategory>,
-    summaries: Map<String, String>,
     initialCategory: Int,
     sounds: UiSounds?,
     onClose: () -> Unit,
     /** Wave 56 (CFG-30): the snapshots a reset takes first and Undo restores; null = resets just run (tests, no state service). */
     snapshots: SettingsSnapshots? = null,
+    /** Wave 57: the row of [initialCategory] to scroll to and flash (a deep link); -1 = none. */
+    initialRow: Int = -1,
+    memory: SettingsTabMemory = SettingsTabMemory.Process,
 ) {
     val haptics = rememberLauncherHaptics()
     val latest by rememberUpdatedState(categories)
-    var nav by remember { mutableStateOf(if (initialCategory in categories.indices) OneUiModel.Nav(initialCategory) else OneUiModel.Nav()) }
+    val tabs = remember(categories.map { it.title }) { SettingsTabs.tabIndices(categories) }
+    val tabsRef by rememberUpdatedState(tabs)
+    val titles = tabs.map { categories[it].title }
+    val start = remember { SettingsTabs.initialTab(categories, tabs, initialCategory, memory.get()) }
+    val pager = rememberPagerState(initialPage = start) { tabsRef.size }
+    var nav by remember { mutableStateOf(SettingsTabs.Nav(start)) }
     var query by remember { mutableStateOf("") }
-    var highlight by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var highlight by remember { mutableStateOf(if (initialRow >= 0 && initialCategory in tabs) initialCategory to initialRow else null) }
     var confirming by remember { mutableStateOf<SettingItem.Action?>(null) }
     var resetResult by remember { mutableStateOf<ResetResult?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -164,41 +177,49 @@ internal fun OneUiSettingsHost(
     val rootFocus = remember { FocusRequester() }
     val backProgress = remember { mutableFloatStateOf(0f) }
     val customBackdrop = LocalSettingsBackdrop.current
+    val reduced = rememberMotionPrefs().reduced
     LaunchedEffect(Unit) { sounds?.play(UiSound.Open) }
-    // CFG-05: arriving from a Radar settings result lands on (and lights) the exact row.
+    // CFG-05: arriving from a Radar settings result lands on (and lights) the exact row, in its tab.
     LaunchedEffect(Unit) {
         val want = SettingsFocus.take()
-        val c = nav.category
-        if (c >= 0 && want in 0 until (latest.getOrNull(c)?.items?.size ?: 0)) highlight = c to want
+        if (initialCategory in tabs && want in 0 until (latest.getOrNull(initialCategory)?.items?.size ?: 0)) highlight = initialCategory to want
     }
     LaunchedEffect(highlight) { if (highlight != null) { delay(2200); highlight = null } }
     LaunchedEffect(paneFlash) { if (paneFlash != null) { delay(1600); paneFlash = null } }
     LaunchedEffect(resetResult) { if (resetResult != null) { delay(UNDO_SHOWN_MS); resetResult = null } }
-    // The Finish setup page goes away once everything is done: a page that no longer exists closes to the root.
-    LaunchedEffect(latest.size) { if (nav.category >= latest.size) nav = OneUiModel.Nav() }
+    // The Finish setup page goes away once everything is done: a page that no longer exists closes back to the tabs.
+    LaunchedEffect(latest.size) { if (nav.subCategory >= latest.size) nav = SettingsTabs.Nav(nav.tab) }
+    // The section shown is remembered (by its English key, so a new language or a new row does not move it).
+    LaunchedEffect(pager.settledPage) {
+        nav = nav.copy(tab = pager.settledPage)
+        latest.getOrNull(tabsRef.getOrNull(pager.settledPage) ?: -1)?.title?.let { t -> memory.set(SettingsTabs.key(t) ?: t) }
+    }
+
+    fun goTab(i: Int) {
+        if (i !in tabsRef.indices) return
+        scope.launch { if (reduced) pager.scrollToPage(i) else pager.animateScrollToPage(i) }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val twoPane = OneUiModel.twoPane(maxWidth.value, maxHeight.value)
-        val cat = if (twoPane) nav.category.coerceAtLeast(0) else nav.category
         val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
         val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
 
+        fun closing() = confirming == null && nav.back() == null && query.isEmpty()
         fun back() {
             when {
                 confirming != null -> { confirming = null; sounds?.play(UiSound.Back) }
-                nav.level == 0 && query.isNotEmpty() -> { query = ""; sounds?.play(UiSound.Back) }
-                else -> {
-                    val n = OneUiModel.Nav(cat, nav.sub).back(twoPane)
-                    if (n == null) { sounds?.play(UiSound.Close); onClose() } else { nav = n; sounds?.play(UiSound.Back) }
-                }
+                nav.subOpen -> { nav = nav.back() ?: nav; sounds?.play(UiSound.Back) }
+                query.isNotEmpty() -> { query = ""; sounds?.play(UiSound.Back) }
+                else -> { sounds?.play(UiSound.Close); onClose() }
             }
         }
         PredictiveBackHandler(enabled = true) { events ->
             try {
                 events.collect { backProgress.floatValue = it.progress.coerceIn(0f, 1f) }
-                val closing = confirming == null && OneUiModel.Nav(cat, nav.sub).back(twoPane) == null && !(nav.level == 0 && query.isNotEmpty())
+                val closes = closing()
                 back()
-                if (!closing) backProgress.floatValue = 0f
+                if (!closes) backProgress.floatValue = 0f
             } catch (e: CancellationException) {
                 backProgress.floatValue = 0f
                 throw e
@@ -209,59 +230,78 @@ internal fun OneUiSettingsHost(
             ItemHost(
                 tick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
                 play = { sounds?.play(it) },
-                openSub = { i -> sounds?.play(UiSound.Select); nav = OneUiModel.Nav(nav.category.coerceAtLeast(0), i) },
+                openSub = { _ -> },
                 confirm = { a -> confirming = a },
             )
         }
-        fun openCategory(i: Int) { sounds?.play(UiSound.Select); nav = OneUiModel.Nav(i); highlight = null }
+        fun hostFor(category: Int) = ItemHost(host.tick, host.play, { i -> sounds?.play(UiSound.Select); nav = nav.openSub(category, i) }, host.confirm)
+        fun selectTab(i: Int) { sounds?.play(UiSound.Select); goTab(i) }
         fun openResult(e: SettingEntry) {
             sounds?.play(UiSound.Select)
-            // A hit on a row inside a pane opens the pane's page and flashes that row (CFG-28); any other hit opens its category and lights the row.
-            nav = if (e.paneEntryId != null) OneUiModel.Nav(e.categoryIndex, e.itemIndex) else OneUiModel.Nav(e.categoryIndex)
+            query = ""
+            val pos = tabsRef.indexOf(e.categoryIndex)
+            if (pos >= 0) scope.launch { pager.scrollToPage(pos) } // a hit in another section switches the tab
             highlight = e.categoryIndex to e.itemIndex
+            // A hit on a row inside a pane opens the pane's page and flashes that row (CFG-28); a hit on the Finish setup page opens it.
+            if (e.paneEntryId != null || pos < 0) nav = nav.openSub(e.categoryIndex, e.itemIndex)
             paneFlash = e.paneEntryId
+        }
+        val finish = OneUiModel.finishSetupIndex(latest)
+        val position = pager.currentPage + pager.currentPageOffsetFraction
+        val keyNav = Modifier.onPreviewKeyEvent { ev ->
+            if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            if (ev.key == Key.Escape) { back(); return@onPreviewKeyEvent true }
+            val step = SettingsTabs.keyStep(ev.nativeKeyEvent.keyCode, ev.isCtrlPressed, ev.isShiftPressed)
+            if (step == null || nav.subOpen || confirming != null || query.isNotEmpty()) return@onPreviewKeyEvent false
+            sounds?.play(UiSound.Select)
+            goTab(SettingsTabs.step(pager.currentPage, tabsRef.size, step == SettingsTabs.KeyStep.Next))
+            true
         }
 
         CompositionLocalProvider(LocalPreviewTop provides (topInset.value + 56f + 8f), LocalPaneFlash provides paneFlash) {
-          Box(
-            Modifier
-                .fillMaxSize()
-                .onPreviewKeyEvent { ev -> if (ev.type == KeyEventType.KeyDown && ev.key == Key.Escape) { back(); true } else false }
-                .focusRequester(rootFocus)
-                .focusable(),
-          ) {
-            LaunchedEffect(Unit) { runCatching { rootFocus.requestFocus() } } // a hardware keyboard's Esc works from the first frame
+          Box(Modifier.fillMaxSize().then(keyNav).focusRequester(rootFocus).focusable()) {
+            LaunchedEffect(Unit) { runCatching { rootFocus.requestFocus() } } // a hardware keyboard's Esc and Ctrl+Tab work from the first frame
             if (customBackdrop != null) customBackdrop()
             val pageAlpha = if (customBackdrop != null) 0.94f else 1f
+            val pages: @Composable (Boolean) -> Unit = { titled ->
+                HorizontalPager(
+                    state = pager, key = { tabsRef.getOrElse(it) { it } }, modifier = Modifier.fillMaxSize().testTag(SettingsTabTags.PAGER),
+                ) { page ->
+                    val ci = tabsRef.getOrNull(page) ?: return@HorizontalPager
+                    val c = latest.getOrNull(ci) ?: return@HorizontalPager
+                    TabContent(c, ci, highlight, hostFor(ci), titled = titled, alpha = pageAlpha)
+                }
+            }
             if (twoPane) {
                 Row(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(0.4f).fillMaxHeight().testTag(OneUiTags.LEFT_PANE)) {
-                        OneUiRootPage(latest, summaries, cat, query, { query = it }, ::openCategory, ::openResult, onClose = { sounds?.play(UiSound.Close); onClose() }, alpha = pageAlpha, compact = true, modifier = Modifier.predictiveBackLayerIf(nav.level == 0, backProgress))
+                        OneUiPage(L10n.tr("Settings"), onBack = { sounds?.play(UiSound.Close); onClose() }, backLabel = L10n.tr("Close settings"), alpha = pageAlpha, compactHeader = true, tag = OneUiTags.ROOT,
+                            modifier = Modifier.predictiveBackLayerIf(!nav.subOpen, backProgress)) {
+                            item(key = "search") { OneUiSearchField(query, { query = it }, L10n.tr("Search settings"), Modifier.padding(bottom = 16.dp)) }
+                            if (query.isNotBlank()) searchResults(latest, query, ::openResult)
+                            else {
+                                if (finish >= 0) item(key = "finish") { FinishSetupRow(latest[finish], selected = nav.subCategory == finish) { sounds?.play(UiSound.Select); nav = nav.openSub(finish, 0) } }
+                                item(key = "rail") { LiftoffTabRail(titles, pager.currentPage, ::selectTab) }
+                            }
+                        }
                     }
                     Box(Modifier.width(1.dp).fillMaxHeight().background(HyleColors.Hairline))
                     Box(Modifier.weight(0.6f).fillMaxHeight().testTag(OneUiTags.RIGHT_PANE)) {
-                        val c = latest.getOrNull(cat)
-                        if (c != null) androidx.compose.runtime.key(cat) {
-                            OneUiCategoryPage(c, cat, highlight, host, onBack = null, modifier = Modifier.predictiveBackLayerIf(nav.sub < 0, backProgress).covered(nav.sub >= 0))
-                            SlideLayer(visible = nav.sub >= 0, rtl = rtl) { OneUiSubPage(c, nav.sub, host, onBack = ::back, modifier = Modifier.predictiveBackLayerIf(true, backProgress)) }
-                        }
+                        Box(Modifier.fillMaxSize().predictiveBackLayerIf(!nav.subOpen, backProgress).covered(nav.subOpen)) { pages(true) }
+                        SubLayer(nav, latest, rtl, ::hostFor, ::back, backProgress)
                     }
                 }
             } else {
                 Box(Modifier.fillMaxSize()) {
-                    OneUiRootPage(latest, summaries, -1, query, { query = it }, ::openCategory, ::openResult, onClose = { sounds?.play(UiSound.Close); onClose() }, alpha = pageAlpha, modifier = Modifier.predictiveBackLayerIf(nav.level == 0, backProgress).covered(cat >= 0))
-                    val shownCat = remember { intArrayOf(0) }
-                    if (cat >= 0) shownCat[0] = cat
-                    val shownSub = remember { intArrayOf(0) }
-                    if (nav.sub >= 0) shownSub[0] = nav.sub
-                    SlideLayer(visible = cat >= 0, rtl = rtl) {
-                        latest.getOrNull(shownCat[0])?.let { c ->
-                            OneUiCategoryPage(c, shownCat[0], highlight, host, onBack = ::back, modifier = Modifier.predictiveBackLayerIf(nav.level == 1, backProgress).covered(nav.sub >= 0))
-                        }
-                    }
-                    SlideLayer(visible = cat >= 0 && nav.sub >= 0, rtl = rtl) {
-                        latest.getOrNull(shownCat[0])?.let { c -> OneUiSubPage(c, shownSub[0], host, onBack = ::back, modifier = Modifier.predictiveBackLayerIf(nav.level == 2, backProgress)) }
-                    }
+                    TabsHome(
+                        titles = titles, selected = pager.currentPage, position = position, query = query, onQuery = { query = it },
+                        finish = finish.takeIf { it >= 0 }?.let { latest[it] }, onFinish = { sounds?.play(UiSound.Select); nav = nav.openSub(finish, 0) },
+                        onSelect = ::selectTab, onClose = { sounds?.play(UiSound.Close); onClose() }, alpha = pageAlpha,
+                        modifier = Modifier.predictiveBackLayerIf(!nav.subOpen, backProgress).covered(nav.subOpen),
+                        results = { SearchResultsList(latest, query, ::openResult) },
+                        pages = { pages(false) },
+                    )
+                    SubLayer(nav, latest, rtl, ::hostFor, ::back, backProgress)
                 }
             }
             confirming?.let { a ->
@@ -283,6 +323,16 @@ internal fun OneUiSettingsHost(
             }
           }
         }
+    }
+}
+
+/** The page of a row (a choice's list, a pane, the Finish setup page), sliding in over the tabs. */
+@Composable
+private fun SubLayer(nav: SettingsTabs.Nav, categories: List<SettingCategory>, rtl: Boolean, hostFor: (Int) -> ItemHost, onBack: () -> Unit, progress: androidx.compose.runtime.State<Float>) {
+    val shown = remember { intArrayOf(-1, -1) }
+    if (nav.subOpen) { shown[0] = nav.subCategory; shown[1] = nav.subItem }
+    SlideLayer(visible = nav.subOpen, rtl = rtl) {
+        categories.getOrNull(shown[0])?.let { c -> OneUiSubPage(c, shown[1], hostFor(shown[0]), onBack = onBack, modifier = Modifier.predictiveBackLayerIf(nav.subOpen, progress)) }
     }
 }
 
@@ -347,6 +397,8 @@ internal fun OneUiPage(
     alpha: Float = 1f,
     state: LazyListState = rememberLazyListState(),
     tag: String? = null,
+    /** Wave 57: a tag on the scrolling list itself (a section's list in the landscape end pane), so a test or a screen reader scrolls that list. */
+    listTag: String? = null,
     content: LazyListScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -361,7 +413,7 @@ internal fun OneUiPage(
         OneUiTopBar(title, collapse, onBack, backLabel)
         LazyColumn(
             state = state,
-            modifier = Modifier.fillMaxWidth().weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+            modifier = Modifier.fillMaxWidth().weight(1f).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)).then(if (listTag != null) Modifier.testTag(listTag) else Modifier),
             contentPadding = PaddingValues(bottom = bottom + 28.dp),
         ) {
             item(key = "title") {
@@ -388,137 +440,192 @@ internal fun OneUiPage(
     }
 }
 
-// ---- root --------------------------------------------------------------------------------------------------------------------
+// ---- the home of Settings: title, search, Finish setup, the tabs and the sections ------------------------------------------------
 
+/**
+ * Wave 57: the portrait home of Settings. The title band, the search field and the Finish setup row scroll away with the first upward drag of a
+ * section's list (the bar's small title fades in); the tab row then stays pinned under the bar. The list's viewport is always the visible part,
+ * so a screen reader's scroll and a test's scroll-to bring a row into sight. While a query is typed the results replace the tabs.
+ */
 @Composable
-private fun OneUiRootPage(
-    categories: List<SettingCategory>,
-    summaries: Map<String, String>,
+private fun TabsHome(
+    titles: List<String>,
     selected: Int,
+    position: Float,
     query: String,
     onQuery: (String) -> Unit,
-    onOpen: (Int) -> Unit,
-    onResult: (SettingEntry) -> Unit,
+    finish: SettingCategory?,
+    onFinish: () -> Unit,
+    onSelect: (Int) -> Unit,
     onClose: () -> Unit,
     alpha: Float,
-    compact: Boolean = false,
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
+    results: @Composable () -> Unit,
+    pages: @Composable () -> Unit,
 ) {
-    val groups = remember(categories.map { it.title }) { OneUiModel.groups(categories) }
-    val finish = OneUiModel.finishSetupIndex(categories)
+    val density = LocalDensity.current
+    val headerDp = OneUiModel.headerDp(LocalConfiguration.current.screenHeightDp.toFloat())
+    val bandPx = with(density) { headerDp.dp.toPx() }
+    val barPx = with(density) { BarHeight.toPx() }
+    val offset = remember { mutableFloatStateOf(0f) }
+    val headerPx = remember { floatArrayOf(0f) }
     val searching = query.isNotBlank()
-    val results = if (searching) SettingsIndex.fromCategories(categories).search(query) else emptyList()
-    OneUiPage(
-        title = L10n.tr("Settings"), onBack = onClose, backLabel = L10n.tr("Close settings"), modifier = modifier, alpha = alpha, compactHeader = compact, tag = OneUiTags.ROOT,
+    LaunchedEffect(searching) { if (searching) offset.floatValue = 0f } // the field stays in sight while typing
+    val collapse = remember(bandPx) { derivedStateOf { (-offset.floatValue / (bandPx - barPx * 0.5f).coerceAtLeast(1f)).coerceIn(0f, 1f) } }
+    val connection = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            fun take(dy: Float): Float {
+                val old = offset.floatValue
+                val new = (old + dy).coerceIn(-headerPx[0], 0f)
+                offset.floatValue = new
+                return new - old
+            }
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource) =
+                if (available.y < 0f) androidx.compose.ui.geometry.Offset(0f, take(available.y)) else androidx.compose.ui.geometry.Offset.Zero
+            override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource) =
+                if (available.y > 0f) androidx.compose.ui.geometry.Offset(0f, take(available.y)) else androidx.compose.ui.geometry.Offset.Zero
+        }
+    }
+    Column(modifier.fillMaxSize().background(OneUi.Page.copy(alpha = alpha)).testTag(OneUiTags.ROOT)) {
+        OneUiTopBar(L10n.tr("Settings"), collapse, onClose, L10n.tr("Close settings"))
+        androidx.compose.ui.layout.Layout(
+            modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds().nestedScroll(connection).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+            content = {
+                Column(Modifier.fillMaxWidth()) {
+                    TitleBand(L10n.tr("Settings"), headerDp, { OneUiModel.largeTitleAlpha(collapse.value) })
+                    OneUiSearchField(query, onQuery, L10n.tr("Search settings"), Modifier.padding(bottom = 12.dp))
+                    if (finish != null && !searching) FinishSetupRow(finish, selected = false, onClick = onFinish)
+                }
+                if (!searching) LiftoffTabRow(titles, selected, position, onSelect) else Spacer(Modifier.height(0.dp))
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().graphicsLayer { this.alpha = if (searching) 0f else 1f }.covered(searching)) { pages() }
+                    if (searching) Box(Modifier.fillMaxSize().background(OneUi.Page.copy(alpha = alpha))) { results() }
+                }
+            },
+        ) { m, c ->
+            val loose = c.copy(minWidth = c.maxWidth, minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity)
+            val h = m[0].measure(loose)
+            headerPx[0] = h.height.toFloat()
+            val off = offset.floatValue.coerceAtLeast(-h.height.toFloat()).roundToInt()
+            val s = m[1].measure(loose)
+            val top = (h.height + off).coerceAtLeast(0)
+            val bodyH = (c.maxHeight - top - s.height).coerceAtLeast(0)
+            val b = m[2].measure(c.copy(minWidth = c.maxWidth, minHeight = bodyH, maxHeight = bodyH))
+            layout(c.maxWidth, c.maxHeight) { h.place(0, off); b.place(0, top + s.height); s.place(0, top) }
+        }
+    }
+}
+
+/** The large title, centred both ways in the empty band under the bar (wave 46 / wave 52). */
+@Composable
+private fun TitleBand(title: String, headerDp: Float, alpha: () -> Float) {
+    val density = LocalDensity.current
+    val headerPx = with(density) { headerDp.dp.toPx() }
+    val minPad = with(density) { 16.dp.toPx() }
+    Box(
+        Modifier.fillMaxWidth().heightIn(min = headerDp.dp).padding(horizontal = 28.dp).testTag(OneUiTags.TITLE_BAND)
+            .layout { m, c ->
+                val p = m.measure(c.copy(minWidth = 0, minHeight = 0))
+                val band = maxOf(headerPx, p.height + 2 * minPad).roundToInt()
+                layout(c.maxWidth, band) { p.place(0, OneUiModel.centredTop(band.toFloat(), p.height.toFloat()).roundToInt()) }
+            },
     ) {
-        item(key = "search") { OneUiSearchField(query, onQuery, L10n.tr("Search settings"), Modifier.padding(bottom = 16.dp)) }
-        if (searching) {
-            if (results.isEmpty()) {
-                item(key = "none") { Text(L10n.tr("No settings match “%s”", query), color = HyleColors.InkDim, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp)) }
-            } else item(key = "results") {
-                OneUiRows(results.size) {
-                    results.forEachIndexed { i, e ->
-                        if (i > 0) OneUiDivider(20.dp)
-                        OneUiRowFrame(
-                            e.title, summary = listOf(e.category, e.parent, e.disabledReason ?: e.value).filter { it.isNotBlank() }.joinToString(" › "),
-                            onClick = { onResult(e) },
-                            modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${e.title}, ${e.category}" + (e.disabledReason?.let { ", $it" } ?: "") },
-                            trailing = { OneUiChevron() },
-                        )
-                    }
-                }
-            }
-        } else {
-            if (finish >= 0) item(key = "finish") {
-                // Wave 56 (CFG-32): one flat row above the groups while something is unfinished; it is gone once everything is done.
-                val c = categories[finish]
-                Column(Modifier.padding(bottom = OneUi.GroupGap)) {
-                    OneUiRows(1) {
-                        OneUiRowFrame(
-                            L10n.tr(OneUiModel.FINISH_SETUP), summary = (c.items.firstOrNull() as? SettingItem.Pane)?.value.orEmpty(), min = OneUi.RootRowMin, selected = finish == selected,
-                            leading = { OneUiIconTile(c.glyph, Color(OneUiModel.accent(OneUiModel.FINISH_SETUP))) },
-                            onClick = { onOpen(finish) },
-                            modifier = Modifier.testTag(SetupTags.ROW).semantics(mergeDescendants = true) {},
-                            trailing = { OneUiChevron() },
-                        )
-                    }
-                }
-            }
-            groups.forEachIndexed { gi, idx ->
-                item(key = "group$gi") {
-                    Column {
-                        if (gi > 0) Spacer(Modifier.height(OneUi.GroupGap))
-                        OneUiRows(idx.size) {
-                            idx.forEachIndexed { r, ci ->
-                                val c = categories[ci]
-                                if (r > 0) OneUiDivider(72.dp)
-                                OneUiRowFrame(
-                                    OneUiModel.displayTitle(c.title), summary = OneUiModel.summary(c, summaries), min = OneUi.RootRowMin, selected = ci == selected,
-                                    leading = { OneUiIconTile(c.glyph, Color(OneUiModel.accent(c.title))) },
-                                    onClick = { onOpen(ci) },
-                                    modifier = Modifier.testTag(OneUiTags.row(OneUiModel.displayTitle(c.title))).semantics(mergeDescendants = true) {},
-                                    trailing = { OneUiChevron() },
-                                )
-                            }
-                        }
-                    }
-                }
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            OneUiTitleText(title, Modifier.testTag(OneUiTags.TITLE_LARGE).graphicsLayer { this.alpha = alpha() })
+        }
+    }
+}
+
+/** Wave 56 (CFG-32): one flat row above the tabs while something is unfinished; it is gone once everything is done. */
+@Composable
+private fun FinishSetupRow(c: SettingCategory, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.padding(bottom = 8.dp)) {
+        OneUiRows(1) {
+            OneUiRowFrame(
+                L10n.tr(OneUiModel.FINISH_SETUP), summary = (c.items.firstOrNull() as? SettingItem.Pane)?.value.orEmpty(), min = OneUi.RootRowMin, selected = selected,
+                leading = { OneUiIconTile(c.glyph, Color(OneUiModel.accent(OneUiModel.FINISH_SETUP))) },
+                onClick = onClick,
+                modifier = Modifier.testTag(SetupTags.ROW).semantics(mergeDescendants = true) {},
+                trailing = { OneUiChevron() },
+            )
+        }
+    }
+}
+
+/** The search hits, in every section: title, then where it is (section, section header, pane) and its value. */
+private fun LazyListScope.searchResults(categories: List<SettingCategory>, query: String, onResult: (SettingEntry) -> Unit) {
+    val results = SettingsIndex.fromCategories(categories).search(query)
+    if (results.isEmpty()) {
+        item(key = "none") { Text(L10n.tr("No settings match “%s”", query), color = HyleColors.InkDim, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp)) }
+    } else item(key = "results") {
+        OneUiRows(results.size) {
+            results.forEachIndexed { i, e ->
+                if (i > 0) OneUiDivider(20.dp)
+                OneUiRowFrame(
+                    e.title, summary = listOf(e.category, e.section, e.parent, e.disabledReason ?: e.value).filter { it.isNotBlank() }.joinToString(" › "),
+                    onClick = { onResult(e) },
+                    modifier = Modifier.testTag("oneui.result").semantics(mergeDescendants = true) { contentDescription = "${e.title}, ${e.category}" + (e.disabledReason?.let { ", $it" } ?: "") },
+                    trailing = { OneUiChevron() },
+                )
             }
         }
     }
 }
 
-// ---- a category --------------------------------------------------------------------------------------------------------------
-
 @Composable
-private fun OneUiCategoryPage(
-    category: SettingCategory,
-    index: Int,
-    highlight: Pair<Int, Int>?,
-    host: ItemHost,
-    onBack: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
+private fun SearchResultsList(categories: List<SettingCategory>, query: String, onResult: (SettingEntry) -> Unit) {
+    val bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottom + 28.dp)) { searchResults(categories, query, onResult) }
+}
+
+// ---- a section ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * One section's rows: the groups under their grey headers ([SettingCategory.headers]) and the page reset at the end. [titled] (the end pane of the
+ * landscape layout) gives the section its own bar and large title, so the floating preview keeps its band; in portrait the shared header is above.
+ */
+@Composable
+private fun TabContent(category: SettingCategory, index: Int, highlight: Pair<Int, Int>?, host: ItemHost, titled: Boolean, alpha: Float) {
     val items = category.items
-    val blocks = OneUiModel.blocks(items, OneUiSections.headers(category.title, items))
+    val blocks = OneUiModel.blocks(items, OneUiSections.headers(category))
     val state = rememberLazyListState()
     val lit = highlight?.takeIf { it.first == index }?.second
+    val base = if (titled) 1 else 0
     LaunchedEffect(lit) {
         if (lit != null) {
             val b = OneUiModel.blockOf(blocks, lit)
-            if (b >= 0) state.scrollToItem(b + 1)
+            if (b >= 0) state.scrollToItem(base + if (b > 0 && blocks[b - 1] is OneUiModel.Block.Header) b - 1 else b)
         }
     }
-    val only = items.singleOrNull() as? SettingItem.Pane
-    // Wave 52: a category that is one pane carries the pane's live line under its title (the active workspace), like the page of a row does.
-    val onlySubtitle = only?.pageSubtitle?.invoke()
-    OneUiPage(title = OneUiModel.displayTitle(category.title), subtitle = onlySubtitle, onBack = onBack, backLabel = L10n.tr("Back"), modifier = modifier, state = state, tag = OneUiTags.CATEGORY_PAGE) {
-        if (only != null) { // a category that is one pane (Hidden apps, Workspaces) is that pane: no second level to tap through
-            item(key = "pane") {
-                if (only.bare) Column(Modifier.fillMaxWidth()) { only.content(this) }
-                else Box(Modifier.fillMaxWidth().padding(horizontal = OneUi.RowPad, vertical = 8.dp)) { Column(Modifier.fillMaxWidth()) { only.content(this) } }
-            }
-            return@OneUiPage
-        }
-        blocks.forEachIndexed { bi, b ->
-            when (b) {
-                is OneUiModel.Block.Header -> item(key = "h$bi") { OneUiSectionHeader(b.text) }
-                is OneUiModel.Block.Group -> item(key = "c$bi") {
-                    Column {
-                        if (bi > 0 && blocks[bi - 1] is OneUiModel.Block.Group) Spacer(Modifier.height(OneUi.GroupGap))
-                        OneUiRows(b.rows.size) {
-                            b.rows.forEachIndexed { r, i ->
-                                if (r > 0) OneUiDivider(20.dp)
-                                OneUiItem(items[i], i, lit == i, host)
-                            }
+    val body: LazyListScope.() -> Unit = { sectionRows(category, blocks, lit, host) }
+    if (titled) {
+        OneUiPage(title = category.title, onBack = null, backLabel = L10n.tr("Back"), state = state, alpha = alpha, listTag = SettingsTabTags.list(category.title), content = body)
+    } else {
+        val bottom = WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding()
+        LazyColumn(state = state, modifier = Modifier.fillMaxSize().testTag(SettingsTabTags.list(category.title)), contentPadding = PaddingValues(top = 8.dp, bottom = bottom + 28.dp), content = body)
+    }
+}
+
+private fun LazyListScope.sectionRows(category: SettingCategory, blocks: List<OneUiModel.Block>, lit: Int?, host: ItemHost) {
+    val items = category.items
+    blocks.forEachIndexed { bi, b ->
+        when (b) {
+            is OneUiModel.Block.Header -> item(key = "h$bi") { OneUiSectionHeader(b.text) }
+            is OneUiModel.Block.Group -> item(key = "c$bi") {
+                Column {
+                    if (bi > 0 && blocks[bi - 1] is OneUiModel.Block.Group) Spacer(Modifier.height(OneUi.GroupGap))
+                    OneUiRows(b.rows.size) {
+                        b.rows.forEachIndexed { r, i ->
+                            if (r > 0) OneUiDivider(20.dp)
+                            OneUiItem(items[i], i, lit == i, host)
                         }
                     }
                 }
             }
         }
-        // Wave 56 (CFG-30): the last line of a page whose settings can be reset.
-        SettingsResetFlow.pageAction(category)?.let { a -> item(key = "reset") { OneUiResetRow { host.play(UiSound.Select); host.confirm(a) } } }
     }
+    // Wave 56 (CFG-30): the last line of a section whose settings can be reset.
+    SettingsResetFlow.pageAction(category)?.let { a -> item(key = "reset") { OneUiResetRow { host.play(UiSound.Select); host.confirm(a) } } }
 }
 
 @Composable

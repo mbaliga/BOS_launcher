@@ -54,7 +54,7 @@ class SettingsCoreW56AppTest {
     )
 
     private fun cats(p: LauncherPrefs, setup: SetupState = SetupState.Complete, shape: PageShape = PageShape.Grid) = buildSettingsCategories(model(p, setup, shape))
-    private fun home(p: LauncherPrefs) = cats(p).first { it.title == "Home screen" }
+    private fun home(p: LauncherPrefs) = cats(p).first { it.title == "Home" } // wave 57: the Home tab
     private fun all(p: LauncherPrefs) = cats(p).flatMap { it.items }
     private fun row(p: LauncherPrefs, title: String) = all(p).first { it.title == title }
 
@@ -81,7 +81,7 @@ class SettingsCoreW56AppTest {
         }
         val snap = hit("snapshot", SettingsRowMeta.PaneIds.BACKUP_SNAPSHOT)
         assertEquals("Export, import and restore", snap.parent)
-        assertEquals("Backup", c[snap.categoryIndex].title)
+        assertEquals("System", c[snap.categoryIndex].title) // wave 57: Backup and restore is a section of System
         assertTrue(c[snap.categoryIndex].items[snap.itemIndex] is SettingItem.Pane)
         hit("microphone", SettingsRowMeta.PaneIds.access(com.bos.sphere.core.design.GrantKind.Microphone))
         hit("browser", SettingsRowMeta.PaneIds.openWith(com.bos.sphere.core.data.CornerActionId.Browser))
@@ -186,7 +186,7 @@ class SettingsCoreW56AppTest {
         for (p in listOf(LauncherPrefs(), LauncherPrefs(homePages = HomePages.Paginated, adaptiveGrid = true, hotCornersOn = true), LauncherPrefs(homeStyle = HomeStyle.Dsi))) {
             for ((k, v) in derive(p)) derived.getOrPut(k) { LinkedHashSet() } += v
         }
-        assertTrue("the probe reached the pages: ${derived.mapValues { it.value.size }}", derived.getValue("Home screen").size > 25 && derived.getValue("Look").size >= 6)
+        assertTrue("the probe reached the pages: ${derived.mapValues { it.value.size }}", derived.getValue("Home").size > 25 && derived.getValue("Look").size >= 6)
         for ((page, fields) in derived) {
             val listed = SettingsReset.PAGES[page].orEmpty()
             assertTrue("$page: rows change $fields but the reset list lacks ${fields - listed}", listed.containsAll(fields))
@@ -201,13 +201,13 @@ class SettingsCoreW56AppTest {
         assertEquals("another page's setting stays", 0.6f, prefs.iconScale, 0f)
         assertFalse(prefs.hotCornersOn); assertFalse(prefs.uiSounds); assertEquals(50f, prefs.cornerIconSize, 0f)
         assertTrue("the first-run flag is never reset", prefs.onboardingDone)
-        cats(prefs).first { it.title == "Corners" }.reset!!.invoke()
+        cats(prefs).first { it.title == "Home" }.reset!!.invoke() // wave 57: Corners is a section of the Home tab
         assertEquals(32f, prefs.cornerIconSize, 0f); assertTrue(prefs.hotCornersOn)
     }
 
     @Test fun CFG_30_resetAllPutsEveryPageBackButKeepsTheExcludedAndUserData() {
         prefs = LauncherPrefs(themeMode = ThemeMode.Light, iconScale = 0.6f, hotCornersOn = false, uiSounds = false, onboardingDone = true, leftWidgetId = 42, homePage = 3)
-        val backup = cats(prefs).first { it.title == "Backup" }
+        val backup = cats(prefs).first { it.title == "System" }
         val a = backup.items.filterIsInstance<SettingItem.Action>().single { it.title == "Reset all settings" }
         assertTrue(a.meta.snapshotFirst); assertNotNull(a.confirm)
         a.onClick()
@@ -224,7 +224,8 @@ class SettingsCoreW56AppTest {
         assertEquals(emptyList<String>(), touched)
         val withReset = cats(LauncherPrefs()).filter { it.reset != null }.map { OneUiModel.key(it.title) }.toSet()
         assertEquals(SettingsReset.PAGES.keys, withReset)
-        for (data in listOf("Pages", "Hidden apps", "Workspaces", "Backup", "Desktop & dock", "About")) assertFalse("$data holds data or actions only: no page reset", data in withReset)
+        // wave 57: every one of the six tabs has a reset of its own preferences; the data pages (Hidden apps, Workspaces, Backup) are rows inside them
+        assertEquals(com.bos.sphere.feature.grid.SettingsTabs.KEYS.toSet(), withReset)
     }
 
     // ---- CFG-31 -------------------------------------------------------------------------------------------------------------------
@@ -243,10 +244,10 @@ class SettingsCoreW56AppTest {
     }
 
     @Test fun CFG_31_circleAndGridRowsOfThePageStayWithTheirReason() {
-        val grid = cats(LauncherPrefs(homePages = HomePages.Paginated), shape = PageShape.Grid).first { it.title == "Pages" }
+        val grid = cats(LauncherPrefs(homePages = HomePages.Paginated), shape = PageShape.Grid).first { it.title == "Home" }
         assertEquals("Needs Circle layout", grid.items.first { it.title == "Rings" }.meta.disabledReason)
         assertNull(grid.items.first { it.title == "Density follows the home default" }.meta.disabledReason)
-        val circle = cats(LauncherPrefs(homePages = HomePages.Paginated), shape = PageShape.Circle).first { it.title == "Pages" }
+        val circle = cats(LauncherPrefs(homePages = HomePages.Paginated), shape = PageShape.Circle).first { it.title == "Home" }
         assertNull(circle.items.first { it.title == "Rings" }.meta.disabledReason)
         assertEquals("Needs Grid layout", circle.items.first { it.title == "Density follows the home default" }.meta.disabledReason)
     }
@@ -276,21 +277,15 @@ class SettingsCoreW56AppTest {
             LauncherPrefs(), LauncherPrefs(homePages = HomePages.Paginated), LauncherPrefs(homePages = HomePages.Continuous), LauncherPrefs(homeStyle = HomeStyle.Psp),
             LauncherPrefs(homeStyle = HomeStyle.Dsi), LauncherPrefs(clockStyle = ClockStyle.Off), LauncherPrefs(hotCornersOn = false), LauncherPrefs(adaptiveGrid = true),
         )
-        for (p in variants) {
-            val h = home(p)
-            val headers = OneUiSections.headers(h.title, h.items)
-            assertEquals("Home screen sections with $p", OneUiSections.TABLE.getValue("Home screen").size, headers.size)
-        }
+        // Wave 57: the sections come from the tab placement; the Home tab keeps all eight in every state.
+        for (p in variants) assertEquals("Home sections with $p", 8, OneUiSections.headers(home(p)).size)
     }
 
-    @Test fun CFG_31_theSectionTableNamesRowsByIdAndEveryIdIsAssigned() {
-        val h = home(LauncherPrefs())
-        for ((rowKey, _) in OneUiSections.TABLE.getValue("Home screen")) {
-            assertTrue("$rowKey is a row id", rowKey.startsWith("home."))
-            assertTrue("a row carries the id $rowKey", h.items.any { it.meta.id == rowKey })
-        }
-        val ids = SettingsRowMeta.IDS.values.flatMap { it.values }
-        assertEquals("ids are unique", ids.size, ids.toSet().size)
+    @Test fun CFG_31_theRowIdsAreUniqueAndAssigned() {
+        val all = cats(LauncherPrefs()).flatMap { it.items }
+        for (id in SettingsRowMeta.IDS.values.flatMap { it.values }) assertTrue("a row carries the id $id", all.any { it.meta.id == id })
+        val ids = all.mapNotNull { it.meta.id }
+        assertEquals("ids are unique: ${ids.groupBy { it }.filterValues { it.size > 1 }.keys}", ids.size, ids.toSet().size)
     }
 
     @Test fun CFG_31_aRowThatIsOffIsStillInTheSearchWithItsReason() {
@@ -306,7 +301,7 @@ class SettingsCoreW56AppTest {
         val open = cats(LauncherPrefs(), setup = SetupState(defaultHome = false, notificationAccess = false, usageAccess = true, dndAccess = false, dndActionBound = false))
         assertEquals("it is the last category, so no index before it moves", open.lastIndex, OneUiModel.finishSetupIndex(open))
         assertEquals("2 left", (open.last().items.single() as SettingItem.Pane).value)
-        assertEquals("the groups of the root do not hold it", open.indices.toList() - open.lastIndex, OneUiModel.groups(open).flatten().sorted())
+        assertEquals("it is not one of the tabs", open.indices.toList() - open.lastIndex, com.bos.sphere.feature.grid.SettingsTabs.tabIndices(open))
     }
 
     @Test fun CFG_32_theStepsOpenTheRightSystemPageThroughTheExistingLinks() {

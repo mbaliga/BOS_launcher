@@ -23,6 +23,8 @@ data class SettingEntry(
     val paneEntryId: String? = null,
     /** The title of the pane a [paneEntryId] row lives in (empty for a row of a category page). */
     val parent: String = "",
+    /** Wave 57: the grey section header the row sits under in its tab ("Corners" in Home); empty when it has none. */
+    val section: String = "",
 )
 
 /**
@@ -67,6 +69,7 @@ class SettingsIndex(val entries: List<SettingEntry>) {
             e.keywords.any { k -> k.lowercase().split(' ', '-', '/').any { it.startsWith(w) } } -> KEYWORD_SCORE
             e.value.lowercase() == w -> 20
             e.category.lowercase().contains(w) -> 10
+            e.section.lowercase().contains(w) -> 10 // wave 57: the section header of the row in its tab ("corners" finds the rows under Corners)
             CATEGORY_KEYWORDS.any { (k, words) -> (e.category == k || e.category == com.bos.sphere.core.design.L10n.tr(k)) && words.contains(w) } -> 10
             else -> 0
         }
@@ -86,7 +89,7 @@ class SettingsIndex(val entries: List<SettingEntry>) {
          * Wave 52: words that find every row of a category besides its title: the "Side panel" category was "Comms", and the panel's Comms section
          * is still a word people type. Hidden, never shown. Keyed by the English category title.
          */
-        private val CATEGORY_KEYWORDS = mapOf("Side panel" to "comms widgets right-hand panel", "Pages" to "page", "Workspaces" to "workspace")
+        private val CATEGORY_KEYWORDS = mapOf("Side panel" to "comms widgets right-hand panel")
 
         /** Wave 56: a hidden synonym scores above the value and the category, below the hint. */
         const val KEYWORD_SCORE = 25
@@ -98,11 +101,13 @@ class SettingsIndex(val entries: List<SettingEntry>) {
         /** An index of every row of every category, built from the live list so no setting can be missing. */
         fun fromCategories(categories: List<SettingCategory>): SettingsIndex = SettingsIndex(
             categories.flatMapIndexed { ci, c ->
+                val heads = OneUiSections.headers(c)
+                val sectionOf = c.items.indices.map { ii -> heads.filterKeys { it <= ii }.maxByOrNull { it.key }?.value.orEmpty() }
                 c.items.flatMapIndexed { ii, item ->
-                    val own = SettingEntry(id(ci, ii), ci, ii, c.title, item.title, item.description().orEmpty(), item.value, item.meta.keywords, item.meta.disabledReason)
+                    val own = SettingEntry(id(ci, ii), ci, ii, c.title, item.title, item.description().orEmpty(), item.value, item.meta.keywords, item.meta.disabledReason, section = sectionOf[ii])
                     // Wave 56: the rows a pane holds are entries of their own, found by their stable id; a hit opens the pane's page.
                     listOf(own) + item.meta.entries.map { e ->
-                        SettingEntry(paneId(ci, ii, e.id), ci, ii, c.title, e.title, e.summary, "", e.keywords, item.meta.disabledReason, paneEntryId = e.id, parent = item.title)
+                        SettingEntry(paneId(ci, ii, e.id), ci, ii, c.title, e.title, e.summary, "", e.keywords, item.meta.disabledReason, paneEntryId = e.id, parent = item.title, section = sectionOf[ii])
                     }
                 }
             },

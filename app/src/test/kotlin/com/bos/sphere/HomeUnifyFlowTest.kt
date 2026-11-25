@@ -179,7 +179,7 @@ class HomeUnifyFlowTest : TourBase() {
     @Test fun HOM_01_w28_groundControlAddPageAddsAPageWhenPaginatedAndNeverAsksScrollOrPaginated() {
         start(edit = { it.copy(homePages = HomePages.Paginated) })
         key(android.view.KeyEvent.KEYCODE_COMMA, ctrl = true); check("ground control", Surface.Settings)
-        rule.onNodeWithText("Home screen", useUnmergedTree = true).performClick(); settle()
+        SettingsTestNav.goTo(rule, "Home", "Add page"); settle(300) // wave 57: the Home tab
         rule.onNodeWithText("Add page", useUnmergedTree = true).performClick(); settle()
         assertFalse("there is no question any more", tagShown("addpage.scroll") || tagShown("addpage.paginated"))
         assertEquals(HomePages.Paginated, stores.prefs.prefs.value.homePages)

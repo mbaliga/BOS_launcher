@@ -28,7 +28,7 @@ class DrawerRowsW29Test {
             pickLeftWidget = {}, leftWidgetLabel = null, pickAppFor = {}, motionAvailable = false, editCorner = {}, editGesture = {},
             system = SystemLinks({}, {}, {}, {}), lab = emptyList(),
         ),
-    ).first { it.title == "App drawer" }.items
+    ).first { it.title == "Apps" }.items // wave 57: the Apps tab
 
     @Test fun HOM_01_w29_theWheelGroupsRowOffersTheThreeGroupingsAndWritesThePref() {
         @Suppress("UNCHECKED_CAST")

@@ -69,6 +69,8 @@ import com.bos.sphere.feature.grid.FinishSetup
 import com.bos.sphere.feature.grid.SetupState
 import com.bos.sphere.feature.grid.SetupStep
 import com.bos.sphere.feature.grid.snapshotFirst
+import com.bos.sphere.feature.grid.paneEntries
+import com.bos.sphere.feature.grid.PaneEntry
 import com.bos.sphere.feature.grid.SettingItem
 import com.bos.sphere.feature.grid.Stepper
 import com.bos.sphere.feature.grid.ToggleRow
@@ -125,6 +127,11 @@ class SettingsModel(
     val setPuckLabels: (Boolean) -> Unit = {},
     /** Wave 56 (CFG-32): what is still unfinished (default home, notification and usage access, Do Not Disturb access); [SetupState.Complete] = no Finish setup row. */
     val setup: SetupState = SetupState.Complete,
+    /** Wave 57 (CFG-44): the page list of Home > Pages: which page the per-page rows below it edit (the host keeps the index, [pageIndex]). */
+    val selectPage: (Int) -> Unit = {},
+    /** Wave 57 (CFG-43): the launcher's own vibration strength, the same store as the Comms Sound and vibration sheet. */
+    val haptic: com.bos.sphere.core.data.HapticStrength = com.bos.sphere.core.data.LauncherHapticSettings.strength.value,
+    val setHaptic: (com.bos.sphere.core.data.HapticStrength) -> Unit = { com.bos.sphere.core.data.LauncherHapticSettings.set(it) },
 )
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
@@ -140,33 +147,52 @@ class SystemLinks(
 )
 
 /**
- * Which category Settings opens on. [CATEGORY_THIS_PAGE] is the "Page N" category (long-press on a
- * page of the paged home); [CATEGORY_HOME] is "Home screen". Resolve to a list index with
- * [settingsCategoryIndex]: the page category only exists on the paged home, so indices move.
+ * Where Settings opens (wave 57: a tab and a row of it, see [settingsTarget]). [CATEGORY_THIS_PAGE]: Home > Pages on the page that was long-pressed;
+ * [CATEGORY_HOME]: the Home tab ("Home settings" from a corner, a gesture or the home's long press); [CATEGORY_APP_DRAWER]: Apps > App drawer,
+ * on Drawer shortcuts; [CATEGORY_WALLPAPER]: Look > Wallpaper; [CATEGORY_ROOT]: the tab shown last (the Home sheet's Settings row);
+ * [CATEGORY_INDEX_BASE] + n: tab n exactly (a Radar settings result; its row comes through [com.bos.sphere.feature.grid.SettingsFocus]).
  */
 const val CATEGORY_THIS_PAGE = 0
 const val CATEGORY_HOME = 1
-/** Wave 30: the App drawer category (where the Drawer shortcuts editor lives); the disc's empty sections open it. */
+/** Wave 30: the App drawer (where the Drawer shortcuts editor lives); the disc's empty sections open it. */
 const val CATEGORY_APP_DRAWER = 900
-/** Wave 40: the root list of every category (what the Home sheet's Ground Control button opens). */
+/** Wave 57: Look > Wallpaper (the Home sheet's Wallpaper row). */
+const val CATEGORY_WALLPAPER = 901
+/** Wave 40: Settings home; wave 57: on the tab shown last. */
 const val CATEGORY_ROOT = -1
 
-private const val HOME_SCREEN_TITLE = "Home screen"
+/** Wave 57: a tab (a category index, or -1 for the remembered one) and the row of it to scroll to and flash (-1 = none). */
+data class SettingsTarget(val category: Int, val row: Int = -1)
 
-/** The index of [which] (one of the CATEGORY_ constants) in [categories] as built for the active home. */
-fun settingsCategoryIndex(categories: List<SettingCategory>, which: Int): Int {
-    val home = categories.indexOfFirst { it.title == x(HOME_SCREEN_TITLE) }.coerceAtLeast(0)
+/** The rows the deep links land on, by row id (the ids the tab placement gives, see [SettingsTabLayout.place]). */
+internal object SettingsLinks {
+    const val HOME = "home.glance"
+    const val THIS_PAGE = "Pages/Layout"
+    const val APP_DRAWER = "Apps/Drawer shortcuts"
+    const val WALLPAPER = "home.glanceWallpaper"
+}
+
+/** The tab and row [which] (one of the CATEGORY_ constants) opens in [categories] as built for the active home. */
+fun settingsTarget(categories: List<SettingCategory>, which: Int): SettingsTarget {
+    fun find(id: String, fallbackTab: String): SettingsTarget {
+        categories.forEachIndexed { ci, c -> val r = c.items.indexOfFirst { it.meta.id == id }; if (r >= 0) return SettingsTarget(ci, r) }
+        return SettingsTarget(categories.indexOfFirst { com.bos.sphere.feature.grid.SettingsTabs.key(it.title) == fallbackTab }.coerceAtLeast(0))
+    }
+    val tabs = com.bos.sphere.feature.grid.SettingsTabs
     return when (which) {
-        CATEGORY_ROOT -> -1
-        CATEGORY_HOME -> home
-        CATEGORY_APP_DRAWER -> categories.indexOfFirst { it.title == x("App drawer") }.let { if (it < 0) home else it }
-        // No page category (a scrolling home): fall through to Home screen.
-        CATEGORY_THIS_PAGE -> if (home == 0) 0 else CATEGORY_THIS_PAGE
-        // 1000 + n: the category at list index n exactly (a Radar settings result opens its own category).
-        in CATEGORY_INDEX_BASE until CATEGORY_INDEX_BASE + 1000 -> (which - CATEGORY_INDEX_BASE).coerceIn(0, (categories.size - 1).coerceAtLeast(0))
-        else -> which.coerceIn(0, (categories.size - 1).coerceAtLeast(0))
+        CATEGORY_ROOT -> SettingsTarget(-1)
+        CATEGORY_HOME -> find(SettingsLinks.HOME, tabs.HOME)
+        // No page list (a scrolling home): the Pages section of Home all the same, on its first row.
+        CATEGORY_THIS_PAGE -> find(SettingsLinks.THIS_PAGE, tabs.HOME).let { if (it.row >= 0) it else find("Home/Pages", tabs.HOME) }
+        CATEGORY_APP_DRAWER -> find(SettingsLinks.APP_DRAWER, tabs.APPS)
+        CATEGORY_WALLPAPER -> find(SettingsLinks.WALLPAPER, tabs.LOOK)
+        in CATEGORY_INDEX_BASE until CATEGORY_INDEX_BASE + 1000 -> SettingsTarget((which - CATEGORY_INDEX_BASE).coerceIn(0, (categories.size - 1).coerceAtLeast(0)))
+        else -> SettingsTarget(which.coerceIn(0, (categories.size - 1).coerceAtLeast(0)))
     }
 }
+
+/** The tab index of [which]; kept for the callers that only need the tab. */
+fun settingsCategoryIndex(categories: List<SettingCategory>, which: Int): Int = settingsTarget(categories, which).category
 
 const val CATEGORY_INDEX_BASE = 1000
 
@@ -209,7 +235,25 @@ private fun paginatedReason(p: LauncherPrefs): String? = when {
     else -> x("Pages is Continuous")
 }
 
+/**
+ * Wave 57 (settingsTabs): Settings as the six tabs (Home, Look, Apps, Radar, Side panel, System), each row placed by [SettingsTabLayout], then
+ * the Finish setup page last while something is unfinished.
+ */
 fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
+    val ordered = SettingsReset.withResets(SettingsTabLayout.place(buildSettingsTopics(m)).tabs, m.updatePrefs)
+    val finish = FinishSetup.category(m.setup) { step ->
+        when (step) {
+            SetupStep.DefaultHome -> m.system.setDefaultHome()
+            SetupStep.Notifications -> m.system.notificationAccess()
+            SetupStep.Usage -> m.system.usageAccess()
+            SetupStep.DoNotDisturb -> m.system.dndAccess()
+        }
+    }
+    return if (finish != null) ordered + finish else ordered
+}
+
+/** The rows as they are built, by topic ("Home", "Corners", "Theme" ...), with their ids, synonyms and slider defaults; [SettingsTabLayout] places them. */
+internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
     val p = m.prefs
     val out = ArrayList<SettingCategory>()
     fun upd(f: (LauncherPrefs) -> LauncherPrefs) = m.updatePrefs(f)
@@ -225,6 +269,13 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     val page = m.pages.getOrNull(m.pageIndex) ?: HomePage()
     val layout = page.layout
     val pageItems = buildList {
+        // Wave 57 (CFG-44): the list of pages; picking one makes the rows below edit it (the long press on a page still opens here on that page).
+        if (m.pages.size > 1) add(
+            SettingItem.Choice(
+                x("Page"), Glyphs.Widget, m.pages.indices.toList(), m.pageIndex.coerceIn(0, m.pages.size - 1), { x("Page %d", it + 1) },
+                hint = x("The page the settings below change"),
+            ) { i -> m.selectPage(i) }.asCards({ i -> SettingsArtApp.pageOf(i, m.pages.size) }, "cfg.pagePick", id = { "page$it" }),
+        )
         add(
             SettingItem.Choice(
                 x("Layout"), Glyphs.Apps, PageShape.entries, layout.shape, { x(it.label) },
@@ -537,7 +588,6 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
                 },
             )
             add(SettingItem.Pane(x("Grouping & rules"), Glyphs.Message, x("Per app, sender, conversation")) { com.bos.sphere.ui.LaunchpadRulesPane() })
-            add(SettingItem.Pane(x("Access Liftoff asks for"), Glyphs.Gear, x("Turn on or review what Liftoff may read")) { com.bos.sphere.ui.AccessPane() })
             add(SettingItem.Action(x("Mark all as read"), Glyphs.Bell, confirm = "Mark every notification, in the list and in the history, as read?", confirmLabel = "Mark all as read", hint = x("Marks every notification in the list and in the history as read.")) { comms.markAllRead() })
             add(SettingItem.Action(x("Clear all notifications"), Glyphs.Close, confirm = "Clear all notifications from the list? The history stays.", confirmLabel = "Clear all", hint = x("Dismisses everything in the Comms list. The history stays.")) { comms.clearAll() })
             add(SettingItem.Action(x("Delete history"), Glyphs.Close, confirm = "Delete all notification history? Notifications in the shade stay.", confirmLabel = "Delete history", hint = x("Deletes the stored notification history. Notifications in the shade stay.")) { comms.deleteHistory() })
@@ -649,7 +699,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
             SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: Radar opens as a flat list while a keyboard or mouse is in use")) { v -> upd { it.copy(searchLayoutPinned = v) } },
             SettingItem.Choice(x("Radar background"), Glyphs.Moon, com.bos.sphere.core.data.RadarBackground.entries, p.radarBackground, { x(it.label) }, hint = x("Dimmed shows your wallpaper at a quarter of its brightness; True black draws nothing, for the most contrast")) { v -> upd { it.copy(radarBackground = v) } }.asCards({ SettingsArtHome.radarBackground.art(it) }, "cfg.radarBackground"),
             SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly; off keeps them still until you move them")) { v -> upd { it.copy(searchMotion = v) } },
-            SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("Enter and the Search row open this engine in your browser")) { v -> upd { it.copy(webEngine = v) } }.asCards({ SettingsArtLook.webEngine.art(it) }, "cfg.webEngine"),
+            SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("Enter and the Search row open this engine in your browser; only then does what you typed go to it")) { v -> upd { it.copy(webEngine = v) } }.asCards({ SettingsArtLook.webEngine.art(it) }, "cfg.webEngine"),
             SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },
             // Wave 43 (radarWeb): the privacy switch of the launcher's only network use. Off = nothing leaves the phone.
             SettingItem.Toggle(x("Web suggestions"), Glyphs.Globe, p.webSuggestions, x("Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions.", p.webEngine.label)) { v -> upd { it.copy(webSuggestions = v) } },
@@ -721,6 +771,11 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         listOf(
             SettingItem.Toggle(x("Interface sounds"), Glyphs.Music, p.uiSounds) { v -> upd { it.copy(uiSounds = v) } },
             SettingItem.Slider(x("Volume"), Glyphs.Ring, p.uiSoundVolume, 0f..1f, pct(p.uiSoundVolume)) { v -> upd { it.copy(uiSoundVolume = v) } },
+            // Wave 57 (CFG-43): the launcher's own vibration, the same store and values as the Comms Sound and vibration sheet.
+            SettingItem.Choice(
+                x("Launcher vibration"), Glyphs.Bolt, com.bos.sphere.core.data.HapticStrength.entries, m.haptic, { x(it.name) },
+                hint = x("How strongly Liftoff itself vibrates on taps and long presses. Android's own vibration settings are not changed."),
+            ) { v -> m.setHaptic(v) }.asCards({ SettingsArtApp.haptic.art(it) }, "cfg.haptic"),
         ),
     )
 
@@ -730,24 +785,29 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         Glyphs.Gear,
         listOf(
             SettingItem.Pane(x("Language"), Glyphs.Globe, if (p.language == UiLanguage.System) x("System") else p.language.label) { LanguagePane(p.language) { l -> upd { it.copy(language = l) } } },
-            SettingItem.Action(x("Set as default home"), Glyphs.Apps, "", navigates = true, onClick = m.system.setDefaultHome),
-            SettingItem.Action(x("Notification access"), Glyphs.Bell, x("For the notifications hub"), navigates = true, onClick = m.system.notificationAccess),
-            SettingItem.Action(x("Do Not Disturb access"), Glyphs.Moon, x("Needed for silent mode / DND actions"), navigates = true, onClick = m.system.dndAccess),
+            // Wave 57 (CFG-42): one page listing every grant (it replaces the default home, notification access and Do Not Disturb rows and the Comms access page).
+            SettingItem.Pane(x("Access and privacy"), Glyphs.Gear, x("What Liftoff may read, and the default home")) { AccessPrivacyPane(m.system) },
             SettingItem.Action(x("Android settings"), Glyphs.Gear, "", navigates = true, onClick = m.system.androidSettings),
         ),
     )
     // --- Capabilities (CFG-08) and Lab (CFG-17) ----------------------------------------------------
     if (m.capabilities.isNotEmpty()) {
         val report = m.capabilities.joinToString("\n") { c -> "${c.title}: ${c.state}" + (c.reason?.let { " - $it" } ?: "") + (c.fix?.let { " ($it)" } ?: "") }
+        // Wave 57: one row of System > Help and recovery; its page lists every capability (each is still found by the search).
+        val on = m.capabilities.count { it.state == com.bos.sphere.core.capabilities.CapState.On }
         out += SettingCategory(
             x("Capabilities"), Glyphs.Info,
-            listOf<SettingItem>(SettingItem.Action(x("Copy report"), Glyphs.Info, "", onClick = { m.copyText(report) })) +
-                m.capabilities.map { c ->
-                    SettingItem.Action(
-                        c.title, if (c.state == com.bos.sphere.core.capabilities.CapState.On) Glyphs.Bolt else Glyphs.Info,
-                        listOfNotNull(c.state.name, c.reason, c.fix?.let { "→ $it" }).joinToString(" · "),
-                    ) {}
-                },
+            listOf<SettingItem>(
+                SettingItem.Pane(x("Capabilities"), Glyphs.Info, x("%d of %d on", on, m.capabilities.size)) {
+                    com.bos.sphere.feature.grid.ActionRow(x("Copy report"), "", Glyphs.Info, flashId = "caps.copy") { m.copyText(report) }
+                    m.capabilities.forEach { c ->
+                        com.bos.sphere.feature.grid.ActionRow(
+                            c.title, listOfNotNull(c.state.name, c.reason, c.fix?.let { "→ $it" }).joinToString(" · "),
+                            if (c.state == com.bos.sphere.core.capabilities.CapState.On) Glyphs.Bolt else Glyphs.Info, flashId = "caps.${c.title}",
+                        ) {}
+                    }
+                }.paneEntries(*(listOf(PaneEntry("caps.copy", x("Copy report"))) + m.capabilities.map { c -> PaneEntry("caps.${c.title}", c.title, summary = c.state.name) }).toTypedArray()),
+            ),
         )
     }
     if (m.lab.isNotEmpty() && LabGate.visible()) { // CFG-17
@@ -768,17 +828,9 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
         Glyphs.Info,
         m.about.map { (k, v) -> SettingItem.Action(x(k), Glyphs.Info, v) {} },
     )
-    // Wave 56: the hidden side of the rows (ids, synonyms, slider defaults and units, pane rows), each page's reset, and the Finish setup page (last, so the indices before it stay put).
-    val ordered = SettingsReset.withResets(SettingsRowMeta.apply(reorganise(out, paged), p), m.updatePrefs)
-    val finish = FinishSetup.category(m.setup) { step ->
-        when (step) {
-            SetupStep.DefaultHome -> m.system.setDefaultHome()
-            SetupStep.Notifications -> m.system.notificationAccess()
-            SetupStep.Usage -> m.system.usageAccess()
-            SetupStep.DoNotDisturb -> m.system.dndAccess()
-        }
-    }
-    return if (finish != null) ordered + finish else ordered
+    // Wave 56: the hidden side of the rows (ids, synonyms, slider defaults and units, pane rows); wave 57: every row placed into one of the six tabs,
+    // each tab's reset, and the Finish setup page (last, so the indices before it stay put).
+    return SettingsRowMeta.apply(out, p)
 }
 
 /** One line for the Gestures category saying how touch works on the active home. */
@@ -790,35 +842,6 @@ internal fun gestureSummary(style: HomeStyle, surface: com.bos.sphere.core.data.
     surface.scroll == com.bos.sphere.core.data.SurfaceScroll.Horizontal ->
         "This home scrolls sideways, so up / down swipes, pinch and double tap on empty space are free; long-press empty space for Settings."
     else -> "This home scrolls up / down, so sideways swipes, pinch and double tap on empty space are free; long-press empty space for Settings."
-}
-
-/**
- * The information architecture, as a launcher user expects it: what's on the home screen, how it
- * looks, corners, gestures, the app drawer, search, the left page, then system.
- * (The categories above are built by topic; this regroups them.) [paged] = the first built
- * category is the "Page N" one, which only the paged home has.
- */
-private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<SettingCategory> {
-    fun cat(title: String) = built.firstOrNull { it.title == title || it.title == x(title) }
-    fun items(vararg titles: String) = titles.flatMap { cat(it)?.items.orEmpty() }
-    val out = ArrayList<SettingCategory>()
-    if (paged) built.firstOrNull()?.let { out += it } // This page
-    out += SettingCategory(x(HOME_SCREEN_TITLE), Glyphs.Apps, items("Home"))
-    out += SettingCategory(x("Look"), Glyphs.Palette, items("Theme", "Indicator"))
-    out += SettingCategory(x("Corners"), Glyphs.Plus, items("Corners"))
-    out += SettingCategory(x("Gestures"), Glyphs.Pinch, items("Gestures", "Motion"))
-    out += SettingCategory(x("App drawer"), Glyphs.Widget, cat("Apps")?.items.orEmpty())
-    built.firstOrNull { it.items.singleOrNull()?.title == x("Hidden apps") }?.let { out += it } // wave 38: its own row in the top-level list
-    cat("Radar")?.let { out += it }
-    cat("Workspaces")?.let { out += it } // wave 52: its own top-level row
-    cat("Side panel")?.let { out += it }
-    out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
-    cat("Backup")?.let { out += it }
-    cat("Desktop & dock")?.let { out += it }
-    cat("Capabilities")?.let { out += it }
-    cat("Lab")?.let { out += it }
-    cat("About")?.let { out += it }
-    return out
 }
 
 /**

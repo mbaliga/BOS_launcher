@@ -63,7 +63,7 @@ class WallpaperRowsW26Test {
         system = SystemLinks({}, {}, {}, {}), lab = listOf(LabEntry("x", "Spike", "result", {})),
     )
 
-    private fun homeItems(p: LauncherPrefs, pages: Int) = buildSettingsCategories(model(p, pages)).first { it.title == "Home screen" }.items
+    private fun homeItems(p: LauncherPrefs, pages: Int) = buildSettingsCategories(model(p, pages)).flatMap { it.items } // wave 57: the wallpaper rows are in Look
 
     private val states = buildList {
         for (glance in listOf(true, false)) for (signal in listOf(SignalForce.Live, SignalForce.NoSignal)) for (same in listOf(true, false)) for (pages in listOf(0, 1, 3)) {

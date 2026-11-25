@@ -36,17 +36,17 @@ class DockDeskReviewW24RulesTest {
         assertTrue("dock finds the Dock page", index.search("dock").any { it.title == "Dock" })
     }
 
-    @Test fun INP_05_theToastsNameGroundControlWithTheSettingsOwnLabelsInEveryLanguage() {
-        // Ground Control's category is "Home screen" (SettingsCategories' HOME_SCREEN_TITLE); there is no category called "Home".
+    @Test fun INP_05_theToastsNameSettingsWithTheSettingsOwnLabelsInEveryLanguage() {
+        // Wave 57: the toasts say Settings (not Ground Control) and name the tab and the row as Settings shows them: Side panel > Right side, Home > Dock.
         listOf("en", "es", "fr", "de", "pt", "hi", "zh", "ja", "ar").forEach { code ->
             L10n.setLanguage(code)
-            if (code != "en") assertTrue("$code: the category title is translated", L10n.tr("Home screen") != "Home screen")
             val landing = L10n.tr(FocusDockRouting.NoDock.Landing.message)
-            listOf("Home screen", "Right side", "Dock rail").forEach { label ->
-                assertTrue("$code: the landing toast names \"$label\" as Ground Control shows it (${L10n.tr(label)}): $landing", landing.contains(L10n.tr(label)))
+            listOf("Settings", "Side panel", "Right side", "Dock rail").forEach { label ->
+                assertTrue("$code: the landing toast names \"$label\" as Settings shows it (${L10n.tr(label)}): $landing", landing.contains(L10n.tr(label)))
             }
             val off = L10n.tr(FocusDockRouting.NoDock.Off.message)
-            assertTrue("$code: the dock-off toast names the Desktop & dock page as shown: $off", off.contains(L10n.tr("Desktop & dock")))
+            listOf("Settings", "Home", "Dock").forEach { label -> assertTrue("$code: the dock-off toast names \"$label\" as shown: $off", off.contains(L10n.tr(label))) }
+            assertTrue("$code: no Ground Control", !landing.contains("Ground Control") && !off.contains("Ground Control"))
         }
     }
 }

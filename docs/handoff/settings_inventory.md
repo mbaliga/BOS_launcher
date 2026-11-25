@@ -1,5 +1,5 @@
 # Liftoff Launcher - Settings inventory, as built
-Branch claude/clever-mccarthy-804ej7. Derived from code (SettingsCategories.kt, SettingsOneUi*.kt, SettingsOneUiSections.kt, SettingsOneUiSummaries.kt, SettingsIndex.kt, DeviceChecksPane.kt, LauncherStores.kt, HomeModel.kt and the pane files). "Settings" is the user-facing name; "Ground Control" is the legacy name still in code/comments/one sheet row.
+Branch claude/clever-mccarthy-804ej7. Derived from code (SettingsCategories.kt, SettingsOneUi*.kt, SettingsOneUiSections.kt, SettingsOneUiSummaries.kt, SettingsIndex.kt, DeviceChecksPane.kt, LauncherStores.kt, HomeModel.kt and the pane files). "Settings" is the user-facing name; "Ground Control" is the legacy name still in code and comments (wave 57: the sheet row reads Settings; "ground control" is a hidden search word).
 
 ## Conventions used below
 - Depth = taps from Settings home. 0 root, 1 category page, 2 a row's own page (radio page / pane) or a dialog/sheet opened from a category row, 3+ pickers/dialogs opened inside a pane.
@@ -7,6 +7,55 @@ Branch claude/clever-mccarthy-804ej7. Derived from code (SettingsCategories.kt, 
 - Persistence: `lp` = SharedPreferences file launcher_prefs (read/written as one LauncherPrefs by LauncherPrefsStore); other files named in full. Exported by Backup (state export: launcher_prefs, shortcuts, home_layout, workspaces, launchpad_rules, ALLOWED pref files) EXCEPT files in StateSchema.BACKUP_EXCLUDED_PREF_FILES (palette, desktop_surface, liftoff_misc, device_checks, device_bound, groups, launchpad_hub, preview_window, edit_chrome) and `theming` (in neither list; no export key found).
 - Search column: `S` = row indexed with title + hint + current value + category title (rank: title prefix 100, title word 80, title contains 60, hint 30, value-equals 20, category 10). `P` = Pane/Action without hint: title + value + category only. `-` = not indexed (lives inside a pane or sheet; only the pane title is searchable). Hidden aliases: "launchpad" -> "comms", "sessions" -> "groups". A hit opens the category page and highlights the row for 2.2 s; it does NOT open the row's sub-page. Radar also queries the same index (CategorySettingsSource) and opens Settings on the row.
 - Rows marked (cond) exist only while their condition holds, so they are also absent from search then.
+
+# A0) Wave 57 (settingsTabs): the tab of every row
+
+Settings is six tabs now (docs/decisions/settingsTabs.md); the root list (A1) and the category pages (A2) below are history, kept for the row details (kind, options, persistence), which did not change. Depth from Settings home: a row is the tab plus the row (a switch, slider, stepper or card choice acts there); a pane or a list page opens one page deeper. "Was in" is the old category page. The table is `SettingsTabLayout.TABS`; `SettingsTabsW57ModelTest` holds it to the built rows.
+
+| Tab | Section | Rows (in order) | Was in |
+|---|---|---|---|
+| HOME | Glance | Calm home screen (Glance), Clock style, Clock format, Show date under the clock, Clock colour, Clock size, Show music, Hotspots, Top left / Top right / Bottom right / Bottom left hotspot, Controls hide after (seconds), Try it: Controls hide after, Surface indicator | Home screen |
+| HOME | Pages | Pages (mode), Order, **Page** (new: the page list, cards), Layout, Density follows the home default, Columns · portrait, Rows · portrait, Columns · landscape, Rows · landscape, Rings, Clock tile on this page, Add a page after this, Delete this page, Add page, Edit home, Widgets, folders and icons, Restore previous pages, Page turning · portrait, Page turning · landscape, Home panels | Home screen; Pages (the per-page rows) |
+| HOME | Layout | Style, Scroll direction, Grid follows window size, Grid density, Default density, Icon size, Same spacing both ways, Spacing / Spacing across, Spacing down, Height in page, Side margin, Top margin, Bottom margin, Label size, App labels, Notification badges, Count in badges, Hide status bar | Home screen |
+| HOME | Corners | Corner style, Corner icon size, Icon type, Follow device rotation, Separate corners for landscape, Top left, Top right, Bottom right, Bottom left | Corners |
+| HOME | Gestures and motion | Pinch changes grid density, Pinch in, Pinch out, Swipe up, Swipe down, Swipe left, Swipe right, Double tap, Long press, On this home, Motion gestures, When home isn't showing, Motion sensitivity, Try it: Motion sensitivity, Shake, Flick twice, Flip twice, Place face down | Gestures |
+| HOME | Keyboard and pointer | Always-on keyboard, Keyboard shortcuts, Hot corners with a mouse, Hot corner delay, Try it: Hot corner delay | Home screen; Corners |
+| HOME | Dock | Dock (page: live preview and the dock sheet's options body) | Desktop & dock |
+| HOME | External displays | Dock and external display | Desktop & dock |
+| LOOK | Looks | Looks (rail) | Look |
+| LOOK | Theme | Light / dark, Accent, Themes | Look |
+| LOOK | Font | Font | Look |
+| LOOK | Icons | Icon shape, Icon colour, Icon plate | Look |
+| LOOK | Wallpaper | Glance wallpaper, Pages use the same wallpaper as Glance, Pages wallpaper | Home screen |
+| LOOK | Calm styles | Calm style, Also show regular battery and signal, Show, Glow: intensity, Glow: speed, Glow: preview, Glow: colours | Look |
+| LOOK | Settings screen and text | Settings backdrop, Backdrop dimming, Wallpaper palette, density and text size | Look |
+| APPS | Profiles | Workspaces (the profiles stream's Profiles page goes here) | Workspaces |
+| APPS | App groups and sessions | App groups | Desktop & dock |
+| APPS | App drawer | Ring segments, Drawer shortcuts, Show labels under glyphs, Wheel groups, Pages (apps kept on pages) | App drawer |
+| APPS | Hidden apps | Hidden apps | Hidden apps |
+| APPS | Open with | Open with | App drawer |
+| RADAR | Layout | Radar layout | Radar |
+| RADAR | Appearance | Radar background, Keep moving | Radar |
+| RADAR | Input | Keep this layout with a keyboard, Keyboard opens with Radar and drawer · portrait, · landscape | Radar; Home screen |
+| RADAR | Sources | Web results, Actions, Files, Deep results, Contacts, Search folders, Search providers from other apps | Radar |
+| RADAR | Web | Web engine (hint says what is sent), Web suggestions | Radar |
+| RADAR | Privacy | Search history and aliases | Radar |
+| SIDE PANEL | Left panel | Left page, Choose widget | Side panel |
+| SIDE PANEL | Panel theme and size | Comms theme, Comms size | Side panel |
+| SIDE PANEL | Sections | Widgets section, Widgets position | Side panel |
+| SIDE PANEL | Comms | Default view, Show pinned at the top, Clear from the shade when dismissed in Comms, Unread strip, Read history | Side panel |
+| SIDE PANEL | Groups and rules | Groups and rules, Grouping & rules, Comms gestures | Side panel |
+| SIDE PANEL | Right side | Right side, Recent apps shown, Include apps opened from elsewhere | Home screen |
+| SIDE PANEL | Clean up | Mark all as read, Clear all notifications, Delete history | Side panel |
+| SYSTEM | General | Language, Restore open screens | System & sound; Home screen |
+| SYSTEM | Sound and haptics | Interface sounds, Volume, **Launcher vibration** (new, the Comms sheet's store) | System & sound |
+| SYSTEM | Access and privacy | **Access and privacy** (new page: notification, usage, contacts, folders, microphone, Do Not Disturb, default home), Android settings | System & sound (Set as default home, Notification access, Do Not Disturb access); Side panel (Access Liftoff asks for) |
+| SYSTEM | Backup and restore | Export, import and restore (now with Import a Studio file), **Open Liftoff Studio** (new), Reset all settings | Backup |
+| SYSTEM | Help and recovery | Capabilities (one row, its page lists them), Crash reports | Capabilities; Backup |
+| SYSTEM | Lab | (debug or alpha builds) Copy all results, Device checks, the spikes | Lab |
+| SYSTEM | About | Version and the rest | About |
+
+Finish setup: one row above the tabs while something is unfinished (not a tab). Deep links: Home settings and a home long press open HOME on the Glance switch; a page's long press opens HOME on that page's Layout; the disc's empty sections open APPS on Drawer shortcuts; the Home sheet's Wallpaper row opens LOOK on Glance wallpaper; its Settings row opens the tab shown last; a Radar result opens its row's tab on the row.
 
 # A) IA as built
 

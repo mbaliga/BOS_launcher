@@ -176,7 +176,7 @@ class CommsOptionsW29Test {
     }
     @Test fun STR_01_w29_deleteHistoryAsksForConfirmationThenDeletes() {
         show(); rule.waitForIdle()
-        val scroller = rule.onAllNodes(androidx.compose.ui.test.hasScrollAction())[0]
+        val scroller = rule.onNodeWithTag(com.bos.sphere.feature.grid.SettingsTabTags.list("Side panel"))
         scroller.performScrollToNode(hasText("Delete history", substring = true)); rule.waitForIdle()
         rule.onAllNodes(hasText("Delete history", substring = true))[0].performClick(); rule.waitForIdle()
         rule.onNodeWithTag("gc.confirm.text").assertExists()
@@ -201,6 +201,7 @@ class CommsOptionsW29Test {
 
     private fun rowsHold(font: Float, rtl: Boolean) {
         show(font, rtl); rule.waitForIdle()
+        rule.onNodeWithTag(com.bos.sphere.feature.grid.SettingsTabTags.list("Side panel")).performScrollToNode(hasText("Default view", substring = true)); rule.waitForIdle() // wave 57: below the Settings header
         val d = rule.activity.resources.displayMetrics.density
         val n = rule.onAllNodes(hasText("Default view", substring = true)).fetchSemanticsNodes()
         assertTrue("'Default view' composes (font $font rtl $rtl)", n.isNotEmpty())
@@ -256,7 +257,7 @@ class CommsOptionsW29Test {
         }
     }
     private fun openConfirm(title: String) {
-        rule.onAllNodes(androidx.compose.ui.test.hasScrollAction())[0].performScrollToNode(hasText(title)); rule.waitForIdle()
+        rule.onNodeWithTag(com.bos.sphere.feature.grid.SettingsTabTags.list("Side panel")).performScrollToNode(hasText(title)); rule.waitForIdle()
         rule.onAllNodes(hasText(title))[0].performClick(); rule.waitForIdle()
         rule.onNodeWithTag("gc.confirm.text").assertExists()
     }

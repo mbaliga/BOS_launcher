@@ -41,6 +41,7 @@ internal object AppSmokeHarness {
     /** Clears the process-wide singletons the launcher keeps in statics (what a new process starts without). */
     fun resetProcess() {
         runCatching { com.bos.sphere.core.data.GroupsSettings.restore(com.bos.sphere.core.data.GroupsConfig()) } // wave 22: the in-memory groups of an earlier test
+        com.bos.sphere.feature.grid.SettingsTabMemory.Process.clear() // wave 57: the Settings tab an earlier test left selected
         for ((cls, field) in listOf(
             "com.bos.sphere.core.data.LauncherStores" to "instance",
             "com.bos.sphere.core.data.OpenSurfaceStore" to "shared",

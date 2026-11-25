@@ -1,5 +1,7 @@
 # Clackpad settings vs Liftoff settings: what to emulate
 
+> Wave 57 (settingsTabs): after this study the owner kept Liftoff's own tabs for the second level: Settings home with six section tabs instead of Clackpad's home list then section page (`docs/decisions/settingsTabs.md`).
+
 Scope: read-only study. Clackpad = /home/user/clackpad (Android IME). Liftoff = /home/user/BOS_launcher, branch claude/clever-mccarthy-804ej7.
 Clackpad paths below are relative to `clackpad/app/src/main/kotlin/xyz/mdhv/clackpad/` unless they start with docs/, web-config/ or clackpad/. "SA" = SettingsActivity.kt.
 Nothing here was run on a device. Counts come from Clackpad's own docs and code.

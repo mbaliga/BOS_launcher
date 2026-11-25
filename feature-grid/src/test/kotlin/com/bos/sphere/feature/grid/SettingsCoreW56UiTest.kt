@@ -108,7 +108,7 @@ class SettingsCoreW56UiTest {
         rule.onNodeWithTag(SetupTags.ROW).assertIsDisplayed()
         rule.onNodeWithText("Finish setup").assertIsDisplayed()
         rule.onNodeWithText("2 left").assertIsDisplayed()
-        rule.onAllNodesWithTag(OneUiTags.row("Home screen")).assertCountEquals(1)
+        rule.onAllNodesWithTag(SettingsTabTags.tab("Home screen"), useUnmergedTree = true).assertCountEquals(1) // the row sits above the tabs, which stay
         shoot("root-finish-setup")
     }
 
@@ -168,7 +168,7 @@ class SettingsCoreW56UiTest {
 
     @Test fun CFG_30_resetThisPageAsksTakesASnapshotThenOffersUndo() {
         show(0)
-        rule.onAllNodes(hasScrollAction())[0].performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
+        rule.onNodeWithTag(SettingsTabTags.list("Home screen")).performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
         rule.onNodeWithTag(OneUiTags.RESET_ROW).assertIsDisplayed().performClick(); rule.waitForIdle()
         // the confirmation: the primary action is a box on top, Cancel plain text below it
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).assertIsDisplayed()
@@ -210,7 +210,7 @@ class SettingsCoreW56UiTest {
 
     @Test fun CFG_30_cancelLeavesEverythingAlone() {
         show(0)
-        rule.onAllNodes(hasScrollAction())[0].performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
+        rule.onNodeWithTag(SettingsTabTags.list("Home screen")).performScrollToNode(hasTestTag(OneUiTags.RESET_ROW))
         rule.onNodeWithTag(OneUiTags.RESET_ROW).performClick(); rule.waitForIdle()
         rule.onNodeWithTag(OneUiDialogTags.CANCEL).performClick(); rule.waitForIdle()
         assertEquals(0, resets); assertTrue(snaps.log.isEmpty())

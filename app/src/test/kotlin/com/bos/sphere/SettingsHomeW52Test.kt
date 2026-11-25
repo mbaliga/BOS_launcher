@@ -30,8 +30,8 @@ import com.bos.sphere.ui.SettingsModel
 import com.bos.sphere.ui.SystemLinks
 import com.bos.sphere.ui.buildSettingsCategories
 import com.bos.sphere.ui.desktopCategory
-import com.bos.sphere.ui.settingsSummaries
-import com.bos.sphere.ui.sidePanelSummary
+import com.bos.sphere.feature.grid.SettingsTabTags
+import com.bos.sphere.feature.grid.SettingsTabs
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -46,9 +46,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Wave 52 (settingsFont), CFG-21: the Settings home after the owner's feedback. The first row is "Pages" (summary "Page 1 of 3 · Grid"), not "Page 1";
- * the right-hand panel's row is "Side panel" (summary by what it holds), not "Comms"; Workspaces is its own top-level row near the top with a count;
- * the Look summary names the font; "comms" still finds the side panel. Screenshot of the root: build/screenshots/w52-settings-home.png.
+ * Wave 52 (settingsFont), CFG-21, updated in wave 57 (settingsTabs): the names the owner chose survive the move to six tabs: the right-hand panel
+ * is "Side panel", not "Comms"; Workspaces is up front (the first row of Apps) and not under Desktop & dock; the Look tab has the font cards;
+ * "comms" still finds the side panel.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -70,95 +70,48 @@ class SettingsHomeW52Test {
         ),
     )
 
-    private fun summaries(c: List<SettingCategory>, workspaces: Int = 3, widgets: Int = 0) =
-        settingsSummaries(HomePages.Paginated, 3, 0, 2, c, pageIndex = 0, workspaceCount = workspaces, sidePanelWidgets = widgets)
-
-    private fun show(c: List<SettingCategory> = cats(), workspaces: Int = 3) {
-        rule.setContent { SphereTheme { SettingsSpace(visible = true, categories = c, initialCategory = CATEGORY_ROOT, sounds = null, onClose = {}, summaries = summaries(c, workspaces), modifier = Modifier.fillMaxSize()) } }
+    private fun show(c: List<SettingCategory> = cats()) {
+        rule.setContent { SphereTheme { SettingsSpace(visible = true, categories = c, initialCategory = CATEGORY_ROOT, sounds = null, onClose = {}, modifier = Modifier.fillMaxSize()) } }
         rule.mainClock.advanceTimeBy(700); rule.waitForIdle()
     }
 
-    private fun shoot(name: String) {
-        rule.mainClock.advanceTimeBy(800); rule.waitForIdle()
-        val view = rule.activity.findViewById<android.view.View>(android.R.id.content)
-        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        rule.runOnUiThread { view.draw(android.graphics.Canvas(bmp)) }
-        File(outDir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-    }
+    // Wave 57 (settingsTabs): the root list with its summary lines is gone (six tabs replace it), so the tests of the "Pages" row, the summary lines
+    // and the Workspaces root row were replaced by these: the names the owner chose stay (Side panel, Workspaces up front in Apps, the font cards).
 
-    @Test fun CFG_21_theFirstRowIsPagesNotPageOneAndItsSummarySaysWhichPageAndTheLayout() {
+    @Test fun CFG_21_theRightHandPanelTabIsSidePanelNotComms() {
         val c = cats()
-        val first = c[OneUiModel.groups(c).first().first()]
-        assertEquals("Pages", first.title)
-        assertEquals(OneUiModel.PAGE, OneUiModel.key(first.title))
-        assertEquals("Page 1 of 3 · Grid", summaries(c)[first.title])
-        assertEquals("Page 2 of 3 · Grid", settingsSummaries(HomePages.Paginated, 3, 0, 2, c, pageIndex = 1)[first.title])
-        show(c)
-        rule.onNodeWithTag(OneUiTags.row("Pages")).assertIsDisplayed()
-        assertEquals("no row says Page 1", 0, rule.onAllNodesWithText("Page 1", substring = false).fetchSemanticsNodes().size)
-        rule.onNodeWithText("Page 1 of 3 · Grid").assertIsDisplayed()
-    }
-
-    @Test fun CFG_21_theRightHandPanelRowIsSidePanelAndItsSummaryNamesWhatItHolds() {
-        val c = cats()
-        val title = c.first { OneUiModel.key(it.title) == OneUiModel.SIDE_PANEL }.title
-        assertEquals("Side panel", title)
+        val side = SettingsTestNav.tab(c, SettingsTabs.SIDE_PANEL)
+        assertEquals("Side panel", side.title)
         assertTrue("no category is still called Comms", c.none { it.title == "Comms" })
-        assertEquals("Comms · 100%", summaries(c)[title])
-        assertEquals("Comms · 100%, Widgets · 2", summaries(c, widgets = 2)[title])
-        assertEquals("widgets only", "Widgets · 2", sidePanelSummary(null, 2))
-        assertEquals("Comms · 100%", sidePanelSummary("100%", 0))
-        // the sections inside the panel keep their names
-        val items = c.first { it.title == title }.items.map { it.title }
+        val items = side.items.map { it.title }
         assertTrue(items.any { it.startsWith("Comms ") }); assertTrue(items.contains("Default view"))
         show(c)
-        rule.onAllNodes(androidx.compose.ui.test.hasScrollAction())[0].performScrollToNode(androidx.compose.ui.test.hasTestTag(OneUiTags.row("Side panel")))
-        rule.onNodeWithTag(OneUiTags.row("Side panel")).assertIsDisplayed()
-        assertEquals(0, rule.onAllNodesWithText("Comms").fetchSemanticsNodes().size)
+        rule.onNodeWithTag(SettingsTabTags.tab("Side panel"), useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun CFG_21_commsStillFindsTheSidePanelByASearchKeyword() {
         val c = cats()
         val index = SettingsIndex.fromCategories(c)
         val sideIdx = c.indexOfFirst { it.title == "Side panel" }
-        assertTrue("every row of the side panel is a result for 'comms'", index.search("comms", 200).count { it.categoryIndex == sideIdx } >= c[sideIdx].items.size)
+        assertTrue("every row of the side panel is a result for 'comms'", index.search("comms", 400).count { it.categoryIndex == sideIdx && it.paneEntryId == null } >= c[sideIdx].items.size)
         assertTrue("the old product word still leads there", index.search("launchpad", 50).any { it.categoryIndex == sideIdx })
         assertTrue("'widgets' finds it as well", index.search("widgets", 200).any { it.categoryIndex == sideIdx })
     }
 
-    @Test fun CFG_21_workspacesIsATopLevelRowNearTheTopWithACountAndLeavesTheDesktopCategory() {
+    @Test fun CFG_21_workspacesLeadsTheAppsTabAndLeftTheDesktopCategory() {
         val c = cats()
-        val ws = c.indexOfFirst { OneUiModel.key(it.title) == "Workspaces" }
-        assertTrue("a top-level Workspaces category exists", ws >= 0)
-        val groups = OneUiModel.groups(c)
-        assertEquals("it sits in the first card, with the pages and the home screen", 0, groups.indexOfFirst { ws in it })
-        assertEquals("3 workspaces", summaries(c, workspaces = 3)[c[ws].title])
-        assertEquals("1 workspace", summaries(c, workspaces = 1)[c[ws].title])
+        val apps = SettingsTestNav.tab(c, SettingsTabs.APPS)
+        val ws = apps.items.first() as SettingItem.Pane
+        assertEquals("Workspaces", ws.title)
+        assertTrue(ws.bare)
         assertTrue("the old entry point under Desktop & dock is gone", desktopCategory().items.none { it.title == "Workspaces" })
-        assertTrue("App groups stay where they were", desktopCategory().items.any { it.title == "App groups" })
-        val only = c[ws].items.single() as SettingItem.Pane
-        assertTrue(only.bare)
-        show(c)
-        rule.onNodeWithTag(OneUiTags.row("Workspaces")).assertIsDisplayed() // on the first screen, no scrolling
-        rule.onNodeWithText("3 workspaces").assertIsDisplayed()
-        val y = { t: String -> rule.onNodeWithTag(OneUiTags.row(t)).getUnclippedBoundsInRoot().top }
-        assertTrue("above Look", y("Workspaces") < y("Look"))
+        assertEquals("one Workspaces row in all of Settings", 1, c.flatMap { it.items }.count { it.title == "Workspaces" })
     }
 
-    @Test fun CFG_21_theLookSummaryNamesTheFontAndTheLookPageHasAFontRowWithAllCards() {
-        val c = cats()
-        val look = c.first { OneUiModel.key(it.title) == "Look" }
-        assertEquals("Dark · Rounded icons · Space Grotesk", summaries(c)[look.title])
-        val chosen = cats(LauncherPrefs(homePages = HomePages.Paginated, uiFont = "jetbrains_mono"))
-        assertTrue(summaries(chosen)["Look"]!!.endsWith("JetBrains Mono"))
+    @Test fun CFG_21_theLookTabHasAFontRowWithAllCards() {
+        val look = SettingsTestNav.tab(cats(), SettingsTabs.LOOK)
         val font = look.items.first { it.title == "Font" } as SettingItem.Choice<*>
         assertEquals(8, font.options.size)
         assertTrue("shown as cards, not a list", OneUiModel.presentation(font) == OneUiModel.Presentation.Rail)
-    }
-
-    @Test fun CFG_21_screenshotOfTheSettingsHome() {
-        show()
-        shoot("w52-settings-home")
-        assertTrue(File(outDir, "w52-settings-home.png").length() > 1000)
     }
 }

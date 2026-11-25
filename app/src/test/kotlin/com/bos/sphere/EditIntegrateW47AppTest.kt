@@ -102,8 +102,8 @@ abstract class EditIntegrateBase : TourBase() {
         }
         if (tagShown("edit.bar")) return
         if (!settingsShown()) rule.onNodeWithTag("quick.groundcontrol", useUnmergedTree = true).performScrollTo().performClick().also { settle() }
-        if (!textShown("Edit home")) { rule.onNodeWithTag("oneui.row.Home screen", useUnmergedTree = true).performScrollTo().performClick(); settle() }
-        rule.onNodeWithText("Edit home", useUnmergedTree = true).performScrollTo().performClick(); settle()
+        SettingsTestNav.goTo(rule, "Home", "Edit home"); settle(300) // wave 57: the Home tab, Pages section
+        rule.onNodeWithText("Edit home", useUnmergedTree = true).performClick(); settle()
         assertTrue("edit mode is on", tagShown("edit.bar"))
     }
 

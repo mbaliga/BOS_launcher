@@ -1,5 +1,7 @@
 # settingsFont (wave 52): Settings home rows, centred capital titles, the UI font
 
+> **Wave 57 (settingsTabs) supersedes the root rows "Pages", "Side panel" and "Workspaces" and their summary lines below: the root list is gone; Side panel is a tab and Workspaces the first row of Apps (`docs/decisions/settingsTabs.md`).**
+
 Owner feedback on the One UI Settings home (CFG-21). Nothing here is device verified.
 
 ## Decisions

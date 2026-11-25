@@ -168,7 +168,6 @@ import com.bos.sphere.ui.HubPanel
 import com.bos.sphere.ui.SettingsModel
 import com.bos.sphere.ui.SystemLinks
 import com.bos.sphere.ui.buildSettingsCategories
-import com.bos.sphere.ui.settingsCategoryIndex
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -557,7 +556,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             // Wave 24: the same route as Ctrl+H, so what hides the rail closes first (the drawer, Radar...) and, with no rail to come, a toast says why.
             com.bos.sphere.core.data.RightSide.DockRail -> { focusDockFromHome(com.bos.sphere.core.input.LauncherCommand.FocusDock); true }
             com.bos.sphere.core.data.RightSide.Off -> {
-                android.widget.Toast.makeText(context, L10n.tr("The right side is off. Turn it on in Ground Control, Home screen, Right side."), android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(context, L10n.tr("The right side is off. Turn it on in Settings, Side panel, Right side."), android.widget.Toast.LENGTH_SHORT).show()
                 false
             }
         }
@@ -570,7 +569,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             CornerActionId.Search -> { wheelOpen = false; searchOpen = true }
             CornerActionId.AllApps -> openAllApps(anchor)
             CornerActionId.Notifications -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true
-            CornerActionId.LauncherSettings -> openSettings(com.bos.sphere.ui.CATEGORY_ROOT)
+            CornerActionId.LauncherSettings -> openSettings(CATEGORY_HOME) // wave 57: "Home settings" opens the Home tab
             CornerActionId.OpenLaunchpad -> if (prefs.leftPage != com.bos.sphere.core.data.LeftPage.Off) leftOpen = true else hubOpen = true // Launchpad off: the Minimal top-right hotspot (and a corner) opens the notification hub like "Notifications" does, never nothing
             CornerActionId.OpenRecents -> openRecents()
             else -> Unit
@@ -1562,10 +1561,14 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
         val setupState = com.bos.sphere.ui.rememberSetupState(corners, gestures, active = settingsOpen) // wave 56 (CFG-26): the Finish setup row
-        val categories = remember(setupState, hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsPrefs, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels) {
+        remember(context) { com.bos.sphere.core.data.LauncherHapticSettings.init(context); true }
+        val hapticStrength by com.bos.sphere.core.data.LauncherHapticSettings.strength.collectAsState() // wave 57 (CFG-43): System > Sound and haptics
+        val categories = remember(setupState, hapticStrength, hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsPrefs, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels) {
             buildSettingsCategories(
             SettingsModel(
                 setup = setupState,
+                selectPage = { i -> settingsPage = i.coerceIn(0, (pages.size - 1).coerceAtLeast(0)) }, // wave 57 (CFG-44): the page list of Home > Pages
+                haptic = hapticStrength,
                 hiddenApps = hiddenAppsAccess,
                 puckSegments = puckSegments,
                 setPuckSegments = { n -> com.bos.sphere.core.data.PuckActionsStore.get(context).setSegments(n) },
@@ -1633,18 +1636,19 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
         androidx.compose.runtime.SideEffect { settingsForRadar.value = categories }
+        val settingsTarget = remember(settingsSession) { com.bos.sphere.ui.settingsTarget(categories, settingsCategory) } // wave 57: a tab and the row to flash, fixed for the visit
         SettingsSpace(
             visible = settingsOpen,
             categories = categories,
-            initialCategory = settingsCategoryIndex(categories, settingsCategory),
+            initialCategory = settingsTarget.category,
+            initialRow = settingsTarget.row,
+            tabMemory = remember(context) { com.bos.sphere.ui.PrefsTabMemory(context) },
             sounds = sounds,
             onClose = { settingsOpen = false },
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
             previewDock = { SettingsPreviewDock(homeCapture) },
             snapshots = remember(context) { com.bos.sphere.ui.StateSnapshots(context) },
-            summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories, pageIndex = settingsPage, workspaceCount = dockState.workspaces.size,
-                sidePanelWidgets = runCatching { com.bos.sphere.ui.HubPrefs.of(context).let { if (it.widgetsSection) it.widgetList.size else 0 } }.getOrDefault(0)),
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))
                 else Box(Modifier.fillMaxSize()) {
@@ -1674,7 +1678,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                         L10n.tr("Clear recents") to { stores.recentsState.clear(); menuApp = null },
                     ) else emptyList()),
                 onHomeSettings = if (!prefs.isPaged) {
-                    { menuApp = null; openSettings(com.bos.sphere.ui.CATEGORY_ROOT) }
+                    { menuApp = null; openSettings(CATEGORY_HOME) }
                 } else null,
                 // Only the paged home has pages to add to; the scrolling homes show every app.
                 isOnHome = if (prefs.isPaged) pages.any { app.key in it.keys } else null,
@@ -1774,8 +1778,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 page = quickPage?.takeIf { landing == HomeShown.Pages && prefs.homeStyle == HomeStyle.Grid && prefs.homePages == com.bos.sphere.core.data.HomePages.Paginated },
                 pageCount = pages.size,
                 onDeletePage = { requestDeletePage(quickPage ?: 0); quickOpen = false },
-                onWallpaper = { quickOpen = false; openSettings(settingsCategoryIndex(categories, CATEGORY_HOME)) }, // HOM-16 (wave 26): the wallpaper rows are in Home screen
-                onGroundControl = { quickOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_ROOT) }, // wave 40: the root list of every category
+                onWallpaper = { quickOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_WALLPAPER) }, // wave 57: the wallpaper rows are in Look > Wallpaper
+                onGroundControl = { quickOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_ROOT) }, // wave 57: Settings on the tab shown last
                 onDismiss = { quickOpen = false },
                 // W51: the same entry points as the edit tray: Edit home, the app picker and the widget picker (Pages turned on first when they are off).
                 onEditHome = { quickOpen = false; editHome() },

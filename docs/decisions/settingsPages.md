@@ -1,5 +1,7 @@
 # settingsPages (wave 46, CFG-21)
 
+> **Wave 57 (settingsTabs): the "category page" title band below is now the one Settings home title band (a section has no page title of its own in portrait; in landscape the end pane carries the section's title) (`docs/decisions/settingsTabs.md`).**
+
 Owner feedback: "Use full page menus where there are popups, not when the Options are outside already! Why is the left page options outside as well as inside? this is there for many options. Move the settings title to the centre of the empty space."
 
 ## One presentation per option set, never two

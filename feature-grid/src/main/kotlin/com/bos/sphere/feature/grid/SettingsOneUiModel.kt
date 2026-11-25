@@ -3,9 +3,9 @@ package com.bos.sphere.feature.grid
 import com.bos.sphere.core.design.L10n
 
 /**
- * Wave 40 (settingsOneUI), CFG-21: the pure model of the One UI style settings: how the categories are grouped into the groups of
- * the root list, the accent of each category's icon tile, the summary line when the app gives none, how the rows of a category
- * page are cut into groups and headed by small section titles, and the maths of the collapsing title. No Compose in here, so every
+ * Wave 40 (settingsOneUI), CFG-21: the pure model of the One UI style settings: how the rows of a section are cut into groups and
+ * headed by small section titles, how a row offers its options, and the maths of the collapsing title. Wave 57 (settingsTabs) removed the root
+ * list of categories (its groups, tiles and summary lines): the six sections are tabs now ([SettingsTabs]). No Compose in here, so every
  * rule is unit-tested on the JVM.
  */
 object OneUiModel {
@@ -14,95 +14,26 @@ object OneUiModel {
 
     fun twoPane(widthDp: Float, heightDp: Float): Boolean = widthDp >= TWO_PANE_MIN_DP && widthDp > heightDp
 
-    /**
-     * The English names of the categories, in the order and the groups One UI would give them: look and home first, then the
-     * inputs, then notifications, then the system. A category that is not listed (a new one) lands in a group of its own before the last group.
-     */
-    val GROUPS: List<List<String>> = listOf(
-        listOf(PAGE, "Home screen", "Workspaces"),
-        listOf("Look", "App drawer", "Desktop & dock"),
-        listOf("Corners", "Gestures", "Radar"),
-        listOf(SIDE_PANEL),
-        listOf("System & sound", "Hidden apps", "Backup", "Capabilities"),
-        listOf("Lab", "About"),
-    )
-
-    /** Stands for the page category of the home's pages (wave 52: the row says "Pages", not "Page 1"; it holds the settings of the page under the finger). */
-    const val PAGE = "Pages"
-
-    /**
-     * Wave 52: the settings of the right-hand panel. It was the "Comms" category; the panel can hold widgets too, so the row is named by what it is.
-     * The sections inside the panel keep their own names (Comms and so on).
-     */
-    const val SIDE_PANEL = "Side panel"
+    /** Wave 52: the settings of the right-hand panel ("Side panel", not "Comms"); wave 57: one of the six sections ([SettingsTabs.SIDE_PANEL]). */
+    const val SIDE_PANEL = SettingsTabs.SIDE_PANEL
 
     /**
      * Wave 56 (CFG-32): the page of what is still unfinished (default home, notification and usage access, Do Not Disturb access). It is a category of the
-     * list (so a search and the back stack treat it like any page) but it is not a row of the groups: the root shows it as one flat row above them, only while it exists.
+     * list (so a search and the back stack treat it like any page) but it is not a tab (wave 57): Settings shows it as one flat row above the tabs, only while it exists.
      */
     const val FINISH_SETUP = "Finish setup"
 
-    private val COUNT_SUFFIX = Regex("""^(.*) · \d+$""")
-
-    /** The title to show: the tab-era "Hidden apps · 2" is plain "Hidden apps" (the count is in the summary line now). */
-    fun displayTitle(title: String): String = COUNT_SUFFIX.matchEntire(title)?.groupValues?.get(1)?.takeIf { keyOf(it) != null } ?: title
-
-    /** The English name of a category from its (maybe translated) [title]; null when it is not one of the known ones. */
-    fun key(title: String): String? = keyOf(displayTitle(title))
-
-    private fun keyOf(title: String): String? {
+    /** The English key of a category from its (maybe translated) [title]: one of the six sections, or the Finish setup page; null otherwise. */
+    fun key(title: String): String? {
         if (title == FINISH_SETUP || title == L10n.tr(FINISH_SETUP)) return FINISH_SETUP
-        for (g in GROUPS) for (k in g) {
-            if (title == k || title == L10n.tr(k)) return k
-        }
-        return null
+        return SettingsTabs.key(title)
     }
 
     /** The index of the Finish setup page in [categories], or -1 while nothing is unfinished. */
     fun finishSetupIndex(categories: List<SettingCategory>): Int = categories.indexOfFirst { key(it.title) == FINISH_SETUP }
 
-    /** The category indices of [categories] cut into the groups of the root list, in order; every index appears exactly once, except the Finish setup page (it has its own row above the groups). */
-    fun groups(categories: List<SettingCategory>): List<List<Int>> {
-        val byKey = categories.indices.groupBy { key(categories[it].title) }
-        val out = ArrayList<List<Int>>()
-        val unknown = byKey[null].orEmpty()
-        GROUPS.forEachIndexed { gi, g ->
-            if (gi == GROUPS.lastIndex && unknown.isNotEmpty()) out += unknown
-            val idx = g.flatMap { byKey[it].orEmpty() }
-            if (idx.isNotEmpty()) out += idx
-        }
-        return out
-    }
-
-    /** Muted flat accent (0xAARRGGBB) of the icon tile of a category. */
-    fun accent(title: String): Long = when (key(title)) {
-        PAGE, "Home screen" -> 0xFF4A86D9
-        "Look" -> 0xFF9B6BD6
-        "App drawer" -> 0xFF2FA3A0
-        "Desktop & dock" -> 0xFF5C74C9
-        "Corners" -> 0xFFD9923A
-        "Gestures" -> 0xFF58A55C
-        "Radar" -> 0xFF2F8FBF
-        SIDE_PANEL -> 0xFFDE6A5E
-        "Workspaces" -> 0xFF4FA38A
-        "System & sound" -> 0xFF76859A
-        "Hidden apps" -> 0xFF8C6CB4
-        "Backup" -> 0xFF3F9E7A
-        "Capabilities" -> 0xFFC48A2E
-        "Lab" -> 0xFFB45F8C
-        "About" -> 0xFF6D7C8C
-        FINISH_SETUP -> 0xFF8E7BFF
-        else -> 0xFF6D7C8C
-    }
-
-    /** The grey line under a category's title when the host gave none: the first two values worth showing, else how many settings it holds. */
-    fun fallbackSummary(c: SettingCategory): String {
-        val vals = c.items.filter { it is SettingItem.Choice<*> || it is SettingItem.Toggle || it is SettingItem.Slider }.map { it.value }.filter { it.isNotBlank() }.take(2)
-        return if (vals.isNotEmpty()) vals.joinToString(" · ") else L10n.tr("%d settings", c.items.size)
-    }
-
-    /** What the root list shows under a category: the host's summary when it has one, else [fallbackSummary]. */
-    fun summary(c: SettingCategory, given: Map<String, String>): String = given[c.title]?.takeIf { it.isNotBlank() } ?: fallbackSummary(c)
+    /** Muted flat accent (0xAARRGGBB) of the icon tile of the Finish setup row (wave 57: the only row of Settings home with a tile). */
+    fun accent(title: String): Long = if (key(title) == FINISH_SETUP) 0xFF8E7BFF else 0xFF6D7C8C
 
     // ---- category pages ---------------------------------------------------------------------------------------------------------
 
@@ -198,20 +129,5 @@ object OneUiModel {
         is SettingItem.Choice<*> -> if (i.preview != null) Presentation.Rail else Presentation.Page
         is SettingItem.Action -> if (i.navigates) Presentation.LinkChevron else Presentation.Link
         is SettingItem.Pane -> Presentation.Pane
-    }
-
-    // ---- navigation ---------------------------------------------------------------------------------------------------------------
-
-    /** Where the user is: the root list ([category] -1), a category page, or a page of one of its rows ([sub] >= 0). */
-    data class Nav(val category: Int = -1, val sub: Int = -1) {
-        val level: Int get() = if (category < 0) 0 else if (sub < 0) 1 else 2
-        fun open(category: Int) = Nav(category, -1)
-        fun openSub(item: Int) = if (category >= 0) Nav(category, item) else this
-        /** One step back; null when there is nowhere to go and the settings close. [twoPane] keeps a category selected (the list stays beside it). */
-        fun back(twoPane: Boolean): Nav? = when {
-            sub >= 0 -> Nav(category, -1)
-            category >= 0 && !twoPane -> Nav(-1, -1)
-            else -> null
-        }
     }
 }

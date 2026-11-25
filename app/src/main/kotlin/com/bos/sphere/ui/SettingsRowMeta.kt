@@ -18,9 +18,9 @@ import com.bos.sphere.feature.grid.SettingItem
  * left exactly as it is. Tests hold the tables to the real categories (every id and every slider is found, every slider has a default).
  */
 internal object SettingsRowMeta {
-    /** English category key to (English row title to row id). */
+    /** English key of the block a row is built in (wave 57: the Home block, which the tabs then share out) to (English row title to row id). */
     val IDS: Map<String, Map<String, String>> = mapOf(
-        "Home screen" to mapOf(
+        "Home" to mapOf(
             "Calm home screen (Glance)" to "home.glance",
             "Order" to "home.order",
             "Glance wallpaper" to "home.glanceWallpaper",
@@ -89,9 +89,9 @@ internal object SettingsRowMeta {
         "Interface sounds" to listOf("click", "tones", "audio", "sfx", "noise"),
         "Volume" to listOf("loudness", "sound level"),
         "Language" to listOf("locale", "translation", "idioma", "english", "deutsch"),
-        "Set as default home" to listOf("default launcher", "home app", "make default"),
-        "Notification access" to listOf("listener", "notifications", "permission", "comms"),
-        "Do Not Disturb access" to listOf("dnd", "silent", "permission", "policy"),
+        "Access and privacy" to listOf("permissions", "grants", "notification access", "usage access", "contacts", "microphone", "do not disturb", "default home", "privacy"),
+        "Launcher vibration" to listOf("haptics", "vibrate", "buzz", "feedback"),
+        "Open Liftoff Studio" to listOf("studio", "browser", "web editor", "configurator", "computer"),
         "Radar layout" to listOf("filmstrip", "orbit", "flat", "search layout"),
         "Web engine" to listOf("google", "duckduckgo", "browser search", "search provider"),
         "Web results" to listOf("internet", "play store", "online"),
@@ -140,6 +140,11 @@ internal object SettingsRowMeta {
         const val BACKUP_IMPORT = "backup.import"
         const val BACKUP_IMPORT_LAYOUT = "backup.importLayout"
         const val BACKUP_SNAPSHOT = "backup.snapshot"
+        /** Wave 57 (CFG-43): Import a Studio file (the same import as Import setup, named for the browser editor). */
+        const val BACKUP_IMPORT_STUDIO = "backup.importStudio"
+        /** Wave 57 (CFG-42): the two rows of Access and privacy that are not grants of [GrantKind]. */
+        const val ACCESS_DND = "access.dnd"
+        const val ACCESS_DEFAULT_HOME = "access.defaultHome"
         fun access(k: GrantKind) = "access.${k.name}"
         fun openWith(id: com.bos.sphere.core.data.CornerActionId) = "openwith.${id.name}"
     }
@@ -160,10 +165,14 @@ internal object SettingsRowMeta {
             PaneEntry(PaneIds.BACKUP_IMPORT, L10n.tr("Import setup…"), listOf("restore", "load", "file", "open")),
             PaneEntry(PaneIds.BACKUP_IMPORT_LAYOUT, L10n.tr("Import layout from another launcher…"), listOf("migrate", "launcher3", "move", "switch launcher")),
             PaneEntry(PaneIds.BACKUP_SNAPSHOT, L10n.tr("Take a snapshot now"), listOf("restore point", "backup", "undo", "history")),
+            PaneEntry(PaneIds.BACKUP_IMPORT_STUDIO, L10n.tr("Import a Studio file…"), listOf("studio", "browser", "web editor", "configurator")),
         ),
-        "Access Liftoff asks for" to GrantKind.entries.map { k ->
+        "Access and privacy" to GrantKind.entries.map { k ->
             PaneEntry(PaneIds.access(k), L10n.tr(GrantGateLogic.copy(k).title), ACCESS_WORDS[k].orEmpty(), L10n.tr(GrantGateLogic.copy(k).button))
-        },
+        } + listOf(
+            PaneEntry(PaneIds.ACCESS_DND, L10n.tr("Do Not Disturb access"), listOf("dnd", "silent", "permission", "policy")),
+            PaneEntry(PaneIds.ACCESS_DEFAULT_HOME, L10n.tr("Set as default home"), listOf("default launcher", "home app", "make default")),
+        ),
         "Open with" to listOf(
             com.bos.sphere.core.data.CornerActionId.Music, com.bos.sphere.core.data.CornerActionId.Messages, com.bos.sphere.core.data.CornerActionId.Browser,
             com.bos.sphere.core.data.CornerActionId.Email, com.bos.sphere.core.data.CornerActionId.Maps, com.bos.sphere.core.data.CornerActionId.Calendar,

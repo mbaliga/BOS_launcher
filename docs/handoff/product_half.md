@@ -231,6 +231,8 @@ Home sheet > Ground Control button (opens the root), a Radar settings result (op
 
 ## 4. IA problems and open decisions
 
+> **Wave 57 (settingsTabs):** the owner chose six sections (Home, Look, Apps, Radar, Side panel, System) behind Liftoff's own text tabs, built as `docs/decisions/settingsTabs.md` describes (problems 1, 2, 3, 5, 6, 12, 13, 14, 18, 19, 20 and 22 are answered there; Workspaces sits at the top of Apps rather than as an eighth group; Controls is the Home tab's Corners, Gestures and motion, and Keyboard and pointer sections). The "current structure" below is history.
+
 Current structure, from `reorganise()` in `SettingsCategories.kt` and `OneUiModel.GROUPS` (root cards, in order):
 Card 1: Page N (paged home only), Look, Home screen, App drawer, Desktop & dock. Card 2: Corners, Gestures, Radar.
 Card 3: Comms. Card 4: System & sound, Hidden apps, Backup, Capabilities. Card 5: Lab (gated), About. Fourteen rows at root.

@@ -172,23 +172,10 @@ class SettingsCoreW56Test {
         assertEquals("Needs Circle layout", hit.disabledReason)
     }
 
-    @Test fun CFG_31_aSectionStartsAtARowIdNotAtItsEnglishTitle() {
-        val items = listOf<SettingItem>(
-            SettingItem.Toggle("Calm home", g, true) {}.rowId("home.glance"),
-            SettingItem.Toggle("Anything", g, true) {},
-            SettingItem.Choice("Reihenfolge", g, listOf("a"), "a", { it }) {}.rowId("home.order"),
-        )
-        // The row is named "Reihenfolge" here (a translation): the id still finds it.
-        val h = OneUiSections.headers("Home screen", items)
-        assertEquals(setOf(0, 2), h.keys)
-        assertEquals("Pages", h[0]); assertEquals("Layout", h[2])
-        assertEquals(2, OneUiSections.find(items, "home.order"))
-        assertEquals("a row without an id is still found by its title", 1, OneUiSections.find(items, "Anything"))
-    }
-
     @Test fun CFG_31_aSectionHeaderSurvivesItsFirstRowBeingConditional() {
+        // Wave 57: the headers come with the category (the app's tab placement makes them); a row that is off keeps its header above it.
         val first = SettingItem.Choice("Clock style", g, listOf("Off"), "Off", { it }) {}.rowId("home.clockStyle").disabled("Clock style is Off")
-        val h = OneUiSections.headers("Home screen", listOf(first))
+        val h = OneUiSections.headers(SettingCategory("Home", g, listOf(first), headers = mapOf(0 to "Glance")))
         assertEquals("Glance", h[0])
     }
 
@@ -216,7 +203,7 @@ class SettingsCoreW56Test {
         val c = FinishSetup.category(s) {}!!
         assertEquals("2 left", (c.items.single() as SettingItem.Pane).value)
         assertEquals(OneUiModel.FINISH_SETUP, OneUiModel.key(c.title))
-        assertEquals("it is no row of the groups", emptyList<List<Int>>(), OneUiModel.groups(listOf(c)))
+        assertEquals("it is not a tab", emptyList<Int>(), SettingsTabs.tabIndices(listOf(c)))
         assertEquals(0, OneUiModel.finishSetupIndex(listOf(c)))
         assertEquals(-1, OneUiModel.finishSetupIndex(emptyList()))
     }

@@ -153,6 +153,8 @@ fun ColumnScope.BackupPane(onStateChanged: (Context) -> Unit = {}) {
         ActionRow(L10n.tr("Export setup…"), L10n.tr("Everything in one file"), Glyphs.Info, flashId = "backup.export") { exportAll.launch("liftoff-setup.json") }
         ActionRow(L10n.tr("Export settings only…"), L10n.tr("A separate settings document"), Glyphs.Info, flashId = "backup.exportSettings") { exportSettings.launch("liftoff-settings.json") }
         ActionRow(L10n.tr("Import setup…"), L10n.tr("From a Liftoff file; snapshots first"), Glyphs.Info, flashId = "backup.import") { pick.launch(arrayOf("application/json", "text/plain", "*/*")) }
+        // Wave 57 (CFG-43): Liftoff Studio writes the same settings and setup files, so this is the same import, named for it.
+        ActionRow(L10n.tr("Import a Studio file…"), L10n.tr("A file saved by Liftoff Studio in a browser; snapshots first"), Glyphs.Globe, flashId = "backup.importStudio") { pick.launch(arrayOf("application/json", "text/plain", "*/*")) }
 
         ActionRow(L10n.tr("Import layout from another launcher…"), L10n.tr("A Launcher3-style database or a backup zip that holds one; apps only"), Glyphs.Info, flashId = "backup.importLayout") {
             pickLauncher.launch(arrayOf("application/octet-stream", "application/zip", "application/x-sqlite3", "*/*"))

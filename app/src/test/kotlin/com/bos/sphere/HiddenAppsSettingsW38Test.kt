@@ -42,20 +42,22 @@ class HiddenAppsSettingsW38Test {
 
     @Test fun HOM_05_w38_hiddenAppsIsItsOwnRowRightAfterTheAppDrawerWithTheCountOnTheTab() {
         val c = cats(access(2))
-        val i = c.indexOfFirst { it.title == "Hidden apps · 2" }
-        assertTrue("a Hidden apps tab with the count: ${c.map { it.title }}", i > 0)
-        assertEquals("App drawer", c[i - 1].title)
-        val row = c[i].items.single() as SettingItem.Pane
-        assertEquals("Hidden apps", row.title); assertEquals("2 hidden", row.value)
+        // wave 57: a row of its own in the Apps tab, its section right after the App drawer, the count in its value
+        val apps = c.first { it.title == "Apps" }
+        val i = apps.items.indexOfFirst { it.title == "Hidden apps" }
+        assertTrue("a Hidden apps row: ${apps.items.map { it.title }}", i > 0)
+        assertEquals("Hidden apps", apps.headers[i])
+        val row = apps.items[i] as SettingItem.Pane
+        assertEquals("2 hidden", row.value)
     }
 
     @Test fun HOM_05_w38_withNothingHiddenTheRowStillExistsWithoutABadge() {
         val c = cats(access(0))
-        val tab = c.first { it.title == "Hidden apps" }
-        assertEquals("None", (tab.items.single() as SettingItem.Pane).value)
+        val row = c.first { it.title == "Apps" }.items.first { it.title == "Hidden apps" } // wave 57: a row of the Apps tab
+        assertEquals("None", (row as SettingItem.Pane).value)
     }
 
-    @Test fun HOM_05_w38_noAccessNoRow() = assertFalse(cats(null).any { it.title.startsWith("Hidden apps") })
+    @Test fun HOM_05_w38_noAccessNoRow() = assertFalse(cats(null).flatMap { it.items }.any { it.title.startsWith("Hidden apps") })
 
     @Test fun HOM_05_w38_unhideEverywhereClearsTheHiddenSetAndEveryHideRuleOfThePackage() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()

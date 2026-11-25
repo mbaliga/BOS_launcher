@@ -131,7 +131,7 @@ class ThemesW39Test {
         )
         val look = cats.first { it.title == "Look" }.items
         assertTrue("Themes is a pane under Look", look.any { it.title == "Themes" && it is SettingItem.Pane })
-        val home = cats.first { it.title == "Home screen" }.items
+        val home = cats.flatMap { it.items } /* wave 57: the rows are shared out over six tabs */
         assertFalse("W55: Dock style left Home screen; it is chosen in the dock's sheet and on Desktop & dock > Dock", cats.flatMap { it.items }.any { it.title == "Dock style" })
         assertTrue(home.isNotEmpty())
         assertEquals("one of each", 1, cats.flatMap { it.items }.count { it.title == "Themes" })

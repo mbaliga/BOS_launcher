@@ -24,6 +24,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.L10n
@@ -89,6 +91,9 @@ class SettingsPagesW46Test {
         rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
     }
 
+    /** Wave 57: the Comms section's list scrolled to its Icon shape row (two rails sit above it). */
+    private fun toIconShape() { rule.onNodeWithTag(SettingsTabTags.list("Comms")).performScrollToNode(hasContentDescription("Icon shape, Rounded")); rule.waitForIdle() }
+
     private fun back() { rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }; rule.mainClock.advanceTimeBy(500); rule.waitForIdle() }
 
     private fun shoot(name: String) {
@@ -121,7 +126,7 @@ class SettingsPagesW46Test {
         show(initial = 1)
         rule.onNode(hasContentDescription("Left page, Comms")).performClick(); rule.waitForIdle()
         rule.onAllNodesWithTag(OneUiTags.SUB_PAGE).assertCountEquals(0)
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).assertIsDisplayed()
+        rule.onNodeWithTag(OneUiTags.ROOT).assertIsDisplayed()
         rule.onAllNodesWithText("Off", useUnmergedTree = true)[0].performClick(); rule.waitForIdle()
         assertEquals(listOf("left=Off"), log)
         rule.onAllNodesWithTag(OneUiTags.SUB_PAGE).assertCountEquals(0)
@@ -130,7 +135,7 @@ class SettingsPagesW46Test {
     // ---- a row without cards: a full page, never a dialog ---------------------------------------------------------------
 
     @Test fun CFG_21_w46_aPlainChoiceShowsItsValueInGreyAndOpensAFullPageNotADialog() {
-        show(initial = 1)
+        show(initial = 1); toIconShape()
         rule.onNode(hasContentDescription("Icon shape, Rounded")).performClick(); rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
         rule.onNodeWithTag(OneUiTags.SUB_PAGE).assertIsDisplayed()
         rule.onAllNodesWithTag(OneUiDialogTags.DIALOG).assertCountEquals(0)
@@ -145,11 +150,11 @@ class SettingsPagesW46Test {
     }
 
     @Test fun CFG_21_w46_backFromAChoicePageReturnsWithoutChangingIt() {
-        show(initial = 1)
+        show(initial = 1); toIconShape()
         rule.onNode(hasContentDescription("Icon shape, Rounded")).performClick(); rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
         back()
         rule.onAllNodesWithTag(OneUiTags.SUB_PAGE).assertCountEquals(0)
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).assertIsDisplayed()
+        rule.onNodeWithTag(OneUiTags.ROOT).assertIsDisplayed()
         assertTrue(log.isEmpty())
         assertEquals(0, closed)
     }
@@ -181,7 +186,7 @@ class SettingsPagesW46Test {
         // a search result or Radar settings result lands on the exact row and lights it, rows with cards included
         SettingsFocus.request(1)
         show(initial = 1)
-        rule.onNodeWithTag(OneUiTags.CATEGORY_PAGE).assertIsDisplayed()
+        rule.onNodeWithTag(OneUiTags.ROOT).assertIsDisplayed()
         rule.onAllNodesWithTag(OneUiTags.RAIL).assertCountEquals(2)
         SettingsFocus.clear()
     }
@@ -203,7 +208,8 @@ class SettingsPagesW46Test {
 
     @Test fun CFG_21_w46_aCategoryTitleAndAChoicePageTitleWithItsExplanationAreCentredToo() {
         show(initial = 1)
-        assertCentred(rule.onNodeWithTag(OneUiTags.TITLE_BAND), rule.onNodeWithTag(OneUiTags.TITLE_LARGE), label = "category")
+        assertCentred(rule.onNodeWithTag(OneUiTags.TITLE_BAND), rule.onNodeWithTag(OneUiTags.TITLE_LARGE), label = "settings home")
+        toIconShape()
         rule.onNode(hasContentDescription("Icon shape, Rounded")).performClick(); rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
         val bands = rule.onAllNodesWithTag(OneUiTags.TITLE_BAND)
         assertTrue(bands.fetchSemanticsNodes().isNotEmpty())
@@ -225,7 +231,8 @@ class SettingsPagesW46Test {
         rule.mainClock.advanceTimeBy(600); rule.waitForIdle()
         rule.onNodeWithTag(OneUiTags.TITLE_LARGE).assertIsDisplayed()
         rule.onAllNodesWithTag(OneUiTags.TITLE_SMALL).assertCountEquals(0)
-        rule.onAllNodes(androidx.compose.ui.test.hasScrollAction())[0].performScrollToNode(androidx.compose.ui.test.hasText("Option 25"))
+        // wave 57: the title band goes with a drag of the section's list (a scroll by the list's own actions keeps it, so the list's viewport is always the visible part)
+        repeat(3) { rule.onNodeWithTag(SettingsTabTags.list("Home screen")).performTouchInput { swipeUp() }; rule.mainClock.advanceTimeBy(400) }
         rule.waitForIdle()
         rule.onNodeWithTag(OneUiTags.TITLE_SMALL).assertIsDisplayed()
         rule.onNodeWithTag(OneUiTags.TITLE_LARGE).assertIsNotDisplayed()
@@ -255,7 +262,7 @@ class SettingsPagesW46Test {
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xhdpi")
     fun CFG_21_w46_screenshotChoicePageDarkLandscape() {
         show(initial = 1)
-        rule.onAllNodes(androidx.compose.ui.test.hasScrollAction() and hasAnyAncestor(hasTestTag(OneUiTags.RIGHT_PANE)))[0].performScrollToNode(hasContentDescription("Icon shape, Rounded")); rule.waitForIdle()
+        toIconShape()
         rule.onNode(hasContentDescription("Icon shape, Rounded")).performClick(); rule.mainClock.advanceTimeBy(600); shoot("w46-choice-page-dark-landscape")
     }
 }

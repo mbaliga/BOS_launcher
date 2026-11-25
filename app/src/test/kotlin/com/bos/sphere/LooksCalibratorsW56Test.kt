@@ -133,10 +133,10 @@ class LooksCalibratorsW56Test {
     // --- the calibrators ------------------------------------------------------------------------------------------------------------------
 
     @Test fun CFG_27_w56_tryItRowsSitUnderTheirSliders() {
-        val corners = cats().first { it.title == "Corners" }.items.map { it.title }
+        val corners = cats().first { it.title == "Home" }.items.map { it.title } // wave 57: Corners and Keyboard and pointer are sections of Home
         assertEquals("the hot corner delay slider is followed by its Try it", corners.indexOf("Hot corner delay") + 1, corners.indexOf("Try it: Hot corner delay"))
         prefs = prefs.copy(hotCornersOn = false)
-        assertTrue("with hot corners off there is nothing to try", cats().first { it.title == "Corners" }.items.none { it.title.startsWith("Try it") })
+        assertTrue("with hot corners off there is nothing to try", cats().first { it.title == "Home" }.items.none { it.title == "Try it: Hot corner delay" })
         val titles = all().map { it.title }
         assertEquals(titles.indexOf("Motion sensitivity") + 1, titles.indexOf("Try it: Motion sensitivity"))
         assertTrue(titles.indexOf("Try it: Controls hide after") > titles.indexOf("Controls hide after (seconds)"))

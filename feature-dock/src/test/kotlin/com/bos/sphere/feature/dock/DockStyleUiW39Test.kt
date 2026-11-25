@@ -126,13 +126,13 @@ class DockStyleUiW39Test {
         rule.waitForIdle()
         // one node per item, never a second one for the 3D reflection
         listOf("Mail, used this session", "Maps", "Notes, used this session", "Music").forEach { rule.onAllNodesWithContentDescription(it).assertCountEquals(1) }
-        rule.onNodeWithContentDescription("Workspace Home").assertExists()
+        rule.onNodeWithContentDescription("Profile Home").assertExists()
         // touch targets are 52 dp whatever the style (48 dp is the minimum)
         listOf("Maps", "Music").forEach { d ->
             val b = rule.onNodeWithContentDescription(d).getBoundsInRoot()
             assertTrue("$style $d width ${b.width}", b.width >= 48.dp); assertTrue("$style $d height ${b.height}", b.height >= 48.dp)
         }
-        val home = rule.onNodeWithContentDescription("Workspace Home").getBoundsInRoot(); assertTrue(home.width >= 40.dp)
+        val home = rule.onNodeWithContentDescription("Profile Home").getBoundsInRoot(); assertTrue(home.width >= 40.dp)
     }
     @Test fun DCK_04_style_11_standardKeepsItsNodesAndTargets() = nodesAndTargets(DockStyle.Standard)
     @Test fun DCK_04_style_11_transparentKeepsItsNodesAndTargets() = nodesAndTargets(DockStyle.Transparent)
@@ -267,7 +267,7 @@ class DockStyleUiW39Test {
 
     private fun rtl(s: DockStyle) {
         rule.setContent { CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { Wallpaper(false) { Rail(s) } } }
-        val home = rule.onNodeWithContentDescription("Workspace Home").getBoundsInRoot(); val maps = rule.onNodeWithContentDescription("Maps").getBoundsInRoot()
+        val home = rule.onNodeWithContentDescription("Profile Home").getBoundsInRoot(); val maps = rule.onNodeWithContentDescription("Maps").getBoundsInRoot()
         assertTrue("$s: home glyph at the start (right) in RTL", home.left > maps.left)
     }
     @Test fun DCK_04_style_24_standardRightToLeft() = rtl(DockStyle.Standard)

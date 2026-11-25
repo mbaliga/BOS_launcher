@@ -201,9 +201,9 @@ class W4RadarInputDockTest {
         val steps = mutableListOf<Int>(); var panels = 0; var homes = 0
         rule.setContent { Rail(content("Alpha"), DockActions(onSwitchWorkspace = { steps += it }, onOpenPanel = { panels++ }, onGoHome = { homes++ }), null) }
         rule.waitForIdle()
-        rule.onNodeWithContentDescription("Workspace Home").performTouchInput { swipeLeft() }
-        rule.onNodeWithContentDescription("Workspace Home").performTouchInput { swipeRight() }
-        rule.onNodeWithContentDescription("Workspace Home").performClick()
+        rule.onNodeWithContentDescription("Profile Home").performTouchInput { swipeLeft() }
+        rule.onNodeWithContentDescription("Profile Home").performTouchInput { swipeRight() }
+        rule.onNodeWithContentDescription("Profile Home").performClick()
         assertEquals(listOf(1, -1), steps)
         assertEquals(0, panels)
         assertEquals(1, homes)

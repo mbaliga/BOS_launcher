@@ -295,9 +295,11 @@ private fun SheetBody(state: DockSheetState, spec: DockSheetSpec, onAbout: () ->
     val dockOn = dockState.dock.isEnabled(spec.tier) || !spec.options.canHide
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         DockEntryTile(Glyphs.Sliders, L10n.tr("Edit dock"), DockSheetTags.EDIT, Modifier.weight(1f), enabled = dockOn) { state.startEditing() }
-        DockEntryTile(Glyphs.Home, L10n.tr("Workspaces and groups"), DockSheetTags.WORKSPACES, Modifier.weight(1f)) { state.dismiss(); spec.onOpenWorkspaces() }
+        DockEntryTile(Glyphs.Home, L10n.tr("Profiles and groups"), DockSheetTags.WORKSPACES, Modifier.weight(1f)) { state.dismiss(); spec.onOpenWorkspaces() }
         DockEntryTile(Glyphs.Info, L10n.tr("About the dock"), DockSheetTags.ABOUT, Modifier.weight(1f), onClick = onAbout)
     }
+    // Wave 57 (CFG-48): the profiles, one tap to switch (each profile has its own dock).
+    ProfileChipRow(dockState, { id -> spec.manager.switchTo(id) }, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
     androidx.compose.runtime.CompositionLocalProvider(com.bos.sphere.feature.grid.LocalOneUiDialogHook provides DockDialogHook) {
         DockOptionsBody(spec.manager, spec.tier, spec.options, landscape = spec.landscape)
         if (spec.options.canHide) DockUseDefaultRow(spec.manager)

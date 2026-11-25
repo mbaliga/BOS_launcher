@@ -125,9 +125,9 @@ class SettingsTabsW57ModelTest {
         assertEquals(listOf("Layout", "Appearance", "Input", "Sources", "Web", "Privacy"), heads("Radar"))
         assertEquals(listOf("Left panel", "Panel theme and size", "Sections", "Comms", "Groups and rules", "Right side", "Clean up"), heads("Side panel"))
         assertEquals(listOf("General", "Sound and haptics", "Access and privacy", "Backup and restore", "Help and recovery", "Lab", "About"), heads("System"))
-        // Looks lead the Look tab; Workspaces (the Profiles slot) leads Apps
+        // Looks lead the Look tab; Profiles (they replaced Workspaces) lead Apps
         assertEquals("Looks", c.first { SettingsTabs.key(it.title) == "Look" }.items.first().title)
-        assertEquals("Workspaces", c.first { SettingsTabs.key(it.title) == "Apps" }.items.first().title)
+        assertEquals("Profiles", c.first { SettingsTabs.key(it.title) == "Apps" }.items.first().title)
     }
 
     @Test fun CFG_40_movedRowsLiveInTheirNewTab() {

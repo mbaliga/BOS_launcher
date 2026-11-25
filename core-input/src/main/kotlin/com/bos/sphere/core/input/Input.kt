@@ -36,7 +36,7 @@ data class KeyChord(val keyCode: Int, val ctrl: Boolean = false, val alt: Boolea
 enum class LauncherCommand(val label: String) {
     OpenPalette("Open Radar"), OpenDrawer("Open all apps"), OpenSettings("Open Settings"), EditMode("Edit home"),
     OpenLaunchpad("Open Comms"), OpenPuck("Open the puck"), ShortcutSheet("Show shortcuts"),
-    NextWorkspace("Next workspace"), PreviousWorkspace("Previous workspace"), FocusDock("Focus the dock"),
+    NextWorkspace("Next profile"), PreviousWorkspace("Previous profile"), FocusDock("Focus the dock"),
     Dock1("Dock item 1"), Dock2("Dock item 2"), Dock3("Dock item 3"), Dock4("Dock item 4"), Dock5("Dock item 5"),
     Dock6("Dock item 6"), Dock7("Dock item 7"), Dock8("Dock item 8"), Dock9("Dock item 9"),
     CornerTopLeft("Top-left corner"), CornerTopRight("Top-right corner"), CornerBottomLeft("Bottom-left corner"), CornerBottomRight("Bottom-right corner"),
@@ -147,7 +147,7 @@ object DefaultShortcuts {
 
 enum class MenuAction(val label: String) {
     Open("Open"), OpenOnDisplay("Open on another display"), OpenBeside("Open beside"), AppInfo("App info"),
-    AddToDock("Add to dock"), AddToWorkspace("Add to workspace"), Uninstall("Uninstall"),
+    AddToDock("Add to dock"), AddToWorkspace("Add to a profile"), Uninstall("Uninstall"),
     Rename("Rename"), Remove("Remove from home"), MoveToFolder("Move to folder"),
 }
 

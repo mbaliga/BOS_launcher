@@ -34,7 +34,7 @@ internal object RadarPicker {
     /** PAL-08: the question the chooser asks for the action that needed a pick. */
     fun titleFor(a: MenuAction?): String = when (a) {
         MenuAction.OpenOnDisplay -> L10n.tr("Open on which display?")
-        MenuAction.AddToWorkspace -> L10n.tr("Add to which workspace?")
+        MenuAction.AddToWorkspace -> L10n.tr("Add to which profile?")
         else -> L10n.tr("Choose")
     }
 }

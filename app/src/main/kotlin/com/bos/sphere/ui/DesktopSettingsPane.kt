@@ -24,7 +24,8 @@ import com.bos.sphere.feature.dock.PanelApp
 import com.bos.sphere.feature.dock.PinnableActions
 import com.bos.sphere.feature.dock.WorkspaceRepository
 import com.bos.sphere.feature.dock.WorkspaceSummary
-import com.bos.sphere.feature.dock.WorkspacesContent
+import com.bos.sphere.feature.dock.ProfilesContent
+import com.bos.sphere.feature.grid.keywords
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.OneUiCaption
 import com.bos.sphere.feature.grid.OneUiGroup
@@ -52,17 +53,17 @@ fun desktopCategory(): SettingCategory = SettingCategory(
 )
 
 /**
- * Wave 52 (settingsFont): Workspaces is a top-level row of Settings (near the top), not a page buried under "Desktop & dock". The category is the one pane,
- * so the row opens the Workspaces page itself, with the active workspace under its title.
+ * Wave 52 (settingsFont): Workspaces was a top-level row of Settings (near the top). Wave 57 (profiles, CFG-45): the row is Profiles, in the same
+ * place; a profile is a workspace plus the settings it carries and its app groups. "workspace" stays a hidden search word for it.
  */
-fun workspacesCategory(): SettingCategory = SettingCategory(
-    L10n.tr("Workspaces"),
+fun profilesCategory(): SettingCategory = SettingCategory(
+    L10n.tr("Profiles"),
     Glyphs.Home,
     listOf(
         SettingItem.Pane(
-            L10n.tr("Workspaces"), Glyphs.Home, L10n.tr("Separate home setups to switch between"), bare = true,
+            L10n.tr("Profiles"), Glyphs.Home, L10n.tr("Named setups like Work, Calm and Desk to switch between"), bare = true,
             pageSubtitle = { WorkspaceSummary.activeLine(WorkspaceRepository.get(LocalContext.current).state.collectAsState().value) },
-        ) { DockSettingsPane(DockPaneKind.Workspaces) },
+        ) { DockSettingsPane(DockPaneKind.Workspaces) }.keywords("workspace", "workspaces"),
     ),
 )
 
@@ -131,7 +132,7 @@ internal fun ColumnScope.DockSettingsPane(kind: DockPaneKind) {
     DockPagesScope {
         when (kind) {
             DockPaneKind.Dock -> DockSettingsContent(manager, tier, panelApps, extra = { DesktopPinRow(manager) })
-            DockPaneKind.Workspaces -> WorkspacesContent(manager, panelApps, PinnableActions.choices())
+            DockPaneKind.Workspaces -> ProfilesContent(manager, panelApps, rememberSuggestFacts(apps), PinnableActions.choices())
             DockPaneKind.Groups -> AppGroupsContent(
                 manager, panelApps, launcher.displays(), onRunGroup = { g -> scope.launch { launcher.runGroup(g) } }, onRestore = { s -> scope.launch { launcher.restore(s) } },
                 onSchedule = { t, label, at -> scheduleFromPanel(context, manager, t, label, at) },

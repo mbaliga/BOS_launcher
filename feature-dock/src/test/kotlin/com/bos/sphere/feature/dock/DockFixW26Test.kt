@@ -53,7 +53,7 @@ class DockFixW26Test {
         val actions = DockActions(onOpenPanel = { ran += "panel" }, onGoHome = { ran += "home" }, onLaunch = { i, _ -> ran += "launch ${i.label}" })
         rule.setContent { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { DockRail(content("Alpha"), DockEdge.Bottom, "Home", true, 0, false, actions, graphBridge = null) { _, s -> Box(Modifier.size(s)) } } }
         rule.waitForIdle()
-        rule.onNodeWithContentDescription("Workspace Home").performClick()
+        rule.onNodeWithContentDescription("Profile Home").performClick()
         assertEquals(listOf("home"), ran)
     }
 
@@ -83,7 +83,7 @@ class DockFixW26Test {
         rule.setContent { Box(Modifier.fillMaxSize()) { Host(this) } }
         rule.waitForIdle()
         rule.onAllNodesWithContentDescription("Dock").assertCountEquals(0)
-        rule.onAllNodesWithContentDescription("Workspace Home").assertCountEquals(0)
+        rule.onAllNodesWithContentDescription("Profile Home").assertCountEquals(0)
         assertFalse(DockPresence.hasItems)
     }
 

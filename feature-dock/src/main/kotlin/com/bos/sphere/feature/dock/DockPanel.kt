@@ -44,7 +44,7 @@ internal val DockDialogHook: @Composable () -> Unit = { DockDialogInput() }
 
 /**
  * Wave 41 (settingsPopups): a full page in the One UI chrome (back arrow, large collapsing title, grouped rounded cards). W55 (dockSheet): it is the
- * dock sheet's "Workspaces and groups" page: Workspaces first, with a row on to App groups. The dock's own options (style, position, mode, ...) are in
+ * dock sheet's "Profiles and groups" page: Profiles first (wave 57: Workspaces became Profiles), with a row on to App groups. The dock's own options (style, position, mode, ...) are in
  * the sheet and in Settings > Desktop & dock > Dock; nothing here is needed to use the dock.
  */
 @Composable
@@ -62,6 +62,8 @@ fun DockPanel(
     /** Groups on the home as a shelf of chips (WSP-05). */
     groupShelfOn: Boolean = true,
     onGroupShelf: (Boolean) -> Unit = {},
+    /** Wave 57: what the app group suggester knows about each app (category, work profile); null derives it from [apps] alone. */
+    facts: List<com.bos.sphere.core.data.SuggestApp>? = null,
 ) {
     var page by remember { mutableStateOf(DockPanelPage.Workspaces) }
     val state by manager.state.collectAsState()
@@ -71,8 +73,8 @@ fun DockPanel(
         DockPagesScope {
             Box(Modifier.fillMaxSize().background(HyleColors.Background)) {
                 when (page) {
-                    DockPanelPage.Workspaces -> OneUiPageFrame(L10n.tr("Workspaces"), back, subtitle = WorkspaceSummary.activeLine(state), tag = DockPanelTags.PAGE) {
-                        item(key = "ws") { Column { WorkspacesContent(manager, apps, paletteActionChoices, onOpenGroups = { page = DockPanelPage.Groups }) } }
+                    DockPanelPage.Workspaces -> OneUiPageFrame(L10n.tr("Profiles"), back, subtitle = WorkspaceSummary.activeLine(state), tag = DockPanelTags.PAGE) {
+                        item(key = "ws") { Column { ProfilesContent(manager, apps, facts ?: apps.map { com.bos.sphere.core.data.SuggestApp(it.key, it.packageName, it.label) }, paletteActionChoices, onOpenGroups = { page = DockPanelPage.Groups }) } }
                     }
                     DockPanelPage.Groups -> OneUiPageFrame(L10n.tr("App groups"), back, tag = DockPanelTags.PAGE) {
                         item(key = "groups") { Column { AppGroupsContent(manager, apps, displays, onRunGroup, onRestore, onSchedule, now, groupShelfOn, onGroupShelf) } }

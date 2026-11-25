@@ -820,7 +820,7 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
     // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
     m.hiddenApps?.let { out += hiddenAppsCategory(it) } // wave 38
     out += com.bos.sphere.ui.backupCategory { SettingsReset.resetAll(m.updatePrefs) }
-    out += com.bos.sphere.ui.workspacesCategory()
+    out += com.bos.sphere.ui.profilesCategory() // wave 57: Profiles replace Workspaces
     out += com.bos.sphere.ui.desktopCategory()
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(

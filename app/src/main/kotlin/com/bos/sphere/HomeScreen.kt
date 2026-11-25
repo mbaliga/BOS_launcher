@@ -1786,6 +1786,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onEditHome = { quickOpen = false; editHome() },
                 onAddApps = { quickOpen = false; editHome(); trayRequest = com.bos.sphere.feature.grid.TrayPanel.Apps },
                 onAddWidgets = { quickOpen = false; editHome(); trayRequest = com.bos.sphere.feature.grid.TrayPanel.Widgets },
+                profiles = dockState, onProfile = { id -> quickOpen = false; com.bos.sphere.feature.dock.WorkspaceRepository.get(context).switchTo(id) }, // wave 57 (CFG-48)
             )
         }
         if (homeItems.panelRequest >= 0) {

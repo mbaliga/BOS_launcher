@@ -90,7 +90,7 @@ class RadarMenuChooserTest {
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun PAL_08_addToWorkspaceOpensTheChooserAndChoosingRunsTheAction() {
         open()
-        rule.onNodeWithContentDescription("Add to workspace").performClick()
+        rule.onNodeWithContentDescription("Add to a profile").performClick()
         rule.mainClock.advanceTimeBy(300)
         assertEquals(listOf(MenuAction.AddToWorkspace), asked)
         rule.onNodeWithTag("radar.picker").assertExists()
@@ -103,7 +103,7 @@ class RadarMenuChooserTest {
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
     fun PAL_08_cancelClosesTheChooserWithoutRunningAnything() {
         open()
-        rule.onNodeWithContentDescription("Add to workspace").performClick()
+        rule.onNodeWithContentDescription("Add to a profile").performClick()
         rule.mainClock.advanceTimeBy(300)
         rule.onNodeWithTag("radar.picker.cancel").performClick()
         rule.mainClock.advanceTimeBy(300)

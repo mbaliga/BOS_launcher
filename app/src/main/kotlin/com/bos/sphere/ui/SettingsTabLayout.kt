@@ -33,7 +33,7 @@ internal object SettingsTabLayout {
     const val T_PAGES = "Pages"; const val T_HOME = "Home"; const val T_APPS = "Apps"; const val T_CORNERS = "Corners"; const val T_SIDE = "Side panel"
     const val T_GESTURES = "Gestures"; const val T_MOTION = "Motion"; const val T_THEME = "Theme"; const val T_RADAR = "Radar"; const val T_INDICATOR = "Indicator"
     const val T_SOUND = "Sound"; const val T_SYSTEM = "System"; const val T_CAPS = "Capabilities"; const val T_LAB = "Lab"; const val T_HIDDEN = "Hidden apps"
-    const val T_BACKUP = "Backup"; const val T_WORKSPACES = "Workspaces"; const val T_DESKTOP = "Desktop & dock"; const val T_ABOUT = "About"
+    const val T_BACKUP = "Backup"; const val T_WORKSPACES = "Profiles"; const val T_DESKTOP = "Desktop & dock"; const val T_ABOUT = "About"
 
     val TOPICS = listOf(T_PAGES, T_HOME, T_APPS, T_CORNERS, T_SIDE, T_GESTURES, T_MOTION, T_THEME, T_RADAR, T_INDICATOR, T_SOUND, T_SYSTEM, T_CAPS, T_LAB, T_HIDDEN, T_BACKUP, T_WORKSPACES, T_DESKTOP, T_ABOUT)
 
@@ -72,8 +72,8 @@ internal object SettingsTabLayout {
         ),
         Tab(
             SettingsTabs.APPS, Glyphs.Apps, listOf(
-                // The profiles stream turns this row into the Profiles page; until then it is the Workspaces page.
-                Section("Profiles", rows(T_WORKSPACES, "Workspaces")),
+                // Wave 57: the Profiles page (Profiles extend and replace Workspaces).
+                Section("Profiles", rows(T_WORKSPACES, "Profiles")),
                 Section("App groups and sessions", rows(T_DESKTOP, "App groups")),
                 Section("App drawer", rows(T_APPS, "Ring segments", "Drawer shortcuts", "Show labels under glyphs", "Wheel groups", "Pages")),
                 Section("Hidden apps", rows(T_HIDDEN, "Hidden apps")),

@@ -104,7 +104,7 @@ class DockIconsOnlyW25Test {
         assertNoText()
         rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("About the dock")), useUnmergedTree = true).assertCountEquals(0)
         rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Workspaces, groups and dock settings")), useUnmergedTree = true).assertCountEquals(0)
-        rule.onNodeWithContentDescription("Workspace Home").assertExists() // the home button is an icon whose name is only its description
+        rule.onNodeWithContentDescription("Profile Home").assertExists() // the home button is an icon whose name is only its description
         shoot("w25-dock-icons-only-bottom")
     }
 
@@ -130,7 +130,7 @@ class DockIconsOnlyW25Test {
         rule.waitForIdle()
         assertEquals(listOf("options"), ran)
         rule.onNodeWithTag(DockMenuModel.TAG_ITEM_MENU).assertDoesNotExist()
-        listOf("Edit dock", "Workspaces and groups", "Dock settings", "Hide dock", "About the dock").forEach { rule.onNodeWithText(it).assertDoesNotExist() }
+        listOf("Edit dock", "Profiles and groups", "Dock settings", "Hide dock", "About the dock").forEach { rule.onNodeWithText(it).assertDoesNotExist() }
     }
 
     @Test fun DCK_01_longPressOnAnIconOpensThatIconsOptionsAndEachEntryRuns() {
@@ -179,11 +179,11 @@ class DockIconsOnlyW25Test {
         ran.clear()
         rule.setContent { Rail(content(recent = true), actions()) }
         val dock = customLabels("Dock")
-        assertEquals(listOf("Dock options", "Edit dock", "Workspaces and groups"), dock)
+        assertEquals(listOf("Dock options", "Edit dock", "Profiles and groups"), dock)
         val item = customLabels("Bravo")
         assertTrue(item.toString(), item.containsAll(listOf("Move earlier", "Move later", "Unpin", "Replace with another app", "App info", "Dock item options")))
         assertTrue(customLabels("Recent one").containsAll(listOf("Pin to dock", "Dock item options")))
-        assertTrue(customLabels("Workspace Home").containsAll(listOf("Switch to the next workspace", "Switch to the previous workspace")))
+        assertTrue(customLabels("Profile Home").containsAll(listOf("Switch to the next profile", "Switch to the previous profile")))
         // And they run.
         rule.runOnUiThread {
             rule.onNodeWithContentDescription("Dock").fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Dock options" }.action()

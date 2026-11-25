@@ -60,6 +60,16 @@ node --test web/liftoff-studio/tests/studio.test.js
 `node --test web/liftoff-studio/tests/studio.test.js` (Node 18 or newer, no dependencies): schema, import and export round trips, unknown fields, wrong types, share links,
 profiles, and that every scene of the preview draws for every look and every option.
 
+## Phone profiles (wave 57)
+
+On the phone, Workspaces became Profiles, and a profile can carry groups of settings. In a Backup file each `workspaces[]` entry may have `carries`
+(group ids) and `settings` (schema key to the value exactly as the Backup holds it: the prefs value, the `action:X` gesture string, the `dock.settings`
+value with `dock.enabled` as `true` / `false` / `null`, the haptic id); `dock.globalSettings` holds the global values the active profile has set aside.
+The groups and their keys are generated into `schema.json` as `profileGroups`. `core.js` reads them with `phoneProfiles(ix, doc)` (Studio values, a
+warning for a key it does not know, which is kept) and writes them with `setPhoneProfile(ix, doc, id, values)` (only the keys the profile carries;
+everything else in the Backup is carried through). The page itself has no editor for phone profiles yet; its own browser profiles are separate.
+See `docs/decisions/profiles.md`.
+
 ## What the preview does not cover
 
 A drawing from the settings, not the app. Signal, System live and Picture wallpapers are placeholders; text, contacts and apps are samples; only portrait; Word clock text is

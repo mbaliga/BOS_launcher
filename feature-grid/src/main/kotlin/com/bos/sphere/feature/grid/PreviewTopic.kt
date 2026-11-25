@@ -56,6 +56,7 @@ object PreviewTopics {
         "Home screen" to PreviewTopic.Home,
         "Home" to PreviewTopic.Home,
         "Workspaces" to PreviewTopic.Home,
+        "Profiles" to PreviewTopic.Home,
         "Look" to PreviewTopic.Look,
         "Theme" to PreviewTopic.Look,
         "Indicator" to PreviewTopic.Glance,

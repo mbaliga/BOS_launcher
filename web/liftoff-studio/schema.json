@@ -2761,5 +2761,12 @@
       "advanced": true,
       "deviceBound": true
     }
+  ],
+  "profileGroups": [
+    {"id": "look", "label": "Look", "keys": ["themeMode", "accent", "uiFont", "iconShape", "iconTint", "iconPlate", "calmStyle", "calmRegular", "wpGlanceKind", "wpGlanceSolid", "wpGlanceFrom", "wpGlanceTo", "wpGlanceAngle"]},
+    {"id": "home", "label": "Home behaviour", "keys": ["homePages", "glanceHotspots", "hotCornersOn", "hotCornerDwell", "cornerStyle", "clockStyle", "clockFormat", "glanceClockDate", "glanceClockSize", "alwaysKeyboard", "kbOpenP", "kbOpenL", "gestures.PinchIn", "gestures.PinchOut", "gestures.SwipeUp", "gestures.SwipeDown", "gestures.SwipeLeft", "gestures.SwipeRight", "gestures.DoubleTap", "gestures.LongPress", "gestures.Shake", "gestures.DoubleFlick", "gestures.DoubleFlip", "gestures.FaceDown", "dock.enabled", "dock.edge", "dock.mode"]},
+    {"id": "radar", "label": "Radar", "keys": ["searchLayout", "searchLayoutPinned", "searchMotion", "radarBackground", "radarIntensity", "searchWeb", "webEngine", "webSuggestions", "searchContacts", "searchFiles", "searchActions", "searchDeep"]},
+    {"id": "side", "label": "Side panel and Comms", "keys": ["leftPage", "launchpadRail", "lpTheme", "rightSide", "recentsLimit", "recentsUsage"]},
+    {"id": "sound", "label": "Sound and vibration", "keys": ["uiSounds", "uiSoundVolume", "hapticStrength"]}
   ]
 }

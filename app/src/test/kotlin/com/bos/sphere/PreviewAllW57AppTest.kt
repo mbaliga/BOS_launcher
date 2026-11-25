@@ -91,7 +91,7 @@ class PreviewAllW57AppTest {
      * text only. Each is kept here with its reason; a new row that changes a preference must map to a topic or be added here on purpose.
      */
     private val notVisual = mapOf(
-        "Interface sounds" to "sound only", "Volume" to "sound only", "Haptics" to "touch feedback only", "Haptic strength" to "touch feedback only",
+        "Interface sounds" to "sound only", "Volume" to "sound only", "Haptics" to "touch feedback only", "Haptic strength" to "touch feedback only", "Launcher vibration" to "touch feedback only",
         "Restore open screens" to "behaviour after a restart",
         "Settings backdrop" to "changes Settings itself, which is in view", "Backdrop dimming" to "changes Settings itself, which is in view",
     )
@@ -129,10 +129,9 @@ class PreviewAllW57AppTest {
     @Test fun CFG_54_everyCategoryOfTheRealSettingsHasATopicAndOnlySystemPagesHaveNone() {
         val cats = buildSettingsCategories(model(LauncherPrefs(homeStyle = HomeStyle.Grid, homePages = HomePages.Paginated)))
         val topics = cats.associate { (OneUiModel.key(it.title) ?: it.title) to PreviewTopics.forCategory(it).topic }
-        assertEquals(PreviewTopic.Home, topics["Home screen"]); assertEquals(PreviewTopic.Look, topics["Look"]); assertEquals(PreviewTopic.Corners, topics["Corners"])
-        assertEquals(PreviewTopic.Gestures, topics["Gestures"]); assertEquals(PreviewTopic.Disc, topics["App drawer"]); assertEquals(PreviewTopic.Radar, topics["Radar"])
-        assertEquals(PreviewTopic.SidePanel, topics["Side panel"]); assertEquals(PreviewTopic.None, topics["System & sound"])
-        for ((k, t) in topics) if (k in setOf("System & sound", "Backup", "About", "Lab", "Capabilities", "Hidden apps")) assertEquals(k, PreviewTopic.None, t)
+        // Wave 57: the six tabs are the categories now (Settings home has no root list of pages)
+        assertEquals(PreviewTopic.Home, topics["Home"]); assertEquals(PreviewTopic.Look, topics["Look"]); assertEquals(PreviewTopic.Disc, topics["Apps"])
+        assertEquals(PreviewTopic.Radar, topics["Radar"]); assertEquals(PreviewTopic.SidePanel, topics["Side panel"]); assertEquals(PreviewTopic.None, topics["System"])
     }
 
     // ---- the real renderers ----------------------------------------------------------------------------------------------------------

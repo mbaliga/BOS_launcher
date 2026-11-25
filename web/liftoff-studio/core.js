@@ -378,6 +378,61 @@
     return out;
   }
 
+  // ---------------------------------------------------------------------------------------------------- phone profiles (wave 57)
+  //
+  // On the phone a profile (it was a workspace) can carry groups of settings: Backup.workspaces[i] has "carries" (group ids, see
+  // schema.profileGroups) and "settings" (schema key -> the value exactly as the Backup holds it at that place: the prefs value, the
+  // gesture string, the dock.settings value with enabled true/false/null, the haptic id). Studio reads them into its own values and
+  // writes them back without touching anything else in the Backup.
+
+  function profileKeys(ix, carries) {
+    var out = [];
+    (ix.schema.profileGroups || []).forEach(function (g) { if ((carries || []).indexOf(g.id) >= 0) g.keys.forEach(function (k) { if (out.indexOf(k) < 0) out.push(k); }); });
+    return out;
+  }
+
+  function fromPhone(f, v) { return f.key === 'dock.enabled' ? readEnabled(v) : v; }
+  function toPhone(f, v) { return f.key === 'dock.enabled' ? dockEnabledOut(v) : v; }
+
+  /**
+   * The phone profiles of a Backup: [{id, name, active, carries, keys, values, warnings}]. values holds Studio values for the keys the profile
+   * has a value for; a key it carries without a value takes the phone's global value on the phone. A value of the wrong type is left out with a warning.
+   */
+  function phoneProfiles(ix, doc) {
+    if (!doc || doc.format !== STATE_FORMAT || !Array.isArray(doc.workspaces)) return [];
+    var active = doc.dock && doc.dock.activeId;
+    return doc.workspaces.filter(function (w) { return w && typeof w === 'object'; }).map(function (w) {
+      var carries = Array.isArray(w.carries) ? w.carries.filter(function (c) { return typeof c === 'string'; }) : [];
+      var values = {}, warnings = [], s = w.settings && typeof w.settings === 'object' && !Array.isArray(w.settings) ? w.settings : {};
+      Object.keys(s).forEach(function (k) {
+        var f = ix.byKey[k];
+        if (!f) { warnings.push(k + ' is not a setting this Studio knows; kept as it is'); return; }
+        var r = f.key === 'dock.enabled' ? { value: fromPhone(f, s[k]) } : checkValue(f, s[k]);
+        if (r.error) warnings.push(r.error); else values[k] = r.value;
+      });
+      return { id: String(w.id), name: String(w.name || ''), active: w.id === active, carries: carries, keys: profileKeys(ix, carries), values: values, warnings: warnings };
+    });
+  }
+
+  /**
+   * A copy of [doc] where phone profile [id] holds [values] (Studio values) for the keys it carries; keys it does not carry are ignored,
+   * every other field of the Backup (and of the profile) is kept. Returns {ok, doc} or {ok:false, error}.
+   */
+  function setPhoneProfile(ix, doc, id, values) {
+    var out = clone(doc);
+    var w = (out.workspaces || []).filter(function (x) { return x && String(x.id) === String(id); })[0];
+    if (!w) return { ok: false, error: 'No profile with the id ' + id + ' in this Backup' };
+    var keys = profileKeys(ix, w.carries);
+    var s = w.settings && typeof w.settings === 'object' && !Array.isArray(w.settings) ? w.settings : {};
+    Object.keys(values || {}).forEach(function (k) {
+      var f = ix.byKey[k];
+      if (!f || keys.indexOf(k) < 0) return;
+      s[k] = toPhone(f, values[k]);
+    });
+    w.settings = s;
+    return { ok: true, doc: out };
+  }
+
   // ---------------------------------------------------------------------------------------------------------- profiles
 
   function memoryStorage() { var m = {}; return { getItem: function (k) { return k in m ? m[k] : null; }, setItem: function (k, v) { m[k] = String(v); }, removeItem: function (k) { delete m[k]; } }; }
@@ -450,5 +505,6 @@
     importDocument: importDocument, exportSettings: exportSettings, exportState: exportState, toText: toText, slug: slug,
     shareFragment: shareFragment, readShare: readShare, LOOKS: LOOKS, STARTERS: STARTERS, applyPreset: applyPreset,
     Profiles: Profiles, memoryStorage: memoryStorage, newExtras: newExtras,
+    phoneProfiles: phoneProfiles, setPhoneProfile: setPhoneProfile, profileKeys: profileKeys,
   };
 });

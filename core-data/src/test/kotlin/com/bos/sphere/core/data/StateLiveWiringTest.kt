@@ -97,6 +97,30 @@ class StateLiveWiringTest {
     }
 
     @Test
+    fun CFG_49_profilesTheirSettingsAndTheGlobalValuesRoundTripThroughABackup() {
+        // Wave 57: Work is active and carries Look; its theme is live, the global one waits in globalSettings.
+        val a = Proc("a"); val b = Proc("b")
+        a.prefs.update { it.copy(themeMode = ThemeMode.Light) }
+        a.workspaceFile.writeText(JSONObject(workspaceDoc).put("globalSettings", JSONObject().put("themeMode", "Dark")).apply {
+            getJSONArray("workspaces").getJSONObject(1).put("carries", JSONArray().put("look")).put("settings", JSONObject().put("themeMode", "Light").put("accent", 4287527935L)).put("groupLinks", JSONArray().put("g1"))
+        }.toString())
+        val doc = a.export()
+        val work = doc.json.getJSONArray(StateSchema.K_WORKSPACES).getJSONObject(1)
+        assertEquals("look", work.getJSONArray("carries").getString(0))
+        assertEquals("Studio schema keys and the Backup's own values", "Light", work.getJSONObject("settings").getString("themeMode"))
+        assertEquals(4287527935L, work.getJSONObject("settings").getLong("accent"))
+        assertEquals("Dark", doc.json.getJSONObject(StateSchema.K_DOCK).getJSONObject("globalSettings").getString("themeMode"))
+        b.import(StateDocument(JSONObject(doc.encode())))
+        val out = JSONObject(b.workspaceFile.readText())
+        val w = out.getJSONArray("workspaces").getJSONObject(1)
+        assertEquals("Light", w.getJSONObject("settings").getString("themeMode"))
+        assertEquals("g1", w.getJSONArray("groupLinks").getString(0))
+        assertEquals("Dark", out.getJSONObject("globalSettings").getString("themeMode"))
+        assertEquals("w2", out.getString("activeId"))
+        assertEquals("the live settings are the active profile's", ThemeMode.Light, b.prefs.prefs.value.themeMode)
+    }
+
+    @Test
     fun CFG_01_aWorkspaceFileFromANewerBuildIsNeverOverwrittenByAnImport() {
         val a = Proc("a"); val b = Proc("b")
         a.workspaceFile.writeText(workspaceDoc)

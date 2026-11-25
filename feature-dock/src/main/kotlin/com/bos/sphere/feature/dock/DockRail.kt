@@ -251,7 +251,7 @@ fun DockRail(
                 customActions = listOf(
                     CustomAccessibilityAction(L10n.tr("Dock options")) { actions.onOpenOptions(); true },
                     CustomAccessibilityAction(L10n.tr("Edit dock")) { actions.onEditDock(); true },
-                    CustomAccessibilityAction(L10n.tr("Workspaces and groups")) { actions.onOpenPanel(); true },
+                    CustomAccessibilityAction(L10n.tr("Profiles and groups")) { actions.onOpenPanel(); true },
                 )
             },
     ) {
@@ -355,10 +355,10 @@ private fun WorkspaceChip(name: String, actions: DockActions, bridge: DockInput.
             .clickable(onClickLabel = L10n.tr("Home"), onClick = actions.onGoHome)
             .semantics {
                 role = Role.Button
-                contentDescription = L10n.tr("Workspace %s", name)
+                contentDescription = L10n.tr("Profile %s", name)
                 customActions = listOf(
-                    CustomAccessibilityAction(L10n.tr("Switch to the next workspace")) { actions.onSwitchWorkspace(1); true },
-                    CustomAccessibilityAction(L10n.tr("Switch to the previous workspace")) { actions.onSwitchWorkspace(-1); true },
+                    CustomAccessibilityAction(L10n.tr("Switch to the next profile")) { actions.onSwitchWorkspace(1); true },
+                    CustomAccessibilityAction(L10n.tr("Switch to the previous profile")) { actions.onSwitchWorkspace(-1); true },
                 )
             }
             .drawBehind {

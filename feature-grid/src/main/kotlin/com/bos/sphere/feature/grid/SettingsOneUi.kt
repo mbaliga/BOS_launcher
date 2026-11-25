@@ -258,6 +258,8 @@ internal fun OneUiSettingsHost(
             true
         }
 
+        val previewFocus = LocalPreviewFocus.current // wave 57 (CFG-50): the Preview shows what this page configures
+        if (previewFocus != null) androidx.compose.runtime.SideEffect { val ci = if (nav.subOpen) nav.subCategory else (tabsRef.getOrNull(pager.currentPage) ?: -1); latest.getOrNull(ci).let { c -> previewFocus.onPage(c, if (nav.subOpen) c?.items?.getOrNull(nav.subItem) else null) } }
         CompositionLocalProvider(LocalPreviewTop provides (topInset.value + 56f + 8f), LocalPaneFlash provides paneFlash) {
           Box(Modifier.fillMaxSize().then(keyNav).focusRequester(rootFocus).focusable()) {
             LaunchedEffect(Unit) { runCatching { rootFocus.requestFocus() } } // a hardware keyboard's Esc and Ctrl+Tab work from the first frame
@@ -629,7 +631,7 @@ private fun LazyListScope.sectionRows(category: SettingCategory, blocks: List<On
 }
 
 @Composable
-private fun OneUiItem(item: SettingItem, index: Int, lit: Boolean, host: ItemHost) {
+private fun OneUiItem(item: SettingItem, index: Int, lit: Boolean, host: ItemHost) = Box(Modifier.previewRow(item)) { // wave 57: a touched row is what the Preview shows
     when (item) {
         is SettingItem.Toggle -> OneUiToggleRow(item, lit) { v -> item.onChange(v); host.play(UiSound.Tick); host.tick() }
         is SettingItem.Slider -> OneUiSliderRow(item, lit) { host.tick() }

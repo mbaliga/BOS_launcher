@@ -314,11 +314,13 @@ internal fun SearchScreen(
     val flatMode = RadarLayoutPolicy.showsFlatList(layout, typing)
 
     PaletteTraceEffects(query) // NFR-03 / NFR-04: trace sections for the macrobenchmarks
-    LaunchedEffect(Unit) {
+    // Wave 57 (previewAll): in the Settings Preview's sandbox Radar never takes the focus nor raises (or lowers) the keyboard.
+    val sandbox = com.bos.sphere.core.design.LocalPreviewSandbox.current
+    if (!sandbox) LaunchedEffect(Unit) {
         delay(60) // let the overlay draw its first frame before the IME animates
         runCatching { focus.requestFocus(); keyboard?.show() }
     }
-    DisposableEffect(Unit) { onDispose { runCatching { keyboard?.hide() } } }
+    if (!sandbox) DisposableEffect(Unit) { onDispose { runCatching { keyboard?.hide() } } }
     var firstQuery by remember { mutableStateOf(true) } // wave 25: the scope Radar was opened on (initialCategory) survives the first, empty query
     LaunchedEffect(trimmed) {
         touched = false
@@ -469,7 +471,7 @@ internal fun SearchScreen(
         }
     }
     val dismissForDrag by androidx.compose.runtime.rememberUpdatedState(onDismiss)
-    androidx.compose.runtime.DisposableEffect(Unit) {
+    if (!sandbox) androidx.compose.runtime.DisposableEffect(Unit) {
         val h: () -> Unit = { dismissForDrag() }
         LauncherDrops.onDragStart = h
         onDispose { if (LauncherDrops.onDragStart === h) LauncherDrops.onDragStart = null }
@@ -534,7 +536,7 @@ internal fun SearchScreen(
         r.consumed
     }
     // The field keeps focus: after a preview closes, or if something steals it, it comes back.
-    LaunchedEffect(previewTile) { if (previewTile == null) { delay(80); runCatching { focus.requestFocus() } } }
+    LaunchedEffect(previewTile) { if (previewTile == null && !sandbox) { delay(80); runCatching { focus.requestFocus() } } }
     val pickSuggestion: (SuggItem) -> Unit = { item ->
         tick()
         item.scope?.let { userCat = it }

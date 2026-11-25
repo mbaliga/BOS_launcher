@@ -58,7 +58,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
@@ -169,7 +171,7 @@ private class PreviewController(val model: PreviewWindowModel, private val env: 
  * with keys and with screen reader actions. Position and size are remembered per orientation, the minimised state as well.
  */
 @Composable
-internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, rtlOverride: Boolean? = null) {
+internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, rtlOverride: Boolean? = null, surfaces: PreviewSurfaces? = null, subject: PreviewSubject = PreviewSubject.HOME) {
     val context = LocalContext.current
     val store = remember(context) { PreviewWindowStore(TolerantPrefs.of(context.applicationContext, PreviewWindowStore.FILE)) }
     val rtl = rtlOverride ?: (LocalConfiguration.current.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL)
@@ -192,7 +194,8 @@ internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, 
         val content = PreviewWindowGeometry.contentSize(long, env.aspect)
         val shape = RoundedCornerShape(if (model.minimised) 20.dp else 12.dp)
         var focused by remember { mutableStateOf(false) }
-        val title = L10n.tr("Preview")
+        // Wave 57 (CFG-50): the bar's title is the small caption of what is shown ("Radar"); the home keeps "Preview". It never covers the picture.
+        val title = if (subject.topic == PreviewTopic.Home) L10n.tr("Preview") else PreviewText.caption(subject.topic)
         val actions = listOf(
             CustomAccessibilityAction(L10n.tr("Move up")) { ctl.nudge(0, -1); true },
             CustomAccessibilityAction(L10n.tr("Move down")) { ctl.nudge(0, 1); true },
@@ -236,7 +239,7 @@ internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, 
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Grip()
-                        BasicText(title, Modifier.weight(1f), style = TextStyle(color = HyleColors.Ink, fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        BasicText(title, Modifier.weight(1f).testTag(PreviewStageTags.CAPTION), style = TextStyle(color = HyleColors.Ink, fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Glyph(restore = true)
                     }
                 } else {
@@ -259,7 +262,7 @@ internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, 
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Grip()
-                            BasicText(title, Modifier.weight(1f), style = TextStyle(color = HyleColors.Ink, fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            BasicText(title, Modifier.weight(1f).testTag(PreviewStageTags.CAPTION), style = TextStyle(color = HyleColors.Ink, fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Box(
                                 Modifier
                                     .size(48.dp)
@@ -274,7 +277,7 @@ internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, 
                             ) { Glyph(restore = false) }
                         }
                         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
-                            PreviewContent(capture, ctl, content.w, content.h)
+                            PreviewContent(capture, ctl, content.w, content.h, subject, surfaces)
                         }
                     }
                     ResizeHandle(ctl, Modifier.align(Alignment.BottomEnd))
@@ -284,10 +287,16 @@ internal fun PreviewWindow(capture: HomeCapture, modifier: Modifier = Modifier, 
     }
 }
 
-/** The scaled live home. No clicks, no focus; a two-finger pinch resizes the window. */
+private val NO_PREFS: () -> com.bos.sphere.core.data.LauncherPrefs = { com.bos.sphere.core.data.LauncherPrefs() }
+
+/**
+ * The live picture of what is being configured (wave 57: the home, Glance, corners, gestures, the dock, Radar, the disc or the side panel, see
+ * [PreviewStageContent]). No clicks, no focus; a two-finger pinch resizes the window. The screen reader hears one line: "Preview of Radar, Orbit layout".
+ */
 @Composable
-private fun PreviewContent(capture: HomeCapture, ctl: PreviewController, w: Float, h: Float) {
-    val label = L10n.tr("Live preview of your home")
+private fun PreviewContent(capture: HomeCapture, ctl: PreviewController, w: Float, h: Float, subject: PreviewSubject, surfaces: PreviewSurfaces?) {
+    val prefs by rememberCoalesced(surfaces?.prefs ?: NO_PREFS)
+    val label = PreviewText.description(subject, prefs, if (subject.topic == PreviewTopic.Dock) surfaces?.dockDetail?.invoke() else null) // the dock's settings live in its own store: the renderer reads them
     Box(
         Modifier
             .size(w.dp, h.dp)
@@ -311,13 +320,10 @@ private fun PreviewContent(capture: HomeCapture, ctl: PreviewController, w: Floa
                     if (pinched) ctl.model.persist()
                 }
             }
-            .semantics { contentDescription = label }
-            .testTag(PreviewWindowTags.CONTENT),
+            // one node for the screen reader: what is shown, never the rows of a sandboxed surface
+            .clearAndSetSemantics { contentDescription = label; testTag = PreviewWindowTags.CONTENT },
     ) {
-        Canvas(Modifier.size(w.dp, h.dp)) {
-            val k = DockGeometry.scale(capture.size.width, size.width)
-            clipRect { scale(k, k, pivot = Offset.Zero) { drawLayer(capture.wallpaperLayer); drawLayer(capture.layer) } }
-        }
+        PreviewStageContent(capture, subject, surfaces, prefs)
     }
 }
 

@@ -1637,6 +1637,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         androidx.compose.runtime.SideEffect { settingsForRadar.value = categories }
         val settingsTarget = remember(settingsSession) { com.bos.sphere.ui.settingsTarget(categories, settingsCategory) } // wave 57: a tab and the row to flash, fixed for the visit
+        val previewSurfaces = com.bos.sphere.ui.rememberPreviewSurfaces(prefs, apps, appsByKey, puckSlots, puckSegments, puckLabels, homeOnGlance = { landing == HomeShown.Glance })
         SettingsSpace(
             visible = settingsOpen,
             categories = categories,
@@ -1647,7 +1648,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onClose = { settingsOpen = false },
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
-            previewDock = { SettingsPreviewDock(homeCapture) },
+            previewDock = { SettingsPreviewDock(homeCapture, surfaces = previewSurfaces) }, // W57 (CFG-50): whatever the open page configures
             snapshots = remember(context) { com.bos.sphere.ui.StateSnapshots(context) },
             backdrop = {
                 if (prefs.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Black) Box(Modifier.fillMaxSize().background(Color.Black))

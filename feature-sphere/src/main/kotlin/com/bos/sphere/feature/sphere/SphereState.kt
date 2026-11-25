@@ -99,12 +99,31 @@ class SphereState(
         position = position.coerceIn(0f, maxIndex.toFloat())
     }
 
+    /** Index of the first item in column [col] (the top row in two-row mode). */
+    fun firstIndexOfColumn(col: Int): Int = if (rows == 2) col * 2 else col
+
+    /** Item index at the focal point (top row in two-row mode): where "add here" inserts. */
+    fun focusedItemIndex(): Int = firstIndexOfColumn(nearestIndex()).coerceIn(0, itemCount)
+
+    /**
+     * Scale of a tile resting exactly at the focal point (the focus lens) for the current rows and
+     * params; equals [transformFor]'s scale at offset 0. Hosted widgets are laid out at this size so
+     * the focused widget tile is drawn 1:1 and taps land where they are drawn.
+     */
+    val focusScale: Float
+        get() = (SphereGeometry.magAt(0.0, lensFocus()) * surfaceScale()).toFloat()
+
+    // Two-row mode shrinks the whole surface (U) and softens the lens (foc), per render().
+    private fun surfaceScale(): Double = if (rows == 2) 0.66 else 1.0
+    private fun lensFocus(): Double =
+        if (rows == 2) 1.0 + (params.focus - 1.0) * 0.45 else params.focus.toDouble()
+
     /** Computes the transform for item [index] at the current [position]. Pure. */
     fun transformFor(index: Int): TileTransform {
         val p = params
         // Two-row mode shrinks the whole surface (U) and softens the lens (foc), per render().
-        val u = if (rows == 2) 0.66 else 1.0
-        val foc = if (rows == 2) 1.0 + (p.focus - 1.0) * 0.45 else p.focus.toDouble()
+        val u = surfaceScale()
+        val foc = lensFocus()
 
         val row = rowOf(index)
         val col = columnOf(index)

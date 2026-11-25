@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sphere's own home-screen widgets (docs/widgets.md). The five providers are exported, as every App
+  Widget provider must be so any launcher can bind it. Besides APPWIDGET_UPDATE they take only
+  protected system broadcasts that Android still delivers to manifest receivers (time, time zone,
+  language, next alarm). Everything else here is not exported. No new permission.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <receiver
+            android:name="com.bos.sphere.feature.homewidgets.ClockWidget"
+            android:exported="true"
+            android:label="@string/hw_clock_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="android.app.action.NEXT_ALARM_CLOCK_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hw_clock_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.bos.sphere.feature.homewidgets.BatteryWidget"
+            android:exported="true"
+            android:label="@string/hw_battery_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hw_battery_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.bos.sphere.feature.homewidgets.NowPlayingWidget"
+            android:exported="true"
+            android:label="@string/hw_now_playing_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hw_now_playing_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.bos.sphere.feature.homewidgets.NeedsYouWidget"
+            android:exported="true"
+            android:label="@string/hw_needs_you_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hw_needs_you_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.bos.sphere.feature.homewidgets.AppPadsWidget"
+            android:exported="true"
+            android:label="@string/hw_pads_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hw_pads_info" />
+        </receiver>
+
+        <!-- Media controls and "read the battery again": Sphere's own PendingIntents only. -->
+        <receiver
+            android:name="com.bos.sphere.feature.homewidgets.WidgetActionReceiver"
+            android:exported="false" />
+
+        <!-- Taps that open another app or a system setting: checks the target, starts it, finishes. -->
+        <activity
+            android:name="com.bos.sphere.feature.homewidgets.WidgetTapActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!--
+          Widget options (pads' apps, privacy choices). Not exported: launchers start it through
+          AppWidgetHost.startAppWidgetConfigureActivityForResult, which the system runs for Sphere.
+        -->
+        <activity
+            android:name="com.bos.sphere.feature.homewidgets.WidgetOptionsActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="@string/hw_options_label"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Material.NoActionBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

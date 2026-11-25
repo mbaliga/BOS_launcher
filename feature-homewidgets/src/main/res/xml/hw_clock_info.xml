@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Size layouts (small / medium / large) are chosen by the launcher from size-mapped RemoteViews;
+  see WidgetKind for each layout's minimum size. No periodic updates: Sphere pushes redraws when
+  the data changes (docs/widgets.md).
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/hw_clock_description"
+    android:initialLayout="@layout/hw_loading"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:previewImage="@drawable/hw_preview_clock"
+    android:previewLayout="@layout/hw_clock_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

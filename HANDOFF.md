@@ -6,6 +6,120 @@
 
 ---
 
+## Sphere's own home-screen widgets — `:feature-homewidgets` (2026-11-04)
+
+Owner: "develop the widgets across multiple sizes for each and every app ... at least 5 widgets each"
+and "The widgets should be usable by Android launchers". Design, data, privacy and the owner-verify
+list: [`docs/widgets.md`](docs/widgets.md).
+
+- **Done (compiled + JVM unit tests):** five App Widget providers (Gate clock, Battery, Now playing,
+  Needs you, App pads), each with small / medium / large layouts as size-mapped RemoteViews, preview
+  layouts, day/night colours; push updates from a process-wide runtime started by the new
+  `SphereApplication` (battery receiver, media sessions, the notification listener's package+flags
+  facts, LauncherApps callbacks, the hidden-apps set); taps through a non-exported trampoline
+  (LauncherApps launches, notification-access setting) and receiver (media controls, battery
+  re-read); a non-exported options screen (pads' apps; "counts only" / "show track and artist").
+  64 tests: models, size keys (also per font scale), colour contrast, and the layout files themselves.
+- **Review fixes (same day):** Now playing shows the app name only by default and never names an
+  app hidden in Sphere; Needs you has no "hidden apps" row (hidden apps count only in the total and
+  "+N more"), splits work-profile apps into their own badged rows that open in that profile; "as of"
+  at every size where data can lapse; size keys grow with the font scale; one-row pads are 48 dp;
+  providers ignore ids that aren't theirs; battery tap uses goAsync; media controls reach the
+  session shown; pads redraw icons on app updates. In `:core-data`, the hub the Needs you card
+  opens is fixed: `SphereNotificationListener.isEnabled` checks listener access (it checked DND
+  access) and `NotificationProvider.notifications` is a StateFlow filled on connect, so the hub no
+  longer opens empty or on demo cards while access is on.
+- **Touches outside the new module:** `SphereApplication` + manifest `android:name` (also redraws
+  widgets on a font-scale change); `MainActivity` / `HomeScreen` (`hubSignal`: a widget can open
+  home with the hub down); `HiddenAppsStore.PREFS_NAME` made public; backup rules leave out
+  `home_widgets.xml`; `:core-data` `NotificationManager.kt` (`ActiveNotification.userSerial`,
+  `isEnabled`, the hub's StateFlow, styled titles) and `HubPanel` (collects that StateFlow).
+- **Not verified:** everything on a device. No emulator here.
+- **Owner decisions open:** whether Now playing should show the track by default (it shows the app
+  name only until the owner says otherwise); which notifications count (shared with pages §7).
+
+---
+
+## Pages — `:feature-pages` (2026-11-04)
+
+Owner (2026-11-04): "also add the Orrery widget runtime to the launcher"; full-page widgets ("Orrery
+would be one such widget"); a page can be a website ("anything can become part of a scrollable set of
+pages"); and "Let the user choose between all three options: 2 finger swipe + dots, swipe past the
+coverflow's ends, vertical pages (swipe up)". Design, rules and the owner-verify list:
+[`docs/pages.md`](docs/pages.md).
+
+- **Done (compiled + JVM unit tests):** page model (home = page 0; `appwidget` / `html` / `web`)
+  persisted as schema-versioned JSON in SharedPreferences with forward-compatible entries; page manager
+  (add, rename, reorder, info, remove; from Settings and a long-press on the dots); the three
+  navigation modes as a setting (two-finger swipe + dots by default), read in the Initial pass and
+  claimed only once clearly a page gesture; page dots (48 dp targets, shape not colour); App Widget
+  pages on a new `Page` placement surface (reusing reconciliation and backup-restore remap; linked to
+  their page by slot); the Orrery widget runtime (own https origin per page under `.invalid`, request
+  interceptor, D-AC package import/validation from zip or folder, single-file pages with Orrery
+  detected by title, permissions denied, popups and downloads refused, packages never online,
+  per-page network switch for single-file pages with reached / refused hosts, host API over an
+  origin-restricted MessagePort with declaration enforcement and D-AC envelopes, `launcher.clock` /
+  `.battery` / `.notifications` channels, `app:` / `page:` routes); website pages (URL validation,
+  https mark, back / reload, third-party cookies off, Safe Browsing off by owner decision, metrics opt
+  out); memory policy (current page ± 1 alive, others saved and destroyed, off-screen paused).
+- **New permission:** `INTERNET` (website pages; network-on single-file pages). No new third-party
+  dependency (`androidx.webkit` was not needed; JUnit 4 is test-only).
+- **Not verified:** everything on a device. No emulator here.
+- **Touches outside the new module (additive):** `feature-sphere/LauncherSurface` (`gestureClaimed`,
+  `onScrubReleased`, `LauncherSurfaceState.scrubPastEnd`; defaults keep the old behaviour),
+  `feature-widgets` (`WidgetSurface.Page`, `PlacementEdits.putOnPage` / `onPage`,
+  `WidgetSizing.pageSizes`, `PageWidget`, a page target in the picker, `FocusNewWidgets(onOpenPage)`),
+  `core-data` (`ActiveNotification`, `NotificationProvider.active`: package and flags only),
+  `HomeScreen` (the pager around home; Chrome now slides with home), `SettingsPanel` (optional pages
+  section), the app manifest.
+- **Review round (2026-11-04, uncommitted with the rest):** three reviewers' findings verified and
+  fixed: two-finger release (blocker), mode-2 past-end from mid-list, claim settling, long-press then
+  drag, turns cancelled by list changes, package navigation / popups, `intent:` crash paths, `open`
+  only after a tap, JS dialogs, WebRTC head-block bypasses, asset documents sandboxed, per-page sites
+  (`<id>.invalid`), package storage removal, page-removal wipe of `localStorage`, import errors and
+  atomic swap, start-up sweep vs unread lists, http cleartext, backup rules, IME on page change, dots
+  placement, TalkBack. Pure parts are JVM-tested (`PageDirsTest`, `RuntimeLimitsTest`, `ReleaseTest`,
+  `ScrubPastEndTest` in `:feature-sphere`, …).
+- **Owner decisions open:** `docs/pages.md` §7 (wrap past the start on home; storage for D-AC
+  packages; `'self'` in the package CSP for `assets/`; file pickers inside pages; WebRTC residual risk;
+  website data on removal; which notifications count; http via cleartext; backups without the WebView
+  profile, so without Orrery's saved state).
+- **Next:** owner-verify list; then the decisions above.
+
+---
+
+## Widget hosting — `:feature-widgets` (2026-11-04)
+
+Sphere now **hosts** standard Android App Widgets from any app (brief §3.D; widget strategy §1.5 / §3:
+an AppWidgetHost shows every app's own widgets with no pairing). Design, touch model, persistence and
+the owner-verify list: [`docs/widget-hosting.md`](docs/widget-hosting.md).
+
+- **Done (compiled + JVM unit tests):** one process-wide `AppWidgetHost` (fixed host id) listening
+  while the activity is started; placements in SharedPreferences with start-up reconciliation
+  (drop forgotten ids, delete orphan ids, "widget unavailable" tile with Remove); picker over
+  `getInstalledProvidersForProfile` for every `LauncherApps` profile; bind via
+  `bindAppWidgetIdIfAllowed` → `ACTION_APPWIDGET_BIND` → configure activity, deleting the id on any
+  cancel or failure; widgets as equator tiles (laid out at the focus-lens size, sizes reported with
+  `updateAppWidgetSize(Bundle, List<SizeF>)`) or in a full-width hub stack (Small / Medium / Large);
+  touch model arbitrated in `LauncherSurface` (focused tile at rest takes taps, drags still scrub,
+  long-press → widget menu, hub stack is a pass-through region once the hub is fully open);
+  backup restore: placements found without this device's `noBackupFilesDir` marker wait as
+  restore-pending (negative ids, no host ids deleted) until `ACTION_APPWIDGET_HOST_RESTORED` maps
+  them, or 3 days pass. No new permission, no new runtime dependency (JUnit 4 is test-only).
+- **Not verified:** everything on a device. No emulator here.
+- **Touches outside the new module (additive):** `feature-sphere` gained `EquatorItem`,
+  `TouchPassThrough`, `SphereState.focusScale` / `focusedItemIndex` and widget tiles in
+  `CoverflowLayer`; `LauncherSurface` takes optional widget parameters (defaults keep the old
+  behaviour) and now reads its lists and callbacks through `rememberUpdatedState`; `HomeScreen`,
+  `MainActivity` (`onActivityResult` forward), `HubPanel` (optional `extraContent`, measured
+  before the notifications, which are now clipped to the height left over),
+  `SettingsPanel` (optional "Widgets" section), `AppContextMenu` (optional "Add widget here").
+- **Next:** owner-verify list; then consider anchoring equator widgets to their neighbouring app
+  (today they keep an index, so app installs before them shift their neighbours), reordering
+  widgets along the equator, and widget stacks/paging if the hub gets crowded.
+
+---
+
 ## Recent Improvements (Extended Session)
 
 ### Phase 1: M1-M2 Polish
@@ -132,7 +246,7 @@
 ### Future Planned (Per Brief) — Not Started
 - `:feature-hub` — Graduate from `:app/ui` to own module; add contextual cards (weather, travel, calendar).
 - `:feature-settings` — Graduate from `:app/ui` to own module.
-- `:feature-widgets` — Home-screen widgets (brief §3.D).
+- `:feature-widgets` — Home-screen widgets (brief §3.D). **Hosting started 2026-11-04** (see top).
 - `:haptics` — Tactile feedback wired to motion primitives (brief §4.C).
 - `:assistant` — AI command palette with intent routing (brief §5).
 

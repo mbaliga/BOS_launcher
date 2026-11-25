@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.width
@@ -23,12 +24,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.feature.sphere.RowMode
 import com.bos.sphere.feature.sphere.SphereParams
+import com.bos.sphere.feature.widgets.R as WidgetsR
 import kotlin.math.roundToInt
 
 /**
@@ -48,6 +56,8 @@ fun SettingsPanel(
     onRubikModeChange: (Boolean) -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onAddWidget: (() -> Unit)? = null,
+    pagesSection: (@Composable () -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -88,6 +98,14 @@ fun SettingsPanel(
 
             Header("ROWS")
             RowModeSelector(rowMode, onRowModeChange)
+
+            if (onAddWidget != null) {
+                Header(stringResource(WidgetsR.string.widgets_section))
+                AddWidgetRow(onAddWidget)
+            }
+
+            // Pages: "Move between pages" (three modes) and "Manage pages".
+            pagesSection?.invoke()
         }
     }
 }
@@ -177,6 +195,27 @@ private fun RowModeSelector(selected: RowMode, onSelect: (RowMode) -> Unit) {
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
+    }
+}
+
+/** Opens the widget picker; a full-width 48 dp row. */
+@Composable
+private fun AddWidgetRow(onClick: () -> Unit) {
+    val label = stringResource(WidgetsR.string.widgets_add)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = HyleColors.Ink, fontSize = 12.sp)
+        Text("+", color = HyleColors.VioletSoft, fontSize = 16.sp, modifier = Modifier.clearAndSetSemantics {})
     }
 }
 

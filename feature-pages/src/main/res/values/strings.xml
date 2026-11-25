@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings -->
+    <string name="pages_section">PAGES</string>
+    <string name="pages_nav_title">Move between pages</string>
+    <string name="pages_nav_two_finger">Two-finger swipe + dots</string>
+    <string name="pages_nav_past_ends">Swipe past the coverflow\'s ends</string>
+    <string name="pages_nav_vertical">Vertical pages (swipe up)</string>
+    <string name="pages_nav_selected_cd">%1$s, selected</string>
+    <string name="pages_nav_choose_cd">Move between pages: %1$s</string>
+    <string name="pages_manage">Manage pages</string>
+
+    <!-- Dots -->
+    <string name="pages_dot_cd">Page %1$d of %2$d: %3$s</string>
+    <string name="pages_dot_current_cd">Page %1$d of %2$d: %3$s, current page</string>
+    <string name="pages_network_on">Network on</string>
+    <string name="pages_network_on_cd">This page can reach the network. Show its info</string>
+
+    <!-- Names -->
+    <string name="pages_home">Home</string>
+    <string name="pages_kind_appwidget">App widget</string>
+    <string name="pages_kind_html_package">HTML widget</string>
+    <string name="pages_kind_html_page">Page</string>
+    <string name="pages_kind_web">Website</string>
+    <string name="pages_widget_default">Widget</string>
+
+    <!-- Manager -->
+    <string name="pages_manager_title">Pages</string>
+    <string name="pages_done">Done</string>
+    <string name="pages_manager_home_note">The coverflow. Always first.</string>
+    <string name="pages_move_up_cd">Move %1$s up</string>
+    <string name="pages_move_down_cd">Move %1$s down</string>
+    <string name="pages_rename">Rename</string>
+    <string name="pages_rename_cd">Rename %1$s</string>
+    <string name="pages_info">Info</string>
+    <string name="pages_info_cd">Info for %1$s</string>
+    <string name="pages_remove">Remove</string>
+    <string name="pages_remove_cd">Remove the %1$s page</string>
+    <string name="pages_add">Add a page</string>
+    <string name="pages_reconfigure">Reconfigure</string>
+    <string name="pages_reconfigure_cd">Reconfigure the %1$s widget</string>
+    <string name="pages_go_to_cd">Go to %1$s</string>
+
+    <!-- Add -->
+    <string name="pages_add_appwidget">App widget</string>
+    <string name="pages_add_appwidget_desc">One Android App Widget filling the page.</string>
+    <string name="pages_add_html_file">HTML widget or page</string>
+    <string name="pages_add_html_file_desc">Import a .zip widget package or an .html page, such as Orrery\'s.</string>
+    <string name="pages_add_html_folder">HTML widget package (folder)</string>
+    <string name="pages_add_html_folder_desc">Import a folder holding widget.json and widget.html.</string>
+    <string name="pages_add_web">Website</string>
+    <string name="pages_add_web_desc">Any http or https address.</string>
+    <string name="pages_cancel">Cancel</string>
+
+    <!-- Website address -->
+    <string name="pages_url_title">Website address</string>
+    <string name="pages_url_hint">https://example.com</string>
+    <string name="pages_url_add">Add</string>
+    <string name="pages_url_https_note">An address without http:// or https:// gets https://.</string>
+    <string name="pages_url_empty">Type an address.</string>
+    <string name="pages_url_too_long">That address is too long.</string>
+    <string name="pages_url_scheme">Only http and https addresses can be pages.</string>
+    <string name="pages_url_no_host">That address has no host name.</string>
+    <string name="pages_url_credentials">Addresses with a user name or password aren\'t accepted.</string>
+    <string name="pages_url_bad_port">That port isn\'t valid.</string>
+    <string name="pages_url_malformed">That isn\'t a valid address.</string>
+    <string name="pages_url_not_https">Not https: what you send and see on this page can be read or changed on the way.</string>
+    <string name="pages_url_preview">Will open %1$s</string>
+
+    <!-- Rename / remove -->
+    <string name="pages_rename_title">Rename page</string>
+    <string name="pages_rename_note">Leave it empty to use the content\'s own name.</string>
+    <string name="pages_save">Save</string>
+    <string name="pages_remove_title">Remove %1$s?</string>
+    <string name="pages_remove_html">Its imported files are deleted, and what it stored in the launcher (its saved state, storage and cookies) is cleared.</string>
+    <string name="pages_remove_web">The page goes. Cookies and storage the site left stay in the launcher\'s shared web storage.</string>
+    <string name="pages_remove_widget">The widget is removed from the launcher.</string>
+
+    <!-- Import -->
+    <string name="pages_importing">Importing…</string>
+    <string name="pages_import_failed_title">Couldn\'t import that</string>
+    <string name="pages_import_unreadable">The file couldn\'t be read.</string>
+    <string name="pages_import_too_large">It\'s too large (packages up to 24 MB, pages up to 32 MB).</string>
+    <string name="pages_import_not_html">That isn\'t an HTML page or a zip package.</string>
+    <string name="pages_layout_empty">The package is empty.</string>
+    <string name="pages_layout_unsafe">The package has a file path that points outside it (%1$s), so it was refused.</string>
+    <string name="pages_layout_no_manifest">There is no widget.json at the top of the package.</string>
+    <string name="pages_layout_no_html">There is no widget.html beside widget.json.</string>
+    <string name="pages_layout_too_many">The package has too many files.</string>
+    <string name="pages_manifest_not_json">widget.json isn\'t valid JSON.</string>
+    <string name="pages_manifest_missing">widget.json has no \"%1$s\".</string>
+    <string name="pages_manifest_wrong_type">\"%1$s\" has the wrong type.</string>
+    <string name="pages_manifest_bad_id">\"id\" (%2$s) may use only letters, digits, dots, dashes and underscores.</string>
+    <string name="pages_manifest_bad_name">\"name\" is empty.</string>
+    <string name="pages_manifest_bad_version">\"version\" must be a whole number from 1.</string>
+    <string name="pages_manifest_bad_size">\"%2$s\" isn\'t a size (use 2x2, 4x2 or fill).</string>
+    <string name="pages_manifest_no_fill">\"sizes\" has no \"fill\": this launcher shows HTML widgets as full pages.</string>
+    <string name="pages_manifest_bad_channel">\"%2$s\" in \"%1$s\" isn\'t a channel name (like news.items).</string>
+    <string name="pages_manifest_launcher_write">Widgets can\'t write \"%2$s\": only the launcher publishes launcher channels.</string>
+    <string name="pages_manifest_network">\"network\" must be false: widget packages never reach the network.</string>
+    <string name="pages_manifest_bad_opens">\"opens\" must be a route or a list of routes.</string>
+    <string name="pages_warn_opens">\"%1$s\" in opens isn\'t an app: or page: route, so it can\'t be opened here.</string>
+    <string name="pages_imported_with_notes">Imported, with notes</string>
+    <string name="pages_ok">OK</string>
+
+    <!-- Info -->
+    <string name="pages_info_package">Widget package · version %1$d</string>
+    <string name="pages_info_page">Single-file page</string>
+    <string name="pages_info_source">From %1$s · %2$s</string>
+    <string name="pages_info_origin">Runs at %1$s, with its own storage.</string>
+    <string name="pages_info_reads">Reads: %1$s</string>
+    <string name="pages_info_writes">Writes: %1$s</string>
+    <string name="pages_info_opens">Opens: %1$s</string>
+    <string name="pages_info_nothing">nothing</string>
+    <string name="pages_info_package_network">Never reaches the network and never opens a link or another app by itself: every request outside its own files is refused, whatever it declares. It can open only the routes it declares, and only right after you tap it.</string>
+    <string name="pages_network_switch">Allow this page to reach the network</string>
+    <string name="pages_switch_on">ON</string>
+    <string name="pages_switch_off">OFF</string>
+    <string name="pages_network_off_note">Off: the page loads nothing from the web. Fonts it would fetch from the web fall back to system fonts.</string>
+    <string name="pages_network_off_orrery">Off: Orrery\'s connectors (weather, models) and its Google Fonts don\'t load, so system fonts are used. Its saved state stays.</string>
+    <string name="pages_network_on_note">On: the page can reach any host it asks for. The hosts it reached are listed below.</string>
+    <string name="pages_hosts_mentioned">Its file mentions: %1$s</string>
+    <string name="pages_hosts_reached">Reached this session: %1$s</string>
+    <string name="pages_hosts_blocked">Refused this session: %1$s</string>
+    <string name="pages_hosts_none">none yet</string>
+    <string name="pages_info_limits">Downloads and file pickers inside pages aren\'t supported. Links from a page to other sites open in your browser; a widget package opens nothing by itself.</string>
+    <string name="pages_info_not_backed_up">What this page saves stays on this phone: it isn\'t in backups or device transfers (and its imported files aren\'t either).</string>
+    <string name="pages_reimport">Re-import</string>
+    <string name="pages_files_missing_title">This page\'s files aren\'t here</string>
+    <string name="pages_files_missing_body">Imported files aren\'t part of backups. Import the file again to bring the page back.</string>
+    <string name="pages_import_again">Import again</string>
+    <string name="pages_safe_browsing_note">Safe Browsing is off (the owner\'s decision): no address is checked with Google, and there is no warning before a known-malicious site.</string>
+    <string name="pages_web_cookies_note">Third-party cookies are off. Permission requests (location, camera, microphone, notifications) are always refused.</string>
+    <string name="pages_close">Close</string>
+
+    <!-- Website header -->
+    <string name="pages_secure">https</string>
+    <string name="pages_not_secure">not https</string>
+    <string name="pages_secure_cd">Secure connection, https</string>
+    <string name="pages_not_secure_cd">Not a secure connection</string>
+    <string name="pages_back">Back</string>
+    <string name="pages_back_cd">Go back in this page</string>
+    <string name="pages_reload">Reload</string>
+    <string name="pages_reload_cd">Reload this page</string>
+
+    <!-- States -->
+    <string name="pages_webview_missing">The system WebView isn\'t available right now (it may be updating).</string>
+    <string name="pages_crashed_title">This page stopped</string>
+    <string name="pages_crashed_body">Its renderer ended: it crashed, or Android reclaimed the memory.</string>
+    <string name="pages_download_refused">\"%1$s\" wasn\'t saved: pages in the launcher can\'t download files.</string>
+    <string name="pages_widget_gone_title">No widget on this page</string>
+    <string name="pages_widget_gone_body">Its app was uninstalled or disabled, or the widget was removed.</string>
+    <string name="pages_choose_widget">Choose a widget</string>
+    <string name="pages_remove_page">Remove page</string>
+    <string name="pages_loading">Loading…</string>
+
+    <!-- Past-the-ends hint (mode 2) -->
+    <string name="pages_past_end_approach">Keep pulling for %1$s</string>
+    <string name="pages_past_end_ready">Release to open %1$s</string>
+</resources>

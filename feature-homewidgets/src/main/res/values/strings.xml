@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Names and descriptions in a launcher's widget picker -->
+    <string name="hw_clock_label">Gate clock</string>
+    <string name="hw_clock_description">The time and date from Sphere\'s gate, and your next alarm when there\'s room.</string>
+    <string name="hw_battery_label">Battery</string>
+    <string name="hw_battery_description">Battery level and whether it\'s charging, with the time it was read.</string>
+    <string name="hw_now_playing_label">Now playing</string>
+    <string name="hw_now_playing_description">What\'s playing, with controls when there\'s room. Uses Sphere\'s notification access.</string>
+    <string name="hw_needs_you_label">Needs you</string>
+    <string name="hw_needs_you_description">How many notifications are waiting, per app. Never what they say. Uses Sphere\'s notification access.</string>
+    <string name="hw_pads_label">App pads</string>
+    <string name="hw_pads_description">Up to six apps you choose, one tap each.</string>
+
+    <!-- Shared -->
+    <string name="hw_loading">Loading…</string>
+    <string name="hw_as_of">as of %1$s</string>
+    <string name="hw_error_title">Couldn\'t read this</string>
+    <string name="hw_error_body">Sphere couldn\'t get this widget\'s data. Tap to open Sphere.</string>
+    <string name="hw_open_sphere_cd">Opens Sphere</string>
+    <string name="hw_sphere">Sphere</string>
+    <string name="hw_access_off_title">Notification access is off</string>
+    <string name="hw_access_off_cd">Notification access is off. Opens the setting to turn it on.</string>
+
+    <!-- Gate clock -->
+    <string name="hw_clock_alarm">Alarm %1$s</string>
+    <string name="hw_clock_no_alarm">No alarm set</string>
+    <string name="hw_clock_cd">Clock. Opens Sphere.</string>
+
+    <!-- Battery -->
+    <string name="hw_battery_percent">%1$d%%</string>
+    <string name="hw_battery_charging">Charging</string>
+    <string name="hw_battery_full">Full</string>
+    <string name="hw_battery_plugged">Plugged in, not charging</string>
+    <string name="hw_battery_on_battery">On battery</string>
+    <string name="hw_battery_low">Low</string>
+    <string name="hw_battery_full_in_hm">Full in about %1$d h %2$d min</string>
+    <string name="hw_battery_full_in_m">Full in about %1$d min</string>
+    <string name="hw_battery_source_ac">Power: charger</string>
+    <string name="hw_battery_source_usb">Power: USB</string>
+    <string name="hw_battery_source_wireless">Power: wireless</string>
+    <string name="hw_battery_source_dock">Power: dock</string>
+    <string name="hw_battery_temperature">Battery %1$s °C</string>
+    <string name="hw_battery_cd">Battery %1$d percent, %2$s, %3$s. Tap to read it again.</string>
+    <string name="hw_battery_unavailable_title">No battery reading</string>
+    <string name="hw_battery_unavailable_body">Android didn\'t report the level. Tap to try again.</string>
+
+    <!-- Now playing -->
+    <string name="hw_np_eyebrow">Now playing · %1$s</string>
+    <!-- When the playing app is hidden in Sphere: no name, and no hint that it is hidden. -->
+    <string name="hw_np_eyebrow_unnamed">Now playing</string>
+    <string name="hw_np_unnamed_app">An app</string>
+    <string name="hw_np_playing">Playing</string>
+    <string name="hw_np_paused">Paused</string>
+    <string name="hw_np_loading">Loading</string>
+    <string name="hw_np_withheld">Track hidden by this widget\'s setting</string>
+    <string name="hw_np_nothing_title">Nothing playing</string>
+    <string name="hw_np_nothing_body">Music and podcasts you play show here.</string>
+    <string name="hw_np_off_body">Sphere needs it to see what\'s playing. Tap to turn it on.</string>
+    <string name="hw_np_previous">Previous track</string>
+    <string name="hw_np_play">Play</string>
+    <string name="hw_np_pause">Pause</string>
+    <string name="hw_np_next">Next track</string>
+    <string name="hw_np_cd">%1$s. %2$s. Opens %3$s.</string>
+
+    <!-- Needs you -->
+    <string name="hw_ny_title">Needs you</string>
+    <plurals name="hw_ny_total">
+        <item quantity="one">%d notification</item>
+        <item quantity="other">%d notifications</item>
+    </plurals>
+    <plurals name="hw_ny_from_apps">
+        <item quantity="one">from %d app</item>
+        <item quantity="other">from %d apps</item>
+    </plurals>
+    <plurals name="hw_ny_more_apps">
+        <item quantity="one">+%d more app</item>
+        <item quantity="other">+%d more apps</item>
+    </plurals>
+    <string name="hw_ny_nothing">Nothing waiting</string>
+    <string name="hw_ny_counts_only">App names are off for this widget</string>
+    <string name="hw_ny_connecting_title">Connecting…</string>
+    <string name="hw_ny_connecting_body">Waiting for Sphere\'s notification listener to start.</string>
+    <string name="hw_ny_off_body">Sphere needs it to count notifications. Tap to turn it on.</string>
+    <string name="hw_ny_row_cd">%1$s, %2$d. Opens %1$s.</string>
+    <string name="hw_ny_cd">Needs you: %1$s. Opens Sphere\'s hub.</string>
+
+    <!-- App pads -->
+    <string name="hw_pads_choose_title">Choose apps</string>
+    <string name="hw_pads_choose_body">Tap to pick up to six apps for these pads.</string>
+    <string name="hw_pad_cd">Open %1$s</string>
+    <string name="hw_app_unavailable">That app isn\'t available any more</string>
+
+    <!-- Options screen (the launcher's reconfigure, or a tap on "Choose apps") -->
+    <string name="hw_options_label">Widget options</string>
+    <string name="hw_options_done">Done</string>
+    <string name="hw_options_cancel">Cancel</string>
+    <string name="hw_options_none">This widget has no options.</string>
+    <string name="hw_options_pads_title">App pads</string>
+    <string name="hw_options_pads_help">Pick up to six. They show in the order you pick them. Apps hidden in Sphere aren\'t listed.</string>
+    <string name="hw_options_filter">Filter apps</string>
+    <string name="hw_options_loading">Loading apps…</string>
+    <string name="hw_options_count">%1$d of %2$d chosen</string>
+    <string name="hw_options_pad_number">Pad %1$d</string>
+    <string name="hw_options_selected_cd">%1$s, on pad %2$d. Tap to remove.</string>
+    <string name="hw_options_unselected_cd">%1$s. Tap to add.</string>
+    <string name="hw_options_full_cd">%1$s. Six apps already chosen.</string>
+    <string name="hw_options_work">Work profile</string>
+    <string name="hw_options_needs_you_title">Needs you</string>
+    <string name="hw_options_names">Show app names</string>
+    <string name="hw_options_names_body">Each app with how many notifications it has. Apps hidden in Sphere are never named: they count only in the total and in “more apps”.</string>
+    <string name="hw_options_counts_only">Counts only</string>
+    <string name="hw_options_counts_only_body">Just the total and how many apps.</string>
+    <string name="hw_options_now_playing_title">Now playing</string>
+    <string name="hw_options_track">Show track and artist</string>
+    <string name="hw_options_track_body">What the playing app reports as its title and artist. Titles can name people, as voice-message players often do, and anyone who sees your home screen sees them.</string>
+    <string name="hw_options_app_only">App name only</string>
+    <string name="hw_options_app_only_body">Which app is playing and whether it\'s paused. The default.</string>
+    <string name="hw_options_chosen_cd">%1$s, chosen</string>
+
+    <!-- Picker previews only (previewLayout): sample content, never shown as data -->
+    <string name="hw_preview_alarm" translatable="false">Alarm Wed 07:00</string>
+    <string name="hw_preview_battery_percent" translatable="false" formatted="false">84%</string>
+    <string name="hw_preview_np_eyebrow" translatable="false">Now playing · Music</string>
+    <string name="hw_preview_ny_row1" translatable="false">Messages</string>
+    <string name="hw_preview_ny_row2" translatable="false">Calendar</string>
+    <string name="hw_preview_ny_row3" translatable="false">Mail</string>
+    <string name="hw_preview_ny_total" translatable="false">6 notifications</string>
+    <string name="hw_preview_pad1" translatable="false">Phone</string>
+    <string name="hw_preview_pad2" translatable="false">Camera</string>
+    <string name="hw_preview_pad3" translatable="false">Maps</string>
+</resources>

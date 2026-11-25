@@ -269,3 +269,89 @@ All modules depend on:
 - Kotlin stdlib + coroutines.
 - Androidx Compose (foundation, material3, activity).
 - Androidx lifecycle (for state collection).
+
+---
+
+## Widget hosting — `:feature-widgets` (2026-11-04)
+
+Added after the graph above was written; additive so the module map stays accurate.
+
+- **Responsibility:** hosting other apps' App Widgets: one process-wide `AppWidgetHost`, the
+  placement store (SharedPreferences) with reconciliation and backup-restore handling, the
+  picker, the bind / configure flow, equator widget tiles and the hub widget stack.
+- **Dependencies:** `:feature-widgets` → `:feature-sphere` (`EquatorItem`, `TouchPassThrough`,
+  `TILE_SIZE_DP`), `:core-design`, `:core-data`. `:app` → `:feature-widgets`.
+  `:feature-sphere` knows nothing about widget hosting: it renders `EquatorItem.Widget` tiles
+  through a slot and arbitrates their touches in `LauncherSurface`.
+- **Pure, JVM-tested parts:** `PlacementCodec`, `PlacementReconciler`, `RestoreWindow`,
+  `EquatorMerge`, `PlacementEdits`, `WidgetSizing`, `HubStackLayout`, `PickerModel`, `BindFlow`
+  (`feature-widgets/src/test`).
+- **Design, touch model, persistence and owner-verify list:**
+  [`docs/widget-hosting.md`](docs/widget-hosting.md).
+
+```
+app
+└── feature-widgets
+    ├── feature-sphere
+    ├── core-design
+    └── core-data
+```
+
+---
+
+## Pages — `:feature-pages` (2026-11-04)
+
+Added after the sections above; additive so the module map stays accurate.
+
+- **Responsibility:** the launcher's pages: the page list and manager, the three navigation modes
+  (the pager reads touches in the Initial pass and claims only page gestures), the Orrery widget
+  runtime (WebViews served from app-private storage at their own origins, the D-AC host API and the
+  launcher's channels) and website pages.
+- **Dependencies:** `:feature-pages` → `:core-design`, `:core-data`. It does not depend on
+  `:feature-widgets`: `HomeScreen` passes App Widget pages in through `AppWidgetPageHooks` and a
+  content slot. `:app` → `:feature-pages`.
+- **Pure, JVM-tested parts:** `PageListCodec`, `PageEdits`, `TwoFingerSwipe`, `EdgeSwipe`,
+  `HomeSwipeUp`, `PageTurn`, `PastEnd`, `UrlRules`, `ManifestRules`, `HtmlScan`, `PackageLayout`,
+  `HostProtocol`, `OpenRoutes`, `Envelope`, `ServePolicy`, `HtmlPrep`, `LauncherChannelData`,
+  `ThemeTokens`, `MiniJson`, `PageDirs`, `PageBackups`, `DragFeed`, `IntentRules`, `DialogBudget`,
+  `RateGate`, `OpenGate`, `OriginWipe` (`feature-pages/src/test`); `ScrubPastEnd`
+  (`feature-sphere/src/test`).
+- **Persistence:** SharedPreferences `pages` (list + navigation mode); imported files in
+  `noBackupFilesDir/pages/`. Backups leave out `app_webview/` (`res/xml/data_extraction_rules.xml`).
+- **Design, gestures, sandbox and owner-verify list:** [`docs/pages.md`](docs/pages.md).
+
+```
+app
+├── feature-pages
+│   ├── core-design
+│   └── core-data
+└── feature-widgets   (App Widget pages: placements on the Page surface)
+```
+
+---
+
+## Sphere's own home-screen widgets — `:feature-homewidgets` (2026-11-04)
+
+Added after the sections above; additive so the module map stays accurate.
+
+- **Responsibility:** the App Widgets Sphere *provides* to any launcher (Gate clock, Battery, Now
+  playing, Needs you, App pads): providers, size-mapped RemoteViews, the live sources that push
+  redraws while the process runs, taps, and the options screen. (`:feature-widgets` *hosts* other
+  apps' widgets; the two don't depend on each other.)
+- **Dependencies:** `:feature-homewidgets` → `:core-data` (`NotificationProvider.active`,
+  `SphereNotificationListener`, `HiddenAppsStore`, `AppEntry`), `:core-design`, `:feature-search`
+  (`AppSearch` in the options filter). `:app` → `:feature-homewidgets` (`SphereApplication` calls
+  `HomeWidgets.init`; `MainActivity` reads `HomeWidgets.EXTRA_OPEN`).
+- **Pure, JVM-tested parts:** `WidgetKind` / `WidgetTiers`, `ClockModel`, `BatteryModel`,
+  `NowPlayingModel`, `NeedsYouModel`, `PadsModel` / `PadsCodec`, `WidgetAction`; plus tests over the
+  resource files (colour contrast, layouts) (`feature-homewidgets/src/test`).
+- **Persistence:** SharedPreferences `home_widgets` (per-widget options), left out of backups.
+- **Design, data, privacy and owner-verify list:** [`docs/widgets.md`](docs/widgets.md).
+
+```
+app
+└── feature-homewidgets
+    ├── core-data
+    ├── core-design
+    └── feature-search
+```

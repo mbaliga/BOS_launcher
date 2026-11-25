@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Needs you, large: the total and five apps with their counts. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/hw_bg"
+    android:clipToOutline="true"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_marginEnd="8dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/hw_ic_dot" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:letterSpacing="0.13"
+            android:maxLines="1"
+            android:text="@string/hw_ny_title"
+            android:textAllCaps="true"
+            android:textColor="@color/hw_ink_dim"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/hw_ny_total"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/hw_accent"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/hw_ny_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="@color/hw_ink_bright"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/hw_ny_message_sub"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="@color/hw_ink"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/hw_ny_row1"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/hw_touch"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/hw_pad_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/hw_ny_row1_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hw_ink_bright"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/hw_ny_row1_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/hw_accent"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/hw_ny_row2"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/hw_touch"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/hw_pad_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/hw_ny_row2_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hw_ink_bright"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/hw_ny_row2_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/hw_accent"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/hw_ny_row3"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/hw_touch"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/hw_pad_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/hw_ny_row3_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hw_ink_bright"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/hw_ny_row3_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/hw_accent"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/hw_ny_row4"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/hw_touch"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/hw_pad_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/hw_ny_row4_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hw_ink_bright"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/hw_ny_row4_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/hw_accent"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/hw_ny_row5"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/hw_touch"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/hw_pad_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/hw_ny_row5_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hw_ink_bright"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/hw_ny_row5_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
+            android:textColor="@color/hw_accent"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/hw_ny_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/hw_ink_dim"
+        android:textSize="12sp" />
+</LinearLayout>

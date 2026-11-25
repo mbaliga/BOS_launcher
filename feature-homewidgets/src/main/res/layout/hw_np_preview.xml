@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker preview (sample content): a track playing, with controls. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/hw_bg"
+    android:clipToOutline="true"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="@dimen/hw_padding">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="@dimen/hw_glyph_small"
+            android:layout_height="@dimen/hw_glyph_small"
+            android:layout_marginEnd="6dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/hw_ic_note" />
+
+        <TextView
+            android:id="@+id/hw_np_eyebrow"
+        android:text="@string/hw_preview_np_eyebrow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:letterSpacing="0.15"
+            android:maxLines="1"
+            android:textAllCaps="true"
+            android:textColor="@color/hw_ink_dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- The default: app name only (the track is shown only if the user turns it on). -->
+    <TextView
+        android:id="@+id/hw_np_title"
+        android:text="@string/hw_np_withheld"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/hw_ink_dim"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/hw_np_artist"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/hw_ink"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/hw_np_state_glyph"
+            android:layout_width="@dimen/hw_glyph_small"
+            android:layout_height="@dimen/hw_glyph_small"
+            android:layout_marginEnd="6dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/hw_ic_play" />
+
+        <TextView
+            android:id="@+id/hw_np_state"
+        android:text="@string/hw_np_playing"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/hw_ink_dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/hw_touch"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/hw_np_prev"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/hw_pad_bg"
+            android:contentDescription="@string/hw_np_previous"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/hw_ic_prev" />
+
+        <ImageButton
+            android:id="@+id/hw_np_playpause"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/hw_pad_bg"
+            android:contentDescription="@string/hw_np_pause"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/hw_ic_pause" />
+
+        <ImageButton
+            android:id="@+id/hw_np_next"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/hw_pad_bg"
+            android:contentDescription="@string/hw_np_next"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/hw_ic_next" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Alarm clock struck through: no alarm set. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M12,5a8,8 0,1 0,0.01 0z" android:fillColor="#00000000" android:strokeColor="@color/hw_accent" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M5,3L2,6" android:fillColor="#00000000" android:strokeColor="@color/hw_accent" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M19,3l3,3" android:fillColor="#00000000" android:strokeColor="@color/hw_accent" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M4,21L20,5" android:fillColor="#00000000" android:strokeColor="@color/hw_accent" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

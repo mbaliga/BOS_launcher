@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Inner padding of every widget card. -->
+    <dimen name="hw_padding">12dp</dimen>
+    <!-- Every tappable pad, control and row is at least this tall and wide. -->
+    <dimen name="hw_touch">48dp</dimen>
+    <dimen name="hw_glyph">20dp</dimen>
+    <dimen name="hw_glyph_small">16dp</dimen>
+    <dimen name="hw_pad_icon">32dp</dimen>
+</resources>

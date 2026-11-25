@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Size layouts (small / medium / large) are chosen by the launcher from size-mapped RemoteViews;
+  see WidgetKind for each layout's minimum size. No periodic updates: Sphere pushes redraws when
+  the data changes (docs/widgets.md).
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/hw_pads_description"
+    android:initialLayout="@layout/hw_loading"
+    android:minWidth="250dp"
+    android:minHeight="48dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="48dp"
+    android:previewImage="@drawable/hw_preview_pads"
+    android:previewLayout="@layout/hw_pads_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:configure="com.bos.sphere.feature.homewidgets.WidgetOptionsActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional" />

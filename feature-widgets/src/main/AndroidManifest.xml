@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+          App Widget hosting: after a backup restore the system re-creates this launcher's hosted
+          widgets under new ids and tells the host (protected system broadcast, so not exported).
+        -->
+        <receiver
+            android:name="com.bos.sphere.feature.widgets.WidgetHostRestoredReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_HOST_RESTORED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

@@ -102,10 +102,11 @@ class SettingsHomeW52Test {
         val c = cats()
         val apps = SettingsTestNav.tab(c, SettingsTabs.APPS)
         val ws = apps.items.first() as SettingItem.Pane
-        assertEquals("Workspaces", ws.title)
+        assertEquals("Profiles (wave 57: they replace Workspaces)", "Profiles", ws.title)
         assertTrue(ws.bare)
-        assertTrue("the old entry point under Desktop & dock is gone", desktopCategory().items.none { it.title == "Workspaces" })
-        assertEquals("one Workspaces row in all of Settings", 1, c.flatMap { it.items }.count { it.title == "Workspaces" })
+        assertTrue("the old entry point under Desktop & dock is gone", desktopCategory().items.none { it.title == "Workspaces" || it.title == "Profiles" })
+        assertEquals("one Profiles row in all of Settings", 1, c.flatMap { it.items }.count { it.title == "Profiles" })
+        assertEquals("no Workspaces row is left", 0, c.flatMap { it.items }.count { it.title == "Workspaces" })
     }
 
     @Test fun CFG_21_theLookTabHasAFontRowWithAllCards() {

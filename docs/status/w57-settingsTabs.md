@@ -27,8 +27,13 @@ Owner: "Keep our style of tabs however, so that the 6 sections are navigable, cl
 ## Tests added
 `SettingsTabsW57ModelTest`, `SettingsTabsW57ShotsTest`, `SettingsTestNav` (app); `SettingsTabsW57UiTest` with its JVM model tests (feature-grid). Strings: `L10nW57settingsTabs.kt` (38 strings, 8 languages).
 
-## Results
-See the end of this file.
+## Results (all `--offline --max-workers=2`, one Gradle build at a time)
+- feature-grid: 1688 tests; the last full run had 40 failures, all `AppNotIdleException` (Compose not idle in 60 s) or missing hosted-widget nodes in classes this wave does not touch (Recents panel, wallpaper panes, widget stacks, shortcut rebind, motion), while another worktree's build loaded the machine; those classes plus the settings classes were rerun alone and all pass. The run before it (same settings code except the tab-fitting and hairline) had 1 failure, `InputTouchPathsUiTest.INP_07_back_dismisses_ground_control`, updated (one Back closes Settings from a tab).
+- app: 709 tests, 2 failures (`TourPanesSmokeTest` expected eight categories, `HomeUnifyReview2FlowTest` stepped back through the root list); both updated and pass when rerun. The full app suite was not rerun after those two edits.
+- core-quality (220, incl. RepoHygieneAuditTest with the recomputed Counts line and the regenerated TEST_COVERAGE.md), core-design (TranslationCoverageTest), core-data, core-input: green.
+- `assembleRelease` was not run.
+- Robolectric note: in the whole-app tests (main looper driven by hand) a scroll through a list's accessibility action (performScrollToNode / performScrollTo) on a section list never finished, so `SettingsTestNav.goTo` reaches a row through Settings' own search (which also exercises the search-hit path). With the normal compose rule those scrolls work (the feature-grid tests use them).
+- Counts line of docs/SPEC_STATUS.md recomputed by the hygiene audit (built 115, partial 53, ... of 175); it was already behind before this wave.
 
 ## Device-only
 Swipe feel and the indicator on a real screen, TalkBack wording ("Tab, 2 of 6"), a real controller's L1 / R1, a hardware keyboard's Ctrl+Tab, the collapsing header with a fling, the Studio link opening a browser, the Access and privacy states after returning from Android's pages.

@@ -74,15 +74,15 @@ class HomeUnifyReview2FlowTest : TourBase() {
         start(HomePages.Off)
         longPressAt(0.5f, 0.75f); assertTrue(quickSheetShown())
         assertFalse("the quick sheet has no Add page any more (wave 34)", tagShown("quick.addpage"))
-        openGroundControlHome()
-        assertTrue("with Pages Off Ground Control shows Add page dimmed with its reason (wave 56)", textShown("Pages is Off"))
-        back(); back(); assertFalse(settingsShown()) // wave 40: the page goes back to the root list first
+        openGroundControlHome(); SettingsTestNav.goTo(rule, "Home", "Add page"); settle(300)
+        assertTrue("with Pages Off Settings shows Add page dimmed with its reason (wave 56)", textShown("Pages is Off"))
+        back(); assertFalse(settingsShown()) // wave 57: from a tab, Back closes Settings
         stores.prefs.update { it.copy(homePages = HomePages.Paginated) }; settle()
         backwardToGlance()
         longPressAt(0.5f, 0.75f); assertTrue(quickSheetShown())
         assertFalse(tagShown("quick.addpage"))
-        openGroundControlHome()
-        assertTrue("with Paginated Ground Control, Home screen offers Add page", textShown("Add page"))
+        openGroundControlHome(); SettingsTestNav.goTo(rule, "Home", "Add page"); settle(300)
+        assertTrue("with Paginated Settings, Home offers Add page", textShown("Add page"))
     }
 
     private fun backwardToGlance() { if (!glanceShown()) { rule.onNodeWithTag("home.pager").performTouchInput { val y = height * 0.5f; swipe(Offset(width * 0.25f, y), Offset(width * 0.75f, y), 300) }; settle() } }

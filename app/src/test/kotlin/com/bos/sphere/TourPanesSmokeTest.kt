@@ -63,13 +63,13 @@ class TourPanesSmokeTest {
         var shownCategories = 0
         for ((name, p) in variants()) {
             rule.runOnIdle { cats = buildSettingsCategories(model(p)); idx = 0 }; rule.waitForIdle()
-            assertTrue("$name: categories exist (${cats.size})", cats.size >= 8)
+            assertTrue("$name: the six tabs exist (${cats.size})", cats.size >= 6) // wave 57: six tabs
             for (i in cats.indices) {
                 try { rule.runOnIdle { idx = i }; rule.waitForIdle() } catch (e: Throwable) { throw AssertionError("$name: category ${cats[i].title} does not compose: $e", e) }
                 shownCategories++
             }
         }
-        assertTrue(shownCategories >= 40)
+        assertTrue(shownCategories >= 30)
     }
 
     private fun details(c: SettingCategory): List<Pair<String, @androidx.compose.runtime.Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit>> =

@@ -72,10 +72,13 @@ fun HomeQuickSheet(
     onAddWidgets: () -> Unit = {},
     onEditHome: () -> Unit = {},
     onDismiss: () -> Unit,
+    /** Wave 57 (CFG-48): the profiles for the chip row at the top; null (or one profile) shows no row. */
+    profiles: com.bos.sphere.feature.dock.DockWorkspaceState? = null,
+    onProfile: (String) -> Unit = {},
 ) {
     // Wave 41: One UI's sheet shape (28 dp top corners and a grabber) through the shared sheet; the black look and the scrim stay.
     com.bos.sphere.feature.grid.OneUiSheet(onDismiss, containerColor = SheetBlack, scrimColor = Color.Black.copy(alpha = 0.62f)) {
-        HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl, onAddApps, onAddWidgets, onEditHome)
+        HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl, onAddApps, onAddWidgets, onEditHome, profiles, onProfile)
     }
 }
 
@@ -96,6 +99,8 @@ internal fun HomeQuickSheetBody(
     onAddApps: () -> Unit = {},
     onAddWidgets: () -> Unit = {},
     onEditHome: () -> Unit = {},
+    profiles: com.bos.sphere.feature.dock.DockWorkspaceState? = null,
+    onProfile: (String) -> Unit = {},
 ) {
     // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
     Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp).padding(bottom = 16.dp)) {
@@ -103,6 +108,11 @@ internal fun HomeQuickSheetBody(
             L10n.tr("Home"), color = InkWhite, fontSize = com.bos.sphere.core.design.PopupTokens.TitleSize, fontWeight = com.bos.sphere.core.design.PopupTokens.TitleWeight, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp).testTag("quick.sheet").semantics { heading() },
         )
+        // Wave 57 (CFG-48): the profiles as one row of chips at the top (Work, Calm, Desk ...); one tap switches. Not shown with a single profile.
+        if (profiles != null && profiles.workspaces.size > 1) {
+            Heading(L10n.tr("Profile"))
+            com.bos.sphere.feature.dock.ProfileChipRow(profiles, onProfile, dark = true)
+        }
         // Wave 51: three entry tiles first, so adding and editing is discoverable on any page, empty or not.
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

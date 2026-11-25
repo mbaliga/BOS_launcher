@@ -760,7 +760,7 @@ fun buildSettingsCategories(m: SettingsModel): List<SettingCategory> {
     // --- Backup (CFG-01..04, CFG-11) ---------------------------------------------------------------
     m.hiddenApps?.let { out += hiddenAppsCategory(it) } // wave 38
     out += com.bos.sphere.ui.backupCategory { SettingsReset.resetAll(m.updatePrefs) }
-    out += com.bos.sphere.ui.workspacesCategory()
+    out += com.bos.sphere.ui.profilesCategory() // wave 57: Profiles replace Workspaces
     out += com.bos.sphere.ui.desktopCategory()
     // --- About -------------------------------------------------------------------------------
     out += SettingCategory(
@@ -810,7 +810,7 @@ private fun reorganise(built: List<SettingCategory>, paged: Boolean): List<Setti
     out += SettingCategory(x("App drawer"), Glyphs.Widget, cat("Apps")?.items.orEmpty())
     built.firstOrNull { it.items.singleOrNull()?.title == x("Hidden apps") }?.let { out += it } // wave 38: its own row in the top-level list
     cat("Radar")?.let { out += it }
-    cat("Workspaces")?.let { out += it } // wave 52: its own top-level row
+    cat("Profiles")?.let { out += it } // wave 52: its own top-level row (wave 57: Profiles, was Workspaces)
     cat("Side panel")?.let { out += it }
     out += SettingCategory(x("System & sound"), Glyphs.Gear, items("System", "Sound"))
     cat("Backup")?.let { out += it }

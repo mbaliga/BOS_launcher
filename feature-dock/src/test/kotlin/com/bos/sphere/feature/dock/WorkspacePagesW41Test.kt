@@ -107,8 +107,8 @@ class WorkspacePagesW41Test {
             CompositionLocalProvider(LocalDensity provides Density(d.density, font)) {
                 DockPagesScope {
                     val s by m.state.collectAsState()
-                    OneUiPageFrame("Workspaces", {}, subtitle = WorkspaceSummary.activeLine(s), tag = DockPanelTags.PAGE) {
-                        item { androidx.compose.foundation.layout.Column { WorkspacesContent(m, apps, actions) } }
+                    OneUiPageFrame("Profiles", {}, subtitle = WorkspaceSummary.activeLine(s), tag = DockPanelTags.PAGE) {
+                        item { androidx.compose.foundation.layout.Column { ProfilesContent(m, apps, paletteActionChoices = actions) } }
                     }
                 }
             }
@@ -158,16 +158,15 @@ class WorkspacePagesW41Test {
     }
 
     private fun openMenu(m: WorkspaceManager, id: String) {
-        rule.onNodeWithTag(DockPageTags.workspaceMore(id)).performScrollTo().performClick(); settle()
+        rule.onNodeWithTag(ProfileTags.more(id)).performScrollTo().performClick(); settle()
     }
 
     // ---- Workspaces page ------------------------------------------------------------------------------------------------------
 
-    @Test fun WSP_07_page_01_explainsWhatAWorkspaceIsAndShowsTheActiveOneInTheTitle() {
+    // Wave 57 (profiles): the explanation card became the drawn active profile card (ProfilesPageW57Test); this keeps the title line.
+    @Test fun WSP_07_page_01_theActiveProfileCardAndTheTitleNameTheActiveOne() {
         val m = manager(); showWorkspaces(m)
-        rule.onNodeWithTag(DockPageTags.EXPLAIN).assertIsDisplayed()
-        val text = rule.onNodeWithTag(DockPageTags.EXPLAIN).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.joinToString { it.text }
-        assertTrue(text, text.startsWith("Workspaces are separate home setups, like Work and Personal."))
+        rule.onNodeWithTag(ProfileTags.ACTIVE_CARD).assertIsDisplayed()
         rule.onNodeWithTag(OneUiTags.SUBTITLE).assertIsDisplayed()
         rule.onNodeWithText("Active: Home").assertIsDisplayed()
         assertTrue(rule.onNodeWithTag(OneUiTags.TITLE_LARGE).fetchSemanticsNode().config.contains(SemanticsProperties.Heading))
@@ -177,28 +176,28 @@ class WorkspacePagesW41Test {
         val m = manager(); showWorkspaces(m)
         val home = DockWorkspaceState.DEFAULT_ID
         val work = m.current.workspaces.first { it.name == "Work" }.id
-        rule.onNodeWithTag(DockPageTags.workspace(home)).assertIsDisplayed()
-        rule.onNodeWithText("3 pages · 5 dock items").assertExists()
-        rule.onNodeWithText("1 page · 1 dock item").assertExists()
-        rule.onNodeWithTag(DockPageTags.workspaceBadge(home), useUnmergedTree = true).assertExists()
-        rule.onAllNodesWithTag(DockPageTags.workspaceBadge(work), useUnmergedTree = true).assertCountEquals(0)
-        assertEquals("In use", rule.onNodeWithTag(DockPageTags.workspace(home)).fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
+        rule.onNodeWithTag(ProfileTags.row(home)).assertIsDisplayed()
+        rule.onNodeWithText("3 pages · 5 dock items · No settings ride along").assertExists()
+        rule.onNodeWithText("1 page · 1 dock item · No settings ride along").assertExists()
+        rule.onNodeWithTag(ProfileTags.badge(home), useUnmergedTree = true).assertExists()
+        rule.onAllNodesWithTag(ProfileTags.badge(work), useUnmergedTree = true).assertCountEquals(0)
+        assertEquals("In use", rule.onNodeWithTag(ProfileTags.row(home)).fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription))
     }
 
-    @Test fun WSP_07_page_03_makeActiveFromTheMenuMovesTheBadgeAndSwitches() {
+    @Test fun WSP_07_page_03_switchFromTheMenuMovesTheBadgeAndSwitches() {
         val m = manager(); showWorkspaces(m)
         val work = m.current.workspaces.first { it.name == "Work" }.id
         openMenu(m, work)
-        rule.onNodeWithText("Make active").performClick(); settle()
+        rule.onNodeWithText("Switch").performClick(); settle()
         assertEquals(work, m.current.activeId)
-        rule.onNodeWithTag(DockPageTags.workspaceBadge(work), useUnmergedTree = true).assertExists()
+        rule.onNodeWithTag(ProfileTags.badge(work), useUnmergedTree = true).assertExists()
         rule.onNodeWithText("Active: Work").assertExists()
     }
 
     @Test fun WSP_07_page_04_tappingAnInactiveCardSwitchesToIt() {
         val m = manager(); showWorkspaces(m)
         val work = m.current.workspaces.first { it.name == "Work" }.id
-        rule.onNodeWithTag(DockPageTags.workspace(work)).performClick(); settle()
+        rule.onNodeWithTag(ProfileTags.row(work)).performClick(); settle()
         assertEquals(work, m.current.activeId)
     }
 
@@ -208,7 +207,7 @@ class WorkspacePagesW41Test {
         rule.mainClock.autoAdvance = false
         openMenu(m, work)
         rule.onNodeWithText("Rename").performClick(); settle()
-        rule.onNodeWithText("Rename workspace").assertIsDisplayed()
+        rule.onNodeWithText("Rename profile").assertIsDisplayed()
         rule.onNodeWithTag(OneUiDialogTags.FIELD).performTextInput("2"); settle()
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).performClick(); settle()
         // the dialog selects the old name, so typing replaces it
@@ -222,7 +221,7 @@ class WorkspacePagesW41Test {
         openMenu(m, work)
         rule.onNodeWithText("Rename").performClick(); settle()
         rule.onNodeWithTag(OneUiDialogTags.FIELD).performTextInput("home"); settle()
-        rule.onNodeWithText("A workspace with this name already exists").assertIsDisplayed()
+        rule.onNodeWithText("A profile with this name already exists").assertIsDisplayed()
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).assertIsNotEnabled()
     }
 
@@ -232,8 +231,8 @@ class WorkspacePagesW41Test {
         rule.onNodeWithText("Duplicate").performClick(); settle()
         val dup = m.current.workspaces.first { it.name == "Home copy" }
         assertEquals(hooks.home, dup.homeArrangement)
-        rule.onNodeWithTag(DockPageTags.workspace(dup.id)).assertExists()
-        rule.onAllNodesWithText("3 pages · 5 dock items", useUnmergedTree = true).assertCountEquals(2)
+        rule.onNodeWithTag(ProfileTags.row(dup.id)).assertExists()
+        rule.onAllNodesWithText("3 pages · 5 dock items · No settings ride along", useUnmergedTree = true).assertCountEquals(2)
     }
 
     @Test fun WSP_07_page_08_deleteAsksFirstAndCancelKeepsIt() {
@@ -257,30 +256,7 @@ class WorkspacePagesW41Test {
         rule.onNodeWithText("Rename").assertIsDisplayed()
     }
 
-    @Test fun WSP_07_page_10_addWorkspaceWithCopyFromTheCurrentOne() {
-        val m = manager(); showWorkspaces(m)
-        rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag(DockPageTags.ADD).performScrollTo().performClick(); settle()
-        rule.onNodeWithTag(OneUiDialogTags.TITLE).assertExists()
-        rule.onNodeWithTag(OneUiDialogTags.CONFIRM).assertIsNotEnabled() // a name is needed
-        rule.onNodeWithTag(OneUiDialogTags.FIELD).performTextInput("Travel"); settle()
-        rule.onNodeWithTag("ws.copy.current").performClick(); settle()
-        rule.onNodeWithTag(OneUiDialogTags.CONFIRM).performClick(); settle()
-        val w = m.current.workspaces.first { it.name == "Travel" }
-        assertEquals(listOf("a", "b", "c", "d", "e").map(DockItemRef::app), w.dockPins)
-        assertEquals(hooks.home, w.homeArrangement)
-        assertEquals(DockWorkspaceState.DEFAULT_ID, m.current.activeId)
-    }
-
-    @Test fun WSP_07_page_11_addWorkspaceEmptyIsTheDefault() {
-        val m = manager(); showWorkspaces(m)
-        rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag(DockPageTags.ADD).performScrollTo().performClick(); settle()
-        rule.onNodeWithTag(OneUiDialogTags.FIELD).performTextInput("Play"); settle()
-        rule.onNodeWithTag(OneUiDialogTags.CONFIRM).performClick(); settle()
-        val w = m.current.workspaces.first { it.name == "Play" }
-        assertTrue(w.dockPins.isEmpty()); assertNull(w.homeArrangement)
-    }
+    // Wave 57: "Add workspace" (a dialog with Empty / Copy) became the New profile page; ProfilesPageW57Test drives it (CFG_45_*).
 
     // ---- the calm centre ---------------------------------------------------------------------------------------------------
 
@@ -289,7 +265,7 @@ class WorkspacePagesW41Test {
         rule.onNodeWithText("What the calm centre shows").performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithText("Calm centre shows all apps").assertCountEquals(0)
         rule.onAllNodesWithText("Choose").assertCountEquals(0)
-        rule.onNodeWithTag(DockPageTags.CALM).performClick(); settle()
+        rule.onNodeWithTag(ProfileTags.CALM).performClick(); settle()
         rule.onNodeWithTag(OneUiDialogTags.option(0)).assertIsDisplayed()
         assertEquals(true, rule.onNodeWithTag(OneUiDialogTags.option(0)).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
         rule.onNodeWithText("Only apps I choose").assertIsDisplayed()
@@ -298,21 +274,21 @@ class WorkspacePagesW41Test {
 
     @Test fun WSP_08_page_13_chooseAppsStoresThePackagesAndAllAppsClearsThem() {
         val m = manager(); showWorkspaces(m)
-        rule.onNodeWithTag(DockPageTags.CALM).performScrollTo().performClick(); settle()
+        rule.onNodeWithTag(ProfileTags.CALM).performScrollTo().performClick(); settle()
         rule.onNodeWithTag(OneUiDialogTags.option(1)).performClick(); settle()
         rule.onNodeWithText("Apps shown in the calm centre").assertIsDisplayed()
         rule.onNodeWithTag(OneUiDialogTags.option(0)).performClick(); rule.onNodeWithTag(OneUiDialogTags.option(2)).performClick()
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).performClick(); settle()
         assertEquals(setOf("p.Alpha", "p.Charlie"), m.current.active.notificationApps)
         rule.onNodeWithText("2 chosen apps").assertIsDisplayed()
-        rule.onNodeWithTag(DockPageTags.CALM).performClick(); settle()
+        rule.onNodeWithTag(ProfileTags.CALM).performClick(); settle()
         rule.onNodeWithTag(OneUiDialogTags.option(0)).performClick(); settle()
         assertNull(m.current.active.notificationApps)
     }
 
     @Test fun WSP_08_page_14_aGroupCanSeedTheCalmCentre() {
         val m = manager(groups = true); showWorkspaces(m)
-        rule.onNodeWithTag(DockPageTags.CALM).performScrollTo().performClick(); settle()
+        rule.onNodeWithTag(ProfileTags.CALM).performScrollTo().performClick(); settle()
         rule.onNodeWithText("Apps of a group").performClick(); settle()
         rule.onNodeWithText("Morning · 2").performClick(); settle()
         assertEquals(setOf("p.Alpha", "p.Bravo"), m.current.active.notificationApps)
@@ -320,7 +296,7 @@ class WorkspacePagesW41Test {
 
     @Test fun WSP_07_page_15_radarActionsAreACheckDialogWhenTheHostOffersActions() {
         val m = manager(); showWorkspaces(m, actions = listOf("a1" to "Open Radar", "a2" to "Flashlight"))
-        rule.onNodeWithTag(DockPageTags.RADAR_ACTIONS).performScrollTo().performClick(); settle()
+        rule.onNodeWithTag(ProfileTags.RADAR_ACTIONS).performScrollTo().performClick(); settle()
         rule.onNodeWithTag(OneUiDialogTags.option(1)).performClick()
         rule.onNodeWithTag(OneUiDialogTags.CONFIRM).performClick(); settle()
         assertEquals(listOf("a2"), m.current.active.paletteActions)
@@ -432,7 +408,7 @@ class WorkspacePagesW41Test {
         assertTrue("W55: the wide picker answers with package names; the pin is stored by the app key the rail resolves", DockItemRef.app("kAlpha") in m.current.active.dockPins)
     }
 
-    @Test fun DCK_04_page_33_theDockPanelIsTheWorkspacesAndGroupsPageWithItsOwnNavigation() {
+    @Test fun DCK_04_page_33_theDockPanelIsTheProfilesAndGroupsPageWithItsOwnNavigation() {
         val m = manager(groups = true)
         rule.setContent {
             DockPanel(m, apps, emptyList(), {}, {}, { _, _, _ -> }, { log += "closed" })
@@ -440,13 +416,13 @@ class WorkspacePagesW41Test {
         settle()
         rule.onNodeWithTag(DockPanelTags.PAGE).assertIsDisplayed()
         rule.onNodeWithTag(OneUiTags.BACK).assertIsDisplayed()
-        assertEquals("Workspaces", rule.onNodeWithTag(OneUiTags.TITLE_LARGE).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.single().text)
+        assertEquals("Profiles", rule.onNodeWithTag(OneUiTags.TITLE_LARGE).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)!!.single().text)
         rule.onNodeWithText("Active: Home").assertIsDisplayed()
-        rule.onNodeWithTag(DockPageTags.ADD).assertExists()
+        rule.onNodeWithTag(ProfileTags.NEW).assertExists()
         rule.onNodeWithTag("dock.openGroups").performScrollTo().performClick(); settle()
         rule.onNodeWithTag(DockPageTags.GROUP_NEW).assertExists()
         rule.onNodeWithTag(OneUiTags.BACK).performClick(); settle()
-        rule.onNodeWithTag(DockPageTags.ADD).assertExists() // back from App groups is the Workspaces page
+        rule.onNodeWithTag(ProfileTags.NEW).assertExists() // back from App groups is the Profiles page
         rule.onNodeWithTag(OneUiTags.BACK).performClick(); settle()
         assertEquals(listOf("closed"), log)
     }
@@ -455,8 +431,8 @@ class WorkspacePagesW41Test {
 
     @Test fun WSP_07_page_40_theListStillReadsAtFontScale2() {
         val m = manager(); showWorkspaces(m, font = 2f)
-        rule.onNodeWithTag(DockPageTags.workspace(DockWorkspaceState.DEFAULT_ID)).assertExists()
-        rule.onNodeWithTag(DockPageTags.workspaceMore(DockWorkspaceState.DEFAULT_ID)).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(ProfileTags.row(DockWorkspaceState.DEFAULT_ID)).assertExists()
+        rule.onNodeWithTag(ProfileTags.more(DockWorkspaceState.DEFAULT_ID)).performScrollTo().assertIsDisplayed()
         shoot("w41-workspaces-fontscale2-dark")
     }
 

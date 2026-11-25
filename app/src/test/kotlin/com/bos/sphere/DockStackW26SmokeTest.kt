@@ -134,7 +134,7 @@ class DockStackW26SmokeTest {
     @Test fun DCK_10_anEmptyDockDrawsNothingOnGlanceAndTheStackHasNoRoomForIt() {
         startGlance(pins = false)
         rule.onAllNodesWithContentDescription("Dock").assertCountEquals(0)
-        rule.onAllNodesWithContentDescription("Workspace Home").assertCountEquals(0)
+        rule.onAllNodesWithContentDescription("Profile Home").assertCountEquals(0)
         assertFalse(DockPresence.hasItems)
         // The indicator keeps its own place.
         val ind = boundsDp("Glance home", false)

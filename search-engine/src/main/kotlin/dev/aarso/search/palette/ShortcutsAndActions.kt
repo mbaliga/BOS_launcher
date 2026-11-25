@@ -38,8 +38,9 @@ object LauncherActions {
     val defaults: List<LauncherActionDef> = listOf(
         LauncherActionDef("OpenSettings", "Open launcher settings", listOf("settings", "ground control", "preferences", "customize")),
         LauncherActionDef("EditMode", "Edit home", listOf("edit", "rearrange", "layout", "widgets", "wallpaper")),
-        LauncherActionDef("NextWorkspace", "Switch to next workspace", listOf("switch workspace", "next workspace", "workspace")),
-        LauncherActionDef("PreviousWorkspace", "Switch to previous workspace", listOf("switch workspace", "previous workspace", "workspace")),
+        // Wave 57: workspaces are profiles now; "workspace" stays a hidden keyword so the old word still finds them.
+        LauncherActionDef("NextWorkspace", "Switch to next profile", listOf("switch profile", "next profile", "profile", "switch workspace", "next workspace", "workspace")),
+        LauncherActionDef("PreviousWorkspace", "Switch to previous profile", listOf("switch profile", "previous profile", "profile", "switch workspace", "previous workspace", "workspace")),
         LauncherActionDef("OpenDrawer", "Open all apps", listOf("drawer", "app list", "all apps")),
         LauncherActionDef("OpenLaunchpad", "Open Comms", listOf("notifications", "launchpad", "comms", "status")),
         LauncherActionDef("ShortcutSheet", "Show keyboard shortcuts", listOf("keys", "shortcuts", "hotkeys", "help")),
@@ -48,7 +49,7 @@ object LauncherActions {
 
 class LauncherActionProvider(
     private val defs: () -> List<LauncherActionDef> = { LauncherActions.defaults },
-    /** Named workspaces so "switch workspace work" finds the one called Work. */
+    /** Named profiles (wave 57; they were workspaces) so "switch to work" or "switch workspace work" finds the one called Work. */
     private val workspaces: () -> List<String> = { emptyList() },
 ) : PaletteProvider {
     override val id = "launcher-actions"
@@ -64,8 +65,11 @@ class LauncherActionProvider(
             if (s > 0) out += PaletteResult("action:${d.command}", id, scope, d.title, "Launcher", s * 0.95, listOf(ResultAction(ResultActionId.Run)), mapOf("command" to d.command))
         }
         workspaces().forEachIndexed { i, name ->
-            val s = maxOf(TextMatch.score(nq, TextMatch.Target(name)), TextMatch.score(nq, TextMatch.Target("switch workspace $name")) * 0.9)
-            if (s > 0) out += PaletteResult("action:workspace:$i", id, scope, "Switch to workspace $name", "Launcher", s * 0.95, listOf(ResultAction(ResultActionId.Run)), mapOf("command" to "GoToWorkspace", "index" to i.toString()))
+            val s = maxOf(
+                TextMatch.score(nq, TextMatch.Target(name)), TextMatch.score(nq, TextMatch.Target("switch to $name")),
+                TextMatch.score(nq, TextMatch.Target("switch profile $name")) * 0.9, TextMatch.score(nq, TextMatch.Target("switch workspace $name")) * 0.9,
+            )
+            if (s > 0) out += PaletteResult("action:workspace:$i", id, scope, "Switch to $name", "Launcher", s * 0.95, listOf(ResultAction(ResultActionId.Run)), mapOf("command" to "GoToWorkspace", "index" to i.toString()))
         }
         return out.sortedByDescending { it.score }.take(limit)
     }

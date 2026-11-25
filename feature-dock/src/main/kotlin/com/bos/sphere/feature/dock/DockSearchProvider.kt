@@ -15,8 +15,8 @@ object PinnableActions {
         Def("OpenSettings", "Open launcher settings", actionId = CornerActionId.LauncherSettings),
         Def("OpenDrawer", "Open all apps", actionId = CornerActionId.AllApps),
         Def("OpenLaunchpad", "Open Comms", actionId = CornerActionId.Notifications),
-        Def("NextWorkspace", "Switch to next workspace", run = RunTarget(RunKind.Workspace, WorkspaceRefs.NEXT)),
-        Def("PreviousWorkspace", "Switch to previous workspace", run = RunTarget(RunKind.Workspace, WorkspaceRefs.PREVIOUS)),
+        Def("NextWorkspace", "Switch to next profile", run = RunTarget(RunKind.Workspace, WorkspaceRefs.NEXT)),
+        Def("PreviousWorkspace", "Switch to previous profile", run = RunTarget(RunKind.Workspace, WorkspaceRefs.PREVIOUS)),
     )
 
     fun choices(): List<Pair<String, String>> = all.map { it.id to it.title }
@@ -57,8 +57,9 @@ class DockSearchProvider(
             id = "group:${g.id}", category = SearchCategory.Actions, title = g.name, subtitle = L10n.tr("App group, %d apps", g.members.size),
             kind = HitKind.Action, intentUri = intentFor(RunTarget(RunKind.Group, g.id)), score = 0.8f,
         )
-        for (w in s.workspaces) if (w.id != s.activeId && (PaletteMatch.matches(q, w.name) || PaletteMatch.matches(q, "workspace"))) out += SearchHit(
-            id = "workspace:${w.id}", category = SearchCategory.Actions, title = L10n.tr("Switch to %s", w.name), subtitle = L10n.tr("Workspace"),
+        // CFG-48: "Switch to Work". Wave 57: profiles replaced workspaces; "workspace" still finds them (a hidden alias).
+        for (w in s.workspaces) if (w.id != s.activeId && (PaletteMatch.matches(q, w.name) || PaletteMatch.matches(q, "switch to ${w.name}") || PaletteMatch.matches(q, "profile") || PaletteMatch.matches(q, "workspace"))) out += SearchHit(
+            id = "workspace:${w.id}", category = SearchCategory.Actions, title = L10n.tr("Switch to %s", w.name), subtitle = L10n.tr("Profile"),
             kind = HitKind.Action, intentUri = intentFor(RunTarget(RunKind.Workspace, w.id)), score = 0.75f,
         )
         for (x in s.sessions) if (PaletteMatch.matches(q, x.name)) out += SearchHit(

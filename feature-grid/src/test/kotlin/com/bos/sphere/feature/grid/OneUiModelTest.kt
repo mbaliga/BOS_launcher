@@ -11,7 +11,7 @@ class OneUiModelTest {
     private fun cat(title: String, vararg items: SettingItem) = SettingCategory(title, Glyphs.Apps, items.toList())
     private fun toggle(t: String) = SettingItem.Toggle(t, Glyphs.Apps, true) {}
     private fun action(t: String) = SettingItem.Action(t, Glyphs.Apps, "") {}
-    private val real = listOf("Pages", "Home screen", "Workspaces", "Look", "Corners", "Gestures", "App drawer", "Hidden apps", "Radar", "Side panel", "System & sound", "Backup", "Desktop & dock", "Capabilities", "Lab", "About")
+    private val real = listOf("Pages", "Home screen", "Profiles", "Look", "Corners", "Gestures", "App drawer", "Hidden apps", "Radar", "Side panel", "System & sound", "Backup", "Desktop & dock", "Capabilities", "Lab", "About")
         .map { cat(it, toggle("x")) }
 
     @Test fun CFG_21_everyCategoryIsInExactlyOneCardOfTheRootList() {
@@ -22,7 +22,7 @@ class OneUiModelTest {
     @Test fun CFG_21_theCardsFollowOneUiOrderLookAndHomeThenInputThenCommsThenSystem() {
         val g = OneUiModel.groups(real).map { card -> card.map { real[it].title } }
         // wave 52: Pages, Home screen and the top-level Workspaces row first; the panel is "Side panel"
-        assertEquals(listOf("Pages", "Home screen", "Workspaces"), g[0])
+        assertEquals(listOf("Pages", "Home screen", "Profiles"), g[0])
         assertEquals(listOf("Look", "App drawer", "Desktop & dock"), g[1])
         assertEquals(listOf("Corners", "Gestures", "Radar"), g[2])
         assertEquals(listOf("Side panel"), g[3])

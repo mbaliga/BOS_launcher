@@ -224,7 +224,7 @@ class SettingsCoreW56AppTest {
         assertEquals(emptyList<String>(), touched)
         val withReset = cats(LauncherPrefs()).filter { it.reset != null }.map { OneUiModel.key(it.title) }.toSet()
         assertEquals(SettingsReset.PAGES.keys, withReset)
-        for (data in listOf("Pages", "Hidden apps", "Workspaces", "Backup", "Desktop & dock", "About")) assertFalse("$data holds data or actions only: no page reset", data in withReset)
+        for (data in listOf("Pages", "Hidden apps", "Profiles", "Backup", "Desktop & dock", "About")) assertFalse("$data holds data or actions only: no page reset", data in withReset)
     }
 
     // ---- CFG-31 -------------------------------------------------------------------------------------------------------------------

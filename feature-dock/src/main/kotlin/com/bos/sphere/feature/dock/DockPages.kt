@@ -131,7 +131,7 @@ fun DockSettingsContent(
     if (onOpenWorkspaces != null || onOpenGroups != null) {
         OneUiGap()
         OneUiGroup(listOfNotNull(onOpenWorkspaces, onOpenGroups).size) {
-            if (onOpenWorkspaces != null) OneUiListRow(L10n.tr("Workspaces"), summary = WorkspaceSummary.activeLine(state), tile = Glyphs.Home, tileColor = TileGreen, chevron = true, onClick = onOpenWorkspaces, modifier = Modifier.testTag("dock.openWorkspaces"))
+            if (onOpenWorkspaces != null) OneUiListRow(L10n.tr("Profiles"), summary = WorkspaceSummary.activeLine(state), tile = Glyphs.Home, tileColor = TileGreen, chevron = true, onClick = onOpenWorkspaces, modifier = Modifier.testTag("dock.openWorkspaces"))
             if (onOpenWorkspaces != null && onOpenGroups != null) OneUiRowDivider(72.dp)
             if (onOpenGroups != null) OneUiListRow(L10n.tr("App groups"), summary = if (state.groups.size == 1) L10n.tr("1 group") else L10n.tr("%d groups", state.groups.size), tile = Glyphs.Apps, tileColor = TileOrange, chevron = true, onClick = onOpenGroups, modifier = Modifier.testTag("dock.openGroups"))
         }
@@ -155,135 +155,8 @@ fun DockSettingsContent(
     )
 }
 
-/** The Workspaces page: what a workspace is, the list of them, adding one, and what the calm centre shows for the active one. */
-@Composable
-fun WorkspacesContent(manager: WorkspaceManager, apps: List<PanelApp>, paletteActionChoices: List<Pair<String, String>> = emptyList(), onOpenGroups: (() -> Unit)? = null) {
-    val state by manager.state.collectAsState()
-    val rows = WorkspaceSummary.rows(state, manager.liveHome())
-    var menuFor by remember { mutableStateOf<String?>(null) }
-    var renaming by remember { mutableStateOf<Workspace?>(null) }
-    var deleting by remember { mutableStateOf<Workspace?>(null) }
-    var adding by remember { mutableStateOf(false) }
-    var calmOpen by remember { mutableStateOf(false) }
-    var pickingApps by remember { mutableStateOf(false) }
-    var pickingGroup by remember { mutableStateOf(false) }
-    var actionsOpen by remember { mutableStateOf(false) }
-    val active = state.active
-
-    OneUiInfoCard(
-        L10n.tr("Workspaces are separate home setups, like Work and Personal. Each has its own home pages, dock, widgets and calm-centre apps. Switch between them here, from Radar or from the dock's menu."),
-        DockPageTags.EXPLAIN,
-    )
-    OneUiGroupTitle(L10n.tr("Your workspaces"))
-    OneUiGroup(rows.size) {
-        rows.forEachIndexed { i, r ->
-            if (i > 0) OneUiRowDivider()
-            val w = state.workspaces.first { it.id == r.id }
-            val entries = buildList {
-                if (!r.active) add(OneUiMenuEntry(L10n.tr("Make active")) { manager.switchTo(r.id) })
-                add(OneUiMenuEntry(L10n.tr("Rename")) { renaming = w })
-                add(OneUiMenuEntry(L10n.tr("Duplicate")) { manager.create(WorkspaceSummary.copyName(w.name, state.workspaces.map { it.name }), r.id) })
-                if (state.workspaces.size > 1) add(OneUiMenuEntry(L10n.tr("Delete"), destructive = true) { deleting = w })
-            }
-            OneUiListRow(
-                r.name, summary = r.summary,
-                onClick = { if (!r.active) manager.switchTo(r.id) },
-                modifier = Modifier.testTag(DockPageTags.workspace(r.id)).semantics(mergeDescendants = false) { if (r.active) stateDescription = L10n.tr("In use") },
-                trailing = {
-                    if (r.active) OneUiBadge(L10n.tr("In use"), Modifier.testTag(DockPageTags.workspaceBadge(r.id)))
-                    OneUiMoreButton(L10n.tr("More options for %s", r.name), menuFor == r.id, { open -> menuFor = if (open) r.id else null }, entries, tag = DockPageTags.workspaceMore(r.id))
-                },
-            )
-        }
-    }
-    OneUiGap()
-    OneUiPrimaryButton(L10n.tr("Add workspace"), { adding = true }, Modifier.testTag(DockPageTags.ADD))
-
-    OneUiGroupTitle(L10n.tr("Calm centre"))
-    OneUiGroup(if (paletteActionChoices.isEmpty()) 1 else 2) {
-        OneUiValueRow(L10n.tr("What the calm centre shows"), WorkspaceSummary.calmValue(active), { calmOpen = true }, modifier = Modifier.testTag(DockPageTags.CALM))
-        if (paletteActionChoices.isNotEmpty()) {
-            OneUiRowDivider()
-            val n = active.paletteActions.count { id -> paletteActionChoices.any { it.first == id } }
-            OneUiValueRow(L10n.tr("Radar actions"), if (n == 0) L10n.tr("None") else L10n.tr("%d pinned", n), { actionsOpen = true }, modifier = Modifier.testTag(DockPageTags.RADAR_ACTIONS))
-        }
-    }
-    OneUiCaption(L10n.tr("The calm centre and the Radar actions are set for %s, the active workspace. This only changes what Liftoff shows. System notification settings are not touched.", active.name))
-    val widgetCount = active.widgets.count { it != WorkspaceWidgets.MARKER }
-    OneUiCaption(if (active.widgets.isEmpty()) L10n.tr("Widgets: saved with this workspace the first time you leave it.") else L10n.tr("Widgets: %d saved with this workspace.", widgetCount))
-    if (onOpenGroups != null) {
-        OneUiGap()
-        OneUiGroup(1) {
-            OneUiListRow(L10n.tr("App groups"), summary = if (state.groups.size == 1) L10n.tr("1 group") else L10n.tr("%d groups", state.groups.size), tile = Glyphs.Apps, tileColor = TileOrange, chevron = true, onClick = onOpenGroups, modifier = Modifier.testTag("dock.openGroups"))
-        }
-    }
-
-    if (adding) {
-        var copy by remember { mutableStateOf(false) }
-        OneUiTextEntryDialog(
-            L10n.tr("Add workspace"), "", L10n.tr("Workspace name"), L10n.tr("Add"),
-            onConfirm = { name -> manager.create(name, if (copy) state.activeId else null); adding = false },
-            onDismiss = { adding = false },
-            error = { n -> if (n.isNotEmpty() && WorkspaceSummary.nameTaken(n, state.workspaces.map { it.name })) L10n.tr("A workspace with this name already exists") else null },
-        ) {
-            Text(L10n.tr("Start from"), color = HyleColors.InkDim, fontSize = 13.sp)
-            OneUiInlineRadio(L10n.tr("An empty home"), !copy, "ws.copy.empty") { copy = false }
-            OneUiInlineRadio(L10n.tr("A copy of %s", active.name), copy, "ws.copy.current") { copy = true }
-        }
-    }
-    renaming?.let { w ->
-        OneUiTextEntryDialog(
-            L10n.tr("Rename workspace"), w.name, L10n.tr("Workspace name"), L10n.tr("Rename"),
-            onConfirm = { name -> manager.rename(w.id, name); renaming = null }, onDismiss = { renaming = null },
-            error = { n -> if (n.isNotEmpty() && WorkspaceSummary.nameTaken(n, state.workspaces.map { it.name }, except = w.name)) L10n.tr("A workspace with this name already exists") else null },
-        )
-    }
-    deleting?.let { w ->
-        OneUiConfirmDialog(
-            L10n.tr("Delete %s?", w.name),
-            L10n.tr("Its saved home pages, dock and widgets are removed. The apps themselves are not touched."),
-            L10n.tr("Delete"), { manager.delete(w.id); deleting = null }, { deleting = null }, destructive = true,
-        )
-    }
-    if (calmOpen) {
-        val opts = buildList { add(CalmChoice.All); add(CalmChoice.Chosen); if (state.groups.isNotEmpty()) add(CalmChoice.Group) }
-        OneUiRadioPage(
-            L10n.tr("What the calm centre shows"), opts, if (active.notificationApps == null) CalmChoice.All else CalmChoice.Chosen, { L10n.tr(it.label) },
-            onSelect = { c ->
-                when (c) {
-                    CalmChoice.All -> manager.setNotificationApps(active.id, null)
-                    CalmChoice.Chosen -> pickingApps = true
-                    CalmChoice.Group -> pickingGroup = true
-                }
-            },
-            onDismiss = { calmOpen = false },
-            detail = { c -> c.detail?.let { L10n.tr(it) } },
-            body = L10n.tr("Notifications from these apps can appear in the calm centre while %s is active.", active.name),
-        )
-    }
-    if (pickingApps) AppPicker(
-        L10n.tr("Apps shown in the calm centre"), apps, active.notificationApps ?: emptySet(), max = Int.MAX_VALUE, min = 0,
-        onDone = { picked -> manager.setNotificationApps(active.id, picked); pickingApps = false }, onDismiss = { pickingApps = false },
-    )
-    if (pickingGroup) OneUiRadioPage(
-        L10n.tr("Apps of which group?"), state.groups, null, { "${it.name} · ${it.members.size}" },
-        onSelect = { g -> manager.setNotificationApps(active.id, g.members.map { it.target.packageName }.toSet()) }, onDismiss = { pickingGroup = false },
-        body = L10n.tr("The group's apps are copied now. Later changes to the group do not follow."),
-    )
-    if (actionsOpen) OneUiCheckPage(
-        L10n.tr("Radar actions"), paletteActionChoices.map { it.first }, active.paletteActions.toSet(), { id -> L10n.tr(paletteActionChoices.first { it.first == id }.second) },
-        onDone = { picked -> manager.setPaletteActions(active.id, paletteActionChoices.map { it.first }.filter { it in picked }); actionsOpen = false },
-        onDismiss = { actionsOpen = false },
-        body = L10n.tr("Pinned actions show in Radar before you type, only while this workspace is active."),
-    )
-}
-
-/** What the calm centre can show. Only what the workspace model holds: every app, or a set of apps. */
-private enum class CalmChoice(val label: String, val detail: String?) {
-    All("All apps", "Every app's notifications can appear"),
-    Chosen("Only apps I choose", null),
-    Group("Apps of a group", "Copies the group's apps once"),
-}
+// Wave 57 (profiles): the Workspaces page became the Profiles page (ProfilesContent in ProfilesPage.kt); a profile is a workspace plus the
+// settings it carries and its app groups (docs/decisions/profiles.md). The old page is removed, not kept beside it (owner: keep only the newest option).
 
 /** The App groups page: the groups, adding one, showing them on the home, scheduled launches and saved sessions. */
 @Composable

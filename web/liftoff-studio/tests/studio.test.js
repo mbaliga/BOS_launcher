@@ -286,3 +286,40 @@ test('the fixtures the Kotlin test reads are what Studio writes now', () => {
   const { build } = require('./make-fixtures.js');
   for (const [name, text] of Object.entries(build())) assert.equal(fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8'), text, name + ' is stale: run node tests/make-fixtures.js');
 });
+
+// ---- wave 57 (profiles, CFG-49): a phone profile's settings subset round-trips through Studio
+
+test('phone profiles: the groups name only schema keys and every key is in one group', () => {
+  const seen = new Set();
+  for (const g of schema.profileGroups) for (const k of g.keys) { assert.ok(ix.byKey[k], g.id + ': ' + k); assert.ok(!seen.has(k), 'twice: ' + k); seen.add(k); }
+  assert.deepEqual(schema.profileGroups.map((g) => g.id), ['look', 'home', 'radar', 'side', 'sound']);
+});
+
+test('phone profiles: a Backup profile reads into Studio values, is edited and written back with nothing else changed', () => {
+  const doc = JSON.parse(JSON.stringify(sampleState));
+  doc.dock = Object.assign({}, doc.dock, { activeId: 'w', globalSettings: { themeMode: 'Dark' } });
+  doc.workspaces = [{ id: 'default', name: 'Home' }, { id: 'w', name: 'Work', carries: ['look', 'home'], settings: { themeMode: 'Light', accent: 4287527935, 'dock.enabled': true, 'gestures.SwipeUp': 'action:AllApps', futureKey: 1 }, groupLinks: ['g1'] }];
+  const ps = Core.phoneProfiles(ix, doc);
+  assert.deepEqual(ps.map((p) => [p.name, p.active]), [['Home', false], ['Work', true]]);
+  const w = ps[1];
+  assert.equal(w.values.themeMode, 'Light');
+  assert.equal(w.values['dock.enabled'], 'on');
+  assert.ok(w.keys.includes('glanceHotspots') && !w.keys.includes('searchFiles'));
+  assert.ok(w.warnings.some((x) => x.includes('futureKey')));
+  const r = Core.setPhoneProfile(ix, doc, 'w', Object.assign({}, w.values, { themeMode: 'Amoled', 'dock.enabled': 'off', searchFiles: false }));
+  assert.ok(r.ok);
+  const out = r.doc.workspaces[1];
+  assert.equal(out.settings.themeMode, 'Amoled');
+  assert.equal(out.settings['dock.enabled'], false);
+  assert.equal(out.settings.searchFiles, undefined, 'a key the profile does not carry is not written');
+  assert.equal(out.settings.futureKey, 1, 'an unknown key is kept');
+  assert.deepEqual(out.groupLinks, ['g1']);
+  assert.deepEqual(r.doc.dock.globalSettings, { themeMode: 'Dark' });
+  // and the whole Backup still exports through Studio unchanged apart from the profile
+  const p = Core.importDocument(ix, r.doc);
+  assert.ok(p.ok);
+  const again = Core.exportState(ix, { values: p.values, extras: p.extras }, 1);
+  assert.deepEqual(again.workspaces, r.doc.workspaces);
+  assert.deepEqual(again.dock.globalSettings, { themeMode: 'Dark' });
+  assert.equal(Core.setPhoneProfile(ix, doc, 'nope', {}).ok, false);
+});

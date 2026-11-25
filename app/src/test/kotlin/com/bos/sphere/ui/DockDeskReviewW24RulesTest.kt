@@ -29,8 +29,9 @@ class DockDeskReviewW24RulesTest {
 
     @Test fun CFG_14_settingsSearchFindsTheDockPagesByWorkspacesAndGroups() {
         L10n.setLanguage("en")
-        val index = SettingsIndex.fromCategories(listOf(workspacesCategory(), desktopCategory())) // wave 52: Workspaces is its own category
-        assertTrue("workspaces finds the Workspaces page", index.search("workspaces").any { it.title == "Workspaces" })
+        val index = SettingsIndex.fromCategories(listOf(profilesCategory(), desktopCategory())) // wave 52: its own category; wave 57: Profiles (was Workspaces)
+        assertTrue("workspaces (a hidden alias since wave 57) finds the Profiles page", index.search("workspaces").any { it.title == "Profiles" })
+        assertTrue("profiles finds the Profiles page", index.search("profiles").any { it.title == "Profiles" })
         assertTrue("groups finds the App groups page", index.search("groups").any { it.title == "App groups" })
         assertTrue("sessions finds the App groups page by its summary", index.search("sessions").any { it.title == "App groups" })
         assertTrue("dock finds the Dock page", index.search("dock").any { it.title == "Dock" })

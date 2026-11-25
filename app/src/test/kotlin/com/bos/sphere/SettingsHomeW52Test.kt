@@ -128,21 +128,22 @@ class SettingsHomeW52Test {
 
     @Test fun CFG_21_workspacesIsATopLevelRowNearTheTopWithACountAndLeavesTheDesktopCategory() {
         val c = cats()
-        val ws = c.indexOfFirst { OneUiModel.key(it.title) == "Workspaces" }
-        assertTrue("a top-level Workspaces category exists", ws >= 0)
+        // Wave 57: the row is Profiles (Workspaces became Profiles), in the same place.
+        val ws = c.indexOfFirst { OneUiModel.key(it.title) == "Profiles" }
+        assertTrue("a top-level Profiles category exists", ws >= 0)
         val groups = OneUiModel.groups(c)
         assertEquals("it sits in the first card, with the pages and the home screen", 0, groups.indexOfFirst { ws in it })
-        assertEquals("3 workspaces", summaries(c, workspaces = 3)[c[ws].title])
-        assertEquals("1 workspace", summaries(c, workspaces = 1)[c[ws].title])
-        assertTrue("the old entry point under Desktop & dock is gone", desktopCategory().items.none { it.title == "Workspaces" })
+        assertEquals("3 profiles", summaries(c, workspaces = 3)[c[ws].title])
+        assertEquals("1 profile", summaries(c, workspaces = 1)[c[ws].title])
+        assertTrue("the old entry point under Desktop & dock is gone", desktopCategory().items.none { it.title == "Workspaces" || it.title == "Profiles" })
         assertTrue("App groups stay where they were", desktopCategory().items.any { it.title == "App groups" })
         val only = c[ws].items.single() as SettingItem.Pane
         assertTrue(only.bare)
         show(c)
-        rule.onNodeWithTag(OneUiTags.row("Workspaces")).assertIsDisplayed() // on the first screen, no scrolling
-        rule.onNodeWithText("3 workspaces").assertIsDisplayed()
+        rule.onNodeWithTag(OneUiTags.row("Profiles")).assertIsDisplayed() // on the first screen, no scrolling
+        rule.onNodeWithText("3 profiles").assertIsDisplayed()
         val y = { t: String -> rule.onNodeWithTag(OneUiTags.row(t)).getUnclippedBoundsInRoot().top }
-        assertTrue("above Look", y("Workspaces") < y("Look"))
+        assertTrue("above Look", y("Profiles") < y("Look"))
     }
 
     @Test fun CFG_21_theLookSummaryNamesTheFontAndTheLookPageHasAFontRowWithAllCards() {

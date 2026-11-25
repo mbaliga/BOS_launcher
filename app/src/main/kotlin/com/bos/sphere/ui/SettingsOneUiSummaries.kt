@@ -33,7 +33,7 @@ fun settingsSummaries(
             "Gestures" -> if (gestureCount == 0) L10n.tr("No gestures assigned") else L10n.tr("%d gestures assigned", gestureCount)
             "Radar" -> join(value(c, "Radar layout"), value(c, "Web engine"))
             OneUiModel.SIDE_PANEL -> sidePanelSummary(value(c, "Comms size"), sidePanelWidgets)
-            "Workspaces" -> if (workspaceCount == 1) L10n.tr("1 workspace") else L10n.tr("%d workspaces", workspaceCount)
+            "Profiles" -> if (workspaceCount == 1) L10n.tr("1 profile") else L10n.tr("%d profiles", workspaceCount)
             "System & sound" -> join(value(c, "Language"), if (value(c, "Interface sounds") == "On") L10n.tr("Sounds on") else L10n.tr("Sounds off"))
             "Hidden apps" -> hiddenCount?.let { if (it == 0) L10n.tr("Nothing hidden") else L10n.tr("%d hidden", it) }
             "About" -> c.items.firstOrNull()?.value?.takeIf { it.isNotBlank() }

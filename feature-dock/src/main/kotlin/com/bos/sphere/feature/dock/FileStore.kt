@@ -79,6 +79,8 @@ object WorkspaceRepository {
     /** What stands in while the launcher screen is not composed: a switch is held until real hooks attach (WSP-12). */
     val DETACHED: WorkspaceHooks = object : WorkspaceHooks { override val ready: Boolean get() = false }
     @Volatile var hooks: WorkspaceHooks = DETACHED
+    /** Wave 57 (CFG-48): where a profile's carried settings are read and written; the stores of the app unless a test sets another. */
+    @Volatile var settings: ProfileSettingsPort? = null
 
     private val writer = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "dock-store").apply { isDaemon = true } }
 
@@ -86,6 +88,7 @@ object WorkspaceRepository {
         instance ?: WorkspaceManager(
             FileWorkspaceStore(File(context.applicationContext.filesDir, "liftoff_workspaces.json"), File(context.applicationContext.noBackupFilesDir, "liftoff_workspace_widgets.json")),
             hooks = { hooks }, io = { writer.execute(it) },
+            settingsPort = { settings ?: StoresProfileSettings(context.applicationContext).also { settings = it } },
         ).also { instance = it }
     }
 }

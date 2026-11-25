@@ -371,6 +371,8 @@ class StudioSchemaW56Test {
             "stateSchemaVersion" to StateSchema.CURRENT,
             "tabs" to tabs.map { mapOf("id" to it.first, "label" to it.second, "blurb" to it.third) },
             "fields" to outFields,
+            // Wave 57 (profiles, CFG-49): which schema keys each settings group of a phone profile carries (ProfileGroup), so Studio reads a profile's subset.
+            "profileGroups" to ProfileGroup.entries.map { mapOf("id" to it.id, "label" to it.label, "keys" to it.keys) },
         )
     }
 

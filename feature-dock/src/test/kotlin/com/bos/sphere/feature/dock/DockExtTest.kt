@@ -157,7 +157,7 @@ class DockExtTest {
         val work = Workspace("w", "Work", paletteActions = listOf("OpenDrawer"))
         var state = DockWorkspaceState(workspaces = listOf(home, work), activeId = "default")
         val p = DockSearchProvider({ state }, { t -> "run:${t.id}" })
-        assertEquals(listOf("Open launcher settings", "Switch to next workspace"), p.search("", 8).map { it.title })
+        assertEquals(listOf("Open launcher settings", "Switch to next profile"), p.search("", 8).map { it.title })
         assertEquals(CornerActionId.LauncherSettings, p.search("", 8).first().actionId)
         assertEquals("run:@next", p.search("", 8).last().intentUri)
         assertEquals(listOf("Open launcher settings"), p.search("sett", 8).map { it.title })

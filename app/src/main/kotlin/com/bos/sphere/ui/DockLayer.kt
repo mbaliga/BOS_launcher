@@ -54,7 +54,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Connects workspace switching to the home arrangement and to the Launchpad's display filter (WSP-07, WSP-08). */
-private class AppWorkspaceHooks(private val stores: LauncherStores, private val extras: com.bos.sphere.core.catalog.HomeExtrasStore) : WorkspaceHooks {
+private class AppWorkspaceHooks(private val stores: LauncherStores, private val extras: com.bos.sphere.core.catalog.HomeExtrasStore, private val context: android.content.Context? = null) : WorkspaceHooks {
     override fun captureHome(): String {
         val l = stores.layout.layout.value
         // HOM-02: the workspace's dock is part of its arrangement now (HomeState.dock is the one dock list).
@@ -66,6 +66,7 @@ private class AppWorkspaceHooks(private val stores: LauncherStores, private val 
         // A workspace saved before the dock moved into the arrangement keeps its own pins.
         val dock = com.bos.sphere.feature.dock.HomeDockKeys.forWorkspace(com.bos.sphere.feature.dock.HomeDockKeys.dockOf(workspace.homeArrangement), workspace.dockPins)
         if (dock != extras.state.value.dock) extras.set(extras.state.value.copy(dock = dock))
+        context?.let { announceSwitch(it, workspace.name) } // wave 57 (CFG-48): "Switched to Work"
     }
 
     override fun applyHome(arrangement: String?) {
@@ -134,7 +135,8 @@ fun BoxScope.DockLayer(
     val manager = remember { WorkspaceRepository.get(context) }
     DisposableEffect(Unit) {
         DockPinBinding.ensure(context)
-        val hooks = AppWorkspaceHooks(stores, com.bos.sphere.core.catalog.HomeExtrasStore.get(context))
+        ProfileSettingsSync.ensure(context) // wave 57 (CFG-48): a change to a carried setting is saved to the active profile
+        val hooks = AppWorkspaceHooks(stores, com.bos.sphere.core.catalog.HomeExtrasStore.get(context), context.applicationContext)
         WorkspaceRepository.hooks = hooks
         manager.applyActive()
         onDispose { if (WorkspaceRepository.hooks === hooks) WorkspaceRepository.hooks = WorkspaceRepository.DETACHED }
@@ -251,6 +253,7 @@ fun DockPanelHost(
         paletteActionChoices = PinnableActions.choices(),
         groupShelfOn = wsState.dock.groupShelf,
         onGroupShelf = { v -> manager.setDock { it.copy(groupShelf = v) } },
+        facts = rememberSuggestFacts(apps),
     )
 }
 

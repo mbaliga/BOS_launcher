@@ -34,7 +34,14 @@ object WorkspaceJson {
                 .put("pins", JSONArray(w.dockPins.map { it.encode() }))
                 .put("widgets", JSONArray(w.widgets)).put("actions", JSONArray(w.paletteActions))
                 .put("notifyApps", w.notificationApps?.let { JSONArray(it.sorted()) } ?: JSONObject.NULL)
+                .apply {
+                    // Wave 57 (profiles): written only when set, so a workspace from before profiles keeps its exact document.
+                    if (w.carries.isNotEmpty()) put("carries", JSONArray(w.carries.sorted()))
+                    if (w.settings.isNotEmpty()) put("settings", com.bos.sphere.core.data.ProfileSettings.toJson(w.settings))
+                    if (w.groupLinks.isNotEmpty()) put("groupLinks", JSONArray(w.groupLinks))
+                }
         }))
+        if (s.globalSettings.isNotEmpty()) put("globalSettings", com.bos.sphere.core.data.ProfileSettings.toJson(s.globalSettings))
         put("groups", JSONArray(s.groups.map { g ->
             JSONObject().put("id", g.id).put("name", g.name).put("layout", g.layout.name).put("members", JSONArray(g.members.map(::request)))
         }))
@@ -73,6 +80,10 @@ object WorkspaceJson {
                     dockPins = w.optJSONArray("pins").strs().mapNotNull(DockItemRef::decode),
                     widgets = w.optJSONArray("widgets").strs(), paletteActions = w.optJSONArray("actions").strs(),
                     notificationApps = if (w.isNull("notifyApps") || !w.has("notifyApps")) null else w.getJSONArray("notifyApps").strs().toSet(),
+                    // Wave 57: a workspace saved before profiles has none of these; it becomes a profile that carries no settings (CFG-49).
+                    carries = w.optJSONArray("carries").strs().filterTo(LinkedHashSet()) { com.bos.sphere.core.data.ProfileGroup.forId(it) != null },
+                    settings = com.bos.sphere.core.data.ProfileSettings.fromJson(w.optJSONObject("settings")),
+                    groupLinks = w.optJSONArray("groupLinks").strs(),
                 )
             }.ifEmpty { listOf(Workspace(DockWorkspaceState.DEFAULT_ID, "Home")) }
             val groups = o.optJSONArray("groups").objs().mapNotNull { g ->
@@ -98,7 +109,7 @@ object WorkspaceJson {
             }
             val active = o.optString("activeId", DockWorkspaceState.DEFAULT_ID).takeIf { id -> workspaces.any { it.id == id } } ?: workspaces.first().id
             val due = o.optString("captureDue").takeIf { id -> id.isNotEmpty() && workspaces.any { it.id == id } }
-            Decoded.Ok(DockWorkspaceState(SCHEMA_VERSION, dock, active, workspaces, groups, sessions, schedules, due))
+            Decoded.Ok(DockWorkspaceState(SCHEMA_VERSION, dock, active, workspaces, groups, sessions, schedules, due, com.bos.sphere.core.data.ProfileSettings.fromJson(o.optJSONObject("globalSettings"))))
         }.getOrDefault(Decoded.Corrupt)
     }
 

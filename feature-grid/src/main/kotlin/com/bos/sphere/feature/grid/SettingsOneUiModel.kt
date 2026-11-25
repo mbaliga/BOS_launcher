@@ -19,7 +19,7 @@ object OneUiModel {
      * inputs, then notifications, then the system. A category that is not listed (a new one) lands in a group of its own before the last group.
      */
     val GROUPS: List<List<String>> = listOf(
-        listOf(PAGE, "Home screen", "Workspaces"),
+        listOf(PAGE, "Home screen", "Profiles"),
         listOf("Look", "App drawer", "Desktop & dock"),
         listOf("Corners", "Gestures", "Radar"),
         listOf(SIDE_PANEL),
@@ -84,7 +84,7 @@ object OneUiModel {
         "Gestures" -> 0xFF58A55C
         "Radar" -> 0xFF2F8FBF
         SIDE_PANEL -> 0xFFDE6A5E
-        "Workspaces" -> 0xFF4FA38A
+        "Profiles" -> 0xFF4FA38A
         "System & sound" -> 0xFF76859A
         "Hidden apps" -> 0xFF8C6CB4
         "Backup" -> 0xFF3F9E7A

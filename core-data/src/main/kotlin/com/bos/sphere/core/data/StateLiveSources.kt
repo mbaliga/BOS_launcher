@@ -110,7 +110,9 @@ class WorkspaceFileSource(private val file: File) : LiveSections {
             StateSchema.K_DOCK to JSONObject()
                 .put("settings", JSONObject(o.optJSONObject("dock")?.toString() ?: "{}"))
                 .put("activeId", o.optString("activeId"))
-                .put("groups", JSONArray(o.optJSONArray("groups")?.toString() ?: "[]")),
+                .put("groups", JSONArray(o.optJSONArray("groups")?.toString() ?: "[]"))
+                // Wave 57 (CFG-49): the global values of the keys the active profile holds for itself, so an import puts them back too.
+                .apply { o.optJSONObject("globalSettings")?.let { put("globalSettings", JSONObject(it.toString())) } },
         )
     }
 
@@ -136,6 +138,8 @@ class WorkspaceFileSource(private val file: File) : LiveSections {
         if (StateSchema.K_DOCK in present && dock != null) {
             dock.optJSONObject("settings")?.takeIf { it.length() > 0 }?.let { existing.put("dock", it) }
             dock.optJSONArray("groups")?.let { existing.put("groups", it) }
+            // A Backup from before profiles has no globalSettings: the profiles it brings carry no settings, so none are kept aside.
+            if (dock.has("globalSettings")) existing.put("globalSettings", dock.getJSONObject("globalSettings")) else if (StateSchema.K_WORKSPACES in present) existing.remove("globalSettings")
         }
         val ids = existing.optJSONArray("workspaces")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("id") } }.orEmpty()
         val wanted = dock?.optString("activeId").orEmpty()

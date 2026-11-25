@@ -256,6 +256,18 @@ class DockSheetW55Test {
         rule.onAllNodesWithTag(DockSheetTags.SHEET).assertCountEquals(0)
     }
 
+    @Test fun CFG_48_sheet_14_theSheetHasTheProfileChipsAndATapSwitchesToThatProfile() {
+        // Wave 57 (profiles): the dock sheet, an existing switch point, carries one chip per profile.
+        val id = manager.create("Desk " + System.nanoTime())
+        try {
+            rule.setContent { Screen() }
+            openSheet()
+            rule.onNodeWithTag(ProfileTags.CHIPS).performScrollTo()
+            rule.onNodeWithTag(ProfileTags.chip(id)).performClick(); settle()
+            assertEquals(id, manager.current.activeId)
+        } finally { manager.switchTo(DockWorkspaceState.DEFAULT_ID); manager.delete(id) }
+    }
+
     @Test fun DCK_04_sheet_13_aboutTheDockOpensItsDialogOnTopOfTheSheet() {
         rule.setContent { Screen() }
         openSheet()

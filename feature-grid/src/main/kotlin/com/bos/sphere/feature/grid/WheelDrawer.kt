@@ -1341,3 +1341,29 @@ private fun WheelIcon(
             ),
     )
 }
+
+/**
+ * Wave 57 (previewAll, CFG-52): the open disc for the Settings Preview, inert (no keys, no touches, no back handler): the same [WheelContent]
+ * fully unfolded with the ring segments, shortcuts, labels and wheel groups the user has. Composed in the Preview's sandbox only.
+ */
+@Composable
+internal fun WheelPreviewContent(
+    anchor: Corner,
+    apps: List<AppEntry>,
+    grouping: WheelGrouping,
+    actions: List<PuckAction>,
+    ringSegments: Int,
+    showRingLabels: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    WheelGeometry.insetPx = with(androidx.compose.ui.platform.LocalDensity.current) { 63.dp.toPx() }
+    val full = remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr) {
+        WheelContent(
+            anchor = anchor, apps = apps, grouping = grouping, onGroupingChange = {}, recentKeys = emptyList(),
+            onLaunch = {}, onLongPressApp = {}, onSearch = {}, actions = actions,
+            ringSegments = com.bos.sphere.core.data.PuckActions.clampSegments(ringSegments), showRingLabels = showRingLabels,
+            work = null, onDismiss = {}, interactive = false, progress = full, modifier = modifier,
+        )
+    }
+}

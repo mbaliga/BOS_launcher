@@ -84,11 +84,15 @@ object DockGeometry {
 
 /**
  * The preview as a floating window (wave 39, see [PreviewWindow]): by default it sits top-end under the Ground Control header at
- * the size the fixed dock had, and it can be dragged, resized and minimised. Absent until the home has drawn once.
+ * the size the fixed dock had, and it can be dragged, resized and minimised. Absent until the home has drawn once. Wave 57: [surfaces]
+ * renders the surfaces that are not the home (Radar, the disc, the side panel, the dock, Glance); without them every topic shows the home.
  */
 @Composable
 @Suppress("UnusedReceiverParameter")
-fun BoxScope.SettingsPreviewDock(capture: HomeCapture, modifier: Modifier = Modifier, rtl: Boolean? = null) {
+fun BoxScope.SettingsPreviewDock(capture: HomeCapture, modifier: Modifier = Modifier, rtl: Boolean? = null, surfaces: PreviewSurfaces? = null) {
     if (capture.size.width <= 0 || capture.size.height <= 0) return
-    PreviewWindow(capture, modifier, rtl)
+    // Wave 57 (CFG-50): the window shows whatever the open page or the row last touched configures; a page with nothing visual hides it.
+    val subject = LocalPreviewFocus.current?.subject ?: PreviewSubject.HOME
+    if (!subject.topic.visual) return
+    PreviewWindow(capture, modifier, rtl, surfaces, subject)
 }

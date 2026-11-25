@@ -231,7 +231,9 @@ fun SettingsSpace(
         exit = if (reducedMotion) fadeOut(tween(90)) else fadeOut(tween(180)) + scaleOut(targetScale = 1.04f, animationSpec = tween(180)),
         modifier = modifier,
     ) {
-        androidx.compose.runtime.CompositionLocalProvider(LocalSettingsBackdrop provides backdrop) {
+        // Wave 57 (CFG-50): what the open page configures, written by the settings host and read only by the Preview window.
+        val previewFocus = remember { PreviewFocusState() }
+        androidx.compose.runtime.CompositionLocalProvider(LocalSettingsBackdrop provides backdrop, LocalPreviewFocus provides previewFocus) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                 androidx.compose.runtime.key(session) { OneUiSettingsHost(categories, summaries, initialCategory, sounds, onClose, snapshots) }
                 previewDock?.invoke(this)

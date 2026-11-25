@@ -694,7 +694,8 @@ fun LaunchpadContent(
             else -> false
         }
     }
-    LaunchedEffect(Unit) { withFrameNanos { }; runCatching { rootReq.requestFocus() } }
+    val previewSandbox = com.bos.sphere.core.design.LocalPreviewSandbox.current // wave 57: the Settings Preview composes this panel with sample rows; it takes no focus there
+    if (!previewSandbox) LaunchedEffect(Unit) { withFrameNanos { }; runCatching { rootReq.requestFocus() } }
     // The handler is read through updated state: with groups the first composition has no sections yet (they are matched off the
     // main thread), and a handler captured then would see an empty focus order for good.
     // (A holder, not state: two references to a local function compare equal whatever they captured, so state would never update.)
@@ -955,7 +956,7 @@ fun LaunchpadContent(
         }
     }
     // The manager is a screen of buttons, so it stays clear of the card's 48 dp return zone (the list behind runs to the card's edge).
-    LaunchedEffect(Unit) { LaunchpadHubNav.groups.collect { if (it) { LaunchpadHubNav.takeGroups(); menu.open = false; groupsOpen = true } } } // wave 29: Ground Control's "Groups and rules" opens the manager here
+    if (!previewSandbox) LaunchedEffect(Unit) { LaunchpadHubNav.groups.collect { if (it) { LaunchpadHubNav.takeGroups(); menu.open = false; groupsOpen = true } } } // wave 29: Ground Control's "Groups and rules" opens the manager here
     LaunchpadGroupsOverlay(groupsOpen, items, endInset = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
     // Wave 38 (popupsHidden): with a host the sheets are drawn in the full-window layer above the home card (full width, scrim over the whole screen);
     // the state stays here. Without one they are drawn in place, as before.

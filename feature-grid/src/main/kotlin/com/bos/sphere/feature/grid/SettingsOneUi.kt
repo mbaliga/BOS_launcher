@@ -222,6 +222,8 @@ internal fun OneUiSettingsHost(
             paneFlash = e.paneEntryId
         }
 
+        val previewFocus = LocalPreviewFocus.current // wave 57 (CFG-50): the Preview shows what this page configures
+        if (previewFocus != null) androidx.compose.runtime.SideEffect { latest.getOrNull(cat).let { c -> previewFocus.onPage(c, c?.items?.getOrNull(nav.sub)?.takeIf { nav.sub >= 0 }) } }
         CompositionLocalProvider(LocalPreviewTop provides (topInset.value + 56f + 8f), LocalPaneFlash provides paneFlash) {
           Box(
             Modifier
@@ -522,7 +524,7 @@ private fun OneUiCategoryPage(
 }
 
 @Composable
-private fun OneUiItem(item: SettingItem, index: Int, lit: Boolean, host: ItemHost) {
+private fun OneUiItem(item: SettingItem, index: Int, lit: Boolean, host: ItemHost) = Box(Modifier.previewRow(item)) { // wave 57: a touched row is what the Preview shows
     when (item) {
         is SettingItem.Toggle -> OneUiToggleRow(item, lit) { v -> item.onChange(v); host.play(UiSound.Tick); host.tick() }
         is SettingItem.Slider -> OneUiSliderRow(item, lit) { host.tick() }

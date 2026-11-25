@@ -1633,6 +1633,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             )
         }
         androidx.compose.runtime.SideEffect { settingsForRadar.value = categories }
+        val previewSurfaces = com.bos.sphere.ui.rememberPreviewSurfaces(prefs, apps, appsByKey, puckSlots, puckSegments, puckLabels, homeOnGlance = { landing == HomeShown.Glance })
         SettingsSpace(
             visible = settingsOpen,
             categories = categories,
@@ -1641,7 +1642,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             onClose = { settingsOpen = false },
             modifier = Modifier.fillMaxSize(),
             session = settingsSession,
-            previewDock = { SettingsPreviewDock(homeCapture) },
+            previewDock = { SettingsPreviewDock(homeCapture, surfaces = previewSurfaces) }, // W57 (CFG-50): whatever the open page configures
             snapshots = remember(context) { com.bos.sphere.ui.StateSnapshots(context) },
             summaries = com.bos.sphere.ui.settingsSummaries(prefs.homePages, pages.size, gestures.size, hiddenAppsAccess.count, categories, pageIndex = settingsPage, workspaceCount = dockState.workspaces.size,
                 sidePanelWidgets = runCatching { com.bos.sphere.ui.HubPrefs.of(context).let { if (it.widgetsSection) it.widgetList.size else 0 } }.getOrDefault(0)),

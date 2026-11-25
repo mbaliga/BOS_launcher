@@ -23,8 +23,10 @@ class ItemMeta {
     var entries: List<PaneEntry> = emptyList()
     /** The row changes preferences in bulk: the host takes a snapshot first and offers Undo afterwards (reset). */
     var snapshotFirst: Boolean = false
+    /** Wave 57 (CFG-50): what the floating Preview shows while this row is being configured; null = the table in [PreviewTopics], then the category's default. */
+    var previewTopic: PreviewSubject? = null
 
-    fun copyFrom(o: ItemMeta) { id = o.id; keywords = o.keywords; disabledReason = o.disabledReason; entries = o.entries; snapshotFirst = o.snapshotFirst }
+    fun copyFrom(o: ItemMeta) { id = o.id; keywords = o.keywords; disabledReason = o.disabledReason; entries = o.entries; snapshotFirst = o.snapshotFirst; previewTopic = o.previewTopic }
 }
 
 /** One searchable row inside a pane. [id] is a stable string; a pane that draws the row with [paneFlash] under that id flashes it on arrival. */

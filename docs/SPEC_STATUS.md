@@ -4,7 +4,7 @@ Source: [Spec.md](Spec.md). Status per requirement: **not started**, **partial**
 
 Requirement texts are in Spec.md; this table is the single place that says how far each one is.
 
-Counts: built 125, partial 58, not started 4, unmet 2, removed 1 (of 190).
+Counts: built 130, partial 63, not started 4, unmet 2, removed 1 (of 200).
 
 <!-- Counting convention: one row per requirement ID of Spec.md (checked by RepoHygieneAuditTest in core-quality, which also recomputes the Counts line). Status words: built, partial, not started, unmet, removed. A requirement taken out by an owner decision is `removed` (its note says "Removed by owner decision", names the wave and where its replacement is tested); it stays a row so its history stays, it is counted under `removed` and not under any work left. ELV rows are the optional elevated tier (not started by design). -->
 

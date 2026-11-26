@@ -95,7 +95,8 @@ class LooksCalibratorsW56Test {
         assertEquals("Looks", items.first().title)
         val row = items.first() as SettingItem.Choice<*>
         assertNotNull("it is a rail row (cards inline, no page)", row.preview)
-        assertTrue(row.hint!!.contains("left alone"))
+        // Wave 58 (CFG-65): the row names what a look sets in a few words; "your own wallpaper stays" is the Theme section's note line.
+        assertEquals("Mode, accent, icons, dock, font, calm", row.hint)
         assertTrue(items.indexOfFirst { it.title == "Light / dark" } > 0)
         assertEquals("one Looks row", 1, all().count { it.title == "Looks" })
     }

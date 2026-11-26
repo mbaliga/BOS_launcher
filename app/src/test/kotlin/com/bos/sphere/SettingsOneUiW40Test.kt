@@ -101,7 +101,7 @@ class SettingsOneUiW40Test {
     @Test fun CFG_21_theBigTabsAreCutIntoSectionsWithHeaders() {
         val home = SettingsTestNav.tab(cats(), "Home")
         val headers = OneUiSections.headers(home)
-        assertTrue("Home has several sections: $headers", headers.size >= 8)
+        assertTrue("Home has several sections: $headers", headers.size >= 7) // wave 58: Dock and External displays are one section
         assertEquals("Glance", headers[0])
     }
 

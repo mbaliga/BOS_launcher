@@ -50,7 +50,7 @@ fun LooksRailSection(prefs: LauncherPrefs, host: ThemeHost, dock: DockStyle) {
 /** CFG-26: the "Looks" row. Its value is empty (the cards are the control and say which is picked); the dock style is read from the workspace state. */
 fun looksRailItem(p: LauncherPrefs): SettingItem = SettingItem.Choice<LookPreset?>(
     L10n.tr("Looks"), Glyphs.Palette, LookPresets.all, null, { "" },
-    hint = L10n.tr("One tap sets mode, accent, icons, dock, font and calm style together. A wallpaper picture or live wallpaper of yours is left alone."),
+    hint = L10n.tr("Mode, accent, icons, dock, font, calm"),
     preview = {
         val ctx = LocalContext.current
         val manager = remember { WorkspaceRepository.get(ctx) }
@@ -65,7 +65,7 @@ private fun tryRow(title: String, hint: String, content: @Composable androidx.co
 
 /** CFG-27: hold in the area for as long as the pointer should rest in a corner; the held time (to the slider's step) becomes Hot corner delay. */
 fun hotCornerTryItem(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): SettingItem = tryRow(
-    L10n.tr("Try it: Hot corner delay"), L10n.tr("Press and hold in the box for as long as the pointer should rest in a corner before it opens."),
+    L10n.tr("Try it: Hot corner delay"), L10n.tr("Press and hold to measure"),
 ) {
     HoldCalibrator(
         "hotCorner", L10n.tr("Press and hold here"), "${p.hotCornerDwellMs} ms", { "$it ms" },
@@ -76,7 +76,7 @@ fun hotCornerTryItem(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -
 
 /** CFG-27: tap, wait as long as the music controls should stay, tap again; the wait (whole seconds) becomes Controls hide after. */
 fun controlsTryItem(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): SettingItem = tryRow(
-    L10n.tr("Try it: Controls hide after"), L10n.tr("Tap the box, wait as long as the controls should stay, then tap it again."),
+    L10n.tr("Try it: Controls hide after"), L10n.tr("Tap, wait, then tap again"),
 ) {
     IntervalCalibrator(
         "controls", L10n.tr("Tap here to start"), L10n.tr("Tap again when the controls should hide"), "${p.glanceControlsSeconds} s", { "%.1f s".format(it / 1000.0) },
@@ -87,7 +87,7 @@ fun controlsTryItem(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) ->
 
 /** CFG-27: shake the phone the way it should react; the strongest push sets Motion sensitivity so that shake just trips the detector. [source] is the accelerometer (injected in tests). */
 fun motionTryItem(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit, source: (@Composable () -> AccelSource?)? = null): SettingItem = tryRow(
-    L10n.tr("Try it: Motion sensitivity"), L10n.tr("Shake your phone the way you want it to react: a lighter shake sets a higher sensitivity."),
+    L10n.tr("Try it: Motion sensitivity"), L10n.tr("Shake the way it should react"),
 ) {
     ShakeCalibrator(
         "motion", L10n.tr("Shake your phone"), L10n.tr("No motion sensor on this device"), "${(p.motionSensitivity * 100).roundToInt()}%", (source ?: { rememberAccelSource() })(), { "%.1f m/s²".format(it) },

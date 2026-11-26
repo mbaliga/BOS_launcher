@@ -99,6 +99,8 @@ import kotlin.coroutines.cancellation.CancellationException
 object OneUiTags {
     const val ROOT = "oneui.root"
     const val SUB_PAGE = "oneui.sub"
+    /** Wave 58 (CFG-65): the one-line note under a section header. */
+    const val SECTION_NOTE = "oneui.sectionNote"
     const val BACK = "oneui.back"
     const val TITLE_LARGE = "oneui.titleLarge"
     const val TITLE_SMALL = "oneui.titleSmall"
@@ -589,7 +591,7 @@ private fun SearchResultsList(categories: List<SettingCategory>, query: String, 
 @Composable
 private fun TabContent(category: SettingCategory, index: Int, highlight: Pair<Int, Int>?, host: ItemHost, titled: Boolean, alpha: Float) {
     val items = category.items
-    val blocks = OneUiModel.blocks(items, OneUiSections.headers(category))
+    val blocks = OneUiModel.blocks(items, OneUiSections.headers(category), category.notes)
     val state = rememberLazyListState()
     val lit = highlight?.takeIf { it.first == index }?.second
     val base = if (titled) 1 else 0
@@ -612,7 +614,7 @@ private fun LazyListScope.sectionRows(category: SettingCategory, blocks: List<On
     val items = category.items
     blocks.forEachIndexed { bi, b ->
         when (b) {
-            is OneUiModel.Block.Header -> item(key = "h$bi") { OneUiSectionHeader(b.text) }
+            is OneUiModel.Block.Header -> item(key = "h$bi") { Column { OneUiSectionHeader(b.text); b.note?.let { OneUiSectionNote(it) } } }
             is OneUiModel.Block.Group -> item(key = "c$bi") {
                 Column {
                     if (bi > 0 && blocks[bi - 1] is OneUiModel.Block.Group) Spacer(Modifier.height(OneUi.GroupGap))

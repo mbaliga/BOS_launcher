@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
 
 /**
  * Wave 56 (settingsCore), CFG-28 / CFG-31: what a settings row carries besides what it shows. None of it is drawn as a row of its own:
@@ -50,8 +51,12 @@ val LocalPaneFlash = compositionLocalOf<String?> { null }
 @Composable
 fun Modifier.paneFlash(id: String?): Modifier {
     val on = id != null && LocalPaneFlash.current == id
-    return if (on) this.background(OneUi.Highlight) else this
+    // Wave 58 (CFG-67): the lit row also says which id lit it, so a test (and nothing else) can find it.
+    return if (on) this.background(OneUi.Highlight).semantics { this[PaneFlashed] = id!! } else this
 }
+
+/** Wave 58 (CFG-67): set on a pane row while it is lit by a search hit (the value is the hit's stable id). */
+val PaneFlashed = androidx.compose.ui.semantics.SemanticsPropertyKey<String>("PaneFlashed")
 
 /** Pure rules of the dimmed rows. */
 object Disabled {

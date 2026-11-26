@@ -32,7 +32,7 @@ import java.io.File
  * crash-free percentage, and (debug and alpha Lab builds only) a button that previews that screen with sample content.
  */
 fun crashReportsItem(): SettingItem = SettingItem.Pane(
-    L10n.tr("Crash reports"), Glyphs.Info, L10n.tr("Saved on this device; you decide whether to share one"),
+    L10n.tr("Crash reports"), Glyphs.Info, L10n.tr("Kept on this device"),
 ) { CrashReportsPane() }
 
 private class PaneState(val pending: String?, val percent: Double)

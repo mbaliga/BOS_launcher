@@ -119,12 +119,13 @@ class SettingsTabsW57ModelTest {
     @Test fun CFG_40_theSectionsOfEachTabAreTheOwnersSections() {
         val c = tabs()
         fun heads(k: String) = c.first { SettingsTabs.key(it.title) == k }.headers.values.toList()
-        assertEquals(listOf("Glance", "Pages", "Layout", "Corners", "Gestures and motion", "Keyboard and pointer", "Dock", "External displays"), heads("Home"))
-        assertEquals(listOf("Looks", "Theme", "Font", "Icons", "Wallpaper", "Calm styles", "Settings screen and text"), heads("Look"))
-        assertEquals(listOf("Profiles", "App groups and sessions", "App drawer", "Hidden apps", "Open with"), heads("Apps"))
+        // Wave 58 (CFG-69): no header repeats a row title of its section word for word, and a one-row section joined its neighbour.
+        assertEquals(listOf("Glance", "Home pages", "Layout", "Corners", "Gestures and motion", "Keyboard and pointer", "Dock and displays"), heads("Home"))
+        assertEquals(listOf("Theme", "Font and icons", "Wallpaper", "Calm styles", "Settings screen and text"), heads("Look"))
+        assertEquals(listOf("Profiles and groups", "App drawer", "Hidden and default apps"), heads("Apps"))
         assertEquals(listOf("Layout", "Appearance", "Input", "Sources", "Web", "Privacy"), heads("Radar"))
-        assertEquals(listOf("Left panel", "Panel theme and size", "Sections", "Comms", "Groups and rules", "Right side", "Clean up"), heads("Side panel"))
-        assertEquals(listOf("General", "Sound and haptics", "Access and privacy", "Backup and restore", "Help and recovery", "Lab", "About"), heads("System"))
+        assertEquals(listOf("Left panel", "Panel theme and size", "Sections", "Comms", "Rules and gestures", "Right edge", "Clean up"), heads("Side panel"))
+        assertEquals(listOf("General", "Sound and haptics", "Permissions", "Backup and restore", "Help and recovery", "Lab", "About"), heads("System"))
         // Looks lead the Look tab; Profiles (they replaced Workspaces) lead Apps
         assertEquals("Looks", c.first { SettingsTabs.key(it.title) == "Look" }.items.first().title)
         assertEquals("Profiles", c.first { SettingsTabs.key(it.title) == "Apps" }.items.first().title)

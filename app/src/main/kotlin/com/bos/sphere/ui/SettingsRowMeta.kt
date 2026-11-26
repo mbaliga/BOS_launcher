@@ -145,6 +145,22 @@ internal object SettingsRowMeta {
         /** Wave 57 (CFG-42): the two rows of Access and privacy that are not grants of [GrantKind]. */
         const val ACCESS_DND = "access.dnd"
         const val ACCESS_DEFAULT_HOME = "access.defaultHome"
+        /** Wave 58 (CFG-67): the rows of the Themes, Drawer shortcuts, Profiles and Radar panes. */
+        const val THEMES_IMPORT = "themes.import"
+        const val THEMES_EXPORT = "themes.export"
+        const val THEMES_RESET = "themes.reset"
+        const val THEMES_UNDO = "themes.undo"
+        fun drawerSegment(n: Int) = "drawer.segment$n"
+        const val DRAWER_RESET = "drawer.reset"
+        const val PROFILES_NEW = com.bos.sphere.feature.dock.ProfilePaneIds.NEW
+        const val PROFILES_LIST = com.bos.sphere.feature.dock.ProfilePaneIds.LIST
+        const val PROFILES_SUGGESTIONS = com.bos.sphere.feature.dock.ProfilePaneIds.SUGGESTIONS
+        const val PROFILES_CALM = com.bos.sphere.feature.dock.ProfilePaneIds.CALM
+        const val PROFILES_RADAR_ACTIONS = com.bos.sphere.feature.dock.ProfilePaneIds.RADAR_ACTIONS
+        fun provider(pkg: String) = "providers.$pkg"
+        const val FOLDERS_ADD = "folders.add"
+        const val FOLDERS_REINDEX = "folders.reindex"
+        const val HISTORY_FORGET = "history.forget"
         fun access(k: GrantKind) = "access.${k.name}"
         fun openWith(id: com.bos.sphere.core.data.CornerActionId) = "openwith.${id.name}"
     }
@@ -172,6 +188,20 @@ internal object SettingsRowMeta {
         } + listOf(
             PaneEntry(PaneIds.ACCESS_DND, L10n.tr("Do Not Disturb access"), listOf("dnd", "silent", "permission", "policy")),
             PaneEntry(PaneIds.ACCESS_DEFAULT_HOME, L10n.tr("Set as default home"), listOf("default launcher", "home app", "make default")),
+        ),
+        // Wave 58 (CFG-67): the Themes page and the Radar panes. The Drawer shortcuts, Profiles and Search providers rows are declared where those rows are built.
+        "Themes" to listOf(
+            PaneEntry(PaneIds.THEMES_IMPORT, L10n.tr("Import theme"), listOf("liftofftheme", "theme file", "load")),
+            PaneEntry(PaneIds.THEMES_EXPORT, L10n.tr("Export current look"), listOf("share theme", "save look", "theme file")),
+            PaneEntry(PaneIds.THEMES_RESET, L10n.tr("Reset to default look"), listOf("default theme", "original look")),
+            PaneEntry(PaneIds.THEMES_UNDO, L10n.tr("Undo last theme change"), listOf("previous look", "revert theme")),
+        ),
+        "Search folders" to listOf(
+            PaneEntry(PaneIds.FOLDERS_ADD, L10n.tr("Add a folder"), listOf("folder picker", "directory", "index")),
+            PaneEntry(PaneIds.FOLDERS_REINDEX, L10n.tr("Update the file index now"), listOf("reindex", "refresh", "scan")),
+        ),
+        "Search history and aliases" to listOf(
+            PaneEntry(PaneIds.HISTORY_FORGET, L10n.tr("Forget what Radar learned"), listOf("clear history", "ranking", "learning")),
         ),
         "Open with" to listOf(
             com.bos.sphere.core.data.CornerActionId.Music, com.bos.sphere.core.data.CornerActionId.Messages, com.bos.sphere.core.data.CornerActionId.Browser,
@@ -206,7 +236,7 @@ internal object SettingsRowMeta {
                 } ?: item else item
                 catKey?.let { IDS[it]?.get(en) }?.let { out.meta.id = it }
                 KEYWORDS[en]?.let { out.meta.keywords = (out.meta.keywords + it).distinct() }
-                if (item is SettingItem.Pane) panes[en]?.let { out.meta.entries = it }
+                if (item is SettingItem.Pane) panes[en]?.let { out.meta.entries = out.meta.entries + it }
                 out
             })
         }

@@ -25,6 +25,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.text.font.FontWeight
@@ -94,16 +99,36 @@ fun OneUiListRow(
 
 /** A switch row. */
 @Composable
-fun OneUiSwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit, summary: String? = null, modifier: Modifier = Modifier) {
+fun OneUiSwitchRow(
+    title: String, checked: Boolean, onChange: (Boolean) -> Unit, summary: String? = null, modifier: Modifier = Modifier,
+    /** Wave 58 (CFG-66): the row stays, dimmed, with this reason as its line, and does not react (the CFG-31 mechanism of the settings rows). */
+    disabledReason: String? = null,
+) {
     OneUiRowFrame(
-        title, summary = summary, role = Role.Switch, onClick = { onChange(!checked) },
+        title, summary = summary, role = Role.Switch, onClick = { onChange(!checked) }, disabledReason = disabledReason,
         modifier = modifier.semantics(mergeDescendants = true) {
-            contentDescription = title
+            contentDescription = if (disabledReason == null) title else Disabled.description(title, disabledReason, com.bos.sphere.core.design.L10n.tr("Unavailable"))
             toggleableState = androidx.compose.ui.state.ToggleableState(checked)
         },
         trailing = { OneUiSwitch(checked) },
     )
 }
+
+/**
+ * Wave 58 (CFG-66): a block of controls (a row of drawn cards) that cannot be used right now: dimmed like a row that is off, a layer over it takes
+ * the touches, and a screen reader hears one node, "[label], unavailable, [reason]". With a null [reason] the content is shown as it is.
+ */
+@Composable
+fun OneUiDisabledBlock(reason: String?, label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    if (reason == null) { Box(modifier) { content() }; return }
+    Box(modifier.testTag(OneUiTags.DISABLED_ROW)) {
+        val said = Disabled.description(label, reason, com.bos.sphere.core.design.L10n.tr("Unavailable"))
+        Box(Modifier.androidx_alpha(Disabled.ALPHA).clearAndSetSemantics { contentDescription = said; disabled(); stateDescription = reason }) { content() }
+        Box(Modifier.matchParentSize().pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() } } })
+    }
+}
+
+private fun Modifier.androidx_alpha(a: Float): Modifier = this.graphicsLayer { alpha = a }
 
 /** A row that shows its current value in grey and a chevron; a tap opens a full page of options (never a popup). */
 @Composable

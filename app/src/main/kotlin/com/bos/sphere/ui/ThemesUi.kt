@@ -188,20 +188,20 @@ fun ColumnScope.ThemesPane(files: ThemeFiles = rememberThemeFiles(), host: Theme
     message?.let { Text(it, color = HyleColors.InkBright, fontSize = 13.sp, modifier = Modifier.padding(vertical = 6.dp).testTag(ThemeTags.APPLIED).semantics { liveRegion = LiveRegionMode.Polite }) }
     (parsed as? ThemeParse.Failed)?.let { ThemeErrors(it.errors) }
 
-    ActionRow(L10n.tr("Import theme"), L10n.tr("Choose a .liftofftheme file; you see what it changes before anything happens"), Glyphs.Plus) {
+    ActionRow(L10n.tr("Import theme"), L10n.tr("Choose a .liftofftheme file; you see what it changes before anything happens"), Glyphs.Plus, flashId = SettingsRowMeta.PaneIds.THEMES_IMPORT) {
         message = null
         files.pickImport { bytes -> parsed = if (bytes == null) ThemeParse.Failed(listOf(ThemeError(ThemeErrorCode.Unreadable))) else ThemePacks.parse(bytes) }
     }
-    ActionRow(L10n.tr("Export current look"), L10n.tr("Saves your mode, accent, icon, dock and wallpaper choices as a theme file"), Glyphs.Image) {
+    ActionRow(L10n.tr("Export current look"), L10n.tr("Saves your mode, accent, icon, dock and wallpaper choices as a theme file"), Glyphs.Image, flashId = SettingsRowMeta.PaneIds.THEMES_EXPORT) {
         val pack = ThemeLook.capture(host.prefs(), host.dockStyle(), L10n.tr("My look"))
         files.saveExport(ThemePacks.fileName(pack.name), ThemePacks.encode(pack)) { done ->
             message = if (done) L10n.tr("Theme exported. A wallpaper picture, video or live wallpaper is not included.") else L10n.tr("The theme could not be saved.")
         }
     }
-    ActionRow(L10n.tr("Reset to default look"), L10n.tr("Dark mode, the default accent, rounded icons, the standard dock; you can undo it"), Glyphs.Home) {
+    ActionRow(L10n.tr("Reset to default look"), L10n.tr("Dark mode, the default accent, rounded icons, the standard dock; you can undo it"), Glyphs.Home, flashId = SettingsRowMeta.PaneIds.THEMES_RESET) {
         host.applier.reset(); parsed = null; message = L10n.tr("Look reset to the default. You can undo it below.")
     }
-    if (undo != null) ActionRow(L10n.tr("Undo last theme change"), L10n.tr("Puts back the look you had before"), Glyphs.Close) {
+    if (undo != null) ActionRow(L10n.tr("Undo last theme change"), L10n.tr("Puts back the look you had before"), Glyphs.Close, flashId = SettingsRowMeta.PaneIds.THEMES_UNDO) {
         if (host.applier.undo()) message = L10n.tr("Your previous look is back.")
     }
 }

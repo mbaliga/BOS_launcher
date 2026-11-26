@@ -56,7 +56,7 @@ fun backupCategory(resetAll: (() -> Unit)? = null): SettingCategory = SettingCat
     L10n.tr("Backup"),
     Glyphs.Info,
     listOfNotNull(
-        SettingItem.Pane(L10n.tr("Export, import and restore"), Glyphs.Info, L10n.tr("One file, or the last five snapshots")) { BackupPane { reloadAfterStateChange(it) } },
+        SettingItem.Pane(L10n.tr("Export, import and restore"), Glyphs.Info, L10n.tr("One file or five snapshots")) { BackupPane { reloadAfterStateChange(it) } },
         crashReportsItem(),
         studioSettingItem(), // wave 57 (CFG-43): Liftoff Studio, the browser editor
         // Wave 56 (CFG-30): every preference back to its default; the host takes a snapshot first and offers Undo. User data (layout, hidden apps, shortcuts, rules) stays.

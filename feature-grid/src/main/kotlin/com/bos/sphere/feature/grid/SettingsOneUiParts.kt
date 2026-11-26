@@ -129,6 +129,15 @@ internal fun OneUiSectionHeader(text: String) {
     )
 }
 
+/** Wave 58 (CFG-65): a section's one short sentence under its header (the help that left the rows' grey lines). */
+@Composable
+internal fun OneUiSectionNote(text: String) {
+    Text(
+        text, color = HyleColors.InkDim, fontSize = 13.sp, lineHeight = 18.sp,
+        modifier = Modifier.fillMaxWidth().padding(start = OneUi.RowPad, end = OneUi.RowPad, top = 0.dp, bottom = 8.dp).testTag(OneUiTags.SECTION_NOTE),
+    )
+}
+
 @Composable
 internal fun OneUiChevron() {
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl

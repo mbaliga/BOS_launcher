@@ -47,7 +47,7 @@ class StudioSchemaW56Test {
 
     private class Opt(val id: String, val label: String)
     private class Fd(
-        val key: String, val label: String, val tab: String, val group: String, val type: String,
+        val key: String, val label: String, val type: String,
         val scope: String = "settings",
         val options: List<Opt> = emptyList(),
         val min: Double? = null, val max: Double? = null, val step: Double? = null, val unit: String? = null,
@@ -58,7 +58,10 @@ class StudioSchemaW56Test {
         val note: String? = null,
         val file: String? = null, val fileKey: String? = null, val fileType: String? = null,
         val count: Int? = null,
-    )
+    ) {
+        // Wave 58 (studioPreview, CFG-70): set from the app's own Settings layout (appRowOf + SettingsTabLayout.kt), never by hand.
+        var row = ""; var tab = ""; var group = ""
+    }
     private companion object { val UNSET = Any() }
 
     private inline fun <reified E : Enum<E>> byName(vararg skip: E, label: (E) -> String): List<Opt> = enumValues<E>().filter { it !in skip }.map { Opt(it.name, label(it)) }
@@ -70,27 +73,25 @@ class StudioSchemaW56Test {
         "jetbrains_mono" to "JetBrains Mono", "atkinson" to "Atkinson Hyperlegible", "lexend" to "Lexend",
     )
     private fun pic(p: String, surface: String, kindKey: String): List<Fd> {
-        val tab = "look"; val g = "Wallpaper: $surface"
         val showPic = kindKey to listOf("picture")
         return listOf(
-            Fd(p + "PicFit", "Picture fit", tab, g, "enum", options = PictureFit.entries.map { Opt(it.id, it.label) }, showWhen = showPic, advanced = true),
-            Fd(p + "PicDim", "Picture dim", tab, g, "int", min = 0.0, max = 80.0, step = 10.0, unit = "%", showWhen = showPic, advanced = true),
-            Fd(p + "PicGif", "Animated picture", tab, g, "enum", options = GifMode.entries.map { Opt(it.id, it.label) }, showWhen = showPic, advanced = true),
-            Fd(p + "SysDim", "Dim over the system wallpaper", tab, g, "int", min = 0.0, max = 80.0, step = 10.0, unit = "%", showWhen = kindKey to listOf("system"), advanced = true),
+            Fd(p + "PicFit", "Picture fit", "enum", options = PictureFit.entries.map { Opt(it.id, it.label) }, showWhen = showPic, advanced = true),
+            Fd(p + "PicDim", "Picture dim", "int", min = 0.0, max = 80.0, step = 10.0, unit = "%", showWhen = showPic, advanced = true),
+            Fd(p + "PicGif", "Animated picture", "enum", options = GifMode.entries.map { Opt(it.id, it.label) }, showWhen = showPic, advanced = true),
+            Fd(p + "SysDim", "Dim over the system wallpaper", "int", min = 0.0, max = 80.0, step = 10.0, unit = "%", showWhen = kindKey to listOf("system"), advanced = true),
             // The file itself and what describes it belong to this device (StateSchema.WALLPAPER_PICTURE_KEYS).
-            Fd(p + "Pic", "Picture file", tab, g, "string", deviceBound = true, advanced = true),
-            Fd(p + "PicAnim", "Picture is animated", tab, g, "bool", deviceBound = true, advanced = true),
-            Fd(p + "PicVid", "Picture is a video", tab, g, "bool", deviceBound = true, advanced = true),
-            Fd(p + "PicMs", "Picture duration", tab, g, "int", deviceBound = true, advanced = true, unit = "ms"),
-            Fd(p + "PicOk", "Picture power check", tab, g, "bool", deviceBound = true, advanced = true),
-            Fd(p + "PicBounce", "Picture bounce support", tab, g, "string", deviceBound = true, advanced = true),
+            Fd(p + "Pic", "Picture file", "string", deviceBound = true, advanced = true),
+            Fd(p + "PicAnim", "Picture is animated", "bool", deviceBound = true, advanced = true),
+            Fd(p + "PicVid", "Picture is a video", "bool", deviceBound = true, advanced = true),
+            Fd(p + "PicMs", "Picture duration", "int", deviceBound = true, advanced = true, unit = "ms"),
+            Fd(p + "PicOk", "Picture power check", "bool", deviceBound = true, advanced = true),
+            Fd(p + "PicBounce", "Picture bounce support", "string", deviceBound = true, advanced = true),
         )
     }
 
     private val cornerActionOpts: List<Opt> = listOf(Opt("", "Nothing")) + CornerActionId.entries.map { Opt("action:" + it.name, it.label) }
 
-    private fun fields(): List<Fd> {
-        val home = "home"; val look = "look"; val apps = "apps"; val radar = "radar"; val side = "side"; val sys = "system"
+    private fun rawFields(): List<Fd> {
         val clockOn = "clockStyle" to ClockStyle.entries.filter { it != ClockStyle.Off }.map { it.name }
         val digital = "clockStyle" to ClockStyle.entries.filter { it.digital }.map { it.name }
         val l = ArrayList<Fd>()
@@ -98,202 +99,344 @@ class StudioSchemaW56Test {
 
         // ---- HOME > Glance
         add(
-            Fd("glanceEnabled", "Glance", home, "Glance", "bool"),
-            Fd("homeOrder", "Order", home, "Glance", "enum", options = byName<HomeOrder> { it.label }),
-            Fd("showMusic", "Music line", home, "Glance", "bool"),
-            Fd("glanceControlsSec", "Music controls stay", home, "Glance", "int", min = GlanceControls.MIN_SECONDS.toDouble(), max = GlanceControls.MAX_SECONDS.toDouble(), step = 1.0, unit = "s"),
-            Fd("glanceIndicator", "Surface indicator", home, "Glance", "bool"),
+            Fd("glanceEnabled", "Glance", "bool"),
+            Fd("homeOrder", "Order", "enum", options = byName<HomeOrder> { it.label }),
+            Fd("showMusic", "Music line", "bool"),
+            Fd("glanceControlsSec", "Music controls stay", "int", min = GlanceControls.MIN_SECONDS.toDouble(), max = GlanceControls.MAX_SECONDS.toDouble(), step = 1.0, unit = "s"),
+            Fd("glanceIndicator", "Surface indicator", "bool"),
         )
         // ---- HOME > Clock
         add(
-            Fd("clockStyle", "Clock style", home, "Clock", "enum", options = byName<ClockStyle> { it.label }),
-            Fd("clockFormat", "Hours", home, "Clock", "enum", options = byName<ClockFormat> { it.label }, showWhen = digital),
-            Fd("glanceClockDate", "Show the date", home, "Clock", "bool", showWhen = clockOn),
-            Fd("glanceClockAccent", "Accent colour", home, "Clock", "bool", showWhen = clockOn),
-            Fd("glanceClockSize", "Size", home, "Clock", "enum", options = byName<ClockSize> { it.label }, showWhen = clockOn),
-            Fd("glanceClockX", "Position across (portrait)", home, "Clock", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", showWhen = clockOn),
-            Fd("glanceClockY", "Position down (portrait)", home, "Clock", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", showWhen = clockOn),
-            Fd("glanceClockXLand", "Position across (landscape)", home, "Clock", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", advanced = true, showWhen = clockOn),
-            Fd("glanceClockYLand", "Position down (landscape)", home, "Clock", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", advanced = true, showWhen = clockOn),
-            Fd("clockTileAnalog", "Clock tile: analog face", home, "Clock tile", "bool", scene = "pages"),
-            Fd("clockTileFormat", "Clock tile: hours", home, "Clock tile", "enum", options = byName<ClockFormat> { it.label }, scene = "pages"),
-            Fd("clockTileDate", "Clock tile: day line", home, "Clock tile", "bool", scene = "pages"),
+            Fd("clockStyle", "Clock style", "enum", options = byName<ClockStyle> { it.label }),
+            Fd("clockFormat", "Hours", "enum", options = byName<ClockFormat> { it.label }, showWhen = digital),
+            Fd("glanceClockDate", "Show the date", "bool", showWhen = clockOn),
+            Fd("glanceClockAccent", "Accent colour", "bool", showWhen = clockOn),
+            Fd("glanceClockSize", "Size", "enum", options = byName<ClockSize> { it.label }, showWhen = clockOn),
+            Fd("glanceClockX", "Position across (portrait)", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", showWhen = clockOn),
+            Fd("glanceClockY", "Position down (portrait)", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", showWhen = clockOn),
+            Fd("glanceClockXLand", "Position across (landscape)", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", advanced = true, showWhen = clockOn),
+            Fd("glanceClockYLand", "Position down (landscape)", "float", min = 0.0, max = 1.0, step = 0.01, unit = "%", advanced = true, showWhen = clockOn),
+            Fd("clockTileAnalog", "Clock tile: analog face", "bool", scene = "pages"),
+            Fd("clockTileFormat", "Clock tile: hours", "enum", options = byName<ClockFormat> { it.label }, scene = "pages"),
+            Fd("clockTileDate", "Clock tile: day line", "bool", scene = "pages"),
         )
         // ---- HOME > Pages
         add(
-            Fd("homePages", "Pages after Glance", home, "Pages", "enum", options = byName<HomePages> { it.label }, scene = "pages"),
-            Fd("scrollAxis", "Scroll direction", home, "Pages", "enum", options = byName<ScrollAxis> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Continuous")),
-            Fd("contCols", "Icons across", home, "Pages", "int", min = 2.0, max = 8.0, step = 1.0, scene = "pages", showWhen = "homePages" to listOf("Continuous")),
-            Fd("pPaging", "Pages turn (portrait)", home, "Pages", "enum", options = byName<PagingAxis> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Paginated")),
-            Fd("lPaging", "Pages turn (landscape)", home, "Pages", "enum", options = byName<PagingAxis> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Paginated")),
-            Fd("pageTransition", "Page transition", home, "Pages", "enum", options = byName<PageTransition> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Paginated")),
-            Fd("homePage", "Home button returns to page", home, "Pages", "int", min = 0.0, max = 20.0, step = 1.0, scene = "pages", advanced = true),
-            Fd("style", "Home style", home, "Pages", "enum", options = byName<HomeStyle> { it.name }, scene = "pages", advanced = true),
-            Fd("pageMode", "Page mode (older)", home, "Pages", "enum", options = byName<PageMode> { it.label }, scene = "pages", advanced = true),
+            Fd("homePages", "Pages after Glance", "enum", options = byName<HomePages> { it.label }, scene = "pages"),
+            Fd("scrollAxis", "Scroll direction", "enum", options = byName<ScrollAxis> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Continuous")),
+            Fd("contCols", "Icons across", "int", min = 2.0, max = 8.0, step = 1.0, scene = "pages", showWhen = "homePages" to listOf("Continuous")),
+            Fd("pPaging", "Pages turn (portrait)", "enum", options = byName<PagingAxis> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Paginated")),
+            Fd("lPaging", "Pages turn (landscape)", "enum", options = byName<PagingAxis> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Paginated")),
+            Fd("pageTransition", "Page transition", "enum", options = byName<PageTransition> { it.label }, scene = "pages", showWhen = "homePages" to listOf("Paginated")),
+            Fd("homePage", "Home button returns to page", "int", min = 0.0, max = 20.0, step = 1.0, scene = "pages", advanced = true),
+            Fd("style", "Home style", "enum", options = byName<HomeStyle> { it.name }, scene = "pages", advanced = true),
+            Fd("pageMode", "Page mode (older)", "enum", options = byName<PageMode> { it.label }, scene = "pages", advanced = true),
         )
         // ---- HOME > Grid
         add(
-            Fd("pCols", "Columns (portrait)", home, "Page grid", "int", min = GridSpec.MIN_COLUMNS.toDouble(), max = GridSpec.MAX_COLUMNS.toDouble(), step = 1.0, scene = "pages"),
-            Fd("pRows", "Rows (portrait)", home, "Page grid", "int", min = GridSpec.MIN_ROWS.toDouble(), max = GridSpec.MAX_ROWS.toDouble(), step = 1.0, scene = "pages"),
-            Fd("lCols", "Columns (landscape)", home, "Page grid", "int", min = GridSpec.MIN_COLUMNS.toDouble(), max = GridSpec.MAX_COLUMNS.toDouble(), step = 1.0, scene = "pages", advanced = true),
-            Fd("lRows", "Rows (landscape)", home, "Page grid", "int", min = GridSpec.MIN_ROWS.toDouble(), max = GridSpec.MAX_ROWS.toDouble(), step = 1.0, scene = "pages", advanced = true),
-            Fd("adaptiveGrid", "Grid from the window size", home, "Page grid", "bool", scene = "pages"),
-            Fd("gridDensity", "Adaptive density", home, "Page grid", "float", min = 0.5, max = 2.0, step = 0.05, scene = "pages", showWhen = "adaptiveGrid" to listOf("true")),
-            Fd("iconScale", "Icon size", home, "Page grid", "float", min = fl(LauncherPrefs.MIN_ICON_SCALE), max = fl(LauncherPrefs.MAX_ICON_SCALE), step = 0.01, unit = "%", scene = "pages"),
-            Fd("iconSpacing", "Spacing", home, "Page grid", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", scene = "pages"),
-            Fd("spacingV", "Spacing down (-1 = same)", home, "Page grid", "float", min = -1.0, max = 1.0, step = 0.05, scene = "pages", advanced = true),
-            Fd("gridBias", "Height in page", home, "Page grid", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", scene = "pages"),
-            Fd("gridInsetX", "Side margin", home, "Page grid", "float", min = 0.0, max = 0.25, step = 0.01, unit = "%", scene = "pages"),
-            Fd("gridInsetTop", "Top margin", home, "Page grid", "float", min = 0.0, max = 0.25, step = 0.01, unit = "%", scene = "pages", advanced = true),
-            Fd("gridInsetBottom", "Bottom margin", home, "Page grid", "float", min = 0.0, max = 0.25, step = 0.01, unit = "%", scene = "pages", advanced = true),
-            Fd("labels", "App names", home, "Page grid", "bool", scene = "pages"),
-            Fd("labelScale", "Name size", home, "Page grid", "float", min = 0.7, max = 1.5, step = 0.05, unit = "%", scene = "pages", showWhen = "labels" to listOf("true")),
+            Fd("pCols", "Columns (portrait)", "int", min = GridSpec.MIN_COLUMNS.toDouble(), max = GridSpec.MAX_COLUMNS.toDouble(), step = 1.0, scene = "pages"),
+            Fd("pRows", "Rows (portrait)", "int", min = GridSpec.MIN_ROWS.toDouble(), max = GridSpec.MAX_ROWS.toDouble(), step = 1.0, scene = "pages"),
+            Fd("lCols", "Columns (landscape)", "int", min = GridSpec.MIN_COLUMNS.toDouble(), max = GridSpec.MAX_COLUMNS.toDouble(), step = 1.0, scene = "pages", advanced = true),
+            Fd("lRows", "Rows (landscape)", "int", min = GridSpec.MIN_ROWS.toDouble(), max = GridSpec.MAX_ROWS.toDouble(), step = 1.0, scene = "pages", advanced = true),
+            Fd("adaptiveGrid", "Grid from the window size", "bool", scene = "pages"),
+            Fd("gridDensity", "Adaptive density", "float", min = 0.5, max = 2.0, step = 0.05, scene = "pages", showWhen = "adaptiveGrid" to listOf("true")),
+            Fd("iconScale", "Icon size", "float", min = fl(LauncherPrefs.MIN_ICON_SCALE), max = fl(LauncherPrefs.MAX_ICON_SCALE), step = 0.01, unit = "%", scene = "pages"),
+            Fd("iconSpacing", "Spacing", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", scene = "pages"),
+            Fd("spacingV", "Spacing down (-1 = same)", "float", min = -1.0, max = 1.0, step = 0.05, scene = "pages", advanced = true),
+            Fd("gridBias", "Height in page", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", scene = "pages"),
+            Fd("gridInsetX", "Side margin", "float", min = 0.0, max = 0.25, step = 0.01, unit = "%", scene = "pages"),
+            Fd("gridInsetTop", "Top margin", "float", min = 0.0, max = 0.25, step = 0.01, unit = "%", scene = "pages", advanced = true),
+            Fd("gridInsetBottom", "Bottom margin", "float", min = 0.0, max = 0.25, step = 0.01, unit = "%", scene = "pages", advanced = true),
+            Fd("labels", "App names", "bool", scene = "pages"),
+            Fd("labelScale", "Name size", "float", min = 0.7, max = 1.5, step = 0.05, unit = "%", scene = "pages", showWhen = "labels" to listOf("true")),
         )
         // ---- HOME > Corners and hotspots
         add(
-            Fd("glanceHotspots", "Hotspots on", home, "Corners and hotspots", "corners", scene = "corners"),
-            Fd("cornerStyle", "Corner style", home, "Corners and hotspots", "enum", options = byName<CornerStyle> { it.label }, scene = "corners"),
-            Fd("cornerIconMode", "Corner icons", home, "Corners and hotspots", "enum", options = byName<CornerIconMode> { it.label }, scene = "corners"),
-            Fd("cornerIconSize", "Corner icon size", home, "Corners and hotspots", "float", min = fl(LauncherPrefs.MIN_CORNER_ICON), max = fl(LauncherPrefs.MAX_CORNER_ICON), step = 2.0, unit = "dp", scene = "corners"),
-            Fd("hotCornersOn", "Hot corners", home, "Corners and hotspots", "bool", scene = "corners"),
-            Fd("hotCornerDwell", "Hot corner delay", home, "Corners and hotspots", "int", min = 50.0, max = 600.0, step = 10.0, unit = "ms", scene = "corners", showWhen = "hotCornersOn" to listOf("true")),
-            Fd("cornersFollow", "Corners follow the device", home, "Corners and hotspots", "bool", scene = "corners", advanced = true),
-            Fd("cornersPerOri", "Separate corners in landscape", home, "Corners and hotspots", "bool", scene = "corners", advanced = true),
+            Fd("glanceHotspots", "Hotspots on", "corners", scene = "corners"),
+            Fd("cornerStyle", "Corner style", "enum", options = byName<CornerStyle> { it.label }, scene = "corners"),
+            Fd("cornerIconMode", "Corner icons", "enum", options = byName<CornerIconMode> { it.label }, scene = "corners"),
+            Fd("cornerIconSize", "Corner icon size", "float", min = fl(LauncherPrefs.MIN_CORNER_ICON), max = fl(LauncherPrefs.MAX_CORNER_ICON), step = 2.0, unit = "dp", scene = "corners"),
+            Fd("hotCornersOn", "Hot corners", "bool", scene = "corners"),
+            Fd("hotCornerDwell", "Hot corner delay", "int", min = 50.0, max = 600.0, step = 10.0, unit = "ms", scene = "corners", showWhen = "hotCornersOn" to listOf("true")),
+            Fd("cornersFollow", "Corners follow the device", "bool", scene = "corners", advanced = true),
+            Fd("cornersPerOri", "Separate corners in landscape", "bool", scene = "corners", advanced = true),
         )
-        for (c in Corner.entries) add(Fd("corners." + c.name, c.label, home, "Corner actions", "enum", scope = "shortcuts", options = cornerActionOpts, scene = "corners",
+        for (c in Corner.entries) add(Fd("corners." + c.name, c.label, "enum", scope = "shortcuts", options = cornerActionOpts, scene = "corners",
             default = (DefaultCorners[c] as? CornerSlot.Single)?.let { ShortcutCodec.encodeItem(it.item) } ?: "",
             note = "A corner that holds an app, a palette or a widget is kept as it is."))
         // ---- HOME > Gestures
-        for (g in HomeGesture.entries) add(Fd("gestures." + g.name, g.label, home, "Gestures", "enum", scope = "shortcuts", options = cornerActionOpts, scene = "glance",
+        for (g in HomeGesture.entries) add(Fd("gestures." + g.name, g.label, "enum", scope = "shortcuts", options = cornerActionOpts, scene = "glance",
             default = DefaultGestures[g]?.let(ShortcutCodec::encodeItem) ?: "", note = g.hint, advanced = g.kind == GestureKind.Motion))
         // ---- HOME > Keyboard and motion
         add(
-            Fd("alwaysKeyboard", "Always-open keyboard", home, "Keyboard", "bool", scene = "radar"),
-            Fd("kbOpenP", "Keyboard on open (portrait)", home, "Keyboard", "bool", scene = "radar"),
-            Fd("kbOpenL", "Keyboard on open (landscape)", home, "Keyboard", "bool", scene = "radar", advanced = true),
-            Fd("motion", "Motion gestures", home, "Motion", "bool"),
-            Fd("motionBg", "Also when home is hidden", home, "Motion", "bool", showWhen = "motion" to listOf("true")),
-            Fd("motionSens", "Sensitivity", home, "Motion", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", showWhen = "motion" to listOf("true")),
+            Fd("alwaysKeyboard", "Always-open keyboard", "bool", scene = "radar"),
+            Fd("kbOpenP", "Keyboard on open (portrait)", "bool", scene = "radar"),
+            Fd("kbOpenL", "Keyboard on open (landscape)", "bool", scene = "radar", advanced = true),
+            Fd("motion", "Motion gestures", "bool"),
+            Fd("motionBg", "Also when home is hidden", "bool", showWhen = "motion" to listOf("true")),
+            Fd("motionSens", "Sensitivity", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", showWhen = "motion" to listOf("true")),
         )
         // ---- HOME > Dock (workspace file, `dock.settings`)
         add(
-            Fd("dock.enabled", "Dock", home, "Dock", "enum", scope = "dock", scene = "dock", optional = true, default = "auto",
+            Fd("dock.enabled", "Dock", "enum", scope = "dock", scene = "dock", optional = true, default = "auto",
                 options = listOf(Opt("auto", "Automatic"), Opt("on", "On"), Opt("off", "Off")), note = "Automatic: off on a small tier, on otherwise."),
-            Fd("dock.style", "Dock style", home, "Dock", "enum", scope = "dock", scene = "dock", options = DockStyle.entries.map { Opt(it.id, it.label) }),
-            Fd("dock.mode", "Dock content", home, "Dock", "enum", scope = "dock", scene = "dock", options = dockEnum("DockMode")),
-            Fd("dock.edge", "Dock position", home, "Dock", "enum", scope = "dock", scene = "dock", options = dockEnum("DockEdge"), note = "Landscape only; portrait is always the bottom."),
-            Fd("dock.groupShelf", "App group chips", home, "Dock", "bool", scope = "dock", scene = "dock"),
-            Fd("dock.magnify", "Magnify icons", home, "Dock", "bool", scope = "dock", scene = "dock", note = "Icons grow under the finger or pointer, like the classic Mac dock."),
-            Fd("dock.magnifyStrength", "Magnify strength", home, "Dock", "enum", scope = "dock", scene = "dock",
+            Fd("dock.style", "Dock style", "enum", scope = "dock", scene = "dock", options = DockStyle.entries.map { Opt(it.id, it.label) }),
+            Fd("dock.mode", "Dock content", "enum", scope = "dock", scene = "dock", options = dockEnum("DockMode")),
+            Fd("dock.edge", "Dock position", "enum", scope = "dock", scene = "dock", options = dockEnum("DockEdge"), note = "Landscape only; portrait is always the bottom."),
+            Fd("dock.groupShelf", "App group chips", "bool", scope = "dock", scene = "dock"),
+            Fd("dock.magnify", "Magnify icons", "bool", scope = "dock", scene = "dock", note = "Icons grow under the finger or pointer, like the classic Mac dock."),
+            Fd("dock.magnifyStrength", "Magnify strength", "enum", scope = "dock", scene = "dock",
                 options = listOf(Opt("subtle", "Subtle (1.3x)"), Opt("medium", "Medium (1.6x)"), Opt("large", "Large (2.0x)")), note = "Only read while Magnify icons is on."),
         )
 
         // ---- LOOK > Theme
         add(
-            Fd("themeMode", "Theme", look, "Theme", "enum", options = byName<ThemeMode> { it.label }),
-            Fd("accent", "Accent colour", look, "Theme", "colour"),
-            Fd("iconShape", "Icon shape", look, "Icons", "enum", options = byName<IconShape> { it.label }, scene = "pages"),
-            Fd("iconTint", "Icon tint", look, "Icons", "enum", options = byName<IconTint> { it.label }, scene = "pages"),
-            Fd("iconPlate", "Plate behind icons", look, "Icons", "bool", scene = "pages"),
-            Fd("uiFont", "Font", look, "Theme", "enum", options = UiFonts.IDS.map { Opt(it, uiFontLabels.getValue(it)) }),
+            Fd("themeMode", "Theme", "enum", options = byName<ThemeMode> { it.label }),
+            Fd("accent", "Accent colour", "colour"),
+            Fd("iconShape", "Icon shape", "enum", options = byName<IconShape> { it.label }, scene = "pages"),
+            Fd("iconTint", "Icon tint", "enum", options = byName<IconTint> { it.label }, scene = "pages"),
+            Fd("iconPlate", "Plate behind icons", "bool", scene = "pages"),
+            Fd("uiFont", "Font", "enum", options = UiFonts.IDS.map { Opt(it, uiFontLabels.getValue(it)) }),
         )
         // ---- LOOK > Wallpaper
         val kinds = WallpaperKind.entries.map { Opt(it.id, it.label) }
         val bgSlot1 = BgItem.entries.filter { it == BgItem.None || it.living }.map { Opt(it.id, it.label) }
         val bgSlot2 = BgItem.entries.filter { it == BgItem.None || !it.living }.map { Opt(it.id, it.label) }
         add(
-            Fd("wpGlanceKind", "Wallpaper", look, "Wallpaper: Glance", "enum", options = kinds),
-            Fd("wpGlanceSolid", "Colour", look, "Wallpaper: Glance", "colour", showWhen = "wpGlanceKind" to listOf("solid")),
-            Fd("wpGlanceFrom", "Gradient from", look, "Wallpaper: Glance", "colour", showWhen = "wpGlanceKind" to listOf("gradient")),
-            Fd("wpGlanceTo", "Gradient to", look, "Wallpaper: Glance", "colour", showWhen = "wpGlanceKind" to listOf("gradient")),
-            Fd("wpGlanceAngle", "Gradient angle", look, "Wallpaper: Glance", "int", min = 0.0, max = 359.0, step = 15.0, unit = "deg", showWhen = "wpGlanceKind" to listOf("gradient")),
-            Fd("bgSlot1", "Signal wallpaper", look, "Wallpaper: Glance", "enum", options = bgSlot1, showWhen = "wpGlanceKind" to listOf("live")),
-            Fd("bgSlot2", "Signal effect", look, "Wallpaper: Glance", "enum", options = bgSlot2, showWhen = "wpGlanceKind" to listOf("live")),
+            Fd("wpGlanceKind", "Wallpaper", "enum", options = kinds),
+            Fd("wpGlanceSolid", "Colour", "colour", showWhen = "wpGlanceKind" to listOf("solid")),
+            Fd("wpGlanceFrom", "Gradient from", "colour", showWhen = "wpGlanceKind" to listOf("gradient")),
+            Fd("wpGlanceTo", "Gradient to", "colour", showWhen = "wpGlanceKind" to listOf("gradient")),
+            Fd("wpGlanceAngle", "Gradient angle", "int", min = 0.0, max = 359.0, step = 15.0, unit = "deg", showWhen = "wpGlanceKind" to listOf("gradient")),
+            Fd("bgSlot1", "Signal wallpaper", "enum", options = bgSlot1, showWhen = "wpGlanceKind" to listOf("live")),
+            Fd("bgSlot2", "Signal effect", "enum", options = bgSlot2, showWhen = "wpGlanceKind" to listOf("live")),
         )
         l += pic("wpGlance", "Glance", "wpGlanceKind")
         add(
-            Fd("wpPagesSame", "Pages use the Glance wallpaper", look, "Wallpaper: Pages", "bool", scene = "pages"),
-            Fd("wpPagesKind", "Wallpaper", look, "Wallpaper: Pages", "enum", options = kinds, scene = "pages", showWhen = "wpPagesSame" to listOf("false")),
-            Fd("wpPagesSolid", "Colour", look, "Wallpaper: Pages", "colour", scene = "pages", showWhen = "wpPagesKind" to listOf("solid")),
-            Fd("wpPagesFrom", "Gradient from", look, "Wallpaper: Pages", "colour", scene = "pages", showWhen = "wpPagesKind" to listOf("gradient")),
-            Fd("wpPagesTo", "Gradient to", look, "Wallpaper: Pages", "colour", scene = "pages", showWhen = "wpPagesKind" to listOf("gradient")),
-            Fd("wpPagesAngle", "Gradient angle", look, "Wallpaper: Pages", "int", min = 0.0, max = 359.0, step = 15.0, unit = "deg", scene = "pages", showWhen = "wpPagesKind" to listOf("gradient")),
-            Fd("wpPagesSlot1", "Signal wallpaper", look, "Wallpaper: Pages", "enum", options = bgSlot1, scene = "pages", showWhen = "wpPagesKind" to listOf("live")),
-            Fd("wpPagesSlot2", "Signal effect", look, "Wallpaper: Pages", "enum", options = bgSlot2, scene = "pages", showWhen = "wpPagesKind" to listOf("live")),
+            Fd("wpPagesSame", "Pages use the Glance wallpaper", "bool", scene = "pages"),
+            Fd("wpPagesKind", "Wallpaper", "enum", options = kinds, scene = "pages", showWhen = "wpPagesSame" to listOf("false")),
+            Fd("wpPagesSolid", "Colour", "colour", scene = "pages", showWhen = "wpPagesKind" to listOf("solid")),
+            Fd("wpPagesFrom", "Gradient from", "colour", scene = "pages", showWhen = "wpPagesKind" to listOf("gradient")),
+            Fd("wpPagesTo", "Gradient to", "colour", scene = "pages", showWhen = "wpPagesKind" to listOf("gradient")),
+            Fd("wpPagesAngle", "Gradient angle", "int", min = 0.0, max = 359.0, step = 15.0, unit = "deg", scene = "pages", showWhen = "wpPagesKind" to listOf("gradient")),
+            Fd("wpPagesSlot1", "Signal wallpaper", "enum", options = bgSlot1, scene = "pages", showWhen = "wpPagesKind" to listOf("live")),
+            Fd("wpPagesSlot2", "Signal effect", "enum", options = bgSlot2, scene = "pages", showWhen = "wpPagesKind" to listOf("live")),
         )
-        l += pic("wpPages", "Pages", "wpPagesKind").map { Fd(it.key, it.label, it.tab, it.group, it.type, scene = "pages", options = it.options, min = it.min, max = it.max, step = it.step, unit = it.unit, advanced = it.advanced, deviceBound = it.deviceBound, showWhen = it.showWhen) }
+        l += pic("wpPages", "Pages", "wpPagesKind").map { Fd(it.key, it.label, it.type, scene = "pages", options = it.options, min = it.min, max = it.max, step = it.step, unit = it.unit, advanced = it.advanced, deviceBound = it.deviceBound, showWhen = it.showWhen) }
         // ---- LOOK > Calm style (signal and battery)
         val styleOpts = listOf(Opt("auto", "Automatic")) + CalmStyle.entries.map { Opt(it.name, it.label) }
         add(
-            Fd("calmStyle", "Signal and battery style", look, "Signal and battery", "enum", options = styleOpts, optional = true, default = "auto", note = "Automatic lets the wallpaper decide."),
-            Fd("calmRegular", "Also show battery and signal", look, "Signal and battery", "bool", showWhen = "calmStyle" to listOf("EdgeDots", "CornerBloom", "BottomGlow", "Beam")),
-            Fd("indMetric", "Reads", look, "Signal and battery", "enum", options = byName<IndicatorMetric> { it.label }),
-            Fd("indIntensity", "Intensity", look, "Signal and battery", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%"),
-            Fd("indSpeed", "Speed", look, "Signal and battery", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%"),
-            Fd("indLow", "Low colour", look, "Signal and battery", "colour", advanced = true),
-            Fd("indMid", "Middle colour", look, "Signal and battery", "colour", advanced = true),
-            Fd("indHigh", "High colour", look, "Signal and battery", "colour", advanced = true),
-            Fd("indIdle", "Idle colour", look, "Signal and battery", "colour", advanced = true),
-            Fd("settingsBackdrop", "Behind Settings", look, "Settings backdrop", "enum", options = byName<SettingsBackdrop> { it.label }, scene = "look"),
-            Fd("settingsDim", "Backdrop dimming", look, "Settings backdrop", "float", min = 0.2, max = 0.95, step = 0.05, unit = "%", scene = "look", showWhen = "settingsBackdrop" to listOf("Wallpaper")),
+            Fd("calmStyle", "Signal and battery style", "enum", options = styleOpts, optional = true, default = "auto", note = "Automatic lets the wallpaper decide."),
+            Fd("calmRegular", "Also show battery and signal", "bool", showWhen = "calmStyle" to listOf("EdgeDots", "CornerBloom", "BottomGlow", "Beam")),
+            Fd("indMetric", "Reads", "enum", options = byName<IndicatorMetric> { it.label }),
+            Fd("indIntensity", "Intensity", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%"),
+            Fd("indSpeed", "Speed", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%"),
+            Fd("indLow", "Low colour", "colour", advanced = true),
+            Fd("indMid", "Middle colour", "colour", advanced = true),
+            Fd("indHigh", "High colour", "colour", advanced = true),
+            Fd("indIdle", "Idle colour", "colour", advanced = true),
+            Fd("settingsBackdrop", "Behind Settings", "enum", options = byName<SettingsBackdrop> { it.label }, scene = "look"),
+            Fd("settingsDim", "Backdrop dimming", "float", min = 0.2, max = 0.95, step = 0.05, unit = "%", scene = "look", showWhen = "settingsBackdrop" to listOf("Wallpaper")),
         )
 
         // ---- APPS
         add(
-            Fd("wheelGrouping", "Group the disc by", apps, "App drawer disc", "enum", options = byName<WheelGrouping> { it.label }, scene = "disc"),
-            Fd("wheelWorkOnly", "Work apps only", apps, "App drawer disc", "bool", scene = "disc"),
-            Fd("puckSegments", "Ring segments", apps, "App drawer disc", "int", scope = "prefFile", file = "puck_actions", fileKey = "segments", fileType = "i", default = PuckActions.DEFAULT_SEGMENTS, min = PuckActions.MIN_SEGMENTS.toDouble(), max = PuckActions.MAX_SEGMENTS.toDouble(), step = 1.0, scene = "disc"),
-            Fd("puckLabels", "Names on the ring", apps, "App drawer disc", "bool", scope = "prefFile", file = "puck_actions", fileKey = "labels", fileType = "b", default = false, scene = "disc"),
-            Fd("puckSlots", "Ring shortcuts", apps, "App drawer disc", "slots", scope = "prefFile", file = "puck_actions", fileKey = "slots", fileType = "s", count = PuckActions.SLOTS, scene = "disc",
+            Fd("wheelGrouping", "Group the disc by", "enum", options = byName<WheelGrouping> { it.label }, scene = "disc"),
+            Fd("wheelWorkOnly", "Work apps only", "bool", scene = "disc"),
+            Fd("puckSegments", "Ring segments", "int", scope = "prefFile", file = "puck_actions", fileKey = "segments", fileType = "i", default = PuckActions.DEFAULT_SEGMENTS, min = PuckActions.MIN_SEGMENTS.toDouble(), max = PuckActions.MAX_SEGMENTS.toDouble(), step = 1.0, scene = "disc"),
+            Fd("puckLabels", "Names on the ring", "bool", scope = "prefFile", file = "puck_actions", fileKey = "labels", fileType = "b", default = false, scene = "disc"),
+            Fd("puckSlots", "Ring shortcuts", "slots", scope = "prefFile", file = "puck_actions", fileKey = "slots", fileType = "s", count = PuckActions.SLOTS, scene = "disc",
                 options = listOf(Opt("-", "Nothing")) + PuckActions.AVAILABLE.map { Opt("a:" + it.name, it.label) }, default = PuckActions.encode(PuckActions.DEFAULT),
                 note = "A segment that holds an app is kept as it is."),
-            Fd("appsOnHome", "Apps on the home pages", apps, "Home apps", "enum", options = byName<AppsOnHome> { it.label }, scene = "pages"),
-            Fd("badgesOn", "Badges", apps, "Badges", "bool", scene = "pages"),
-            Fd("badgeCount", "Badge numbers", apps, "Badges", "bool", scene = "pages", showWhen = "badgesOn" to listOf("true")),
+            Fd("appsOnHome", "Apps on the home pages", "enum", options = byName<AppsOnHome> { it.label }, scene = "pages"),
+            Fd("badgesOn", "Badges", "bool", scene = "pages"),
+            Fd("badgeCount", "Badge numbers", "bool", scene = "pages", showWhen = "badgesOn" to listOf("true")),
         )
 
         // ---- RADAR
         add(
-            Fd("searchLayout", "Radar layout", radar, "Layout", "enum", options = byName<SearchLayout> { it.label }, scene = "radar"),
-            Fd("searchLayoutPinned", "Keep this layout with a keyboard", radar, "Layout", "bool", scene = "radar", advanced = true),
-            Fd("searchMotion", "Slow drift", radar, "Layout", "bool", scene = "radar", showWhen = "searchLayout" to listOf("Filmstrip", "Orbit")),
-            Fd("radarBackground", "Background", radar, "Background", "enum", options = byName<RadarBackground> { it.label }, scene = "radar"),
-            Fd("radarIntensity", "Background items", radar, "Background", "enum", options = byName<RadarIntensity> { it.label }, scene = "radar"),
-            Fd("searchWeb", "Web search", radar, "Sources", "bool", scene = "radar"),
-            Fd("webEngine", "Web engine", radar, "Sources", "enum", options = WebEngine.entries.map { Opt(it.name, it.label) }, scene = "radar", showWhen = "searchWeb" to listOf("true")),
-            Fd("webSuggestions", "Web suggestions", radar, "Sources", "bool", scene = "radar", showWhen = "searchWeb" to listOf("true")),
-            Fd("searchContacts", "Contacts", radar, "Sources", "bool", scene = "radar"),
-            Fd("searchFiles", "Files", radar, "Sources", "bool", scene = "radar"),
-            Fd("searchActions", "Actions", radar, "Sources", "bool", scene = "radar"),
-            Fd("searchDeep", "Deep file matches", radar, "Sources", "bool", scene = "radar", advanced = true),
-            Fd("radarSignalForce", "Signal override (lab)", radar, "Lab", "enum", options = byName<SignalForce> { it.label }, scene = "radar", advanced = true),
+            Fd("searchLayout", "Radar layout", "enum", options = byName<SearchLayout> { it.label }, scene = "radar"),
+            Fd("searchLayoutPinned", "Keep this layout with a keyboard", "bool", scene = "radar", advanced = true),
+            Fd("searchMotion", "Slow drift", "bool", scene = "radar", showWhen = "searchLayout" to listOf("Filmstrip", "Orbit")),
+            Fd("radarBackground", "Background", "enum", options = byName<RadarBackground> { it.label }, scene = "radar"),
+            Fd("radarIntensity", "Background items", "enum", options = byName<RadarIntensity> { it.label }, scene = "radar"),
+            Fd("searchWeb", "Web search", "bool", scene = "radar"),
+            Fd("webEngine", "Web engine", "enum", options = WebEngine.entries.map { Opt(it.name, it.label) }, scene = "radar", showWhen = "searchWeb" to listOf("true")),
+            Fd("webSuggestions", "Web suggestions", "bool", scene = "radar", showWhen = "searchWeb" to listOf("true")),
+            Fd("searchContacts", "Contacts", "bool", scene = "radar"),
+            Fd("searchFiles", "Files", "bool", scene = "radar"),
+            Fd("searchActions", "Actions", "bool", scene = "radar"),
+            Fd("searchDeep", "Deep file matches", "bool", scene = "radar", advanced = true),
+            Fd("radarSignalForce", "Signal override (lab)", "enum", options = byName<SignalForce> { it.label }, scene = "radar", advanced = true),
         )
 
         // ---- SIDE PANEL
         add(
-            Fd("leftPage", "Left of home", side, "Comms", "enum", options = byName<LeftPage> { it.label }, scene = "comms"),
-            Fd("launchpadRail", "Unread strip", side, "Comms", "bool", scene = "comms", showWhen = "leftPage" to listOf("Launchpad")),
-            Fd("lpTheme", "Comms theme", side, "Comms", "enum", options = byName<LaunchpadTheme> { it.label }, scene = "comms", showWhen = "leftPage" to listOf("Launchpad")),
-            Fd("commsScale", "Comms text size", side, "Comms", "int", scope = "prefFile", file = CommsScaleSettings.FILE, fileKey = CommsScaleSettings.KEY, fileType = "i", default = CommsScale.DEFAULT, scene = "comms",
+            Fd("leftPage", "Left of home", "enum", options = byName<LeftPage> { it.label }, scene = "comms"),
+            Fd("launchpadRail", "Unread strip", "bool", scene = "comms", showWhen = "leftPage" to listOf("Launchpad")),
+            Fd("lpTheme", "Comms theme", "enum", options = byName<LaunchpadTheme> { it.label }, scene = "comms", showWhen = "leftPage" to listOf("Launchpad")),
+            Fd("commsScale", "Comms text size", "int", scope = "prefFile", file = CommsScaleSettings.FILE, fileKey = CommsScaleSettings.KEY, fileType = "i", default = CommsScale.DEFAULT, scene = "comms",
                 min = CommsScale.MIN.toDouble(), max = CommsScale.MAX.toDouble(), step = 5.0, unit = "%"),
-            Fd("rightSide", "Right of home", side, "Right side", "enum", options = byName<RightSide> { it.label }, scene = "recents"),
-            Fd("recentsLimit", "Recent apps kept", side, "Right side", "int", min = HomeRecents.MIN_LIMIT.toDouble(), max = HomeRecents.MAX_LIMIT.toDouble(), step = 4.0, scene = "recents", showWhen = "rightSide" to listOf("RecentsPanel")),
-            Fd("recentsUsage", "Add apps opened elsewhere", side, "Right side", "bool", scene = "recents", showWhen = "rightSide" to listOf("RecentsPanel")),
-            Fd("leftWidgetId", "Left page widget", side, "Comms", "int", deviceBound = true, advanced = true, scene = "comms"),
+            Fd("rightSide", "Right of home", "enum", options = byName<RightSide> { it.label }, scene = "recents"),
+            Fd("recentsLimit", "Recent apps kept", "int", min = HomeRecents.MIN_LIMIT.toDouble(), max = HomeRecents.MAX_LIMIT.toDouble(), step = 4.0, scene = "recents", showWhen = "rightSide" to listOf("RecentsPanel")),
+            Fd("recentsUsage", "Add apps opened elsewhere", "bool", scene = "recents", showWhen = "rightSide" to listOf("RecentsPanel")),
+            Fd("leftWidgetId", "Left page widget", "int", deviceBound = true, advanced = true, scene = "comms"),
         )
 
         // ---- SYSTEM
         add(
-            Fd("language", "Language", sys, "Language", "enum", options = UiLanguage.entries.map { Opt(it.name, it.label) }, scene = "look"),
-            Fd("uiSounds", "Interface sounds", sys, "Sound and touch", "bool", scene = "look"),
-            Fd("uiSoundVolume", "Sound volume", sys, "Sound and touch", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", scene = "look", showWhen = "uiSounds" to listOf("true")),
-            Fd("hapticStrength", "Launcher vibration", sys, "Sound and touch", "enum", scope = "prefFile", file = LauncherHapticSettings.FILE, fileKey = LauncherHapticSettings.KEY, fileType = "s",
+            Fd("language", "Language", "enum", options = UiLanguage.entries.map { Opt(it.name, it.label) }, scene = "look"),
+            Fd("uiSounds", "Interface sounds", "bool", scene = "look"),
+            Fd("uiSoundVolume", "Sound volume", "float", min = 0.0, max = 1.0, step = 0.05, unit = "%", scene = "look", showWhen = "uiSounds" to listOf("true")),
+            Fd("hapticStrength", "Launcher vibration", "enum", scope = "prefFile", file = LauncherHapticSettings.FILE, fileKey = LauncherHapticSettings.KEY, fileType = "s",
                 options = HapticStrength.entries.map { Opt(it.id, it.name) }, default = HapticStrength.DEFAULT.id, scene = "look"),
-            Fd("hideStatusBar", "Hide the status bar", sys, "Screen", "bool"),
-            Fd("restoreSurfaces", "Reopen Radar or the drawer after a restart", sys, "Screen", "bool", scene = "look"),
-            Fd("onboardingDone", "First-run tour done", sys, "This device only", "bool", deviceBound = true, scene = "look", advanced = true),
+            Fd("hideStatusBar", "Hide the status bar", "bool"),
+            Fd("restoreSurfaces", "Reopen Radar or the drawer after a restart", "bool", scene = "look"),
+            Fd("onboardingDone", "First-run tour done", "bool", deviceBound = true, scene = "look", advanced = true),
         )
         return l
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Wave 58 (studioPreview, CFG-70): the tab and section of every field are the app's own
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /**
+     * The Settings row of the app ("topic/English title", the key `SettingsTabLayout` uses) that edits each field. The tab and the section header
+     * are NOT written here: they are read from the app's placement table (`app/.../ui/SettingsTabLayout.kt`), so Studio's six tabs and their
+     * sections are the app's. A field with no row of its own (the clock's edited place, a clock tile's options, the page the Home button returns to)
+     * names the row next to which the app keeps it. `StudioTabsW58Test` (app) checks every row here against the real built Settings and against the
+     * rows' own setters.
+     */
+    private fun appRowOf(key: String): String {
+        Corner.entries.firstOrNull { key == "corners." + it.name }?.let { return "Corners/${it.label}" }
+        HomeGesture.entries.firstOrNull { key == "gestures." + it.name }?.let { return (if (it.kind == GestureKind.Motion) "Motion/" else "Gestures/") + it.label }
+        if (key.startsWith("dock.")) return "Desktop & dock/Dock"
+        if (key.startsWith("wpGlance") || key == "bgSlot1" || key == "bgSlot2") return "Home/Glance wallpaper"
+        if (key == "wpPagesSame") return "Home/Pages use the same wallpaper as Glance"
+        if (key.startsWith("wpPages")) return "Home/Pages wallpaper"
+        return APP_ROWS[key] ?: error("$key has no app Settings row in appRowOf: name the row that edits it")
+    }
+
+    private val APP_ROWS: Map<String, String> = mapOf(
+        // HOME > Glance
+        "glanceEnabled" to "Home/Calm home screen (Glance)", "clockStyle" to "Home/Clock style", "clockFormat" to "Home/Clock format",
+        "glanceClockDate" to "Home/Show date under the clock", "glanceClockAccent" to "Home/Clock colour", "glanceClockSize" to "Home/Clock size",
+        // the clock's place is set by dragging it on the Glance (edit mode); the app keeps it beside the size
+        "glanceClockX" to "Home/Clock size", "glanceClockY" to "Home/Clock size", "glanceClockXLand" to "Home/Clock size", "glanceClockYLand" to "Home/Clock size",
+        "showMusic" to "Home/Show music", "glanceHotspots" to "Home/Hotspots", "glanceControlsSec" to "Home/Controls hide after (seconds)", "glanceIndicator" to "Home/Surface indicator",
+        // HOME > Pages
+        "homePages" to "Home/Pages", "homeOrder" to "Home/Order", "contCols" to "Home/Pages", "homePage" to "Home/Pages",
+        "clockTileAnalog" to "Pages/Clock tile on this page", "clockTileFormat" to "Pages/Clock tile on this page", "clockTileDate" to "Pages/Clock tile on this page",
+        "pPaging" to "Home/Page turning · portrait", "lPaging" to "Home/Page turning · landscape", "pageTransition" to "Home/Page turning · portrait",
+        // HOME > Layout
+        "style" to "Home/Style", "scrollAxis" to "Home/Scroll direction", "adaptiveGrid" to "Home/Grid follows window size", "gridDensity" to "Home/Grid density",
+        "pCols" to "Home/Default density", "pRows" to "Home/Default density", "lCols" to "Home/Default density", "lRows" to "Home/Default density",
+        "iconScale" to "Home/Icon size", "spacingV" to "Home/Same spacing both ways", "iconSpacing" to "Home/Spacing", "gridBias" to "Home/Height in page",
+        "gridInsetX" to "Home/Side margin", "gridInsetTop" to "Home/Top margin", "gridInsetBottom" to "Home/Bottom margin", "labelScale" to "Home/Label size",
+        "labels" to "Home/App labels", "badgesOn" to "Home/Notification badges", "badgeCount" to "Home/Count in badges", "hideStatusBar" to "Home/Hide status bar",
+        // HOME > Corners
+        "cornerStyle" to "Corners/Corner style", "cornerIconSize" to "Corners/Corner icon size", "cornerIconMode" to "Corners/Icon type",
+        "cornersFollow" to "Corners/Follow device rotation", "cornersPerOri" to "Corners/Separate corners for landscape",
+        // HOME > Gestures and motion
+        "motion" to "Motion/Motion gestures", "motionBg" to "Motion/When home isn't showing", "motionSens" to "Motion/Motion sensitivity",
+        // HOME > Keyboard and pointer
+        "alwaysKeyboard" to "Home/Always-on keyboard", "hotCornersOn" to "Corners/Hot corners with a mouse", "hotCornerDwell" to "Corners/Hot corner delay",
+        // LOOK
+        "themeMode" to "Theme/Light / dark", "accent" to "Theme/Accent", "uiFont" to "Theme/Font",
+        "iconShape" to "Theme/Icon shape", "iconTint" to "Theme/Icon colour", "iconPlate" to "Theme/Icon plate",
+        "calmStyle" to "Indicator/Calm style", "calmRegular" to "Indicator/Also show regular battery and signal", "indMetric" to "Indicator/Show",
+        "indIntensity" to "Indicator/Glow: intensity", "indSpeed" to "Indicator/Glow: speed",
+        "indLow" to "Indicator/Glow: colours", "indMid" to "Indicator/Glow: colours", "indHigh" to "Indicator/Glow: colours", "indIdle" to "Indicator/Glow: colours",
+        "settingsBackdrop" to "Theme/Settings backdrop", "settingsDim" to "Theme/Backdrop dimming",
+        // APPS
+        "puckSegments" to "Apps/Ring segments", "puckSlots" to "Apps/Drawer shortcuts", "puckLabels" to "Apps/Show labels under glyphs",
+        "wheelGrouping" to "Apps/Wheel groups", "wheelWorkOnly" to "Apps/Wheel groups", "pageMode" to "Apps/Pages", "appsOnHome" to "Apps/Pages",
+        // RADAR
+        "searchLayout" to "Radar/Radar layout", "radarBackground" to "Radar/Radar background", "radarIntensity" to "Radar/Radar background", "searchMotion" to "Radar/Keep moving",
+        "searchLayoutPinned" to "Radar/Keep this layout with a keyboard", "kbOpenP" to "Home/Keyboard opens with Radar and drawer · portrait", "kbOpenL" to "Home/Keyboard opens with Radar and drawer · landscape",
+        "searchWeb" to "Radar/Web results", "searchActions" to "Radar/Actions", "searchFiles" to "Radar/Files", "searchDeep" to "Radar/Deep results", "searchContacts" to "Radar/Contacts",
+        "webEngine" to "Radar/Web engine", "webSuggestions" to "Radar/Web suggestions",
+        "radarSignalForce" to "Lab/*",
+        // SIDE PANEL
+        "leftPage" to "Side panel/Left page", "leftWidgetId" to "Side panel/Choose widget", "lpTheme" to "Side panel/Comms theme", "commsScale" to "Side panel/Comms size",
+        "launchpadRail" to "Side panel/Unread strip", "rightSide" to "Home/Right side", "recentsLimit" to "Home/Recent apps shown", "recentsUsage" to "Home/Include apps opened from elsewhere",
+        // SYSTEM
+        "language" to "System/Language", "restoreSurfaces" to "Home/Restore open screens",
+        "uiSounds" to "Sound/Interface sounds", "uiSoundVolume" to "Sound/Volume", "hapticStrength" to "Sound/Launcher vibration",
+        "onboardingDone" to "Backup/Export, import and restore",
+    )
+
+    /** One section of one tab of the app's Settings, as `SettingsTabLayout.kt` lists it: its header and its rows (exact "topic/title" keys, or patterns for rows built from an enum). */
+    private class AppSection(val header: String, val rows: List<String>, val patterns: List<Regex>)
+    private class AppTab(val key: String, val sections: List<AppSection>)
+
+    /** The arguments of the call whose '(' is at [open], as raw text (string literals may hold parentheses: "Calm home screen (Glance)"). */
+    private fun callArgs(t: String, open: Int): String {
+        var depth = 0; var i = open; var inStr = false
+        while (i < t.length) {
+            val c = t[i]
+            if (inStr) { if (c == '\\') i++ else if (c == '"') inStr = false }
+            else when (c) { '"' -> inStr = true; '(' -> depth++; ')' -> { depth--; if (depth == 0) return t.substring(open + 1, i) } }
+            i++
+        }
+        error("unbalanced call in SettingsTabLayout.kt at $open")
+    }
+    private fun literals(args: String) = Regex(""""((?:[^"\\]|\\.)*)"""").findAll(args).map { it.groupValues[1] }.toList()
+
+    /** The app's six tabs and their sections, read from the source of `SettingsTabLayout` (the app module is not a dependency of this one). */
+    private fun appLayout(): List<AppTab> {
+        val src = File(root(), "app/src/main/kotlin/com/bos/sphere/ui/SettingsTabLayout.kt").readText()
+        val tabKeys = Regex("""const val (\w+) = "([^"]+)"""").findAll(File(root(), "feature-grid/src/main/kotlin/com/bos/sphere/feature/grid/SettingsTabs.kt").readText()).associate { it.groupValues[1] to it.groupValues[2] }
+        val topics = Regex("""const val (T_\w+) = "([^"]+)"""").findAll(src).associate { it.groupValues[1] to it.groupValues[2] }
+        val all = Regex("""const val ALL = "([^"]+)"""").find(src)!!.groupValues[1]
+        val body = src.substringAfter("val TABS: List<Tab> = listOf(").substringBefore("\n    /**")
+        val tabStarts = Regex("""Tab\(\s*SettingsTabs\.(\w+),""").findAll(body).toList()
+        return tabStarts.mapIndexed { ti, tm ->
+            val chunk = body.substring(tm.range.first, if (ti + 1 < tabStarts.size) tabStarts[ti + 1].range.first else body.length)
+            val secStarts = Regex("""Section\("([^"]+)",""").findAll(chunk).toList()
+            AppTab(tabKeys.getValue(tm.groupValues[1]), secStarts.mapIndexed { si, sm ->
+                val sec = chunk.substring(sm.range.first, if (si + 1 < secStarts.size) secStarts[si + 1].range.first else chunk.length)
+                val rows = ArrayList<String>(); val patterns = ArrayList<Regex>()
+                for (call in Regex("""\b(rows|Row)\((T_\w+),""").findAll(sec)) {
+                    val topic = topics.getValue(call.groupValues[2])
+                    val args = callArgs(sec, call.range.first + call.groupValues[1].length).substringAfter(",")
+                    if (call.groupValues[1] == "rows") {
+                        if (args.trim() == "ALL") rows += "$topic/$all"
+                        literals(args).forEach { rows += "$topic/$it" }
+                    } else {
+                        // Row(T_CORNERS, it.label) or Row(T_HOME, "${c.label} hotspot"): one row per enum entry
+                        val lit = literals(args).firstOrNull()
+                        patterns += Regex(Regex.escape("$topic/") + (lit?.split(Regex("""\$\{[^}]*\}"""))?.joinToString(".+") { Regex.escape(it) } ?: ".+"))
+                    }
+                }
+                AppSection(sm.groupValues[1], rows, patterns)
+            })
+        }
+    }
+
+    /** Where the app lists [row]: (tab index, section index, row index in the section). */
+    private fun placeOf(layout: List<AppTab>, row: String): Triple<Int, Int, Int>? {
+        for ((ti, t) in layout.withIndex()) for ((si, s) in t.sections.withIndex()) { val r = s.rows.indexOf(row); if (r >= 0) return Triple(ti, si, r) }
+        for ((ti, t) in layout.withIndex()) for ((si, s) in t.sections.withIndex()) if (s.patterns.any { it.matches(row) }) return Triple(ti, si, s.rows.size)
+        return null
+    }
+
+    /** Studio's ids of the app's six tabs, in the app's order (the ids are kept from wave 56 so a saved "last tab" still opens). */
+    private val tabIds = listOf("home", "look", "apps", "radar", "side", "system")
+
+    /** Every field, its row, tab and section from the app's layout, in the app's order (tab, section, row; fields of one row in the order above). */
+    private fun fields(): List<Fd> {
+        val layout = appLayout()
+        check(layout.size == tabIds.size) { "the app has ${layout.size} Settings tabs, Studio knows ${tabIds.size}" }
+        val raw = rawFields()
+        val placed = raw.mapIndexed { i, f ->
+            f.row = appRowOf(f.key)
+            val (ti, si, ri) = placeOf(layout, f.row) ?: error("${f.key}: the row ${f.row} is not in SettingsTabLayout")
+            f.tab = tabIds[ti]; f.group = layout[ti].sections[si].header
+            Triple(f, listOf(ti, si, ri), i)
+        }
+        return placed.sortedWith(compareBy<Triple<Fd, List<Int>, Int>>({ it.second[0] }, { it.second[1] }, { it.second[2] }, { it.third })).map { it.first }
     }
 
     /** Option ids and labels of an enum declared in feature-dock's DockModel.kt, read from the source (that module is not a dependency of this one). */
@@ -312,14 +455,16 @@ class StudioSchemaW56Test {
     // Building the document
     // ---------------------------------------------------------------------------------------------------------------
 
-    private val tabs = listOf(
-        Triple("home", "HOME", "The Glance, the clock, the pages and their grid, the four corners, gestures, keyboard, motion and the dock."),
-        Triple("look", "LOOK", "Theme, icons, font, wallpaper, and how signal and battery show."),
-        Triple("apps", "APPS", "The app drawer disc, which apps the home holds, badges. Workspaces and app groups are made on the phone."),
-        Triple("radar", "RADAR", "Search: layout, background and sources."),
-        Triple("side", "SIDE PANEL", "Comms on one side, the Recents panel or the dock rail on the other."),
-        Triple("system", "SYSTEM", "Language, sound, the screen, and what stays on the phone."),
+    /** The six tabs: the app's English key in capitals, its sections in the app's order, and a line of what Studio edits there. */
+    private val tabBlurbs = mapOf(
+        "home" to "The Glance and its clock, the pages and their layout, the four corners, gestures and motion, keyboard and pointer, the dock.",
+        "look" to "Theme, font, icons, wallpaper, the calm styles of signal and battery, and the Settings screen.",
+        "apps" to "Profiles, the app drawer disc and which apps the pages hold. App groups and hidden apps are made on the phone.",
+        "radar" to "Search: layout, appearance, input, sources, the web engine.",
+        "side" to "The left panel and Comms, and what the right side of home shows.",
+        "system" to "Language, sound and vibration, restoring open screens, and what stays on the phone.",
     )
+    private val tabs: List<Triple<String, String, String>> get() = appLayout().mapIndexed { i, t -> Triple(tabIds[i], t.key.uppercase(), tabBlurbs.getValue(tabIds[i])) }
 
     private fun defaultOf(f: Fd, d: Map<String, Any?>): Any? = when {
         f.default !== UNSET -> f.default
@@ -348,6 +493,7 @@ class StudioSchemaW56Test {
             m["label"] = f.label
             m["tab"] = f.tab
             m["group"] = f.group
+            m["row"] = f.row
             m["type"] = f.type
             m["scope"] = f.scope
             if (f.file != null) { m["file"] = f.file; m["fileKey"] = f.fileKey; m["fileType"] = f.fileType }
@@ -369,11 +515,30 @@ class StudioSchemaW56Test {
             "settingsVersion" to StateSchema.SETTINGS_CURRENT,
             "stateFormat" to StateSchema.FORMAT,
             "stateSchemaVersion" to StateSchema.CURRENT,
-            "tabs" to tabs.map { mapOf("id" to it.first, "label" to it.second, "blurb" to it.third) },
+            "tabs" to appLayout().let { lay -> tabs.mapIndexed { i, it -> linkedMapOf("id" to it.first, "label" to it.second, "blurb" to it.third, "sections" to lay[i].sections.map { s -> s.header }) } },
             "fields" to outFields,
             // Wave 57 (profiles, CFG-49): which schema keys each settings group of a phone profile carries (ProfileGroup), so Studio reads a profile's subset.
             "profileGroups" to ProfileGroup.entries.map { mapOf("id" to it.id, "label" to it.label, "keys" to it.keys) },
+            // Wave 58 (CFG-71): the phone's Profiles page, as Studio's Profiles panel shows it: the starters and the app group suggester's own tables.
+            "profileStarts" to ProfileStart.entries.map { st ->
+                linkedMapOf("id" to st.name, "label" to st.label, "detail" to st.detail, "carries" to ProfileStarters.carries(st).map { it.id }, "settings" to ProfileStarters.overrides(st).toSortedMap())
+            },
+            "appSuggest" to linkedMapOf(
+                "min" to AppGroupSuggester.GROUP_MIN, "max" to AppGroupSuggester.GROUP_MAX,
+                "kinds" to SuggestionKind.entries.map { k -> linkedMapOf("id" to k.name, "label" to k.label, "packages" to suggestTable(k)) },
+            ),
         )
+    }
+
+    /** The suggester's package table of [k] (the same lists, in the same order, as `AppGroupSuggester`'s TABLES; a test classifies every entry). */
+    private fun suggestTable(k: SuggestionKind): List<String> = when (k) {
+        SuggestionKind.Work -> AppGroupSuggester.WORK_PACKAGES
+        SuggestionKind.Personal -> AppGroupSuggester.MESSAGING_PACKAGES + AppGroupSuggester.SOCIAL_PACKAGES
+        SuggestionKind.Media -> AppGroupSuggester.MEDIA_PACKAGES
+        SuggestionKind.Travel -> AppGroupSuggester.TRAVEL_PACKAGES
+        SuggestionKind.Money -> AppGroupSuggester.MONEY_PACKAGES
+        SuggestionKind.Games -> AppGroupSuggester.GAME_PACKAGES
+        SuggestionKind.Utilities -> AppGroupSuggester.UTILITY_PACKAGES
     }
 
     // A small ordered JSON writer (org.json's object does not keep the order).
@@ -534,6 +699,38 @@ class StudioSchemaW56Test {
         for (f in fields()) assertTrue("${f.key} names the unknown tab ${f.tab}", f.tab in ids)
         for (t in ids) assertTrue("tab $t is empty", fields().any { it.tab == t && !it.deviceBound })
         assertEquals("duplicate keys", emptyList<String>(), fields().groupBy { it.key }.filterValues { it.size > 1 }.keys.toList())
+    }
+
+    @Test fun CFG_70_studioTabsAndSectionsAreTheAppsSettingsTabsAndSectionsInTheAppsOrder() {
+        val layout = appLayout()
+        assertEquals("the app's tab keys", listOf("Home", "Look", "Apps", "Radar", "Side panel", "System"), layout.map { it.key })
+        val doc = JSONObject(json())
+        val tabsOut = doc.getJSONArray("tabs")
+        for (i in layout.indices) {
+            val t = tabsOut.getJSONObject(i)
+            assertEquals(layout[i].key.uppercase(), t.getString("label"))
+            val secs = t.getJSONArray("sections"); assertEquals("sections of ${t.getString("id")}", layout[i].sections.map { it.header }, List(secs.length()) { secs.getString(it) })
+        }
+        // every field sits in its row's tab and section, and the fields of a tab follow the app's section order
+        var last = Pair(-1, -1)
+        for (f in fields()) {
+            val (ti, si, _) = placeOf(layout, f.row)!!
+            assertEquals(f.key, tabIds[ti], f.tab); assertEquals(f.key, layout[ti].sections[si].header, f.group)
+            assertTrue("${f.key} is out of the app's order", ti > last.first || (ti == last.first && si >= last.second)); last = ti to si
+        }
+        // the parser sees the rows a reader of SettingsTabLayout.kt sees
+        assertEquals(Triple(0, 0, 0), placeOf(layout, "Home/Calm home screen (Glance)"))
+        assertEquals("Input", layout[3].sections[placeOf(layout, "Home/Keyboard opens with Radar and drawer · portrait")!!.second].header)
+        assertEquals("Gestures and motion", layout[0].sections[placeOf(layout, "Gestures/Swipe up")!!.second].header)
+        assertEquals("Glance", layout[0].sections[placeOf(layout, "Home/Top left hotspot")!!.second].header)
+        assertEquals("Lab", layout[5].sections[placeOf(layout, "Lab/*")!!.second].header)
+    }
+
+    @Test fun CFG_71_theSuggesterTablesAndStartersInTheSchemaAreTheAppsOwn() {
+        for (k in SuggestionKind.entries) for (pkg in suggestTable(k))
+            assertEquals(pkg, k, AppGroupSuggester.classify(SuggestApp("$pkg/.Main#0", pkg, pkg)))
+        assertEquals(ProfileStart.entries.map { it.name }, listOf("Current", "Empty", "Work", "Calm", "Desk"))
+        for (st in ProfileStart.entries) for (k in ProfileStarters.overrides(st).keys) assertTrue("$k of ${st.name} is a profile key", k in ProfileSettings.ALL_KEYS)
     }
 
     @Test fun CFG_34_theSampleFilesTheNodeTestsReadAreWhatTheAppsOwnCodecWrites() {

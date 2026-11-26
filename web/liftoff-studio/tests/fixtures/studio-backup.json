@@ -187,13 +187,13 @@
         "t": "i",
         "v": 6
       },
-      "labels": {
-        "t": "b",
-        "v": false
-      },
       "slots": {
         "t": "s",
         "v": "a:Flashlight\na:Clock\na:Notifications\na:DoNotDisturb\na:Search\na:Camera\na:Calculator\na:SystemSettings"
+      },
+      "labels": {
+        "t": "b",
+        "v": false
       }
     },
     "comms_scale": {

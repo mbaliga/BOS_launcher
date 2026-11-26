@@ -327,7 +327,7 @@ test('phone profiles: a Backup profile reads into Studio values, is edited and w
 // ---- wave 58 (studioPreview)
 
 test('CFG-70: the tabs carry the app\'s sections in order and every field sits in one of its tab\'s sections, in that order', () => {
-  assert.deepEqual(schema.tabs.find((t) => t.id === 'apps').sections, ['Profiles', 'App groups and sessions', 'App drawer', 'Hidden apps', 'Open with']);
+  assert.deepEqual(schema.tabs.find((t) => t.id === 'apps').sections, ['Profiles and groups', 'App drawer', 'Hidden and default apps'] // wave 58: the app merged one-row sections (settingsPolish));
   for (const t of schema.tabs) {
     const fs2 = schema.fields.filter((f) => f.tab === t.id);
     let last = -1;

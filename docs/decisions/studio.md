@@ -2,6 +2,8 @@
 
 Owner: "Browser page will be good, and it should be like in the asystemofcells/liftoff/studio". The study that raised it is [../handoff/clackpad_vs_liftoff_settings.md](../handoff/clackpad_vs_liftoff_settings.md) (Q3: Clackpad's Studio is a left-preview, right-tabs page over one shared file format). Nothing here was run on a device or on the owner's site.
 
+> Wave 58: the tab and group of each field now come from the app's Settings layout, the page has a phone Profiles panel, and the drawing gained Signal approximations, landscape and side docks: see [studioPreview.md](studioPreview.md).
+
 ## Decisions
 - **Self-contained static site in this repository**, `web/liftoff-studio/`: `index.html`, `studio.css`, `app.js` (the page), `core.js` (logic, no DOM, testable under node), `preview.js` (SVG drawing of the phone), `cards.js` (option card drawings), `schema.json` / `schema.js`, `fonts/`. Vanilla JS and CSS, no build step, no CDN, no network request of any kind (a test greps for `fetch`, XHR, beacons, sockets and external addresses). Every URL is relative, so the folder works from any sub-path and from `file://`.
 - **The site repository was not accessible**, so nothing could be put on the owner's site. The folder is built so that publishing is a copy (below). An optional workflow, `.github/workflows/liftoff-studio-pages.yml`, can publish it on GitHub Pages; it is `workflow_dispatch` only and does nothing until Pages is enabled.

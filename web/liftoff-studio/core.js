@@ -433,6 +433,259 @@
     return { ok: true, doc: out };
   }
 
+  // ---------------------------------------------------------------------------------------------------- phone profiles editor (wave 58)
+  //
+  // The Profiles panel of the APPS tab edits the phone profiles of a Backup the way the phone's Profiles page does (CFG-71): New from a start
+  // (Current setup, Empty, Work, Calm, Desk: schema.profileStarts, generated from the app's ProfileStarters), Rename, Duplicate, Delete, Switch,
+  // the settings groups that ride along, and app groups made from the suggester's own tables (schema.appSuggest). Every function takes a Backup
+  // document and returns a changed copy; the page keeps it in the Studio profile's extras.base, so the Export writes it as the Backup's
+  // "workspaces" and "dock" sections, which the app imports as they are.
+
+  var PHONE_DEFAULT_ID = 'default';
+
+  function newPhoneId(doc) {
+    var ids = (doc.workspaces || []).map(function (w) { return w && w.id; }), id;
+    do { id = Math.random().toString(16).slice(2, 10); } while (ids.indexOf(id) >= 0);
+    return id;
+  }
+  function phoneUniqueName(doc, name, exceptId) {
+    var names = (doc.workspaces || []).filter(function (w) { return w && w.id !== exceptId; }).map(function (w) { return w.name; });
+    var base = String(name || 'Profile').trim().slice(0, 40) || 'Profile', n = base, i = 2;
+    while (names.indexOf(n) >= 0) n = base + ' ' + i++;
+    return n;
+  }
+  function wsOf(doc, id) { return (doc.workspaces || []).filter(function (w) { return w && String(w.id) === String(id); })[0]; }
+  function activeIdOf(doc) {
+    var a = doc.dock && doc.dock.activeId, ws = doc.workspaces || [];
+    return ws.some(function (w) { return w && w.id === a; }) ? a : (ws[0] && ws[0].id);
+  }
+
+  /**
+   * A Backup document that has a profile list: [base] (an imported Backup) with its own list, or a copy of it with the phone's main profile
+   * "Home" when it has none. A list made here replaces the phone's list when the file is imported (the page says so).
+   */
+  function withPhoneProfiles(ix, base) {
+    var doc = base ? clone(base) : { format: STATE_FORMAT, schemaVersion: ix.schema.stateSchemaVersion };
+    if (!Array.isArray(doc.workspaces) || !doc.workspaces.length) doc.workspaces = [{ id: PHONE_DEFAULT_ID, name: 'Home' }];
+    doc.dock = doc.dock && typeof doc.dock === 'object' && !Array.isArray(doc.dock) ? doc.dock : {};
+    doc.dock.activeId = activeIdOf(doc);
+    return doc;
+  }
+
+  /** Studio values to the phone's value texts (parsed) for [keys]. */
+  function phoneValues(ix, values, keys) {
+    var out = {};
+    keys.forEach(function (k) { var f = ix.byKey[k]; if (f && values[k] !== undefined && values[k] !== CUSTOM) out[k] = toPhone(f, values[k]); });
+    return out;
+  }
+  function studioValue(ix, k, v) { var f = ix.byKey[k]; if (!f) return undefined; if (k === 'dock.enabled') return fromPhone(f, v); var r = checkValue(f, v); return r.error ? undefined : r.value; }
+
+  /** The global value of [k] while [doc]'s active profile is live: the kept-aside value when the active profile carries [k], the live one otherwise. */
+  function globalValue(ix, doc, values, k) {
+    var a = wsOf(doc, activeIdOf(doc)), stash = (doc.dock && doc.dock.globalSettings) || {};
+    if (a && profileKeys(ix, a.carries).indexOf(k) >= 0 && k in stash) { var v = studioValue(ix, k, stash[k]); if (v !== undefined) return v; }
+    return values[k];
+  }
+
+  /** A home with one page holding [keys] and an empty dock, in the shape the phone's profile hooks write (ProfileStarters.arrangement). */
+  function phoneArrangement(keys) {
+    return JSON.stringify({ pages: JSON.stringify([{ k: keys || [], s: 'Grid', r: 2, id: 1 }]), removed: [], dock: [] });
+  }
+
+  // ---- what apps a Backup knows, and the suggester (the phone's tables; no labels or categories travel in a Backup)
+
+  function keyTarget(key) {
+    var m = /^([A-Za-z0-9_.]+)\/([A-Za-z0-9_.$]+)(?:#(\d+))?$/.exec(String(key || ''));
+    if (!m) return null;
+    var pkg = m[1], cls = m[2].charAt(0) === '.' ? pkg + m[2] : m[2], user = m[3] ? Number(m[3]) : 0;
+    // the key in the app's own form (ComponentName.flattenToShortString, then #user), so one app found twice is one entry
+    var short = cls.indexOf(pkg + '.') === 0 ? cls.slice(pkg.length) : cls;
+    return { key: pkg + '/' + short + '#' + user, pkg: pkg, cls: cls, user: user };
+  }
+
+  /** The apps a Backup names: on its pages, hidden, in its profiles' homes and docks, in its app groups. One entry per app key. */
+  function backupApps(doc) {
+    var seen = {}, out = [];
+    function add(k) { var t = keyTarget(k); if (t && !seen[t.key]) { seen[t.key] = 1; out.push(t); } }
+    function pages(p) { var a = p; if (typeof a === 'string') { try { a = JSON.parse(a); } catch (e) { a = null; } } if (Array.isArray(a)) a.forEach(function (pg) { if (pg && Array.isArray(pg.k)) pg.k.forEach(add); else if (pg && Array.isArray(pg.keys)) pg.keys.forEach(add); }); }
+    if (!doc || typeof doc !== 'object') return out;
+    var lay = doc.layout;
+    if (lay && typeof lay === 'object') { pages(lay.pages); (Array.isArray(lay.hidden) ? lay.hidden : []).forEach(add); (Array.isArray(lay.dock) ? lay.dock : []).forEach(add); }
+    (Array.isArray(doc.workspaces) ? doc.workspaces : []).forEach(function (w) {
+      if (!w) return;
+      if (typeof w.home === 'string') { try { var h = JSON.parse(w.home); pages(h.pages); (h.dock || []).forEach(add); } catch (e) { /* not a home */ } }
+      (Array.isArray(w.pins) ? w.pins : []).forEach(function (p) { add(String(p).replace(/^app:/, '')); });
+    });
+    var groups = doc.dock && Array.isArray(doc.dock.groups) ? doc.dock.groups : [];
+    groups.forEach(function (g) { (g && Array.isArray(g.members) ? g.members : []).forEach(function (m) { var t = m && m.target; if (t && t.p) add(t.p + '/' + (t.c || t.p) + '#' + (t.u || 0)); }); });
+    return out;
+  }
+
+  function looksLikeMoney(pkg) {
+    var p = pkg.toLowerCase();
+    if (p.indexOf('bank') >= 0) return true;
+    return p.split(/[._-]/).some(function (w) { return w.length >= 3 && (w.indexOf('pay') === 0 || w.slice(-3) === 'pay'); });
+  }
+  /** The kind the phone's suggester gives an app from what a Backup holds (its package and whether it is a work-profile app). */
+  function classifyApp(ix, app) {
+    var s = ix.schema.appSuggest; if (!s) return null;
+    if (app.user && app.user !== 0) return 'Work';
+    for (var i = 0; i < s.kinds.length; i++) if (s.kinds[i].packages.indexOf(app.pkg) >= 0) return s.kinds[i].id;
+    if (looksLikeMoney(app.pkg)) return 'Money';
+    return null;
+  }
+  /** Groups of two or more apps, in the phone's order: [{kind, label, apps}], each list best first (table order, then by package). */
+  function suggestGroups(ix, apps) {
+    var s = ix.schema.appSuggest; if (!s) return [];
+    return s.kinds.map(function (k) {
+      var list = apps.filter(function (a) { return classifyApp(ix, a) === k.id; });
+      list.sort(function (a, b) { var ia = k.packages.indexOf(a.pkg), ib = k.packages.indexOf(b.pkg); ia = ia < 0 ? 1e9 : ia; ib = ib < 0 ? 1e9 : ib; return ia - ib || (a.pkg < b.pkg ? -1 : a.pkg > b.pkg ? 1 : 0); });
+      return { kind: k.id, label: k.label, apps: list };
+    }).filter(function (g) { return g.apps.length >= s.min; });
+  }
+
+  /** Adds an App group of 2 to 4 apps to the Backup (dock.groups), optionally linked to profile [linkTo]. Returns {ok, doc, id} or {ok:false, error}. */
+  function addAppGroup(ix, doc, name, apps, linkTo) {
+    var s = ix.schema.appSuggest || { min: 2, max: 4 };
+    if (!apps || apps.length < s.min || apps.length > s.max) return { ok: false, error: 'An app group holds ' + s.min + ' to ' + s.max + ' apps (they open together)' };
+    var out = clone(doc);
+    out.dock = out.dock && typeof out.dock === 'object' ? out.dock : {};
+    out.dock.groups = Array.isArray(out.dock.groups) ? out.dock.groups : [];
+    var ids = out.dock.groups.map(function (g) { return g && g.id; }), id;
+    do { id = 'g' + Math.random().toString(16).slice(2, 10); } while (ids.indexOf(id) >= 0);
+    out.dock.groups.push({ id: id, name: String(name || 'Group').slice(0, 40), layout: 'Tile', members: apps.map(function (a) { return { target: { p: a.pkg, c: a.cls, u: a.user || 0 }, display: null, bounds: null, placement: 'Default' }; }) });
+    if (linkTo) { var w = wsOf(out, linkTo); if (w) { w.groupLinks = (Array.isArray(w.groupLinks) ? w.groupLinks : []).concat([id]); } }
+    return { ok: true, doc: out, id: id };
+  }
+
+  // ---- the list
+
+  /**
+   * A new profile from a start of schema.profileStarts. opts: {start, name, carries (optional: the ticked groups), values (Studio's live values),
+   * apps (what the Backup knows, for Work and Calm)}. Current setup copies the active profile (home, dock pins, actions, calm centre, links) with
+   * the live values of what it carries; the others are one page (Work: the suggested work apps on it) and an empty dock, with the start's values
+   * on top of the global ones for the groups they carry. Returns {ok, doc, id}.
+   */
+  function createPhoneProfile(ix, doc, opts) {
+    var out = clone(doc), o = opts || {}, values = o.values || {};
+    var st = (ix.schema.profileStarts || []).filter(function (s) { return s.id === (o.start || 'Empty'); })[0];
+    if (!st) return { ok: false, error: 'Unknown start ' + o.start };
+    var active = wsOf(out, activeIdOf(out)), id = newPhoneId(out), w;
+    var carries = Array.isArray(o.carries) ? o.carries.slice() : st.id === 'Current' && active ? (active.carries || []).slice() : st.carries.slice();
+    carries = carries.filter(function (c) { return (ix.schema.profileGroups || []).some(function (g) { return g.id === c; }); });
+    var keys = profileKeys(ix, carries), settings = {};
+    keys.forEach(function (k) { var v = globalValue(ix, out, values, k); if (st.id === 'Current') v = values[k]; var f = ix.byKey[k]; if (f && v !== undefined && v !== CUSTOM) settings[k] = toPhone(f, v); });
+    Object.keys(st.settings || {}).forEach(function (k) { if (keys.indexOf(k) >= 0) { try { settings[k] = JSON.parse(st.settings[k]); } catch (e) { /* a starter value is a JSON text */ } } });
+    if (st.id === 'Current' && active) {
+      w = clone(active); w.id = id; delete w.widgets;
+    } else {
+      var apps = o.apps || [], firstPage = [], notify = null;
+      if (st.id === 'Work') {
+        var work = suggestGroups(ix, apps).filter(function (g) { return g.kind === 'Work'; })[0];
+        firstPage = work ? work.apps.map(function (a) { return a.key; }) : [];
+        var wp = apps.filter(function (a) { return classifyApp(ix, a) === 'Work'; }).map(function (a) { return a.pkg; });
+        notify = wp.length ? wp.filter(function (p, i) { return wp.indexOf(p) === i; }).sort() : null;
+      } else if (st.id === 'Calm') {
+        var calm = (ix.schema.appSuggest && ix.schema.appSuggest.calm) || [];
+        var cp = apps.filter(function (a) { return !a.user && calm.indexOf(a.pkg) >= 0; }).map(function (a) { return a.pkg; });
+        notify = cp.filter(function (p, i) { return cp.indexOf(p) === i; }).sort();
+      }
+      w = { id: id, home: phoneArrangement(firstPage), pins: [], widgets: [], actions: [], notifyApps: notify };
+    }
+    w.name = phoneUniqueName(out, o.name || st.label);
+    if (carries.length) w.carries = carries.slice().sort(); else delete w.carries;
+    if (Object.keys(settings).length) w.settings = settings; else delete w.settings;
+    out.workspaces.push(w);
+    return { ok: true, doc: out, id: id };
+  }
+
+  function renamePhoneProfile(doc, id, name) {
+    var out = clone(doc), w = wsOf(out, id);
+    if (!w) return { ok: false, error: 'No profile ' + id };
+    var t = String(name || '').trim().slice(0, 40);
+    if (!t) return { ok: false, error: 'A profile needs a name' };
+    if ((out.workspaces || []).some(function (x) { return x && x.id !== w.id && x.name === t; })) return { ok: false, error: 'There is already a profile called ' + t };
+    w.name = t; return { ok: true, doc: out };
+  }
+  function duplicatePhoneProfile(doc, id) {
+    var out = clone(doc), w = wsOf(out, id);
+    if (!w) return { ok: false, error: 'No profile ' + id };
+    var c = clone(w); c.id = newPhoneId(out); c.name = phoneUniqueName(out, w.name + ' copy'); delete c.widgets;
+    out.workspaces.splice(out.workspaces.indexOf(w) + 1, 0, c);
+    return { ok: true, doc: out, id: c.id };
+  }
+  /** The active profile and the last one cannot be deleted (as on the phone: switch first). */
+  function deletePhoneProfile(doc, id) {
+    var out = clone(doc), w = wsOf(out, id);
+    if (!w) return { ok: false, error: 'No profile ' + id };
+    if (w.id === activeIdOf(out)) return { ok: false, error: 'Switch to another profile before deleting this one' };
+    if (out.workspaces.length <= 1) return { ok: false, error: 'The last profile cannot be deleted' };
+    out.workspaces = out.workspaces.filter(function (x) { return x !== w; });
+    return { ok: true, doc: out };
+  }
+
+  /**
+   * Which settings groups ride along with profile [id] (the phone's rules, docs/decisions/profiles.md "Precedence"): adding a group to the active
+   * profile keeps the live values (they become its own and are kept aside as the global ones); dropping one puts the global values back live;
+   * adding a group to another profile starts it from the global values. Returns {ok, doc, values} (values: Studio's live values after it).
+   */
+  function setPhoneCarries(ix, doc, id, carries, values) {
+    var out = clone(doc), w = wsOf(out, id), live = Object.assign({}, values);
+    if (!w) return { ok: false, error: 'No profile ' + id };
+    var ids = (carries || []).filter(function (c) { return (ix.schema.profileGroups || []).some(function (g) { return g.id === c; }); });
+    var oldK = profileKeys(ix, w.carries), newK = profileKeys(ix, ids), isActive = w.id === activeIdOf(out);
+    var s = w.settings && typeof w.settings === 'object' ? w.settings : {};
+    out.dock = out.dock || {};
+    var stash = out.dock.globalSettings && typeof out.dock.globalSettings === 'object' ? out.dock.globalSettings : {};
+    newK.filter(function (k) { return oldK.indexOf(k) < 0; }).forEach(function (k) {
+      var f = ix.byKey[k]; if (!f) return;
+      if (isActive) { if (live[k] !== undefined && live[k] !== CUSTOM) { s[k] = toPhone(f, live[k]); stash[k] = toPhone(f, live[k]); } }
+      else { var g = globalValue(ix, doc, values, k); if (g !== undefined && g !== CUSTOM) s[k] = toPhone(f, g); }
+    });
+    oldK.filter(function (k) { return newK.indexOf(k) < 0; }).forEach(function (k) {
+      if (isActive && k in stash) { var v = studioValue(ix, k, stash[k]); if (v !== undefined) live[k] = v; delete stash[k]; }
+      delete s[k];
+    });
+    if (ids.length) w.carries = ids.slice().sort(); else delete w.carries;
+    if (Object.keys(s).length) w.settings = s; else delete w.settings;
+    if (Object.keys(stash).length) out.dock.globalSettings = stash; else delete out.dock.globalSettings;
+    return { ok: true, doc: out, values: live };
+  }
+
+  /** The active profile holds the live values of what it carries (on the phone this is written through as they change). */
+  function syncActivePhoneProfile(ix, doc, values) {
+    var out = clone(doc), a = wsOf(out, activeIdOf(out));
+    if (!a) return out;
+    var keys = profileKeys(ix, a.carries); if (!keys.length) return out;
+    a.settings = Object.assign(a.settings && typeof a.settings === 'object' ? a.settings : {}, phoneValues(ix, values, keys));
+    return out;
+  }
+
+  /**
+   * Switching A to B, as the phone does (ProfileSwitch.plan): A keeps its carried keys as they are now; the global values are the live ones
+   * with A's kept-aside values put back; B's values go over them for the keys B carries; the kept-aside values become B's global ones.
+   * Returns {ok, doc, values} (values: Studio's live values after the switch). The home, dock and widgets switch on the phone, not here.
+   */
+  function switchPhoneProfile(ix, doc, id, values) {
+    var out = syncActivePhoneProfile(ix, doc, values), b = wsOf(out, id), aId = activeIdOf(out);
+    if (!b) return { ok: false, error: 'No profile ' + id };
+    if (b.id === aId) return { ok: true, doc: out, values: Object.assign({}, values) };
+    var a = wsOf(out, aId), lk = a ? profileKeys(ix, a.carries) : [], ek = profileKeys(ix, b.carries);
+    out.dock = out.dock || {};
+    var stash = out.dock.globalSettings && typeof out.dock.globalSettings === 'object' ? out.dock.globalSettings : {};
+    var global = Object.assign({}, values);
+    lk.forEach(function (k) { if (k in stash) { var v = studioValue(ix, k, stash[k]); if (v !== undefined) global[k] = v; } });
+    var live = Object.assign({}, global), bs = b.settings && typeof b.settings === 'object' ? b.settings : {}, nextStash = {};
+    ek.forEach(function (k) {
+      var f = ix.byKey[k]; if (!f) return;
+      if (global[k] !== undefined && global[k] !== CUSTOM) nextStash[k] = toPhone(f, global[k]);
+      if (k in bs) { var v = studioValue(ix, k, bs[k]); if (v !== undefined) live[k] = v; }
+    });
+    if (Object.keys(nextStash).length) out.dock.globalSettings = nextStash; else delete out.dock.globalSettings;
+    out.dock.activeId = b.id;
+    return { ok: true, doc: out, values: live };
+  }
+
   // ---------------------------------------------------------------------------------------------------------- profiles
 
   function memoryStorage() { var m = {}; return { getItem: function (k) { return k in m ? m[k] : null; }, setItem: function (k, v) { m[k] = String(v); }, removeItem: function (k) { delete m[k]; } }; }
@@ -506,5 +759,9 @@
     shareFragment: shareFragment, readShare: readShare, LOOKS: LOOKS, STARTERS: STARTERS, applyPreset: applyPreset,
     Profiles: Profiles, memoryStorage: memoryStorage, newExtras: newExtras,
     phoneProfiles: phoneProfiles, setPhoneProfile: setPhoneProfile, profileKeys: profileKeys,
+    PHONE_DEFAULT_ID: PHONE_DEFAULT_ID, withPhoneProfiles: withPhoneProfiles, createPhoneProfile: createPhoneProfile, renamePhoneProfile: renamePhoneProfile,
+    duplicatePhoneProfile: duplicatePhoneProfile, deletePhoneProfile: deletePhoneProfile, setPhoneCarries: setPhoneCarries, switchPhoneProfile: switchPhoneProfile,
+    syncActivePhoneProfile: syncActivePhoneProfile, backupApps: backupApps, classifyApp: classifyApp, suggestGroups: suggestGroups, addAppGroup: addAppGroup,
+    phoneArrangement: phoneArrangement,
   };
 });

@@ -4,7 +4,8 @@
  *
  * Scenes: glance, pages, radar, disc, comms, recents. The page picks the scene that the active tab or field concerns (field.scene in schema.json).
  *
- * This is a drawing made from the settings, not the app: Signal, System and Picture wallpapers are placeholders, text is sample text, and the
+ * This is a drawing made from the settings, not the app: Signal wallpapers are still approximations of the app's painters, System and Picture
+ * wallpapers are placeholders, text is sample text, and the
  * spacing rules follow the app's own (docs/decisions/*.md) but were not measured against a device.
  */
 (function (root, factory) {
@@ -13,7 +14,8 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var W = 360, H = 740;
+  // One unit is one dp. W and H are the phone's in the orientation being drawn (portrait 360 by 740; landscape 740 by 360, see render).
+  var PW = 360, PH = 740, W = PW, H = PH, LAND = false;
   var SCENES = [
     { id: 'glance', label: 'Glance' }, { id: 'pages', label: 'Pages' }, { id: 'radar', label: 'Radar' },
     { id: 'disc', label: 'Drawer' }, { id: 'comms', label: 'Comms' }, { id: 'recents', label: 'Recents' },
@@ -134,13 +136,41 @@
     return '<linearGradient id="' + id + '" x1="' + f1(0.5 - dx) + '" y1="' + f1(0.5 - dy) + '" x2="' + f1(0.5 + dx) + '" y2="' + f1(0.5 + dy) + '"><stop offset="0" stop-color="' + css(from) + '"/><stop offset="1" stop-color="' + css(to) + '"/></linearGradient>';
   }
 
+  // Wave 58 (CFG-72): the Signal wallpapers drawn as approximations of the app's painters (feature-grid LivingWallpapers.kt), in the theme's
+  // accent over the theme's black (or, in Light, pale) gradient: Beam rises from the bottom edge, Spire is a cusp from the lower third with a
+  // bloom under it and a white core, Halo a tilted ring, Laser thin lines, Shaft a wide diagonal band. Still frames: no motion, no signal level.
   var BG_LIVE = {
-    beam: function (a) { return '<g opacity="0.9">' + '<polygon points="150,740 210,740 250,0 190,0" fill="url(#LG)" opacity="0.5"/><polygon points="40,740 70,740 140,0 110,0" fill="url(#LG)" opacity="0.28"/></g>'; },
-    spire: function (a) { return '<polygon points="180,120 214,740 146,740" fill="url(#LG)" opacity="0.55"/><circle cx="180" cy="120" r="3" fill="' + a + '"/>'; },
-    halo: function (a) { return [60, 110, 170, 240].map(function (r, i) { return circle(180, 360, r, 'none', 'stroke="' + a + '" stroke-opacity="' + (0.5 - i * 0.1) + '" stroke-width="' + (6 - i) + '"'); }).join(''); },
-    laser: function (a) { return line(0, 250, 360, 330, a, 1.5, 'stroke-opacity="0.8"') + line(0, 420, 360, 380, a, 1, 'stroke-opacity="0.5"') + line(0, 560, 360, 520, a, 1, 'stroke-opacity="0.35"'); },
-    shaft: function (a) { return '<polygon points="-20,740 120,740 380,0 240,0" fill="url(#LG)" opacity="0.4"/>'; },
+    beam: function (a, L) {
+      var cx = 180, s = '<ellipse cx="' + cx + '" cy="600" rx="200" ry="330" fill="url(#LW)"/>';
+      s += '<path d="M' + (cx - 5) + ' 740 C ' + (cx - 30) + ' 520 ' + (cx - 150) + ' 300 ' + (cx - 210) + ' 40 L ' + (cx + 210) + ' 40 C ' + (cx + 150) + ' 300 ' + (cx + 30) + ' 520 ' + (cx + 5) + ' 740 Z" fill="url(#LG)" opacity="' + (L ? 0.35 : 0.8) + '"/>';
+      s += '<path d="M' + (cx - 2) + ' 740 L ' + (cx - 0.5) + ' 110 L ' + (cx + 0.5) + ' 110 L ' + (cx + 2) + ' 740 Z" fill="url(#LC)"/>';
+      for (var i = 0; i < 14; i++) { var y = 640 - i * 36; s += circle(cx + (i % 2 ? 3 : -3), y, 1.4, '#FFFFFF', 'fill-opacity="' + f1((L ? 0.3 : 0.75) * (1 - i / 16) * 100) / 100 + '"'); }
+      return s + '<ellipse cx="' + cx + '" cy="736" rx="34" ry="12" fill="url(#LT)"/>';
+    },
+    spire: function (a, L) {
+      var cx = 180, base = 474, h = 330, hb = 144;
+      var s = rect(0, 370, 360, 370, 0, 'url(#LF)') + '<ellipse cx="' + cx + '" cy="' + (base + 90) + '" rx="200" ry="190" fill="url(#LW)"/>';
+      s += '<path d="M' + cx + ' ' + (base - h) + ' C ' + f1(cx + hb * 0.03) + ' ' + f1(base - h * 0.55) + ' ' + f1(cx + hb * 0.12) + ' ' + f1(base - h * 0.12) + ' ' + (cx + hb) + ' ' + base + ' L ' + (cx - hb) + ' ' + base +
+        ' C ' + f1(cx - hb * 0.12) + ' ' + f1(base - h * 0.12) + ' ' + f1(cx - hb * 0.03) + ' ' + f1(base - h * 0.55) + ' ' + cx + ' ' + (base - h) + ' Z" fill="url(#LS)" opacity="' + (L ? 0.45 : 0.95) + '"/>';
+      return s + (L ? '' : '<ellipse cx="' + cx + '" cy="' + f1(base - h * 0.45) + '" rx="' + f1(hb * 0.3) + '" ry="' + f1(h * 0.38) + '" fill="url(#LT)"/>');
+    },
+    halo: function (a, L) {
+      return '<g transform="rotate(-18 180 360)">' + [0, 1, 2].map(function (i) { return '<ellipse cx="180" cy="360" rx="' + (150 + i * 6) + '" ry="' + (96 + i * 4) + '" fill="none" stroke="' + a + '" stroke-opacity="' + f1((L ? 0.25 : 0.7) - i * 0.18) + '" stroke-width="' + (5 - i * 1.5) + '" stroke-dasharray="' + (520 - i * 60) + ' 900" stroke-linecap="round"/>'; }).join('') +
+        '<ellipse cx="180" cy="360" rx="150" ry="96" fill="none" stroke="#FFFFFF" stroke-opacity="' + (L ? 0.2 : 0.8) + '" stroke-width="1.4" stroke-dasharray="90 900" stroke-linecap="round"/></g>';
+    },
+    laser: function (a, L) { var o = L ? 0.4 : 1; return line(0, 250, 360, 330, a, 1.6, 'stroke-opacity="' + 0.85 * o + '"') + line(0, 251, 360, 331, '#FFFFFF', 0.5, 'stroke-opacity="' + 0.7 * o + '"') + line(0, 420, 360, 380, a, 1, 'stroke-opacity="' + 0.5 * o + '"') + line(0, 560, 360, 520, a, 1, 'stroke-opacity="' + 0.35 * o + '"'); },
+    shaft: function (a, L) { return '<polygon points="-20,740 120,740 380,0 240,0" fill="url(#LG)" opacity="' + (L ? 0.25 : 0.55) + '"/><polygon points="40,740 60,740 330,0 310,0" fill="#FFFFFF" opacity="' + (L ? 0.08 : 0.18) + '"/>'; },
   };
+  function signalDefs(ac, L) {
+    return '<linearGradient id="LG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="0.18" stop-color="' + ac + '" stop-opacity="0.85"/><stop offset="1" stop-color="' + ac + '" stop-opacity="0"/></linearGradient>' +
+      '<linearGradient id="LC" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="' + (L ? 0.5 : 1) + '"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>' +
+      '<linearGradient id="LS" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="0.3" stop-color="' + ac + '"/><stop offset="0.86" stop-color="' + ac + '" stop-opacity="0.8"/><stop offset="1" stop-color="' + ac + '" stop-opacity="0"/></linearGradient>' +
+      '<linearGradient id="LF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + ac + '" stop-opacity="0"/><stop offset="1" stop-color="' + ac + '" stop-opacity="' + (L ? 0.12 : 0.3) + '"/></linearGradient>' +
+      '<radialGradient id="LW"><stop offset="0" stop-color="' + ac + '" stop-opacity="' + (L ? 0.12 : 0.32) + '"/><stop offset="1" stop-color="' + ac + '" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="LT"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/><stop offset="0.4" stop-color="' + ac + '" stop-opacity="0.6"/><stop offset="1" stop-color="' + ac + '" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="BGFX" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="' + ac + '" stop-opacity="0.4"/><stop offset="1" stop-color="' + ac + '" stop-opacity="0"/></linearGradient>' +
+      '<linearGradient id="LBG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + (L ? '#FAFAFD' : '#000000') + '"/><stop offset="1" stop-color="' + (L ? '#E9E9F1' : '#0B0B16') + '"/></linearGradient>';
+  }
   var BG_FX = {
     'glow-lines': function (a) { return [180, 300, 430, 560].map(function (y, i) { return '<path d="M0 ' + y + ' Q 180 ' + (y - 50 + i * 12) + ' 360 ' + y + '" fill="none" stroke="' + a + '" stroke-opacity="0.35" stroke-width="1.2"/>'; }).join(''); },
     'breathing-dots': function (a) { var s = ''; for (var y = 40; y < 740; y += 60) for (var x = 30; x < 360; x += 60) s += circle(x, y, 2.2, a, 'fill-opacity="0.35"'); return s; },
@@ -150,7 +180,7 @@
 
   /**
    * The wallpaper layer for the surface ("glance" or "pages"). Returns {defs, body, ink}: ink is the text colour that reads on it.
-   * Signal, System and Picture are placeholders: the drawing says so on the canvas itself.
+   * Signal is an approximation in the theme colours; System and Picture are placeholders and the drawing says so on the canvas itself.
    */
   function wallpaper(v, surface, T) {
     var P = surface === 'pages' && !g(v, 'wpPagesSame', true) ? 'wpPages' : 'wpGlance';
@@ -160,11 +190,10 @@
       var a = g(v, P + 'From', 0xFF2A2F6B), b = g(v, P + 'To', 0xFF0B0B10);
       defs = gradientDef(id, a, b, g(v, P + 'Angle', 90)); body = rect(0, 0, W, H, 0, 'url(#' + id + ')'); base = mixc(a, b, 0.5);
     } else if (kind === 'live') {
-      var s1 = g(v, P === 'wpGlance' ? 'bgSlot1' : 'wpPagesSlot1', 'spire'), s2 = g(v, P === 'wpGlance' ? 'bgSlot2' : 'wpPagesSlot2', 'breathing-dots'), ac = css(T.accent);
-      defs = '<linearGradient id="LG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="' + ac + '" stop-opacity="0.9"/><stop offset="1" stop-color="' + ac + '" stop-opacity="0"/></linearGradient>' +
-        '<linearGradient id="BGFX" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="' + ac + '" stop-opacity="0.4"/><stop offset="1" stop-color="' + ac + '" stop-opacity="0"/></linearGradient>';
-      body = rect(0, 0, W, H, 0, '#07070C') + (BG_LIVE[s1] ? BG_LIVE[s1](ac) : '') + (BG_FX[s2] ? BG_FX[s2](ac) : '') + text(180, 30, 'Signal wallpaper (drawn as a placeholder)', 8.5, 'rgba(255,255,255,0.35)', 'text-anchor="middle"');
-      base = 0xFF07070C;
+      var s1 = g(v, P === 'wpGlance' ? 'bgSlot1' : 'wpPagesSlot1', 'spire'), s2 = g(v, P === 'wpGlance' ? 'bgSlot2' : 'wpPagesSlot2', 'breathing-dots'), ac = css(T.accent), L = !T.dark;
+      defs = signalDefs(ac, L);
+      body = rect(0, 0, W, H, 0, 'url(#LBG)') + (BG_LIVE[s1] ? BG_LIVE[s1](ac, L) : '') + (BG_FX[s2] ? BG_FX[s2](ac) : '');
+      base = L ? 0xFFF1F1F6 : 0xFF05050A;
     } else if (kind === 'system') {
       defs = gradientDef(id, 0xFF22384D, 0xFF4A2F55, 70); body = rect(0, 0, W, H, 0, 'url(#' + id + ')') + text(180, 30, 'System live wallpaper shows through (placeholder)', 8.5, 'rgba(255,255,255,0.45)', 'text-anchor="middle"');
       var sd = g(v, P + 'SysDim', 0); if (sd) body += rect(0, 0, W, H, 0, '#000', 'opacity="' + sd / 100 + '"'); base = 0xFF30364F;
@@ -221,10 +250,13 @@
     // fit: the app shrinks the clock until it is inside its area (82 percent wide, 42 percent high)
     var sc = Math.min(1, TOP_AREA.w * areaW / bw, TOP_AREA.h * areaH / (bh + dateH));
     var w = bw * sc, h = (bh + dateH) * sc;
-    var x = clamp(g(v, 'glanceClockX', 0.5), 0, 1), y = clamp(g(v, 'glanceClockY', 0.14), 0, 1);
+    var kx = LAND ? 'glanceClockXLand' : 'glanceClockX', ky = LAND ? 'glanceClockYLand' : 'glanceClockY';
+    var x = clamp(g(v, kx, 0.5), 0, 1), y = clamp(g(v, ky, 0.14), 0, 1);
     var left = clamp(x * areaW - w / 2, 0, Math.max(0, areaW - w)), top = clamp(y * areaH, 0, Math.max(0, areaH - h));
     var inner = body(0, 0) + (showDate ? text(bw / 2, bh + 22, cp.date, 17, colr, 'text-anchor="middle" opacity="0.85"') : '');
-    return '<g transform="translate(' + f1(left) + ' ' + f1(top) + ') scale(' + f1(sc * 1000) / 1000 + ')">' + inner + '</g>';
+    // Wave 58 (CFG-72): the box is marked so the page can drag it (the app's clock edit mode); the drag writes the same two fields.
+    return '<g class="clock" data-kx="' + kx + '" data-ky="' + ky + '" data-left="' + f1(left) + '" data-top="' + f1(top) + '" data-w="' + f1(w) + '" data-h="' + f1(h) + '" data-areaw="' + areaW + '" data-areah="' + areaH + '">' +
+      rect(left, top, w, h, 8, 'transparent', 'class="clock-hit"') + '<g transform="translate(' + f1(left) + ' ' + f1(top) + ') scale(' + f1(sc * 1000) / 1000 + ')">' + inner + '</g></g>';
   }
 
   // ----------------------------------------------------------------------------------------------------- hotspots
@@ -284,37 +316,70 @@
 
   // ----------------------------------------------------------------------------------------------------------- dock
   function dockOn(v) { return g(v, 'dock.enabled', 'auto') !== 'off'; }
+  /** Where the dock sits: the bottom in portrait; in landscape the edge the settings say (DockSettings.edgeFor). */
+  function dockEdge(v) { var e = g(v, 'dock.edge', 'Bottom'); return LAND && (e === 'Left' || e === 'Right') ? e : 'Bottom'; }
+  var MAGNIFY = { subtle: 1.3, medium: 1.6, large: 2.0 };
+  /**
+   * Wave 58 (CFG-72): the icon scales of a dock row while a sample pointer rests on icon [at] (the app's rail magnifies only under a finger or
+   * pointer, so Studio shows it frozen): the icon under it at the strength's peak, the neighbours on a cosine falloff over two icons.
+   */
+  function magnifyScales(v, n, at) {
+    var peak = g(v, 'dock.magnify', false) ? (MAGNIFY[g(v, 'dock.magnifyStrength', 'medium')] || 1.6) : 1, out = [];
+    for (var i = 0; i < n; i++) { var d = Math.min(1, Math.abs(i - at) / 2); out.push(1 + (peak - 1) * Math.cos(d * Math.PI / 2)); }
+    return out;
+  }
   function dockLayer(v, T, ink, baseY) {
-    if (!dockOn(v)) return { svg: '', top: H };
-    var style = g(v, 'dock.style', 'standard'), mode = g(v, 'dock.mode', 'PinnedPlusRecent'), y = baseY, out = '';
-    if (mode === 'Collapsed') { return { svg: rect(W / 2 - 46, y + 24, 92, 5, 2.5, T.dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'), top: y + 18 }; }
-    var n = 4, size = 46, gap = 12, divider = 16, recent = 2, total = n * size + (n - 1) * gap + divider + recent * 38 + recent * 10;
-    var pw = total + 28, px = (W - pw) / 2, ph = 66, top = y - 4;
-    var icons = function (raise, halo) {
-      var s = '', x = px + 14;
-      for (var i = 0; i < n; i++) {
-        var iy = y + 3 - raise;
-        if (halo) s += circle(x + size / 2, iy + size / 2, size * 0.62, 'url(#dockhalo)');
-        if (style === '3d') s += '<ellipse cx="' + f1(x + size / 2) + '" cy="' + f1(y + size + 2) + '" rx="' + f1(size * 0.4) + '" ry="3" fill="rgba(0,0,0,0.35)"/>';
-        s += appIcon(v, x, iy, size, [0, 2, 5, 10][i], T); x += size + gap;
-      }
-      x += divider - gap; s += line(x - divider / 2 - 2, y + 8, x - divider / 2 - 2, y + 46, T.hair, 1);
-      for (var j = 0; j < recent; j++) { s += appIcon(v, x, y + 9 - raise / 2, 38, [3, 7][j], T) .replace(/^/, '<g opacity="0.85">') + '</g>'; x += 38 + 10; }
-      return s;
-    };
-    var defs = '<radialGradient id="dockhalo"><stop offset="0" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>' +
-      '<linearGradient id="slab" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + (T.dark ? '#3A3A46' : '#FFFFFF') + '"/><stop offset="1" stop-color="' + (T.dark ? '#1B1B22' : '#CFCFD8') + '"/></linearGradient>';
-    out += '<defs>' + defs + '</defs>';
-    if (style === 'transparent') out += icons(0, true);
-    else if (style === '3d') {
-      for (var k = 6; k >= 1; k--) out += rect(px - k, top + 4 + k * 1.4, pw + 2 * k, ph, 24 + k, 'rgba(0,0,0,' + f1(0.05 * (7 - k)) / 1 + ')');
-      out += rect(px, top, pw, ph, 24, 'url(#slab)', 'stroke="' + (T.dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.9)') + '"') + rect(px + 12, top + 4, pw - 24, 3, 1.5, 'rgba(255,255,255,0.35)') + icons(5, false);
-    } else out += rect(px, top, pw, ph, 24, T.panel, 'stroke="' + T.hair + '"') + icons(0, false);
-    if (g(v, 'dock.groupShelf', true)) {
-      var cx0 = W / 2 - 66;
-      ['Work', 'Play', 'Trip'].forEach(function (nm, i) { out += rect(cx0 + i * 46, top - 26, 40, 18, 9, T.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)') + text(cx0 + i * 46 + 20, top - 13.5, nm, 9, ink, 'text-anchor="middle"'); });
+    if (!dockOn(v)) return { svg: '', top: H, side: null, width: 0 };
+    var style = g(v, 'dock.style', 'standard'), mode = g(v, 'dock.mode', 'PinnedPlusRecent'), edge = dockEdge(v), y = baseY, out = '';
+    var vertical = edge !== 'Bottom';
+    if (mode === 'Collapsed') {
+      if (vertical) { var hx = edge === 'Left' ? 8 : W - 13; return { svg: rect(hx, H / 2 - 46, 5, 92, 2.5, T.dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'), top: H, side: edge, width: 18 }; }
+      return { svg: rect(W / 2 - 46, y + 24, 92, 5, 2.5, T.dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'), top: y + 18, side: null, width: 0 };
     }
-    return { svg: out, top: top - 30 };
+    var magnify = g(v, 'dock.magnify', false);
+    var items = [[0, 46, 1], [2, 46, 1], [5, 46, 1], [10, 46, 1], [3, 38, 0.85], [7, 38, 0.85]], n = items.length, gap = 12, divider = 16;
+    var sc = magnifyScales(v, n, 1);
+    var along = 0; items.forEach(function (it, i) { along += it[1] + (i < n - 1 ? (i === 3 ? divider : gap) : 0); });
+    var thick = 66, pad = 14, len = along + 2 * pad;
+    // the bar: horizontal at the bottom, or a column at a side edge in landscape
+    var bx, by, bw, bh;
+    if (vertical) { bw = thick; bh = len; bx = edge === 'Left' ? 10 : W - 10 - thick; by = (H - len) / 2; }
+    else { bw = len; bh = thick; bx = (W - len) / 2; by = y - 4; }
+    var defs = '<radialGradient id="dockhalo"><stop offset="0" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="slab" x1="0" y1="0" x2="' + (vertical ? 1 : 0) + '" y2="' + (vertical ? 0 : 1) + '"><stop offset="0" stop-color="' + (T.dark ? '#3A3A46' : '#FFFFFF') + '"/><stop offset="1" stop-color="' + (T.dark ? '#1B1B22' : '#CFCFD8') + '"/></linearGradient>';
+    out += '<defs>' + defs + '</defs>';
+    if (style === '3d') {
+      for (var k = 6; k >= 1; k--) out += rect(bx - k, by + 4 + k * 1.4, bw + 2 * k, bh, 24 + k, 'rgba(0,0,0,' + f1(0.05 * (7 - k)) / 1 + ')');
+      out += rect(bx, by, bw, bh, 24, 'url(#slab)', 'stroke="' + (T.dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.9)') + '"') + (vertical ? '' : rect(bx + 12, by + 4, bw - 24, 3, 1.5, 'rgba(255,255,255,0.35)'));
+    } else if (style !== 'transparent') out += rect(bx, by, bw, bh, 24, T.panel, 'stroke="' + T.hair + '"');
+    // the icons, grown under the sample pointer; they grow away from the edge the dock sits on, and the row spreads to make room
+    var extra = 0; items.forEach(function (it, i) { extra += it[1] * (sc[i] - 1); });
+    // the grown row stays on the screen: when it would not fit, the whole row is drawn a little smaller (the bar keeps its place)
+    var room = (vertical ? H : W) - 16, fit = Math.min(1, room / (along + extra)), grow = 0;
+    var pos = Math.max(8, (vertical ? by : bx) + pad - extra * fit / 2 - (along * (1 - fit)) / 2), raise = style === '3d' ? 5 : 0, pointer = null;
+    items.forEach(function (it, i) {
+      var size = it[1] * sc[i] * fit, ix, iy; grow = Math.max(grow, size - it[1]);
+      if (vertical) { iy = pos; ix = edge === 'Left' ? bx + (thick - it[1]) / 2 : bx + thick - (thick - it[1]) / 2 - size; }
+      else { ix = pos; iy = by + 4 + (it[1] === 46 ? 3 : 9) + it[1] - size - raise; }
+      if (style === 'transparent') out += circle(ix + size / 2, iy + size / 2, size * 0.62, 'url(#dockhalo)');
+      if (style === '3d' && !vertical) out += '<ellipse cx="' + f1(ix + size / 2) + '" cy="' + f1(by + 4 + it[1] + 7) + '" rx="' + f1(size * 0.4) + '" ry="3" fill="rgba(0,0,0,0.35)"/>';
+      var ic = appIcon(v, ix, iy, size, it[0], T);
+      out += it[2] < 1 ? '<g opacity="' + it[2] + '">' + ic + '</g>' : ic;
+      if (i === 1) pointer = vertical ? [edge === 'Left' ? ix + size + 10 : ix - 10, iy + size / 2] : [ix + size / 2, iy - 10];
+      pos += size + (i < n - 1 ? (i === 3 ? divider : gap) * fit : 0);
+      if (i === 3) {
+        var dp = pos - divider / 2 - 2;
+        out += vertical ? line(bx + 8, dp, bx + thick - 8, dp, T.hair, 1) : line(dp, by + 12, dp, by + 50, T.hair, 1);
+      }
+    });
+    if (magnify && pointer) out += '<g class="magnify-sample">' + circle(pointer[0], pointer[1], 6, 'none', 'stroke="' + ink + '" stroke-width="1.5" stroke-opacity="0.85"') + circle(pointer[0], pointer[1], 2, ink, 'fill-opacity="0.85"') + '</g>';
+    if (g(v, 'dock.groupShelf', true) && !vertical) {
+      var cx0 = W / 2 - 66;
+      var cy0 = by - 26 - Math.max(0, grow);
+      ['Work', 'Play', 'Trip'].forEach(function (nm, i) { out += rect(cx0 + i * 46, cy0, 40, 18, 9, T.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)') + text(cx0 + i * 46 + 20, cy0 + 12.5, nm, 9, ink, 'text-anchor="middle"'); });
+    }
+    if (vertical) return { svg: out, top: H, side: edge, width: thick + 16 };
+    return { svg: out, top: by - 30 - Math.max(0, grow), side: null, width: 0 };
   }
 
   // ----------------------------------------------------------------------------------------------------- chrome pieces
@@ -361,13 +426,15 @@
     var rtl = g(v, 'homeOrder', 'LeftToRight') === 'RightToLeft', mode = g(v, 'homePages', 'Off');
     var topY = g(v, 'hideStatusBar', true) ? 50 : 64, d = dockLayer(v, T, ink, H - 108), bottomY = (dockOn(v) ? d.top : H - 70) - 6;
     var inX = clamp(g(v, 'gridInsetX', 0), 0, 0.25) * W, inT = clamp(g(v, 'gridInsetTop', 0), 0, 0.25) * H, inB = clamp(g(v, 'gridInsetBottom', 0), 0, 0.25) * H;
-    var left = inX + 8, availW = W - 2 * inX - 16, top = topY + inT, availH = Math.max(120, bottomY - top - inB);
+    if (d.side) bottomY = H - 30; // a side dock in landscape leaves the bottom free and takes a strip at its edge
+    var left = inX + 8 + (d.side === 'Left' ? d.width : 0), availW = W - 2 * inX - 16 - (d.side ? d.width : 0), top = topY + inT, availH = Math.max(LAND ? 80 : 120, bottomY - top - inB);
     var labels = g(v, 'labels', false), ls = g(v, 'labelScale', 1), labelH = labels ? 14 * ls : 0;
     var cols, rows, horizontalCont = false, cont = mode === 'Continuous';
     if (cont) {
-      var ax = g(v, 'scrollAxis', 'Long'); horizontalCont = ax === 'Horizontal' || ax === 'Short'; // portrait: the long side is vertical
+      var ax = g(v, 'scrollAxis', 'Long'); horizontalCont = ax === 'Horizontal' || ax === (LAND ? 'Long' : 'Short'); // the long side is vertical in portrait, across in landscape
       cols = horizontalCont ? 5 : g(v, 'contCols', 4); rows = horizontalCont ? g(v, 'contCols', 4) : 7;
     } else if (g(v, 'adaptiveGrid', false)) { var dn = g(v, 'gridDensity', 1); cols = Math.max(2, Math.round(availW / (76 / dn))); rows = Math.max(1, Math.round(availH / ((84 + labelH) / dn))); }
+    else if (LAND) { cols = g(v, 'lCols', 5); rows = g(v, 'lRows', 2); }
     else { cols = g(v, 'pCols', 3); rows = g(v, 'pRows', 6); }
     var sp = clamp(g(v, 'iconSpacing', 0), 0, 1), spV = g(v, 'spacingV', -1) < 0 ? sp : clamp(g(v, 'spacingV', -1), 0, 1);
     var pitchC = Math.min(availW / cols, availH / rows), pitchX = lerp(pitchC, availW / cols, sp), pitchY = lerp(pitchC, availH / rows, spV);
@@ -539,13 +606,29 @@
    * The phone as SVG text for a scene. [values] is a configuration (schema key -> value; missing keys read as the defaults of the code that the
    * drawing hard-codes, which are the same as the schema defaults).
    */
+  /** Scenes drawn in landscape when asked (opts.landscape): the home surfaces, where the side dock and the landscape clock place live. */
+  var LANDSCAPE_SCENES = { glance: true, pages: true };
   function render(scene, values, opts) {
-    var v = values || {}, T = theme(v), sc = SCENE_FN[SCENE_ALIAS[scene] || scene] || glanceScene, r = sc(v, T), font = fontOf(v), cid = uid('scr');
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 760" role="img" aria-label="Phone preview: ' + esc(scene) + '" font-family="' + esc(font) + '">' +
-      '<defs><clipPath id="' + cid + '"><rect x="10" y="10" width="360" height="740" rx="34"/></clipPath>' + r.defs + '</defs>' +
-      '<rect x="0" y="0" width="380" height="760" rx="44" fill="#16161B"/><rect x="2" y="2" width="376" height="756" rx="42" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>' +
-      '<g clip-path="url(#' + cid + ')"><g transform="translate(10 10)">' + r.body + '</g></g>' +
-      '<rect x="162" y="16" width="56" height="6" rx="3" fill="rgba(0,0,0,0.55)"/></svg>';
+    var id = SCENE_ALIAS[scene] || scene, land = !!(opts && opts.landscape) && !!LANDSCAPE_SCENES[id];
+    LAND = land; W = land ? PH : PW; H = land ? PW : PH;
+    try {
+      var v = values || {}, T = theme(v), sc = SCENE_FN[id] || glanceScene, r = sc(v, T), font = fontOf(v), cid = uid('scr');
+      var fw = W + 20, fh = H + 20;
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + fw + ' ' + fh + '" role="img" aria-label="Phone preview: ' + esc(scene) + (land ? ', landscape' : '') + '" font-family="' + esc(font) + '" data-landscape="' + land + '">' +
+        '<defs><clipPath id="' + cid + '"><rect x="10" y="10" width="' + W + '" height="' + H + '" rx="34"/></clipPath>' + r.defs + '</defs>' +
+        '<rect x="0" y="0" width="' + fw + '" height="' + fh + '" rx="44" fill="#16161B"/><rect x="2" y="2" width="' + (fw - 4) + '" height="' + (fh - 4) + '" rx="42" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>' +
+        '<g clip-path="url(#' + cid + ')"><g class="screen" transform="translate(10 10)">' + r.body + '</g></g>' +
+        (land ? '<rect x="16" y="' + (fh / 2 - 28) + '" width="6" height="56" rx="3" fill="rgba(0,0,0,0.55)"/>' : '<rect x="162" y="16" width="56" height="6" rx="3" fill="rgba(0,0,0,0.55)"/>') + '</svg>';
+    } finally { LAND = false; W = PW; H = PH; }
+  }
+
+  /**
+   * Wave 58 (CFG-72): the clock dragged on the Glance. The box (in dp of the drawn screen) is kept inside the screen and turned into the two
+   * placement fields the app's edit mode writes (centre across, top down, each 0 to 1, to the hundredth).
+   */
+  function clockFromBox(left, top, w, h, areaW, areaH) {
+    var l = clamp(left, 0, Math.max(0, areaW - w)), t = clamp(top, 0, Math.max(0, areaH - h));
+    return { x: Math.round(clamp((l + w / 2) / areaW, 0, 1) * 100) / 100, y: Math.round(clamp(t / areaH, 0, 1) * 100) / 100 };
   }
 
   /** The scene a field wants (aliases resolved), or the tab's own scene. */
@@ -554,7 +637,7 @@
 
   return {
     SCENES: SCENES, FONTS: FONTS, TAB_SCENE: TAB_SCENE, W: W, H: H,
-    render: render, sceneFor: sceneFor,
+    render: render, sceneFor: sceneFor, clockFromBox: clockFromBox, magnifyScales: magnifyScales, LANDSCAPE_SCENES: LANDSCAPE_SCENES,
     helpers: { glyph: glyph, glyphKey: glyphKey, GLYPHS: GLYPHS, appIcon: appIcon, theme: theme, css: css, shapePath: shapePath, closeShape: closeShape, rect: rect, circle: circle, line: line, text: text, analog: analog, f1: f1, esc: esc, lum: lum, mixc: mixc, g: g, clamp: clamp, APP_COLOURS: APP_COLOURS, regularIndicators: regularIndicators },
   };
 });

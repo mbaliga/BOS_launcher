@@ -18,10 +18,10 @@
   var storage, storageOk = true;
   try { storage = window.localStorage; storage.setItem('liftoff_studio_probe', '1'); storage.removeItem('liftoff_studio_probe'); } catch (e) { storage = Core.memoryStorage(); storageOk = false; }
   var profiles = new Core.Profiles(ix, storage);
-  var ui = { tab: 'home', scene: 'glance', follow: true, theme: 'auto', adv: {} };
-  try { var saved = JSON.parse(storage.getItem(Core.UI_KEY) || '{}'); ['tab', 'theme', 'follow'].forEach(function (k) { if (saved[k] !== undefined) ui[k] = saved[k]; }); } catch (e) { /* defaults */ }
+  var ui = { tab: 'home', scene: 'glance', follow: true, theme: 'auto', adv: {}, landscape: false };
+  try { var saved = JSON.parse(storage.getItem(Core.UI_KEY) || '{}'); ['tab', 'theme', 'follow', 'landscape'].forEach(function (k) { if (saved[k] !== undefined) ui[k] = saved[k]; }); } catch (e) { /* defaults */ }
   if (!ix.tabs.some(function (t) { return t.id === ui.tab; })) ui.tab = 'home';
-  function saveUi() { try { storage.setItem(Core.UI_KEY, JSON.stringify({ tab: ui.tab, theme: ui.theme, follow: ui.follow })); } catch (e) { /* not kept */ } }
+  function saveUi() { try { storage.setItem(Core.UI_KEY, JSON.stringify({ tab: ui.tab, theme: ui.theme, follow: ui.follow, landscape: ui.landscape })); } catch (e) { /* not kept */ } }
   var undoSnapshot = null;
 
   function vals() { return profiles.active().values; }
@@ -48,15 +48,50 @@
     if (renderQueued) return; renderQueued = true;
     requestAnimationFrame(function () {
       renderQueued = false;
-      $('phone').innerHTML = Prev.render(ui.scene, vals());
+      $('phone').innerHTML = Prev.render(ui.scene, vals(), { landscape: ui.landscape });
+      wireClockDrag();
       var sb = $('scenes'); Array.prototype.forEach.call(sb.children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.scene === ui.scene)); });
       $('caption').textContent = captionFor(ui.scene);
     });
   }
+  // Wave 58 (CFG-72): the Glance clock is moved by dragging it in the preview (or with the arrow keys once it has focus), as in the app's
+  // clock edit mode; it writes the clock place of the orientation shown (glanceClockX / Y, or the landscape pair).
+  function wireClockDrag() {
+    var svg = $('phone').querySelector('svg'), c = svg && svg.querySelector('g.clock');
+    if (!c) return;
+    var kx = c.getAttribute('data-kx'), ky = c.getAttribute('data-ky');
+    var box = ['left', 'top', 'w', 'h', 'areaw', 'areah'].map(function (k) { return Number(c.getAttribute('data-' + k)); });
+    c.setAttribute('tabindex', '0'); c.setAttribute('role', 'button'); c.setAttribute('aria-roledescription', 'movable clock');
+    c.setAttribute('aria-label', 'Clock: drag it, or use the arrow keys, to move it on the Glance (' + Math.round(vals()[kx] * 100) + '% across, ' + Math.round(vals()[ky] * 100) + '% down)');
+    function commit(left, top) {
+      var r = Prev.clockFromBox(left, top, box[2], box[3], box[4], box[5]);
+      profiles.set(kx, r.x); profiles.set(ky, r.y); afterChange(ix.byKey[kx]); renderPanelSoon();
+      return r;
+    }
+    function toSvg(e) { var m = svg.getScreenCTM(); if (!m) return { x: e.clientX, y: e.clientY }; var pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; var q = pt.matrixTransform(m.inverse()); return { x: q.x, y: q.y }; }
+    var start = null;
+    c.addEventListener('pointerdown', function (e) { start = toSvg(e); c.setPointerCapture && c.setPointerCapture(e.pointerId); c.classList.add('dragging'); e.preventDefault(); });
+    c.addEventListener('pointermove', function (e) {
+      if (!start) return; var p = toSvg(e), dx = p.x - start.x, dy = p.y - start.y;
+      var l = Math.max(0, Math.min(box[4] - box[2], box[0] + dx)), t = Math.max(0, Math.min(box[5] - box[3], box[1] + dy));
+      c.setAttribute('transform', 'translate(' + (l - box[0]) + ' ' + (t - box[1]) + ')');
+    });
+    function end(e) { if (!start) return; var p = toSvg(e); commit(box[0] + p.x - start.x, box[1] + p.y - start.y); start = null; }
+    c.addEventListener('pointerup', end); c.addEventListener('pointercancel', function () { start = null; renderPreview(); });
+    c.addEventListener('keydown', function (e) {
+      var step = e.shiftKey ? 0.05 : 0.01, x = vals()[kx], y = vals()[ky];
+      if (e.key === 'ArrowLeft') x -= step; else if (e.key === 'ArrowRight') x += step; else if (e.key === 'ArrowUp') y -= step; else if (e.key === 'ArrowDown') y += step; else return;
+      e.preventDefault();
+      commit(x * box[4] - box[2] / 2, y * box[5]);
+      setTimeout(function () { var again = $('phone').querySelector('g.clock'); if (again) again.focus(); }, 30);
+    });
+  }
   function captionFor(scene) {
     var v = vals();
-    if (scene === 'glance') return v.glanceEnabled === false ? 'Glance is off: the first page is the home.' : 'The Glance: wallpaper, clock, music line, hotspots, calm style and dock.';
-    if (scene === 'pages') return v.homePages === 'Off' ? 'Pages are Off, so home is the Glance only. This is how the first page would look.' : v.homePages === 'Continuous' ? 'The scroll after the Glance, column by column.' : 'A page after the Glance.';
+    var land = ui.landscape && Prev.LANDSCAPE_SCENES[scene] ? ' Landscape' + (v['dock.enabled'] !== 'off' && v['dock.edge'] !== 'Bottom' ? ', dock at the ' + String(v['dock.edge']).toLowerCase() + '.' : '.') : '';
+    var mag = v['dock.magnify'] && v['dock.enabled'] !== 'off' && (scene === 'glance' || scene === 'pages') ? ' Dock magnified under a sample pointer.' : '';
+    if (scene === 'glance') return (v.glanceEnabled === false ? 'Glance is off: the first page is the home.' : 'The Glance. Drag the clock to move it.') + land + mag;
+    if (scene === 'pages') return (v.homePages === 'Off' ? 'Pages are Off, so home is the Glance only. This is how the first page would look.' : v.homePages === 'Continuous' ? 'The scroll after the Glance, column by column.' : 'A page after the Glance.') + land + mag;
     if (scene === 'radar') return 'Radar, search. The layout is a sketch, the results are samples.';
     if (scene === 'disc') return 'The app drawer disc with its shortcut ring at the bottom left corner.';
     if (scene === 'comms') return 'Comms, the side panel left of home (shown over the home card).';
@@ -183,39 +218,188 @@
   }
   function selectTab(id) { ui.tab = id; saveUi(); renderTabs(); renderPanel(); if (ui.follow) setScene(Prev.TAB_SCENE[id] || 'glance'); $('tabPanel').setAttribute('aria-labelledby', 'tab_' + id); }
 
+  // ---- the panel: the app's sections of the tab, in the app's order (schema tabs[].sections, from SettingsTabLayout)
+  var SECTION_NOTES = {
+    'home/External displays': 'Set on the phone, with the display connected.',
+    'apps/App groups and sessions': 'App groups are made on the phone or from the suggestions under Profiles; sessions are saved on the phone. Both travel in a Backup unchanged.',
+    'apps/Hidden apps': 'Chosen on the phone, from the apps installed there.',
+    'apps/Open with': 'Chosen on the phone, from the apps installed there.',
+    'radar/Privacy': 'Search history and aliases stay on the phone.',
+    'side/Sections': 'The widgets section of the hub is set on the phone (widgets cannot move between phones).',
+    'side/Groups and rules': 'Comms groups and rules are edited on the phone; a Backup carries them unchanged.',
+    'side/Clean up': 'Actions on the phone’s notifications.',
+    'system/Access and privacy': 'Permissions are granted on the phone and cannot be set from a file.',
+    'system/Help and recovery': 'Capabilities and crash reports are read on the phone.',
+    'system/About': 'The version and licences are shown on the phone.',
+  };
+  function rowTitle(f) { return String(f.row || '').split('/').slice(1).join('/'); }
   function renderPanel(keepFocus) {
     var focusKey = keepFocus && document.activeElement && document.activeElement.closest ? (document.activeElement.closest('.row') || {}).dataset : null;
     var tab = ix.tabs.filter(function (t) { return t.id === ui.tab; })[0], root = $('tabPanel'); root.innerHTML = '';
     root.appendChild(el('p', { class: 'blurb', text: tab.blurb }));
-    var groups = [], seen = {};
-    ix.fields.forEach(function (f) { if (f.tab !== ui.tab || f.deviceBound) return; if (!seen[f.group]) { seen[f.group] = { name: f.group, fields: [] }; groups.push(seen[f.group]); } seen[f.group].fields.push(f); });
-    groups.forEach(function (gr) {
-      var sec = el('section', { class: 'group' }, [el('h2', { text: gr.name })]);
-      var main = gr.fields.filter(function (f) { return !f.advanced && showWhenOk(f); }), adv = gr.fields.filter(function (f) { return f.advanced && showWhenOk(f); });
-      main.forEach(function (f) { sec.appendChild(buildField(f)); });
+    var sections = tab.sections || [], byGroup = {};
+    ix.fields.forEach(function (f) { if (f.tab !== ui.tab || f.deviceBound) return; (byGroup[f.group] = byGroup[f.group] || []).push(f); if (sections.indexOf(f.group) < 0) sections = sections.concat([f.group]); });
+    sections.forEach(function (name) {
+      var fields = byGroup[name] || [], key = ui.tab + '/' + name;
+      var sec = el('section', { class: 'group', 'data-section': name }, [el('h2', { text: name })]);
+      if (key === 'apps/Profiles') { renderPhoneProfiles(sec); root.appendChild(sec); return; }
+      if (key === 'look/Looks') { renderLooksInline(sec); root.appendChild(sec); return; }
+      var main = fields.filter(function (f) { return !f.advanced && showWhenOk(f); }), adv = fields.filter(function (f) { return f.advanced && showWhenOk(f); });
+      // a row of the app that holds four or more of these fields (a wallpaper) gets its own small heading, as its page does in the app
+      var perRow = {}; main.forEach(function (f) { perRow[f.row] = (perRow[f.row] || 0) + 1; });
+      var lastRow = null;
+      main.forEach(function (f) {
+        if (f.row !== lastRow && perRow[f.row] >= 4 && rowTitle(f) !== name) sec.appendChild(el('h3', { class: 'subhead', text: rowTitle(f) }));
+        lastRow = f.row; sec.appendChild(buildField(f));
+      });
       if (adv.length) {
         var d = el('details', { class: 'more' }, [el('summary', { text: 'More (' + adv.length + ')' })]);
-        d.open = !!ui.adv[gr.name]; d.addEventListener('toggle', function () { ui.adv[gr.name] = d.open; });
+        d.open = !!ui.adv[name]; d.addEventListener('toggle', function () { ui.adv[name] = d.open; });
         adv.forEach(function (f) { d.appendChild(buildField(f)); });
         sec.appendChild(d);
       }
-      if (main.length || adv.length) root.appendChild(sec);
+      if (!fields.length) sec.appendChild(el('p', { class: 'phone-only', text: SECTION_NOTES[key] || (name === 'Lab' ? 'Lab switches are set on the phone.' : 'Set on the phone.') }));
+      else if (!main.length && !adv.length) sec.appendChild(el('p', { class: 'phone-only', text: 'Nothing here applies with the choices above.' }));
+      root.appendChild(sec);
     });
-    var bound = ix.fields.filter(function (f) { return f.tab === ui.tab && f.deviceBound; });
-    if (ui.tab === 'apps') root.appendChild(el('div', { class: 'note', html: '<b>Workspaces and app groups</b> are made on the phone, with the apps you have installed. They are not edited here. When you import a full Backup into Studio and export it again, they travel through unchanged.' }));
     if (ui.tab === 'system') {
       root.appendChild(el('div', { class: 'note', html: '<b>Backup and access.</b> Export makes the file the app\'s Backup imports, and Import reads a file the app made. Permissions (notifications, usage access, the default launcher) are granted on the phone and cannot be set from a file.' }));
       root.appendChild(el('div', { class: 'summary' }, [
         el('span', { text: profiles.changedKeys().length + ' settings differ from the app defaults.' }),
         el('button', { type: 'button', class: 'btn', text: 'Reset this profile', onclick: function () { resetProfile(); } }),
       ]));
-    }
-    if (bound.length || ui.tab === 'system') {
       var all = ix.fields.filter(function (f) { return f.deviceBound; });
-      if (ui.tab === 'system') root.appendChild(el('div', { class: 'note', html: '<b>Stays on the phone.</b> These are never in an export and Studio does not touch them: the first-run tour state, the widget on the left page, and the picture files of the wallpapers (' + all.length + ' settings in all). A restored phone with a Picture wallpaper but no file draws the solid colour.' }));
+      root.appendChild(el('div', { class: 'note', html: '<b>Stays on the phone.</b> These are never in an export and Studio does not touch them: the first-run tour state, the widget on the left page, and the picture files of the wallpapers (' + all.length + ' settings in all). A restored phone with a Picture wallpaper but no file draws the solid colour.' }));
     }
     root.setAttribute('aria-labelledby', 'tab_' + ui.tab);
     if (focusKey && focusKey.key) { var again = document.querySelector('.row[data-key="' + focusKey.key + '"] input, .row[data-key="' + focusKey.key + '"] select'); if (again && again.focus) try { again.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+  }
+
+  function renderLooksInline(sec) {
+    sec.appendChild(el('p', { class: 'phone-only', text: 'Quick looks change the theme, accent, wallpaper, icons, font and dock style of this Studio profile at once.' }));
+    var c = el('div', { class: 'chips' });
+    Core.LOOKS.forEach(function (lk) { c.appendChild(el('button', { type: 'button', class: 'chip', onclick: function () { applyPresetToCurrent(lk); } }, [el('b', { text: lk.name }), el('small', { text: lk.note })])); });
+    sec.appendChild(c);
+  }
+
+  // ---- phone profiles (the phone's Profiles page, CFG-71). The list lives in the Studio profile's Backup (extras.base).
+  function phoneDocOf(p) { var b = p.extras && p.extras.base; return b && Array.isArray(b.workspaces) && b.workspaces.length ? b : null; }
+  function savePhone(doc, values) {
+    var p = profiles.active(); p.extras = p.extras || Core.newExtras(); p.extras.base = doc;
+    if (values) Object.keys(values).forEach(function (k) { if (ix.byKey[k] && !ix.byKey[k].deviceBound) p.values[k] = values[k]; });
+    profiles.save(); if (profiles.saveError) toast(profiles.saveError);
+    renderPanel(); renderPreview();
+  }
+  function groupLabels(ids) { return (ix.schema.profileGroups || []).filter(function (g) { return (ids || []).indexOf(g.id) >= 0; }).map(function (g) { return g.label; }); }
+  function carriesCards(selected, onChange, idPrefix) {
+    var wrap = el('div', { class: 'cards wide', role: 'group', 'aria-label': 'Settings that ride along' });
+    (ix.schema.profileGroups || []).forEach(function (g) {
+      var inp = el('input', { type: 'checkbox', id: idPrefix + g.id, onchange: function () {
+        var now = (ix.schema.profileGroups || []).filter(function (x) { return x.id === g.id ? inp.checked : selected.indexOf(x.id) >= 0; }).map(function (x) { return x.id; });
+        onChange(now);
+      } });
+      inp.checked = selected.indexOf(g.id) >= 0;
+      wrap.appendChild(el('label', { class: 'cardopt textonly check' }, [inp, el('span', {}, [el('b', { text: g.label }), el('small', { text: g.keys.length + ' settings' })])]));
+    });
+    return wrap;
+  }
+  function renderPhoneProfiles(sec) {
+    var p = profiles.active(), doc = phoneDocOf(p), values = p.values;
+    var made = p.extras && p.extras.phoneMade;
+    sec.appendChild(el('p', { class: 'phone-only', text: 'The phone’s profiles: named setups (home, dock, calm centre) that can carry groups of settings. Switch them on the phone; here you prepare them in the Backup file. (The Studio profiles at the top are drafts kept in this browser.)' }));
+    if (!doc) {
+      sec.appendChild(el('p', { class: 'phone-only', text: 'This Studio profile holds no phone profiles. Import a Backup made on the phone to edit its profiles, or start a list here: when the file is imported, the list replaces the phone’s, and Home keeps the home that is on the phone.' }));
+      sec.appendChild(el('div', { class: 'row-actions' }, [el('button', { type: 'button', class: 'btn', id: 'phoneStart', text: 'Start a profile list', onclick: function () {
+        var pp = profiles.active(); pp.extras = pp.extras || Core.newExtras(); pp.extras.phoneMade = !(pp.extras.base && pp.extras.base.workspaces);
+        savePhone(Core.withPhoneProfiles(ix, pp.extras.base), null);
+      } })]));
+      return;
+    }
+    if (made) sec.appendChild(el('p', { class: 'warnline', text: 'Made in Studio: importing this file replaces the phone’s profile list.' }));
+    var activeId = (doc.dock && doc.dock.activeId) || doc.workspaces[0].id;
+    var phone = Core.phoneProfiles(ix, doc);
+    var ul = el('ul', { class: 'plist phonelist', id: 'phoneList' });
+    phone.forEach(function (pp) {
+      var isAct = pp.id === activeId, carries = groupLabels(pp.carries);
+      var li = el('li', { 'aria-current': String(isAct), 'data-id': pp.id }, [
+        el('span', { class: 'pname' }, [el('b', { text: pp.name }), isAct ? el('span', { class: 'badge', text: 'Active' }) : null, el('small', { text: carries.length ? 'Carries ' + carries.join(', ') : 'No settings ride along' })]),
+        isAct ? null : el('button', { type: 'button', class: 'btn', text: 'Switch', onclick: function () { var r = Core.switchPhoneProfile(ix, doc, pp.id, values); if (r.ok) { savePhone(r.doc, r.values); toast('Switched to ' + pp.name + ' (its settings are now the ones Studio shows)'); } } }),
+        el('button', { type: 'button', class: 'btn', text: ui.phoneSel === pp.id ? 'Close' : 'Edit', 'aria-expanded': String(ui.phoneSel === pp.id), onclick: function () { ui.phoneSel = ui.phoneSel === pp.id ? null : pp.id; ui.phoneNew = false; renderPanel(); } }),
+      ]);
+      ul.appendChild(li);
+      if (ui.phoneSel === pp.id) ul.appendChild(el('li', { class: 'pedit' }, [phoneEditor(doc, pp, isAct, values)]));
+    });
+    sec.appendChild(ul);
+    sec.appendChild(el('div', { class: 'row-actions' }, [el('button', { type: 'button', class: 'btn', id: 'phoneNew', text: ui.phoneNew ? 'Cancel new profile' : 'New profile', onclick: function () { ui.phoneNew = !ui.phoneNew; ui.phoneSel = null; ui.phoneDraft = null; renderPanel(); } })]));
+    if (ui.phoneNew) sec.appendChild(phoneNewForm(doc, values));
+    sec.appendChild(phoneSuggestions(doc, phone, activeId));
+  }
+  function phoneEditor(doc, pp, isAct, values) {
+    var box = el('div', { class: 'pbox' });
+    var name = el('input', { type: 'text', value: pp.name, maxlength: 40, 'aria-label': 'Profile name' });
+    box.appendChild(el('div', { class: 'prow' }, [name, el('button', { type: 'button', class: 'btn', text: 'Rename', onclick: function () { var r = Core.renamePhoneProfile(doc, pp.id, name.value); if (r.ok) savePhone(r.doc); else toast(r.error); } }),
+      el('button', { type: 'button', class: 'btn', text: 'Duplicate', onclick: function () { var r = Core.duplicatePhoneProfile(doc, pp.id); if (r.ok) { ui.phoneSel = r.id; savePhone(r.doc); toast('Duplicated'); } } }),
+      el('button', { type: 'button', class: 'btn danger', text: 'Delete', disabled: isAct, title: isAct ? 'Switch to another profile first' : '', onclick: function () { if (!window.confirm('Delete the phone profile "' + pp.name + '" from this file?')) return; var r = Core.deletePhoneProfile(doc, pp.id); if (r.ok) { ui.phoneSel = null; savePhone(r.doc); } else toast(r.error); } })]));
+    box.appendChild(el('h3', { class: 'subhead', text: 'Settings that ride along' }));
+    box.appendChild(el('p', { class: 'phone-only', text: isAct ? 'While this profile is active, the settings of a ticked group are its own: what Studio shows is the profile’s value.' : 'A ticked group starts from the global values; switch to this profile to edit them in Studio.' }));
+    box.appendChild(carriesCards(pp.carries, function (now) { var r = Core.setPhoneCarries(ix, doc, pp.id, now, values); if (r.ok) savePhone(r.doc, r.values); }, 'pc_' + pp.id + '_'));
+    if (pp.warnings.length) box.appendChild(el('ul', { class: 'warn' }, pp.warnings.slice(0, 4).map(function (w) { return el('li', { text: w }); })));
+    return box;
+  }
+  function phoneNewForm(doc, values) {
+    var starts = ix.schema.profileStarts || [], d = ui.phoneDraft || (ui.phoneDraft = { start: 'Empty', carries: [], name: '' });
+    var box = el('div', { class: 'pbox', id: 'phoneNewForm' }, [el('h3', { class: 'subhead', text: 'New profile' })]);
+    var name = el('input', { type: 'text', value: d.name, placeholder: (starts.filter(function (s) { return s.id === d.start; })[0] || {}).label || 'Name', maxlength: 40, 'aria-label': 'Name of the new profile', oninput: function () { d.name = name.value; } });
+    box.appendChild(name);
+    box.appendChild(el('h3', { class: 'subhead', text: 'Start from' }));
+    var cards = el('div', { class: 'cards wide', role: 'radiogroup', 'aria-label': 'Start from' });
+    starts.forEach(function (s) {
+      var inp = el('input', { type: 'radio', name: 'phoneStart', value: s.id, onchange: function () { d.start = s.id; d.carries = s.carries.slice(); renderPanel(); } });
+      inp.checked = s.id === d.start;
+      cards.appendChild(el('label', { class: 'cardopt textonly check' }, [inp, el('span', {}, [el('b', { text: s.label }), el('small', { text: s.detail })])]));
+    });
+    box.appendChild(cards);
+    box.appendChild(el('h3', { class: 'subhead', text: 'Settings that ride along' }));
+    box.appendChild(carriesCards(d.carries, function (now) { d.carries = now; }, 'pn_'));
+    box.appendChild(el('div', { class: 'row-actions' }, [el('button', { type: 'button', class: 'btn primary', id: 'phoneCreate', text: 'Create', onclick: function () {
+      var r = Core.createPhoneProfile(ix, doc, { start: d.start, name: d.name, carries: d.carries, values: values, apps: Core.backupApps(doc) });
+      if (!r.ok) { toast(r.error); return; }
+      ui.phoneNew = false; ui.phoneDraft = null; ui.phoneSel = r.id; savePhone(r.doc); toast('Made the profile');
+    } })]));
+    return box;
+  }
+  function phoneSuggestions(doc, phone, activeId) {
+    var box = el('div', { class: 'pbox sugg', id: 'phoneSuggest' }, [el('h3', { class: 'subhead', text: 'Suggested app groups' })]);
+    var apps = Core.backupApps(doc), sugg = Core.suggestGroups(ix, apps), s = ix.schema.appSuggest || { min: 2, max: 4 };
+    if (!sugg.length) {
+      box.appendChild(el('p', { class: 'phone-only', text: 'Suggestions run on the phone, from the apps installed there (their names and categories never travel in a Backup). ' + (apps.length ? 'This file names ' + apps.length + ' app' + (apps.length === 1 ? '' : 's') + ', not enough to suggest a group.' : 'This file names no apps.') }));
+      return box;
+    }
+    box.appendChild(el('p', { class: 'phone-only', text: 'From the ' + apps.length + ' apps this file names, with the phone’s own tables (the phone also reads the categories apps declare, so it may suggest more). An app group opens ' + s.min + ' to ' + s.max + ' apps together.' }));
+    ui.sugg = ui.sugg || {};
+    sugg.forEach(function (g) {
+      var picked = ui.sugg[g.kind] || (ui.sugg[g.kind] = g.apps.slice(0, s.max).map(function (a) { return a.key; }));
+      var list = el('div', { class: 'suglist', role: 'group', 'aria-label': g.label });
+      g.apps.forEach(function (a) {
+        var inp = el('input', { type: 'checkbox', onchange: function () {
+          var i = picked.indexOf(a.key);
+          if (inp.checked && i < 0) { if (picked.length >= s.max) { inp.checked = false; toast('At most ' + s.max + ' apps in a group'); return; } picked.push(a.key); }
+          if (!inp.checked && i >= 0) picked.splice(i, 1);
+        } });
+        inp.checked = picked.indexOf(a.key) >= 0;
+        list.appendChild(el('label', { class: 'hot' }, [inp, el('span', { text: a.pkg + (a.user ? ' (work)' : '') })]));
+      });
+      var link = el('select', { 'aria-label': 'Link to a profile' }, [el('option', { value: '', text: 'Not linked to a profile' })].concat(phone.map(function (pp) { return el('option', { value: pp.id, text: 'Link to ' + pp.name }); })));
+      box.appendChild(el('div', { class: 'sugrow' }, [el('b', { text: g.label }), list, el('div', { class: 'prow' }, [link, el('button', { type: 'button', class: 'btn', text: 'Save as app group', onclick: function () {
+        var chosen = g.apps.filter(function (a) { return picked.indexOf(a.key) >= 0; });
+        var r = Core.addAppGroup(ix, doc, g.label, chosen, link.value || null);
+        if (!r.ok) { toast(r.error); return; }
+        savePhone(r.doc); toast('Saved the app group ' + g.label);
+      } })])]));
+    });
+    var groups = doc.dock && Array.isArray(doc.dock.groups) ? doc.dock.groups : [];
+    if (groups.length) box.appendChild(el('p', { class: 'phone-only', text: 'App groups in this file: ' + groups.map(function (g) { return g.name; }).join(', ') + '.' }));
+    return box;
   }
 
   // ---- profile bar and dialogs
@@ -295,7 +479,13 @@
     var done = function () { toast('Copied'); }, fail = function () { showMsg(msgId, ['Copying was blocked by the browser. Select the text and copy it by hand, or use Download.']); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fail); else fail();
   }
-  function exportText(kind) { var p = profiles.active(); return Core.toText(kind === 'state' ? Core.exportState(ix, p) : Core.exportSettings(ix, p)); }
+  function exportText(kind) {
+    var p = profiles.active();
+    if (kind !== 'state') return Core.toText(Core.exportSettings(ix, p));
+    // the active phone profile holds the live values of what it carries (the phone writes them through as they change)
+    var doc = phoneDocOf(p), q = doc ? { values: p.values, extras: Object.assign({}, p.extras, { base: Core.syncActivePhoneProfile(ix, doc, p.values) }) } : p;
+    return Core.toText(Core.exportState(ix, q));
+  }
   function exportName(kind) { return 'liftoff-' + Core.slug(profiles.active().name) + (kind === 'state' ? '-backup' : '-settings') + '.json'; }
 
   // share
@@ -317,6 +507,7 @@
     applyTheme();
     var sb = $('scenes'); Prev.SCENES.forEach(function (s) { sb.appendChild(el('button', { type: 'button', 'data-scene': s.id, 'aria-pressed': String(s.id === ui.scene), text: s.label, onclick: function () { ui.scene = s.id; renderPreview(); } })); });
     $('follow').checked = ui.follow; $('follow').addEventListener('change', function () { ui.follow = $('follow').checked; saveUi(); });
+    $('landscape').checked = !!ui.landscape; $('landscape').addEventListener('change', function () { ui.landscape = $('landscape').checked; saveUi(); renderPreview(); });
     ui.scene = Prev.TAB_SCENE[ui.tab] || 'glance';
     $('profileSel').addEventListener('change', function () { profiles.use($('profileSel').value); fullRender(); });
     $('btnProfiles').addEventListener('click', function () { renderProfileList(); renderPresets(); openDlg('dlgProfiles'); });

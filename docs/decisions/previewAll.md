@@ -28,6 +28,8 @@ The floating Preview window of wave 39 (`PreviewWindow`, movable, resizable, min
 - **Touches**: unchanged from wave 39: the window consumes every touch; a one-finger touch on the picture does nothing, two fingers resize.
 
 ## Not matched
+> Wave 58 ([studioPreview.md](studioPreview.md)): the three items below are now drawn (sample bulge, Widgets sample cards, the Glance's own wallpaper on a page).
+
 - Glance off the Glance page draws the current backdrop layer (the Pages wallpaper when it differs) under the Glance surface, not the Glance wallpaper itself, so a second live wallpaper never runs.
 - The dock's magnification is not drawn as a sample bulge (the rail only magnifies under a pointer; adding a sample pointer would change `DockRail`, which another stream works on); its strength is in the description.
 - The hub's Widgets section is not in the side panel preview (the hub state reads the real history).

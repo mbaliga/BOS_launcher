@@ -131,6 +131,11 @@ fun DockRail(
     editing: Boolean = false,
     /** W55: gets the rail's layout coordinates, so the sheet's host can leave exactly the dock touchable while editing. */
     onCoordinates: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
+    /**
+     * Wave 58 (CFG-73): a still sample pointer for the Settings Preview, as a fraction (0..1) along the row: with [magnify] on, the row is drawn
+     * magnified there as if a finger rested on it (no tooltip, nothing pressed). Null (the default) is the real dock: only a finger, a pointer or the focus magnify.
+     */
+    demoPointer: Float? = null,
     icon: @Composable (DockItem, Dp) -> Unit,
 ) {
     val horizontal = edge == DockEdge.Bottom
@@ -188,6 +193,7 @@ fun DockRail(
             field.density = dens; field.horizontal = horizontal; field.edge = edge; field.factor = if (magnifyOn) magnify!!.factor else 1f
             field.pitch = DockMagnify.PITCH_DP * dens; field.gapHalf = (DockMagnify.PITCH_DP - DockMagnify.SLOT_DP) / 2f * dens
             field.lo = 0f; field.hi = (if (horizontal) railSize.width else railSize.height).toFloat()
+            field.demo = if (magnifyOn) demoPointer else null
         }
         LaunchedEffect(field) { snapshotFlow { field.engaged }.collect { engaged = it } }
         LaunchedEffect(field, reduced) {
@@ -229,6 +235,7 @@ fun DockRail(
             .onGloballyPositioned { c ->
                 railOrigin = c.positionInRoot(); railSize = c.size; onCoordinates?.invoke(c)
                 field?.viewport = c; field?.refreshAll()
+                if (field != null && field.demo != null) { field.lo = 0f; field.hi = (if (horizontal) c.size.width else c.size.height).toFloat() }
                 if (!padded) restMain = if (horizontal) c.size.width else c.size.height
             }
             .then(if (field != null) Modifier.pointerInput(field) { trackMagnify(field) } else Modifier)

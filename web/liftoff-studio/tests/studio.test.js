@@ -323,3 +323,187 @@ test('phone profiles: a Backup profile reads into Studio values, is edited and w
   assert.deepEqual(again.dock.globalSettings, { themeMode: 'Dark' });
   assert.equal(Core.setPhoneProfile(ix, doc, 'nope', {}).ok, false);
 });
+
+// ---- wave 58 (studioPreview)
+
+test('CFG-70: the tabs carry the app\'s sections in order and every field sits in one of its tab\'s sections, in that order', () => {
+  assert.deepEqual(schema.tabs.find((t) => t.id === 'apps').sections, ['Profiles', 'App groups and sessions', 'App drawer', 'Hidden apps', 'Open with']);
+  for (const t of schema.tabs) {
+    const fs2 = schema.fields.filter((f) => f.tab === t.id);
+    let last = -1;
+    for (const f of fs2) { const i = t.sections.indexOf(f.group); assert.ok(i >= 0, f.key + ' in ' + f.group); assert.ok(i >= last, f.key + ' out of order'); last = i; assert.ok(/^[^/]+\/.+/.test(f.row), f.key + ' names its app row'); }
+  }
+  assert.equal(ix.byKey.kbOpenP.tab, 'radar', 'the keyboard-with-Radar rows are on the Radar tab, as in the app');
+  assert.equal(ix.byKey.rightSide.tab, 'side');
+  assert.equal(ix.byKey.wpGlanceKind.group, 'Wallpaper');
+});
+
+const APPKEYS = ['com.google.android.gm/.ConversationListActivityGmail#0', 'com.microsoft.office.outlook/.MainActivity#0', 'com.whatsapp/.Main#0',
+  'org.telegram.messenger/org.telegram.ui.LaunchActivity#0', 'com.example.mybank/.Main#0', 'com.example.paytoday/.Main#0', 'com.example.notes/.Main#0', 'com.example.mail/.Main#10'];
+function phoneBase() { return Core.withPhoneProfiles(ix, { format: Core.STATE_FORMAT, schemaVersion: schema.stateSchemaVersion, layout: { pages: [{ k: APPKEYS, s: 'Grid', r: 2, id: 1 }] } }); }
+
+test('CFG-71: a list started in Studio has the phone\'s Home; New from each start carries and sets what the phone\'s starters do', () => {
+  let doc = Core.withPhoneProfiles(ix, null);
+  assert.deepEqual(doc.workspaces, [{ id: 'default', name: 'Home' }]);
+  assert.equal(doc.dock.activeId, 'default');
+  doc = phoneBase();
+  const values = Object.assign({}, D, { themeMode: 'Light' }), apps = Core.backupApps(doc);
+  const starts = schema.profileStarts.map((s) => s.id);
+  assert.deepEqual(starts, ['Current', 'Empty', 'Work', 'Calm', 'Desk']);
+  const made = {};
+  for (const st of starts) { const r = Core.createPhoneProfile(ix, doc, { start: st, values, apps }); assert.ok(r.ok, st); doc = r.doc; made[st] = doc.workspaces.find((w) => w.id === r.id); }
+  assert.equal(made.Empty.carries, undefined); assert.equal(made.Empty.settings, undefined);
+  assert.deepEqual(JSON.parse(JSON.parse(made.Empty.home).pages), [{ k: [], s: 'Grid', r: 2, id: 1 }]);
+  assert.deepEqual(made.Work.carries, ['radar']); assert.equal(made.Work.settings.searchFiles, true);
+  assert.deepEqual(JSON.parse(JSON.parse(made.Work.home).pages)[0].k, APPKEYS.filter((k) => /gm\/|outlook|#10/.test(k)).sort((a, b) => (a.includes('gm/') ? -1 : b.includes('gm/') ? 1 : a.includes('outlook') ? -1 : 1)));
+  assert.ok(made.Work.notifyApps.includes('com.example.mail'), 'a work-profile app counts as work');
+  assert.deepEqual(made.Calm.carries, ['home', 'look']);
+  assert.equal(made.Calm.settings.homePages, 'Off'); assert.equal(made.Calm.settings.calmStyle, 'EdgeDots'); assert.equal(made.Calm.settings.glanceHotspots, 'BottomRight,BottomLeft');
+  assert.equal(made.Calm.settings.themeMode, 'Light', 'a carried key without a starter value takes the global value');
+  assert.deepEqual(made.Calm.notifyApps, ['com.whatsapp', 'org.telegram.messenger']);
+  assert.equal(made.Desk.settings['dock.enabled'], true); assert.equal(made.Desk.settings['dock.edge'], 'Left'); assert.equal(made.Desk.settings.kbOpenL, true);
+  assert.deepEqual(doc.workspaces.map((w) => w.name), ['Home', 'Current setup', 'Empty', 'Work', 'Calm', 'Desk']);
+  // ticking other groups before saving: a starter value of an unticked group is dropped
+  const r2 = Core.createPhoneProfile(ix, doc, { start: 'Calm', name: 'Calm', carries: ['look'], values, apps });
+  const c2 = r2.doc.workspaces.find((w) => w.id === r2.id);
+  assert.equal(c2.name, 'Calm 2'); assert.equal(c2.settings.homePages, undefined); assert.equal(c2.settings.calmStyle, 'EdgeDots');
+  assert.equal(Core.createPhoneProfile(ix, doc, { start: 'Nope' }).ok, false);
+});
+
+test('CFG-71: rename, duplicate and delete follow the phone\'s rules', () => {
+  let doc = phoneBase();
+  const a = Core.createPhoneProfile(ix, doc, { start: 'Work', values: D, apps: [] }); doc = a.doc;
+  assert.equal(Core.renamePhoneProfile(doc, a.id, 'Home').ok, false, 'names are unique');
+  assert.equal(Core.renamePhoneProfile(doc, a.id, '  ').ok, false);
+  doc = Core.renamePhoneProfile(doc, a.id, 'Office').doc;
+  const d = Core.duplicatePhoneProfile(doc, a.id); doc = d.doc;
+  const copy = doc.workspaces.find((w) => w.id === d.id);
+  assert.equal(copy.name, 'Office copy'); assert.deepEqual(copy.carries, ['radar']); assert.notEqual(copy.id, a.id);
+  assert.equal(Core.deletePhoneProfile(doc, 'default').ok, false, 'the active profile cannot be deleted');
+  doc = Core.deletePhoneProfile(doc, d.id).doc;
+  assert.deepEqual(doc.workspaces.map((w) => w.name), ['Home', 'Office']);
+  assert.equal(Core.deletePhoneProfile(Core.withPhoneProfiles(ix, null), 'default').ok, false);
+});
+
+test('CFG-71: carries and switching follow the phone\'s precedence, and switching back restores the values', () => {
+  let doc = phoneBase(), values = Object.assign({}, D, { themeMode: 'Light', searchFiles: false });
+  const w = Core.createPhoneProfile(ix, doc, { start: 'Work', values, apps: [] }); doc = w.doc;
+  // switch to Work: its searchFiles becomes live, the global false is kept aside
+  let r = Core.switchPhoneProfile(ix, doc, w.id, values); doc = r.doc; values = r.values;
+  assert.equal(values.searchFiles, true); assert.equal(doc.dock.activeId, w.id); assert.equal(doc.dock.globalSettings.searchFiles, false);
+  // an edit while Work is active belongs to Work; the theme (not carried) stays global
+  values = Object.assign({}, values, { searchLayout: 'Orbit', themeMode: 'Amoled' });
+  // add Look to the active profile: the live values become its own and are kept aside as the global ones
+  r = Core.setPhoneCarries(ix, doc, w.id, ['radar', 'look'], values); doc = r.doc; values = r.values;
+  assert.equal(doc.workspaces.find((x) => x.id === w.id).settings.themeMode, 'Amoled'); assert.equal(doc.dock.globalSettings.themeMode, 'Amoled');
+  // back to Home: Work keeps Orbit and files on, the global values come back
+  r = Core.switchPhoneProfile(ix, doc, 'default', values); doc = r.doc; values = r.values;
+  const work = doc.workspaces.find((x) => x.id === w.id);
+  assert.equal(work.settings.searchLayout, 'Orbit'); assert.equal(work.settings.searchFiles, true);
+  assert.equal(values.searchFiles, false); assert.equal(values.searchLayout, D.searchLayout); assert.equal(values.themeMode, 'Amoled');
+  assert.equal(doc.dock.globalSettings, undefined, 'Home carries nothing, nothing is kept aside');
+  // drop Look from the active profile puts the global value back live
+  r = Core.switchPhoneProfile(ix, doc, w.id, Object.assign({}, values, { themeMode: 'Dark' })); doc = r.doc; values = r.values;
+  values = Object.assign({}, values, { themeMode: 'Light' });
+  r = Core.setPhoneCarries(ix, doc, w.id, ['radar'], values); doc = r.doc; values = r.values;
+  assert.equal(values.themeMode, 'Dark'); assert.equal(doc.workspaces.find((x) => x.id === w.id).settings.themeMode, undefined);
+  // a group added to another profile starts from the global values
+  r = Core.setPhoneCarries(ix, doc, 'default', ['sound'], values);
+  assert.equal(r.doc.workspaces[0].settings.uiSounds, values.uiSounds);
+  assert.equal(Core.switchPhoneProfile(ix, doc, 'nope', values).ok, false);
+});
+
+test('CFG-71: app group suggestions come from the apps a Backup names, with the phone\'s tables, and save as app groups of 2 to 4', () => {
+  const doc = phoneBase(), apps = Core.backupApps(doc);
+  assert.equal(apps.length, APPKEYS.length);
+  const g = Core.suggestGroups(ix, apps);
+  assert.deepEqual(g.map((x) => x.kind), ['Work', 'Personal', 'Money']);
+  assert.deepEqual(g[0].apps.map((a) => a.pkg), ['com.google.android.gm', 'com.microsoft.office.outlook', 'com.example.mail']);
+  assert.deepEqual(g[2].apps.map((a) => a.pkg), ['com.example.mybank', 'com.example.paytoday'], 'bank and pay words');
+  assert.equal(Core.addAppGroup(ix, doc, 'One', g[0].apps.slice(0, 1)).ok, false);
+  const r = Core.addAppGroup(ix, doc, 'Work apps', g[0].apps, 'default');
+  assert.ok(r.ok);
+  const grp = r.doc.dock.groups[0];
+  assert.deepEqual(grp.members[0], { target: { p: 'com.google.android.gm', c: 'com.google.android.gm.ConversationListActivityGmail', u: 0 }, display: null, bounds: null, placement: 'Default' });
+  assert.equal(grp.members[2].target.u, 10);
+  assert.deepEqual(r.doc.workspaces[0].groupLinks, [grp.id]);
+  assert.deepEqual(Core.suggestGroups(ix, Core.backupApps({ format: Core.STATE_FORMAT })), [], 'a file with no apps suggests nothing (the page says suggestions run on the phone)');
+  // apps are also found in profile homes, pins and groups
+  const more = Core.backupApps(r.doc);
+  assert.equal(more.length, APPKEYS.length);
+});
+
+test('CFG-71: the profiles travel in the exported Backup and survive an import and export', () => {
+  let doc = phoneBase();
+  doc = Core.createPhoneProfile(ix, doc, { start: 'Desk', values: D, apps: [] }).doc;
+  const p = { name: 'x', values: Object.assign({}, D), extras: Object.assign(Core.newExtras(), { base: doc }) };
+  const out = Core.exportState(ix, p, 1);
+  assert.deepEqual(out.workspaces, doc.workspaces);
+  assert.equal(out.dock.activeId, 'default');
+  const back = Core.importDocument(ix, out);
+  assert.ok(back.ok);
+  assert.deepEqual(Core.phoneProfiles(ix, back.extras.base).map((x) => x.name), ['Home', 'Desk']);
+  assert.deepEqual(Core.exportState(ix, back, 1).workspaces, doc.workspaces);
+  // the active profile holds the live values of what it carries when exported
+  const sw = Core.switchPhoneProfile(ix, doc, doc.workspaces[1].id, D);
+  const synced = Core.syncActivePhoneProfile(ix, sw.doc, Object.assign({}, sw.values, { kbOpenP: false }));
+  assert.equal(synced.workspaces[1].settings.kbOpenP, false);
+  const fix = require('./make-fixtures.js');
+  assert.equal(fs.readFileSync(path.join(__dirname, 'fixtures', 'studio-profiles-backup.json'), 'utf8'), fix.build()['studio-profiles-backup.json'], 'studio-profiles-backup.json is stale: run node tests/make-fixtures.js');
+});
+
+test('CFG-72: the Signal wallpaper is drawn in the theme colours, not as a placeholder, for every wallpaper and effect', () => {
+  const opts = (k) => ix.byKey[k].options.map((o) => o.id);
+  for (const s1 of opts('bgSlot1')) for (const s2 of opts('bgSlot2')) for (const themeMode of ['Dark', 'Light']) {
+    const svg = Prev.render('glance', Object.assign({}, D, { wpGlanceKind: 'live', bgSlot1: s1, bgSlot2: s2, themeMode, accent: 0xFF112233 }));
+    assert.ok(!/placeholder/i.test(svg), s1 + '/' + s2 + ' still says placeholder');
+    assert.ok(svg.includes('url(#LBG)'), 'the black (or pale) gradient behind it');
+    if (s1 !== 'none') assert.ok(svg.includes('rgb(17,34,51)'), s1 + ' uses the accent');
+  }
+  const spire = Prev.render('glance', Object.assign({}, D, { wpGlanceKind: 'live', bgSlot1: 'spire', bgSlot2: 'none' }));
+  const beam = Prev.render('glance', Object.assign({}, D, { wpGlanceKind: 'live', bgSlot1: 'beam', bgSlot2: 'none' }));
+  assert.notEqual(spire, beam);
+  assert.ok(Prev.render('glance', Object.assign({}, D, { wpGlanceKind: 'live', bgSlot1: 'none', bgSlot2: 'breathing-dots' })).match(/<circle/g).length > 40, 'the dots');
+});
+
+test('CFG-72: landscape draws the home surfaces wide, with the dock at the side edge the settings say', () => {
+  const v = Object.assign({}, D, { 'dock.enabled': 'on', 'dock.edge': 'Left', homePages: 'Paginated' });
+  const land = Prev.render('glance', v, { landscape: true });
+  assert.ok(land.includes('viewBox="0 0 760 380"') && land.includes('data-landscape="true"'));
+  assert.ok(Prev.render('glance', v).includes('viewBox="0 0 380 760"'), 'portrait keeps the dock at the bottom');
+  // the dock bar is a column near the left edge in landscape, near the right with Right, and at the bottom with Bottom
+  const bar = (svg) => { const m = /<rect x="([\d.]+)" y="([\d.]+)" width="66" height="([\d.]+)"/.exec(svg); return m && m.slice(1).map(Number); };
+  assert.equal(bar(land)[0], 10);
+  assert.ok(bar(Prev.render('glance', Object.assign({}, v, { 'dock.edge': 'Right' }), { landscape: true }))[0] > 600);
+  assert.equal(bar(Prev.render('glance', Object.assign({}, v, { 'dock.edge': 'Bottom' }), { landscape: true })), null, 'Bottom stays a row');
+  for (const sc of ['glance', 'pages']) for (const edge of ['Bottom', 'Left', 'Right']) for (const mode of ['Collapsed', 'PinnedPlusRecent'])
+    assert.ok(Prev.render(sc, Object.assign({}, v, { 'dock.edge': edge, 'dock.mode': mode }), { landscape: true }).length > 1000);
+  assert.ok(Prev.render('radar', v, { landscape: true }).includes('viewBox="0 0 380 760"'), 'the other scenes stay portrait');
+  // the landscape clock place is the landscape pair
+  const c = /<g class="clock" data-kx="(\w+)" data-ky="(\w+)"/.exec(land);
+  assert.deepEqual([c[1], c[2]], ['glanceClockXLand', 'glanceClockYLand']);
+});
+
+test('CFG-72: dock magnification is drawn as a sample bulge when it is on, growing with the strength', () => {
+  const v = Object.assign({}, D, { 'dock.enabled': 'on' });
+  assert.ok(!Prev.render('glance', v).includes('magnify-sample'));
+  const on = Object.assign({}, v, { 'dock.magnify': true });
+  assert.ok(Prev.render('glance', on).includes('magnify-sample'));
+  const peak = (s) => Math.max.apply(null, Prev.magnifyScales(Object.assign({}, on, { 'dock.magnifyStrength': s }), 6, 1));
+  assert.equal(peak('subtle'), 1.3); assert.equal(peak('medium'), 1.6); assert.equal(peak('large'), 2.0);
+  const sc = Prev.magnifyScales(Object.assign({}, on, { 'dock.magnifyStrength': 'large' }), 6, 1);
+  assert.ok(sc[1] > sc[0] && sc[0] > 1 && sc[3] === 1, 'neighbours grow less, two away not at all');
+  assert.deepEqual(Prev.magnifyScales(v, 6, 1), [1, 1, 1, 1, 1, 1]);
+  assert.ok(Prev.render('glance', Object.assign({}, on, { 'dock.edge': 'Right' }), { landscape: true }).includes('magnify-sample'), 'the side dock too');
+});
+
+test('CFG-72: the clock drag writes the placement fields, kept inside the screen, to the hundredth', () => {
+  assert.deepEqual(Prev.clockFromBox(100, 74, 160, 120, 360, 740), { x: 0.5, y: 0.1 });
+  assert.deepEqual(Prev.clockFromBox(-50, -20, 160, 120, 360, 740), { x: 0.22, y: 0 }, 'not past the left or top');
+  assert.deepEqual(Prev.clockFromBox(400, 900, 160, 120, 360, 740), { x: 0.78, y: 0.84 }, 'not past the right or bottom');
+  const svg = Prev.render('glance', Object.assign({}, D, { glanceClockX: 0.3, glanceClockY: 0.5 }));
+  const m = /data-left="([\d.]+)" data-top="([\d.]+)" data-w="([\d.]+)" data-h="([\d.]+)" data-areaw="(\d+)" data-areah="(\d+)"/.exec(svg).slice(1).map(Number);
+  const back = Prev.clockFromBox(m[0], m[1], m[2], m[3], m[4], m[5]);
+  assert.ok(Math.abs(back.x - 0.3) < 0.011 && Math.abs(back.y - 0.5) < 0.011, 'the drawn box reads back as the saved place');
+  for (const k of ['glanceClockX', 'glanceClockY', 'glanceClockXLand', 'glanceClockYLand']) assert.equal(Core.checkValue(ix.byKey[k], back.x).error, undefined);
+});

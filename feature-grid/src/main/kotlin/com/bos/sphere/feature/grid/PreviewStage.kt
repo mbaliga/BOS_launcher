@@ -53,6 +53,7 @@ import com.bos.sphere.core.data.AppEntry
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.HomeGesture
 import com.bos.sphere.core.data.LauncherPrefs
+import com.bos.sphere.core.data.sharesWallpaper
 import com.bos.sphere.core.data.WebSuggestSource
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
@@ -192,7 +193,11 @@ internal fun PreviewStageContent(capture: HomeCapture, subject: PreviewSubject, 
                 PreviewTopic.Glance -> {
                     val g = sandboxed(surfaces?.glance)
                     if (g == null || surfaces?.homeOnGlance?.invoke() == true) CaptureLayer(capture, home = true)
-                    else { CaptureLayer(capture, home = false); g() }
+                    else if (PreviewGlanceBackdrop.own(prefs)) {
+                        // Wave 58 (CFG-73): on a page whose wallpaper differs, the Glance's own wallpaper is drawn in the sandbox (a still frame), not the page's
+                        val f = surfaces!!.glance!!
+                        PreviewSandbox(hw, hh) { PreviewGlanceBackdrop(prefs); f(prefs) }
+                    } else { CaptureLayer(capture, home = false); g() }
                     if (subject.corner != null) CornerMarks(subject.corner, reduced, prefs.glanceHotspots)
                 }
                 PreviewTopic.Corners -> { CaptureLayer(capture, home = true); CornerMarks(subject.corner, reduced, Corner.entries.toSet()) }
@@ -336,6 +341,22 @@ private fun DrawScope.arrow(a: Offset, b: Offset, c: Color, sw: Float) {
 }
 
 // ---- the renderers of feature-grid's own surfaces --------------------------------------------------------------------------------------
+
+/**
+ * Wave 58 (CFG-73): the Glance's own wallpaper for the Preview, used while the home shows a page whose wallpaper is not the Glance one (the capture
+ * then holds the page's). It is the home's own [HomeSurfaceBackground] for the Glance, drawn as one still frame: a live wallpaper does not run a
+ * second time, an animated picture shows its first frame, no alert and no announcement.
+ */
+object PreviewGlanceBackdrop {
+    const val TAG = "previewGlanceBackdrop"
+    /** Whether the Preview must draw the Glance wallpaper itself: the Pages wallpaper is a different one (with the same one the capture is already exact). */
+    fun own(prefs: LauncherPrefs): Boolean = !prefs.sharesWallpaper(com.bos.sphere.core.data.WallpaperSurface.Pages)
+}
+
+@Composable
+fun PreviewGlanceBackdrop(prefs: LauncherPrefs) {
+    HomeSurfaceBackground(com.bos.sphere.core.data.WallpaperSurface.Glance, prefs, Modifier.fillMaxSize().testTag(PreviewGlanceBackdrop.TAG), animate = false, announce = false, play = false, alert = false)
+}
 
 /** CFG-51: the Glance page with the current prefs: the clock at its edited place, its style, date and colour (the wallpaper is drawn below it). */
 @Composable

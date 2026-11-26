@@ -23,8 +23,17 @@ import com.bos.sphere.feature.grid.SettingItem
  * example.com host, so it can never open somebody else's page); the page says so.
  */
 object LiftoffStudio {
-    const val URL = "https://example.com/liftoff/studio/"
-    const val PUBLISHED = false
+    /** The address used until Studio is published: the reserved example.com host, which can never be somebody else's page. */
+    const val PLACEHOLDER_URL = "https://example.com/liftoff/studio/"
+    /**
+     * Wave 58 (CFG-74): THE address of Liftoff Studio, the one constant to change. Set when published: replace it with the published address
+     * (`<site>/liftoff/studio/`, see web/liftoff-studio/README.md); everything else (the row's "Not published yet", the page's note) follows from it.
+     */
+    const val URL = PLACEHOLDER_URL
+    /** Studio is published once [URL] is not the placeholder. */
+    val PUBLISHED: Boolean get() = isPublished(URL)
+    fun isPublished(url: String): Boolean = url != PLACEHOLDER_URL
+    const val NOT_PUBLISHED_ROW = "Not published yet"
     const val ABOUT = "Liftoff Studio is a web page that edits your Liftoff setup on a computer: the same six sections, with a drawing of the phone that follows what you change. Nothing you do there is sent anywhere; it saves a file. Bring that file here with Import a Studio file, under Export, import and restore."
     const val NOT_PUBLISHED = "Studio is not published yet: the address below is a placeholder."
 
@@ -33,7 +42,8 @@ object LiftoffStudio {
 }
 
 /** The "Open Liftoff Studio" row of System > Backup and restore: what Studio is, its address and a button that opens it in the browser. */
-fun studioSettingItem(): SettingItem = SettingItem.Pane(L10n.tr("Open Liftoff Studio"), Glyphs.Globe, L10n.tr("Edit your setup in a browser")) { StudioPane() }
+fun studioSettingItem(published: Boolean = LiftoffStudio.PUBLISHED): SettingItem =
+    SettingItem.Pane(L10n.tr("Open Liftoff Studio"), Glyphs.Globe, L10n.tr(if (published) "Edit your setup in a browser" else LiftoffStudio.NOT_PUBLISHED_ROW)) { StudioPane() }
 
 @Composable
 fun StudioPane() {

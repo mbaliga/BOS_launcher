@@ -137,7 +137,7 @@ class NotificationHistoryTest {
     fun HUB_04_theHistoryFileIsNeverExportedAndExcludedFromBackup() {
         assertTrue(NotificationHistoryStore.RELATIVE_PATH in StateSchema.NEVER_EXPORTED_FILES)
         assertTrue(NotificationHistoryStore.RELATIVE_PATH.substringBefore('/') in StateSchema.BACKUP_EXCLUDED_FILES)
-        assertTrue("launchpad_hub" in StateSchema.BACKUP_EXCLUDED_PREF_FILES)
+        assertTrue(StateSchema.COMMS_WIDGETS_FILE in StateSchema.BACKUP_EXCLUDED_PREF_FILES) // wave 58: the hub settings are exported; only its widget list stays on the device
     }
 
     @Test

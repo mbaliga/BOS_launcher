@@ -64,7 +64,6 @@ class EditCardPagesTest {
         assertTrue(FreshHome.isFresh(HomeLayout(), onboardingDone = false))
         val seed = FreshHome.emptyLayout()
         assertEquals(1, seed.pages.size); assertTrue(seed.pages[0].keys.isEmpty()); assertTrue(seed.seeded)
-        assertEquals(AppsOnHome.PinnedOnly, FreshHome.prefs(LauncherPrefs()).appsOnHome)
     }
 
     @Test fun HOM_01_existingUsersAreNeverTouched() {

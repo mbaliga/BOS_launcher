@@ -8,8 +8,8 @@ enum class PhysicalSide { Left, Right;
 /**
  * Wave 26 (HOM-01, HOM-23): the one abstraction of the home's direction. "Left to right" (the default) has the Launchpad on the left edge
  * and pages / columns progressing from left to right; "Right to left" mirrors all of it: the Launchpad on the right edge, the Recents panel
- * on the left, columns filled from the right, pages ordered right to left, swipe directions mirrored, the Glance hotspots' left and right roles
- * swapped. It is independent of the app language: the home is laid out in physical coordinates, so every function here takes and returns
+ * on the left, columns filled from the right, pages ordered right to left, swipe directions mirrored. Wave 58 (defects58): the four hotspots stay
+ * physical in both orders (a corner keeps what is assigned to it; the never-wired corner mapping is gone). It is independent of the app language: the home is laid out in physical coordinates, so every function here takes and returns
  * physical x and physical sides, and the four combinations (order x language direction) draw the same.
  */
 enum class HomeOrder(val label: String) {
@@ -44,14 +44,6 @@ enum class HomeOrder(val label: String) {
 
     /** The reverse of [visualIndex] (it is its own inverse). */
     fun logicalIndex(visual: Int, count: Int): Int = visualIndex(visual, count)
-
-    /** The physical corner that plays the role [c] has in left to right (top-left stays the first hotspot: it becomes the top-right one when mirrored). */
-    fun corner(c: Corner): Corner = if (!rtl) c else when (c) {
-        Corner.TopLeft -> Corner.TopRight
-        Corner.TopRight -> Corner.TopLeft
-        Corner.BottomLeft -> Corner.BottomRight
-        Corner.BottomRight -> Corner.BottomLeft
-    }
 
     /** The scroll offset (px) a horizontal scroll of [max] px starts at: the start edge. */
     fun initialScroll(max: Int): Int = if (rtl) max else 0

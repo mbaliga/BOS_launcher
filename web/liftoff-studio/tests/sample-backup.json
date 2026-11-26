@@ -95,7 +95,6 @@
       "badgesOn": true,
       "searchLayout": "Filmstrip",
       "calmRegular": false,
-      "appsOnHome": "Everything",
       "pCols": 3,
       "cornerIconSize": 32,
       "wheelWorkOnly": false,
@@ -174,7 +173,7 @@
       "DoubleTap": "",
       "LongPress": "",
       "DoubleFlip": "action:Flashlight",
-      "SwipeLeft": "action:Search"
+      "SwipeLeft": ""
     }
   },
   "widgets": [],

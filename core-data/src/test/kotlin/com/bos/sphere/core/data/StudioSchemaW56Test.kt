@@ -247,7 +247,6 @@ class StudioSchemaW56Test {
             Fd("puckSlots", "Ring shortcuts", apps, "App drawer disc", "slots", scope = "prefFile", file = "puck_actions", fileKey = "slots", fileType = "s", count = PuckActions.SLOTS, scene = "disc",
                 options = listOf(Opt("-", "Nothing")) + PuckActions.AVAILABLE.map { Opt("a:" + it.name, it.label) }, default = PuckActions.encode(PuckActions.DEFAULT),
                 note = "A segment that holds an app is kept as it is."),
-            Fd("appsOnHome", "Apps on the home pages", apps, "Home apps", "enum", options = byName<AppsOnHome> { it.label }, scene = "pages"),
             Fd("badgesOn", "Badges", apps, "Badges", "bool", scene = "pages"),
             Fd("badgeCount", "Badge numbers", apps, "Badges", "bool", scene = "pages", showWhen = "badgesOn" to listOf("true")),
         )

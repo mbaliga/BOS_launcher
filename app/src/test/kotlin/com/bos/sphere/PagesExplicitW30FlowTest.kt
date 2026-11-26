@@ -149,7 +149,7 @@ class PagesExplicitW30FlowTest : TourBase() {
         val all = (0 until 30).map { key(it) }
         val legacyPages = all.chunked(6).mapIndexed { i, ks -> HomePage(ks, id = i + 1L) } // 5 full pages of the apps in catalog order
         AppSmokeHarness.seedApps(*Array(30) { "App %02d".format(it) })
-        AppSmokeHarness.configureFresh { it.copy(glanceEnabled = true, homePages = HomePages.Paginated, appsOnHome = com.bos.sphere.core.data.AppsOnHome.Everything, portraitGrid = com.bos.sphere.core.data.GridSpec(3, 2)) }
+        AppSmokeHarness.configureFresh { it.copy(glanceEnabled = true, homePages = HomePages.Paginated, portraitGrid = com.bos.sphere.core.data.GridSpec(3, 2)) }
         AppSmokeHarness.app.getSharedPreferences("liftoff_misc", android.content.Context.MODE_PRIVATE).edit().putBoolean("defaultHomeSeeded", true).commit()
         stores.layout.replace(HomeLayout(pages = legacyPages, seeded = true))
         launch()

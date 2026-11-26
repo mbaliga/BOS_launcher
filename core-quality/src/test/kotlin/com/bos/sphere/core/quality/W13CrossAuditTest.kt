@@ -41,10 +41,11 @@ class W13CrossAuditTest {
     @Test fun NFR_18_everyPreferenceFileTheSourcesOpenIsClassified() {
         // The user's own setup (exported through the file as a section or settings; theming is appearance only), or device-local and excluded from backup and transfer, or audited as holding no personal content.
         val exported = setOf("launcher_prefs", "home_layout", "hidden_apps", "shortcuts", "launchpad_rules", "home_state", "home_tags", "home_icons", "home_badges",
-            "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", "theming", "launcher_haptics", "comms_scale")
-        val excluded = setOf("launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "palette", "liftoff_spikes", "desktop_surface",
-            "liftoff_misc", "device_bound", "launchpad_groups", "device_checks", "preview_window", "edit_chrome")
-        val benign = setOf("grant_history") // when each permission was asked for, nothing about contacts or messages
+            "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", "theming", "launcher_haptics", "comms_scale",
+            "launchpad_hub", "icon_colors") // wave 58 (CFG-60): the Comms options and per-app icon colours are the user's setup and are exported
+        val excluded = setOf("launch_history", "search_habits", "steps", "weather", "crash_loop", "palette", "liftoff_spikes", "desktop_surface",
+            "liftoff_misc", "device_bound", "launchpad_groups", "device_checks", "preview_window", "edit_chrome", "comms_widgets", "theme_undo", "grant_history")
+        val benign = emptySet<String>() // wave 58: grant_history (when each access was asked for on this device) is device-local now
         val opened = Regex("""getSharedPreferences\(\s*"([A-Za-z0-9_]+)"|\bFILE = "([A-Za-z0-9_]+)"""")
         val found = Repo.mainSources().flatMap { f -> opened.findAll(f.readText()).map { it.groupValues[1].ifEmpty { it.groupValues[2] } }.toList() }.toSet()
         val unknown = found - exported - excluded - benign

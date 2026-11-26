@@ -18,6 +18,16 @@ object EditChromeHint {
 }
 
 /**
+ * Wave 58 (defects58, CFG-63): first-run hints where the user can act on them. Glance (the home a fresh install lands on, Pages Off) shows
+ * "Long press for options" once, after onboarding, while nothing is being edited; the pages keep "Long press to add apps" on an empty first page.
+ */
+object FirstRunHints {
+    const val GLANCE_HINT_MS = 6000L
+    fun showsGlanceHint(landing: HomeShown, shownBefore: Boolean, onboardingDone: Boolean, editing: Boolean): Boolean =
+        landing == HomeShown.Glance && !shownBefore && onboardingDone && !editing
+}
+
+/**
  * The counter of the hint, in its own preference file (device-local UI state: it describes what this person has already been told on this device, so the
  * file is excluded from backup and transfer, see [StateSchema.BACKUP_EXCLUDED_PREF_FILES]). Opened with [TolerantPrefs]. Written when edit mode is entered
  * (an input handler), never during composition.
@@ -32,8 +42,13 @@ class EditChromeStore(private val sp: SharedPreferences) {
         return EditChromeHint.shownOn(before)
     }
 
+    /** Wave 58 (CFG-63): whether Glance has shown its one "Long press for options" hint on this device. */
+    fun glanceHintShown(): Boolean = runCatching { sp.getBoolean(GLANCE_HINT, false) }.getOrDefault(false)
+    fun markGlanceHintShown() { runCatching { sp.edit().putBoolean(GLANCE_HINT, true).apply() } }
+
     companion object {
         const val FILE = "edit_chrome"
         private const val KEY = "entries"
+        private const val GLANCE_HINT = "glanceHint"
     }
 }

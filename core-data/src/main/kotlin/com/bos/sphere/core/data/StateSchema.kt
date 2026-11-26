@@ -18,6 +18,10 @@ import org.json.JSONObject
  *
  * Wave 39: the floating Settings preview window (position, size and minimised state per orientation) lives in its own device-local pref file "preview_window", excluded from backup and transfer (BACKUP_EXCLUDED_PREF_FILES) and never exported.
  *
+ * Wave 58 (defects58, CFG-60): every user-chosen preference is portable. `launchpad_hub` (Comms default view, grouping, clear from the shade, the Widgets
+ * section switch and place), `icon_colors` (per-app icon colours) and `theming` (palette source, interface density, text size) join PrefFilesSource.ALLOWED;
+ * the Comms widget list moves to the device-local [COMMS_WIDGETS_FILE]. Additive, no version bump.
+ *
  * Wave 45: the count of edit-mode entries that decides whether the one-line hint shows lives in its own device-local pref file "edit_chrome" (EditChromeStore), excluded from backup and transfer and never exported.
  *
  * Schema history (every version listed here has a fixture under `core-data/src/test/resources` and a
@@ -91,7 +95,17 @@ object StateSchema {
      * the desktop profile table describe this device, and crash reports hold stack traces. The user's own export file is
      * the portable copy of the part of this that is setup (aliases).
      */
-    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE, "launchpad_hub", "preview_window", EditChromeStore.FILE)
+    /**
+     * Wave 58 (defects58, CFG-60): the Comms widget list (app widget ids of this device's host) has its own device-local file; the rest of the hub's settings
+     * (`launchpad_hub`: default view, grouping, clear from the shade, the Widgets section switch and place) are exported and backed up.
+     */
+    const val COMMS_WIDGETS_FILE = "comms_widgets"
+    /** Wave 58: the look before the last theme change, kept so "Undo last theme change" survives a restart; a convenience of this device, never exported. */
+    const val THEME_UNDO_FILE = "theme_undo"
+    /** Wave 58: when each access was asked for on this device (the "asked before and still off" text); a new device has not asked, so it stays here. */
+    const val GRANT_HISTORY_FILE = "grant_history"
+
+    val BACKUP_EXCLUDED_PREF_FILES: Set<String> = setOf("palette", "liftoff_spikes", "desktop_surface", "liftoff_misc", "device_checks", DeviceBound.FILE, GroupsSettings.FILE, COMMS_WIDGETS_FILE, "preview_window", EditChromeStore.FILE, THEME_UNDO_FILE, GRANT_HISTORY_FILE)
     val BACKUP_EXCLUDED_FILES: Set<String> = setOf("palette-files.idx", "crash-reports", "usage", "wallpapers", LegacyHomeBackup.FILE)
 
     /**
@@ -101,7 +115,7 @@ object StateSchema {
     val NEVER_EXPORTED_FILES: Set<String> = setOf(TimelineLogStore.RELATIVE_PATH, RecentsStateStore.RELATIVE_PATH, NotificationHistoryStore.RELATIVE_PATH, TimelineEventStore.RELATIVE_PATH)
 
     val NEVER_EXPORTED_STORES: Set<String> = setOf(
-        "launch_history", "search_habits", "steps", "weather", "crash_loop", "icon_colors", "liftoff_misc",
+        "launch_history", "search_habits", "steps", "weather", "crash_loop", "liftoff_misc",
     )
 }
 

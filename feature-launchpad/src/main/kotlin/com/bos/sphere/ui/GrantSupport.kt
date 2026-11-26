@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.bos.sphere.core.data.SphereNotificationListener
@@ -125,3 +126,25 @@ fun MediaStripGrantPrompt(visible: Boolean, modifier: Modifier = Modifier) {
     }, modifier = modifier)
     prompter.Host()
 }
+
+/**
+ * Wave 58 (defects58, CFG-63): the one-screen explanation before Android's Do Not Disturb access page opens (asked by a Silent, Vibrate or Do not disturb
+ * action, the default motion gestures included). [onAllow] opens the page; "Not now" leaves everything as it is.
+ */
+@Composable
+fun DndAccessExplainer(onAllow: () -> Unit, onNotNow: () -> Unit) {
+    val ctx = LocalContext.current
+    androidx.compose.ui.window.Dialog(onDismissRequest = onNotNow, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.bos.sphere.core.design.HyleColors.Background).testTag("dnd.explainer")) {
+            com.bos.sphere.core.design.GrantScreen(
+                c = com.bos.sphere.core.design.GrantGateLogic.DND_COPY,
+                askedBefore = ctx.applicationContext.getSharedPreferences(DND_ASKED_FILE, Context.MODE_PRIVATE).getBoolean(DND_ASKED_KEY, false),
+                onEnable = { ctx.applicationContext.getSharedPreferences(DND_ASKED_FILE, Context.MODE_PRIVATE).edit().putBoolean(DND_ASKED_KEY, true).apply(); onAllow() },
+                onNotNow = onNotNow,
+            )
+        }
+    }
+}
+
+private const val DND_ASKED_FILE = "grant_history"
+private const val DND_ASKED_KEY = "DoNotDisturb"

@@ -93,7 +93,6 @@
     "badgesOn": true,
     "searchLayout": "Orbit",
     "calmRegular": false,
-    "appsOnHome": "Everything",
     "pCols": 3,
     "cornerIconSize": 32,
     "wheelWorkOnly": false,

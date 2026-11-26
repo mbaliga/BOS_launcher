@@ -47,7 +47,7 @@ fun Onboarding(
         step = step,
         prefs = prefs,
         importMessage = importMessage,
-        onStyle = { s -> update { it.copy(homeStyle = s) } },
+        onStyle = { look -> update { OnboardingFlow.applyLook(it, look) } }, // wave 58 (CFG-63): the pick has a visible effect
         onSetDefault = setDefaultHome,
         onImport = { importPicker.launch(arrayOf("application/json", "text/plain", "*/*")) },
         onNext = { if (step < steps.lastIndex) step++ else onDone() },

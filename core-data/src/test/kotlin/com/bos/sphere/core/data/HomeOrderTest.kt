@@ -31,10 +31,13 @@ class HomeOrderTest {
         assertEquals(0, HomeOrder.LeftToRight.initialScroll(900)); assertEquals(900, HomeOrder.RightToLeft.initialScroll(900))
     }
 
-    @Test fun HOM_23_hotspotCornersSwapLeftAndRightInRightToLeftOnly() {
-        for (c in Corner.entries) assertEquals(c, HomeOrder.LeftToRight.corner(c))
-        assertEquals(Corner.TopRight, HomeOrder.RightToLeft.corner(Corner.TopLeft)); assertEquals(Corner.BottomLeft, HomeOrder.RightToLeft.corner(Corner.BottomRight))
-        for (c in Corner.entries) assertEquals(c, HomeOrder.RightToLeft.corner(HomeOrder.RightToLeft.corner(c)))
+    // Wave 58 (defects58, CFG-62) replaces HOM_23_hotspotCornersSwapLeftAndRightInRightToLeftOnly: the order mirrors which side Comms and Recents open on;
+    // the hotspots stay physical (a corner keeps its assignment in both orders), so the never-called corner mapping is gone.
+    @Test fun HOM_23_theOrderMirrorsCommsAndRecentsButNotTheHotspots() {
+        assertEquals(PhysicalSide.Right, HomeOrder.RightToLeft.launchpadSide); assertEquals(PhysicalSide.Left, HomeOrder.RightToLeft.recentsSide)
+        assertTrue("no corner mapping: hotspots are physical", HomeOrder::class.java.methods.none { it.name == "corner" })
+        val doc = java.io.File(generateSequence(java.io.File("").absoluteFile) { it.parentFile }.first { java.io.File(it, "app/src/main").isDirectory }, "core-data/src/main/kotlin/com/bos/sphere/core/data/HomeOrder.kt").readText()
+        assertFalse("the order's description no longer promises swapped hotspot roles", doc.contains("hotspots' left and right roles"))
     }
 
     @Test fun HOM_01_theDeckIsGlanceThenPagesAndGlanceOffStartsOnThePages() {

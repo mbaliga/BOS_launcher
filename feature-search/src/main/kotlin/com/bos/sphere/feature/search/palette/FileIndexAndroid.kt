@@ -82,17 +82,17 @@ object FileIndexer {
     private const val MAX_PER_SOURCE = 20_000
     private const val MAX_DEPTH = 8
 
+    // Wave 58 (defects58): the media read permissions are no longer declared (nothing ever asked for them); files come from the folders the user picks.
+    // READ_EXTERNAL_STORAGE is not declared either, so the media pass only runs where the platform grants it on its own.
     fun hasAccess(c: Context): Boolean =
-        listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE)
-            .any { c.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED } || FileGrants.trees(c).isNotEmpty()
+        c.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED || FileGrants.trees(c).isNotEmpty()
 
     /** Full incremental pass; [isActive] lets the job stop early when the system cancels it. */
     fun reconcile(context: Context, isActive: () -> Boolean = { true }): FileIndex.Diff {
         val idx = FileIndexHolder.get(context)
         var added = 0; var removed = 0; var changed = 0
         fun add(d: FileIndex.Diff) { added += d.added; removed += d.removed; changed += d.changed }
-        val mediaGranted = listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE)
-            .any { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+        val mediaGranted = context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         if (mediaGranted && isActive()) runCatching { val l = scanMedia(context); if (isActive()) add(idx.reconcile("media", l)) }
         val trees = FileGrants.trees(context)
         for (t in trees) { if (!isActive()) return FileIndex.Diff(added, removed, changed); runCatching { val l = scanTree(context, t, isActive); if (isActive()) add(idx.reconcile("tree:$t", l)) } }

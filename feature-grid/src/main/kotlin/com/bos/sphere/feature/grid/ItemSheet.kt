@@ -92,7 +92,7 @@ private fun Row(o: SheetOption, clock: ClockTileOptions, a: ItemSheetActions, cl
         @Composable { OneUiListRow(L10n.tr(title), tag, summary = summary?.let { L10n.tr(it) }, tile = glyph, tileColor = Color(0xFF5B7FE8), onClick = { run(); close() }, chevron = chevron) }
     when (o) {
         SheetOption.ClockStyle -> Box(tag) { OneUiSegmentedRow(L10n.tr("Style"), listOf(L10n.tr("Digital"), L10n.tr("Analog")), if (clock.analog) 1 else 0, { a.onClock(clock.copy(analog = it == 1)) }) }
-        SheetOption.ClockFormat -> Box(tag) { OneUiSegmentedRow(L10n.tr("Hours"), listOf(L10n.tr("System"), L10n.tr("12-hour"), L10n.tr("24-hour")), clock.format.ordinal, { a.onClock(clock.copy(format = ClockFormat.entries[it])) }) }
+        SheetOption.ClockFormat -> Box(tag) { OneUiSegmentedRow(L10n.tr("Hours"), ClockFormat.entries.map { L10n.tr(it.label) }, clock.format.ordinal, { a.onClock(clock.copy(format = ClockFormat.entries[it])) }) }
         SheetOption.ClockDate -> OneUiSwitchRow(L10n.tr("Show date"), clock.date, { a.onClock(clock.copy(date = it)) }, summary = L10n.tr("The day and date under the time"), modifier = tag)
         SheetOption.OpenApp -> item("Open app", Glyphs.Apps, run = a.onOpen)()
         SheetOption.AppInfo -> item("App info", Glyphs.Info, run = a.onAppInfo)()

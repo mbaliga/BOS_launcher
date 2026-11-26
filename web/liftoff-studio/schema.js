@@ -98,7 +98,7 @@ window.LIFTOFF_SCHEMA = {
       "type": "enum",
       "scope": "settings",
       "options": [
-        {"id": "System", "label": "System"},
+        {"id": "System", "label": "System (12/24 by device)"},
         {"id": "Hour12", "label": "12-hour"},
         {"id": "Hour24", "label": "24-hour"}
       ],
@@ -224,7 +224,7 @@ window.LIFTOFF_SCHEMA = {
       "type": "enum",
       "scope": "settings",
       "options": [
-        {"id": "System", "label": "System"},
+        {"id": "System", "label": "System (12/24 by device)"},
         {"id": "Hour12", "label": "12-hour"},
         {"id": "Hour24", "label": "24-hour"}
       ],
@@ -1059,7 +1059,7 @@ window.LIFTOFF_SCHEMA = {
         {"id": "action:OpenLaunchpad", "label": "Comms"},
         {"id": "action:OpenRecents", "label": "Open recents"}
       ],
-      "default": "action:Search",
+      "default": "",
       "scene": "glance",
       "note": "Only when pages turn up / down"
     },
@@ -2352,20 +2352,6 @@ window.LIFTOFF_SCHEMA = {
       "default": "a:Flashlight\na:Clock\na:Notifications\na:DoNotDisturb\na:Search\na:Camera\na:Calculator\na:SystemSettings",
       "scene": "disc",
       "note": "A segment that holds an app is kept as it is."
-    },
-    {
-      "key": "appsOnHome",
-      "label": "Apps on the home pages",
-      "tab": "apps",
-      "group": "Home apps",
-      "type": "enum",
-      "scope": "settings",
-      "options": [
-        {"id": "Everything", "label": "All apps"},
-        {"id": "PinnedOnly", "label": "Only ones I add"}
-      ],
-      "default": "Everything",
-      "scene": "pages"
     },
     {
       "key": "badgesOn",

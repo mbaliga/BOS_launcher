@@ -129,6 +129,12 @@ class ActionRunner(
     private val onPickApp: ((CornerActionId) -> Unit)? = null,
     /** Wave 23: puts the English words of a toast into the app language (core-data cannot see the string tables); the default leaves them as they are. */
     private val translate: (String) -> String = { it },
+    /**
+     * Wave 58 (defects58, CFG-63): asked when an action needs Do Not Disturb access that is not granted; the host shows its explanation and calls the given
+     * function to open Android's page only when the user asks. Null (the background motion service, which cannot show one) never opens the page: it only
+     * says what is missing, so a shake or flick never jumps to a settings page unprompted.
+     */
+    private val onPolicyAccessNeeded: ((openSettings: () -> Unit) -> Unit)? = null,
 ) {
     private val ctx = context.applicationContext
 
@@ -256,8 +262,9 @@ class ActionRunner(
     }
 
     private fun requestPolicyAccess() {
-        toast("Allow Do Not Disturb access for Liftoff to change silent mode")
-        start(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS), null)
+        val ask = onPolicyAccessNeeded
+        if (ask != null) ask { start(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS), null) }
+        else toast("Allow Do Not Disturb access for Liftoff to change silent mode")
     }
 
     private fun toast(key: String, vararg args: Any?) {

@@ -21,7 +21,6 @@ import com.bos.sphere.core.catalog.Folder
 import com.bos.sphere.core.catalog.HomeExtrasStore
 import com.bos.sphere.core.catalog.HomeState
 import com.bos.sphere.core.catalog.ItemKeys
-import com.bos.sphere.core.data.AppsOnHome
 import com.bos.sphere.core.data.CrashLoopGuard
 import com.bos.sphere.core.data.HomeLayout
 import com.bos.sphere.core.data.HomePage
@@ -70,9 +69,9 @@ class AppSmokeTest {
         AppSmokeHarness.resetProcess()
     }
 
-    private fun start(restoreSurfaces: Boolean = false, apps: AppsOnHome = AppsOnHome.Everything, dock: Boolean = true): ActivityScenario<MainActivity> {
+    private fun start(restoreSurfaces: Boolean = false, dock: Boolean = true): ActivityScenario<MainActivity> {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
-        AppSmokeHarness.configure { it.copy(appsOnHome = apps, restoreOpenSurfaces = restoreSurfaces) }
+        AppSmokeHarness.configure { it.copy(restoreOpenSurfaces = restoreSurfaces) }
         // Wave 30 (pagesExplicit): nothing is placed for the user, so a test that wants apps on the page places them (as the user's own, recorded edit).
         LauncherStores.get(AppSmokeHarness.app).layout.replace(com.bos.sphere.core.data.HomeLayout(pages = listOf(com.bos.sphere.core.data.HomePage(listOf("Alpha", "Bravo", "Camera", "Delta").map { AppSmokeHarness.appKey(it) }, id = 1L)), seeded = true))
         LauncherStores.get(AppSmokeHarness.app).layout.markExplicit()
@@ -127,7 +126,7 @@ class AppSmokeTest {
 
     @Test fun HOM_01_thePageGridShowsAppsAndAFolderAndTheFolderOpens() {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
-        AppSmokeHarness.configure { it.copy(appsOnHome = AppsOnHome.PinnedOnly) }
+        AppSmokeHarness.configure()
         val a = AppSmokeHarness.appKey("Alpha"); val b = AppSmokeHarness.appKey("Bravo"); val c = AppSmokeHarness.appKey("Camera"); val d = AppSmokeHarness.appKey("Delta")
         val folder = Folder("f1", "Work", listOf(a, b))
         HomeExtrasStore.get(AppSmokeHarness.app).set(HomeState(folders = mapOf("f1" to folder)))
@@ -321,7 +320,7 @@ class AppSmokeTest {
 
     @Test fun HOM_01_aFolderOpenIntentWhileTheDrawerIsOpenClosesItAndOpensTheFolder() {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
-        AppSmokeHarness.configure { it.copy(appsOnHome = AppsOnHome.PinnedOnly) }
+        AppSmokeHarness.configure()
         val a = AppSmokeHarness.appKey("Alpha"); val b = AppSmokeHarness.appKey("Bravo"); val c = AppSmokeHarness.appKey("Camera")
         HomeExtrasStore.get(AppSmokeHarness.app).set(HomeState(folders = mapOf("f1" to Folder("f1", "Work", listOf(a, b)))))
         LauncherStores.get(AppSmokeHarness.app).layout.replace(HomeLayout(pages = listOf(HomePage(keys = listOf(ItemKeys.folder("f1"), c))), seeded = true))

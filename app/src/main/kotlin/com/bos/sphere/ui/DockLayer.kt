@@ -93,9 +93,7 @@ private class AppWorkspaceHooks(private val stores: LauncherStores, private val 
         if (!WorkspaceWidgets.isSnapshot(widgets)) return
         val slots = WorkspaceWidgets.decode(widgets)
         val left = slots.filterIsInstance<WorkspaceWidgets.Slot.Left>().firstOrNull()
-        val cur = stores.prefs.prefs.value
-        if (left != null) stores.prefs.update { it.copy(leftPage = LeftPage.Widget, leftWidgetId = left.appWidgetId) }
-        else if (cur.leftPage == LeftPage.Widget) stores.prefs.update { it.copy(leftPage = LeftPage.Off, leftWidgetId = -1) }
+        stores.prefs.update { com.bos.sphere.core.data.ProfileLeftWidget.apply(it, left?.appWidgetId) } // wave 58: the global Left page setting stays
         val wanted = slots.filterIsInstance<WorkspaceWidgets.Slot.Corner>().associateBy { it.corner }
         Corner.entries.forEach { c ->
             val now = stores.shortcuts.corners.value[c]

@@ -20,9 +20,12 @@ class LauncherStores private constructor(context: Context) {
     /** NFR-18: widget ids and the background picture path belong to one device; they live in a file the platform backup excludes. */
     private val deviceBound = TolerantPrefs.of(app, DeviceBound.FILE)
 
+    /** Read before the store writes anything: an install with settings from an earlier build (the same test as onboardingDone's fallback). */
+    private val existingInstall = TolerantPrefs.of(app, "launcher_prefs").let { it.contains("style") || it.contains("pCols") }
     val prefs = LauncherPrefsStore(TolerantPrefs.of(app, "launcher_prefs"), deviceBound)
     val layout = HomeLayoutStore(TolerantPrefs.of(app, "home_layout"), deviceBound)
     init { prefs.migratePages(layout.layout.value.pages) } // wave 28: the Pages setting from the old Scroll / Paginated choice, once the layout is known
+    init { GestureDefaultsW58.migrate(TolerantPrefs.of(app, "shortcuts"), prefs.prefs.value, existingInstall) } // wave 58: the dead swipe-left default, before the gestures are read
     val shortcuts = ShortcutStore(TolerantPrefs.of(app, "shortcuts"), deviceBound)
     val history = LaunchHistoryStore(TolerantPrefs.of(app, "launch_history"))
     /** HOM-18: the larger, file-backed log the timeline reads; fed by every [history] record. */
@@ -35,6 +38,7 @@ class LauncherStores private constructor(context: Context) {
     /** HOM-22: what the user removed from the Recent landing; private usage history, never exported or backed up. */
     val recentsState = RecentsStateStore(java.io.File(app.filesDir, RecentsStateStore.RELATIVE_PATH))
     val iconColors = IconColorStore(TolerantPrefs.of(app, "icon_colors"))
+    init { ThemeUndo.attach(TolerantPrefs.of(app, StateSchema.THEME_UNDO_FILE)) } // wave 58: the theme undo survives a restart
 
     companion object {
         @Volatile private var instance: LauncherStores? = null
@@ -45,6 +49,7 @@ class LauncherStores private constructor(context: Context) {
 }
 
 class LauncherPrefsStore internal constructor(private val sp: SharedPreferences, private val device: SharedPreferences? = null) {
+    private companion object { const val LEGACY_APPS_ON_HOME = "appsOnHome" }
     private val _prefs = MutableStateFlow(run { DeviceBound.migratePrefs(sp, device); migrateEffects(); read() })
     val prefs: StateFlow<LauncherPrefs> = _prefs.asStateFlow()
 
@@ -59,6 +64,21 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
         update { it.copy(homePages = mode) }
     }
     private var forceWrite = false
+
+    /**
+     * Writes every key of [p], even when it equals what the store holds. The codecs use it on an empty map to get the stored form of a settings value
+     * (wave 58: since `appsOnHome` is gone, the defaults read from an empty file equal [LauncherPrefs] itself, so a plain [update] would write nothing).
+     */
+    internal fun writeAll(p: LauncherPrefs) { forceWrite = true; update { p } }
+
+    /**
+     * Wave 58 (CFG-62): the retired `appsOnHome` setting, read only for the one-time pages migration ([PagesExplicitMigration]): what an older build stored,
+     * or "All apps" (that build's default) for an install with settings and no stored value. A fresh install never had it.
+     */
+    fun legacyAppsEverything(): Boolean = (sp.getString(LEGACY_APPS_ON_HOME, null) ?: if (sp.contains("style") || sp.contains("pCols")) "Everything" else "PinnedOnly") == "Everything"
+
+    /** Removes the retired key once the pages migration has settled. */
+    fun dropLegacyAppsOnHome() { if (sp.contains(LEGACY_APPS_ON_HOME)) sp.edit().remove(LEGACY_APPS_ON_HOME).apply() }
 
     fun update(transform: (LauncherPrefs) -> LauncherPrefs) {
         val next = transform(_prefs.value).let {
@@ -125,7 +145,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putString("cornerIconMode", next.cornerIconMode.name)
             .putBoolean("hideStatusBar", next.hideStatusBar)
             .putBoolean("restoreSurfaces", next.restoreOpenSurfaces)
-            .putString("appsOnHome", next.appsOnHome.name)
             .putString("pageMode", next.pageMode.name)
             .putString("indMetric", next.indicatorMetric.name)
             .putBoolean("calmRegular", next.calmAlsoRegular)
@@ -282,8 +301,6 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             cornerIconMode = enumOr(sp.getString("cornerIconMode", null), d.cornerIconMode),
             hideStatusBar = sp.getBoolean("hideStatusBar", d.hideStatusBar),
             restoreOpenSurfaces = sp.getBoolean("restoreSurfaces", d.restoreOpenSurfaces),
-            // New installs keep the home nearly empty (the drawer has everything); existing ones keep All apps.
-            appsOnHome = enumOr(sp.getString("appsOnHome", null), if (sp.contains("style") || sp.contains("pCols")) AppsOnHome.Everything else AppsOnHome.PinnedOnly),
             pageMode = enumOr(sp.getString("pageMode", null), d.pageMode),
             indicatorMetric = enumOr(sp.getString("indMetric", null), d.indicatorMetric),
             calmStyle = readCalmStyle(), calmAlsoRegular = sp.getBoolean("calmRegular", d.calmAlsoRegular),
@@ -448,6 +465,7 @@ object HomeLayoutCodec {
 
 /** Corner slots (by physical corner) and gesture bindings. */
 class ShortcutStore internal constructor(private val sp: SharedPreferences, private val device: SharedPreferences? = null) {
+    private companion object { const val PINCH_SAVED_MARK = "pinchSaved" }
     private val _corners = MutableStateFlow(run { DeviceBound.migrateSlots(sp, device); readCorners() })
     val corners: StateFlow<Map<Corner, CornerSlot>> = _corners.asStateFlow()
 
@@ -484,6 +502,19 @@ class ShortcutStore internal constructor(private val sp: SharedPreferences, priv
         _gestures.value = next
         // An explicit "none" is stored as an empty string so it survives over the defaults.
         sp.edit().putString("gesture.${gesture.name}", item?.let(ShortcutCodec::encodeItem) ?: "").apply()
+    }
+
+    /** Wave 58 (CFG-62): the pinch bindings [PinchDensityToggle] replaced; null when none is remembered. Stored beside the gestures as `pinchSaved.<gesture>`. */
+    fun savedPinch(): Map<HomeGesture, CornerItem?>? {
+        if (!sp.contains(PINCH_SAVED_MARK)) return null
+        return PinchDensityToggle.PINCHES.associateWith { g -> sp.getString("pinchSaved.${g.name}", null)?.let(ShortcutCodec::decodeItem) }
+    }
+
+    fun savePinch(saved: Map<HomeGesture, CornerItem?>?) {
+        val e = sp.edit()
+        if (saved == null) { e.remove(PINCH_SAVED_MARK); PinchDensityToggle.PINCHES.forEach { e.remove("pinchSaved.${it.name}") } }
+        else { e.putBoolean(PINCH_SAVED_MARK, true); PinchDensityToggle.PINCHES.forEach { g -> e.putString("pinchSaved.${g.name}", saved[g]?.let(ShortcutCodec::encodeItem) ?: "") } }
+        e.apply()
     }
 
     private fun readCorners(): Map<Corner, CornerSlot> = Corner.entries.associateWith { c ->
@@ -594,9 +625,15 @@ private inline fun <reified E : Enum<E>> enumOr(name: String?, fallback: E): E =
 
 
 /** Per-app icon tint overrides (ARGB), keyed by [AppEntry.key]. */
+/** Per-app icon colours (the app menu's colour picker). Wave 58 (CFG-60): the user's own setup, exported with Backup (`icon_colors` in PrefFilesSource.ALLOWED). */
 class IconColorStore internal constructor(private val sp: SharedPreferences) {
-    private val _colors = MutableStateFlow(sp.all.mapNotNull { (k, v) -> (v as? Long)?.let { k to it } }.toMap())
+    private val _colors = MutableStateFlow(read())
     val colors: StateFlow<Map<String, Long>> = _colors.asStateFlow()
+
+    private fun read(): Map<String, Long> = sp.all.mapNotNull { (k, v) -> (v as? Long)?.let { k to it } }.toMap()
+
+    /** Re-reads the file after an import or a restore wrote it (CFG-02). */
+    fun reload() { _colors.value = read() }
 
     fun set(key: String, argb: Long?) {
         _colors.value = if (argb == null) _colors.value - key else _colors.value + (key to argb)

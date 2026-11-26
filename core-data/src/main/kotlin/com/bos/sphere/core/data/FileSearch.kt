@@ -72,10 +72,8 @@ class FileSearch(private val context: Context) : SearchProvider {
 
     fun hasAccess(): Boolean {
         fun granted(p: String) = context.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
-        return granted(Manifest.permission.READ_MEDIA_IMAGES) ||
-            granted(Manifest.permission.READ_MEDIA_VIDEO) ||
-            granted(Manifest.permission.READ_MEDIA_AUDIO) ||
-            granted(Manifest.permission.READ_EXTERNAL_STORAGE) ||
+        // Wave 58 (defects58): the media read permissions are not declared any more (never requested); granted folders are the way to file results.
+        return granted(Manifest.permission.READ_EXTERNAL_STORAGE) ||
             runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
     }
 

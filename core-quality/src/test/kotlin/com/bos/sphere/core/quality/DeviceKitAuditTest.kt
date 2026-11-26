@@ -48,9 +48,9 @@ class DeviceKitAuditTest {
         val declared = Regex("""<uses-permission android:name="([^"]+)"""").findAll(manifest).map { it.groupValues[1] }.toSortedSet()
         val expected = setOf(
             "android.permission.QUERY_ALL_PACKAGES", "android.permission.REQUEST_DELETE_PACKAGES", "android.permission.RECORD_AUDIO", "android.permission.PACKAGE_USAGE_STATS", "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
-            "android.permission.health.READ_STEPS", "android.permission.health.READ_FLOORS_CLIMBED", "android.permission.health.READ_ELEVATION_GAINED", "android.permission.health.READ_DISTANCE",
-            "android.permission.health.READ_ACTIVE_CALORIES_BURNED", "android.permission.ACTIVITY_RECOGNITION", "com.bos.sphere.permission.READ_SEARCH",
-            "android.permission.READ_CONTACTS", "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VIDEO", "android.permission.READ_MEDIA_AUDIO",
+            // Wave 58 (defects58): the Health Connect reads, ACTIVITY_RECOGNITION and READ_MEDIA_* had no live consumer and were removed (PermissionConsumersW58AuditTest).
+            "com.bos.sphere.permission.READ_SEARCH",
+            "android.permission.READ_CONTACTS",
             "android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE", "android.permission.VIBRATE", "android.permission.ACCESS_NOTIFICATION_POLICY",
             "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE", "android.permission.POST_NOTIFICATIONS",
             // Wave 43 (radarWeb): the one deliberate addition, for Radar's live web suggestions (docs/decisions/radarWebSuggest.md); not a side effect of the device checks.

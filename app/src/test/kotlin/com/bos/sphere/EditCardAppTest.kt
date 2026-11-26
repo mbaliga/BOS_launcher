@@ -12,7 +12,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
-import com.bos.sphere.core.data.AppsOnHome
 import com.bos.sphere.core.data.HomeLayout
 import com.bos.sphere.core.data.HomePage
 import com.bos.sphere.core.data.LauncherStores
@@ -66,7 +65,6 @@ class EditCardAppTest {
         val stores = startFresh()
         val l = stores.layout.layout.value
         assertEquals(1, l.pages.size); assertTrue(l.pages[0].keys.isEmpty()); assertTrue(l.seeded)
-        assertEquals(AppsOnHome.PinnedOnly, stores.prefs.prefs.value.appsOnHome)
         // (Camera is also a corner shortcut, so the grid check uses apps that are not a corner action.)
         for (label in listOf("Alpha", "Bravo", "Delta")) assertFalse("$label is not placed on a fresh home", onHome(label))
         rule.onNodeWithText("Long press to add apps").assertIsDisplayed()
@@ -85,7 +83,7 @@ class EditCardAppTest {
     // Wave 30 (pagesExplicit), replaces HOM_01_aReturningUserWithoutALayoutStillSeesTheirAppsFlow: nothing is placed for the user, not even for a user from before.
     @Test fun PGX_aReturningUserWithoutALayoutGetsNoAppsFlowedOntoThePages() {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
-        AppSmokeHarness.configure { it.copy(appsOnHome = AppsOnHome.Everything) } // onboarding done: a user from before this change
+        AppSmokeHarness.configure() // onboarding done: a user from before this change (wave 58: appsOnHome is gone)
         scenario = AppSmokeHarness.launch(); rule.waitForIdle(); settle()
         for (label in listOf("Alpha", "Bravo", "Delta")) assertFalse("$label is not placed for the user", onHome(label))
         assertTrue(LauncherStores.get(AppSmokeHarness.app).layout.layout.value.pages.flatMap { it.keys }.isEmpty())

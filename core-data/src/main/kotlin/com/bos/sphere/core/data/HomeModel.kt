@@ -67,7 +67,6 @@ enum class DensityPreset(val label: String, val portrait: GridSpec, val landscap
 }
 
 /** Where steps and the other activity numbers come from. */
-enum class HealthSourcePref(val label: String) { Phone("Phone sensor"), HealthConnect("Health Connect") }
 
 /** How the search screen presents results. */
 enum class SearchLayout(val label: String) { Filmstrip("Filmstrip"), Orbit("Orbit"), Flat("Flat") }
@@ -117,7 +116,8 @@ enum class WebEngine(val label: String, private val template: String, private va
 }
 
 /** Clock number format. */
-enum class ClockFormat(val label: String) { System("System"), Hour12("12-hour"), Hour24("24-hour") }
+/** Wave 58 (CFG-61): System, the default, follows the device's own 12 or 24 hour setting, and every chooser offers it first under this name. */
+enum class ClockFormat(val label: String) { System("System (12/24 by device)"), Hour12("12-hour"), Hour24("24-hour") }
 
 /**
  * Wave 41 (glanceClock): the styles of the big wallpaper clock on the Glance page (it replaces the small wave 38 clock of the fixed chrome). The stored name of
@@ -144,8 +144,6 @@ enum class ClockSize(val label: String, val factor: Float) { Small("Small", 0.6f
 /** Whether corner actions show a drawn glyph or the real icon of the app they open. */
 enum class CornerIconMode(val label: String) { Glyph("Glyph"), AppIcon("App icon") }
 
-/** What lives on the home pages. */
-enum class AppsOnHome(val label: String) { Everything("All apps"), PinnedOnly("Only ones I add") }
 
 /** One page or many. */
 enum class PageMode(val label: String) { Multiple("Multiple pages"), Single("One page") }
@@ -343,7 +341,7 @@ data class LauncherPrefs(
     val restoreOpenSurfaces: Boolean = false,
 
     // --- apps and pages
-    val appsOnHome: AppsOnHome = AppsOnHome.Everything,
+    // Wave 58 (CFG-62): `appsOnHome` is gone: no screen offered it and every start forced "Only ones I add"; the pages hold only what the user puts there.
     val pageMode: PageMode = PageMode.Multiple,
 
     // --- indicator (the background dots and effects)
@@ -597,9 +595,9 @@ fun LauncherPrefs.surface(landscape: Boolean): HomeSurface = when {
         if (pagingFor(landscape) == PagingAxis.Horizontal) SurfaceScroll.Horizontal else SurfaceScroll.Vertical,
         paged = true, hasDensity = true, leftPageOn = leftPage != LeftPage.Off,
     )
-    homeStyle == HomeStyle.Grid -> HomeSurface(
-        if (scrollsHorizontally(landscape)) SurfaceScroll.Horizontal else SurfaceScroll.Vertical, paged = false, hasDensity = true,
-    )
+    // Wave 58 (CFG-62): Grid + Continuous is the column scroll (ColumnScrollHome), which always scrolls sideways in both orientations; the scroll axis
+    // setting belongs to DSi only (Settings offers it there only), so the gesture annotations follow the real scroll.
+    homeStyle == HomeStyle.Grid -> HomeSurface(SurfaceScroll.Horizontal, paged = false, hasDensity = true)
     homeStyle == HomeStyle.Dsi -> HomeSurface(
         if (scrollsHorizontally(landscape)) SurfaceScroll.Horizontal else SurfaceScroll.Vertical, paged = false, hasDensity = false,
     )
@@ -607,12 +605,15 @@ fun LauncherPrefs.surface(landscape: Boolean): HomeSurface = when {
     else -> HomeSurface(SurfaceScroll.Both, paged = false, hasDensity = false) // PSP: sideways for categories, up / down for apps
 }
 
-/** Defaults: the requested pinch-in → search, plus the three motion examples. */
+/**
+ * Defaults: the requested pinch-in → search, plus the three motion examples. Wave 58 (CFG-62): swipe left is unbound by default (it was Radar, which can
+ * never fire on the default sideways paged home; Radar stays on pinch in and the bottom-right hotspot). [GestureDefaultsW58] keeps Radar for an older
+ * install whose home lets swipe left fire.
+ */
 val DefaultGestures: Map<HomeGesture, CornerItem> = mapOf(
     HomeGesture.PinchIn to CornerItem.Action(CornerActionId.Search),
     HomeGesture.SwipeDown to CornerItem.Action(CornerActionId.Notifications),
     HomeGesture.SwipeUp to CornerItem.Action(CornerActionId.AllApps),
-    HomeGesture.SwipeLeft to CornerItem.Action(CornerActionId.Search),
     HomeGesture.Shake to CornerItem.Action(CornerActionId.RingerVibrate),
     HomeGesture.DoubleFlick to CornerItem.Action(CornerActionId.RingerSilent),
     HomeGesture.DoubleFlip to CornerItem.Action(CornerActionId.Flashlight),

@@ -284,7 +284,6 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val legacy = withContext(kotlinx.coroutines.Dispatchers.IO) { misc.getBoolean("defaultHomeSeeded", false) }
         if (com.bos.sphere.core.data.FreshHome.isFresh(stores.layout.layout.value, stores.prefs.prefs.value.onboardingDone, legacy)) {
             stores.layout.replace(com.bos.sphere.core.data.FreshHome.emptyLayout())
-            stores.prefs.update { com.bos.sphere.core.data.FreshHome.prefs(it) }
             misc.edit().putBoolean("defaultHomeSeeded", true).apply()
         }
         freshDecided = true
@@ -313,10 +312,11 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val result = withContext(kotlinx.coroutines.Dispatchers.IO) {
             com.bos.sphere.core.data.PagesExplicitMigration.run(
                 stores.layout, com.bos.sphere.core.data.LegacyHomeBackup(context.filesDir), installedOrders, capacityOf,
-                legacyEverything = storedPrefs.appsOnHome == com.bos.sphere.core.data.AppsOnHome.Everything, nowMillis = System.currentTimeMillis(),
+                legacyEverything = stores.prefs.legacyAppsEverything(), nowMillis = System.currentTimeMillis(),
             )
         }
-        if (storedPrefs.appsOnHome != com.bos.sphere.core.data.AppsOnHome.PinnedOnly) stores.prefs.update { it.copy(appsOnHome = com.bos.sphere.core.data.AppsOnHome.PinnedOnly) }
+        // Wave 58 (CFG-62): the retired appsOnHome key is removed once the migration that reads it has settled (no forcing on every start any more).
+        if (stores.layout.pagesExplicitVersion() >= com.bos.sphere.core.data.PagesExplicit.VERSION) withContext(kotlinx.coroutines.Dispatchers.IO) { stores.prefs.dropLegacyAppsOnHome() }
         if (result == com.bos.sphere.core.data.PagesMigrationResult.Reset) { layoutEpoch++; resetNotice = true }
     }
     // "One page" shows only the first page; the rest of the apps stay in the drawer.
@@ -384,6 +384,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val editHintStore = remember(context) { com.bos.sphere.core.data.EditChromeStore(com.bos.sphere.core.data.TolerantPrefs.of(context.applicationContext, com.bos.sphere.core.data.EditChromeStore.FILE)) }
     var showEditHint by remember { mutableStateOf(false) }
     LaunchedEffect(homeEdit.active) { showEditHint = if (homeEdit.active) editHintStore.registerEntry() else false } // the counter is written on entry (a handler), never in composition
+    var glanceHint by remember { mutableStateOf(false) } // wave 58 (CFG-63): Glance's one "Long press for options" hint
     LaunchedEffect(pageEditorOn) { if (pageEditorOn) showEditHint = false }
     val sounds = remember { UiSounds() }
     DisposableEffect(Unit) { onDispose { sounds.release() } }
@@ -594,8 +595,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     var pickFor by remember { mutableStateOf<CornerActionId?>(null) }
     var actionAppsRev by remember { mutableIntStateOf(0) }
     val pickAppForRef by rememberUpdatedState({ id: CornerActionId -> pickFor = id })
+    var dndAsk by remember { mutableStateOf<(() -> Unit)?>(null) } // wave 58 (CFG-63): the Do Not Disturb explanation, asked before Android's page opens
     val runner = remember {
-        ActionRunner(context, onInternal = { internalRef(it, null) }, onAppLaunched = { stores.history.record(it) }, onPickApp = { pickAppForRef(it) }, translate = { com.bos.sphere.core.design.L10n.tr(it) })
+        ActionRunner(context, onInternal = { internalRef(it, null) }, onAppLaunched = { stores.history.record(it) }, onPickApp = { pickAppForRef(it) }, translate = { com.bos.sphere.core.design.L10n.tr(it) },
+            onPolicyAccessNeeded = { open -> dndAsk = open })
     }
     runner.launchHook = { key ->
         com.bos.sphere.feature.dock.AppKeys.target(key)?.let { t ->
@@ -1274,6 +1277,16 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     onOpen = { editFocusAdd = true; pageEditorOn = true; homeEdit.enter() }, modifier = Modifier.align(Alignment.Center),
                 )
             }
+            // Wave 58 (CFG-63): Glance shows "Long press for options" once (a fresh install lands there with Pages Off), until the long press or a few seconds.
+            LaunchedEffect(landing, prefs.onboardingDone, homeEdit.active) {
+                val before = withContext(kotlinx.coroutines.Dispatchers.IO) { editHintStore.glanceHintShown() }
+                if (com.bos.sphere.core.data.FirstRunHints.showsGlanceHint(landing, before, prefs.onboardingDone, homeEdit.active)) {
+                    editHintStore.markGlanceHintShown(); glanceHint = true
+                    kotlinx.coroutines.delay(com.bos.sphere.core.data.FirstRunHints.GLANCE_HINT_MS); glanceHint = false
+                }
+            }
+            LaunchedEffect(quickOpen) { if (quickOpen) glanceHint = false }
+            if (glanceHint && landing == HomeShown.Glance && !homeEdit.active) com.bos.sphere.feature.grid.GlanceOptionsHint(Modifier.align(Alignment.Center))
             // HOM-08: widgets and the item strip live in a band on the scrolling homes, never over their tiles.
             if (HomeShownRules.hasPages(landing) && prefs.homeStyle != HomeStyle.Grid) { // W47: the Grid style with Pages Continuous is the column scroll surface, whose widgets are its own cells (the band drew every widget a second time, with a second frame and a second set of handles in edit mode)
                 homeItems.Band(layout.pages, cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat(), prefs.homeStyle)
@@ -1311,6 +1324,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         )
 
         grantPrompter.Host()
+        dndAsk?.let { open -> com.bos.sphere.ui.DndAccessExplainer(onAllow = { dndAsk = null; open() }, onNotNow = { dndAsk = null }) }
 
         // STR-01/STR-09: the Launchpad opens from the physical left edge in every language, so these sit there too (not at the layout start, which is the right in RTL).
         val leftEdge = androidx.compose.ui.BiasAbsoluteAlignment(if (launchpadRtl) 1f else -1f, 0f)
@@ -1603,6 +1617,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 corners = corners,
                 gestures = gestures,
                 setGesture = { g, item -> stores.shortcuts.setGesture(g, item) },
+                savedPinch = { stores.shortcuts.savedPinch() }, savePinch = { stores.shortcuts.savePinch(it) }, // wave 58 (CFG-62)
                 about = about,
                 capabilities = capabilityRows,
                 copyText = { t -> (context.getSystemService(android.content.ClipboardManager::class.java)).setPrimaryClip(android.content.ClipData.newPlainText("Liftoff", t)) },

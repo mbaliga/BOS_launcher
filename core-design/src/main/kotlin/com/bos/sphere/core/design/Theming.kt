@@ -149,7 +149,7 @@ object WallpaperColorReader {
 
 /** Persistent theming choices. Call [init] once; collect [settings]. */
 object ThemingStore {
-    private const val FILE = "theming"
+    const val FILE = "theming"
     private var sp: android.content.SharedPreferences? = null
     private val _s = MutableStateFlow(ThemingSettings())
     val settings: StateFlow<ThemingSettings> = _s.asStateFlow()
@@ -158,6 +158,13 @@ object ThemingStore {
         if (sp != null) return
         sp = ctx.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         _s.value = ThemingSettings.fromJson(sp?.getString("settings", null))
+        HyleScale.apply(_s.value)
+    }
+
+    /** Wave 58 (CFG-60): the file travels with Backup (PrefFilesSource.ALLOWED); after an import or a restore wrote it, the live settings follow. */
+    fun reload() {
+        val p = sp ?: return
+        _s.value = ThemingSettings.fromJson(p.getString("settings", null))
         HyleScale.apply(_s.value)
     }
 

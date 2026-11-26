@@ -101,8 +101,11 @@ object SettingsArtLook {
         digit(a, x0, y, dw, dh, th, ink.strong); digit(b, x0 + dw * 1.5f, y, dw, dh, th, ink.strong)
         drawCircle(ink.strong, dp(1.3f), Offset(x0 + dw * 3.05f, h * 0.34f)); drawCircle(ink.strong, dp(1.3f), Offset(x0 + dw * 3.05f, h * 0.48f))
         digit(3, x0 + dw * 3.6f, y, dw, dh, th, ink.strong); digit(0, x0 + dw * 5.1f, y, dw, dh, th, ink.strong)
-        if (f != ClockFormat.Hour24) rect(ink.soft, 0.6f, 0.72f, 0.22f, 0.14f, 0.5f) // the AM or PM mark
-        else line(ink.faint, 0.18f, 0.79f, 0.82f, 0.79f, 1.2f)
+        when (f) {
+            ClockFormat.Hour12 -> rect(ink.soft, 0.6f, 0.72f, 0.22f, 0.14f, 0.5f) // the AM or PM mark
+            ClockFormat.Hour24 -> line(ink.faint, 0.18f, 0.79f, 0.82f, 0.79f, 1.2f)
+            ClockFormat.System -> { rect(ink.faint, 0.2f, 0.72f, 0.18f, 0.14f, 0.5f, stroke = 1f); rect(ink.soft, 0.6f, 0.72f, 0.22f, 0.14f, 0.5f) } // wave 58: either form, as the device says
+        }
     }
 
     private fun clockSizeArt(s: ClockSize): VisualArt = { ink ->

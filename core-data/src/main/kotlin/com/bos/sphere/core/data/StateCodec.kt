@@ -60,7 +60,7 @@ object SettingsCodec {
 
     fun encode(p: LauncherPrefs, unknown: JSONObject = JSONObject()): JSONObject {
         val sp = MapSharedPreferences()
-        LauncherPrefsStore(sp).update { p }
+        LauncherPrefsStore(sp).writeAll(p)
         val map = JSONObject()
         sp.all.forEach { (k, v) ->
             if (k in StateSchema.DEVICE_BOUND_PREF_KEYS) return@forEach

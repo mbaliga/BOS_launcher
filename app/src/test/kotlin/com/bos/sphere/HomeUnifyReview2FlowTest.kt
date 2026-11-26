@@ -59,7 +59,7 @@ class HomeUnifyReview2FlowTest : TourBase() {
     }
 
     @Test fun HOM_01_w28_anEmptyContinuousScrollSaysHowToAddAndEditModeAddsAnAppToTheScroll() {
-        start(HomePages.Continuous, layout = listOf(HomePage(keys = emptyList(), id = 1L))) { it.copy(appsOnHome = com.bos.sphere.core.data.AppsOnHome.PinnedOnly) }
+        start(HomePages.Continuous, layout = listOf(HomePage(keys = emptyList(), id = 1L)))
         forward(); assertFalse(glanceShown()); assertTrue(tagShown("scrollhome"))
         assertTrue("an empty scroll tells the user how to start", textShown("Long press to add apps"))
         rule.onNodeWithText("Long press to add apps").performClick(); settle()

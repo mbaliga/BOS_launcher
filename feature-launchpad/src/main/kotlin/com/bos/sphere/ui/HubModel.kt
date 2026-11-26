@@ -115,8 +115,13 @@ object HubLogic {
     }
 }
 
-/** The persisted hub settings: the default view and the grouping (wave 28: the row density is gone, the Comms size replaces it). */
-class HubPrefs(private val sp: SharedPreferences?) {
+/**
+ * The persisted hub settings: the default view and the grouping (wave 28: the row density is gone, the Comms size replaces it).
+ * Wave 58 (defects58, CFG-60): the settings ([sp], pref file `launchpad_hub`) are the user's own and travel with Backup (PrefFilesSource.ALLOWED) and
+ * system backup; the widget list ([device], pref file [com.bos.sphere.core.data.StateSchema.COMMS_WIDGETS_FILE]) holds this device's app widget ids and
+ * stays on the device. An install from before wave 58 keeps its list in `launchpad_hub`; [of] moves it once.
+ */
+class HubPrefs(private val sp: SharedPreferences?, private val device: SharedPreferences? = sp) {
     var defaultView: HubView
         get() = (sp?.getString("defaultView", null)).let { raw ->
             // Wave 28: a stored default of the removed Usage view becomes Timeline, and is rewritten so the migration runs once.
@@ -143,10 +148,26 @@ class HubPrefs(private val sp: SharedPreferences?) {
     private var memoryWidgets: List<PanelWidget> = emptyList()
     /** The widgets of the section, in order (see [PanelWidgetList.encode]). */
     var widgetList: List<PanelWidget>
-        get() = if (sp == null) memoryWidgets else PanelWidgetList.decode(sp.getString("widgets", null))
-        set(v) { memoryWidgets = v; sp?.edit()?.putString("widgets", PanelWidgetList.encode(v))?.apply() }
+        get() = if (device == null) memoryWidgets else PanelWidgetList.decode(device.getString(WIDGETS_KEY, null))
+        set(v) { memoryWidgets = v; device?.edit()?.putString(WIDGETS_KEY, PanelWidgetList.encode(v))?.apply() }
 
-    companion object { fun of(context: Context) = HubPrefs(TolerantPrefs.of(context.applicationContext, "launchpad_hub")) }
+    companion object {
+        const val FILE = "launchpad_hub"
+        const val WIDGETS_KEY = "widgets"
+        fun of(context: Context): HubPrefs {
+            val settings = TolerantPrefs.of(context.applicationContext, FILE)
+            val device = TolerantPrefs.of(context.applicationContext, com.bos.sphere.core.data.StateSchema.COMMS_WIDGETS_FILE)
+            migrateWidgets(settings, device)
+            return HubPrefs(settings, device)
+        }
+
+        /** Wave 58: the widget list of an older install moves out of the exported settings file into the device-local one (once; the newer list wins). */
+        fun migrateWidgets(settings: SharedPreferences, device: SharedPreferences) {
+            val old = settings.getString(WIDGETS_KEY, null) ?: return
+            if (!device.contains(WIDGETS_KEY)) device.edit().putString(WIDGETS_KEY, old).apply()
+            settings.edit().remove(WIDGETS_KEY).apply()
+        }
+    }
 }
 
 /**

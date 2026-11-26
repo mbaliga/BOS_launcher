@@ -11,7 +11,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ActivityScenario
-import com.bos.sphere.core.data.AppsOnHome
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.RightSide
 import com.bos.sphere.feature.dock.DockItemRef
@@ -49,7 +48,7 @@ class RecentsPanelSmokeTest {
 
     private fun start(dock: Boolean = false): ActivityScenario<MainActivity> {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
-        AppSmokeHarness.configure { it.copy(appsOnHome = AppsOnHome.Everything) }
+        AppSmokeHarness.configure()
         if (dock) {
             WorkspaceRepository.get(AppSmokeHarness.app).setDock { it.copy(enabled = true) }
             WorkspaceRepository.get(AppSmokeHarness.app).setPins(listOf(DockItemRef.app(AppSmokeHarness.appKey("Alpha"))))

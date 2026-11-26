@@ -42,7 +42,7 @@ internal object SettingsReset {
             "glanceWallpaperKind", "glanceSolid", "glanceGradFrom", "glanceGradTo", "glanceGradAngle", "backgroundSlot1", "backgroundSlot2", "glanceSystemDim",
             "pagesSameAsGlance", "pagesWallpaperKind", "pagesSolid", "pagesGradFrom", "pagesGradTo", "pagesGradAngle", "pagesSlot1", "pagesSlot2", "pagesSystemDim",
         ),
-        "Apps" to setOf("wheelGrouping", "wheelWorkOnly", "pageMode", "appsOnHome"),
+        "Apps" to setOf("wheelGrouping", "wheelWorkOnly", "pageMode"),
         "Radar" to setOf(
             "searchLayout", "searchLayoutPinned", "radarBackground", "radarIntensity", "searchMotion", "webEngine", "searchWeb", "webSuggestions",
             "searchActions", "searchFiles", "searchDeep", "searchContacts", "keyboardOnOpenPortrait", "keyboardOnOpenLandscape",

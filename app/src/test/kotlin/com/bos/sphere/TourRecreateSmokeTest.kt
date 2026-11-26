@@ -42,7 +42,7 @@ class TourRecreateSmokeTest : TourBase() {
 
     private fun startSelected(restore: Boolean) {
         AppSmokeHarness.seedApps("Alpha", "Bravo", "Camera", "Delta")
-        AppSmokeHarness.configure { it.copy(appsOnHome = com.bos.sphere.core.data.AppsOnHome.Everything, restoreOpenSurfaces = restore) }
+        AppSmokeHarness.configure { it.copy(restoreOpenSurfaces = restore) }
         launch()
     }
     private fun killAndRestart() { sc.close(); scenario = null; AppSmokeHarness.restartProcess(); launch() }

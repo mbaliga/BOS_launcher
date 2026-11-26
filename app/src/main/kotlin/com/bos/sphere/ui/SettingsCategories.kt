@@ -132,6 +132,9 @@ class SettingsModel(
     /** Wave 57 (CFG-43): the launcher's own vibration strength, the same store as the Comms Sound and vibration sheet. */
     val haptic: com.bos.sphere.core.data.HapticStrength = com.bos.sphere.core.data.LauncherHapticSettings.strength.value,
     val setHaptic: (com.bos.sphere.core.data.HapticStrength) -> Unit = { com.bos.sphere.core.data.LauncherHapticSettings.set(it) },
+    /** Wave 58 (CFG-62): the pinch bindings "Pinch changes grid density" replaced, kept so turning it off restores them (the app keeps them in the shortcuts store). */
+    val savedPinch: () -> Map<HomeGesture, CornerItem?>? = { null },
+    val savePinch: (Map<HomeGesture, CornerItem?>?) -> Unit = {},
 )
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
@@ -609,13 +612,9 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
                 x("Pinch changes grid density"), Glyphs.Pinch, pinchDensity,
                 if (paged) x("Pinch in packs more icons in; spread opens them up") else x("Pinch in adds a column; spread removes one"),
             ) { on ->
-                if (on) {
-                    m.setGesture(HomeGesture.PinchIn, CornerItem.Action(CornerActionId.GridDenser))
-                    m.setGesture(HomeGesture.PinchOut, CornerItem.Action(CornerActionId.GridSparser))
-                } else {
-                    m.setGesture(HomeGesture.PinchIn, CornerItem.Action(CornerActionId.Search))
-                    m.setGesture(HomeGesture.PinchOut, null)
-                }
+                // Wave 58 (CFG-62): turning it on remembers the two pinch bindings it replaces; turning it off puts them back (or the defaults, when none was remembered).
+                val next = if (on) com.bos.sphere.core.data.PinchDensityToggle.on(m.gestures).also { m.savePinch(it.saved) } else com.bos.sphere.core.data.PinchDensityToggle.off(m.savedPinch()).also { m.savePinch(null) }
+                next.bindings.forEach { (g, item) -> m.setGesture(g, item) }
             },
             )
             HomeGesture.entries.filter { it.kind == GestureKind.Touch }.forEach { g ->
@@ -694,15 +693,16 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         listOf(
             SettingItem.Choice(
                 x("Radar layout"), Glyphs.Apps, com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { x(it.label) },
-                preview = { OneUiVisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } }, { x(it.label) }, { SettingsArtHome.searchLayout.art(it) }, tag = "cfg.radarLayout") },
-            ) { v -> upd { it.copy(searchLayout = v, searchLayoutPinned = true) } },
+                preview = { OneUiVisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v) } }, { x(it.label) }, { SettingsArtHome.searchLayout.art(it) }, tag = "cfg.radarLayout") },
+            ) { v -> upd { it.copy(searchLayout = v) } }, // wave 58 (CFG-62): picking a layout never changes "Keep this layout with a keyboard"
             SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: Radar opens as a flat list while a keyboard or mouse is in use")) { v -> upd { it.copy(searchLayoutPinned = v) } },
             SettingItem.Choice(x("Radar background"), Glyphs.Moon, com.bos.sphere.core.data.RadarBackground.entries, p.radarBackground, { x(it.label) }, hint = x("Dimmed shows your wallpaper at a quarter of its brightness; True black draws nothing, for the most contrast")) { v -> upd { it.copy(radarBackground = v) } }.asCards({ SettingsArtHome.radarBackground.art(it) }, "cfg.radarBackground"),
             SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly; off keeps them still until you move them")) { v -> upd { it.copy(searchMotion = v) } },
             SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("Enter and the Search row open this engine in your browser; only then does what you typed go to it")) { v -> upd { it.copy(webEngine = v) } }.asCards({ SettingsArtLook.webEngine.art(it) }, "cfg.webEngine"),
             SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },
             // Wave 43 (radarWeb): the privacy switch of the launcher's only network use. Off = nothing leaves the phone.
-            SettingItem.Toggle(x("Web suggestions"), Glyphs.Globe, p.webSuggestions, x("Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions.", p.webEngine.label)) { v -> upd { it.copy(webSuggestions = v) } },
+            SettingItem.Toggle(x("Web suggestions"), Glyphs.Globe, p.webSuggestions, x("Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions.", p.webEngine.label)) { v -> upd { it.copy(webSuggestions = v) } }
+                .disabledUnless(p.searchWeb, x("Web results is off")), // wave 58 (CFG-62): suggestions do nothing without web results
             SettingItem.Toggle(x("Actions"), Glyphs.Bolt, p.searchActions, x("Find things to do, like “flashlight”")) { v -> upd { it.copy(searchActions = v) } },
             SettingItem.Toggle(x("Files"), Glyphs.Image, p.searchFiles, x("Documents, photos and downloads on this phone")) { v -> upd { it.copy(searchFiles = v) } },
             SettingItem.Toggle(x("Deep results"), Glyphs.Search, p.searchDeep, x("With Fylz or Fotoz installed: text inside documents and images")) { v -> upd { it.copy(searchDeep = v) } },
@@ -863,8 +863,8 @@ internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherP
     val clockOff = p.clockStyle == com.bos.sphere.core.data.ClockStyle.Off
     val clockOffReason = if (clockOff) x("Clock style is Off") else null
     run {
-        val fmt = com.bos.sphere.core.data.ClockFormat.entries.filter { it != com.bos.sphere.core.data.ClockFormat.System }
-        add(SettingItem.Choice(x("Clock format"), Glyphs.Clock, fmt, p.clockFormat.takeIf { it != com.bos.sphere.core.data.ClockFormat.System } ?: com.bos.sphere.core.data.ClockFormat.Hour24, { x(it.label) }) { v -> upd { it.copy(clockFormat = v) } }.asCards({ SettingsArtLook.clockFormat.art(it) }, "cfg.clockFormat").disabled(clockOffReason ?: if (p.clockStyle.digital) null else x("Needs a digital clock")))
+        val fmt = com.bos.sphere.core.data.ClockFormat.entries // wave 58 (CFG-61): System (12/24 by device) is the default and is offered first
+        add(SettingItem.Choice(x("Clock format"), Glyphs.Clock, fmt, p.clockFormat, { x(it.label) }) { v -> upd { it.copy(clockFormat = v) } }.asCards({ SettingsArtLook.clockFormat.art(it) }, "cfg.clockFormat").disabled(clockOffReason ?: if (p.clockStyle.digital) null else x("Needs a digital clock")))
         add(SettingItem.Toggle(x("Show date under the clock"), Glyphs.Clock, p.glanceClockDate, x("The day and date in small text")) { on -> upd { it.copy(glanceClockDate = on) } }.disabled(clockOffReason))
         add(SettingItem.Choice(x("Clock colour"), Glyphs.Clock, listOf(false, true), p.glanceClockAccent, { x(if (it) "Accent" else "Automatic") }, hint = x("Automatic is white or dark, whichever reads on the wallpaper")) { v -> upd { it.copy(glanceClockAccent = v) } }.asCards({ SettingsArtLook.clockColour.art(it) }, "cfg.clockColour").disabled(clockOffReason))
         add(SettingItem.Choice(x("Clock size"), Glyphs.Clock, com.bos.sphere.core.data.ClockSize.entries, p.glanceClockSize, { x(it.label) }) { v -> upd { it.copy(glanceClockSize = v) } }.asCards({ SettingsArtLook.clockSize.art(it) }, "cfg.clockSize").disabled(clockOffReason))

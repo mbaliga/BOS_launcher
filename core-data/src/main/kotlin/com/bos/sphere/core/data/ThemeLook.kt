@@ -1,8 +1,5 @@
 package com.bos.sphere.core.data
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /** One row of the import preview: what a setting is now and what the theme would make it. Colours are 0xFFRRGGBB swatches when the setting is a colour. */
 data class ThemeChange(
@@ -92,14 +89,6 @@ object ThemeLook {
             add(ThemeChange(ThemeField.Wallpaper, bText, aText, bCols, aCols))
         }
     }
-}
-
-/** The one in-memory undo: the look before the last theme was applied or the look reset. It is not stored; a restart forgets it. */
-object ThemeUndo {
-    private val state = MutableStateFlow<LookSnapshot?>(null)
-    val snapshot: StateFlow<LookSnapshot?> = state.asStateFlow()
-    fun remember(s: LookSnapshot) { state.value = s }
-    fun clear() { state.value = null }
 }
 
 /**

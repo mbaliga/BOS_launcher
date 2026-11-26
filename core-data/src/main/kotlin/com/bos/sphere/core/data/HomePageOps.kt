@@ -108,9 +108,6 @@ object FreshHome {
     /** The one empty page a fresh install starts with. */
     fun emptyLayout(): HomeLayout = HomeLayout(pages = listOf(HomePage(id = 1L)), seeded = true)
 
-    /** Only the apps the user adds are placed; everything else stays behind the add carousel, drawer, Radar and search. */
-    fun prefs(p: LauncherPrefs): LauncherPrefs = p.copy(appsOnHome = AppsOnHome.PinnedOnly)
-
     /** The quiet hint shows when no page holds anything. */
     fun isEmpty(pages: List<HomePage>): Boolean = pages.all { it.keys.isEmpty() }
 }

@@ -41,6 +41,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -181,6 +183,18 @@ private fun AppCard(app: AppEntry, onAdd: (AppEntry) -> Unit, cardRect: () -> Ed
     ) {
         AppIcon(app, iconSize)
         Text(app.label, color = HyleColors.InkBright, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Wave 58 (CFG-63): the one-time hint on Glance; it says how to reach the options (the long press opens the quick sheet). Not a control itself. */
+@Composable
+fun GlanceOptionsHint(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Text(
+            L10n.tr("Long press for options"), color = HyleColors.Ink, fontSize = 15.sp,
+            modifier = Modifier.background(HyleColors.InkDim.copy(alpha = 0.10f), RoundedCornerShape(50)).padding(horizontal = 18.dp, vertical = 10.dp)
+                .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }.testTag("glance.optionsHint"),
+        )
     }
 }
 

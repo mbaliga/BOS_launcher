@@ -26,7 +26,7 @@ Owner bug on build 54: "I can't add pages after the glance calm home page."
 
 ## Order (`HomeOrder`)
 - One abstraction, independent of the app language. The home is laid out in physical coordinates, so each function takes and returns physical x and sides; the four combinations (order x language direction) draw the same.
-- Left to right (default): Launchpad (notifications) on the left edge, Recents on the right, pages and columns progress left to right, the scroll starts at the left. Right to left: Launchpad handle, slide-in and shrunken home card on the RIGHT, the Recents panel on the left, columns and cells fill from the right, the scroll starts at the right, paginated order and the swipe directions are mirrored (`reverseLayout`), the Glance hotspots' left and right roles swap (top-left becomes top-right) and the deck dots start at the right.
+- Left to right (default): Launchpad (notifications) on the left edge, Recents on the right, pages and columns progress left to right, the scroll starts at the left. Right to left: Launchpad handle, slide-in and shrunken home card on the RIGHT, the Recents panel on the left, columns and cells fill from the right, the scroll starts at the right, paginated order and the swipe directions are mirrored (`reverseLayout`) and the deck dots start at the right. Wave 58 (defects58.md): the hotspots stay physical in both orders; the role swap was never wired and is dropped.
 - This replaces the earlier rule that an RTL app language mirrored the Launchpad: only the order does now. An Arabic user who wants the mirrored home sets Order to Right to left.
 
 ## Migration (HomeModelMigration, JVM-tested)

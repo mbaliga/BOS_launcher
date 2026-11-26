@@ -178,7 +178,8 @@ class PrefFilesSource(
             if (all.isEmpty()) continue
             val o = JSONObject()
             val arrangement = f in WidgetIdSplit.ARRANGEMENT_FILES // NFR-18: no widget ids in the export
-            all.toSortedMap().forEach { (k, v) -> encode(if (arrangement) cleanValue(v) else v)?.let { o.put(k, it) } }
+            val local = DEVICE_KEYS[f].orEmpty()
+            all.toSortedMap().forEach { (k, v) -> if (k !in local) encode(if (arrangement) cleanValue(v) else v)?.let { o.put(k, it) } }
             out.put(f, o)
         }
         return mapOf(StateSchema.K_PREF_FILES to out)
@@ -189,9 +190,12 @@ class PrefFilesSource(
         val src = objects[StateSchema.K_PREF_FILES] ?: return
         for (f in files) {
             val o = src.optJSONObject(f) ?: continue
-            val ed = open(f).edit().clear()
+            val sp = open(f)
+            val local = DEVICE_KEYS[f].orEmpty()
+            val ed = sp.edit()
+            sp.all.keys.forEach { k -> if (k !in local) ed.remove(k) } // the device-local keys of a file are never replaced by an import
             val arrangement = f in WidgetIdSplit.ARRANGEMENT_FILES
-            o.keys().forEach { k -> decode(o.optJSONObject(k))?.let { v -> put(ed, k, (if (arrangement) cleanValue(v) else v) ?: return@let) } }
+            o.keys().forEach { k -> if (k !in local) decode(o.optJSONObject(k))?.let { v -> put(ed, k, (if (arrangement) cleanValue(v) else v) ?: return@let) } }
             ed.apply()
         }
     }
@@ -238,6 +242,11 @@ class PrefFilesSource(
     }
 
     companion object {
-        val ALLOWED = listOf("home_state", "home_tags", "home_icons", "home_badges", "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", LauncherHapticSettings.FILE, CommsScaleSettings.FILE)
+        /** Wave 58 (CFG-60): `launchpad_hub` (Comms options), `icon_colors` (per-app icon colours) and `theming` (palette source, density, text size) are setup too. */
+        val ALLOWED = listOf("home_state", "home_tags", "home_icons", "home_badges", "action_apps", "radar_ui", "orbit_feel", "puck_actions", "home_layout_by_class", "home_extras", LauncherHapticSettings.FILE, CommsScaleSettings.FILE,
+            "launchpad_hub", "icon_colors", "theming")
+
+        /** Keys of an exported file that belong to this device and never leave it (a build before wave 58 kept the Comms widget ids in `launchpad_hub`). */
+        val DEVICE_KEYS: Map<String, Set<String>> = mapOf("launchpad_hub" to setOf("widgets"))
     }
 }

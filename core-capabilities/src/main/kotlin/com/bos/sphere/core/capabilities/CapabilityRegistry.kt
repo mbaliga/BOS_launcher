@@ -29,7 +29,7 @@ class CapabilityRegistry(private val context: Context) {
             notificationAccess = Settings.Secure.getString(app.contentResolver, "enabled_notification_listeners")?.contains(app.packageName) == true,
             usageAccess = usageAccess(),
             contactsGranted = app.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED,
-            folderGranted = app.checkSelfPermission(android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED,
+            folderGranted = app.contentResolver.persistedUriPermissions.any { it.isReadPermission }, // wave 58: folders the user picked (the media read permissions are gone)
             speechOnDevice = runCatching { if (Build.VERSION.SDK_INT >= 31) SpeechRecognizer.isOnDeviceRecognitionAvailable(app) else null }.getOrNull(),
             manufacturer = Build.MANUFACTURER.orEmpty(),
             pinShortcutsSupported = runCatching {

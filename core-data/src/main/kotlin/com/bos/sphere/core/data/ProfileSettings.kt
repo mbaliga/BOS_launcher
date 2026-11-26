@@ -86,7 +86,7 @@ object ProfileSettings {
     /** The [PREF_KEYS] of [p] as JSON texts; a key the store leaves out (an unset calm style) reads as `null`. */
     fun readPrefs(p: LauncherPrefs): Map<String, String> {
         val sp = MapSharedPreferences()
-        LauncherPrefsStore(sp).update { p }
+        LauncherPrefsStore(sp).writeAll(p)
         val all = sp.all
         return PREF_KEYS.associateWith { k -> text(all[k]) }
     }
@@ -96,7 +96,7 @@ object ProfileSettings {
         val mine = values.filterKeys { it in PREF_KEYS }
         if (mine.isEmpty()) return p
         val sp = MapSharedPreferences()
-        LauncherPrefsStore(sp).update { p }
+        LauncherPrefsStore(sp).writeAll(p)
         val raw = LinkedHashMap<String, Any?>(sp.all)
         mine.forEach { (k, t) -> val v = value(t); if (v == null) raw.remove(k) else raw[k] = v }
         return LauncherPrefsStore(MapSharedPreferences(raw)).prefs.value.copy(onboardingDone = p.onboardingDone, leftWidgetId = p.leftWidgetId)

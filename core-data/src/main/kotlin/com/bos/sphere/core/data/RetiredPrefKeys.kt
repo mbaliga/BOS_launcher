@@ -29,7 +29,8 @@ object RetiredPrefKeys {
     val AFTER_MIGRATION: Map<String, Map<String, String>> = mapOf("launcher_prefs" to mapOf("indEffects" to "calmStyle", "indCalm" to "calmStyle", "indAlert" to "calmStyle", "glanceContent" to "showMusic"))
 
     /** Keys an imported settings file may still carry from those builds; they are dropped, never kept as unknown fields. */
-    val DROPPED_ON_IMPORT: Set<String> = RetiredBackgroundKeys.KEYS + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert", "glanceWeather", "suggestion", "drawerStyle", "drawerView", "drawerSort", "drawerRail", "drawerRailVisible", "drawerViewSwitch") + ClockRetired.KEYS
+    val DROPPED_ON_IMPORT: Set<String> = RetiredBackgroundKeys.KEYS + setOf("minimalHints", "networkDots", "switcherStyle", "drawerShortcutsOn", "drawerShortcuts", "drawerShortcutsShown", "indInvert", "glanceWeather", "suggestion", "drawerStyle", "drawerView", "drawerSort", "drawerRail", "drawerRailVisible", "drawerViewSwitch") + ClockRetired.KEYS +
+        setOf("appsOnHome") // wave 58: retired; the install's own key is removed after the pages migration (LauncherPrefsStore.dropLegacyAppsOnHome)
 
     /** Removes every retired key present in the files [open] returns; the number of keys removed. Never throws. */
     fun purge(open: (String) -> SharedPreferences?): Int {

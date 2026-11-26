@@ -46,7 +46,7 @@ fun OnboardingView(
     step: Int,
     prefs: LauncherPrefs,
     importMessage: String?,
-    onStyle: (HomeStyle) -> Unit,
+    onStyle: (com.bos.sphere.core.data.OnboardingLook) -> Unit,
     onSetDefault: () -> Unit,
     onImport: () -> Unit,
     onNext: () -> Unit,
@@ -77,9 +77,10 @@ fun OnboardingView(
                         TextButtonPill(L10n.tr("Set as default"), primary = true, onClick = onSetDefault)
                     }
                     OnboardingStep.HomeStyle -> {
-                        OneUiVisualChoice(HomeStyle.entries, prefs.homeStyle, onStyle, {
-                            L10n.tr(when (it) { HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" })
-                        }, { SettingsArtHome.homeStyle.art(it) }, tag = "onboarding.style")
+                        // Wave 58 (CFG-63): Glance only keeps Pages Off; a page style turns Pages on, so the pick is visible.
+                        OneUiVisualChoice(com.bos.sphere.core.data.OnboardingLook.entries, com.bos.sphere.core.data.OnboardingLook.of(prefs), onStyle, {
+                            L10n.tr(when (it.style) { null -> "Glance only"; HomeStyle.Grid -> "Pages"; HomeStyle.List -> "List"; HomeStyle.Psp -> "PSP"; HomeStyle.Dsi -> "DSi" })
+                        }, { l -> l.style?.let { SettingsArtHome.homeStyle.art(it) } ?: SettingsArtHome.pages.art(com.bos.sphere.core.data.HomePages.Off) }, tag = "onboarding.style")
                         Text(L10n.tr("Press and hold anywhere to change things."), color = HyleColors.InkDim, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                     }
                     OnboardingStep.Import -> {

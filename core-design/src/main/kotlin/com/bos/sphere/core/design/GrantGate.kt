@@ -105,6 +105,17 @@ object GrantGateLogic {
         )
     }
 
+    /**
+     * Wave 58 (defects58, CFG-63): the explanation before Liftoff opens Android's Do Not Disturb access page (Silent, Vibrate out of silent and Do not
+     * disturb actions, the default motion gestures included). Not a [GrantKind]: it is asked from the action that needs it, never listed as a feature grant.
+     */
+    val DND_COPY = GrantCopy(
+        "Change the sound mode",
+        "Silent, Vibrate and Do not disturb switch your phone's sound mode. Android asks you to allow Liftoff to do this once, in its settings.",
+        STAYS_ON_DEVICE, "Allow Do Not Disturb access",
+        "Do Not Disturb access is still off, so the sound mode stays as it is.",
+    )
+
     /** Every English string this screen can show, for the translation check. */
     val allEnglish: List<String> get() = GrantKind.entries.flatMap { copy(it).all } + NOT_NOW
 }
@@ -148,8 +159,18 @@ fun GrantScreen(
     modifier: Modifier = Modifier,
     onNotNow: (() -> Unit)? = null,
     colors: GrantColors = GrantColors.fromTheme(),
+) = GrantScreen(GrantGateLogic.copy(kind), askedBefore, onEnable, modifier, onNotNow, colors)
+
+/** The same screen for a copy that is not a [GrantKind] (wave 58: Do Not Disturb access, [GrantGateLogic.DND_COPY]). */
+@Composable
+fun GrantScreen(
+    c: GrantCopy,
+    askedBefore: Boolean,
+    onEnable: () -> Unit,
+    modifier: Modifier = Modifier,
+    onNotNow: (() -> Unit)? = null,
+    colors: GrantColors = GrantColors.fromTheme(),
 ) {
-    val c = GrantGateLogic.copy(kind)
     BoxWithConstraints(modifier.fillMaxSize()) {
         // Short windows (landscape phones) drop the badge and tighten spacing so the whole explanation stays on one screen.
         val compact = maxHeight < 420.dp

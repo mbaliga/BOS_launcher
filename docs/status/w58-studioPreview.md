@@ -20,7 +20,7 @@ Branch `w58-studioPreview`. Decision record: `docs/decisions/studioPreview.md`. 
 ## Tests run (all `--offline --max-workers=2`, one Gradle build at a time)
 - Node: `node --test web/liftoff-studio/tests/studio.test.js`: 36 of 36 (10 new: sections, starters, rename/duplicate/delete, carries and switching, suggestions, Backup round trip, Signal, landscape, magnification, clock drag).
 - New JVM / Robolectric: `StudioSchemaW56Test` (10, two new), `StudioTabsW58Test` (3), `StudioProfilesW58Test` (2), `DockDemoPointerW58Test` (4), `DockMagnifyUiW56Test` (19, unchanged, still green), `PreviewGlanceBackdropW58UiTest` (3), `CommsPreviewWidgetsW58Test` (3), `StudioPreviewW58AppTest` (4).
-- Module runs: see "Module results" below.
+- Module runs (whole modules): core-design 32/0, core-quality 220/0 (after recomputing the Counts line of SPEC_STATUS.md, which the hygiene audit asked for: 190 rows), core-data 788/0, feature-dock 341/0, feature-launchpad 826/0, feature-grid 1717/0, app 724 tests with 1 failure, `FilesCollectionsW53UiTest.HOM_15_w53_dateAddedAppearsOnlyWhenSomeFileHasOne` (expected x.txt, was Screenshot_1.png), which passes when its class runs alone and touches nothing this wave changed (order-dependent in the full run). The full app suite was not rerun after that. `assembleRelease` was not run.
 - `python3 tools/spec_coverage.py --check`: 0 M/S without a test (the tool now also counts the Studio node tests, `test('CFG-72: ...')`).
 
 ## Screenshots read (`docs/status/w58-studioPreview/`)

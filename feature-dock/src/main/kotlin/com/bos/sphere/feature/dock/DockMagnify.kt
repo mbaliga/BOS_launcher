@@ -215,6 +215,8 @@ internal class MagnifyField {
     var rise = DockMagnify.RISE_DP
     var icon = DockMagnify.ICON_DP
     var viewport: LayoutCoordinates? = null
+    /** Wave 58 (CFG-73): a still sample pointer (0..1 along the row) for the Settings Preview: the row is drawn magnified there with no finger; null = off. */
+    var demo by mutableStateOf<Float?>(null)
 
     class Member(val coords: LayoutCoordinates, val center: Float, val half: Float, val crossStart: Float, val crossSize: Float, val magnifiable: Boolean, val outerFrac: Float, val label: String)
     private val members = HashMap<Int, Member>()
@@ -262,7 +264,7 @@ internal class MagnifyField {
         val n = sorted.size
         DockMagnify.compute(
             IntArray(n) { sorted[it].key }, FloatArray(n) { sorted[it].value.center }, FloatArray(n) { sorted[it].value.half }, BooleanArray(n) { sorted[it].value.magnifiable },
-            pointer, factor, amount, pitch, gapHalf, lo, hi,
+            demo?.let { lo + it.coerceIn(0f, 1f) * (hi - lo) } ?: pointer, factor, amount, pitch, gapHalf, lo, hi,
         )
     }
 
@@ -276,7 +278,7 @@ internal class MagnifyField {
     }
 
     /** Whether the magnification wants to be on: the animation's target. */
-    val wantsMagnify get() = factor > 1f && ((pointerDown && magnifyTouch) || (focusId != NONE && !pointerDown))
+    val wantsMagnify get() = factor > 1f && (demo != null || (pointerDown && magnifyTouch) || (focusId != NONE && !pointerDown))
     val engaged get() = pointerDown || focusId != NONE || amount > 0.002f
 
     /** Where the focused member's centre is (the pointer follows it while no finger or mouse is on the dock). */

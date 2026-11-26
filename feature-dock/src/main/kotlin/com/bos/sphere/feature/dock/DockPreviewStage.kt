@@ -50,9 +50,14 @@ fun DockPreviewStage(manager: WorkspaceManager, apps: List<PanelApp>, landscape:
         DockRail(
             content, edge, state.active.name, expanded = false, focusRequest = 0, showNumbers = false, actions = DockActions(), graphBridge = null,
             modifier = place, style = state.dock.style, dark = !HyleTheme.isLight, magnify = state.dock.magnifyStrength.takeIf { state.dock.magnify },
+            // Wave 58 (CFG-73): the magnification drawn as a sample bulge, a still pointer over the second icon
+            demoPointer = if (state.dock.magnify) DEMO_POINTER else null,
         ) { item, size -> StageTile(item, size) }
     }
 }
+
+/** Where the Preview's still sample pointer rests along the dock (a fraction of its length): over the second of four or six icons. */
+const val DEMO_POINTER = 0.3f
 
 /** The dock's words for the screen reader: "Standard, Bottom" (and the magnification strength when it is on). */
 @Composable

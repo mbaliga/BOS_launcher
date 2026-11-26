@@ -3,8 +3,9 @@
 A static page that edits a Liftoff configuration in the browser, shows the home as you change it, and reads and writes the same JSON file the app's Backup uses.
 Plain HTML, CSS and JavaScript: no build step, no framework, no network request (it loads nothing from outside its own folder, and it sends nothing anywhere).
 
-Left: a live drawing of the phone (Glance, Pages, Radar, the drawer disc, Comms, Recents). It follows the setting you touch. Right: the six sections as text tabs
-HOME, LOOK, APPS, RADAR, SIDE PANEL, SYSTEM. Header: profiles (New, Duplicate, Rename, Delete, Use, quick looks, starter profiles Work, Calm and Desk),
+Left: a live drawing of the phone (Glance, Pages, Radar, the drawer disc, Comms, Recents), portrait or landscape. It follows the setting you touch; the Glance
+clock can be dragged. Right: the six sections as text tabs HOME, LOOK, APPS, RADAR, SIDE PANEL, SYSTEM, with the app's own sections in the app's order (APPS starts
+with the phone's Profiles). Header: profiles (New, Duplicate, Rename, Delete, Use, quick looks, starter profiles Work, Calm and Desk),
 Import, Export, Share link.
 
 ## Publish it at `<site>/liftoff/studio/`
@@ -43,7 +44,10 @@ URL fragment (`#p=...`, at most 6000 characters), so they never reach a server.
 ## Where the fields come from
 
 `schema.json` (and `schema.js`, the same document as a script so the page also works from `file://`) is **generated from the app's code**, not written by hand:
-keys, defaults, option ids and ranges come from `LauncherPrefs`, `SettingsCodec`, the enums, `StateSchema` and the dock source; only labels, tabs and groups are editorial.
+keys, defaults, option ids and ranges come from `LauncherPrefs`, `SettingsCodec`, the enums, `StateSchema` and the dock source. The tab and section of each field are
+the app's: each field names the app Settings row that edits it, and the generator reads its tab and section from `app/.../ui/SettingsTabLayout.kt` (wave 58;
+the app test `StudioTabsW58Test` checks them against the real rows). Only labels and the row of each field are editorial. The phone's profile starters and the
+app group suggester's tables are generated too (`profileStarts`, `appSuggest`).
 The JVM test `core-data/.../StudioSchemaW56Test.kt` fails when the export carries a key the schema lacks, when a schema key is not a real key, when a default or an option
 id changed, or when the two files are out of date. To regenerate after a settings change:
 
@@ -67,14 +71,17 @@ On the phone, Workspaces became Profiles, and a profile can carry groups of sett
 value with `dock.enabled` as `true` / `false` / `null`, the haptic id); `dock.globalSettings` holds the global values the active profile has set aside.
 The groups and their keys are generated into `schema.json` as `profileGroups`. `core.js` reads them with `phoneProfiles(ix, doc)` (Studio values, a
 warning for a key it does not know, which is kept) and writes them with `setPhoneProfile(ix, doc, id, values)` (only the keys the profile carries;
-everything else in the Backup is carried through). The page itself has no editor for phone profiles yet; its own browser profiles are separate.
+everything else in the Backup is carried through). Wave 58: the APPS tab's Profiles section edits them like the phone's Profiles page (New from Current setup,
+Empty, Work, Calm, Desk; Rename, Duplicate, Delete, Switch; the groups that ride along; suggested app groups from the apps the file names). The list is saved in
+the Backup and exported with it; a list started in Studio replaces the phone's list when imported. Studio's own browser profiles (the header) are separate drafts.
 See `docs/decisions/profiles.md`.
 
 ## What the preview does not cover
 
-A drawing from the settings, not the app. Signal, System live and Picture wallpapers are placeholders; text, contacts and apps are samples; only portrait; Word clock text is
-fixed to one time; the Glance spacing and the adaptive grid follow the app's rules approximately; motion, haptics and sound are not shown; side docks (landscape) are
-not drawn. Nothing was compared with a device.
+A drawing from the settings, not the app. Signal wallpapers are still approximations of the app's painters in the theme colours; System live and Picture wallpapers
+are placeholders; text, contacts and apps are samples; landscape covers the Glance and Pages only; dock magnification is a still sample under a sample pointer; Word
+clock text is fixed to one time; the Glance spacing and the adaptive grid follow the app's rules approximately; motion, haptics and sound are not shown. Nothing was
+compared with a device.
 
 ## Licences
 

@@ -169,12 +169,8 @@
       inp.checked = on.indexOf(c) >= 0;
       grid.appendChild(el('label', { class: 'hot' }, [inp, el('span', { html: '<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + Prev.helpers.GLYPHS[gk] + '</svg>' }), CORNER_LABEL[c]]));
     });
-    var presets = [['Four', Core.CORNERS], ['Two (bottom)', ['BottomRight', 'BottomLeft']], ['One', ['BottomRight']], ['None', []]], pr = el('div', { class: 'presetrow' });
-    presets.forEach(function (p) {
-      var key = Core.CORNERS.filter(function (c) { return p[1].indexOf(c) >= 0; }).join(',');
-      pr.appendChild(el('button', { type: 'button', class: 'pill', 'aria-pressed': String(key === vals()[f.key]), text: p[0], onclick: function () { set(f, key); renderPanel(); } }));
-    });
-    wrap.appendChild(grid); wrap.appendChild(pr); return wrap;
+    // Wave 59 (glanceTop): no presets (Four, Two, One, None) any more: each corner is turned on or off, as in the app's Hotspots editor.
+    wrap.appendChild(grid); return wrap;
   }
   function slotsCtl(f) {
     var cur = String(vals()[f.key]).split('\n'), seg = vals().puckSegments || 8, grid = el('div', { class: 'slotgrid' });

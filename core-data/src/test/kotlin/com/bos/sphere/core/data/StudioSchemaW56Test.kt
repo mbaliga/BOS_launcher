@@ -102,6 +102,7 @@ class StudioSchemaW56Test {
             Fd("glanceEnabled", "Glance", "bool"),
             Fd("homeOrder", "Order", "enum", options = byName<HomeOrder> { it.label }),
             Fd("showMusic", "Music line", "bool"),
+            Fd("musicLineWidth", "Music line width", "enum", options = byName<MusicLineWidth> { it.label }, showWhen = "showMusic" to listOf("true")),
             Fd("glanceControlsSec", "Music controls stay", "int", min = GlanceControls.MIN_SECONDS.toDouble(), max = GlanceControls.MAX_SECONDS.toDouble(), step = 1.0, unit = "s"),
             Fd("glanceIndicator", "Surface indicator", "bool"),
         )
@@ -308,7 +309,7 @@ class StudioSchemaW56Test {
      * rows' own setters.
      */
     private fun appRowOf(key: String): String {
-        Corner.entries.firstOrNull { key == "corners." + it.name }?.let { return "Corners/${it.label}" }
+        Corner.entries.firstOrNull { key == "corners." + it.name }?.let { return "Corners/Hotspots" } // wave 59: the Hotspots editor edits every corner
         HomeGesture.entries.firstOrNull { key == "gestures." + it.name }?.let { return (if (it.kind == GestureKind.Motion) "Motion/" else "Gestures/") + it.label }
         if (key.startsWith("dock.")) return "Desktop & dock/Dock"
         if (key.startsWith("wpGlance") || key == "bgSlot1" || key == "bgSlot2") return "Home/Glance wallpaper"
@@ -323,7 +324,7 @@ class StudioSchemaW56Test {
         "glanceClockDate" to "Home/Show date under the clock", "glanceClockAccent" to "Home/Clock colour", "glanceClockSize" to "Home/Clock size",
         // the clock's place is set by dragging it on the Glance (edit mode); the app keeps it beside the size
         "glanceClockX" to "Home/Clock size", "glanceClockY" to "Home/Clock size", "glanceClockXLand" to "Home/Clock size", "glanceClockYLand" to "Home/Clock size",
-        "showMusic" to "Home/Show music", "glanceHotspots" to "Home/Hotspots", "glanceControlsSec" to "Home/Controls hide after (seconds)", "glanceIndicator" to "Home/Surface indicator",
+        "showMusic" to "Home/Show music", "musicLineWidth" to "Home/Music line width", "glanceHotspots" to "Corners/Hotspots", "glanceControlsSec" to "Home/Controls hide after (seconds)", "glanceIndicator" to "Home/Surface indicator",
         // HOME > Pages
         "homePages" to "Home/Pages", "homeOrder" to "Home/Order", "contCols" to "Home/Pages", "homePage" to "Home/Pages",
         "clockTileAnalog" to "Pages/Clock tile on this page", "clockTileFormat" to "Pages/Clock tile on this page", "clockTileDate" to "Pages/Clock tile on this page",
@@ -723,7 +724,7 @@ class StudioSchemaW56Test {
         assertEquals(Triple(0, 0, 0), placeOf(layout, "Home/Calm home screen (Glance)"))
         assertEquals("Input", layout[3].sections[placeOf(layout, "Home/Keyboard opens with Radar and drawer · portrait")!!.second].header)
         assertEquals("Gestures and motion", layout[0].sections[placeOf(layout, "Gestures/Swipe up")!!.second].header)
-        assertEquals("Glance", layout[0].sections[placeOf(layout, "Home/Top left hotspot")!!.second].header)
+        assertEquals("Corners", layout[0].sections[placeOf(layout, "Corners/Hotspots")!!.second].header) // wave 59: the Hotspots editor heads Home > Corners
         assertEquals("Lab", layout[5].sections[placeOf(layout, "Lab/*")!!.second].header)
     }
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -21,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
@@ -30,6 +30,7 @@ import com.bos.sphere.core.data.ControlsPop
 import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.IndicatorReading
 import com.bos.sphere.core.data.MediaInfo
+import com.bos.sphere.core.data.MusicLineWidth
 import com.bos.sphere.core.design.rememberMotionPrefs
 import kotlinx.coroutines.delay
 
@@ -53,10 +54,16 @@ object FixedHomeChrome {
     /**
      * The widest the music line may be in a window [windowDp] wide. A top hotspot reserves [GlanceNotch.TITLE_SIDE_DP] on its side (the line stays centred, so the wider
      * reserve wins) and the line is capped at 280 dp; with no top hotspot at all it runs edge to edge (window width less [EDGE_MARGIN_DP] each side, no cap).
+     * Wave 59 (glanceTop): [topLeft] / [topRight] mean a hotspot that DRAWS there (enabled and assigned, [com.bos.sphere.core.data.GlanceHotspots.drawnOnScreen]),
+     * and [MusicLineWidth.FullWidth] always runs edge to edge (the corner icons then sit over the faded ends; their touch squares stay on top).
      */
-    fun titleWidthDp(windowDp: Float, topLeft: Boolean, topRight: Boolean): Float =
-        if (!topLeft && !topRight) (windowDp - 2 * EDGE_MARGIN_DP).coerceAtLeast(120f)
+    fun titleWidthDp(windowDp: Float, topLeft: Boolean, topRight: Boolean, width: MusicLineWidth = MusicLineWidth.FitAroundCorners): Float =
+        if (width == MusicLineWidth.FullWidth || (!topLeft && !topRight)) (windowDp - 2 * EDGE_MARGIN_DP).coerceAtLeast(120f)
         else (windowDp - 2 * GlanceNotch.TITLE_SIDE_DP).coerceIn(120f, 280f)
+
+    /** Wave 59: with Full width, the line is clear (transparent) for this much at a drawn top corner, under the corner glyph, then fades in over [UNDER_CORNER_FADE_DP]. */
+    const val UNDER_CORNER_CLEAR_DP = 46f
+    const val UNDER_CORNER_FADE_DP = 28f
 
     /** A hotspot's reserved touch area (dp): at least the 48 dp minimum, so it always wins its corner over the pager. */
     const val HOTSPOT_TOUCH_DP = 64f
@@ -88,9 +95,11 @@ fun FixedHomeChrome(
     /** The four (or fewer) hotspots, drawn above the music line: the home passes its corner layer, so the chosen corner style (Holo, Sony discs, bubbles) applies. */
     corners: @Composable () -> Unit = {},
     dark: Boolean = isDarkSurface(),
-    /** Whether a hotspot is drawn in the top-left and top-right screen corners; with neither, the music line runs edge to edge (owner request). */
+    /** Whether a hotspot is DRAWN in the top-left and top-right screen corners (enabled and holding something); with neither, the music line runs edge to edge (owner request). */
     topLeftHotspot: Boolean = true,
     topRightHotspot: Boolean = true,
+    /** Wave 59: the "Music line width" setting (fit around the drawn corners, or always full width). */
+    musicWidth: MusicLineWidth = MusicLineWidth.FitAroundCorners,
     /** Wave 55: the regular battery and signal indicators ([RegularIndicators]), drawn under the music line (or in its place when nothing plays); null = not shown. */
     regular: Pair<IndicatorReading, IndicatorReading>? = null,
     low: Long = 0xFFFF4D4D,
@@ -130,7 +139,14 @@ fun FixedHomeChrome(
             }
             Box(Modifier.align(Alignment.TopCenter).padding(top = GlanceNotch.TITLE_TOP_DP.dp).offset { IntOffset(0, push.roundToPx()) }.height(40.dp).testTag("glance.title.slot")) {
                 if (playing && media != null) {
-                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = FixedHomeChrome.titleWidthDp(w, topLeftHotspot, topRightHotspot).dp, edge = if (dark) Color.Black else Color(0xFFF3F3F6))
+                    // Wave 59: with Full width a drawn top corner sits over the line's end: that end of the whole line (glyph and text) fades out under it,
+                    // so the corner icon reads clearly (an alpha mask, no colour; physical sides, like the corners).
+                    val under = musicWidth == MusicLineWidth.FullWidth
+                    val fadeUnder = with(density) { FixedHomeChrome.UNDER_CORNER_FADE_DP.dp.toPx() }
+                    val clearUnder = with(density) { FixedHomeChrome.UNDER_CORNER_CLEAR_DP.dp.toPx() }
+                    Box((if (under) Modifier.fillMaxWidth() else Modifier).fadeClippedEdges(under && topLeftHotspot, under && topRightHotspot, fadeUnder, rtl = false, clearPx = clearUnder), contentAlignment = Alignment.Center) {
+                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = FixedHomeChrome.titleWidthDp(w, topLeftHotspot, topRightHotspot, musicWidth).dp)
+                    }
                 }
             }
         }

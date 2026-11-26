@@ -22,13 +22,15 @@ class GlanceAuditW20Test {
         }
     }
 
-    @Test fun HOM_23_everyHotspotPresetDrawsTheRightCountInEveryRotation() {
-        val counts = mapOf(HotspotPreset.Four to 4, HotspotPreset.Two to 2, HotspotPreset.One to 1, HotspotPreset.None to 0)
-        for ((p, n) in counts) for (r in 0..3) assertEquals("$p at $r", n, GlanceHotspots.enabledOnScreen(GlanceHotspots.preset(p)!!, r, true).size)
-        // the Two preset is the bottom edge of the natural portrait; turned a quarter (rotation 1) that edge is the screen's right edge
-        assertEquals(setOf(Corner.TopRight, Corner.BottomRight), GlanceHotspots.enabledOnScreen(GlanceHotspots.preset(HotspotPreset.Two)!!, 1, true))
-        assertEquals(setOf(Corner.BottomLeft, Corner.BottomRight), GlanceHotspots.enabledOnScreen(GlanceHotspots.preset(HotspotPreset.Two)!!, 0, true))
-        assertEquals(setOf(Corner.TopLeft, Corner.TopRight), GlanceHotspots.enabledOnScreen(GlanceHotspots.preset(HotspotPreset.Two)!!, 2, true))
+    @Test fun HOM_23_everyHotspotSetDrawsTheRightCountInEveryRotation() {
+        // wave 59: the sets the old presets named (Four, Two (bottom), One, None) are plain sets now, made in the Hotspots editor
+        val bottom = setOf(Corner.BottomLeft, Corner.BottomRight)
+        val counts = mapOf(GlanceHotspots.ALL to 4, bottom to 2, setOf(Corner.BottomRight) to 1, emptySet<Corner>() to 0)
+        for ((set, n) in counts) for (r in 0..3) assertEquals("$set at $r", n, GlanceHotspots.enabledOnScreen(set, r, true).size)
+        // the bottom edge of the natural portrait; turned a quarter (rotation 1) that edge is the screen's right edge
+        assertEquals(setOf(Corner.TopRight, Corner.BottomRight), GlanceHotspots.enabledOnScreen(bottom, 1, true))
+        assertEquals(setOf(Corner.BottomLeft, Corner.BottomRight), GlanceHotspots.enabledOnScreen(bottom, 0, true))
+        assertEquals(setOf(Corner.TopLeft, Corner.TopRight), GlanceHotspots.enabledOnScreen(bottom, 2, true))
     }
 
     @Test fun HOM_23_aStoredHotspotListWithJunkKeepsTheValidCornersAndNothingElse() {

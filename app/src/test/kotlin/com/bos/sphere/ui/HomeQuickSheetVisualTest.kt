@@ -9,6 +9,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -38,11 +40,11 @@ import org.robolectric.annotation.GraphicsMode
 class HomeQuickSheetVisualTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private class Seen { var prefs = LauncherPrefs(); var apps = 0; var widgets = 0; var edit = 0; var home = 0 }
+    private class Seen { var prefs = LauncherPrefs(); var apps = 0; var widgets = 0; var edit = 0; var home = 0; var hotspots = 0 }
 
     private fun sheet(start: LauncherPrefs, seen: Seen, page: Int? = null) = rule.setContent {
         var p by remember { mutableStateOf(start) }
-        HomeQuickSheetBody(p, { f -> p = f(p); seen.prefs = p }, page, 2, {}, {}, {}, { seen.apps++ }, { seen.widgets++ }, { seen.edit++ })
+        HomeQuickSheetBody(p, { f -> p = f(p); seen.prefs = p }, page, 2, {}, {}, {}, { seen.apps++ }, { seen.widgets++ }, { seen.edit++ }, onHotspots = { seen.hotspots++ })
     }
 
     private fun tag(t: String) = rule.onNodeWithTag(t).performScrollTo()
@@ -72,13 +74,14 @@ class HomeQuickSheetVisualTest {
         tag("quick.order.RightToLeft").assertIsSelected(); tag("quick.order.LeftToRight").assertIsNotSelected()
     }
 
-    @Test fun HOM_21_w51_everyHotspotsCardSetsItsCorners() {
+    // Wave 59 (glanceTop): the Hotspots cards (Four, Two (bottom), One, None) were replaced by one tile that opens the Hotspots editor.
+    @Test fun CFG_77_theHotspotsTileOpensTheEditorAndTheOldCardsAreGone() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
-        tag("quick.hotspots.Four").assertIsSelected()
-        val expect = mapOf(
-            "Two" to setOf(Corner.BottomLeft, Corner.BottomRight), "One" to setOf(Corner.BottomRight), "None" to emptySet(), "Four" to Corner.entries.toSet(),
-        )
-        for ((n, corners) in expect) { tag("quick.hotspots.$n").performClick(); assertEquals(corners, seen.prefs.glanceHotspots); tag("quick.hotspots.$n").assertIsSelected() }
+        tag("quick.hotspots").assertHasClickAction().performClick()
+        assertEquals(1, seen.hotspots)
+        assertEquals("the stored set is untouched", LauncherPrefs().glanceHotspots, seen.prefs.glanceHotspots)
+        for (n in listOf("Four", "Two", "One", "None")) assertTrue(rule.onAllNodes(hasTestTag("quick.hotspots.$n")).fetchSemanticsNodes().isEmpty())
+        assertTrue(rule.onAllNodesWithText("Two (bottom)").fetchSemanticsNodes().isEmpty())
     }
 
     @Test fun HOM_21_w51_thePageCardsAlignMakeHomeAndEveryTransition() {
@@ -95,8 +98,8 @@ class HomeQuickSheetVisualTest {
 
     @Test fun HOM_21_w51_theLabelIsTheCardsAccessibleTextAndTheRoleIsRadio() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
-        val n = rule.onNodeWithTag("quick.hotspots.Two").fetchSemanticsNode().config
-        assertEquals("Two (bottom)", n[SemanticsProperties.Text].joinToString { it.text })
+        val n = rule.onNodeWithTag("quick.order.RightToLeft").fetchSemanticsNode().config
+        assertEquals(HomeOrder.RightToLeft.label, n[SemanticsProperties.Text].joinToString { it.text })
         assertEquals(androidx.compose.ui.semantics.Role.RadioButton, n[SemanticsProperties.Role])
         assertTrue(n.contains(SemanticsProperties.Selected))
     }
@@ -104,7 +107,7 @@ class HomeQuickSheetVisualTest {
     @Test fun HOM_21_w51_cardsAndTilesAreAtLeast48dp() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
         val density = rule.density
-        for (t in listOf("quick.pages.Off", "quick.order.LeftToRight", "quick.hotspots.None", "quick.add.apps", "quick.edit")) {
+        for (t in listOf("quick.pages.Off", "quick.order.LeftToRight", "quick.hotspots", "quick.add.apps", "quick.edit")) {
             val h = rule.onNodeWithTag(t).fetchSemanticsNode().size
             assertTrue("$t is at least 48 dp", h.height >= with(density) { 48.dp.roundToPx() } && h.width >= with(density) { 48.dp.roundToPx() })
         }

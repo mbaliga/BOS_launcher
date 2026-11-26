@@ -327,7 +327,7 @@ test('phone profiles: a Backup profile reads into Studio values, is edited and w
 // ---- wave 58 (studioPreview)
 
 test('CFG-70: the tabs carry the app\'s sections in order and every field sits in one of its tab\'s sections, in that order', () => {
-  assert.deepEqual(schema.tabs.find((t) => t.id === 'apps').sections, ['Profiles and groups', 'App drawer', 'Hidden and default apps'] // wave 58: the app merged one-row sections (settingsPolish));
+  assert.deepEqual(schema.tabs.find((t) => t.id === 'apps').sections, ['Profiles and groups', 'App drawer', 'Hidden and default apps']); // wave 58: the app merged one-row sections (settingsPolish)
   for (const t of schema.tabs) {
     const fs2 = schema.fields.filter((f) => f.tab === t.id);
     let last = -1;
@@ -506,4 +506,23 @@ test('CFG-72: the clock drag writes the placement fields, kept inside the screen
   const back = Prev.clockFromBox(m[0], m[1], m[2], m[3], m[4], m[5]);
   assert.ok(Math.abs(back.x - 0.3) < 0.011 && Math.abs(back.y - 0.5) < 0.011, 'the drawn box reads back as the saved place');
   for (const k of ['glanceClockX', 'glanceClockY', 'glanceClockXLand', 'glanceClockYLand']) assert.equal(Core.checkValue(ix.byKey[k], back.x).error, undefined);
+});
+
+// Wave 59 (glanceTop, CFG-75/76): the music line runs edge to edge when no top corner DRAWS something, always with Full width, and its fade is a mask.
+test('CFG-75, CFG-76: the music line: an empty top corner reserves nothing, Full width runs edge to edge, the fade is an alpha mask', () => {
+  const line = (over) => { const m = /class="musicline" data-left="([\d.]+)" data-right="([\d.]+)"/.exec(Prev.render('glance', Object.assign({}, D, over))); return m ? [Number(m[1]), Number(m[2])] : null; };
+  const fit = line({});
+  assert.ok(fit[0] > 12, 'the drawn top corners keep the line clear by default');
+  assert.deepEqual(line({ 'corners.TopLeft': '', 'corners.TopRight': '' }), [12, 360 - 12], 'enabled but empty top corners draw nothing');
+  assert.deepEqual(line({ glanceHotspots: 'BottomRight,BottomLeft' }), [12, 348]);
+  assert.deepEqual(line({ musicLineWidth: 'FullWidth' }), [12, 348], 'Full width is edge to edge whatever the corners');
+  const svg = Prev.render('glance', D);
+  assert.match(svg, /<mask id="mf\d+"/); assert.match(svg, /stop-opacity="0"/);
+  assert.ok(!/stop-color="#000"/.test(svg.slice(svg.indexOf('class="musicline"') - 900, svg.indexOf('class="musicline"'))), 'no black is painted at the ends');
+  assert.equal(schema.fields.some((f) => f.key === 'musicLineWidth' && f.default === 'FitAroundCorners'), true);
+});
+
+test('CFG-77: the hotspots field has no presets any more (wave 59: each corner is on or off, as in the app)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  assert.equal(/Two \(bottom\)|presetrow/.test(src), false);
 });

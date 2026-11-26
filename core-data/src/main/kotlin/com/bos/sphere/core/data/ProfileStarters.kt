@@ -32,7 +32,7 @@ object ProfileStarters {
         ProfileStart.Calm -> mapOf(
             "homePages" to "\"${HomePages.Off.name}\"", // Glance only: the pages stay stored, they are not shown
             "calmStyle" to "\"${CalmStyle.EdgeDots.name}\"",
-            "glanceHotspots" to "\"" + GlanceHotspots.encode(GlanceHotspots.preset(HotspotPreset.Two)!!) + "\"",
+            "glanceHotspots" to "\"" + GlanceHotspots.encode(setOf(Corner.BottomLeft, Corner.BottomRight)) + "\"",
         )
         ProfileStart.Desk -> mapOf(
             "dock.enabled" to "true",

@@ -143,6 +143,7 @@ class GlanceFixedW38SmokeTest : TourBase() {
         val titles = com.bos.sphere.ui.glanceSettings(LauncherPrefs()) { }.map { it.title }
         assertTrue("Show music" in titles)
         for (gone in listOf("Glance content", "Time", "Date", "Weather", "Battery", "Weather effect")) assertFalse(gone, gone in titles)
-        assertTrue("Hotspots" in titles)
+        // wave 59: the Hotspots presets and switches left the Glance rows (the Hotspots editor is in Home > Corners); the music line has its width
+        assertFalse("Hotspots" in titles); assertTrue("Music line width" in titles)
     }
 }

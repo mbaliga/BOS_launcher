@@ -75,7 +75,7 @@ class SettingsVisualW54Test {
     )
 
     private fun choices(cats: List<SettingCategory>): List<Pair<String, SettingItem.Choice<*>>> =
-        cats.flatMap { c -> c.items.filterIsInstance<SettingItem.Choice<*>>().filter { it.title != "Looks" && !it.title.startsWith("Try it") }.map { c.title to it } } // wave 56: the Looks rail and the Try it areas are rail rows of their own, covered by LooksCalibratorsW56Test
+        cats.flatMap { c -> c.items.filterIsInstance<SettingItem.Choice<*>>().filter { it.title != "Looks" && it.title != "Hotspots" && !it.title.startsWith("Try it") }.map { c.title to it } } // wave 56: the Looks rail and the Try it areas are rail rows of their own, covered by LooksCalibratorsW56Test // wave 59: the Hotspots editor too (HotspotsEditorW59UiTest)
 
     @Test fun CFG_23_noChoiceOfTheSettingsIsLeftAsATextRadioPage() {
         var rails = 0
@@ -92,7 +92,7 @@ class SettingsVisualW54Test {
     @Test fun CFG_23_everySmallChoiceTheInventoryListsIsThere() {
         val titles = variants().flatMap { (_, p) -> choices(buildSettingsCategories(model(p))).map { it.second.title } }.toSet()
         for (t in listOf(
-            "Order", "Right side", "Clock style", "Clock format", "Clock colour", "Clock size", "Hotspots", "Icon colour", "Calm style", "Show",
+            "Order", "Right side", "Clock style", "Clock format", "Clock colour", "Clock size", "Music line width", "Icon colour", "Calm style", "Show",
             "Wheel groups", "Ring segments", "Radar background", "Radar layout", "Web engine", "Default view", "Comms theme", "Page turning · portrait", "Page turning · landscape",
             "Scroll direction", "Corner style", "Icon type", "Light / dark", "Icon shape", "Style", "Pages", "Settings backdrop", "Left page", "Layout", "Default density", "Font",
         )) assertTrue("$t is a choice of cards", t in titles)

@@ -262,6 +262,8 @@
   // ----------------------------------------------------------------------------------------------------- hotspots
   function hotspotSet(v) { var s = g(v, 'glanceHotspots', 'TopLeft,TopRight,BottomRight,BottomLeft'); return s ? s.split(',') : []; }
   function cornerAction(v, c) { var a = v['corners.' + c]; return a === undefined ? 'action:None' : a; }
+  /** Wave 59: a corner draws something when it is on and holds an assignment (an empty corner, "", draws nothing and reserves no room). */
+  function cornerDrawn(v, c) { var a = v['corners.' + c]; return hotspotSet(v).indexOf(c) >= 0 && a !== '' && a !== '-' && a !== null; }
   function cornerGlyph(v, c, cx, cy, sz, T, ink) {
     var a = cornerAction(v, c);
     if (a === '~custom') return glyph('AllApps', cx, cy, sz, ink, 1.6);
@@ -389,13 +391,18 @@
   }
   function musicLine(v, T, ink) {
     if (!g(v, 'showMusic', true)) return '';
-    var on = hotspotSet(v), top = g(v, 'hideStatusBar', true) ? 12 : 26, sz = g(v, 'cornerIconSize', 32), style = g(v, 'cornerStyle', 'Glyph');
-    var reserve = style === 'Quarter' ? sz * 1.95 : sz + 28;
-    var l = on.indexOf('TopLeft') >= 0 ? reserve : 16, r = on.indexOf('TopRight') >= 0 ? W - reserve : W - 16; // edge to edge when no top hotspot
-    var cx = (l + r) / 2, clip = uid('ml');
-    return '<clipPath id="' + clip + '"><rect x="' + l + '" y="' + top + '" width="' + (r - l) + '" height="26"/></clipPath><g clip-path="url(#' + clip + ')">' +
-      glyph('Note', l + 10, top + 14, 15, ink, 1.8) + text(l + 24, top + 18, 'Midnight City  -  M83  -  Hurry Up, We\'re Dreaming', 12, ink, 'opacity="0.9"') + '</g>' +
-      (r - l < 200 ? '' : '') + (cx ? '' : '');
+    var top = g(v, 'hideStatusBar', true) ? 12 : 26, sz = g(v, 'cornerIconSize', 32), style = g(v, 'cornerStyle', 'Glyph');
+    var reserve = style === 'Quarter' ? sz * 1.95 : sz + 28, full = g(v, 'musicLineWidth', 'FitAroundCorners') === 'FullWidth';
+    // Wave 59 (glanceTop): only a top corner that DRAWS something (on and holding an assignment) keeps the line clear; Full width always runs edge to edge.
+    var l = !full && cornerDrawn(v, 'TopLeft') ? reserve : 12, r = !full && cornerDrawn(v, 'TopRight') ? W - reserve : W - 12;
+    var clip = uid('ml'), mask = uid('mf'), fade = 14;
+    // The edge fade is an alpha mask on the text (never a colour painted over it), so any wallpaper shows through.
+    return '<clipPath id="' + clip + '"><rect x="' + l + '" y="' + top + '" width="' + (r - l) + '" height="26"/></clipPath>' +
+      '<linearGradient id="' + mask + 'g" gradientUnits="userSpaceOnUse" x1="' + l + '" x2="' + r + '" y1="0" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="1"/>' +
+      '<stop offset="' + f1((r - l - fade) / (r - l) * 100) / 100 + '" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+      '<mask id="' + mask + '"><rect x="' + l + '" y="' + top + '" width="' + (r - l) + '" height="26" fill="url(#' + mask + 'g)"/></mask>' +
+      '<g class="musicline" data-left="' + f1(l) + '" data-right="' + f1(r) + '" clip-path="url(#' + clip + ')" mask="url(#' + mask + ')">' +
+      glyph('Note', l + 10, top + 14, 15, ink, 1.8) + text(l + 24, top + 18, 'Midnight City  -  M83  -  Hurry Up, We\'re Dreaming', 12, ink, 'opacity="0.9"') + '</g>';
   }
   function surfaceIndicator(v, T, ink, y) {
     if (!g(v, 'glanceIndicator', true)) return '';

@@ -13,3 +13,7 @@ Owner request: "I want the settings options to be visual as far as possible", sh
 - No looped animation on the selected card: the illustrations are static (the owner called it a bonus), so no infinite animation exists to gate on the motion prefs.
 - Keyboard focus uses Compose's own focus on the cards (the sheet is a popup window, outside the home's `launcherItem` focus graph, and the old pills did not use it either).
 - Other sheets: none of the other pill sets in the app/ui files is a small fixed set of options (the theme preview chips in `ThemesUi.kt` are colour swatches, not choices), so none was converted.
+
+## Superseded in part by wave 59 (glanceTop)
+
+The Hotspots presets (Four, Two (bottom), One, None), the four per-corner hotspot switches and the Home sheet's Hotspots cards are gone: one Hotspots editor (a live miniature of the home; a tap turns a corner on or off, a long press or Edit configures it) is the first block of Settings > Home > Corners and opens from the Home sheet's Hotspots tile. See `docs/decisions/glanceTop.md`.

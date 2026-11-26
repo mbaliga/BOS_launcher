@@ -146,10 +146,10 @@ class SettingsOneUiW40Test {
         val c = cats()
         show(CATEGORY_ROOT, c)
         rule.onNodeWithTag(SettingsTabTags.tab("Look"), useUnmergedTree = true).performClick(); rule.mainClock.advanceTimeBy(700); rule.waitForIdle()
-        rule.onNodeWithTag(OneUiTags.SEARCH).performTextInput("hotspot")
+        rule.onNodeWithTag(OneUiTags.SEARCH).performTextInput("music line")
         rule.waitForIdle()
-        rule.onAllNodes(hasText("Top left hotspot", substring = true))[0].performClick(); rule.mainClock.advanceTimeBy(700); rule.waitForIdle()
+        rule.onAllNodes(hasText("Music line width", substring = true))[0].performClick(); rule.mainClock.advanceTimeBy(700); rule.waitForIdle()
         assertTrue("the hit switched to the Home tab", SettingsTestNav.tabShown(rule, "Home"))
-        rule.onNodeWithText("Top left hotspot").assertIsDisplayed()
+        rule.onNodeWithText("Music line width").assertIsDisplayed() // wave 59: the "<corner> hotspot" rows left for the Hotspots editor
     }
 }

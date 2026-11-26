@@ -229,7 +229,7 @@ Also Look>Glow: "Glow: preview" pane (no setting, scrub only).
 | HS11 | Clock colour | Home>Glance | Page | Automatic / Accent | Automatic | lp:glanceClockAccent | Glance | style != Off | S |
 | HS12 | Clock size | Home>Glance | Page | Small .6 / Medium .8 / Large 1 | Large | lp:glanceClockSize | Glance | style != Off | S |
 | HS13 | Show music | Home>Glance | Switch | on/off | on | lp:showMusic | now-playing line + pop-in controls on every page | - | S |
-| HS14 | Hotspots | Home>Glance | Page | Four / Two (bottom) / One / None (Custom shown only via toggles) | Four | lp:glanceHotspots (encoded set) | corner hotspots | also quick sheet | S |
+| HS14 | Hotspots | Home>Corners | Editor | wave 59: a live miniature; each corner on or off, long press or Edit configures it (presets removed) | all four on | lp:glanceHotspots (encoded set) | corner hotspots | also the Home sheet tile (full page) | S |
 | HS15 | Top left hotspot | Home>Glance | Switch | on/off | on | lp:glanceHotspots | what each runs = Corners | - | S |
 | HS16 | Top right hotspot | same | Switch | | on | same | | | S |
 | HS17 | Bottom right hotspot | same | Switch | | on | same | | | S |
@@ -428,7 +428,7 @@ Comms-owned settings outside Settings (reachable from Comms itself): Groups mana
 |---|---|---|---|---|---|---|---|
 | QS01 | Pages | Home quick sheet (long-press empty home) | Chips | Off / Paginated / Continuous | | lp:homePages | HS22 |
 | QS02 | Order | quick sheet | Chips | LTR / RTL | | lp:homeOrder | HS02 |
-| QS03 | Hotspots | quick sheet | Chips | Four / Two (bottom) / One / None | | lp:glanceHotspots | HS14 |
+| QS03 | Hotspots | quick sheet | Tile | wave 59: opens the Hotspots editor as a full page (the chips are gone) | | lp:glanceHotspots | HS14 |
 | QS04 | This page: Align top / Align bottom / Make home page | quick sheet (paged) | Chips | | gridBias 0.4 / homePage 0 | lp:gridBias, lp:homePage | HS38 (partly) |
 | QS05 | Transition | quick sheet (paged) | Chips | Slide / Fade / Zoom / Cube / Flip / Stack | Slide | lp:pageTransition | no Settings row |
 | QS06 | Wallpaper (row) / Ground Control (row) / Delete page | quick sheet | Rows | | | | HS05, root |

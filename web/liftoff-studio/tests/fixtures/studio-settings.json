@@ -70,6 +70,7 @@
     "motion": true,
     "motionBg": false,
     "motionSens": 0.5,
+    "musicLineWidth": "FitAroundCorners",
     "pCols": 3,
     "pPaging": "Horizontal",
     "pRows": 6,

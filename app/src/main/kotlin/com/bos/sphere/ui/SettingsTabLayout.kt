@@ -1,7 +1,6 @@
 package com.bos.sphere.ui
 
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.GestureKind
 import com.bos.sphere.core.data.HomeGesture
 import com.bos.sphere.core.design.L10n
@@ -43,15 +42,14 @@ internal object SettingsTabLayout {
     val TABS: List<Tab> = listOf(
         Tab(
             SettingsTabs.HOME, Glyphs.Home, listOf(
-                Section("Glance", note = "Glance is the calm first screen; your pages follow it.", rows = rows(T_HOME, "Calm home screen (Glance)", "Clock style", "Clock format", "Show date under the clock", "Clock colour", "Clock size", "Show music", "Hotspots") +
-                    Corner.entries.map { c -> Row(T_HOME, "${c.label} hotspot") { L10n.tr("%s hotspot", L10n.tr(c.label)) } } +
+                Section("Glance", note = "Glance is the calm first screen; your pages follow it.", rows = rows(T_HOME, "Calm home screen (Glance)", "Clock style", "Clock format", "Show date under the clock", "Clock colour", "Clock size", "Show music", "Music line width") +
                     rows(T_HOME, "Controls hide after (seconds)", "Try it: Controls hide after", "Surface indicator")),
                 Section("Home pages", rows(T_HOME, "Pages", "Order") +
                     rows(T_PAGES, "Page", "Layout", "Density follows the home default", "Columns · portrait", "Rows · portrait", "Columns · landscape", "Rows · landscape", "Rings", "Clock tile on this page", "Add a page after this", "Delete this page") +
                     rows(T_HOME, "Add page", "Edit home", "Widgets, folders and icons", "Restore previous pages", "Page turning · portrait", "Page turning · landscape", "Home panels")),
                 Section("Layout", rows(T_HOME, "Style", "Scroll direction", "Grid follows window size", "Grid density", "Default density", "Icon size", "Same spacing both ways", "Spacing", "Spacing across", "Spacing down",
                     "Height in page", "Side margin", "Top margin", "Bottom margin", "Label size", "App labels", "Notification badges", "Count in badges", "Hide status bar")),
-                Section("Corners", rows(T_CORNERS, "Corner style", "Corner icon size", "Icon type", "Follow device rotation", "Separate corners for landscape") + Corner.entries.map { Row(T_CORNERS, it.label) }),
+                Section("Corners", rows(T_CORNERS, "Hotspots", "Corner style", "Corner icon size", "Icon type", "Follow device rotation", "Separate corners for landscape")), // wave 59: the Hotspots editor replaced the four corner rows
                 Section("Gestures and motion", rows(T_GESTURES, "Pinch changes grid density") + HomeGesture.entries.filter { it.kind == GestureKind.Touch }.map { Row(T_GESTURES, it.label) } +
                     rows(T_GESTURES, "On this home") + rows(T_MOTION, "Motion gestures", "When home isn't showing", "Motion sensitivity", "Try it: Motion sensitivity") +
                     HomeGesture.entries.filter { it.kind == GestureKind.Motion }.map { Row(T_MOTION, it.label) }),

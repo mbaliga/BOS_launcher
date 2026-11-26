@@ -17,3 +17,7 @@ Pure black surface, 36 dp top corners, no drag handle, scrim black 62 percent, c
 - Not matched: the Sound sheet's 640 dp width cap and slide-in animation (the Material sheet's own animation is used), and the title is 22 sp like the real Sound sheet, not the 28-30 sp of the brief.
 
 Wave 37: the title is now 28 sp like the other two popups ([specSync.md](specSync.md), `PopupTokens`).
+
+## Superseded in part by wave 59 (glanceTop)
+
+The Hotspots presets (Four, Two (bottom), One, None), the four per-corner hotspot switches and the Home sheet's Hotspots cards are gone: one Hotspots editor (a live miniature of the home; a tap turns a corner on or off, a long press or Edit configures it) is the first block of Settings > Home > Corners and opens from the Home sheet's Hotspots tile. See `docs/decisions/glanceTop.md`.

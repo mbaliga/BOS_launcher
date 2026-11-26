@@ -17,26 +17,15 @@ object GlanceMusic {
         storedShowMusic ?: (legacyGlanceContent == null || legacyGlanceContent.split(',').any { it.trim() == "NowPlaying" })
 }
 
-/** Presets of the hotspot count. */
-enum class HotspotPreset(val label: String) { Four("Four"), Two("Two (bottom)"), One("One"), None("None"), Custom("Custom") }
-
 /**
  * HOM-23, INP-16: which of the four hotspots are on. Enabled corners are stored by PHYSICAL corner of the natural portrait
  * orientation (like the corner assignments), so the whole composition rotates with the device.
+ *
+ * Wave 59 (glanceTop): the presets (Four, Two (bottom), One, None) are gone; the Hotspots editor toggles each corner. The stored set is read as it is
+ * (nothing was ever stored for a preset: it was only a reading of the set), so an install keeps exactly the corners it had on.
  */
 object GlanceHotspots {
     val ALL: Set<Corner> = Corner.entries.toSet()
-
-    fun preset(p: HotspotPreset): Set<Corner>? = when (p) {
-        HotspotPreset.Four -> ALL
-        HotspotPreset.Two -> setOf(Corner.BottomLeft, Corner.BottomRight)
-        HotspotPreset.One -> setOf(Corner.BottomRight)
-        HotspotPreset.None -> emptySet()
-        HotspotPreset.Custom -> null
-    }
-
-    fun presetOf(on: Set<Corner>): HotspotPreset =
-        HotspotPreset.entries.firstOrNull { preset(it) == on } ?: HotspotPreset.Custom
 
     fun toggle(on: Set<Corner>, c: Corner): Set<Corner> = if (c in on) on - c else on + c
 
@@ -55,6 +44,19 @@ object GlanceHotspots {
 
     /** What a hotspot runs: a single assignment, or the first item of a palette; a widget, complication or nothing is no hotspot. */
     fun itemOf(slot: CornerSlot): CornerItem? = MinimalHotspots.itemOf(slot)
+
+    /** Wave 59: whether a corner holding [slot] draws anything (a glyph, a palette badge, a complication, a cluster or a widget peek); an empty corner draws nothing. */
+    fun draws(slot: CornerSlot?): Boolean = slot != null && slot !is CornerSlot.Empty
+
+    /**
+     * Wave 59 (glanceTop, CFG-75): the screen corners at the top that really DRAW a hotspot at [rotation]: enabled AND holding an assignment that draws.
+     * Only these reserve room beside the music line; an enabled but empty corner reserves nothing. [slots] are keyed by physical corner.
+     */
+    fun drawnOnScreen(on: Set<Corner>, slots: Map<Corner, CornerSlot>, rotation: Int, followDevice: Boolean): Set<Corner> =
+        Corner.entries.filterTo(LinkedHashSet()) { screen ->
+            val physical = if (followDevice) CornerMapping.physicalCornerAt(screen, rotation) else screen
+            physical in on && draws(slots[physical])
+        }
 }
 
 /** How the pop-in controls timeout is clamped (setting 2 to 10 seconds, default 4). */

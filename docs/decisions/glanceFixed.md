@@ -33,3 +33,9 @@ Owner feedback (verbatim): "1. the four hotspots are supposed to remain constant
 ## Superseded by wave 55 (fixedBackdrop)
 
 The Glance page no longer carries the wallpaper: it is drawn once, fixed, below the pager (`docs/decisions/fixedBackdrop.md`). The statement above that the Glance page is "the wallpaper only" now reads: the Glance page is transparent and holds the clock and the gestures; the wallpaper is the fixed layer behind it.
+
+## Superseded in part by wave 59 (glanceTop)
+
+The Hotspots presets (Four, Two (bottom), One, None), the four per-corner hotspot switches and the Home sheet's Hotspots cards are gone: one Hotspots editor (a live miniature of the home; a tap turns a corner on or off, a long press or Edit configures it) is the first block of Settings > Home > Corners and opens from the Home sheet's Hotspots tile. See `docs/decisions/glanceTop.md`.
+
+Wave 59 (glanceTop): the music line's edge fade is now an alpha mask on the text (no colour painted), and only a top corner that draws something keeps the line clear; "Music line width" (Fit around corners or Full width) is in Settings > Home > Glance. See `docs/decisions/glanceTop.md`.

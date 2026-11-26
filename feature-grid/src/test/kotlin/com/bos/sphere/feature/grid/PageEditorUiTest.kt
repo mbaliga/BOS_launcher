@@ -424,9 +424,9 @@ class PageEditorUiTest {
         val c = Calls(); host(c, fourPages, current = 0, glanceFocus = true)
         tag("pe.glance").assertIsSelected(); tag("pe.glance").assert(hasContentDescription("Glance, selected"))
         pc(0).assertIsNotSelected()
-        rule.onNodeWithText("Hotspots").assertIsDisplayed(); rule.onNodeWithText("Show music").assertIsDisplayed()
-        rule.onNodeWithText("Top left").performClick()
-        assertTrue("a hotspot toggled", com.bos.sphere.core.data.Corner.TopLeft !in c.prefs.glanceHotspots)
+        rule.onNodeWithText("Show music").assertIsDisplayed()
+        // wave 59 (glanceTop): the hotspot switches left this tab (the Hotspots editor is the one place)
+        rule.onAllNodesWithText("Hotspots").assertCountEquals(0); rule.onAllNodesWithText("Top left").assertCountEquals(0)
         shoot("glance_focus")
     }
 

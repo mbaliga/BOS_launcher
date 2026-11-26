@@ -322,13 +322,48 @@ object GlanceInk {
 object GlanceControlsMs { fun of(seconds: Int): Long = com.bos.sphere.core.data.GlanceControls.clampSeconds(seconds) * 1000L }
 
 /**
+ * Wave 59 (glanceTop, CFG-75): the marquee's edge fade is an ALPHA MASK on the text (offscreen layer, a gradient drawn with [BlendMode.DstIn]), never a colour
+ * painted over it, so a light, dark, live or picture wallpaper shows through unchanged. Only a clipped edge fades: the end while the text overflows, the start
+ * once the text has started to move.
+ */
+object MarqueeFade {
+    const val FADE_DP = 14f
+    const val START_DELAY_MS = 1200
+
+    /** Which edges fade (start, end) for a line that [scrolling] (overflows and moves) and has [moved] off its start. */
+    fun edges(scrolling: Boolean, moved: Boolean): Pair<Boolean, Boolean> = (scrolling && moved) to scrolling
+}
+
+/**
+ * Fades the content to transparent over [fadePx] at its start and/or end edge ([rtl]: the start is the right edge); with [clearPx] the outermost
+ * [clearPx] are fully transparent first (the line under a corner icon). Paints no colour: an alpha mask over an offscreen layer.
+ */
+internal fun Modifier.fadeClippedEdges(start: Boolean, end: Boolean, fadePx: Float, rtl: Boolean, clearPx: Float = 0f): Modifier =
+    if (!start && !end) this
+    else this
+        .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val c = clearPx.coerceIn(0f, size.width / 2f)
+            val f = fadePx.coerceAtMost(size.width / 2f - c).coerceAtLeast(1f)
+            val left = if (rtl) end else start
+            val right = if (rtl) start else end
+            val dstIn = androidx.compose.ui.graphics.BlendMode.DstIn
+            if (left) drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), c, c + f), size = androidx.compose.ui.geometry.Size(c + f, size.height), blendMode = dstIn)
+            if (right) drawRect(
+                Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), size.width - c - f, size.width - c), topLeft = Offset(size.width - c - f, 0f),
+                size = androidx.compose.ui.geometry.Size(c + f, size.height), blendMode = dstIn,
+            )
+        }
+
+/**
  * The song title (W25): one line, centred when it fits; when it is wider than its slot it scrolls as a marquee with both edges faded.
  * With reduced motion it does not scroll: it shows the beginning with an ellipsis. The text carries the test tag "glance.title.marquee"
  * or "glance.title.static" (fits, or reduced motion) so the state is observable.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit, maxWidth: Dp = 280.dp, edge: Color = Color.Black) {
+internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit, maxWidth: Dp = 280.dp) {
     val line = GlanceText.nowPlayingLine(media.title, media.artist)
     val display = GlanceText.nowPlayingDisplay(media.title, media.artist)
     val spoken = L10n.tr("Now playing: %s", line)
@@ -341,7 +376,12 @@ internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onA
     val natural = remember(display, density.fontScale) { measurer.measure(display, style, softWrap = false, maxLines = 1).size.width }
     val overflow = natural > room
     val scrolling = marquee && overflow
-    val fade = with(density) { 14.dp.toPx() }
+    val fade = with(density) { MarqueeFade.FADE_DP.dp.toPx() }
+    // Wave 59 (glanceTop): the start edge is clipped only once the text has started to move (the marquee waits 1.2 s at its start first).
+    var moved by remember(display, scrolling) { mutableStateOf(false) }
+    LaunchedEffect(display, scrolling) { if (scrolling) { kotlinx.coroutines.delay(MarqueeFade.START_DELAY_MS.toLong()); moved = true } }
+    val (fadeStart, fadeEnd) = MarqueeFade.edges(scrolling, moved)
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     Row(
         Modifier.widthIn(max = maxWidth)
             .launcherItem("glance.nowplaying", focusable = true, onActivate = onActivate, ringRadiusDp = 16f)
@@ -357,14 +397,9 @@ internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onA
             modifier = Modifier.weight(1f, fill = false).testTag(if (scrolling) "glance.title.marquee" else "glance.title.static")
                 .then(
                     if (scrolling) Modifier
-                        .drawWithContent {
-                            drawContent()
-                            // Both edges fade into the surface colour (no blend mode, no offscreen layer).
-                            val f = fade.coerceAtMost(size.width / 2f)
-                            drawRect(Brush.horizontalGradient(listOf(edge, Color.Transparent), 0f, f), size = androidx.compose.ui.geometry.Size(f, size.height))
-                            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, edge), size.width - f, size.width), topLeft = Offset(size.width - f, 0f), size = androidx.compose.ui.geometry.Size(f, size.height))
-                        }
-                        .basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1200, repeatDelayMillis = 1200, spacing = MarqueeSpacing(32.dp))
+                        // Wave 59 (glanceTop): the TEXT fades to transparent at a clipped edge (an alpha mask), so any wallpaper shows through; no colour is painted.
+                        .fadeClippedEdges(fadeStart, fadeEnd, fade, rtl)
+                        .basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = MarqueeFade.START_DELAY_MS, repeatDelayMillis = 1200, spacing = MarqueeSpacing(32.dp))
                     else Modifier,
                 ),
         )

@@ -111,7 +111,7 @@ class SettingsTabsW57ModelTest {
         val c = tabs()
         val counts = c.associate { SettingsTabs.key(it.title)!! to it.items.size }
         // The numbers of the fullest state (paged home, three pages, Lab visible); a moved row changes two of them on purpose.
-        assertEquals(mapOf("Home" to 87, "Look" to 21, "Apps" to 9, "Radar" to 16, "Side panel" to 20, "System" to 17), counts)
+        assertEquals(mapOf("Home" to 80, "Look" to 21, "Apps" to 9, "Radar" to 16, "Side panel" to 20, "System" to 17), counts)
         // every tab has sections
         for (t in c) assertTrue("${t.title} has section headers", t.headers.size >= 2)
     }

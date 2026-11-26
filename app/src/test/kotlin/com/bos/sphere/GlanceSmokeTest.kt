@@ -21,7 +21,6 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import com.bos.sphere.core.data.GlanceHotspots
-import com.bos.sphere.core.data.HotspotPreset
 import com.bos.sphere.core.data.LauncherStores
 import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.MediaNow
@@ -91,11 +90,13 @@ class GlanceSmokeTest {
         assertFalse("and pop out", controlsShown())
     }
 
-    @Test fun HOM_23_theHotspotPresetsShowFourTwoOneOrNone() {
+    // Wave 59: the presets are gone (the Hotspots editor toggles each corner); the sets they named still draw their count.
+    @Test fun HOM_23_theHotspotSetsShowTheirCount() {
         startFresh(); settle()
         val stores = LauncherStores.get(AppSmokeHarness.app)
-        for ((p, n) in listOf(HotspotPreset.Two to 2, HotspotPreset.One to 1, HotspotPreset.None to 0, HotspotPreset.Four to 4)) {
-            stores.prefs.update { it.copy(glanceHotspots = GlanceHotspots.preset(p)!!) }; settle()
+        val bottom = setOf(com.bos.sphere.core.data.Corner.BottomLeft, com.bos.sphere.core.data.Corner.BottomRight)
+        for ((p, n) in listOf(bottom to 2, setOf(com.bos.sphere.core.data.Corner.BottomRight) to 1, emptySet<com.bos.sphere.core.data.Corner>() to 0, GlanceHotspots.ALL to 4)) {
+            stores.prefs.update { it.copy(glanceHotspots = p) }; settle()
             assertEquals("$p", n, hotspotCount())
         }
     }

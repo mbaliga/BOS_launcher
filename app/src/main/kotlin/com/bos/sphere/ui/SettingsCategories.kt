@@ -76,6 +76,8 @@ import com.bos.sphere.feature.grid.Stepper
 import com.bos.sphere.feature.grid.ToggleRow
 import com.bos.sphere.feature.grid.itemLabel
 import com.bos.sphere.feature.grid.slotSummary
+import com.bos.sphere.feature.grid.keywords
+import com.bos.sphere.feature.grid.previewTopic
 import com.bos.sphere.core.data.isPaged
 import com.bos.sphere.core.data.surface
 import kotlin.math.roundToInt
@@ -137,7 +139,34 @@ class SettingsModel(
     val savePinch: (Map<HomeGesture, CornerItem?>?) -> Unit = {},
     /** Wave 58 (CFG-67): the apps offering a Radar search provider (package to label), so a search for one opens Search providers on its row. */
     val searchProviders: List<Pair<String, String>> = emptyList(),
+    /** Wave 59 (glanceTop): both corner sets (the Hotspots editor shows the orientation in view; null = [corners] for both), the display rotation, and an
+     *  edit of a corner in a given set (null = [editCorner], the set in use). */
+    val portraitCorners: Map<Corner, CornerSlot>? = null,
+    val landscapeCorners: Map<Corner, CornerSlot>? = null,
+    val rotation: Int = 0,
+    val editCornerIn: ((Corner, Boolean) -> Unit)? = null,
+    /** Wave 59: the home's live picture (its fixed wallpaper is the editor's backdrop); null = a plain backdrop. */
+    val homeCapture: com.bos.sphere.feature.grid.HomeCapture? = null,
 )
+
+/**
+ * Wave 59 (glanceTop, CFG-77): the Hotspots editor as a row of Home > Corners: the live miniature of the home (a tap turns a corner on or off, a long
+ * press or Edit opens the corner editor), the compact row for the selected corner below it. Its value is how many are on.
+ */
+internal fun hotspotsEditorItem(m: SettingsModel): SettingItem.Choice<String> {
+    val p = m.prefs
+    val summary = com.bos.sphere.feature.grid.HotspotsEditorModel.summary(p.glanceHotspots)
+    return SettingItem.Choice(
+        x("Hotspots"), Glyphs.Dial, listOf(summary), summary, { it },
+        preview = {
+            com.bos.sphere.feature.grid.HotspotsEditorFor(
+                prefs = p, update = m.updatePrefs, portraitSlots = m.portraitCorners ?: m.corners, landscapeSlots = m.landscapeCorners ?: m.corners,
+                deviceLandscape = m.isLandscape, deviceRotation = m.rotation, appsByKey = m.appsByKey,
+                onEdit = { c, land -> m.editCornerIn?.invoke(c, land) ?: m.editCorner(c) }, capture = m.homeCapture,
+            )
+        },
+    ) {}.keywords(x("Corners"), x("Top left"), x("Top right"), x("Bottom left"), x("Bottom right"))
+}
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
 class LabEntry(val id: String, val title: String, val result: String, val run: (() -> Unit)?)
@@ -485,6 +514,7 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         x("Corners"),
         Glyphs.Palette,
         buildList {
+            add(hotspotsEditorItem(m)) // wave 59 (glanceTop): the Hotspots editor is the first block of Home > Corners
             add(
                 SettingItem.Choice(
                     x("Corner style"), Glyphs.Palette, CornerStyle.entries, p.cornerStyle, { x(it.label) },
@@ -498,9 +528,6 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(SettingItem.Toggle(x("Hot corners with a mouse"), Glyphs.Pinch, p.hotCornersOn, x("Rest the pointer, click to run")) { v -> upd { it.copy(hotCornersOn = v) } })
             add(SettingItem.Slider(x("Hot corner delay"), Glyphs.Dial, p.hotCornerDwellMs.toFloat(), 50f..600f, "${p.hotCornerDwellMs} ms", step = 10f) { v -> upd { it.copy(hotCornerDwellMs = v.roundToInt()) } }.disabledUnless(p.hotCornersOn, x("Hot corners are off")))
             if (p.hotCornersOn) add(hotCornerTryItem(p, m.updatePrefs)) // W56: Try it
-            Corner.entries.forEach { c ->
-                add(SettingItem.Action(x(c.label), Glyphs.Palette, slotSummary(m.corners[c] ?: CornerSlot.Empty, m.appsByKey), navigates = true) { m.editCorner(c) })
-            }
         },
     )
 
@@ -861,16 +888,13 @@ internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherP
         add(SettingItem.Choice(x("Clock size"), Glyphs.Clock, com.bos.sphere.core.data.ClockSize.entries, p.glanceClockSize, { x(it.label) }) { v -> upd { it.copy(glanceClockSize = v) } }.asCards({ SettingsArtLook.clockSize.art(it) }, "cfg.clockSize").disabled(clockOffReason))
     }
     add(SettingItem.Toggle(x("Show music"), Glyphs.Music, p.showMusic, x("Song and controls on every page")) { on -> upd { it.copy(showMusic = on) } })
-    val hp = com.bos.sphere.core.data.GlanceHotspots.presetOf(p.glanceHotspots)
+    // Wave 59 (glanceTop): the Hotspots presets and the four hotspot switches are gone (the Hotspots editor in Home > Corners replaces them); the music
+    // line gets its width: around the drawn top corners (default) or always edge to edge.
     add(
-        SettingItem.Choice(
-            x("Hotspots"), Glyphs.Dial, com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }, hp.takeIf { it != com.bos.sphere.core.data.HotspotPreset.Custom } ?: com.bos.sphere.core.data.HotspotPreset.Four, { x(it.label) },
-            hint = x("What each runs is under Corners"),
-        ) { v -> upd { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(v) ?: it.glanceHotspots) } }.asCards({ SettingsArtHome.hotspots.art(it) }, "cfg.hotspots"),
+        SettingItem.Choice(x("Music line width"), Glyphs.Music, com.bos.sphere.core.data.MusicLineWidth.entries, p.musicLineWidth, { x(it.label) }) { v -> upd { it.copy(musicLineWidth = v) } }
+            .asCards({ com.bos.sphere.feature.grid.SettingsArtHome.musicWidth.art(it) }, "cfg.musicWidth").disabledUnless(p.showMusic, x("Show music is off"))
+            .previewTopic(com.bos.sphere.feature.grid.PreviewTopic.Glance, music = true), // the Preview draws the line (a sample title when nothing plays)
     )
-    for (c in com.bos.sphere.core.data.Corner.entries) {
-        add(SettingItem.Toggle(x("%s hotspot", x(c.label)), Glyphs.Dial, c in p.glanceHotspots) { on -> upd { it.copy(glanceHotspots = if (on) it.glanceHotspots + c else it.glanceHotspots - c) } })
-    }
     add(SettingItem.Stepper(x("Controls hide after (seconds)"), Glyphs.Clock, p.glanceControlsSeconds, com.bos.sphere.core.data.GlanceControls.MIN_SECONDS..com.bos.sphere.core.data.GlanceControls.MAX_SECONDS, null) { v -> upd { it.copy(glanceControlsSeconds = com.bos.sphere.core.data.GlanceControls.clampSeconds(v)) } })
     add(controlsTryItem(p, upd)) // W56: Try it
     add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("Comms, home and panel dots")) { v -> upd { it.copy(glanceIndicator = v) } })

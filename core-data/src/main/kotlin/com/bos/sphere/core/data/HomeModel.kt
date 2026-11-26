@@ -123,6 +123,16 @@ enum class ClockFormat(val label: String) { System("System (12/24 by device)"), 
  * Wave 41 (glanceClock): the styles of the big wallpaper clock on the Glance page (it replaces the small wave 38 clock of the fixed chrome). The stored name of
  * an older install ("Analog", "Digital") is mapped by [fromStored]: Analog -> AnalogClassic, Digital -> BigDigital.
  */
+/** Wave 59 (glanceTop, CFG-76): the width of the music line at the top of every home page. */
+enum class MusicLineWidth(val label: String) {
+    /** The line keeps clear of a top corner that draws something (and runs edge to edge when neither does). */
+    FitAroundCorners("Fit around corners"),
+    /** Always edge to edge (12 dp margins); the top corner icons sit over the line's faded ends. */
+    FullWidth("Full width");
+
+    companion object { fun fromStored(s: String?): MusicLineWidth = entries.firstOrNull { it.name == s } ?: FitAroundCorners }
+}
+
 enum class ClockStyle(val label: String) {
     BigDigital("Big digital"), BigDigitalLine("Big digital, one line"), AnalogClassic("Analog classic"), AnalogMinimal("Analog minimal"), Word("Word clock"), Off("Off");
 
@@ -216,6 +226,8 @@ data class LauncherPrefs(
     val homeOrder: HomeOrder = HomeOrder.LeftToRight,
     /** Wave 38: the music line (title and pop-in controls) at the top of every home page while something plays; default on. */
     val showMusic: Boolean = true,
+    /** Wave 59 (glanceTop, CFG-76): how wide the music line runs: around the drawn top corners (default) or always edge to edge. */
+    val musicLineWidth: MusicLineWidth = MusicLineWidth.FitAroundCorners,
     /** HOM-23: which hotspots are on, by physical corner (default all four). */
     val glanceHotspots: Set<Corner> = GlanceHotspots.ALL,
     /** HOM-23: seconds of inactivity before the pop-in music controls pop out (2 to 10). */

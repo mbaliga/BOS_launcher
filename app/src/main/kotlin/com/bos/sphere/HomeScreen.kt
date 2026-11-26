@@ -360,6 +360,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
     val recentsUsageOn by rememberUsageAccess(context, rightOpen)
     var menuApp by remember { mutableStateOf<AppEntry?>(null) }
     var editCorner by remember { mutableStateOf<Corner?>(null) }
+    /** Wave 59: the set the corner editor writes (true = landscape, false = portrait); null = the set in use for this orientation. */
+    var editCornerLandscape by remember { mutableStateOf<Boolean?>(null) }
+    /** Wave 59: the Hotspots editor as a full page (the Home sheet's Hotspots tile). */
+    var hotspotsPage by remember { mutableStateOf(false) }
     var editGesture by remember { mutableStateOf<HomeGesture?>(null) }
     val editSelection = remember { com.bos.sphere.feature.grid.EditSelectionState().also { it.fallbackBar = false } } // W47: THE selection of edit mode; the item action bar exists, so the 48 dp fallback Remove button is off
     val itemEdit = rememberItemEditState(editSelection) // wave 45 (editSheet): the selected item's action bar and sheet replace the old full-screen tile menu
@@ -469,6 +473,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
 
     // HOM-23: the screen corners whose hotspot is on (the physical corner under each decides; a disabled hotspot draws nothing and does nothing).
     val glanceOn = remember(prefs.glanceHotspots, rotation, prefs.cornersFollowDevice) { com.bos.sphere.core.data.GlanceHotspots.enabledOnScreen(prefs.glanceHotspots, rotation, prefs.cornersFollowDevice) }
+    // Wave 59 (glanceTop): only a top corner that DRAWS something (enabled and assigned) keeps the music line clear of it.
+    val glanceDrawn = remember(prefs.glanceHotspots, activeCorners, rotation, prefs.cornersFollowDevice) { com.bos.sphere.core.data.GlanceHotspots.drawnOnScreen(prefs.glanceHotspots, activeCorners, rotation, prefs.cornersFollowDevice) }
     val hotspotPlacements = remember(placements, glanceOn) { placements.filter { it.screen in glanceOn } } // wave 38: the Hotspots chips pick which corners draw, on every page
 
     fun openAllApps(anchor: Corner?) {
@@ -682,7 +688,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         if (old is CornerSlot.Widget && (slot !is CornerSlot.Widget || slot.appWidgetId != old.appWidgetId)) {
             widgetHost.deleteWidget(old.appWidgetId)
         }
-        if (com.bos.sphere.core.data.CornerSets.writesLandscape(prefs.cornersPerOrientation, isLandscape)) stores.shortcuts.setLandscapeCorner(c, slot) else stores.shortcuts.setCorner(c, slot)
+        // Wave 59: the Hotspots editor may edit the other orientation's set (its Portrait / Landscape control); otherwise the set in use.
+        if (editCornerLandscape ?: com.bos.sphere.core.data.CornerSets.writesLandscape(prefs.cornersPerOrientation, isLandscape)) stores.shortcuts.setLandscapeCorner(c, slot) else stores.shortcuts.setCorner(c, slot)
     }
     androidx.compose.runtime.SideEffect { com.bos.sphere.feature.search.palette.PaletteWorkspaces.names = { com.bos.sphere.feature.dock.WorkspaceRepository.get(context).names() } }
     var pickingLeft by remember { mutableStateOf(false) }
@@ -725,7 +732,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             pickingLeft = false
         } else {
             widgetFor?.let { setCorner(it, CornerSlot.Widget(id, label)) }
-            widgetFor = null
+            widgetFor = null; editCornerLandscape = null
         }
     }
 
@@ -863,7 +870,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 iconMode = prefs.cornerIconMode,
                 appsByKey = appsByKey,
                 onRun = { item, screen -> runItem(item, screen) },
-                onEdit = { editCorner = it },
+                onEdit = { editCornerLandscape = null; editCorner = it },
                 complication = { placement, slot, mod ->
                     ComplicationView(slot.kind, 48.dp, onClick = { slot.kind.action?.let { runItem(CornerItem.Action(it), placement.screen) } }, modifier = mod)
                 },
@@ -1261,7 +1268,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                     onPrevious = { com.bos.sphere.core.data.MediaNow.previous() }, onPlayPause = { com.bos.sphere.core.data.MediaNow.playPause() }, onNext = { com.bos.sphere.core.data.MediaNow.next() },
                     onAwake = { indicatorAwake++ },
                     corners = { Corners() },
-                    topLeftHotspot = com.bos.sphere.core.data.Corner.TopLeft in glanceOn, topRightHotspot = com.bos.sphere.core.data.Corner.TopRight in glanceOn,
+                    topLeftHotspot = com.bos.sphere.core.data.Corner.TopLeft in glanceDrawn, topRightHotspot = com.bos.sphere.core.data.Corner.TopRight in glanceDrawn,
+                    musicWidth = prefs.musicLineWidth, // wave 59: Fit around corners or Full width
                     regular = if (regularShown) signalReading to batteryReading else null, low = prefs.indicatorLow, // wave 55: the regular battery and signal indicators
                 )
                 if (glanceClockEditing) com.bos.sphere.feature.grid.GlanceClockEditShield() // wave 50: dimmed like the home editor does, and inert
@@ -1636,8 +1644,10 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 appsByKey = appsByKey,
                 isLandscape = isLandscape,
                 motionAvailable = motion.available,
-                editCorner = { editCorner = it },
+                editCorner = { editCornerLandscape = null; editCorner = it },
                 editGesture = { editGesture = it },
+                portraitCorners = portraitCorners, landscapeCorners = landscapeCorners, rotation = rotation, // wave 59: the Hotspots editor
+                editCornerIn = { c, land -> editCornerLandscape = land; editCorner = c }, homeCapture = homeCapture,
                 system = SystemLinks(
                     setDefaultHome = {
                         val i = DefaultLauncher.requestRoleIntent(context) ?: DefaultLauncher.homeSettingsIntent()
@@ -1659,7 +1669,8 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         }
         androidx.compose.runtime.SideEffect { settingsForRadar.value = categories }
         val settingsTarget = remember(settingsSession) { com.bos.sphere.ui.settingsTarget(categories, settingsCategory) } // wave 57: a tab and the row to flash, fixed for the visit
-        val previewSurfaces = com.bos.sphere.ui.rememberPreviewSurfaces(prefs, apps, appsByKey, puckSlots, puckSegments, puckLabels, homeOnGlance = { landing == HomeShown.Glance })
+        val previewSurfaces = com.bos.sphere.ui.rememberPreviewSurfaces(prefs, apps, appsByKey, puckSlots, puckSegments, puckLabels, homeOnGlance = { landing == HomeShown.Glance },
+            topDrawn = { (com.bos.sphere.core.data.Corner.TopLeft in glanceDrawn) to (com.bos.sphere.core.data.Corner.TopRight in glanceDrawn) }, mediaPlaying = { prefs.showMusic && mediaInfo != null })
         SettingsSpace(
             visible = settingsOpen,
             categories = categories,
@@ -1712,15 +1723,25 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 },
             )
         }
+        if (hotspotsPage) {
+            com.bos.sphere.feature.grid.HotspotsEditorPage(onDismiss = { hotspotsPage = false }) {
+                com.bos.sphere.feature.grid.HotspotsEditorFor(
+                    prefs = prefs, update = { f -> stores.prefs.update(f) }, portraitSlots = portraitCorners, landscapeSlots = landscapeCorners,
+                    deviceLandscape = isLandscape, deviceRotation = rotation, appsByKey = appsByKey,
+                    onEdit = { c, land -> editCornerLandscape = land; editCorner = c }, capture = homeCapture, large = true,
+                )
+            }
+        }
         editCorner?.let { c ->
+            val editSet = editCornerLandscape?.let { if (it) landscapeCorners else portraitCorners } ?: corners
             CornerEditorDialog(
                 corner = c,
-                current = corners[c] ?: CornerSlot.Empty,
+                current = editSet[c] ?: CornerSlot.Empty,
                 apps = apps,
                 appsByKey = appsByKey,
-                onSave = { setCorner(c, it); editCorner = null },
+                onSave = { setCorner(c, it); editCorner = null; editCornerLandscape = null },
                 onPickWidget = { widgetFor = c; editCorner = null; widgetPicker.launch() },
-                onDismiss = { editCorner = null },
+                onDismiss = { editCorner = null; editCornerLandscape = null },
             )
         }
         editGesture?.let { g ->
@@ -1804,6 +1825,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 onWallpaper = { quickOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_WALLPAPER) }, // wave 57: the wallpaper rows are in Look > Wallpaper
                 onGroundControl = { quickOpen = false; openSettings(com.bos.sphere.ui.CATEGORY_ROOT) }, // wave 57: Settings on the tab shown last
                 onDismiss = { quickOpen = false },
+                onHotspots = { quickOpen = false; hotspotsPage = true }, // wave 59: the Hotspots editor as a full page
                 // W51: the same entry points as the edit tray: Edit home, the app picker and the widget picker (Pages turned on first when they are off).
                 onEditHome = { quickOpen = false; editHome() },
                 onAddApps = { quickOpen = false; editHome(); trayRequest = com.bos.sphere.feature.grid.TrayPanel.Apps },

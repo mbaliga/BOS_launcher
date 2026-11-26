@@ -27,7 +27,7 @@ internal object SettingsReset {
      */
     val PAGES: Map<String, Set<String>> = mapOf(
         "Home" to setOf(
-            "glanceEnabled", "homeOrder", "showMusic", "glanceHotspots", "glanceControlsSeconds", "glanceIndicator",
+            "glanceEnabled", "homeOrder", "showMusic", "musicLineWidth", "glanceHotspots", "glanceControlsSeconds", "glanceIndicator",
             "clockStyle", "clockFormat", "glanceClockDate", "glanceClockAccent", "glanceClockSize",
             "homeStyle", "homePages", "scrollAxis", "continuousColumns", "adaptiveGrid", "gridDensity", "portraitGrid", "landscapeGrid",
             "iconScale", "iconSpacing", "spacingV", "gridBias", "gridInsetX", "gridInsetTop", "gridInsetBottom", "labelScale", "showLabels",

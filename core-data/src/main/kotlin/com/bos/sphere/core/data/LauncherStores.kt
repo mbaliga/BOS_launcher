@@ -164,7 +164,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             .putBoolean("hotCornersOn", next.hotCornersOn).putInt("hotCornerDwell", next.hotCornerDwellMs)
             .putString("wheelGrouping", next.wheelGrouping.name).putBoolean("wheelWorkOnly", next.wheelWorkOnly)
             .putBoolean("glanceEnabled", next.glanceEnabled).putString("homeOrder", next.homeOrder.name)
-            .putBoolean("showMusic", next.showMusic).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
+            .putBoolean("showMusic", next.showMusic).putString("musicLineWidth", next.musicLineWidth.name).putString("glanceHotspots", GlanceHotspots.encode(next.glanceHotspots))
             .putInt("glanceControlsSec", next.glanceControlsSeconds).putBoolean("glanceIndicator", next.glanceIndicator)
             .putInt("recentsLimit", next.recentsLimit)
             .putBoolean("recentsUsage", next.recentsUseUsageAccess)
@@ -325,6 +325,7 @@ class LauncherPrefsStore internal constructor(private val sp: SharedPreferences,
             wheelWorkOnly = sp.getBoolean("wheelWorkOnly", d.wheelWorkOnly),
             glanceEnabled = migrated.glanceEnabled, homeOrder = HomeOrder.parse(sp.getString("homeOrder", null)),
             showMusic = GlanceMusic.resolve(if (sp.contains("showMusic")) sp.getBoolean("showMusic", true) else null, sp.getString("glanceContent", null)),
+            musicLineWidth = MusicLineWidth.fromStored(runCatching { sp.getString("musicLineWidth", null) }.getOrNull()),
             glanceHotspots = GlanceHotspots.decode(sp.getString("glanceHotspots", null)),
             glanceControlsSeconds = GlanceControls.clampSeconds(sp.getInt("glanceControlsSec", d.glanceControlsSeconds)),
             glanceIndicator = sp.getBoolean("glanceIndicator", d.glanceIndicator),

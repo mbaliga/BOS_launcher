@@ -18,7 +18,6 @@ import com.bos.sphere.core.data.DensityPreset
 import com.bos.sphere.core.data.HomeOrder
 import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.HomeStyle
-import com.bos.sphere.core.data.HotspotPreset
 import com.bos.sphere.core.data.IconShape
 import com.bos.sphere.core.data.IconTint
 import com.bos.sphere.core.data.IndicatorMetric
@@ -88,7 +87,7 @@ class SettingsArtW54Test {
         check("Page turning", PagingAxis.entries, SettingsArtHome.paging)
         check("Scroll direction", ScrollAxis.entries, SettingsArtHome.scrollAxis)
         check("Default density", DensityPreset.entries, SettingsArtHome.density)
-        check("Hotspots", HotspotPreset.entries, SettingsArtHome.hotspots)
+        check("Music line width", com.bos.sphere.core.data.MusicLineWidth.entries, SettingsArtHome.musicWidth) // wave 59: the Hotspots presets are gone
         check("Corner style", CornerStyle.entries, SettingsArtHome.cornerStyle)
         check("Icon type", CornerIconMode.entries, SettingsArtHome.cornerIcon)
         check("Left page", LeftPage.entries, SettingsArtHome.leftPage)

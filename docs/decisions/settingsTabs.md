@@ -46,3 +46,7 @@ The root list of categories (`OneUiRootPage`, `OneUiCategoryPage`, `OneUiModel.G
 
 ## Undo
 Revert the wave-57 commit: the root list, the category pages and the summary lines come back.
+
+## Superseded in part by wave 59 (glanceTop)
+
+The Hotspots presets (Four, Two (bottom), One, None), the four per-corner hotspot switches and the Home sheet's Hotspots cards are gone: one Hotspots editor (a live miniature of the home; a tap turns a corner on or off, a long press or Edit configures it) is the first block of Settings > Home > Corners and opens from the Home sheet's Hotspots tile. See `docs/decisions/glanceTop.md`.

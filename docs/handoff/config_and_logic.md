@@ -28,7 +28,7 @@ Dispatch (HS:1180 paged grid; HS:622-626 every other surface and Glance):
 |---|---|---|---|---|
 | Pages | chips Off / Paginated / Continuous (QS:102-103) | `homePages` | DUP (SC:303) | launcher_prefs `homePages`; exported |
 | Order | chips Left to right / Right to left (QS:104-105) | `homeOrder` | DUP (SC:268) | `homeOrder`; exported |
-| Hotspots | chips Four / Two (bottom) / One / None (QS:109-113); Custom is not a chip | `glanceHotspots` | DUP (SC:818-828 preset + 4 toggles; page editor Settings tab has 4 toggles too) | `glanceHotspots` CSV of physical corners |
+| Hotspots | wave 59: one Hotspots editor (live miniature, tap a corner on or off, long press or Edit to configure it): Settings > Home > Corners and the Home sheet tile; the presets and per-corner switches are gone | `glanceHotspots` | none (one editor; Studio keeps per-corner checkboxes) | `glanceHotspots` CSV of physical corners |
 | This page (only when Pages = Paginated, Grid style, Glance not on screen) | "Align with top" / "Align with bottom" (QS:132-133) | GLOBAL `gridBias` = 0 or 1 (not per page, despite the heading) | PARTIAL: Settings "Height in page" slider (SC:359) is the same pref | `gridBias` |
 | This page | "Make this home" (QS:134) | `homePage` (index the Home button returns to) | ONLY-HERE | `homePage` |
 | Transition | chips Slide / Fade / Zoom / Cube / Flip / Stack (QS:139-142) | GLOBAL `pageTransition` | ONLY-HERE (no Settings row) | `pageTransition` |

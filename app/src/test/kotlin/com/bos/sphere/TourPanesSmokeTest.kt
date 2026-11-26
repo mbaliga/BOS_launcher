@@ -100,11 +100,12 @@ class TourPanesSmokeTest {
         assertEquals(LeftPage.Off, again.selected); again.onSelect(LeftPage.Launchpad); assertEquals(LeftPage.Launchpad, prefs.leftPage)
     }
 
-    @Test fun HOM_23_theHotspotsRowChangesTheGlanceHotspots() {
-        prefs = LauncherPrefs()
-        @Suppress("UNCHECKED_CAST") val row = item("Hotspots") as SettingItem.Choice<com.bos.sphere.core.data.HotspotPreset>
-        row.onSelect(com.bos.sphere.core.data.HotspotPreset.None); assertTrue(prefs.glanceHotspots.isEmpty())
-        row.onSelect(com.bos.sphere.core.data.HotspotPreset.entries.first { com.bos.sphere.core.data.GlanceHotspots.preset(it)?.size == 4 })
-        assertEquals(4, prefs.glanceHotspots.size)
+    // Wave 59 (glanceTop): the Hotspots row is the editor (Home > Corners): its value is how many are on, its control is the live miniature.
+    @Test fun CFG_77_theHotspotsRowIsTheEditorAndReadsHowManyAreOn() {
+        prefs = LauncherPrefs(glanceHotspots = setOf(com.bos.sphere.core.data.Corner.BottomLeft))
+        val row = item("Hotspots") as SettingItem.Choice<*>
+        assertEquals("1 of 4 on", row.value)
+        assertTrue("the editor is drawn inline", row.preview != null)
+        assertTrue("no preset options", row.options.size == 1)
     }
 }

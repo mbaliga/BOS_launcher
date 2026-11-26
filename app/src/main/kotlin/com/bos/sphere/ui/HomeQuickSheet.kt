@@ -54,7 +54,7 @@ import com.bos.sphere.feature.grid.SettingsArtHome
 
 /**
  * What a long-press on the home screen opens. Wave 34 (homeSheet): styled like the Sound and Vibration sheet (docs/decisions/homeSheet.md): pure black,
- * large top radius, centred title, hairlines, 48 dp targets. Wave 51 (homeMenuVisual): every choice is a drawn card (HomeQuickSheetCards.kt) and three entry tiles (Add apps, Add widgets, Edit home) lead the sheet. It carries only the quick choices (Pages, Order, Hotspots, this page's
+ * large top radius, centred title, hairlines, 48 dp targets. Wave 51 (homeMenuVisual): every choice is a drawn card (HomeQuickSheetCards.kt) and three entry tiles (Add apps, Add widgets, Edit home) lead the sheet. It carries only the quick choices (Pages, Order, the Hotspots tile (wave 59), this page's
  * tools) and two plain rows, Wallpaper and Ground Control. Glance on/off, Add page, Files and the item picker live in Ground Control, Comms
  * and the edit-home mode; the Add apps, Add widgets and Edit home tiles call the same entry points as the edit tray. [page] is null on homes without pages.
  */
@@ -72,13 +72,15 @@ fun HomeQuickSheet(
     onAddWidgets: () -> Unit = {},
     onEditHome: () -> Unit = {},
     onDismiss: () -> Unit,
+    /** Wave 59: the Hotspots tile (the host opens the Hotspots editor as a full page). */
+    onHotspots: () -> Unit = {},
     /** Wave 57 (CFG-48): the profiles for the chip row at the top; null (or one profile) shows no row. */
     profiles: com.bos.sphere.feature.dock.DockWorkspaceState? = null,
     onProfile: (String) -> Unit = {},
 ) {
     // Wave 41: One UI's sheet shape (28 dp top corners and a grabber) through the shared sheet; the black look and the scrim stay.
     com.bos.sphere.feature.grid.OneUiSheet(onDismiss, containerColor = SheetBlack, scrimColor = Color.Black.copy(alpha = 0.62f)) {
-        HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl, onAddApps, onAddWidgets, onEditHome, profiles, onProfile)
+        HomeQuickSheetBody(prefs, update, page, pageCount, onDeletePage, onWallpaper, onGroundControl, onAddApps, onAddWidgets, onEditHome, profiles, onProfile, onHotspots)
     }
 }
 
@@ -101,6 +103,7 @@ internal fun HomeQuickSheetBody(
     onEditHome: () -> Unit = {},
     profiles: com.bos.sphere.feature.dock.DockWorkspaceState? = null,
     onProfile: (String) -> Unit = {},
+    onHotspots: () -> Unit = {},
 ) {
     // HOM-21: the content scrolls, so nothing falls off a short window or a large font.
     Column(Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp).padding(bottom = 16.dp)) {
@@ -126,17 +129,9 @@ internal fun HomeQuickSheetBody(
         Heading(L10n.tr("Order"))
         CardRow { for (o in com.bos.sphere.core.data.HomeOrder.entries) OptionCardArt(o.label, prefs.homeOrder == o, "quick.order.${o.name}", { update { it.copy(homeOrder = o) } }, SettingsArtHome.orderArt(o.rtl)) }
 
-        run {
-            // W38: the hotspots are fixed chrome on every page, so their cards are always here.
-            Heading(L10n.tr("Hotspots"))
-            val hc = com.bos.sphere.core.data.GlanceHotspots.presetOf(prefs.glanceHotspots)
-            CardRow {
-                for (pr in com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }) {
-                    val corners = com.bos.sphere.core.data.GlanceHotspots.preset(pr) ?: emptySet()
-                    OptionCardArt(pr.label, hc == pr, "quick.hotspots.${pr.name}", { update { it.copy(glanceHotspots = corners) } }, SettingsArtHome.hotspotsArt(corners))
-                }
-            }
-        }
+        // Wave 59 (glanceTop): the Hotspots cards (Four, Two, One, None) are gone; one tile opens the Hotspots editor as a full page.
+        Spacer(Modifier.height(18.dp))
+        EntryTile(Glyphs.Dial, "Hotspots", "quick.hotspots", Modifier.fillMaxWidth(), onHotspots)
 
         if (page != null) {
             // HOM-21: this page's rows come from ContextMenus.forHomeSheet, the model touch, right-click and the Menu key share.

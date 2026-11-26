@@ -153,7 +153,7 @@ class PageEditorAppTest {
         val stores = start(glance = true); openEditor(stores)
         rule.onNodeWithTag("pe.glance").performClick(); settle(700)
         rule.onNodeWithTag("pe.glance").assertIsSelected()
-        rule.onNodeWithText("Hotspots").assertIsDisplayed()
+        rule.onNodeWithText("Show music").assertIsDisplayed() // wave 59: the hotspot switches left this tab (the Hotspots editor is the one place)
         assertFalse("the Glance card has no move or delete actions", rule.onNodeWithTag("pe.glance").fetchSemanticsNode().config.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
         rule.onNodeWithTag("pe.page.0").performClick(); settle(700)
         rule.onNodeWithTag("pe.page.0").assertIsSelected()

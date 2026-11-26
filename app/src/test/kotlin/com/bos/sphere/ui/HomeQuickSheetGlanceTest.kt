@@ -78,20 +78,19 @@ class HomeQuickSheetGlanceTest {
         assertEquals(HomeOrder.LeftToRight, seen.prefs.homeOrder)
     }
 
-    @Test fun HOM_23_theQuickSheetHasHotspotsChipsButNoGlanceContentChips() {
+    // Wave 59 (glanceTop): the Hotspots chips became one tile that opens the Hotspots editor.
+    @Test fun HOM_23_theQuickSheetHasAHotspotsTileButNoGlanceContentChipsAndNoPresets() {
         val seen = Seen(); sheet(LauncherPrefs(), seen)
         gone("GLANCE CONTENT")
         for (t in listOf("Time", "Time + Date", "Date + Weather", "Time + Date + Weather")) gone(t)
-        rule.onNodeWithText("HOTSPOTS").performScrollTo().assertExists()
-        for (t in listOf("Four", "Two (bottom)", "One", "None")) rule.onNodeWithText(t).performScrollTo().assertExists()
-        rule.onNodeWithText("Two (bottom)").performScrollTo().performClick()
-        assertEquals(setOf(com.bos.sphere.core.data.Corner.BottomLeft, com.bos.sphere.core.data.Corner.BottomRight), seen.prefs.glanceHotspots)
+        rule.onNodeWithTag("quick.hotspots").performScrollTo().assertExists()
+        for (t in listOf("Four", "Two (bottom)", "One", "None")) gone(t)
     }
 
-    @Test fun GFX_38_theHotspotsChipsStayWithGlanceOffBecauseTheHotspotsAreOnEveryPage() {
+    @Test fun GFX_38_theHotspotsTileStaysWithGlanceOffBecauseTheHotspotsAreOnEveryPage() {
         val seen = Seen(); sheet(LauncherPrefs(glanceEnabled = false), seen)
         gone("GLANCE CONTENT")
-        rule.onNodeWithText("HOTSPOTS").performScrollTo().assertExists()
+        rule.onNodeWithTag("quick.hotspots").performScrollTo().assertExists()
         rule.onNodeWithText("PAGES").assertExists()
     }
 

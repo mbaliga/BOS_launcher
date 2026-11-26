@@ -225,8 +225,10 @@ class GlanceHomeUiTest {
                 onRun = { _, _ -> }, onPrevious = {}, onPlayPause = {}, onNext = {}, modifier = Modifier.fillMaxSize(),
             )
         }
-        for ((preset, n) in listOf(com.bos.sphere.core.data.HotspotPreset.Four to 4, com.bos.sphere.core.data.HotspotPreset.Two to 2, com.bos.sphere.core.data.HotspotPreset.One to 1, com.bos.sphere.core.data.HotspotPreset.None to 0)) {
-            Snapshot.withMutableSnapshot { on.value = GlanceHotspots.preset(preset)!! }
+        // wave 59: plain sets (the presets are gone; the Hotspots editor toggles each corner)
+        val bottom = setOf(com.bos.sphere.core.data.Corner.BottomLeft, com.bos.sphere.core.data.Corner.BottomRight)
+        for ((preset, n) in listOf(GlanceHotspots.ALL to 4, bottom to 2, setOf(com.bos.sphere.core.data.Corner.BottomRight) to 1, emptySet<com.bos.sphere.core.data.Corner>() to 0)) {
+            Snapshot.withMutableSnapshot { on.value = preset }
             rule.waitForIdle()
             assertEquals("$preset on the focus graph", n, LauncherInput.focus.nodes().count { it.id.startsWith("minimal.corner.") })
             assertEquals("$preset in the semantics", n, rule.onAllNodesWithContentDescription("hotspot", substring = true).fetchSemanticsNodes().size)

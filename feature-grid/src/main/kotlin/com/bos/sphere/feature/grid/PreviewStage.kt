@@ -78,6 +78,9 @@ class PreviewSurfaces(
     val dock: (@Composable (LauncherPrefs) -> Unit)? = null,
     /** The dock's own words for the screen reader ("Standard, Bottom"): its settings are not in [LauncherPrefs]. */
     val dockDetail: @Composable () -> String? = { null },
+    /** Wave 59: whether a hotspot is drawn in the top-left and top-right screen corners (the music line's room), and whether something plays now. */
+    val topDrawn: () -> Pair<Boolean, Boolean> = { true to true },
+    val mediaPlaying: () -> Boolean = { false },
 )
 
 /** Test tags of the stage: one per topic, on the layer that draws it. */
@@ -121,6 +124,9 @@ object PreviewText {
 
 /** The sample data of the sandboxes: no network, no private content. */
 object PreviewSamples {
+    /** Wave 59: the sample now-playing line the Glance topic draws while the music line's width is set and nothing plays (long enough to scroll). */
+    val MUSIC = com.bos.sphere.core.data.MediaInfo("Sample song with a long title that scrolls", "Sample artist", "", playing = true, canPrev = true, canNext = true)
+
     /** A two-letter query from the real app list, so the results are the user's own apps. */
     fun query(apps: List<AppEntry>): String = apps.firstOrNull { it.label.trim().length >= 3 }?.label?.trim()?.take(2)?.lowercase() ?: "ma"
 
@@ -199,8 +205,19 @@ internal fun PreviewStageContent(capture: HomeCapture, subject: PreviewSubject, 
                         PreviewSandbox(hw, hh) { PreviewGlanceBackdrop(prefs); f(prefs) }
                     } else { CaptureLayer(capture, home = false); g() }
                     if (subject.corner != null) CornerMarks(subject.corner, reduced, prefs.glanceHotspots)
+                    // Wave 59 (CFG-76): the music line's width is being set and nothing plays: the real fixed chrome draws a sample title over the picture.
+                    if (subject.music && surfaces != null && !surfaces.mediaPlaying()) {
+                        val (tl, tr) = surfaces.topDrawn()
+                        PreviewSandbox(hw, hh) {
+                            FixedHomeChrome(
+                                media = PreviewSamples.MUSIC, showMusic = true, controlsSeconds = prefs.glanceControlsSeconds, onPrevious = {}, onPlayPause = {}, onNext = {},
+                                topLeftHotspot = tl, topRightHotspot = tr, musicWidth = prefs.musicLineWidth,
+                            )
+                        }
+                        Badge(L10n.tr("Sample"), Modifier.align(Alignment.TopEnd))
+                    }
                 }
-                PreviewTopic.Corners -> { CaptureLayer(capture, home = true); CornerMarks(subject.corner, reduced, Corner.entries.toSet()) }
+                PreviewTopic.Corners -> { CaptureLayer(capture, home = true); CornerMarks(subject.corner, reduced, prefs.glanceHotspots) } // wave 59: the hotspots that are on, the editor's selected corner pulsing
                 PreviewTopic.Gestures -> { CaptureLayer(capture, home = true); GestureHint(subject.gesture, reduced) }
                 PreviewTopic.Dock -> sandboxed(surfaces?.dock)?.let { CaptureLayer(capture, home = false); it() } ?: CaptureLayer(capture, home = true)
                 PreviewTopic.Radar -> sandboxed(surfaces?.radar)?.let { CaptureLayer(capture, home = false); it() } ?: CaptureLayer(capture, home = true)

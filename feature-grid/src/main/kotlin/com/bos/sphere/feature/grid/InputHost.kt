@@ -269,6 +269,9 @@ fun Modifier.launcherItem(
     /** Reports keyboard focus gained or lost to an item that draws its own outline. */
     onFocusState: ((Boolean) -> Unit)? = null,
 ): Modifier = composed {
+    // Wave 59: a picture composed in a preview sandbox (the Hotspots editor's miniature, the Settings Preview) is no focus node: it must never take
+    // (and on leaving, drop) the real home's ids in the focus graph.
+    if (com.bos.sphere.core.design.LocalPreviewSandbox.current) return@composed this
     val requester = remember { FocusRequester() }
     val modeState = LocalInputMode.current
     val ambientLayer = LocalFocusLayer.current

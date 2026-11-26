@@ -247,10 +247,7 @@ private fun SettingsContent(page: Int?, pageCount: Int, prefs: LauncherPrefs, ac
         } else {
             Text(L10n.tr("Glance"), color = HyleColors.InkBright, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             ToggleRow(L10n.tr("Show music"), prefs.showMusic, { v -> actions.onPrefs { it.copy(showMusic = v) } }) // wave 38: the clock, date and weather are gone; the music line is the one toggle
-            Text(L10n.tr("Hotspots"), color = HyleColors.InkDim, fontSize = 12.sp)
-            Corner.entries.forEach { c ->
-                ToggleRow(L10n.tr(c.label), c in prefs.glanceHotspots, { v -> actions.onPrefs { it.copy(glanceHotspots = if (v) it.glanceHotspots + c else it.glanceHotspots - c) } })
-            }
+            // Wave 59 (glanceTop): the hotspot switches left this tab; the Hotspots editor (Settings, Home, Corners, or the Home sheet's tile) is the one place.
         }
     }
 }

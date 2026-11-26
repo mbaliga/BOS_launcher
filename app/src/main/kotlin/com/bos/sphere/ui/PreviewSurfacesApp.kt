@@ -33,6 +33,9 @@ internal fun rememberPreviewSurfaces(
     puckSegments: Int,
     puckLabels: Boolean,
     homeOnGlance: () -> Boolean,
+    /** Wave 59: the music line's room (a hotspot drawn at the top left / right) and whether something plays (else the Preview draws a sample line). */
+    topDrawn: () -> Pair<Boolean, Boolean> = { true to true },
+    mediaPlaying: () -> Boolean = { false },
 ): PreviewSurfaces {
     val context = LocalContext.current
     val landscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -41,6 +44,8 @@ internal fun rememberPreviewSurfaces(
     val ring = rememberUpdatedState(Triple(puckSlots, puckSegments, puckLabels))
     val byKey = rememberUpdatedState(appsByKey)
     val onGlance = rememberUpdatedState(homeOnGlance)
+    val drawnNow = rememberUpdatedState(topDrawn)
+    val playingNow = rememberUpdatedState(mediaPlaying)
     val manager = remember(context) { WorkspaceRepository.get(context) }
     return remember(manager, landscape) {
         PreviewSurfaces(
@@ -58,6 +63,7 @@ internal fun rememberPreviewSurfaces(
                 DockPreviewStage(manager, panel, landscape)
             },
             dockDetail = { dockPreviewDetail(manager, landscape) },
+            topDrawn = { drawnNow.value() }, mediaPlaying = { playingNow.value() },
         )
     }
 }

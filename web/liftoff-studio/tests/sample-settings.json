@@ -97,6 +97,7 @@
     "cornerIconSize": 32,
     "wheelWorkOnly": false,
     "badgeCount": true,
+    "musicLineWidth": "FitAroundCorners",
     "searchMotion": true,
     "pPaging": "Horizontal",
     "wpPagesPicDim": 0,

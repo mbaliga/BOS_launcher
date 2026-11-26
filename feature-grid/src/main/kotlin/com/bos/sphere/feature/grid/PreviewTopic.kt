@@ -29,7 +29,11 @@ enum class PreviewTopic(val label: String) {
 }
 
 /** A topic plus what inside it is being configured: the corner that pulses, the gesture whose hint plays. */
-data class PreviewSubject(val topic: PreviewTopic, val corner: Corner? = null, val gesture: HomeGesture? = null) {
+data class PreviewSubject(
+    val topic: PreviewTopic, val corner: Corner? = null, val gesture: HomeGesture? = null,
+    /** Wave 59: the music line is what is configured (its width): the Glance topic draws it, with a sample title when nothing plays. */
+    val music: Boolean = false,
+) {
     companion object {
         val HOME = PreviewSubject(PreviewTopic.Home)
         val NONE = PreviewSubject(PreviewTopic.None)
@@ -37,7 +41,7 @@ data class PreviewSubject(val topic: PreviewTopic, val corner: Corner? = null, v
 }
 
 /** Declares what the Preview shows while this row is configured (overrides [PreviewTopics]). */
-fun <T : SettingItem> T.previewTopic(topic: PreviewTopic, corner: Corner? = null, gesture: HomeGesture? = null): T { meta.previewTopic = PreviewSubject(topic, corner, gesture); return this }
+fun <T : SettingItem> T.previewTopic(topic: PreviewTopic, corner: Corner? = null, gesture: HomeGesture? = null, music: Boolean = false): T { meta.previewTopic = PreviewSubject(topic, corner, gesture, music); return this }
 
 /**
  * CFG-50: the one table that maps settings to Preview topics. Resolution of a row, first match wins:
@@ -92,7 +96,8 @@ object PreviewTopics {
         "Clock colour" to PreviewTopic.Glance,
         "Clock size" to PreviewTopic.Glance,
         "Show music" to PreviewTopic.Glance,
-        "Hotspots" to PreviewTopic.Glance,
+        "Hotspots" to PreviewTopic.Corners, // wave 59: the Hotspots editor (Home > Corners); its selected corner pulses
+        "Music line width" to PreviewTopic.Glance,
         "Controls hide after (seconds)" to PreviewTopic.Glance,
         "Surface indicator" to PreviewTopic.Glance,
         "Right side" to PreviewTopic.Home,
@@ -188,6 +193,9 @@ class PreviewFocusState {
 
     /** A row of the current page was touched, focused or changed. */
     fun onRow(item: SettingItem) { rowSubject = PreviewTopics.forRow(category, item) }
+
+    /** Wave 59: a row that knows exactly what it configures (the Hotspots editor's selected corner) says so. */
+    fun onSubject(s: PreviewSubject) { rowSubject = s }
 }
 
 /** Provided by [SettingsSpace] around the settings and the Preview window; null outside Settings. */

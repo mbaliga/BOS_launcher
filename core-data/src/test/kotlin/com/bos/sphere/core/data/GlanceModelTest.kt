@@ -21,13 +21,8 @@ class GlanceModelTest {
     }
 
     // ---- hotspots
-    @Test fun HOM_23_hotspotPresetsAreFourTwoOneNone() {
-        assertEquals(4, GlanceHotspots.preset(HotspotPreset.Four)!!.size)
-        assertEquals(setOf(Corner.BottomLeft, Corner.BottomRight), GlanceHotspots.preset(HotspotPreset.Two))
-        assertEquals(1, GlanceHotspots.preset(HotspotPreset.One)!!.size)
-        assertEquals(emptySet<Corner>(), GlanceHotspots.preset(HotspotPreset.None))
-        for (p in HotspotPreset.entries.filter { it != HotspotPreset.Custom }) assertEquals(p, GlanceHotspots.presetOf(GlanceHotspots.preset(p)!!))
-        assertEquals(HotspotPreset.Custom, GlanceHotspots.presetOf(setOf(Corner.TopLeft, Corner.BottomRight, Corner.TopRight)))
+    // Wave 59 (glanceTop): the presets are gone (the Hotspots editor toggles each corner); the default is still all four.
+    @Test fun HOM_23_allFourHotspotsAreOnByDefault() {
         assertEquals(GlanceHotspots.ALL, LauncherPrefs().glanceHotspots)
     }
 

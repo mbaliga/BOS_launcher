@@ -13,11 +13,9 @@ import com.bos.sphere.core.data.Corner
 import com.bos.sphere.core.data.CornerIconMode
 import com.bos.sphere.core.data.CornerStyle
 import com.bos.sphere.core.data.DensityPreset
-import com.bos.sphere.core.data.GlanceHotspots
 import com.bos.sphere.core.data.HomeOrder
 import com.bos.sphere.core.data.HomePages
 import com.bos.sphere.core.data.HomeStyle
-import com.bos.sphere.core.data.HotspotPreset
 import com.bos.sphere.core.data.LeftPage
 import com.bos.sphere.core.data.PageMode
 import com.bos.sphere.core.data.PageShape
@@ -44,7 +42,7 @@ object SettingsArtHome {
     val paging = ArtSet(PagingAxis.entries) { pagingArt(it) }
     val scrollAxis = ArtSet(ScrollAxis.entries) { scrollAxisArt(it) }
     val density = ArtSet(DensityPreset.entries) { densityArt(it) }
-    val hotspots = ArtSet(HotspotPreset.entries) { hotspotsPresetArt(it) }
+    val musicWidth = ArtSet(com.bos.sphere.core.data.MusicLineWidth.entries) { musicWidthArt(it) }
     val cornerStyle = ArtSet(CornerStyle.entries) { cornerStyleArt(it) }
     val cornerIcon = ArtSet(CornerIconMode.entries) { cornerIconArt(it) }
     val leftPage = ArtSet(LeftPage.entries) { leftPageArt(it) }
@@ -110,7 +108,24 @@ object SettingsArtHome {
         }
     }
 
-    private fun hotspotsPresetArt(p: HotspotPreset): VisualArt = hotspotsArt(GlanceHotspots.preset(p) ?: setOf(Corner.TopLeft, Corner.BottomRight))
+    /**
+     * Wave 59 (glanceTop): Music line width. Fit around corners: the line between the two top corner dots; Full width: the line runs edge to edge and the
+     * dots sit over its faded ends.
+     */
+    fun musicWidthArt(w: com.bos.sphere.core.data.MusicLineWidth): VisualArt = { ink ->
+        val (o, sz) = phoneFrame(ink)
+        val inset = dp(6f); val r = dp(3.4f); val y = o.y + inset
+        val full = w == com.bos.sphere.core.data.MusicLineWidth.FullWidth
+        val x0 = if (full) o.x + dp(3f) else o.x + inset + dp(7f)
+        val x1 = if (full) o.x + sz.width - dp(3f) else o.x + sz.width - inset - dp(7f)
+        val f = if (full) dp(9f) else 0f
+        drawLine(ink.strong, Offset(x0 + f, y), Offset(x1 - f, y), dp(2f))
+        if (full) {
+            drawLine(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color.Transparent, ink.strong), x0, x0 + f), Offset(x0, y), Offset(x0 + f, y), dp(2f))
+            drawLine(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(ink.strong, Color.Transparent), x1 - f, x1), Offset(x1 - f, y), Offset(x1, y), dp(2f))
+        }
+        drawCircle(ink.soft, r, Offset(o.x + inset, y)); drawCircle(ink.soft, r, Offset(o.x + sz.width - inset, y))
+    }
 
     // ---- Right side: the panel, the dock rail, nothing --------------------------------------------------------------------------------------------
 

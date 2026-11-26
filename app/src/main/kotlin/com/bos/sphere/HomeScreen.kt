@@ -1577,10 +1577,17 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
         val setupState = com.bos.sphere.ui.rememberSetupState(corners, gestures, active = settingsOpen) // wave 56 (CFG-26): the Finish setup row
         remember(context) { com.bos.sphere.core.data.LauncherHapticSettings.init(context); true }
         val hapticStrength by com.bos.sphere.core.data.LauncherHapticSettings.strength.collectAsState() // wave 57 (CFG-43): System > Sound and haptics
-        val categories = remember(setupState, hapticStrength, hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsPrefs, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels) {
+        // Wave 58 (CFG-67): the apps offering a Radar search provider, read when Settings opens, so the search finds them inside their pane.
+        val searchProviders = remember(settingsOpen) {
+            if (!settingsOpen) emptyList() else runCatching {
+                com.bos.sphere.feature.search.palette.ThirdPartyProviders.discover(context, com.bos.sphere.feature.search.palette.PaletteHost.get(context).prefs.approvedSources()).map { it.packageName to it.label }
+            }.getOrDefault(emptyList())
+        }
+        val categories = remember(setupState, hapticStrength, hiddenAppsAccess, prefs, pages, layout, apps, corners, gestures, settingsPage, isLandscape, leftWidgetName, actionAppsRev, capabilityRows, labEntries.map { it.result }, commsScalePct, commsDefaultView, commsPrefs, commsClearShade, commsWidgetsOn, commsWidgetsSlot, legacyAvailable, puckSegments, puckLabels, searchProviders) {
             buildSettingsCategories(
             SettingsModel(
                 setup = setupState,
+                searchProviders = searchProviders,
                 selectPage = { i -> settingsPage = i.coerceIn(0, (pages.size - 1).coerceAtLeast(0)) }, // wave 57 (CFG-44): the page list of Home > Pages
                 haptic = hapticStrength,
                 hiddenApps = hiddenAppsAccess,

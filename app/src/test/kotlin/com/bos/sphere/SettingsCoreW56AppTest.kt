@@ -267,8 +267,8 @@ class SettingsCoreW56AppTest {
         assertNull(reason(LauncherPrefs(adaptiveGrid = true), "Grid density"))
         assertEquals("Notification badges are off", reason(LauncherPrefs(badgesOn = false), "Count in badges"))
         assertEquals("Needs the DSi home style", reason(LauncherPrefs(homeStyle = HomeStyle.Grid), "Scroll direction"))
-        assertEquals("The PSP bar has a fixed icon size", reason(LauncherPrefs(homeStyle = HomeStyle.Psp), "Icon size"))
-        assertEquals("Pages use the same wallpaper as Glance", reason(LauncherPrefs(pagesSameAsGlance = true), "Pages wallpaper"))
+        assertEquals("Fixed on the PSP bar", reason(LauncherPrefs(homeStyle = HomeStyle.Psp), "Icon size")) // wave 58: the help diet's short reasons
+        assertEquals("Same as Glance", reason(LauncherPrefs(pagesSameAsGlance = true), "Pages wallpaper"))
         assertNull(reason(LauncherPrefs(pagesSameAsGlance = false), "Pages wallpaper"))
     }
 
@@ -278,7 +278,7 @@ class SettingsCoreW56AppTest {
             LauncherPrefs(homeStyle = HomeStyle.Dsi), LauncherPrefs(clockStyle = ClockStyle.Off), LauncherPrefs(hotCornersOn = false), LauncherPrefs(adaptiveGrid = true),
         )
         // Wave 57: the sections come from the tab placement; the Home tab keeps all eight in every state.
-        for (p in variants) assertEquals("Home sections with $p", 8, OneUiSections.headers(home(p)).size)
+        for (p in variants) assertEquals("Home sections with $p", 7, OneUiSections.headers(home(p)).size) // wave 58: Dock and External displays are one section
     }
 
     @Test fun CFG_31_theRowIdsAreUniqueAndAssigned() {

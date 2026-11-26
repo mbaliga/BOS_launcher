@@ -44,7 +44,7 @@ fun FolderGrantsPane() {
     }
     Column {
         Text(L10n.tr("Radar finds files in photos, video and audio you allow, and in the folders you add here. Only the folders you pick are read."), color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(vertical = 6.dp))
-        ActionRow(label = L10n.tr("Add a folder"), summary = L10n.tr("Opens the system folder picker"), onClick = { picker.launch(FileGrants.pickerIntent()) })
+        ActionRow(label = L10n.tr("Add a folder"), summary = L10n.tr("Opens the system folder picker"), flashId = "folders.add", onClick = { picker.launch(FileGrants.pickerIntent()) })
         trees.forEach { t ->
             ActionRow(label = Uri.decode(t.lastPathSegment.orEmpty()).substringAfter(':').ifEmpty { t.toString() }, summary = L10n.tr("Tap to stop searching this folder"), onClick = {
                 FileGrants.release(context, t); trees = FileGrants.trees(context)
@@ -52,7 +52,7 @@ fun FolderGrantsPane() {
                 scope.launch { withContext(Dispatchers.IO) { FileIndexer.reconcile(context) } }
             })
         }
-        ActionRow(label = L10n.tr("Update the file index now"), summary = status.ifEmpty { L10n.tr("%s files indexed", FileIndexHolder.get(context).size()) }, onClick = {
+        ActionRow(label = L10n.tr("Update the file index now"), summary = status.ifEmpty { L10n.tr("%s files indexed", FileIndexHolder.get(context).size()) }, flashId = "folders.reindex", onClick = {
             status = L10n.tr("Indexing…")
             scope.launch { withContext(Dispatchers.IO) { FileIndexer.reconcile(context) }; status = L10n.tr("%s files indexed", FileIndexHolder.get(context).size()) }
         })
@@ -67,7 +67,7 @@ fun SearchHistoryPane() {
     var aliases by remember { mutableStateOf(PaletteHost.aliases(context)) }
     Column {
         Text(L10n.tr("Radar ranks the things you pick more often higher. This is kept on this device only and never sent anywhere."), color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(vertical = 6.dp))
-        ActionRow(label = L10n.tr("Forget what Radar learned"), summary = if (done) L10n.tr("Forgotten") else null, onClick = { RadarLearning.forget(context); done = true })
+        ActionRow(label = L10n.tr("Forget what Radar learned"), summary = if (done) L10n.tr("Forgotten") else null, flashId = "history.forget", onClick = { RadarLearning.forget(context); done = true })
         aliases.entries.sortedBy { it.value.lowercase() }.forEach { (pkg, alias) ->
             ActionRow(label = alias, summary = pkg + " · " + L10n.tr("Tap to remove this alias"), onClick = { PaletteHost.setAlias(context, pkg, ""); aliases = PaletteHost.aliases(context) })
         }
@@ -85,7 +85,7 @@ fun SearchProvidersPane() {
         Text(L10n.tr("Apps can offer search results to Radar through a read-only provider that uses the READ_SEARCH permission. Only the ones you switch on are asked, and only after you type."), color = HyleColors.InkDim, fontSize = 11.5.sp, modifier = Modifier.padding(vertical = 6.dp))
         if (found.isEmpty()) Text(L10n.tr("No app offers one right now."), color = HyleColors.Ink, fontSize = 14.sp, modifier = Modifier.padding(vertical = 8.dp))
         found.forEach { c ->
-            ActionRow(label = c.label, summary = if (c.approved) L10n.tr("On: tap to turn off") else L10n.tr("Off: tap to turn on"), selected = c.approved, onClick = {
+            ActionRow(label = c.label, summary = if (c.approved) L10n.tr("On: tap to turn off") else L10n.tr("Off: tap to turn on"), selected = c.approved, flashId = "providers.${c.packageName}", onClick = {
                 prefs.setApproved(c.packageName, !c.approved); approved = prefs.approvedSources()
             })
         }

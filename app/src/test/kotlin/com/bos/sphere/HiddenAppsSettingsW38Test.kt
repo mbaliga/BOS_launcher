@@ -46,7 +46,7 @@ class HiddenAppsSettingsW38Test {
         val apps = c.first { it.title == "Apps" }
         val i = apps.items.indexOfFirst { it.title == "Hidden apps" }
         assertTrue("a Hidden apps row: ${apps.items.map { it.title }}", i > 0)
-        assertEquals("Hidden apps", apps.headers[i])
+        assertEquals("Hidden and default apps", apps.headers[i]) // wave 58 (CFG-69): the header no longer repeats the row title
         val row = apps.items[i] as SettingItem.Pane
         assertEquals("2 hidden", row.value)
     }

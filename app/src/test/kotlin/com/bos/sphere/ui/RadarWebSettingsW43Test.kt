@@ -15,7 +15,9 @@ class RadarWebSettingsW43Test {
         val engine = radar.indexOf("x(\"Web engine\")"); val results = radar.indexOf("x(\"Web results\")"); val sugg = radar.indexOf("x(\"Web suggestions\")")
         assertTrue(engine in 0 until results && results < sugg && sugg - engine < 2500)
         assertTrue(radar.contains("p.webSuggestions") && radar.contains("copy(webSuggestions = v)"))
-        assertTrue("the hint names the engine and the Play Store", radar.contains("Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions."))
+        // Wave 58 (CFG-65): the row's line names the engine in a few words; the Play Store is named in the Web section's note line.
+        assertTrue("the hint names the engine", radar.contains("Sends what you type to %s"))
+        assertTrue("the Web section names the Play Store", text("app/src/main/kotlin/com/bos/sphere/ui/SettingsTabLayout.kt").contains("Suggestions also send your typing to the Play Store."))
         assertTrue(radar.contains("WebEngine.entries"))
     }
 

@@ -200,6 +200,8 @@ data class SettingCategory(
     val title: String, val glyph: ImageVector, val items: List<SettingItem>, val reset: (() -> Unit)? = null,
     /** Wave 57 (CFG-40): the grey section headers of the page: item index to the translated header shown above that row. */
     val headers: Map<Int, String> = emptyMap(),
+    /** Wave 58 (CFG-65): a short line under some headers (same keys as [headers]): the help that left the rows' grey lines (the help diet). */
+    val notes: Map<Int, String> = emptyMap(),
 )
 
 /**

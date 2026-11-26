@@ -207,6 +207,8 @@ class CommsOptionsW29Test {
         assertTrue("'Default view' composes (font $font rtl $rtl)", n.isNotEmpty())
         assertTrue("the Default view row is at least 48 dp: ${n[0].boundsInRoot.height / d}", n[0].boundsInRoot.height / d >= 47.5f)
         shoot("w29-comms-settings-font${font.toInt()}${if (rtl) "-rtl" else ""}")
+        // Wave 58: shorter grey lines bring Read history into the list's prefetch range, where it is composed but not placed; scroll it into view first.
+        rule.onNodeWithTag(com.bos.sphere.feature.grid.SettingsTabTags.list("Side panel")).performScrollToNode(hasText("Read history", substring = true)); rule.waitForIdle()
         val reads = rule.onAllNodes(hasText("Read history", substring = true)).fetchSemanticsNodes()
         if (reads.isNotEmpty()) assertTrue("an action row is at least 48 dp: ${reads[0].boundsInRoot.height / d}", reads[0].boundsInRoot.height / d >= 47.5f)
     }

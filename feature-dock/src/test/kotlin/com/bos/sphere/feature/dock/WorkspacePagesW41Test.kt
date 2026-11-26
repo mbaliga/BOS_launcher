@@ -373,8 +373,6 @@ class WorkspacePagesW41Test {
 
     @Test fun DCK_04_page_31_theSwitchesAndTheCardsChangeTheDock() {
         val m = manager(); showDock(m)
-        rule.onNodeWithTag(DockPageTags.SHOW_DOCK).performScrollTo().performClick(); settle()
-        assertEquals(false, m.current.dock.enabled)
         rule.onNodeWithTag(DockOptionTags.position(DockEdge.Right)).performScrollTo().performClick(); settle()
         assertEquals(DockEdge.Right, m.current.dock.edge)
         rule.onNodeWithTag(DockOptionTags.mode(DockMode.Collapsed)).performScrollTo().performClick(); settle()
@@ -384,6 +382,9 @@ class WorkspacePagesW41Test {
         val shelf = m.current.dock.groupShelf
         rule.onNodeWithTag(DockOptionTags.GROUP_SHELF).performScrollTo().performClick(); settle()
         assertEquals(!shelf, m.current.dock.groupShelf)
+        // Wave 58 (CFG-66): the dock is switched off last; with it off the options above are dimmed and take no touch.
+        rule.onNodeWithTag(DockPageTags.SHOW_DOCK).performScrollTo().performClick(); settle()
+        assertEquals(false, m.current.dock.enabled)
         rule.onNodeWithTag("dock.useDefault").performScrollTo().performClick(); settle()
         assertNull(m.current.dock.enabled)
     }

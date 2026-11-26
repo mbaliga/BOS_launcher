@@ -43,7 +43,7 @@ class CalmStyleRowsW55Test {
         val row = choice<CalmStyle>("Calm style")
         assertEquals(listOf("Off", "Regular", "Edge dots", "Corner bloom", "Bottom glow", "Edge beam"), row.options.map { row.label(it) })
         assertEquals("a Signal wallpaper with nothing chosen shows Edge dots", CalmStyle.EdgeDots, row.selected)
-        assertTrue(row.hint!!.contains("never cover your wallpaper"))
+        assertNull("wave 58 (CFG-65): the cards show the styles; \"never cover your wallpaper\" is the Calm styles section note", row.hint)
         row.onSelect(CalmStyle.CornerBloom); assertEquals(CalmStyle.CornerBloom, prefs.calmStyle)
         row.onSelect(CalmStyle.Regular); assertEquals(CalmStyle.Regular, prefs.calmStyle)
         row.onSelect(CalmStyle.None); assertEquals(CalmStyle.None, prefs.calmStyle)
@@ -52,11 +52,13 @@ class CalmStyleRowsW55Test {
     @Test fun PAL_24_w55_aPictureWallpaperWithNothingChosenShowsOffAndNoRegularSwitch() {
         prefs = prefs.withWallpaper(WallpaperSurface.Glance, prefs.wallpaper(WallpaperSurface.Glance).copy(kind = WallpaperKind.Picture))
         assertEquals(CalmStyle.None, choice<CalmStyle>("Calm style").selected)
-        assertTrue("no ambient style: no switch", items().none { it.title == "Also show regular battery and signal" })
+        // Wave 58 (CFG-66): no ambient style: the switch stays, dimmed, with the reason (it was absent before).
+        assertEquals("Calm style is Off", items().first { it.title == "Also show regular battery and signal" }.meta.disabledReason)
     }
 
     @Test fun PAL_24_w55_theRegularSwitchAppearsOnlyBesideAnAmbientStyle() {
-        fun has() = items().any { it.title == "Also show regular battery and signal" }
+        // Wave 58 (CFG-66): the switch is always listed; it can be used only beside an ambient style, otherwise it is dimmed with the reason.
+        fun has() = items().first { it.title == "Also show regular battery and signal" }.meta.disabledReason == null
         prefs = prefs.copy(calmStyle = CalmStyle.None); assertTrue(!has())
         prefs = prefs.copy(calmStyle = CalmStyle.Regular); assertTrue("Regular alone is the regular indicators already", !has())
         for (s in CalmStyle.entries.filter { it.ambient }) {

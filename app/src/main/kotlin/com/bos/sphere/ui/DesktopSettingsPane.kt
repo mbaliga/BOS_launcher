@@ -36,6 +36,8 @@ import com.bos.sphere.feature.grid.OneUiRowDivider
 import com.bos.sphere.feature.grid.OneUiValueRow
 import com.bos.sphere.feature.grid.SettingCategory
 import com.bos.sphere.feature.grid.SettingItem
+import com.bos.sphere.feature.grid.PaneEntry
+import com.bos.sphere.feature.grid.paneEntries
 import kotlinx.coroutines.launch
 
 /**
@@ -47,7 +49,7 @@ fun desktopCategory(): SettingCategory = SettingCategory(
     Glyphs.Apps,
     listOf(
         SettingItem.Pane(L10n.tr("Dock"), Glyphs.Apps, L10n.tr("Show, mode, position, apps"), bare = true) { DockSettingsPane(DockPaneKind.Dock) },
-        SettingItem.Pane(L10n.tr("App groups"), Glyphs.Apps, L10n.tr("Open several apps together, sessions, schedules"), bare = true) { DockSettingsPane(DockPaneKind.Groups) },
+        SettingItem.Pane(L10n.tr("App groups"), Glyphs.Apps, L10n.tr("Apps that open together"), bare = true) { DockSettingsPane(DockPaneKind.Groups) },
         SettingItem.Pane(L10n.tr("Dock and external display"), Glyphs.Apps, L10n.tr("Offer, disconnect, per-display profiles"), bare = true) { DesktopPane() },
     ),
 )
@@ -61,9 +63,17 @@ fun profilesCategory(): SettingCategory = SettingCategory(
     Glyphs.Home,
     listOf(
         SettingItem.Pane(
-            L10n.tr("Profiles"), Glyphs.Home, L10n.tr("Named setups like Work, Calm and Desk to switch between"), bare = true,
+            L10n.tr("Profiles"), Glyphs.Home, L10n.tr("Work, Calm, Desk and your own"), bare = true,
             pageSubtitle = { WorkspaceSummary.activeLine(WorkspaceRepository.get(LocalContext.current).state.collectAsState().value) },
-        ) { DockSettingsPane(DockPaneKind.Workspaces) }.keywords("workspace", "workspaces"),
+        ) { DockSettingsPane(DockPaneKind.Workspaces) }.keywords("workspace", "workspaces")
+            // Wave 58 (CFG-67): the page's rows are search entries; ProfilesContent draws them with the same ids.
+            .paneEntries(
+                PaneEntry(SettingsRowMeta.PaneIds.PROFILES_NEW, L10n.tr("New profile"), listOf("add profile", "create profile", "workspace")),
+                PaneEntry(SettingsRowMeta.PaneIds.PROFILES_LIST, L10n.tr("Your profiles"), listOf("switch profile", "rename profile", "duplicate", "delete profile")),
+                PaneEntry(SettingsRowMeta.PaneIds.PROFILES_SUGGESTIONS, L10n.tr("Suggested app groups"), listOf("work apps", "personal apps", "suggestions")),
+                PaneEntry(SettingsRowMeta.PaneIds.PROFILES_CALM, L10n.tr("What the calm centre shows"), listOf("calm centre", "notifications per profile")),
+                PaneEntry(SettingsRowMeta.PaneIds.PROFILES_RADAR_ACTIONS, L10n.tr("Radar actions"), listOf("pinned actions", "profile actions")),
+            ),
     ),
 )
 

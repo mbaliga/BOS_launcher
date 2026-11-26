@@ -38,7 +38,8 @@ object OneUiModel {
     // ---- category pages ---------------------------------------------------------------------------------------------------------
 
     sealed interface Block {
-        data class Header(val text: String) : Block
+        /** [note]: wave 58 (CFG-65), the section's one-line note under the header, if it has one. */
+        data class Header(val text: String, val note: String? = null) : Block
         /** Indices (into the category's items) of the rows of one group. */
         data class Group(val rows: List<Int>) : Block
     }
@@ -52,13 +53,13 @@ object OneUiModel {
      * Cuts [items] into groups: a new group starts at every [headers] entry (item index to header text, the header is emitted first), where
      * the rows change from controls (switches, choices, sliders) to links (actions, panes), and around a row of preview cards.
      */
-    fun blocks(items: List<SettingItem>, headers: Map<Int, String> = emptyMap()): List<Block> {
+    fun blocks(items: List<SettingItem>, headers: Map<Int, String> = emptyMap(), notes: Map<Int, String> = emptyMap()): List<Block> {
         val out = ArrayList<Block>()
         var cur = ArrayList<Int>()
         fun flush() { if (cur.isNotEmpty()) { out += Block.Group(cur); cur = ArrayList() } }
         items.forEachIndexed { i, it ->
             val h = headers[i]
-            if (h != null) { flush(); out += Block.Header(h) }
+            if (h != null) { flush(); out += Block.Header(h, notes[i]) }
             else if (cur.isNotEmpty()) {
                 val prev = items[cur.last()]
                 if (isRail(it) || isRail(prev) || navigates(it) != navigates(prev)) flush()

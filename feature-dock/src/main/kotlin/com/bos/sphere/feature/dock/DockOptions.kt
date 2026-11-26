@@ -10,6 +10,7 @@ import com.bos.sphere.core.data.DockStyle
 import com.bos.sphere.core.design.HyleColors
 import com.bos.sphere.core.design.L10n
 import com.bos.sphere.feature.grid.OneUiCaption
+import com.bos.sphere.feature.grid.OneUiDisabledBlock
 import com.bos.sphere.feature.grid.OneUiGap
 import com.bos.sphere.feature.grid.OneUiGroup
 import com.bos.sphere.feature.grid.OneUiGroupTitle
@@ -36,6 +37,8 @@ class DockOptionsScope(
     val canHide: Boolean = true,
     /** The Desktop item's pin, or null where the item is not offered. */
     val desktopPin: DockItemRef? = null,
+    /** Wave 58 (CFG-66): why the dock cannot be switched off here (translated); the Show the dock row then stays, dimmed, with it. Null = "Always shown here". */
+    val forcedReason: String? = null,
 )
 
 /**
@@ -50,32 +53,38 @@ internal fun DockOptionsBody(manager: WorkspaceManager, tier: Tier, scope: DockO
     val dock = state.dock
     val ink = HyleColors.InkDim
     val accent = HyleColors.Violet
+    // Wave 58 (CFG-66): with the dock off its options stay on the page, dimmed, with the reason (they apply when it is switched back on).
+    val off = DockOptionRules.offReason(dock.isEnabled(tier), scope.canHide)?.let { L10n.tr(it) }
 
     OneUiGroupTitle(L10n.tr("Dock style"))
-    OneUiGroup(1) {
-        DockCardRow {
-            DockStyle.entries.forEach { s ->
-                DockOptionCard(L10n.tr(s.label), dock.style == s, DockOptionTags.style(s), { manager.setDock { it.copy(style = s) } }, width = DockCardTokens.StyleWidth) { _ -> DockStylePreview(s) }
+    OneUiDisabledBlock(off, L10n.tr("Dock style")) {
+        OneUiGroup(1) {
+            DockCardRow {
+                DockStyle.entries.forEach { s ->
+                    DockOptionCard(L10n.tr(s.label), dock.style == s, DockOptionTags.style(s), { manager.setDock { it.copy(style = s) } }, width = DockCardTokens.StyleWidth) { _ -> DockStylePreview(s) }
+                }
             }
         }
     }
-    OneUiCaption(L10n.tr("Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it."))
+    OneUiCaption(off ?: L10n.tr("Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it."))
 
     OneUiGap()
     OneUiGroupTitle(L10n.tr("Magnify icons"))
     OneUiGroup(1) {
         OneUiSwitchRow(
             L10n.tr("Magnify icons"), dock.magnify, { v -> manager.setDock { it.copy(magnify = v) } },
-            summary = L10n.tr("Icons grow around your finger or pointer, like the Mac dock."), modifier = Modifier.testTag(DockOptionTags.MAGNIFY),
+            summary = L10n.tr("Icons grow around your finger or pointer, like the Mac dock."), modifier = Modifier.testTag(DockOptionTags.MAGNIFY), disabledReason = off,
         )
     }
     if (dock.magnify) {
         OneUiGap()
-        OneUiGroup(1) {
-            DockCardRow {
-                MagnifyStrength.entries.forEach { m ->
-                    DockOptionCard(L10n.tr(m.label) + " " + m.factor.toString() + "x", dock.magnifyStrength == m, DockOptionTags.strength(m), { manager.setDock { it.copy(magnifyStrength = m) } }, width = DockCardTokens.StyleWidth) { mod ->
-                        androidx.compose.foundation.Canvas(mod) { strengthArt(m, ink, accent)(this, size) }
+        OneUiDisabledBlock(off, L10n.tr("Magnify icons")) {
+            OneUiGroup(1) {
+                DockCardRow {
+                    MagnifyStrength.entries.forEach { m ->
+                        DockOptionCard(L10n.tr(m.label) + " " + m.factor.toString() + "x", dock.magnifyStrength == m, DockOptionTags.strength(m), { manager.setDock { it.copy(magnifyStrength = m) } }, width = DockCardTokens.StyleWidth) { mod ->
+                            androidx.compose.foundation.Canvas(mod) { strengthArt(m, ink, accent)(this, size) }
+                        }
                     }
                 }
             }
@@ -86,11 +95,13 @@ internal fun DockOptionsBody(manager: WorkspaceManager, tier: Tier, scope: DockO
     if (!scope.edgeFixed) {
         OneUiGap()
         OneUiGroupTitle(L10n.tr("Position"))
-        OneUiGroup(1) {
-            DockCardRow {
-                DockEdge.entries.forEach { e ->
-                    DockOptionCard(L10n.tr(e.label), dock.edge == e, DockOptionTags.position(e), { manager.setDock { it.copy(edge = e) } }) { m ->
-                        androidx.compose.foundation.Canvas(m) { positionArt(e, ink, accent)(this, size) }
+        OneUiDisabledBlock(off, L10n.tr("Position")) {
+            OneUiGroup(1) {
+                DockCardRow {
+                    DockEdge.entries.forEach { e ->
+                        DockOptionCard(L10n.tr(e.label), dock.edge == e, DockOptionTags.position(e), { manager.setDock { it.copy(edge = e) } }) { m ->
+                            androidx.compose.foundation.Canvas(m) { positionArt(e, ink, accent)(this, size) }
+                        }
                     }
                 }
             }
@@ -103,11 +114,13 @@ internal fun DockOptionsBody(manager: WorkspaceManager, tier: Tier, scope: DockO
 
     OneUiGap()
     OneUiGroupTitle(L10n.tr("Dock mode"))
-    OneUiGroup(1) {
-        DockCardRow {
-            DockMode.entries.forEach { m ->
-                DockOptionCard(L10n.tr(m.label), dock.mode == m, DockOptionTags.mode(m), { manager.setDock { it.copy(mode = m) } }, width = DockCardTokens.StyleWidth) { mod ->
-                    androidx.compose.foundation.Canvas(mod) { modeArt(m, ink, accent)(this, size) }
+    OneUiDisabledBlock(off, L10n.tr("Dock mode")) {
+        OneUiGroup(1) {
+            DockCardRow {
+                DockMode.entries.forEach { m ->
+                    DockOptionCard(L10n.tr(m.label), dock.mode == m, DockOptionTags.mode(m), { manager.setDock { it.copy(mode = m) } }, width = DockCardTokens.StyleWidth) { mod ->
+                        androidx.compose.foundation.Canvas(mod) { modeArt(m, ink, accent)(this, size) }
+                    }
                 }
             }
         }
@@ -116,18 +129,18 @@ internal fun DockOptionsBody(manager: WorkspaceManager, tier: Tier, scope: DockO
 
     OneUiGap()
     val enabled = dock.isEnabled(tier)
-    OneUiGroup((if (scope.canHide) 1 else 0) + 1 + (if (scope.desktopPin != null) 1 else 0)) {
-        if (scope.canHide) {
-            OneUiSwitchRow(
-                L10n.tr("Show the dock"), enabled, { v -> manager.setDock { it.copy(enabled = v) } },
-                summary = if (dock.enabled == null) L10n.tr("Default for this device: %s", if (tier == Tier.T1) L10n.tr("off") else L10n.tr("on")) else null,
-                modifier = Modifier.testTag(DockPageTags.SHOW_DOCK),
-            )
-            OneUiRowDivider()
-        }
+    OneUiGroup(2 + (if (scope.desktopPin != null) 1 else 0)) {
+        // Wave 58 (CFG-66): where a surface forces the dock (the desktop, Glance with Right side = Dock rail) the switch stays, dimmed, with the reason.
+        OneUiSwitchRow(
+            L10n.tr("Show the dock"), if (scope.canHide) enabled else true, { v -> manager.setDock { it.copy(enabled = v) } },
+            summary = if (dock.enabled == null) L10n.tr("Default for this device: %s", if (tier == Tier.T1) L10n.tr("off") else L10n.tr("on")) else null,
+            modifier = Modifier.testTag(DockPageTags.SHOW_DOCK),
+            disabledReason = if (scope.canHide) null else scope.forcedReason ?: L10n.tr("Always shown here"),
+        )
+        OneUiRowDivider()
         OneUiSwitchRow(
             L10n.tr("Show app group chips on the home"), dock.groupShelf, { v -> manager.setDock { it.copy(groupShelf = v) } },
-            summary = L10n.tr("Saved app groups appear as chips above the dock."), modifier = Modifier.testTag(DockOptionTags.GROUP_SHELF),
+            summary = L10n.tr("Saved app groups appear as chips above the dock."), modifier = Modifier.testTag(DockOptionTags.GROUP_SHELF), disabledReason = off,
         )
         scope.desktopPin?.let { pin ->
             OneUiRowDivider()
@@ -135,9 +148,21 @@ internal fun DockOptionsBody(manager: WorkspaceManager, tier: Tier, scope: DockO
             OneUiSwitchRow(
                 L10n.tr("Desktop item in the dock"), pinned,
                 { on -> manager.setPins(if (on) state.active.dockPins + pin else state.active.dockPins - pin) },
-                summary = L10n.tr("The Desktop item opens the Liftoff desktop on a connected display."), modifier = Modifier.testTag(DockOptionTags.DESKTOP_ITEM),
+                summary = L10n.tr("The Desktop item opens the Liftoff desktop on a connected display."), modifier = Modifier.testTag(DockOptionTags.DESKTOP_ITEM), disabledReason = off,
             )
         }
+    }
+}
+
+/** Wave 58 (CFG-66): the pure rule of the dimmed dock options. */
+object DockOptionRules {
+    /** Why the options cannot be used (English key), or null: the dock is off and this surface could show it (a forced dock is never off). */
+    fun offReason(enabled: Boolean, canHide: Boolean): String? = if (!enabled && canHide) "Dock is off" else null
+    /** Why a surface keeps the dock on (English key): the desktop always shows it; on Glance, Right side = Dock rail does. */
+    fun forcedReason(forceEnabled: Boolean, alwaysShown: Boolean): String? = when {
+        forceEnabled -> "The desktop always shows it"
+        alwaysShown -> "Right side is Dock rail"
+        else -> null
     }
 }
 

@@ -30,6 +30,9 @@ import com.bos.sphere.feature.grid.OneUiRadioPage
 import com.bos.sphere.feature.grid.Glyphs
 import com.bos.sphere.feature.grid.SettingItem
 import com.bos.sphere.feature.grid.asCards
+import com.bos.sphere.feature.grid.PaneEntry
+import com.bos.sphere.feature.grid.paneEntries
+import com.bos.sphere.feature.grid.paneFlash
 import com.bos.sphere.feature.grid.TextButtonPill
 
 /**
@@ -40,11 +43,16 @@ import com.bos.sphere.feature.grid.TextButtonPill
 fun drawerRingItems(m: SettingsModel): List<SettingItem> = listOf(
     SettingItem.Choice(
         L10n.tr("Ring segments"), Glyphs.Dial, PuckActions.SEGMENT_CHOICES, m.puckSegments, { it.toString() },
-        hint = L10n.tr("How many segments the white ring around the Back button has. Turn the ring with a finger to reach the others."),
+        hint = L10n.tr("Turn the ring to reach others"),
     ) { m.setPuckSegments(it) }.asCards({ com.bos.sphere.feature.grid.SettingsArtHome.ringSegments.art(it) }, "cfg.ringSegments"),
-    SettingItem.Pane(L10n.tr("Drawer shortcuts"), Glyphs.Dial, L10n.tr("%d segments", m.puckSegments)) { PuckActionsPane(m.appsByKey) },
+    SettingItem.Pane(L10n.tr("Drawer shortcuts"), Glyphs.Dial, L10n.tr("%d segments", m.puckSegments)) { PuckActionsPane(m.appsByKey) }
+        // Wave 58 (CFG-67): each segment of the ring and the reset are search entries; the pane draws them with the same ids.
+        .paneEntries(
+            *((1..m.puckSegments).map { n -> PaneEntry(SettingsRowMeta.PaneIds.drawerSegment(n), L10n.tr("Segment %d", n), listOf("ring shortcut", "drawer shortcut", "segment")) } +
+                PaneEntry(SettingsRowMeta.PaneIds.DRAWER_RESET, L10n.tr("Reset to default"), listOf("ring shortcuts", "drawer shortcuts"))).toTypedArray(),
+        ),
     SettingItem.Toggle(
-        L10n.tr("Show labels under glyphs"), Glyphs.Message, m.puckLabels, L10n.tr("A small name under each shortcut in the visible segments"),
+        L10n.tr("Show labels under glyphs"), Glyphs.Message, m.puckLabels, L10n.tr("A name under each shortcut"),
     ) { m.setPuckLabels(it) },
 )
 
@@ -77,9 +85,10 @@ fun ColumnScope.PuckActionsPane(appsByKey: Map<String, AppEntry>) {
                 glyph = (slot as? PuckSlot.Action)?.let { Glyphs.forAction(it.id) },
                 leading = app?.let { a -> { AppIcon(a, 24.dp) } },
                 selected = false,
+                flashId = SettingsRowMeta.PaneIds.drawerSegment(i + 1),
             ) { editing = i }
         }
-        Row(Modifier.padding(top = 10.dp)) { TextButtonPill(L10n.tr("Reset to default")) { store.reset() } }
+        Row(Modifier.padding(top = 10.dp).paneFlash(SettingsRowMeta.PaneIds.DRAWER_RESET)) { TextButtonPill(L10n.tr("Reset to default")) { store.reset() } }
     }
 
     if (editing in 0 until count && !pickingApp) {

@@ -34,6 +34,7 @@ import com.bos.sphere.ui.buildSettingsCategories
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -111,10 +112,10 @@ class SettingsVisualW54Test {
         val all = choices(cats).map { it.second }
         val clock = all.first { it.title == "Clock style" }
         assertEquals("Big digital", clock.value)
-        assertEquals("The big clock on the Glance page", clock.hint)
+        assertNull("wave 58 (CFG-65): the cards say what the clock looks like; no grey line repeats it", clock.hint)
         val order = all.first { it.title == "Order" }
         assertEquals("Left to right", order.value)
-        assertTrue(order.hint!!.contains("Right to left"))
+        assertEquals("Mirrors Comms, Recents and columns", order.hint) // wave 58 (CFG-65): a few words
     }
 
     // ---- every card group, composed and driven -----------------------------------------------------------------------------------------------

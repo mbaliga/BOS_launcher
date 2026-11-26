@@ -225,7 +225,7 @@ fun DockHost(
     var adding by remember { mutableStateOf(false) }
     val edgeNow = edgeOverride ?: state.dock.edgeFor(landscape)
     val sheetSpec = remember(manager, tier, landscape, edgeOverride, forceEnabled, alwaysShown, desktopPin, onOpenPanel) {
-        DockSheetSpec(manager, tier, landscape, edgeOverride, DockOptionsScope(edgeFixed = edgeOverride != null, canHide = !(forceEnabled || alwaysShown), desktopPin = desktopPin), onOpenPanel)
+        DockSheetSpec(manager, tier, landscape, edgeOverride, DockOptionsScope(edgeFixed = edgeOverride != null, canHide = !(forceEnabled || alwaysShown), desktopPin = desktopPin, forcedReason = DockOptionRules.forcedReason(forceEnabled, alwaysShown)?.let { L10n.tr(it) }), onOpenPanel)
     }
     val actions = remember(content, state.active.dockPins, landscape, edgeOverride, forceEnabled, alwaysShown, onGoHome, sheet, sheetSpec) {
         DockActions(

@@ -1,5 +1,6 @@
 package com.bos.sphere.feature.dock
 
+import com.bos.sphere.feature.grid.paneFlash
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -81,6 +82,15 @@ import com.bos.sphere.feature.grid.VisualCardGroup
 import com.bos.sphere.feature.grid.VisualInk
 
 /** Test tags of the Profiles pages (wave 57). */
+/** Wave 58 (CFG-67): the stable ids of the Profiles page's rows that a Settings search can land on (the row lights for a moment). */
+object ProfilePaneIds {
+    const val NEW = "profiles.new"
+    const val LIST = "profiles.list"
+    const val SUGGESTIONS = "profiles.suggestions"
+    const val CALM = "profiles.calm"
+    const val RADAR_ACTIONS = "profiles.radarActions"
+}
+
 object ProfileTags {
     const val ACTIVE_CARD = "profiles.active"
     const val UNDO = "profiles.undo"
@@ -186,7 +196,7 @@ fun ProfilesContent(
     }
 
     OneUiGroupTitle(L10n.tr("Your profiles"))
-    OneUiGroup(rows.size) {
+    OneUiGroup(rows.size, Modifier.paneFlash(ProfilePaneIds.LIST)) {
         rows.forEachIndexed { i, r ->
             if (i > 0) OneUiRowDivider()
             val w = state.workspaces.first { it.id == r.id }
@@ -209,13 +219,13 @@ fun ProfilesContent(
         }
     }
     OneUiGap()
-    OneUiPrimaryButton(L10n.tr("New profile"), { adding = true }, Modifier.testTag(ProfileTags.NEW))
+    OneUiPrimaryButton(L10n.tr("New profile"), { adding = true }, Modifier.paneFlash(ProfilePaneIds.NEW).testTag(ProfileTags.NEW))
 
     // CFG-47: the suggested app groups not saved yet.
     val suggestions = remember(facts, state.groups) { ProfileSummary.openSuggestions(AppGroupSuggester.suggest(facts), state.groups) }
     if (suggestions.isNotEmpty()) {
         OneUiGroupTitle(L10n.tr("Suggested app groups"))
-        OneUiGroup(suggestions.size, Modifier.testTag(ProfileTags.SUGGESTIONS)) {
+        OneUiGroup(suggestions.size, Modifier.paneFlash(ProfilePaneIds.SUGGESTIONS).testTag(ProfileTags.SUGGESTIONS)) {
             suggestions.forEachIndexed { i, s ->
                 if (i > 0) OneUiRowDivider()
                 OneUiListRow(L10n.tr(s.kind.label), summary = appsLine(s.apps), tile = Glyphs.Apps, tileColor = TileOrange, chevron = true, onClick = { suggestionOpen = s }, modifier = Modifier.testTag(ProfileTags.suggestion(s.kind)))
@@ -226,11 +236,11 @@ fun ProfilesContent(
 
     OneUiGroupTitle(L10n.tr("Calm centre"))
     OneUiGroup(if (paletteActionChoices.isEmpty()) 1 else 2) {
-        OneUiValueRow(L10n.tr("What the calm centre shows"), WorkspaceSummary.calmValue(active), { calmOpen = true }, modifier = Modifier.testTag(ProfileTags.CALM))
+        OneUiValueRow(L10n.tr("What the calm centre shows"), WorkspaceSummary.calmValue(active), { calmOpen = true }, modifier = Modifier.paneFlash(ProfilePaneIds.CALM).testTag(ProfileTags.CALM))
         if (paletteActionChoices.isNotEmpty()) {
             OneUiRowDivider()
             val n = active.paletteActions.count { id -> paletteActionChoices.any { it.first == id } }
-            OneUiValueRow(L10n.tr("Radar actions"), if (n == 0) L10n.tr("None") else L10n.tr("%d pinned", n), { actionsOpen = true }, modifier = Modifier.testTag(ProfileTags.RADAR_ACTIONS))
+            OneUiValueRow(L10n.tr("Radar actions"), if (n == 0) L10n.tr("None") else L10n.tr("%d pinned", n), { actionsOpen = true }, modifier = Modifier.paneFlash(ProfilePaneIds.RADAR_ACTIONS).testTag(ProfileTags.RADAR_ACTIONS))
         }
     }
     OneUiCaption(L10n.tr("The calm centre and the Radar actions are set for %s, the active profile. This only changes what Liftoff shows. System notification settings are not touched.", active.name))

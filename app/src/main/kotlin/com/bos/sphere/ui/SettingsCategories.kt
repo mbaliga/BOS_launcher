@@ -135,6 +135,8 @@ class SettingsModel(
     /** Wave 58 (CFG-62): the pinch bindings "Pinch changes grid density" replaced, kept so turning it off restores them (the app keeps them in the shortcuts store). */
     val savedPinch: () -> Map<HomeGesture, CornerItem?>? = { null },
     val savePinch: (Map<HomeGesture, CornerItem?>?) -> Unit = {},
+    /** Wave 58 (CFG-67): the apps offering a Radar search provider (package to label), so a search for one opens Search providers on its row. */
+    val searchProviders: List<Pair<String, String>> = emptyList(),
 )
 
 /** One row of the Lab page: a spike or live readout, its latest result text, and how to run it. */
@@ -276,17 +278,13 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         if (m.pages.size > 1) add(
             SettingItem.Choice(
                 x("Page"), Glyphs.Widget, m.pages.indices.toList(), m.pageIndex.coerceIn(0, m.pages.size - 1), { x("Page %d", it + 1) },
-                hint = x("The page the settings below change"),
+                hint = x("Settings below change this page"),
             ) { i -> m.selectPage(i) }.asCards({ i -> SettingsArtApp.pageOf(i, m.pages.size) }, "cfg.pagePick", id = { "page$it" }),
         )
         add(
             SettingItem.Choice(
                 x("Layout"), Glyphs.Apps, PageShape.entries, layout.shape, { x(it.label) },
-                hint = when (layout.shape) {
-                    PageShape.Grid -> x("Rows and columns of icons.")
-                    PageShape.Circle -> x("A centre app with rings of 6, 12 and 18 around it.")
-                    PageShape.Coverflow -> x("A strip you scrub sideways; tap the centre app to open it.")
-                },
+                hint = null, // wave 58 (CFG-65): the cards show the three layouts
                 preview = {
                     OneUiVisualChoice(PageShape.entries, layout.shape, { m.setPageLayout(m.pageIndex, layout.copy(shape = it)) }, { x(it.label) }, { SettingsArtHome.pageShape.art(it) }, tag = "cfg.pageLayout")
                 },
@@ -298,24 +296,24 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         val pg = layout.portrait ?: p.portraitGrid
         val lg = layout.landscape ?: p.landscapeGrid
         add(
-            SettingItem.Toggle(x("Density follows the home default"), Glyphs.Widget, !custom, x("Home default: %s portrait · %s landscape", gridLabel(p.portraitGrid), gridLabel(p.landscapeGrid))) { follow ->
+            SettingItem.Toggle(x("Density follows the home default"), Glyphs.Widget, !custom, x("Home default: %s · %s", gridLabel(p.portraitGrid), gridLabel(p.landscapeGrid))) { follow ->
                 m.setPageLayout(m.pageIndex, if (follow) layout.copy(portrait = null, landscape = null) else layout.copy(portrait = pg, landscape = lg))
             }.disabledUnless(isGrid, x("Needs Grid layout")),
         )
         if (isGrid) {
-            val noCustom = x("Density follows the home default is on")
+            val noCustom = x("Follows the home default")
             add(SettingItem.Stepper(x("Columns · portrait"), Glyphs.Widget, pg.columns, GridSpec.MIN_COLUMNS..GridSpec.MAX_COLUMNS) { m.setPageLayout(m.pageIndex, layout.copy(portrait = pg.copy(columns = it), landscape = lg)) }.disabledUnless(custom, noCustom))
             add(SettingItem.Stepper(x("Rows · portrait"), Glyphs.Widget, pg.rows, GridSpec.MIN_ROWS..GridSpec.MAX_ROWS) { m.setPageLayout(m.pageIndex, layout.copy(portrait = pg.copy(rows = it), landscape = lg)) }.disabledUnless(custom, noCustom))
             add(SettingItem.Stepper(x("Columns · landscape"), Glyphs.Widget, lg.columns, GridSpec.MIN_COLUMNS..GridSpec.MAX_COLUMNS) { m.setPageLayout(m.pageIndex, layout.copy(landscape = lg.copy(columns = it), portrait = pg)) }.disabledUnless(custom, noCustom))
-            add(SettingItem.Stepper(x("Rows · landscape"), Glyphs.Widget, lg.rows, GridSpec.MIN_ROWS..GridSpec.MAX_ROWS, x("Apps that no longer fit move to the next page.")) { m.setPageLayout(m.pageIndex, layout.copy(landscape = lg.copy(rows = it), portrait = pg)) }.disabledUnless(custom, noCustom))
+            add(SettingItem.Stepper(x("Rows · landscape"), Glyphs.Widget, lg.rows, GridSpec.MIN_ROWS..GridSpec.MAX_ROWS, x("Extra apps move to the next page")) { m.setPageLayout(m.pageIndex, layout.copy(landscape = lg.copy(rows = it), portrait = pg)) }.disabledUnless(custom, noCustom))
         }
         add(
             SettingItem.Stepper(x("Rings"), Glyphs.Dial, layout.rings, PageLayout.MIN_RINGS..PageLayout.MAX_RINGS, x("%d apps fit", PageLayout.circleCapacity(layout.rings))) { m.setPageLayout(m.pageIndex, layout.copy(rings = it)) }
                 .disabledUnless(layout.shape == PageShape.Circle, x("Needs Circle layout")),
         )
-        add(SettingItem.Toggle(x("Clock tile on this page"), Glyphs.Clock, HomeTiles.CLOCK in page.keys, x("Moves it here if it is on another page")) { on -> m.setClockTile(m.pageIndex, on) })
+        add(SettingItem.Toggle(x("Clock tile on this page"), Glyphs.Clock, HomeTiles.CLOCK in page.keys, x("Moves it from another page")) { on -> m.setClockTile(m.pageIndex, on) })
         add(SettingItem.Action(x("Add a page after this"), Glyphs.Plus, "") { m.addPageAfter(m.pageIndex) })
-        if (m.pages.size > 1 || page.keys.isNotEmpty()) add(SettingItem.Action(x("Delete this page"), Glyphs.Close, x("Items on it leave the home; they stay in the drawer")) { m.deletePage(m.pageIndex) })
+        if (m.pages.size > 1 || page.keys.isNotEmpty()) add(SettingItem.Action(x("Delete this page"), Glyphs.Close, x("Its items stay in the drawer")) { m.deletePage(m.pageIndex) })
     }
     out += SettingCategory(x("Pages"), Glyphs.Widget, pageItems) // wave 52: "Pages", not "Page 1" (the row opens the settings of the page you are on)
     }
@@ -329,44 +327,42 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Toggle(
                     x("Calm home screen (Glance)"), Glyphs.Home, p.glanceEnabled,
-                    x("On: home is the calm, empty screen and your pages come after it. Off: home shows the first page or the scroll."),
+                    if (p.glanceEnabled) null else x("Home opens on the first page"),
                 ) { v -> upd { it.copy(glanceEnabled = v) } },
             )
-            add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("Adds a page after the last one")) { m.addHomePage() }.disabled(paginatedReason(p)))
-            add(SettingItem.Action(x("Edit home"), Glyphs.Apps, x("Add icons, widgets and folders to the pages")) { m.editHomePages() })
-            add(SettingItem.Action(x("Widgets, folders and icons"), Glyphs.Plus, x("Add icons, widgets and folders to the pages")) { m.addHomeItems() })
+            add(SettingItem.Action(x("Add page"), Glyphs.Plus, x("After the last page")) { m.addHomePage() }.disabled(paginatedReason(p)))
+            add(SettingItem.Action(x("Edit home"), Glyphs.Apps, x("Arrange your pages")) { m.editHomePages() })
+            add(SettingItem.Action(x("Widgets, folders and icons"), Glyphs.Plus, x("Add them to your pages")) { m.addHomeItems() })
             // Wave 30 (pagesExplicit): after the one-time reset of an auto-filled home, the old pages come back from here for 30 days.
-            m.restorePages?.let { restore -> add(SettingItem.Action(x("Restore previous pages"), Glyphs.Home, x("Brings back the pages from before the reset (kept for 30 days)")) { restore() }) }
+            m.restorePages?.let { restore -> add(SettingItem.Action(x("Restore previous pages"), Glyphs.Home, x("Kept 30 days after the reset")) { restore() }) }
             add(
                 SettingItem.Choice(
                     x("Order"), Glyphs.Swipe, com.bos.sphere.core.data.HomeOrder.entries, p.homeOrder, { x(it.label) },
-                    hint = x("Right to left puts the Comms on the right edge, the Recents panel on the left, and fills columns and pages from the right."),
+                    hint = x("Mirrors Comms, Recents and columns"),
                 ) { v -> upd { it.copy(homeOrder = v) } }.asCards({ SettingsArtHome.order.art(it) }, "cfg.order"),
             )
             // STR-14: what a swipe from the right edge does. The dock stays optional: "Dock rail" only reveals it, it never turns it on.
             add(
                 SettingItem.Choice(
                     x("Right side"), Glyphs.Apps, com.bos.sphere.core.data.RightSide.entries, p.rightSide, { x(it.label) },
-                    hint = x("What a swipe in from the right edge opens: the recent apps, the dock rail, or nothing"),
-                ) { v -> upd { it.copy(rightSide = v) } }.asCards({ SettingsArtHome.rightSide.art(it) }, "cfg.rightSide"),
+                                    ) { v -> upd { it.copy(rightSide = v) } }.asCards({ SettingsArtHome.rightSide.art(it) }, "cfg.rightSide"),
             )
             addAll(wallpaperSettings(p) { f -> upd(f) }) // HOM-16 (wave 26): Glance and Pages wallpaper, always listed
             run {
-                add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first; at most this many")) { v -> upd { it.copy(recentsLimit = v) } })
-                add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Uses usage access when it is allowed; otherwise only apps opened from Liftoff are listed")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })
+                add(SettingItem.Stepper(x("Recent apps shown"), Glyphs.Apps, p.recentsLimit, com.bos.sphere.core.data.HomeRecents.MIN_LIMIT..com.bos.sphere.core.data.HomeRecents.MAX_LIMIT, x("Newest first")) { v -> upd { it.copy(recentsLimit = v) } })
+                add(SettingItem.Toggle(x("Include apps opened from elsewhere"), Glyphs.Clock, p.recentsUseUsageAccess, x("Needs usage access")) { v -> upd { it.copy(recentsUseUsageAccess = v) } })
             }
             addAll(glanceSettings(p) { f -> upd(f) })
             add(
                 SettingItem.Choice(
                     x("Style"), Glyphs.Apps, HomeStyle.entries, p.homeStyle, { x(homeStyleName(it)) },
-                    hint = x(
-                        when (p.homeStyle) {
-                            HomeStyle.Grid -> "Pages of icons you arrange yourself — or one long scroll (see Scrolling)."
-                            HomeStyle.List -> "Every app in an A–Z list with a letter rail. Long-press an app for its menu; long-press a letter header or the margin for Settings."
-                            HomeStyle.Psp -> "A cross media bar: swipe sideways for categories, up / down for apps. Hold the clock band for Settings."
-                            HomeStyle.Dsi -> "Every app on a glossy tile, three across, one long scroll. Long-press the empty space for Settings."
-                        },
-                    ),
+                    // Wave 58 (CFG-65): the cards show the styles; the line keeps only how to reach Settings from a home that has no empty space to hold.
+                    hint = when (p.homeStyle) {
+                        HomeStyle.Grid -> null
+                        HomeStyle.List -> x("Long-press the margin for Settings")
+                        HomeStyle.Psp -> x("Hold the clock band for Settings")
+                        HomeStyle.Dsi -> x("Long-press empty space for Settings")
+                    },
                     preview = {
                         OneUiVisualChoice(HomeStyle.entries, p.homeStyle, { s -> upd { it.copy(homeStyle = s) } }, { x(homeStyleName(it)) }, { SettingsArtHome.homeStyle.art(it) }, tag = "cfg.homeStyle")
                     },
@@ -375,7 +371,6 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Pages"), Glyphs.Swipe, com.bos.sphere.core.data.HomePages.entries, p.homePages, { x(it.label) },
-                    hint = x("Off: home is the calm screen only. Paginated: regular pages after it, swiped like any home. Continuous: one sideways scroll after it, filled column by column."),
                     preview = {
                         OneUiVisualChoice(com.bos.sphere.core.data.HomePages.entries, p.homePages, { v -> upd { it.copy(homePages = v) } }, { x(it.label) }, { SettingsArtHome.pages.art(it) }, tag = "cfg.pages")
                     },
@@ -384,10 +379,10 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Scroll direction"), Glyphs.Swipe, com.bos.sphere.core.data.ScrollAxis.entries, p.scrollAxis, { x(it.label) },
-                    hint = x("\"Long side\" keeps scrolling along the phone's longer edge however you hold it. Swipes across the other way are free for gestures."),
+                    hint = x("Long side follows your grip"),
                 ) { v -> upd { it.copy(scrollAxis = v) } }.asCards({ SettingsArtHome.scrollAxis.art(it) }, "cfg.scrollAxis").disabledUnless(p.homeStyle == HomeStyle.Dsi, x("Needs the DSi home style")),
             )
-            add(SettingItem.Toggle(x("Grid follows window size"), Glyphs.Widget, p.adaptiveGrid, x("Columns and rows come from the window (rotation, folding, split screen) and the density below, instead of the fixed grids")) { v -> upd { it.copy(adaptiveGrid = v) } })
+            add(SettingItem.Toggle(x("Grid follows window size"), Glyphs.Widget, p.adaptiveGrid, x("Columns and rows follow the window")) { v -> upd { it.copy(adaptiveGrid = v) } })
             add(SettingItem.Pane(x("Home panels"), Glyphs.Apps, x("Files, usage, timeline"), { com.bos.sphere.HomePanelSettings() })) // HOM-15, HOM-17, HOM-18
             add(SettingItem.Slider(x("Grid density"), Glyphs.Widget, p.gridDensity, 0.5f..2f, pct(p.gridDensity)) { v -> upd { it.copy(gridDensity = v) } }.disabledUnless(p.adaptiveGrid, x("Needs Grid follows window size")))
             run {
@@ -415,32 +410,31 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             // Icon size: the paged / continuous grids, DSi tiles and List rows scale; the PSP bar is fixed.
             add(
                 SettingItem.Slider(x("Icon size"), Glyphs.Apps, p.iconScale, LauncherPrefs.MIN_ICON_SCALE..LauncherPrefs.MAX_ICON_SCALE, pct(p.iconScale)) { v -> upd { it.copy(iconScale = v) } }
-                    .disabledUnless(p.homeStyle != HomeStyle.Psp, x("The PSP bar has a fixed icon size")),
+                    .disabledUnless(p.homeStyle != HomeStyle.Psp, x("Fixed on the PSP bar")),
             )
             if (paged) {
-                add(SettingItem.Toggle(x("Same spacing both ways"), Glyphs.Widget, p.spacingV < 0f, x("Compact keeps square cells; higher spreads the icons without resizing them")) { same -> upd { it.copy(spacingV = if (same) -1f else it.iconSpacing) } })
+                add(SettingItem.Toggle(x("Same spacing both ways"), Glyphs.Widget, p.spacingV < 0f, null) { same -> upd { it.copy(spacingV = if (same) -1f else it.iconSpacing) } })
                 add(SettingItem.Slider(x(if (p.spacingV < 0f) "Spacing" else "Spacing across"), Glyphs.Widget, p.iconSpacing, 0f..1f, pct(p.iconSpacing)) { v -> upd { it.copy(iconSpacing = v) } })
                 // Wave 56 (CFG-29): while "Same spacing both ways" is on this row follows "Spacing" and reads Auto; moving it sets the vertical spacing by hand.
                 val follows = p.spacingV < 0f
                 add(SettingItem.Slider(x("Spacing down"), Glyphs.Widget, if (follows) p.iconSpacing else p.spacingV, 0f..1f, if (follows) x("Auto") else pct(p.spacingV), auto = follows) { v -> upd { it.copy(spacingV = v) } })
             } else {
                 // The scrolling grids only have a gap between rows; the other homes have no icon spacing at all.
-                add(SettingItem.Slider(x("Spacing"), Glyphs.Widget, p.iconSpacing, 0f..1f, pct(p.iconSpacing), x("Room between the rows of icons.")) { v -> upd { it.copy(iconSpacing = v) } }.disabledUnless(continuous || p.homeStyle == HomeStyle.Dsi, x("Needs the Pages, Continuous or DSi home style")))
+                add(SettingItem.Slider(x("Spacing"), Glyphs.Widget, p.iconSpacing, 0f..1f, pct(p.iconSpacing), x("Room between the rows")) { v -> upd { it.copy(iconSpacing = v) } }.disabledUnless(continuous || p.homeStyle == HomeStyle.Dsi, x("Needs Pages, Continuous or DSi")))
             }
             // Wave 56 (CFG-31): the page margins stay on the page of every home; only the scrolling homes lose the vertical ones, with the reason shown.
             add(SettingItem.Slider(x("Height in page"), Glyphs.Widget, p.gridBias, 0f..1f, pct(p.gridBias)) { v -> upd { it.copy(gridBias = v) } }.disabled(pagedReason(p)))
-            add(SettingItem.Slider(x("Side margin"), Glyphs.Widget, p.gridInsetX, 0f..0.25f, pct(p.gridInsetX), if (paged) null else x("Extra room at the left and right edges.")) { v -> upd { it.copy(gridInsetX = v) } })
-            add(SettingItem.Slider(x("Top margin"), Glyphs.Widget, p.gridInsetTop, 0f..0.4f, pct(p.gridInsetTop), x("Leave room for the clock")) { v -> upd { it.copy(gridInsetTop = v) } }.disabled(pagedReason(p)))
-            add(SettingItem.Slider(x("Bottom margin"), Glyphs.Widget, p.gridInsetBottom, 0f..0.4f, pct(p.gridInsetBottom), x("Keep thumbs clear at the bottom")) { v -> upd { it.copy(gridInsetBottom = v) } }.disabled(pagedReason(p)))
+            add(SettingItem.Slider(x("Side margin"), Glyphs.Widget, p.gridInsetX, 0f..0.25f, pct(p.gridInsetX), if (paged) null else x("Room at the left and right")) { v -> upd { it.copy(gridInsetX = v) } })
+            add(SettingItem.Slider(x("Top margin"), Glyphs.Widget, p.gridInsetTop, 0f..0.4f, pct(p.gridInsetTop), x("Room for the clock")) { v -> upd { it.copy(gridInsetTop = v) } }.disabled(pagedReason(p)))
+            add(SettingItem.Slider(x("Bottom margin"), Glyphs.Widget, p.gridInsetBottom, 0f..0.4f, pct(p.gridInsetBottom), x("Room for your thumbs")) { v -> upd { it.copy(gridInsetBottom = v) } }.disabled(pagedReason(p)))
             add(SettingItem.Slider(x("Label size"), Glyphs.Message, p.labelScale, 0.7f..1.5f, pct(p.labelScale)) { v -> upd { it.copy(labelScale = v) } }.disabled(pagedReason(p)))
-            add(SettingItem.Toggle(x("App labels"), Glyphs.Message, p.showLabels, if (p.homeStyle == HomeStyle.Psp) x("Off shows only the focused app's name") else null) { v -> upd { it.copy(showLabels = v) } })
-            add(SettingItem.Toggle(x("Notification badges"), Glyphs.Bell, p.badgesOn, x("A dot on apps with unread notifications. Needs notification access; work apps use their own profile's notifications")) { v -> upd { it.copy(badgesOn = v) } })
+            add(SettingItem.Toggle(x("App labels"), Glyphs.Message, p.showLabels, if (p.homeStyle == HomeStyle.Psp) x("Off: only the focused app") else null) { v -> upd { it.copy(showLabels = v) } })
+            add(SettingItem.Toggle(x("Notification badges"), Glyphs.Bell, p.badgesOn, x("Needs notification access")) { v -> upd { it.copy(badgesOn = v) } })
             add(SettingItem.Toggle(x("Count in badges"), Glyphs.Bell, p.badgeCount, x("Off shows a plain dot")) { v -> upd { it.copy(badgeCount = v) } }.disabledUnless(p.badgesOn, x("Notification badges are off")))
             run {
                 add(
                     SettingItem.Choice(
                         x("Page turning · portrait"), Glyphs.Swipe, PagingAxis.entries, p.portraitPaging, { x(it.label) },
-                        hint = x("Swipes across the other axis are free for gestures."),
                         preview = { OneUiVisualChoice(PagingAxis.entries, p.portraitPaging, { a -> upd { it.copy(portraitPaging = a) } }, { x(it.label) }, { SettingsArtHome.paging.art(it) }, tag = "cfg.pagingPortrait") },
                     ) { a -> upd { it.copy(portraitPaging = a) } }.disabled(pagedReason(p)),
                 )
@@ -451,12 +445,12 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
                     ) { a -> upd { it.copy(landscapePaging = a) } }.disabled(pagedReason(p)),
                 )
             }
-            add(SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("A keyboard that's always open: type to find an app, like an old-school phone")) { v -> upd { it.copy(alwaysKeyboard = v) } })
-            add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · portrait"), Glyphs.Message, p.keyboardOnOpenPortrait, x("Raises the on-screen keyboard when Radar or the drawer opens")) { v -> upd { it.copy(keyboardOnOpenPortrait = v) } })
+            add(SettingItem.Toggle(x("Always-on keyboard"), Glyphs.Message, p.alwaysKeyboard, x("Type to find an app")) { v -> upd { it.copy(alwaysKeyboard = v) } })
+            add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · portrait"), Glyphs.Message, p.keyboardOnOpenPortrait) { v -> upd { it.copy(keyboardOnOpenPortrait = v) } })
             add(SettingItem.Toggle(x("Keyboard opens with Radar and drawer · landscape"), Glyphs.Message, p.keyboardOnOpenLandscape) { v -> upd { it.copy(keyboardOnOpenLandscape = v) } })
             add(com.bos.sphere.feature.grid.keyboardShortcutsRow())
-            add(SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("The clock and corner icons sit flush to the top; swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } })
-            add(SettingItem.Toggle(x("Restore open screens"), Glyphs.Up, p.restoreOpenSurfaces, if (p.restoreOpenSurfaces) x("On: after a restart, Liftoff reopens the drawer or search screen that was open") else x("Off: Liftoff always starts on the home screen")) { v -> upd { it.copy(restoreOpenSurfaces = v) } })
+            add(SettingItem.Toggle(x("Hide status bar"), Glyphs.Up, p.hideStatusBar, x("Swipe down to peek")) { v -> upd { it.copy(hideStatusBar = v) } })
+            add(SettingItem.Toggle(x("Restore open screens"), Glyphs.Up, p.restoreOpenSurfaces, if (p.restoreOpenSurfaces) x("Reopens the drawer or Radar") else x("Always starts on the home")) { v -> upd { it.copy(restoreOpenSurfaces = v) } })
         },
     )
 
@@ -467,11 +461,11 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         buildList {
             // Wave 38: the white shortcut ring (segments, editor, labels) leads the App drawer, then the open-the-drawer settings, then what lives on the home screen.
             addAll(com.bos.sphere.ui.drawerRingItems(m))
-            add(SettingItem.Choice(x("Wheel groups"), Glyphs.Dial, WheelGrouping.entries, p.wheelGrouping, { x(it.label) }, hint = x("How the wheel groups apps into spokes.")) { g -> upd { it.copy(wheelGrouping = g) } }.asCards({ SettingsArtHome.wheelGrouping.art(it) }, "cfg.wheelGroups"))
+            add(SettingItem.Choice(x("Wheel groups"), Glyphs.Dial, WheelGrouping.entries, p.wheelGrouping, { x(it.label) }, hint = null) { g -> upd { it.copy(wheelGrouping = g) } }.asCards({ SettingsArtHome.wheelGrouping.art(it) }, "cfg.wheelGroups"))
             // Only the paged home has pages to curate; the scrolling homes always show every app.
-            add(SettingItem.Choice(x("Pages"), Glyphs.Swipe, PageMode.entries, p.pageMode, { x(it.label) }, hint = x("One page shows just the first page; the rest stay in the drawer.")) { v -> upd { it.copy(pageMode = v) } }.asCards({ SettingsArtHome.pageMode.art(it) }, "cfg.drawerPages").disabled(pagedReason(p)))
+            add(SettingItem.Choice(x("Pages"), Glyphs.Swipe, PageMode.entries, p.pageMode, { x(it.label) }, hint = x("The rest stay in the drawer")) { v -> upd { it.copy(pageMode = v) } }.asCards({ SettingsArtHome.pageMode.art(it) }, "cfg.drawerPages").disabled(pagedReason(p)))
             add(
-                SettingItem.Pane(x("Open with"), Glyphs.Apps, x("Choose the app for Music, Browser…")) {
+                SettingItem.Pane(x("Open with"), Glyphs.Apps, x("Music, Browser, Maps…")) {
                     listOf(
                         CornerActionId.Music, CornerActionId.Messages, CornerActionId.Browser, CornerActionId.Email, CornerActionId.Maps,
                         CornerActionId.Calendar, CornerActionId.Gallery, CornerActionId.Contacts, CornerActionId.Calculator, CornerActionId.Camera,
@@ -494,15 +488,14 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Corner style"), Glyphs.Palette, CornerStyle.entries, p.cornerStyle, { x(it.label) },
-                    hint = x("Holo: just the icons. Sony: a quarter-disc in each corner. Bubbles: a round bubble behind each icon."),
                     preview = { OneUiVisualChoice(CornerStyle.entries, p.cornerStyle, { c -> upd { it.copy(cornerStyle = c) } }, { x(it.label) }, { SettingsArtHome.cornerStyle.art(it) }, tag = "cfg.cornerStyle") },
                 ) { c -> upd { it.copy(cornerStyle = c) } },
             )
             add(SettingItem.Slider(x("Corner icon size"), Glyphs.Dial, p.cornerIconSize, LauncherPrefs.MIN_CORNER_ICON..LauncherPrefs.MAX_CORNER_ICON, "${p.cornerIconSize.roundToInt()}", step = 1f) { v -> upd { it.copy(cornerIconSize = v) } })
-            add(SettingItem.Choice(x("Icon type"), Glyphs.Apps, CornerIconMode.entries, p.cornerIconMode, { x(it.label) }, hint = x("App icon shows the real icon of the app an action opens (Music → your music player).")) { c -> upd { it.copy(cornerIconMode = c) } }.asCards({ SettingsArtHome.cornerIcon.art(it) }, "cfg.cornerIcon"))
-            add(SettingItem.Toggle(x("Follow device rotation"), Glyphs.Flip, p.cornersFollowDevice, x("Each corner stays under the same physical corner when you rotate")) { v -> upd { it.copy(cornersFollowDevice = v) } })
-            add(SettingItem.Toggle(x("Separate corners for landscape"), Glyphs.Flip, p.cornersPerOrientation, x("Landscape keeps its own set; edits below apply to the orientation you are in")) { v -> upd { it.copy(cornersPerOrientation = v) } })
-            add(SettingItem.Toggle(x("Hot corners with a mouse"), Glyphs.Pinch, p.hotCornersOn, x("Rest the pointer in a corner to reveal its action, click to run it")) { v -> upd { it.copy(hotCornersOn = v) } })
+            add(SettingItem.Choice(x("Icon type"), Glyphs.Apps, CornerIconMode.entries, p.cornerIconMode, { x(it.label) }, hint = x("App icon shows the real app")) { c -> upd { it.copy(cornerIconMode = c) } }.asCards({ SettingsArtHome.cornerIcon.art(it) }, "cfg.cornerIcon"))
+            add(SettingItem.Toggle(x("Follow device rotation"), Glyphs.Flip, p.cornersFollowDevice, x("Corners stay put when you rotate")) { v -> upd { it.copy(cornersFollowDevice = v) } })
+            add(SettingItem.Toggle(x("Separate corners for landscape"), Glyphs.Flip, p.cornersPerOrientation, x("Edits apply to this orientation")) { v -> upd { it.copy(cornersPerOrientation = v) } })
+            add(SettingItem.Toggle(x("Hot corners with a mouse"), Glyphs.Pinch, p.hotCornersOn, x("Rest the pointer, click to run")) { v -> upd { it.copy(hotCornersOn = v) } })
             add(SettingItem.Slider(x("Hot corner delay"), Glyphs.Dial, p.hotCornerDwellMs.toFloat(), 50f..600f, "${p.hotCornerDwellMs} ms", step = 10f) { v -> upd { it.copy(hotCornerDwellMs = v.roundToInt()) } }.disabledUnless(p.hotCornersOn, x("Hot corners are off")))
             if (p.hotCornersOn) add(hotCornerTryItem(p, m.updatePrefs)) // W56: Try it
             Corner.entries.forEach { c ->
@@ -523,7 +516,6 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
                 SettingItem.Choice(
                     x("Left page"), Glyphs.Bell, com.bos.sphere.core.data.LeftPage.entries, p.leftPage,
                     { if (it == com.bos.sphere.core.data.LeftPage.Widget) (m.leftWidgetLabel ?: x("A widget")) else x(it.label) },
-                    hint = x("One swipe right from the first page: your notifications, or any app's widget full-screen."),
                     preview = {
                         OneUiVisualChoice(com.bos.sphere.core.data.LeftPage.entries, p.leftPage, leftPick, { x(it.label) }, { SettingsArtHome.leftPage.art(it) }, tag = "cfg.leftPage")
                     },
@@ -536,7 +528,6 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Comms theme"), Glyphs.Moon, com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { x(it.label) },
-                    hint = x("Dark suits the rest of the launcher; Light is the classic hub look."),
                     preview = {
                         OneUiVisualChoice(com.bos.sphere.core.data.LaunchpadTheme.entries, p.launchpadTheme, { v -> upd { it.copy(launchpadTheme = v) } }, { x(it.label) }, { com.bos.sphere.ui.SettingsArtApp.commsTheme.art(it) }, tag = "cfg.commsTheme")
                     },
@@ -547,7 +538,7 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
                 SettingItem.Stepper(
                     x("Comms size"), Glyphs.Pinch, com.bos.sphere.core.data.CommsScaleSettings.percent.value,
                     com.bos.sphere.core.data.CommsScale.MIN..com.bos.sphere.core.data.CommsScale.MAX,
-                    hint = x("Text, icons and rows of Comms and its menu, from 75 to 125 percent. Ctrl+Plus and Ctrl+Minus change it too."),
+                    hint = x("Ctrl+Plus and Ctrl+Minus too"),
                     step = com.bos.sphere.core.data.CommsScale.STEP, valueText = "${com.bos.sphere.core.data.CommsScaleSettings.percent.value}%",
                 ) { v -> com.bos.sphere.core.data.CommsScaleSettings.set(v) },
             )
@@ -556,26 +547,25 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Default view"), Glyphs.Bell, comms.defaultChoices(), comms.defaultChoice(), { x(it.label) },
-                    hint = x("What Comms shows first when it opens. Messages, Notifications and Alerts open All with that category."),
+                    hint = x("What Comms opens on"),
                 ) { v -> comms.setDefaultChoice(v) }.asCards({ com.bos.sphere.ui.SettingsArtApp.defaultView.art(it) }, "cfg.defaultView", id = { "${it.view.id}${it.category?.let { c -> "." + c.id } ?: ""}" }),
             )
             // Wave 53 (commsCategories): the pinned block (ongoing notifications and Pin-by-rule rows) at the top of Comms; stored with the exported Comms prefs.
-            add(SettingItem.Toggle(x("Show pinned at the top"), Glyphs.Bell, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.pinnedAtTop, x("Ongoing notifications such as music, calls, timers, navigation and downloads, and senders you pinned, stay in a block at the top of Comms. Off lists them with the others. They never count as unread and cannot be dismissed.")) { v -> com.bos.sphere.core.data.LaunchpadSettings.setPinnedAtTop(v) })
+            add(SettingItem.Toggle(x("Show pinned at the top"), Glyphs.Bell, com.bos.sphere.core.data.LaunchpadSettings.prefs.value.pinnedAtTop, x("Ongoing and pinned stay on top")) { v -> com.bos.sphere.core.data.LaunchpadSettings.setPinnedAtTop(v) })
             // Wave 52 (panelWidgets): the fifth section, off until chosen; its place in the tab row is a visual card choice.
-            add(SettingItem.Toggle(x("Widgets section"), Glyphs.Bell, comms.widgetsSection.value, x("Adds a Widgets section to this panel, where you can put real widgets instead of on the right side. Off keeps the four sections.")) { v -> comms.setWidgetsSection(v) })
+            add(SettingItem.Toggle(x("Widgets section"), Glyphs.Bell, comms.widgetsSection.value, x("Real widgets inside this panel")) { v -> comms.setWidgetsSection(v) })
             add(
                 SettingItem.Choice(
                     x("Widgets position"), Glyphs.Bell, com.bos.sphere.ui.WidgetsSlot.entries, comms.widgetsSlot.value, { x(it.label) },
-                    hint = x("Where the Widgets tab sits among the sections."),
                     preview = {
                         OneUiVisualChoice(com.bos.sphere.ui.WidgetsSlot.entries, comms.widgetsSlot.value, { v -> comms.setWidgetsSlot(v) }, { x(it.label) }, { com.bos.sphere.ui.SettingsArtApp.widgetsSlot.art(it) }, tag = "cfg.widgetsSlot")
                     },
                 ) { v -> comms.setWidgetsSlot(v) }.disabledUnless(comms.widgetsSection.value, x("Widgets section is off")),
             )
-            add(SettingItem.Toggle(x("Clear from the shade when dismissed in Comms"), Glyphs.Bell, comms.clearFromShade.value, x("Off: dismissing only marks it read and the notification stays in the system shade, still openable from there.")) { v -> comms.setClearFromShade(v) })
-            add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true, hint = x("Opens the notifications you have already read.")) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })
-            add(SettingItem.Action(x("Groups and rules"), Glyphs.Message, x("Open"), navigates = true, hint = x("Opens the groups and rules manager in Comms.")) { m.openComms(null, true) })
-            add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("A slim strip of unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })
+            add(SettingItem.Toggle(x("Clear from the shade when dismissed in Comms"), Glyphs.Bell, comms.clearFromShade.value, x("Off: it stays in the shade")) { v -> comms.setClearFromShade(v) })
+            add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true, hint = x("Notifications already read")) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })
+            add(SettingItem.Action(x("Groups and rules"), Glyphs.Message, x("Open"), navigates = true, hint = x("The manager in Comms")) { m.openComms(null, true) })
+            add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("Unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })
             add(
                 SettingItem.Pane(x("Comms gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {
                     val bound by com.bos.sphere.core.data.LaunchpadSettings.gestures.collectAsState()
@@ -591,9 +581,9 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
                 },
             )
             add(SettingItem.Pane(x("Grouping & rules"), Glyphs.Message, x("Per app, sender, conversation")) { com.bos.sphere.ui.LaunchpadRulesPane() })
-            add(SettingItem.Action(x("Mark all as read"), Glyphs.Bell, confirm = "Mark every notification, in the list and in the history, as read?", confirmLabel = "Mark all as read", hint = x("Marks every notification in the list and in the history as read.")) { comms.markAllRead() })
-            add(SettingItem.Action(x("Clear all notifications"), Glyphs.Close, confirm = "Clear all notifications from the list? The history stays.", confirmLabel = "Clear all", hint = x("Dismisses everything in the Comms list. The history stays.")) { comms.clearAll() })
-            add(SettingItem.Action(x("Delete history"), Glyphs.Close, confirm = "Delete all notification history? Notifications in the shade stay.", confirmLabel = "Delete history", hint = x("Deletes the stored notification history. Notifications in the shade stay.")) { comms.deleteHistory() })
+            add(SettingItem.Action(x("Mark all as read"), Glyphs.Bell, confirm = "Mark every notification, in the list and in the history, as read?", confirmLabel = "Mark all as read", hint = x("The list and the history")) { comms.markAllRead() })
+            add(SettingItem.Action(x("Clear all notifications"), Glyphs.Close, confirm = "Clear all notifications from the list? The history stays.", confirmLabel = "Clear all", hint = x("The history stays")) { comms.clearAll() })
+            add(SettingItem.Action(x("Delete history"), Glyphs.Close, confirm = "Delete all notification history? Notifications in the shade stay.", confirmLabel = "Delete history", hint = x("Notifications in the shade stay")) { comms.deleteHistory() })
         },
     )
 
@@ -607,20 +597,21 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         x("Gestures"),
         Glyphs.Pinch,
         buildList<SettingItem> {
-            if (surface.hasDensity) add(
+            // Wave 58 (CFG-66): a home without a grid density keeps the row, dimmed, with the reason.
+            add(
             SettingItem.Toggle(
                 x("Pinch changes grid density"), Glyphs.Pinch, pinchDensity,
-                if (paged) x("Pinch in packs more icons in; spread opens them up") else x("Pinch in adds a column; spread removes one"),
+                if (paged) x("Pinch in packs more icons") else x("Pinch in adds a column"),
             ) { on ->
                 // Wave 58 (CFG-62): turning it on remembers the two pinch bindings it replaces; turning it off puts them back (or the defaults, when none was remembered).
                 val next = if (on) com.bos.sphere.core.data.PinchDensityToggle.on(m.gestures).also { m.savePinch(it.saved) } else com.bos.sphere.core.data.PinchDensityToggle.off(m.savedPinch()).also { m.savePinch(null) }
                 next.bindings.forEach { (g, item) -> m.setGesture(g, item) }
-            },
+            }.disabledUnless(surface.hasDensity, x("No grid density on %s", styleName)),
             )
             HomeGesture.entries.filter { it.kind == GestureKind.Touch }.forEach { g ->
                 val bound = m.gestures[g]?.let { itemLabel(it, m.appsByKey) } ?: x("Nothing")
                 val why = g.unavailableReason(surface)
-                add(SettingItem.Action(x(g.label), Glyphs.forGesture(g), if (why == null) bound else "$bound · ${x("not on %s: %s", styleName, x(why))}", navigates = true) { m.editGesture(g) })
+                add(SettingItem.Action(x(g.label), Glyphs.forGesture(g), if (why == null) bound else "$bound · ${x(gestureWhy(why))}", navigates = true) { m.editGesture(g) })
             }
             add(SettingItem.Action(x("On this home"), Glyphs.Info, x(gestureSummary(p.homeStyle, surface))) {})
         },
@@ -633,7 +624,7 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         buildList {
             add(SettingItem.Toggle(x("Motion gestures"), Glyphs.Shake, p.motionEnabled, if (!m.motionAvailable) x("No motion sensor on this device") else null) { v -> upd { it.copy(motionEnabled = v) } })
             add(SettingItem.Toggle(x("When home isn't showing"), Glyphs.Bolt, p.motionInBackground) { v -> upd { it.copy(motionInBackground = v) } })
-            add(SettingItem.Slider(x("Motion sensitivity"), Glyphs.Dial, p.motionSensitivity, 0f..1f, pct(p.motionSensitivity), x("Higher reacts to lighter movements (and more false triggers).")) { v -> upd { it.copy(motionSensitivity = v) } })
+            add(SettingItem.Slider(x("Motion sensitivity"), Glyphs.Dial, p.motionSensitivity, 0f..1f, pct(p.motionSensitivity), x("Higher reacts to lighter shakes")) { v -> upd { it.copy(motionSensitivity = v) } })
             add(motionTryItem(p, m.updatePrefs)) // W56: Try it
             HomeGesture.entries.filter { it.kind == GestureKind.Motion }.forEach { g ->
                 add(SettingItem.Action(x(g.label), Glyphs.forGesture(g), m.gestures[g]?.let { itemLabel(it, m.appsByKey) } ?: x("Nothing"), navigates = true) { m.editGesture(g) })
@@ -659,7 +650,7 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Font"), Glyphs.Dial, com.bos.sphere.core.design.FontCatalog.entries, com.bos.sphere.core.design.FontCatalog.entry(p.uiFont), { x(it.label) },
-                    hint = x("The font of Liftoff's own text: labels, Radar, sheets and the clock. Titles stay in Space Grotesk."),
+                    hint = x("Titles stay in Space Grotesk"),
                     preview = { com.bos.sphere.feature.grid.FontChoice(p.uiFont) { v -> upd { it.copy(uiFont = v) } } },
                 ) { v -> upd { it.copy(uiFont = v.id) } },
             )
@@ -669,20 +660,19 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
                     preview = { OneUiVisualChoice(IconShape.entries, p.iconShape, { v -> upd { it.copy(iconShape = v) } }, { x(it.label) }, { SettingsArtLook.iconShape.art(it) }, tag = "cfg.iconShape") },
                 ) { v -> upd { it.copy(iconShape = v) } },
             )
-            add(SettingItem.Choice(x("Icon colour"), Glyphs.Image, IconTint.entries, p.iconTint, { x(it.label) }, hint = x("Long-press an app and choose Icon colour to tint just that app.")) { v -> upd { it.copy(iconTint = v) } }.asCards({ SettingsArtLook.iconTint.art(it) }, "cfg.iconTint"))
+            add(SettingItem.Choice(x("Icon colour"), Glyphs.Image, IconTint.entries, p.iconTint, { x(it.label) }, hint = x("Long-press an app to tint one")) { v -> upd { it.copy(iconTint = v) } }.asCards({ SettingsArtLook.iconTint.art(it) }, "cfg.iconTint"))
             add(SettingItem.Toggle(x("Icon plate"), Glyphs.Widget, p.iconPlate, x("A tile behind transparent icons")) { v -> upd { it.copy(iconPlate = v) } })
             add(
                 SettingItem.Choice(
                     x("Settings backdrop"), Glyphs.Moon, com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { x(it.label) },
-                    hint = x("Settings use your background, dimmed, or pitch black."),
                     preview = {
                         OneUiVisualChoice(com.bos.sphere.core.data.SettingsBackdrop.entries, p.settingsBackdrop, { v -> upd { it.copy(settingsBackdrop = v) } }, { x(it.label) }, { SettingsArtLook.backdrop.art(it) }, tag = "cfg.backdrop")
                     },
                 ) { v -> upd { it.copy(settingsBackdrop = v) } },
             )
-            if (p.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Wallpaper) {
-                add(SettingItem.Slider(x("Backdrop dimming"), Glyphs.Moon, p.settingsDim, 0.2f..0.95f, pct(p.settingsDim)) { v -> upd { it.copy(settingsDim = v) } })
-            }
+            // Wave 58 (CFG-66): over a pitch-black backdrop there is nothing to dim; the row stays, dimmed, with the reason.
+            add(SettingItem.Slider(x("Backdrop dimming"), Glyphs.Moon, p.settingsDim, 0.2f..0.95f, pct(p.settingsDim)) { v -> upd { it.copy(settingsDim = v) } }
+                .disabledUnless(p.settingsBackdrop == com.bos.sphere.core.data.SettingsBackdrop.Wallpaper, x("Backdrop is Pitch black")))
         },
     )
 
@@ -694,21 +684,22 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             SettingItem.Choice(
                 x("Radar layout"), Glyphs.Apps, com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { x(it.label) },
                 preview = { OneUiVisualChoice(com.bos.sphere.core.data.SearchLayout.entries, p.searchLayout, { v -> upd { it.copy(searchLayout = v) } }, { x(it.label) }, { SettingsArtHome.searchLayout.art(it) }, tag = "cfg.radarLayout") },
-            ) { v -> upd { it.copy(searchLayout = v) } }, // wave 58 (CFG-62): picking a layout never changes "Keep this layout with a keyboard"
-            SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: Radar opens as a flat list while a keyboard or mouse is in use")) { v -> upd { it.copy(searchLayoutPinned = v) } },
-            SettingItem.Choice(x("Radar background"), Glyphs.Moon, com.bos.sphere.core.data.RadarBackground.entries, p.radarBackground, { x(it.label) }, hint = x("Dimmed shows your wallpaper at a quarter of its brightness; True black draws nothing, for the most contrast")) { v -> upd { it.copy(radarBackground = v) } }.asCards({ SettingsArtHome.radarBackground.art(it) }, "cfg.radarBackground"),
-            SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly; off keeps them still until you move them")) { v -> upd { it.copy(searchMotion = v) } },
-            SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("Enter and the Search row open this engine in your browser; only then does what you typed go to it")) { v -> upd { it.copy(webEngine = v) } }.asCards({ SettingsArtLook.webEngine.art(it) }, "cfg.webEngine"),
-            SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("Search the web and the Play Store from here")) { v -> upd { it.copy(searchWeb = v) } },
+            ) { v -> upd { it.copy(searchLayout = v) } },
+            SettingItem.Toggle(x("Keep this layout with a keyboard"), Glyphs.Apps, p.searchLayoutPinned, x("Off: flat list with a keyboard")) { v -> upd { it.copy(searchLayoutPinned = v) } },
+            SettingItem.Choice(x("Radar background"), Glyphs.Moon, com.bos.sphere.core.data.RadarBackground.entries, p.radarBackground, { x(it.label) }, hint = null) { v -> upd { it.copy(radarBackground = v) } }.asCards({ SettingsArtHome.radarBackground.art(it) }, "cfg.radarBackground"),
+            SettingItem.Toggle(x("Keep moving"), Glyphs.Swipe, p.searchMotion, x("Filmstrip and Orbit drift slowly")) { v -> upd { it.copy(searchMotion = v) } },
+            SettingItem.Choice(x("Web engine"), Glyphs.Globe, com.bos.sphere.core.data.WebEngine.entries, p.webEngine, { it.label }, hint = x("Gets only what you send")) { v -> upd { it.copy(webEngine = v) } }.asCards({ SettingsArtLook.webEngine.art(it) }, "cfg.webEngine"),
+            SettingItem.Toggle(x("Web results"), Glyphs.Globe, p.searchWeb, x("The web and the Play Store")) { v -> upd { it.copy(searchWeb = v) } },
             // Wave 43 (radarWeb): the privacy switch of the launcher's only network use. Off = nothing leaves the phone.
-            SettingItem.Toggle(x("Web suggestions"), Glyphs.Globe, p.webSuggestions, x("Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions.", p.webEngine.label)) { v -> upd { it.copy(webSuggestions = v) } }
+            SettingItem.Toggle(x("Web suggestions"), Glyphs.Globe, p.webSuggestions, x("Sends what you type to %s", p.webEngine.label)) { v -> upd { it.copy(webSuggestions = v) } }
                 .disabledUnless(p.searchWeb, x("Web results is off")), // wave 58 (CFG-62): suggestions do nothing without web results
-            SettingItem.Toggle(x("Actions"), Glyphs.Bolt, p.searchActions, x("Find things to do, like “flashlight”")) { v -> upd { it.copy(searchActions = v) } },
-            SettingItem.Toggle(x("Files"), Glyphs.Image, p.searchFiles, x("Documents, photos and downloads on this phone")) { v -> upd { it.copy(searchFiles = v) } },
-            SettingItem.Toggle(x("Deep results"), Glyphs.Search, p.searchDeep, x("With Fylz or Fotoz installed: text inside documents and images")) { v -> upd { it.copy(searchDeep = v) } },
-            SettingItem.Toggle(x("Contacts"), Glyphs.Message, p.searchContacts, x("Call, message or email people straight from results")) { v -> upd { it.copy(searchContacts = v) } },
+            SettingItem.Toggle(x("Actions"), Glyphs.Bolt, p.searchActions, x("Things to do, like “flashlight”")) { v -> upd { it.copy(searchActions = v) } },
+            SettingItem.Toggle(x("Files"), Glyphs.Image, p.searchFiles, x("Documents, photos and downloads")) { v -> upd { it.copy(searchFiles = v) } },
+            SettingItem.Toggle(x("Deep results"), Glyphs.Search, p.searchDeep, x("Inside files, with Fylz or Fotoz")) { v -> upd { it.copy(searchDeep = v) } },
+            SettingItem.Toggle(x("Contacts"), Glyphs.Message, p.searchContacts, x("Call, message or email people")) { v -> upd { it.copy(searchContacts = v) } },
             SettingItem.Pane(x("Search folders"), Glyphs.Image, "") { com.bos.sphere.feature.grid.FolderGrantsPane() },
-            SettingItem.Pane(x("Search providers from other apps"), Glyphs.Search, "") { com.bos.sphere.feature.grid.SearchProvidersPane() },
+            SettingItem.Pane(x("Search providers from other apps"), Glyphs.Search, "") { com.bos.sphere.feature.grid.SearchProvidersPane() }
+                .paneEntries(*m.searchProviders.map { (pkg, label) -> PaneEntry(SettingsRowMeta.PaneIds.provider(pkg), label, listOf("search provider", "results from apps")) }.toTypedArray()),
             SettingItem.Pane(x("Search history and aliases"), Glyphs.Search, "") { com.bos.sphere.feature.grid.SearchHistoryPane() },
         ),
     )
@@ -723,16 +714,15 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             add(
                 SettingItem.Choice(
                     x("Calm style"), Glyphs.Dial, CalmStyle.entries, shownStyle, { x(it.label) },
-                    hint = x("Quiet accents at the screen edge that never cover your wallpaper, or the regular battery and signal indicators at the top."),
                 ) { v -> upd { it.copy(calmStyle = v) } }.asCards({ SettingsArtLook.calm.art(it) }, "cfg.calm"),
             )
-            if (shownStyle.ambient) {
-                add(SettingItem.Toggle(x("Also show regular battery and signal"), Glyphs.Dial, p.calmAlsoRegular, x("The small battery with its percentage and the signal bars at the top of the home, beside the calm style.")) { v -> upd { it.copy(calmAlsoRegular = v) } })
-            }
+            // Wave 58 (CFG-66): beside Off or Regular there is no calm style to add the indicators to; the row stays, dimmed, with the reason.
+            add(SettingItem.Toggle(x("Also show regular battery and signal"), Glyphs.Dial, p.calmAlsoRegular, x("Battery and signal bars too")) { v -> upd { it.copy(calmAlsoRegular = v) } }
+                .disabledUnless(shownStyle.ambient, x("Calm style is %s", x(shownStyle.label))))
             add(
                 SettingItem.Choice(
                     x("Show"), Glyphs.Dial, IndicatorMetric.entries, p.indicatorMetric, { x(it.label) },
-                    hint = x("What the calm style shows: the signal level, or the battery (charging counts as healthy)."),
+                    hint = x("Charging counts as healthy"),
                 ) { v -> upd { it.copy(indicatorMetric = v) } }.asCards({ SettingsArtLook.metric.art(it) }, "cfg.metric"),
             )
             add(SettingItem.Slider(x("Glow: intensity"), Glyphs.Dial, p.indicatorIntensity, 0f..1f, pct(p.indicatorIntensity)) { v -> upd { it.copy(indicatorIntensity = v) } })
@@ -774,7 +764,6 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             // Wave 57 (CFG-43): the launcher's own vibration, the same store and values as the Comms Sound and vibration sheet.
             SettingItem.Choice(
                 x("Launcher vibration"), Glyphs.Bolt, com.bos.sphere.core.data.HapticStrength.entries, m.haptic, { x(it.name) },
-                hint = x("How strongly Liftoff itself vibrates on taps and long presses. Android's own vibration settings are not changed."),
             ) { v -> m.setHaptic(v) }.asCards({ SettingsArtApp.haptic.art(it) }, "cfg.haptic"),
         ),
     )
@@ -786,7 +775,7 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
         listOf(
             SettingItem.Pane(x("Language"), Glyphs.Globe, if (p.language == UiLanguage.System) x("System") else p.language.label) { LanguagePane(p.language) { l -> upd { it.copy(language = l) } } },
             // Wave 57 (CFG-42): one page listing every grant (it replaces the default home, notification access and Do Not Disturb rows and the Comms access page).
-            SettingItem.Pane(x("Access and privacy"), Glyphs.Gear, x("What Liftoff may read, and the default home")) { AccessPrivacyPane(m.system) },
+            SettingItem.Pane(x("Access and privacy"), Glyphs.Gear, x("What Liftoff may read")) { AccessPrivacyPane(m.system) },
             SettingItem.Action(x("Android settings"), Glyphs.Gear, "", navigates = true, onClick = m.system.androidSettings),
         ),
     )
@@ -833,16 +822,18 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
     return SettingsRowMeta.apply(out, p)
 }
 
-/** One line for the Gestures category saying how touch works on the active home. */
+/**
+ * One line for the Gestures category saying which swipes are free on the active home. Wave 58 (CFG-65): a few words (the help diet); how to reach
+ * Settings from each home is on the home Style row's line.
+ */
 internal fun gestureSummary(style: HomeStyle, surface: com.bos.sphere.core.data.HomeSurface): String = when {
-    surface.paged -> if (surface.scroll == com.bos.sphere.core.data.SurfaceScroll.Horizontal)
-        "Pages turn sideways, so up / down swipes, pinch and double tap on empty space are free; long-press empty space for page settings."
-    else "Pages turn up / down, so sideways swipes, pinch and double tap on empty space are free; long-press empty space for page settings."
-    style == HomeStyle.Psp -> "The bar scrolls both ways, so only pinch and double tap on empty space fire here; hold the clock band for Settings."
-    surface.scroll == com.bos.sphere.core.data.SurfaceScroll.Horizontal ->
-        "This home scrolls sideways, so up / down swipes, pinch and double tap on empty space are free; long-press empty space for Settings."
-    else -> "This home scrolls up / down, so sideways swipes, pinch and double tap on empty space are free; long-press empty space for Settings."
+    style == HomeStyle.Psp && !surface.paged -> "Only pinch and double tap"
+    surface.scroll == com.bos.sphere.core.data.SurfaceScroll.Horizontal -> "Up / down swipes are free"
+    else -> "Sideways swipes are free"
 }
+
+/** Wave 58 (CFG-65): the short reason a touch gesture does nothing on this home (the gesture rows show it after the binding). */
+internal fun gestureWhy(why: String): String = if (why == "opens the left page") "Opens the left page" else "Home scrolls this way"
 
 /**
  * HOM-16 (wave 26): the wallpaper rows of the Home screen category. They are listed in every state (Glance on or off, signal
@@ -851,36 +842,36 @@ internal fun gestureSummary(style: HomeStyle, surface: com.bos.sphere.core.data.
 internal fun wallpaperSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): List<SettingItem> = buildList {
     val tr = { s: String -> com.bos.sphere.core.design.L10n.tr(s) }
     add(SettingItem.Pane(x("Glance wallpaper"), Glyphs.Image, com.bos.sphere.feature.grid.wallpaperSummary(p.wallpaper(WallpaperSurface.Glance), tr)) { com.bos.sphere.feature.grid.BackgroundPane(p, WallpaperSurface.Glance, upd) })
-    add(SettingItem.Toggle(x("Pages use the same wallpaper as Glance"), Glyphs.Image, p.pagesSameAsGlance, x("Applies to the pages and the scroll alike")) { v -> upd { it.copy(pagesSameAsGlance = v) } })
-    add(SettingItem.Pane(x("Pages wallpaper"), Glyphs.Image, com.bos.sphere.feature.grid.wallpaperSummary(p.wallpaper(WallpaperSurface.Pages), tr)) { com.bos.sphere.feature.grid.BackgroundPane(p, WallpaperSurface.Pages, upd) }.disabledUnless(!p.pagesSameAsGlance, x("Pages use the same wallpaper as Glance")))
+    add(SettingItem.Toggle(x("Pages use the same wallpaper as Glance"), Glyphs.Image, p.pagesSameAsGlance, x("Pages and the scroll alike")) { v -> upd { it.copy(pagesSameAsGlance = v) } })
+    add(SettingItem.Pane(x("Pages wallpaper"), Glyphs.Image, com.bos.sphere.feature.grid.wallpaperSummary(p.wallpaper(WallpaperSurface.Pages), tr)) { com.bos.sphere.feature.grid.BackgroundPane(p, WallpaperSurface.Pages, upd) }.disabledUnless(!p.pagesSameAsGlance, x("Same as Glance")))
 }
 
 /** HOM-23: the Glance settings rows (the clock style rows of wave 41, the music toggle, hotspot presets and corners, controls timeout, indicator; wave 38 removed the old clock, date and weather settings). */
 internal fun glanceSettings(p: LauncherPrefs, upd: ((LauncherPrefs) -> LauncherPrefs) -> Unit): List<SettingItem> = buildList {
     // Wave 41: the clock settings of the big Glance wallpaper clock: style (Analog/Digital of wave 38 became these styles), 12/24 hour for the digital styles, date, colour, size.
-    add(SettingItem.Choice(x("Clock style"), Glyphs.Clock, com.bos.sphere.core.data.ClockStyle.entries, p.clockStyle, { x(it.label) }, hint = x("The big clock on the Glance page")) { v -> upd { it.copy(clockStyle = v) } }.asCards({ SettingsArtLook.clockStyle.art(it) }, "cfg.clockStyle"))
+    add(SettingItem.Choice(x("Clock style"), Glyphs.Clock, com.bos.sphere.core.data.ClockStyle.entries, p.clockStyle, { x(it.label) }, hint = null) { v -> upd { it.copy(clockStyle = v) } }.asCards({ SettingsArtLook.clockStyle.art(it) }, "cfg.clockStyle"))
     // Wave 56 (CFG-31): the clock options stay on the page; with the clock Off they are dimmed ("Clock style is Off"), and the format also needs a digital clock.
     val clockOff = p.clockStyle == com.bos.sphere.core.data.ClockStyle.Off
     val clockOffReason = if (clockOff) x("Clock style is Off") else null
     run {
         val fmt = com.bos.sphere.core.data.ClockFormat.entries // wave 58 (CFG-61): System (12/24 by device) is the default and is offered first
         add(SettingItem.Choice(x("Clock format"), Glyphs.Clock, fmt, p.clockFormat, { x(it.label) }) { v -> upd { it.copy(clockFormat = v) } }.asCards({ SettingsArtLook.clockFormat.art(it) }, "cfg.clockFormat").disabled(clockOffReason ?: if (p.clockStyle.digital) null else x("Needs a digital clock")))
-        add(SettingItem.Toggle(x("Show date under the clock"), Glyphs.Clock, p.glanceClockDate, x("The day and date in small text")) { on -> upd { it.copy(glanceClockDate = on) } }.disabled(clockOffReason))
-        add(SettingItem.Choice(x("Clock colour"), Glyphs.Clock, listOf(false, true), p.glanceClockAccent, { x(if (it) "Accent" else "Automatic") }, hint = x("Automatic is white or dark, whichever reads on the wallpaper")) { v -> upd { it.copy(glanceClockAccent = v) } }.asCards({ SettingsArtLook.clockColour.art(it) }, "cfg.clockColour").disabled(clockOffReason))
+        add(SettingItem.Toggle(x("Show date under the clock"), Glyphs.Clock, p.glanceClockDate, null) { on -> upd { it.copy(glanceClockDate = on) } }.disabled(clockOffReason))
+        add(SettingItem.Choice(x("Clock colour"), Glyphs.Clock, listOf(false, true), p.glanceClockAccent, { x(if (it) "Accent" else "Automatic") }, hint = x("Automatic reads on any wallpaper")) { v -> upd { it.copy(glanceClockAccent = v) } }.asCards({ SettingsArtLook.clockColour.art(it) }, "cfg.clockColour").disabled(clockOffReason))
         add(SettingItem.Choice(x("Clock size"), Glyphs.Clock, com.bos.sphere.core.data.ClockSize.entries, p.glanceClockSize, { x(it.label) }) { v -> upd { it.copy(glanceClockSize = v) } }.asCards({ SettingsArtLook.clockSize.art(it) }, "cfg.clockSize").disabled(clockOffReason))
     }
-    add(SettingItem.Toggle(x("Show music"), Glyphs.Music, p.showMusic, x("The song that is playing, with its controls, at the top of every page")) { on -> upd { it.copy(showMusic = on) } })
+    add(SettingItem.Toggle(x("Show music"), Glyphs.Music, p.showMusic, x("Song and controls on every page")) { on -> upd { it.copy(showMusic = on) } })
     val hp = com.bos.sphere.core.data.GlanceHotspots.presetOf(p.glanceHotspots)
     add(
         SettingItem.Choice(
             x("Hotspots"), Glyphs.Dial, com.bos.sphere.core.data.HotspotPreset.entries.filter { it != com.bos.sphere.core.data.HotspotPreset.Custom }, hp.takeIf { it != com.bos.sphere.core.data.HotspotPreset.Custom } ?: com.bos.sphere.core.data.HotspotPreset.Four, { x(it.label) },
-            hint = x("How many corner hotspots the Glance home draws. What each runs is set under Corners."),
+            hint = x("What each runs is under Corners"),
         ) { v -> upd { it.copy(glanceHotspots = com.bos.sphere.core.data.GlanceHotspots.preset(v) ?: it.glanceHotspots) } }.asCards({ SettingsArtHome.hotspots.art(it) }, "cfg.hotspots"),
     )
     for (c in com.bos.sphere.core.data.Corner.entries) {
         add(SettingItem.Toggle(x("%s hotspot", x(c.label)), Glyphs.Dial, c in p.glanceHotspots) { on -> upd { it.copy(glanceHotspots = if (on) it.glanceHotspots + c else it.glanceHotspots - c) } })
     }
-    add(SettingItem.Stepper(x("Controls hide after (seconds)"), Glyphs.Clock, p.glanceControlsSeconds, com.bos.sphere.core.data.GlanceControls.MIN_SECONDS..com.bos.sphere.core.data.GlanceControls.MAX_SECONDS, x("The music controls pop out after this long without a touch")) { v -> upd { it.copy(glanceControlsSeconds = com.bos.sphere.core.data.GlanceControls.clampSeconds(v)) } })
+    add(SettingItem.Stepper(x("Controls hide after (seconds)"), Glyphs.Clock, p.glanceControlsSeconds, com.bos.sphere.core.data.GlanceControls.MIN_SECONDS..com.bos.sphere.core.data.GlanceControls.MAX_SECONDS, null) { v -> upd { it.copy(glanceControlsSeconds = com.bos.sphere.core.data.GlanceControls.clampSeconds(v)) } })
     add(controlsTryItem(p, upd)) // W56: Try it
-    add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("A small row at the bottom: Comms, home and the right-hand panel")) { v -> upd { it.copy(glanceIndicator = v) } })
+    add(SettingItem.Toggle(x("Surface indicator"), Glyphs.Dial, p.glanceIndicator, x("Comms, home and panel dots")) { v -> upd { it.copy(glanceIndicator = v) } })
 }

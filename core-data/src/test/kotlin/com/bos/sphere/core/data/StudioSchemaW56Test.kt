@@ -526,6 +526,8 @@ class StudioSchemaW56Test {
             "appSuggest" to linkedMapOf(
                 "min" to AppGroupSuggester.GROUP_MIN, "max" to AppGroupSuggester.GROUP_MAX,
                 "kinds" to SuggestionKind.entries.map { k -> linkedMapOf("id" to k.name, "label" to k.label, "packages" to suggestTable(k)) },
+                // the Calm starter's calm-centre apps: messaging and alert apps (AppGroupSuggester.calmPackages)
+                "calm" to (AppGroupSuggester.MESSAGING_PACKAGES + AppGroupSuggester.ALERT_PACKAGES).distinct(),
             ),
         )
     }
@@ -729,6 +731,8 @@ class StudioSchemaW56Test {
     @Test fun CFG_71_theSuggesterTablesAndStartersInTheSchemaAreTheAppsOwn() {
         for (k in SuggestionKind.entries) for (pkg in suggestTable(k))
             assertEquals(pkg, k, AppGroupSuggester.classify(SuggestApp("$pkg/.Main#0", pkg, pkg)))
+        val calm = (AppGroupSuggester.MESSAGING_PACKAGES + AppGroupSuggester.ALERT_PACKAGES).distinct()
+        assertEquals(calm.toSet(), AppGroupSuggester.calmPackages(calm.map { SuggestApp("$it/.Main#0", it, it) }))
         assertEquals(ProfileStart.entries.map { it.name }, listOf("Current", "Empty", "Work", "Calm", "Desk"))
         for (st in ProfileStart.entries) for (k in ProfileStarters.overrides(st).keys) assertTrue("$k of ${st.name} is a profile key", k in ProfileSettings.ALL_KEYS)
     }

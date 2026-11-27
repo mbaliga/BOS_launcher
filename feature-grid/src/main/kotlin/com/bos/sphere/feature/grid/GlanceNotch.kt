@@ -1,12 +1,5 @@
 package com.bos.sphere.feature.grid
 
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
-
 /** HOM-23 (wave 22): the numbers of the controls notch (pure, in dp). */
 object GlanceNotch {
     /** The notch is this share of the clock-area width, within [MIN_WIDTH_DP] and [MAX_WIDTH_DP], never wider than the window. */
@@ -18,7 +11,13 @@ object GlanceNotch {
     const val BODY_HEIGHT_DP = 48f
     /** Concave flare of each top shoulder, and the convex radius of each bottom corner. */
     const val FLARE_DP = 28f
-    /** Height of the upper shoulders: long and shallow, so the notch melts into the top edge. */
+    /**
+     * Legacy fixed shoulder height, kept only for the geometry tests that exercise [NotchShape.shoulderAt] in isolation. The live notch
+     * (GlanceHome.kt) no longer passes this: it lets [NotchShape.path]'s `hs` default to `h - corner`, so the shoulder curve always lands
+     * exactly where the bottom corner's straight run would otherwise start. A fixed shoulder shorter than `h - corner` left a straight
+     * vertical seam between the two curves whenever the cutout made the notch taller than shoulder + corner, which read as a kink rather
+     * than the single smooth bulge the shape is meant to be.
+     */
     const val SHOULDER_DP = 26f
     const val CORNER_DP = 14f
     const val TARGET_DP = 48f
@@ -40,46 +39,6 @@ object GlanceNotch {
     fun heightDp(cutoutTopDp: Float): Float = cutoutTopDp.coerceAtLeast(0f) + BODY_HEIGHT_DP
 }
 
-/**
- * W25 (owner item 3, "it needs to gently merge into the top edge"): the notch outline as ONE smooth path. The top edge is flush at y = 0 and
- * is drawn a few pixels past the screen edge (so no anti-aliasing seam), each upper shoulder is a long concave cubic that leaves the top edge
- * horizontally (tangent along the edge, no corner, no vertical segment there) and arrives vertically at the straight side after [shoulder] dp,
- * the bottom corners are convex cubics. [flare] is the horizontal reach of a shoulder, [shoulder] its height, [corner] the bottom radius; all in dp.
- */
-class NotchShape(
-    private val flare: Float = GlanceNotch.FLARE_DP, private val corner: Float = GlanceNotch.CORNER_DP,
-    private val shoulder: Float = GlanceNotch.SHOULDER_DP,
-) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val d = density.density
-        return Outline.Generic(path(size.width, size.height, flare * d, corner * d, shoulder * d))
-    }
-
-    companion object {
-        /** Bezier control polygon of the LEFT shoulder, from the top edge (0, 0) to the side (f, hs). The right one is its mirror image. */
-        fun shoulderPoints(f: Float, hs: Float): List<Pair<Float, Float>> =
-            listOf(0f to 0f, (f * 0.62f) to 0f, f to (hs * 0.38f), f to hs)
-
-        /** The Bezier point at [t] of [shoulderPoints]. */
-        fun shoulderAt(f: Float, hs: Float, t: Float): Pair<Float, Float> {
-            val p = shoulderPoints(f, hs); val u = 1f - t
-            val x = u * u * u * p[0].first + 3 * u * u * t * p[1].first + 3 * u * t * t * p[2].first + t * t * t * p[3].first
-            val y = u * u * u * p[0].second + 3 * u * u * t * p[1].second + 3 * u * t * t * p[2].second + t * t * t * p[3].second
-            return x to y
-        }
-
-        fun path(w: Float, h: Float, f: Float, c: Float, hs: Float = f, over: Float = 3f): Path = Path().apply {
-            val k = 0.5523f * c // circle-like convex corner as a cubic
-            moveTo(-over, -over); lineTo(w + over, -over); lineTo(w + over, 0f); lineTo(w, 0f)
-            cubicTo(w - f * 0.62f, 0f, w - f, hs * 0.38f, w - f, hs)
-            lineTo(w - f, h - c)
-            cubicTo(w - f, h - c + k, w - f - c + k, h, w - f - c, h)
-            lineTo(f + c, h)
-            cubicTo(f + c - k, h, f, h - c + k, f, h - c)
-            lineTo(f, hs)
-            cubicTo(f, hs * 0.38f, f * 0.62f, 0f, 0f, 0f)
-            lineTo(-over, 0f)
-            close()
-        }
-    }
-}
+// W25/W60: the shape itself (com.bos.sphere.core.design.NotchShape) now lives in core-design, shared with the Launchpad waiting
+// indicator's EdgeBulgeShape (its left-edge twin, com.bos.sphere.core.design.EdgeBulgeShape) so the two curves can never drift apart.
+// GlanceNotch still passes its own FLARE_DP/CORNER_DP defaults at each call site in GlanceHome.kt, same as before this moved.

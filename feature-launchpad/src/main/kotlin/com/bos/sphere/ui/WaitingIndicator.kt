@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +34,7 @@ import com.bos.sphere.core.data.HubNotification
 import com.bos.sphere.core.data.LaunchpadSettings
 import com.bos.sphere.core.data.NotificationProvider
 import com.bos.sphere.core.data.WaitingLogic
+import com.bos.sphere.core.design.EdgeBulgeShape
 import com.bos.sphere.core.design.L10n
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -141,8 +141,14 @@ fun WaitingIndicatorView(
             .pointerInput(Unit) { detectTapGestures { onOpen() } }
             .animateContentSize()
             .heightIn(min = 36.dp)
-            .background(if (priorityCount > 0 && accent != null) lpAccentFill(accent).copy(alpha = 0.95f) else Color(0xE60A5C95), RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
-            .padding(start = 4.dp, end = if (headline != null) 10.dp else 4.dp, top = 4.dp, bottom = 4.dp),
+            // W60 (owner: trace the reference shape exactly): the same melts-into-the-edge bulge as the Glance music-controls notch,
+            // transposed for this vertical edge (EdgeBulgeShape = NotchShape.edgePath), not a plain two-corner rounded rect. Flare/corner
+            // are scaled down from the notch's own (28/14 dp, tuned for a ~48-88 dp tall bar) to suit this badge's much shorter height.
+            .background(
+                if (priorityCount > 0 && accent != null) lpAccentFill(accent).copy(alpha = 0.95f) else Color(0xE60A5C95),
+                EdgeBulgeShape(flare = 14f, corner = 8f),
+            )
+            .padding(start = 10.dp, end = if (headline != null) 10.dp else 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text((if (priorityCount > 0) "★ " else "") + (if (count > 99) "99+" else "$count"), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)

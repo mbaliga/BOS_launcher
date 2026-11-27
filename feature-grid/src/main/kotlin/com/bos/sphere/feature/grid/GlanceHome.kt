@@ -10,6 +10,7 @@ import android.text.format.DateFormat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import com.bos.sphere.core.design.NotchShape
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -467,11 +468,15 @@ internal fun ControlsNotch(
             // Wave 23: the box, the drawn shape and the 48 dp targets are the same height, so a tap outside the black falls through to the home card.
             .width(GlanceNotch.widthDp(areaWidthDp).dp).height(cutoutTop + GlanceNotch.TARGET_DP.dp)
             .drawBehind {
-                val path = NotchShape.path(size.width, height.toPx(), GlanceNotch.FLARE_DP.dp.toPx(), GlanceNotch.CORNER_DP.dp.toPx(), GlanceNotch.SHOULDER_DP.dp.toPx())
+                // W60 (owner: trace the reference shape exactly): hs is left at its path() default (h - corner), not GlanceNotch.SHOULDER_DP,
+                // so the shoulder curve always lands exactly where the bottom corner's straight run starts, whatever the cutout height is on
+                // this device. A fixed shoulder shorter than that left a straight vertical seam in the middle of the shape - a kink the
+                // reference image's single smooth bulge does not have.
+                val path = NotchShape.path(size.width, height.toPx(), GlanceNotch.FLARE_DP.dp.toPx(), GlanceNotch.CORNER_DP.dp.toPx())
                 drawPath(path, Color.Black)
                 // The one allowed extra: a hairline lighter edge so the black tab still reads on a black surface. W25: it fades out toward the top
                 // edge (zero alpha at y = 0 and along the shoulders' start), so there is no line along the top and the notch melts into the status area.
-                val fadeEnd = GlanceNotch.SHOULDER_DP.dp.toPx() * 1.4f
+                val fadeEnd = (height.toPx() - GlanceNotch.CORNER_DP.dp.toPx()) * 1.4f
                 drawPath(
                     path, Brush.verticalGradient(0f to Color.Transparent, 0.35f * fadeEnd / size.height to Color.Transparent, fadeEnd / size.height to Color.White.copy(alpha = 0.16f), 1f to Color.White.copy(alpha = 0.16f)),
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),

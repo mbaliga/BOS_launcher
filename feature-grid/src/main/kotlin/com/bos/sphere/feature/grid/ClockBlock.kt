@@ -40,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -169,7 +168,9 @@ fun GlanceWallpaperClock(
     val spokenTime = remember(now, is24) { SimpleDateFormat(if (is24) "HH:mm" else "h:mm a", Locale.getDefault()).format(now) }
     val dateText = remember(now) { SimpleDateFormat(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEMMMd"), Locale.getDefault()).format(now) }
     val ink = if (useAccent) accent else GlanceInk.clock(dark)
-    val shadow = Shadow(if (dark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.6f), Offset(0f, 2f), 14f)
+    // Wave 60 (polish60): the clock's halo is now the shared GlanceInk.shadow (stronger and centred, so it also clears 3:1 against a plain
+    // white or black wallpaper, which the wave 59 screenshot found weak); the music line uses the same one (NowPlayingLine).
+    val shadow = GlanceInk.shadow(dark)
     val open = L10n.tr("Open clock")
     val editingLabel = L10n.tr("Editing clock")
     val spoken = if (showDate) "$spokenTime, $dateText" else spokenTime

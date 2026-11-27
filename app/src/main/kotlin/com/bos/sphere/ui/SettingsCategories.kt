@@ -591,7 +591,9 @@ internal fun buildSettingsTopics(m: SettingsModel): List<SettingCategory> {
             )
             add(SettingItem.Toggle(x("Clear from the shade when dismissed in Comms"), Glyphs.Bell, comms.clearFromShade.value, x("Off: it stays in the shade")) { v -> comms.setClearFromShade(v) })
             add(SettingItem.Action(x("Read history"), Glyphs.Message, x("Open"), navigates = true, hint = x("Notifications already read")) { m.openComms(com.bos.sphere.ui.HubView.Read, false) })
-            add(SettingItem.Action(x("Groups and rules"), Glyphs.Message, x("Open"), navigates = true, hint = x("The manager in Comms")) { m.openComms(null, true) })
+            // Wave 60 (polish60): renamed from "Groups and rules" (CFG-80), which read as a near-duplicate of the "Grouping & rules" pane
+            // below; this one is the action that opens Comms' own manager overlay, so its name says "manage" and "the manager in Comms" hint.
+            add(SettingItem.Action(x("Manage groups and rules"), Glyphs.Message, x("Open"), navigates = true, hint = x("The manager in Comms")) { m.openComms(null, true) })
             add(SettingItem.Toggle(x("Unread strip"), Glyphs.Bell, p.launchpadRail, x("Unread counts at the left edge")) { v -> upd { it.copy(launchpadRail = v) } })
             add(
                 SettingItem.Pane(x("Comms gestures"), Glyphs.Pinch, x("Pinch, slide, long-press")) {

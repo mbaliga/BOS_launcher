@@ -97,7 +97,7 @@ class CommsOptionsW29Test {
 
     @Test fun STR_01_w29_theCommsCategoryListsEveryMovedOptionOnce() {
         val titles = comms().items.map { it.title }
-        for (t in listOf("Comms size", "Default view", "Read history", "Groups and rules", "Mark all as read", "Clear all notifications", "Delete history")) assertEquals("one '$t' row", 1, titles.count { it == t })
+        for (t in listOf("Comms size", "Default view", "Read history", "Manage groups and rules", "Mark all as read", "Clear all notifications", "Delete history")) assertEquals("one '$t' row", 1, titles.count { it == t })
         assertTrue("the three destructive rows ask first", listOf("Mark all as read", "Clear all notifications", "Delete history").all { (row(it) as SettingItem.Action).confirm != null })
     }
 
@@ -141,7 +141,7 @@ class CommsOptionsW29Test {
         (row("Read history") as SettingItem.Action).onClick()
         assertEquals(HubView.Read, LaunchpadHubNav.requests.value); assertTrue(LaunchpadHubNav.openSignal.value); assertFalse(LaunchpadHubNav.groups.value)
         LaunchpadHubNav.requests.value = null; LaunchpadHubNav.openSignal.value = false
-        (row("Groups and rules") as SettingItem.Action).onClick()
+        (row("Manage groups and rules") as SettingItem.Action).onClick()
         assertTrue("the manager is requested", LaunchpadHubNav.groups.value); assertTrue(LaunchpadHubNav.openSignal.value)
         assertTrue(LaunchpadHubNav.takeGroups()); assertFalse(LaunchpadHubNav.groups.value)
     }
@@ -191,7 +191,7 @@ class CommsOptionsW29Test {
 
     @Test fun STR_01_w29_settingsSearchFindsEveryMovedRow() {
         val idx = SettingsIndex.fromCategories(cats())
-        for ((q, t) in listOf("comms size" to "Comms size", "default view" to "Default view", "read history" to "Read history", "groups and rules" to "Groups and rules",
+        for ((q, t) in listOf("comms size" to "Comms size", "default view" to "Default view", "read history" to "Read history", "groups and rules" to "Manage groups and rules", // wave 60: the old title is a hidden search alias (CFG-80); it still finds the renamed row
             "mark all" to "Mark all as read", "clear all notifications" to "Clear all notifications", "delete history" to "Delete history")) {
             val hit = idx.search(q).firstOrNull { it.title == t }
             assertNotNull("search '$q' finds '$t'", hit); assertEquals("Side panel", hit!!.category)
@@ -237,7 +237,7 @@ class CommsOptionsW29Test {
     }
 
     @Test fun STR_01_w29_theActionRowsHaveASummaryLikeEveryOtherRow() {
-        for (t in listOf("Read history", "Groups and rules", "Mark all as read", "Clear all notifications", "Delete history")) {
+        for (t in listOf("Read history", "Manage groups and rules", "Mark all as read", "Clear all notifications", "Delete history")) {
             assertTrue("'$t' has a summary", !(row(t) as SettingItem.Action).hint.isNullOrBlank())
         }
         assertNotNull("search matches the summary text", SettingsIndex.fromCategories(cats()).search("shade").firstOrNull { it.title == "Delete history" })

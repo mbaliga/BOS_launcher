@@ -70,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -316,6 +317,18 @@ fun GlanceSurface(
 object GlanceInk {
     fun clock(dark: Boolean): Color = if (dark) Color(0xFFE7E9F0) else Color(0xFF0E1018)
     fun secondary(dark: Boolean): Color = if (dark) Color(0xFFC9CDD6) else Color(0xFF2A2E3A)
+
+    /**
+     * Wave 60 (polish60, CFG-75 follow-up): a tight, near-opaque halo behind Glance text, so the clock and the music line stay legible over a
+     * wallpaper the app cannot sample a colour from (a picture or the system's own live wallpaper, see `WallpaperSurfaces.kt`'s comment that
+     * "a picture or the system wallpaper has no colour the app knows"). The scrim (`HomeScrim`/`HomeLegibility`) already covers the kinds the
+     * app paints itself (solid, gradient, signal); this covers the rest without reverting the wave 59 marquee edge fade, which stays an alpha
+     * mask on the text itself. Opposite tone of the ink (black halo behind the dark theme's light ink, white behind the light theme's dark
+     * ink), centred (no offset, so it reads the same at every edge of a scrolling line), close enough to the glyph to stay a halo, not a glow.
+     * At this alpha a pixel right next to a glyph is overwhelmingly the halo colour, so it clears WCAG's 3:1 against literal white or black
+     * (`GlanceLegibilityW60Test`, `GlanceMusicLineContrastW60PixelTest`).
+     */
+    fun shadow(dark: Boolean): Shadow = Shadow(if (dark) Color.Black.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.85f), Offset.Zero, 10f)
 }
 
 /** The controls timeout in milliseconds (setting seconds, clamped). */
@@ -363,13 +376,16 @@ internal fun Modifier.fadeClippedEdges(start: Boolean, end: Boolean, fadePx: Flo
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit, maxWidth: Dp = 280.dp) {
+internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onActivate: () -> Unit, maxWidth: Dp = 280.dp, dark: Boolean = isDarkSurface()) {
     val line = GlanceText.nowPlayingLine(media.title, media.artist)
     val display = GlanceText.nowPlayingDisplay(media.title, media.artist)
     val spoken = L10n.tr("Now playing: %s", line)
     val showLabel = L10n.tr("Show playback controls")
     val measurer = androidx.compose.ui.text.rememberTextMeasurer()
-    val style = androidx.compose.ui.text.TextStyle(color = tint, fontSize = GlanceText.MUSIC_SP.sp)
+    // Wave 60 (polish60): the halo that keeps the title readable over a wallpaper colour the app cannot sample (GlanceInk.shadow); it does not
+    // change the glyphs' metrics, so measuring with it costs nothing extra.
+    val shadow = GlanceInk.shadow(dark)
+    val style = androidx.compose.ui.text.TextStyle(color = tint, fontSize = GlanceText.MUSIC_SP.sp, shadow = shadow)
     val density = androidx.compose.ui.platform.LocalDensity.current
     // The text's room: the slot minus the 16 dp note glyph, its 8 dp gap and the 12 dp padding on each side.
     val room = with(density) { (maxWidth - 16.dp - 8.dp - 24.dp).roundToPx() }
@@ -392,7 +408,7 @@ internal fun NowPlayingLine(media: MediaInfo, tint: Color, marquee: Boolean, onA
     ) {
         Icon(Glyphs.Music, null, tint = tint, modifier = Modifier.size(16.dp))
         Text(
-            display, color = tint, fontSize = GlanceText.MUSIC_SP.sp, maxLines = 1, softWrap = false,
+            display, style = style, maxLines = 1, softWrap = false,
             overflow = if (scrolling) TextOverflow.Clip else TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false).testTag(if (scrolling) "glance.title.marquee" else "glance.title.static")
                 .then(

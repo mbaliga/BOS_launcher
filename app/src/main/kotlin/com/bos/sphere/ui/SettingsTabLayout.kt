@@ -90,7 +90,7 @@ internal object SettingsTabLayout {
                 Section("Panel theme and size", rows(T_SIDE, "Comms theme", "Comms size")),
                 Section("Sections", rows(T_SIDE, "Widgets section", "Widgets position")),
                 Section("Comms", note = "Pinned items never count as unread or get dismissed.", rows = rows(T_SIDE, "Default view", "Show pinned at the top", "Clear from the shade when dismissed in Comms", "Unread strip", "Read history")),
-                Section("Rules and gestures", rows(T_SIDE, "Groups and rules", "Grouping & rules", "Comms gestures")),
+                Section("Rules and gestures", rows(T_SIDE, "Manage groups and rules", "Grouping & rules", "Comms gestures")),
                 Section("Right edge", rows(T_HOME, "Right side", "Recent apps shown", "Include apps opened from elsewhere")),
                 Section("Clean up", rows(T_SIDE, "Mark all as read", "Clear all notifications", "Delete history")),
             ),

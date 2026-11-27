@@ -956,7 +956,7 @@ fun LaunchpadContent(
         }
     }
     // The manager is a screen of buttons, so it stays clear of the card's 48 dp return zone (the list behind runs to the card's edge).
-    if (!previewSandbox) LaunchedEffect(Unit) { LaunchpadHubNav.groups.collect { if (it) { LaunchpadHubNav.takeGroups(); menu.open = false; groupsOpen = true } } } // wave 29: Ground Control's "Groups and rules" opens the manager here
+    if (!previewSandbox) LaunchedEffect(Unit) { LaunchpadHubNav.groups.collect { if (it) { LaunchpadHubNav.takeGroups(); menu.open = false; groupsOpen = true } } } // wave 29: Ground Control's row opens the manager here (wave 60: renamed "Manage groups and rules")
     LaunchpadGroupsOverlay(groupsOpen, items, endInset = if (endInset > 0.dp) maxOf(endInset, 48.dp) + 8.dp else 0.dp) { groupsOpen = false; runCatching { rootReq.requestFocus() } }
     // Wave 38 (popupsHidden): with a host the sheets are drawn in the full-window layer above the home card (full width, scrim over the whole screen);
     // the state stays here. Without one they are drawn in place, as before.

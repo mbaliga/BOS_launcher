@@ -145,7 +145,7 @@ fun FixedHomeChrome(
                     val fadeUnder = with(density) { FixedHomeChrome.UNDER_CORNER_FADE_DP.dp.toPx() }
                     val clearUnder = with(density) { FixedHomeChrome.UNDER_CORNER_CLEAR_DP.dp.toPx() }
                     Box((if (under) Modifier.fillMaxWidth() else Modifier).fadeClippedEdges(under && topLeftHotspot, under && topRightHotspot, fadeUnder, rtl = false, clearPx = clearUnder), contentAlignment = Alignment.Center) {
-                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = FixedHomeChrome.titleWidthDp(w, topLeftHotspot, topRightHotspot, musicWidth).dp)
+                    NowPlayingLine(media, inkDim, !reduced, onActivate = { tapLine() }, maxWidth = FixedHomeChrome.titleWidthDp(w, topLeftHotspot, topRightHotspot, musicWidth).dp, dark = dark)
                     }
                 }
             }

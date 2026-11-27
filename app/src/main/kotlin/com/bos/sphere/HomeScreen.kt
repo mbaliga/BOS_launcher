@@ -1842,7 +1842,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
                 if (prefs.leftPage == com.bos.sphere.core.data.LeftPage.Launchpad) leftOpen = true else hubStandalone = true
             }
         }
-        // Wave 29: Ground Control's Comms rows (Read history, Groups and rules) bring Comms up through the same request the panel tiles use.
+        // Wave 29: Ground Control's Comms rows (Read history, Manage groups and rules — wave 60) bring Comms up through the same request the panel tiles use.
         val commsOpenSignal by com.bos.sphere.ui.LaunchpadHubNav.openSignal.collectAsState()
         LaunchedEffect(commsOpenSignal) {
             if (commsOpenSignal) {

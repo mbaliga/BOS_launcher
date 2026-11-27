@@ -106,6 +106,11 @@ internal object SettingsRowMeta {
         "Wheel groups" to listOf("letters", "categories", "spokes", "drawer"),
         "Open with" to listOf("default app", "browser", "music", "email", "maps"),
         "Backup" to listOf("export", "import", "restore", "snapshot"),
+        // Wave 60 (polish60, CFG-80): hidden alias for the row's old title ("Groups and rules"), so existing muscle memory still finds it
+        // under its new name (it collided with "Grouping & rules" below, the Settings pane; this one opens Comms' own manager overlay).
+        "Manage groups and rules" to listOf("groups and rules", "comms manager", "rule editor", "notification groups"),
+        // Wave 60: the Settings pane keeps its wave 58 name; a synonym so "groups" alone (the word the renamed action above now needs "manage" for) still finds it too.
+        "Grouping & rules" to listOf("default grouping", "per app delivery", "message rules"),
     )
 
     /** A slider's default (it may follow another preference, so it is given the current prefs) and the unit its readout carries. */

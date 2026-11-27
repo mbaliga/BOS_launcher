@@ -91,6 +91,8 @@ fun PageEditorTabRow(selected: EditorTab, onSelect: (EditorTab) -> Unit, modifie
 /** What the Settings tab can change, as one callback: the pages' wallpaper switch and the Glance's content and hotspots. Deleting a page lives in its card's menu only. */
 class PageEditorSettingsActions(
     val onPrefs: ((LauncherPrefs) -> LauncherPrefs) -> Unit,
+    /** Wave 60 (testFlake, CFG-77): opens the Hotspots editor as a full page (the same component as Settings > Home > Corners and the Home sheet tile). Null hides the row (no caller wired). */
+    val onEditHotspots: (() -> Unit)? = null,
 )
 
 /** The content under the tabs. [page] is the page being edited (null while the Glance card is the focus). */
@@ -142,13 +144,19 @@ fun PageEditorContent(
 private fun Modifier.verticalScrollable(): Modifier = this.verticalScroll(rememberScrollState())
 
 @Composable
-private fun ActionTile(label: String, onClick: () -> Unit) {
+private fun ActionTile(label: String, onClick: () -> Unit, summary: String? = null, tag: String? = null) {
     Box(
         Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp).background(HyleColors.Surface.copy(alpha = 0.8f), RoundedCornerShape(18.dp))
             .border(1.dp, HyleColors.InkDim.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick).semantics { role = Role.Button; contentDescription = label },
+            .let { if (tag != null) it.testTag(tag) else it }
+            .clickable(onClick = onClick).semantics { role = Role.Button; contentDescription = if (summary == null) label else "$label: $summary" },
         contentAlignment = Alignment.CenterStart,
-    ) { Text(label, color = HyleColors.InkBright, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) }
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = HyleColors.InkBright, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            if (summary != null) Text(summary, color = HyleColors.InkDim, fontSize = 13.sp)
+        }
+    }
 }
 
 /**
@@ -247,7 +255,13 @@ private fun SettingsContent(page: Int?, pageCount: Int, prefs: LauncherPrefs, ac
         } else {
             Text(L10n.tr("Glance"), color = HyleColors.InkBright, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             ToggleRow(L10n.tr("Show music"), prefs.showMusic, { v -> actions.onPrefs { it.copy(showMusic = v) } }) // wave 38: the clock, date and weather are gone; the music line is the one toggle
-            // Wave 59 (glanceTop): the hotspot switches left this tab; the Hotspots editor (Settings, Home, Corners, or the Home sheet's tile) is the one place.
+            // Wave 59 (glanceTop): the hotspot switches left this tab for the one Hotspots editor; wave 60 (testFlake, CFG-77) adds the link to it here too.
+            if (actions.onEditHotspots != null) {
+                Text(L10n.tr("Hotspots"), color = HyleColors.InkDim, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 8.dp))
+                ActionTile(
+                    L10n.tr("Edit hotspots"), actions.onEditHotspots, summary = HotspotsEditorModel.summary(prefs.glanceHotspots), tag = "pe.settings.editHotspots",
+                )
+            }
         }
     }
 }

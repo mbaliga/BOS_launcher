@@ -69,7 +69,11 @@ class GlanceTopW59SettingsTest {
     private val edits = ArrayList<Pair<Corner, Boolean>>()
 
     @Before fun fresh() { AppSmokeHarness.resetProcess() }
-    @After fun done() { AppSmokeHarness.resetProcess() }
+    // Wave 60 (testFlake, CFG-67): every other app/feature-grid test that composes the Hotspots editor forces reduced motion (its selected corner pulses
+    // with a real infinite transition otherwise); this one test scrolled to the row and composed it with real motion, the one place that did not. Kept
+    // in line with that established, deliberate pattern even though isolating this test alone did not, by itself, reproduce or fix the app suite's rare
+    // full-run "Compose did not get idle" flake (investigated at length; see docs/status/w60-testFlake.md for the evidence and the honest conclusion).
+    @After fun done() { ReducedMotionTesting.force(null); AppSmokeHarness.resetProcess() }
 
     private fun model(p: LauncherPrefs) = SettingsModel(
         prefs = p, updatePrefs = { f -> stores.prefs.update(f) }, pageIndex = 0, pages = listOf(HomePage(keys = emptyList(), id = 1L)),
@@ -109,6 +113,7 @@ class GlanceTopW59SettingsTest {
     }
 
     @Test fun CFG_77_inSettingsATapTogglesAndPersistsAndEditOpensTheCornerEditor() {
+        ReducedMotionTesting.force(MotionPrefs(0f, 0f, 0f)) // wave 60 (testFlake): the editor's selected corner pulses with a real infinite transition otherwise
         var cats by mutableStateOf(buildSettingsCategories(model(stores.prefs.prefs.value)))
         val home = cats.indexOfFirst { com.bos.sphere.feature.grid.SettingsTabs.key(it.title) == com.bos.sphere.feature.grid.SettingsTabs.HOME }
         rule.setContent { SphereTheme { SettingsSpace(visible = true, categories = cats, initialCategory = home, sounds = null, onClose = {}) } }

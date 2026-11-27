@@ -134,6 +134,8 @@ fun PageEditorHost(
     onFile: () -> Unit,
     onGroup: (() -> Unit)?,
     onPrefs: ((LauncherPrefs) -> LauncherPrefs) -> Unit,
+    /** Wave 60 (testFlake, CFG-77): the Glance Settings tab's "Edit hotspots" row; null hides the row. */
+    onEditHotspots: (() -> Unit)? = null,
     notice: UndoNotice?,
     onNoticeDone: () -> Unit,
     focusAdd: Boolean,
@@ -200,7 +202,7 @@ fun PageEditorHost(
                         PageEditorContent(
                             tab = tab, page = if (glanceFocus) null else current, pageCount = pages.size, prefs = prefs, apps = apps, onHome = onHome, hasWork = hasWork, isWork = isWork,
                             drag = drag, focusRequester = focus, onAddApp = onAddApp, onWidget = onWidget, onFolder = onFolder, onShortcut = onShortcut, onLink = onLink, onFile = onFile, onGroup = onGroup,
-                            settings = PageEditorSettingsActions(onPrefs), modifier = Modifier.weight(1f).fillMaxSize(), widgetSource = widgetSource,
+                            settings = PageEditorSettingsActions(onPrefs, onEditHotspots), modifier = Modifier.weight(1f).fillMaxSize(), widgetSource = widgetSource,
                         )
                     }
                     // ---- the strip ----

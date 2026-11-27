@@ -1035,6 +1035,7 @@ fun HomeScreen(homeSignal: Int, externalAction: ExternalAction? = null) {
             prefs = prefs, isLandscape = isLandscape, focusAdd = editFocusAdd, savePages = { savePages(it) },
             // W47: the page editor uses the same bar as the single-page edit mode; Esc and Back there are Cancel (the confirm only when something changed).
             onExit = { chromeState.requestCancel(homeEdit.hasChanges) { homeEdit.cancel() } },
+            onEditHotspots = { hotspotsPage = true }, // wave 60 (testFlake, CFG-77): the Glance Settings tab's link to the one Hotspots editor
             topBar = {
                 val say = com.bos.sphere.feature.grid.rememberAnnouncer()
                 com.bos.sphere.feature.grid.EditTopBar(

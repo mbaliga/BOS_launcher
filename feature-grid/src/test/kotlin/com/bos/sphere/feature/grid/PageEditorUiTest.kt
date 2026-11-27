@@ -123,6 +123,7 @@ class PageEditorUiTest {
         c: Calls, pages: List<HomePage>, current: Int = 0, continuous: Boolean = false, landscape: Boolean = false, rtl: Boolean = false, orderRtl: Boolean = false,
         glanceOn: Boolean = true, glanceFocus: Boolean = false, swing: PageEditorGeometry.Swing = PageEditorGeometry.REST, onHome: Set<String> = emptySet(),
         reduced: Boolean = false, fontScale: Float = 1f, focusAdd: Boolean = false, keyboard: Boolean = false, topBar: (@androidx.compose.runtime.Composable () -> Unit)? = null,
+        onEditHotspots: (() -> Unit)? = null,
     ) {
         drag = AddCarouselDrag()
         rule.setContent {
@@ -147,7 +148,7 @@ class PageEditorUiTest {
                         onSelectPage = { i, dx, dy -> c.selected += Triple(i, dx, dy) }, onSelectGlance = { dx, dy -> c.glance += dx to dy }, onAddPage = { dx, dy -> c.added += dx to dy },
                         onDelete = { c.deleted += it }, onMove = { i, d -> c.moved += i to d }, onReorder = { f, t -> c.reordered += f to t }, onAddApp = { c.addedApps += it.label }, onDropApp = { a, p -> c.dropped += a.label to p },
                         onWidget = { c.widgets += it.label }, onFolder = { c.folder++ }, onShortcut = {}, onLink = {}, onFile = {}, onGroup = { c.group++ },
-                        onPrefs = { f -> c.prefs = f(c.prefs) }, notice = null, onNoticeDone = {}, focusAdd = focusAdd, onExit = { c.exit++ },
+                        onPrefs = { f -> c.prefs = f(c.prefs) }, onEditHotspots = onEditHotspots, notice = null, onNoticeDone = {}, focusAdd = focusAdd, onExit = { c.exit++ },
                         topBar = topBar, widgetSource = { fakeWidgets },
                     )
                     // The live page, in the focus slot (the real home does this with the same frame).
@@ -428,6 +429,26 @@ class PageEditorUiTest {
         // wave 59 (glanceTop): the hotspot switches left this tab (the Hotspots editor is the one place)
         rule.onAllNodesWithText("Hotspots").assertCountEquals(0); rule.onAllNodesWithText("Top left").assertCountEquals(0)
         shoot("glance_focus")
+    }
+
+    /** Wave 60 (testFlake, CFG-77): the Glance Settings tab's "Edit hotspots" row opens the one Hotspots editor. */
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_pe51_editHotspotsRowOpensTheEditor() {
+        val c = Calls(); var opened = 0
+        host(c, fourPages, current = 0, glanceFocus = true, onEditHotspots = { opened++ })
+        rule.onNodeWithTag("pe.settings.editHotspots").assertIsDisplayed()
+        rule.onNodeWithText("Edit hotspots").assertIsDisplayed()
+        rule.onNodeWithTag("pe.settings.editHotspots").performClick()
+        assertEquals(1, opened)
+        shoot("glance_focus_edit_hotspots")
+    }
+
+    /** With no caller wired (the default), the row and its "Hotspots" heading are gone, as pe24b already checks for the old per-corner switches. */
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_pe51b_editHotspotsRowIsGoneWithNoCallerWired() {
+        val c = Calls(); host(c, fourPages, current = 0, glanceFocus = true)
+        rule.onAllNodesWithTag("pe.settings.editHotspots").assertCountEquals(0)
+        rule.onAllNodesWithText("Edit hotspots").assertCountEquals(0)
     }
 
     @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")

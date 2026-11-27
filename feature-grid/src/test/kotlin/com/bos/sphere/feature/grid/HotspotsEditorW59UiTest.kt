@@ -7,8 +7,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -20,10 +23,12 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
@@ -148,6 +153,35 @@ class HotspotsEditorW59UiTest {
         fun pulse() = rule.onNodeWithTag(HotspotsEditorTags.PULSE, useUnmergedTree = true).fetchSemanticsNode().config[HotspotPulse]
         val a = pulse(); rule.mainClock.advanceTimeBy(350)
         assertEquals(1f, a, 0f); assertEquals(1f, pulse(), 0f)
+    }
+
+    /**
+     * Wave 60 (testFlake, CFG-67): a regression for the app suite's rare "Compose did not get idle" flake. The selected corner's pulse is a real,
+     * infinite transition with full motion; composing it, then disposing the editor (as a test that forgets to force reduced motion or stop the
+     * clock would leave it), must cancel that transition with the composition, so the host settles promptly on the very next [waitForIdle] rather
+     * than spin forever polling a leaked animation (the symptom the flake showed on an unrelated, later test in the same JVM fork).
+     */
+    @Test fun CFG_77_wave60_disposingTheEditorCancelsItsPulseSoTheHostStaysIdle() {
+        var showEditor by mutableStateOf(true)
+        rule.setContent {
+            if (showEditor) {
+                Box(Modifier.fillMaxSize()) {
+                    HotspotsEditorFor(
+                        prefs = prefs.value, update = { f -> Snapshot.withMutableSnapshot { prefs.value = f(prefs.value) } },
+                        portraitSlots = DefaultCorners, landscapeSlots = landscape, deviceLandscape = false, deviceRotation = 0,
+                        appsByKey = emptyMap(), onEdit = { _, _ -> },
+                    )
+                }
+            } else Text("idle")
+        }
+        // The selected corner (Top left, by default) pulses with real motion: not forced here, on purpose.
+        rule.mainClock.advanceTimeBy(500)
+        corner(Corner.TopLeft).assertIsSelected()
+        showEditor = false // leaves the editor's composition: its infinite pulse coroutine must be cancelled with it
+        val start = System.currentTimeMillis()
+        rule.waitForIdle() // a leaked pulse would keep requesting frames forever and this would hang (the flake's exact symptom)
+        assertTrue("waitForIdle returned promptly once the pulse's composition left", System.currentTimeMillis() - start < 10_000)
+        rule.onNodeWithText("idle", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun CFG_78_eachCornerIsALabelledToggleWithItsItemAndState() {

@@ -49,7 +49,7 @@ Not changed: the quiet (dot-only) form of the waiting indicator, the corner "pee
 not a mid-edge bulge, and a weaker match for the reference's flush-at-x=0 criterion), and the music-reliability and Settings-flake
 work landing in the same wave (separate agents, separate files).
 
-## Not done
+## Not done (as of the pixel-traced version above)
 - The flare:corner ratio was **not** recalibrated to the reference's measured ~1:1 split (the current code is closer to 2:1,
   28:14). The pixel trace's exact dp mapping from a cropped, unknown-DPI reference image is too uncertain to retune with
   confidence; the change made here (eliminating the straight-run seam) is the part the measured data supports without
@@ -59,3 +59,48 @@ work landing in the same wave (separate agents, separate files).
 - Whether `WaitingIndicatorView` is in fact the UI element the owner meant by "the thing that hosts notifications" is a reasoned
   call, not a certainty: it is the left-edge, flush-to-x=0 indicator whose own docstring already says it "hugs the physical left
   edge", which best matches the reference image's positioning, but no second screenshot confirms it.
+
+## Revision: the owner supplied the actual design source (`Music Controls.svg` / `Notification bar.svg`)
+
+The owner followed up with a `Bulge_thingies.zip` containing the two components' real exported vector paths - the ground truth
+the pixel trace above was only approximating. Parsing both confirmed the earlier guess architecturally (`Notification bar.svg` is
+`Music Controls.svg`'s exact path with every `(x, y)` control point swapped, matching `path`/`edgePath`'s transpose relationship
+byte-for-byte at matching offsets) but revealed the **curve itself** was still wrong in detail: the real curve is not a 2-piece
+"shoulder, then a separate circular corner" (what `path()` built, even after the `hs = h - c` fix) - it is **one continuous
+8-segment cubic spline** that leaves the flush edge with a horizontal tangent and arrives at the flat body with a horizontal
+tangent too, with no intermediate vertical-tangent waypoint.
+
+**Decision: replace the shoulder+corner construction with the traced spline, normalized and scaled to fit the existing reach/depth
+budget.** `NotchShape`'s `shoulderPoints`/`shoulderAt`/the old `path()` are gone; a private `FLARE_SPLINE` (the 8 segments'
+control points, normalized to a 0..1 reach/depth unit square) and a `flareSpline()` builder replace them, used by both `path()`
+and `edgePath()` (still an exact transpose of each other - `flareSpline`'s `reachX/reachY/depthX/depthY` pair just swaps which
+real axis plays which role). Verified by reconstructing the exact reference curve in Python from the parsed SVG and rendering it
+pixel-for-pixel against the original `Music Controls.svg` (Playwright screenshot, overlaid) before porting it to Kotlin - the two
+are visually indistinguishable at the reference's own 366x67 scale.
+
+The reference's own absolute proportions (reach ≈ 2.15x depth) are **not** used directly: at that ratio, `FLARE_DP`'s existing
+28dp (and even a much larger value) would eat far more than half the notch's own `MIN_WIDTH_DP` body, breaking the existing
+"three 48dp targets fit the body" contract. The curve's *character* (continuous, no straight run, horizontal at both ends) is
+preserved exactly; its reach is still bounded by `FLARE_DP + CORNER_DP` (42dp, unchanged) and its depth is always the real `h` -
+a deliberate choice to keep the existing structural/layout guarantees rather than the reference's literal aspect ratio.
+
+**New bug found and fixed while verifying at production sizes:** the Launchpad waiting indicator's badge can be as short as its
+own `heightIn(min = 36.dp)`. With `reach = flare + corner` uneclamped, a badge shorter than `2 * reach` makes the two mirrored
+curves cross into a pointed, arrow-like shape instead of a bulge (caught by rendering the real sizes with Playwright, not by the
+unit tests alone, which only checked bounds). `path()`/`edgePath()` now clamp `reach` to at most half the available width/length.
+The badge's own `flare`/`corner` were also tuned down from 14/8 to **10/6dp** so the common case stays clear of the clamp
+entirely and reads less "pinched" even at the 36dp minimum (still a compressed, pointier bulge than at a taller badge height -
+an inherent trade-off of a wide, gentle reference curve squeezed into a short badge, not a bug).
+
+Verified: `EdgeBulgeShapeW60Test.kt` (the no-crossing clamp, the transpose relationship, reach/depth reaching exactly `h`/`w`) and
+a new `EdgeBulgeShapeShotW60Test.kt` (real Compose+Robolectric `PixelCopy` screenshots of both shapes at realistic sizes,
+`build/screenshots/w60_shape_*.png`, read and judged - the top notch and the taller waiting-indicator badge both read as clean,
+seamless bulges matching the reference image's silhouettes; the 36dp-minimum badge is visibly more compressed/pointed, the
+honest trade-off above).
+
+### Not done (this revision)
+- The reference's literal reach:depth aspect ratio is still not reproduced (see above - a deliberate, not an oversight).
+- No device screenshot; verification is Robolectric `PixelCopy` screenshots and the Playwright-rendered SVG comparison, not a
+  real phone.
+- The 36dp-minimum badge still looks more pointed than the taller states; a further redesign (e.g. a higher minimum height, or a
+  badge-specific curve) was not attempted.

@@ -9,14 +9,14 @@ object GlanceNotch {
     /** The drawn height below the display cutout (the cutout itself is also covered: the shape starts at y = 0). */
     /** Wave 23: as tall as the 48 dp targets, so the drawn notch and the touch area are the same (no invisible hit area below it). */
     const val BODY_HEIGHT_DP = 48f
-    /** Concave flare of each top shoulder, and the convex radius of each bottom corner. */
+    /** How far the notch's curve eats into the flat body from each side (together with [CORNER_DP]); see [NotchShape]. */
     const val FLARE_DP = 28f
     /**
-     * Legacy fixed shoulder height, kept only for the geometry tests that exercise [NotchShape.shoulderAt] in isolation. The live notch
-     * (GlanceHome.kt) no longer passes this: it lets [NotchShape.path]'s `hs` default to `h - corner`, so the shoulder curve always lands
-     * exactly where the bottom corner's straight run would otherwise start. A fixed shoulder shorter than `h - corner` left a straight
-     * vertical seam between the two curves whenever the cutout made the notch taller than shoulder + corner, which read as a kink rather
-     * than the single smooth bulge the shape is meant to be.
+     * Legacy fixed shoulder height, kept only for the geometry tests that exercise [NotchShape.shoulderAt] in isolation (a 4-point
+     * single-cubic approximation of the curve's start). The live notch (GlanceHome.kt) no longer uses a "shoulder" and "corner" as two
+     * separate pieces at all: `NotchShape.path`'s curve is one continuous spline, traced directly from the owner's own design file
+     * ("Music Controls.svg"), that leaves the flush edge and arrives at the flat body both with a horizontal tangent, with no join and
+     * no straight run anywhere in between - for any notch height, by construction, not by a runtime rule that could be gotten wrong.
      */
     const val SHOULDER_DP = 26f
     const val CORNER_DP = 14f

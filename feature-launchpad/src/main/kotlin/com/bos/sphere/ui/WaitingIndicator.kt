@@ -143,10 +143,11 @@ fun WaitingIndicatorView(
             .heightIn(min = 36.dp)
             // W60 (owner: trace the reference shape exactly): the same melts-into-the-edge bulge as the Glance music-controls notch,
             // transposed for this vertical edge (EdgeBulgeShape = NotchShape.edgePath), not a plain two-corner rounded rect. Flare/corner
-            // are scaled down from the notch's own (28/14 dp, tuned for a ~48-88 dp tall bar) to suit this badge's much shorter height.
+            // are scaled down from the notch's own (28/14 dp, tuned for a ~48-88 dp tall bar): 10/6 keeps the curve clear of its own
+            // reach-clamp (which still applies, and still protects it) at this badge's 36 dp minimum height without looking pinched.
             .background(
                 if (priorityCount > 0 && accent != null) lpAccentFill(accent).copy(alpha = 0.95f) else Color(0xE60A5C95),
-                EdgeBulgeShape(flare = 14f, corner = 8f),
+                EdgeBulgeShape(flare = 10f, corner = 6f),
             )
             .padding(start = 10.dp, end = if (headline != null) 10.dp else 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

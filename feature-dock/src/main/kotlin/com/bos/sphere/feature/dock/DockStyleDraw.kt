@@ -236,7 +236,8 @@ fun DockStylePreview(style: DockStyle, modifier: Modifier = Modifier, dark: Bool
             }
             return@Box
         }
-        val pill = RoundedCornerShape(12.dp)
+        // W60: a percent shape, so the preview card's capsule matches the real dock's at any height (see DockRail.kt for the reasoning).
+        val pill = RoundedCornerShape(50)
         Row(
             Modifier.dockSurface(style, dark, DockEdge.Bottom, pill, 12f).padding(horizontal = 6.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,

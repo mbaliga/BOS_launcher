@@ -161,7 +161,10 @@ fun DockRail(
         val at = if (b != null) Offset(b.center.x, b.bottom) else railOrigin
         menuPress = androidx.compose.ui.unit.IntOffset(at.x.toInt(), at.y.toInt()); menuFor = i
     }
-    val shape = RoundedCornerShape(22.dp)
+    // W60 (owner: "I want the default dock to have fully rounded ends, like a capsule"): a percent corner shape always radii at
+    // min(width, height)/2, so the short ends of the bar are true semicircles whatever the bar's height turns out to be, rather than
+    // a fixed-dp rounded rect that only looks like a capsule by coincidence at one particular height.
+    val shape = RoundedCornerShape(50)
     val surface = Modifier.dockSurface(style, dark, edge, shape)
     val glyph = glyphColor(style, HyleColors.InkDim)
     val threeD = style == com.bos.sphere.core.data.DockStyle.ThreeD

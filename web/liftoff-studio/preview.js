@@ -353,7 +353,8 @@
     if (style === '3d') {
       for (var k = 6; k >= 1; k--) out += rect(bx - k, by + 4 + k * 1.4, bw + 2 * k, bh, 24 + k, 'rgba(0,0,0,' + f1(0.05 * (7 - k)) / 1 + ')');
       out += rect(bx, by, bw, bh, 24, 'url(#slab)', 'stroke="' + (T.dark ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.9)') + '"') + (vertical ? '' : rect(bx + 12, by + 4, bw - 24, 3, 1.5, 'rgba(255,255,255,0.35)'));
-    } else if (style !== 'transparent') out += rect(bx, by, bw, bh, 24, T.panel, 'stroke="' + T.hair + '"');
+    // W60: a capsule (radius = half the bar's own thickness, not a fixed value), matching the app's percent-corner shape.
+    } else if (style !== 'transparent') out += rect(bx, by, bw, bh, Math.min(bw, bh) / 2, T.panel, 'stroke="' + T.hair + '"');
     // the icons, grown under the sample pointer; they grow away from the edge the dock sits on, and the row spreads to make room
     var extra = 0; items.forEach(function (it, i) { extra += it[1] * (sc[i] - 1); });
     // the grown row stays on the screen: when it would not fit, the whole row is drawn a little smaller (the bar keeps its place)

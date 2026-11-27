@@ -188,12 +188,32 @@ fun DockRail(
     var restMain by remember { mutableIntStateOf(0) }
     var engaged by remember { mutableStateOf(false) }
     val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    // W60 (dockMagnifyFix): how far outside the rail's own measured bounds a finger may drift before the press-drag-release gesture cancels — a
+    // small forgiving margin (roughly a third of a slot), so a finger that is still clearly "on" the strip (just a few px past its hit-tested edge,
+    // the usual slop of a real touch) is not punished, while a finger dragged meaningfully away (up off a bottom dock, say) still cancels promptly.
+    val gestureMarginPx = 18f * dens
     if (field != null) {
         SideEffect {
             field.density = dens; field.horizontal = horizontal; field.edge = edge; field.factor = if (magnifyOn) magnify!!.factor else 1f
             field.pitch = DockMagnify.PITCH_DP * dens; field.gapHalf = (DockMagnify.PITCH_DP - DockMagnify.SLOT_DP) / 2f * dens
             field.lo = 0f; field.hi = (if (horizontal) railSize.width else railSize.height).toFloat()
             field.demo = if (magnifyOn) demoPointer else null
+            // W60 (dockMagnifyFix): the press-drag-release gesture (see trackMagnify's doc). Off while editing or with magnify off: a per-item
+            // clickable keeps launching exactly as it always did. Refreshed every recomposition so the long-lived tracking coroutine always sees
+            // the current rail bounds, items and whether a menu is open, without ever needing to restart (which would drop the finger mid-gesture).
+            field.gestureActive = magnifyOn
+            field.insideBounds = { p ->
+                p.x >= -gestureMarginPx && p.x <= railSize.width + gestureMarginPx && p.y >= -gestureMarginPx && p.y <= railSize.height + gestureMarginPx
+            }
+            field.onGestureRelease = { cancelled, at ->
+                if (!cancelled && menuFor < 0) {
+                    val main = if (horizontal) at.x else at.y
+                    val r = field.result.value
+                    val i = r.indexAt(main)
+                    val idx = if (i >= 0) r.ids[i] - 1 else -1
+                    if (idx in items.indices) actions.onLaunch(items[idx], idx)
+                }
+            }
         }
         LaunchedEffect(field) { snapshotFlow { field.engaged }.collect { engaged = it } }
         LaunchedEffect(field, reduced) {
@@ -235,7 +255,13 @@ fun DockRail(
             .onGloballyPositioned { c ->
                 railOrigin = c.positionInRoot(); railSize = c.size; onCoordinates?.invoke(c)
                 field?.viewport = c; field?.refreshAll()
-                if (field != null && field.demo != null) { field.lo = 0f; field.hi = (if (horizontal) c.size.width else c.size.height).toFloat() }
+                // W60 (dockMagnifyFix): set [lo]/[hi] straight from this callback's own measured size, not only through the `SideEffect` below that
+                // reads the `railSize` state var — a recomposition that changes `padded` (engaging the slack) can relayout the rail, growing its
+                // real measured size, several frames before anything schedules DockRail to recompose again and re-run that `SideEffect`, which left
+                // `compute()` clamping the spread to the OLD, smaller room long after the rail had actually grown to hold it (part of the root cause
+                // behind the owner's screenshot: a plainly non-overflowing dock still getting cropped once touched). This keeps the room compute()
+                // sees always exactly what was just measured, with no extra round trip through recomposition.
+                if (field != null) { field.lo = 0f; field.hi = (if (horizontal) c.size.width else c.size.height).toFloat() }
                 if (!padded) restMain = if (horizontal) c.size.width else c.size.height
             }
             .then(if (field != null) Modifier.pointerInput(field) { trackMagnify(field) } else Modifier)
@@ -268,8 +294,9 @@ fun DockRail(
                 .then(if (field != null && magnifyOn) Modifier.graphicsLayer {
                     val r = field.result.value
                     if (r.size > 0 && field.amount != 0f) {
-                        val gs = if (r.baseStart < 0f) 0f else (r.baseStart - r.start).coerceAtLeast(0f)
-                        val ge = if (r.baseEnd > (if (horizontal) railSize.width else railSize.height).toFloat()) 0f else (r.end - r.baseEnd).coerceAtLeast(0f)
+                        // W60 (dockMagnifyFix): the same pure function the stress test checks, fed the exact fields the icon layers draw from — so the
+                        // shelf can never disagree with (or grow past) the icons' own, now always-contained, geometry.
+                        val (gs, ge) = DockMagnify.surfaceGrowth(r.baseStart, r.baseEnd, r.start, r.end)
                         val len = if (horizontal) size.width else size.height
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                         if (horizontal) { scaleX = (len + gs + ge) / len; translationX = -gs } else { scaleY = (len + gs + ge) / len; translationY = -gs }
@@ -282,14 +309,14 @@ fun DockRail(
             if (editing) DockAddTile(actions.onAddApps, graphBridge, style) // W55: the plus tile (first, so a long row never scrolls it out of reach) opens the app picker
             content.pinned.forEachIndexed { i, item ->
                 DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = { pendingFocus = it }, bridge = graphBridge, widget = widget, style = style, dark = dark, editing = editing,
-                    onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE }, edge = edge, field = field)
+                    onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE }, edge = edge, field = field, magnifyOn = magnifyOn)
             }
             if (!editing && content.showRecentSection && content.recent.isNotEmpty()) {
                 SectionDivider(horizontal, style, edge, field)
                 content.recent.forEachIndexed { j, item ->
                     val i = content.pinned.size + j
                     DockSlot(item, i, items.size, horizontal, showNumbers, icon, actions, requesters[i], items, onFocusMove = { requesters.getOrNull(it)?.runCatching { requestFocus() } }, onMoved = {}, reorderable = false, bridge = graphBridge, style = style, dark = dark,
-                        onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE }, edge = edge, field = field)
+                        onBounds = { slotBounds[i] = it }, onMenu = { openItemMenu(i) }, onDragBegin = { menuFor = MENU_NONE }, edge = edge, field = field, magnifyOn = magnifyOn)
                 }
             }
             if (!editing && content.showEnableRow) EnableButton(actions.onEnableUsage, graphBridge, style, edge, field)
@@ -418,6 +445,9 @@ private fun DockSlot(
     editing: Boolean = false,
     edge: DockEdge = DockEdge.Bottom,
     field: MagnifyField? = null,
+    /** W60 (dockMagnifyFix): while this is on, the slot's own clickable no longer launches on its own — the rail's press-drag-release gesture
+     * (trackMagnify's `onGestureRelease`) does all the launching, for both a plain tap and a drag release, so the two can never double-fire. */
+    magnifyOn: Boolean = false,
 ) {
     val slot = 52.dp
     // HOM-02: a pinned widget takes its span of slots along the rail and one slot across it.
@@ -486,11 +516,15 @@ private fun DockSlot(
                     DockKeyAction.None -> false
                 }
             }
+            // W60 (dockMagnifyFix): while magnify is on, the rail's own press-drag-release gesture does the launching (see trackMagnify's doc and
+            // the rail's `onGestureRelease`); this modifier still supplies the ripple/indication, the role and (for a recent item) the long click,
+            // but its own `onClick` is a no-op so a plain tap is never launched twice.
             .then(if (editing) Modifier else if (reorderable) {
                 // W56: in the 3D look the press feedback is the lifted icon and its tooltip (a ripple over the whole slot reads as a dark box on glass)
-                if (threeD) Modifier.clickable(interactionSource = noRippleSource, indication = null) { actions.onLaunch(item, index) } else Modifier.clickable { actions.onLaunch(item, index) }
-            } else if (threeD) Modifier.combinedClickable(interactionSource = noRippleSource, indication = null, onLongClick = onMenu) { actions.onLaunch(item, index) }
-            else Modifier.combinedClickable(onLongClick = onMenu) { actions.onLaunch(item, index) }) // W25: a recent icon has no reorder drag, so its long press is the click's own
+                if (threeD) Modifier.clickable(interactionSource = noRippleSource, indication = null) { if (!magnifyOn) actions.onLaunch(item, index) }
+                else Modifier.clickable { if (!magnifyOn) actions.onLaunch(item, index) }
+            } else if (threeD) Modifier.combinedClickable(interactionSource = noRippleSource, indication = null, onLongClick = onMenu) { if (!magnifyOn) actions.onLaunch(item, index) }
+            else Modifier.combinedClickable(onLongClick = onMenu) { if (!magnifyOn) actions.onLaunch(item, index) }) // W25: a recent icon has no reorder drag, so its long press is the click's own
             // HOM-02: an icon slot starts a reorder with a long press anywhere on it. A widget slot does not: the hosted view takes the touches that
             // start on it (its own taps, scrolls and long-presses), so its reorder lives on the grip strip drawn above it.
             .then(if (editing && reorderable && !wide) editDrag else if (reorderable && !wide) reorderDrag else Modifier)

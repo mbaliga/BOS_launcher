@@ -114,7 +114,11 @@ class DockMagnifyUiW56Test {
 
     // --------------------------------------------------------------------------------------------------------------------------------------
 
-    @Test fun DCK_04_mag_ui_01_aTouchDragAlongTheDockGrowsTheIconsAroundTheFingerAndAReleaseSpringsThemBack() {
+    // W60 (dockMagnifyFix): this used to assert that a drag-then-release launched NOTHING ("decoupled from the magnify gesture", per the wave 60
+    // brief). The owner asked for press-anywhere-drag-release-to-launch instead: the release inside the dock now launches whatever the magnified
+    // geometry is under the finger at that moment (here, D, since the finger dragged past C onto D before lifting). See `DockGestureW60Test` for the
+    // fuller matrix (drag-to-a-different-icon, drag-outside-cancels, plain-tap-unchanged, long-press-unchanged).
+    @Test fun DCK_04_mag_ui_01_aTouchDragAlongTheDockGrowsTheIconsAroundTheFingerAndThenLaunchesWhereItIsReleased() {
         rule.setContent { Scene(4) }
         val rest = listOf("App A", "App B", "App C", "App D").map { widthOf(it) }
         assertEquals("resting slot width is 52 dp", 52f, rest[2], 0.5f)
@@ -128,9 +132,9 @@ class DockMagnifyUiW56Test {
         settle(350)
         assertTrue("moving right shifts the peak right: D (${widthOf("App D")}) is now bigger than B (${widthOf("App B")})", widthOf("App D") > widthOf("App B"))
         rule.onNodeWithContentDescription("App C").performTouchInput { up() }
+        assertEquals("the finger started on C but lifted over D, inside the dock: D launches, not C", listOf("launch App D"), ran)
         settle(700)
         listOf("App A", "App B", "App C", "App D").forEachIndexed { i, l -> assertEquals("$l springs back to its resting size", rest[i], widthOf(l), 0.8f) }
-        assertEquals("nothing launched by a drag", emptyList<String>(), ran)
     }
 
     @Test fun DCK_04_mag_ui_01_theGrowthIsAnimatedNotInstant() {
@@ -173,9 +177,9 @@ class DockMagnifyUiW56Test {
         settle()
         val b = boundsOf("App B"); val a = boundsOf("App A")
         // B's right part (past where its resting slot ended) now belongs to B; the neighbour C starts further right
-        val x = b.right.value - 4f; val y = (b.top.value + b.bottom.value) / 2f
+        val x = b.right.value - 20f; val y = (b.top.value + b.bottom.value) / 2f
         assertTrue("B reaches beyond its resting width", b.width.value > 60f)
-        rule.onNodeWithContentDescription("App B").performMouseInput { moveTo(Offset(width - 4f * density, height / 2f)); click(Offset(width - 4f * density, height / 2f)) }
+        rule.onNodeWithContentDescription("App B").performMouseInput { moveTo(Offset(width - 20f * density, height / 2f)); click(Offset(width - 20f * density, height / 2f)) }
         assertEquals(listOf("launch App B"), ran)
         assertTrue("A is to the left of B and did not launch (${a.right.value} <= $x at y=$y)", a.right.value <= b.left.value + 1f)
     }

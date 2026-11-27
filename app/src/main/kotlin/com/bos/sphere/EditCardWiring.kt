@@ -106,6 +106,8 @@ fun EditCardOverlay(
     /** W47: the one edit bar (the home's chrome bar with the title "Editing pages") in the page editor's top slot, and what Esc does there (the Cancel rule). */
     topBar: (@Composable () -> Unit)? = null,
     onExit: () -> Unit = { homeEdit.exit() },
+    /** Wave 60 (testFlake, CFG-77): the Glance Settings tab's "Edit hotspots" row (opens the Hotspots editor as a full page); null hides the row. */
+    onEditHotspots: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -192,6 +194,7 @@ fun EditCardOverlay(
         onFile = { homeItems.fileRequest++ },
         onGroup = { homeItems.groupOpen = true },
         onPrefs = { f -> stores.prefs.update(f) },
+        onEditHotspots = onEditHotspots,
         notice = notice, onNoticeDone = { notice = null },
         focusAdd = focusAdd, onExit = onExit, topBar = topBar,
         modifier = modifier,

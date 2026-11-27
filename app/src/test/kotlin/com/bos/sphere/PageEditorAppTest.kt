@@ -160,6 +160,26 @@ class PageEditorAppTest {
         assertTrue(has("Actions for page 1"))
     }
 
+    /**
+     * Wave 60 (testFlake, CFG-77): the Glance Settings tab's "Edit hotspots" row opens the same Hotspots editor as Settings > Home > Corners and the
+     * Home sheet tile, and an edit there (turning a corner off) is reflected back in the row's "N of 4 on" summary once the editor is dismissed.
+     */
+    @Test fun HOM_12_pe52_editHotspotsOpensTheEditorAndAnEditThereReflectsOnTheRow() {
+        val stores = start(glance = true); openEditor(stores)
+        rule.onNodeWithTag("pe.glance").performClick(); settle(700)
+        rule.onNodeWithTag("pe.glance").assertIsSelected()
+        rule.onNodeWithTag("pe.settings.editHotspots").performScrollTo()
+        rule.onNodeWithText("4 of 4 on").assertIsDisplayed() // the row's summary before any edit
+        rule.onNodeWithTag("pe.settings.editHotspots").performClick(); settle(300)
+        assertTrue("the Hotspots editor opened as a full page", rule.onAllNodesWithTag("hotspots.page", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithTag(com.bos.sphere.feature.grid.HotspotsEditorTags.corner(com.bos.sphere.core.data.Corner.TopLeft)).performClick(); settle(300)
+        assertEquals(com.bos.sphere.core.data.GlanceHotspots.ALL - com.bos.sphere.core.data.Corner.TopLeft, stores.prefs.prefs.value.glanceHotspots)
+        rule.onNodeWithContentDescription("Back").performClick(); settle(300)
+        assertFalse("the editor page closed", rule.onAllNodesWithTag("hotspots.page", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithTag("pe.settings.editHotspots").performScrollTo()
+        rule.onNodeWithText("3 of 4 on").assertIsDisplayed() // the page editor's own row reads the update, same store
+    }
+
     // ---- wave 45 (pageEditorLayout) ----
 
     @Test fun HOM_12_pl10_moveLaterInTheCardsOverflowMenuReordersTheStoredPagesAndFocusesTheMovedPage() {

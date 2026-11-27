@@ -189,7 +189,6 @@ fun DockRail(
     val dens = LocalDensity.current.density
     var availMain by remember { mutableIntStateOf(0) }
     var restMain by remember { mutableIntStateOf(0) }
-    var engaged by remember { mutableStateOf(false) }
     val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
     // W60 (dockMagnifyFix): how far outside the rail's own measured bounds a finger may drift before the press-drag-release gesture cancels — a
     // small forgiving margin (roughly a third of a slot), so a finger that is still clearly "on" the strip (just a few px past its hit-tested edge,
@@ -218,7 +217,6 @@ fun DockRail(
                 }
             }
         }
-        LaunchedEffect(field) { snapshotFlow { field.engaged }.collect { engaged = it } }
         LaunchedEffect(field, reduced) {
             snapshotFlow { if (field.wantsMagnify) 1f else 0f }.collectLatest { target ->
                 if (reduced) field.amount = target
@@ -237,7 +235,10 @@ fun DockRail(
         }
     }
     // While it is touched the rail asks for room: the spread has somewhere to go at the ends (never more than the parent allows) and the grown icons have headroom.
-    val padded = magnifyOn && engaged
+    // W61: read field.engaged directly (not through a LaunchedEffect/snapshotFlow collector, which lagged a frame or more behind the actual touch):
+    // the padding this drives must grow in the SAME frame a touch starts, or DockMagnify.compute() sees the still-unpadded (tighter) room on the
+    // first frame(s) of a touch and falls back to its emergency "squeeze the spacing" path even on a dock with plenty of slack to give.
+    val padded = magnifyOn && field != null && field.engaged
     val slackDp = if (padded) (minOf(DockMagnify.slackDp(magnify!!) * dens, maxOf(0f, (availMain - restMain) / 2f))) / dens else 0f
     val headDp = if (padded) DockMagnify.headDp(magnify!!) else 0f
     val base = 10f

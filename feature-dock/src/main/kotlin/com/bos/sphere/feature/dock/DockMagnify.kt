@@ -170,23 +170,29 @@ object DockMagnify {
         // collapse at k = 1 already contains anything that full collapse at k = 0 (the rest layout) does.
         if (n >= 1 && amount != 0f) {
             fun within(): Boolean = mn >= lo - EPS && mx <= hi + EPS
-            fun fitsAt(k: Float): Boolean {
+            // Bisects the contraction lam down to [lamMin, 1] at a given growth k: lam = 1 is what was just placed (fails, or this wouldn't have
+            // been called); true only if the row fits somewhere in [lamMin, 1], i.e. the floor itself is not what is returned when it fails.
+            fun fitsAt(k: Float, lamMin: Float): Boolean {
                 place(1f, k)
                 if (within()) return true
-                // Bisect the contraction lam in [0, 1]: lam = 1 is what was just placed (fails), lam = 0 always succeeds (every centre at the
-                // pointer), unless the pointer's own fully-grown icon at this k cannot fit even collapsed to a point — then no lam helps, and the
-                // caller must try a smaller k instead.
-                place(0f, k)
+                place(lamMin, k)
                 val floorOk = within()
-                var good = 0f; var bad = 1f
+                var good = lamMin; var bad = 1f
                 repeat(24) { val mid = (good + bad) / 2f; place(mid, k); if (within()) good = mid else bad = mid }
                 place(good, k)
                 return floorOk
             }
-            if (!fitsAt(1f)) {
+            // W61: full growth (k = 1) is kept over a recognisable pitch whenever the two trade off — a dock that already scrolls at rest
+            // (so even an unmagnified row doesn't fit [lo, hi]) routinely needs the spacing squeezed well past MIN_PITCH_FRACTION just to
+            // hold the touched icon's own full size, and that is a better result than refusing to grow it at all. So: try the floor first
+            // (the common case, where there is enough room that growth never has to compete with it); only if the floor itself can't be
+            // honoured at full growth, retry at full growth with no floor (lam down to 0) before ever reducing growth itself; growth is
+            // reduced only as the very last resort, when even a fully squeezed-to-a-point row at full growth still does not fit (the
+            // pointer's own fully-grown icon cannot fit at all — out of scope, see DockMagnifyFixW60Test's own documented precondition).
+            if (!fitsAt(1f, MIN_PITCH_FRACTION) && !fitsAt(1f, 0f)) {
                 var good = 0f; var bad = 1f
-                repeat(16) { val mid = (good + bad) / 2f; if (fitsAt(mid)) good = mid else bad = mid }
-                fitsAt(good)
+                repeat(16) { val mid = (good + bad) / 2f; if (fitsAt(mid, 0f)) good = mid else bad = mid }
+                fitsAt(good, 0f)
             }
         }
         for (i in 0 until n) reach[i] = (halves[i] + gapHalf) * scale[i]
@@ -344,12 +350,18 @@ internal suspend fun PointerInputScope.trackMagnify(field: MagnifyField) {
             if (ev == null) { field.magnifyTouch = true; pending = false; continue }
             val c = ev.changes.firstOrNull() ?: continue
             val main = if (field.horizontal) c.position.x else c.position.y
+            // W61: DockMagnify.compute() is only ever proven correct (DockMagnifyFixW60Test) for a pointer within [lo, hi] - itself
+            // documented as a precondition, not a loophole. A real drag routinely reports one event already well outside the dock (the
+            // same frame that trips the cancel check below): without this clamp, field.pointer briefly held that raw, out-of-room value
+            // while amount was still springing down from an engaged touch, asking compute() to magnify around a pointer outside its own
+            // room - exactly the scenario the stress test excludes, and it degenerates by collapsing every icon onto the pointer at once.
+            val clampedMain = main.coerceIn(field.lo, field.hi)
             if (c.type != PointerType.Touch) {
                 // A mouse, trackpad or stylus: hovering is enough, the effect starts at once. A press-drag-release launches the same way a finger
                 // does; a plain click (no drag between press and release) reaches the release point with the geometry still unmagnified.
                 when {
                     ev.type == PointerEventType.Exit -> { field.pointerDown = false; field.magnifyTouch = false; cancelled = false }
-                    ev.type == PointerEventType.Press -> { down = c.position; field.pointer = main; field.pointerDown = true; field.magnifyTouch = true; cancelled = field.gestureActive && !field.insideBounds(c.position) }
+                    ev.type == PointerEventType.Press -> { down = c.position; field.pointer = clampedMain; field.pointerDown = true; field.magnifyTouch = true; cancelled = field.gestureActive && !field.insideBounds(c.position) }
                     ev.type == PointerEventType.Release -> {
                         if (field.gestureActive && !cancelled && !field.insideBounds(c.position)) cancelled = true
                         field.onGestureRelease(cancelled && field.gestureActive, c.position)
@@ -357,14 +369,14 @@ internal suspend fun PointerInputScope.trackMagnify(field: MagnifyField) {
                         cancelled = false
                     }
                     else -> {
-                        field.pointer = main; field.pointerDown = true; field.magnifyTouch = true
+                        field.pointer = clampedMain; field.pointerDown = true; field.magnifyTouch = true
                         if (field.gestureActive && !cancelled && !field.insideBounds(c.position)) cancelled = true
                     }
                 }
             } else if (c.pressed) {
                 if (!cancelled && (!field.pointerDown || ev.type == PointerEventType.Press)) { down = c.position; field.pointerDown = true; field.magnifyTouch = false; pending = true }
                 if (!cancelled) {
-                    field.pointer = main
+                    field.pointer = clampedMain
                     if (!field.magnifyTouch && (c.position - down).getDistance() > slop) { field.magnifyTouch = true; pending = false }
                     if (field.gestureActive && !field.insideBounds(c.position)) {
                         // Outside the dock's own interactive bounds without having lifted: cancelled at once, springing back now rather than

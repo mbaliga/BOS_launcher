@@ -24,6 +24,7 @@ import com.bos.sphere.core.data.MediaInfo
 import com.bos.sphere.core.data.MediaLogic
 import com.bos.sphere.core.data.MediaNow
 import com.bos.sphere.core.data.MediaPort
+import com.bos.sphere.core.data.MediaScheduler
 import com.bos.sphere.core.design.HyleTheme
 import com.bos.sphere.core.design.ReducedMotionTesting
 import com.bos.sphere.core.design.ThemeVariant
@@ -58,9 +59,33 @@ class FakePort(
     override fun unregister() { cb = null; registered = false }
     /** The player changes state: the framework calls the callback. */
     fun change(state: Int? = null, actions: Long? = null) { state?.let { this.state = it }; actions?.let { this.actions = it }; cb?.invoke() }
-    override fun transport(cmd: MediaCommands.Cmd) { calls += "transport:$cmd" }
-    override fun controllerKey(keyCode: Int): Boolean { calls += "controller:$keyCode"; return controllerOk }
-    override fun systemKey(keyCode: Int): Boolean { calls += "system:$keyCode"; return systemOk }
+    /** W60: a route can simulate the session reacting at the moment the call lands (a "confirms on this route" fake), by name
+     * ("transport" / "controller" / "system"); by default a route is accepted but silent, which is the "swallows the command" fake. */
+    var onCall: ((String) -> Unit)? = null
+    override fun transport(cmd: MediaCommands.Cmd) { calls += "transport:$cmd"; onCall?.invoke("transport") }
+    override fun controllerKey(keyCode: Int): Boolean { calls += "controller:$keyCode"; onCall?.invoke("controller"); return controllerOk }
+    override fun systemKey(keyCode: Int): Boolean { calls += "system:$keyCode"; onCall?.invoke("system"); return systemOk }
+}
+
+/** W60: a [MediaScheduler] a test drives by hand — "no callback arrived within the window" is simulated by never firing a task, not by
+ * sleeping a real thread. [advanceBy] fires every task now due (in fire-time order), including ones a just-fired task itself schedules. */
+class FakeMediaScheduler(var time: Long = 0L) : MediaScheduler {
+    private val tasks = mutableListOf<Pair<Long, () -> Unit>>()
+    override fun now(): Long = time
+    override fun postDelayed(delayMs: Long, action: () -> Unit): () -> Unit {
+        val entry = (time + delayMs.coerceAtLeast(0L)) to action
+        tasks += entry
+        return { tasks.remove(entry) }
+    }
+    fun advanceBy(ms: Long) {
+        time += ms
+        while (true) {
+            val due = tasks.filter { it.first <= time }
+            if (due.isEmpty()) return
+            due.forEach { tasks.remove(it) }
+            due.sortedBy { it.first }.forEach { it.second() }
+        }
+    }
 }
 
 /** W42: MediaNow with fake sessions (Robolectric has no media sessions): picking, re-picking and the command routes. */
@@ -125,17 +150,21 @@ class MediaNowW42Test {
         assertEquals(listOf("controller:87", "controller:88", "transport:Pause"), p.calls)
     }
 
-    @Test fun STR_06_theSystemKeyIsTheLastResortAndAFullFailureIsReported() {
+    // W60: was "...AndAFullFailureIsReported" — rewritten for the confirm-or-escalate ladder (musicControls follow-up, mediaReliability.md):
+    // a route the framework ACCEPTS is no longer trusted at once, so the final failure only shows once the accepted system key's own
+    // confirmation window has run out with total silence from the session, not the instant it was sent.
+    @Test fun STR_06_theSystemKeyIsTheLastResortAndAFullFailureIsReportedOnlyAfterItsWindowRunsOutInSilence() {
+        val sched = FakeMediaScheduler()
+        MediaNow.schedulerForTest(sched)
         val p = FakePort("a", "browser", P, MediaCommands.ACTION_PAUSE, controllerOk = false)
         MediaNow.sessionsForTest(listOf(p))
         val got = mutableListOf<String>()
         val scope = CoroutineScope(Dispatchers.Unconfined)
         MediaNow.failures.onEach { got += it }.launchIn(scope)
         MediaNow.next()
-        assertEquals(listOf("controller:87", "system:87"), p.calls)
-        assertTrue("the system key was sent, so no failure yet", got.isEmpty())
-        p.systemOk = false
-        MediaNow.next()
+        assertEquals("controllerKey refused outright, so systemKey is tried at once, with no wait", listOf("controller:87", "system:87"), p.calls)
+        assertTrue("systemKey was accepted but not yet confirmed: no failure yet", got.isEmpty())
+        sched.advanceBy(MediaCommands.CONFIRM_MS) // total silence from the session for the whole window: the sign of a dropped command
         assertEquals(listOf("browser"), got)
         scope.cancel()
     }

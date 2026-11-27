@@ -168,6 +168,15 @@ private class ControllerPort(val c: MediaController, private val handler: Handle
  * W42 ("the music controls at the top don't always work"): every active session is watched (not only the shown one), so a second player that
  * starts playing takes over the line at once; the session is re-picked on a session-list change, on every playback-state change and again
  * on every tap before the command goes out; commands follow [MediaCommands] (transport, then media-button event, then the system key).
+ *
+ * W60 ("still flaky on a real device", a follow-up to W42): W42's ladder tried a route and, for [MediaCommands.Route.Transport], counted it
+ * as success the instant the one-way binder call was accepted — which a real player can silently ignore (not focused, a stale remote stub,
+ * a race with another command). So a dropped Transport command never fell through to the working routes below it. [send] now drives the
+ * ladder itself: each route is given up to [MediaCommands.CONFIRM_MS] to be confirmed by the session's OWN callback (Play/Pause: the
+ * reported state actually flipped; Next/Previous: any callback from that session at all, since track identity can't be checked generically)
+ * before moving to the next route; "Can't control <app>" fires only once every route has been tried AND given its window with no
+ * confirmation. A short debounce ([MediaCommands.DEBOUNCE_MS]) drops a same-command repeat that arrives while the first is still pending, so
+ * a double-fired tap cannot send two commands that race each other onto the player.
  */
 object MediaNow {
     private val _info = MutableStateFlow<MediaInfo?>(null)
@@ -187,6 +196,18 @@ object MediaNow {
     private var current: MediaPort? = null
     private var refCount = 0
     private val handler = Handler(Looper.getMainLooper())
+    private var scheduler: MediaScheduler = HandlerMediaScheduler(handler)
+
+    /** One command working its way down the ladder: which route is next, since when, and whose session it targets. */
+    private class Escalation(
+        val cmd: MediaCommands.Cmd,
+        val portId: Any,
+        val portPackage: String,
+        var routesLeft: List<MediaCommands.Route>,
+        val startedAt: Long,
+        var cancelTimer: (() -> Unit)? = null,
+    )
+    private var escalation: Escalation? = null
 
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { list -> adopt(list.orEmpty().map { wrap(it) }) }
 
@@ -241,7 +262,14 @@ object MediaNow {
 
     /** Tests only: the session list as the system would report it, and where a tap's refresh reads it from. */
     fun sessionsForTest(list: List<MediaPort>, source: (() -> List<MediaPort>)? = { list }) { provider = source; adopt(list) }
-    fun resetForTest() { dropPorts(); provider = null; refCount = 0; _info.value = null; _needsAccess.value = false }
+    fun resetForTest() {
+        dropPorts(); provider = null; refCount = 0; _info.value = null; _needsAccess.value = false
+        escalation?.cancelTimer?.invoke(); escalation = null
+        scheduler = HandlerMediaScheduler(handler)
+    }
+
+    /** Tests only: a deterministic scheduler so "no confirmation arrived within the window" can be simulated without sleeping a thread. */
+    fun schedulerForTest(s: MediaScheduler) { scheduler = s }
 
     /** Play when paused, pause when playing, after re-reading the session list (a stale controller is the classic "does nothing"). */
     fun playPause() {
@@ -253,9 +281,60 @@ object MediaNow {
     fun next() { refresh(); current?.let { send(it, MediaCommands.Cmd.Next) } }
     fun previous() { refresh(); current?.let { send(it, MediaCommands.Cmd.Previous) } }
 
+    /**
+     * W60: sends [cmd] to [p], escalating through [MediaCommands.routes] until one route is confirmed by the session's own callback or
+     * every route has been tried and given [MediaCommands.CONFIRM_MS] with no confirmation (then "Can't control <app>" fires). A repeat of
+     * the same command on the same session within [MediaCommands.DEBOUNCE_MS] of one still pending is dropped (the small-target double-fire).
+     */
     private fun send(p: MediaPort, cmd: MediaCommands.Cmd) {
-        if (MediaCommands.execute(p, cmd, p.actions) == null) _failures.tryEmit(labelOf(p.packageName))
+        val now = scheduler.now()
+        val pending = escalation
+        if (pending != null && pending.cmd == cmd && pending.portId == p.id && now - pending.startedAt < MediaCommands.DEBOUNCE_MS) return
+        pending?.cancelTimer?.invoke()
+        val e = Escalation(cmd, p.id, p.packageName, MediaCommands.routes(cmd, p.actions), now)
+        escalation = e
+        dispatchRoute(e)
         reselect() // the player's own state callback follows; this only picks up a change that already happened
+    }
+
+    /** Sends [e]'s current (first of [Escalation.routesLeft]) route. A route the framework refused outright escalates at once, with no
+     * wait; one it accepted gets up to [MediaCommands.CONFIRM_MS] for the session's callback to confirm it (see [onPortSignal]). */
+    private fun dispatchRoute(e: Escalation) {
+        val p = ports.firstOrNull { it.id == e.portId } ?: run { resolveEscalation(e, confirmed = false); return }
+        val route = e.routesLeft.first()
+        val accepted = MediaCommands.attempt(p, route, e.cmd)
+        if (!accepted) { advanceEscalation(e); return }
+        e.cancelTimer = scheduler.postDelayed(MediaCommands.CONFIRM_MS) { if (escalation === e) advanceEscalation(e) }
+    }
+
+    /** The current route's window ran out (or it was refused outright) with no confirmation: move to the next route, or fail. */
+    private fun advanceEscalation(e: Escalation) {
+        if (escalation !== e) return
+        val rest = e.routesLeft.drop(1)
+        if (rest.isEmpty()) { resolveEscalation(e, confirmed = false); return }
+        e.routesLeft = rest
+        dispatchRoute(e)
+    }
+
+    /** Called with every port's own callback (whether or not a command is pending on it): confirms an in-flight escalation targeting that
+     * session, per [MediaCommands.confirmsPlayPause] for Play/Pause, or on ANY callback for Next/Previous (can't verify track identity
+     * generically; total silence from the session is the actual sign of a dropped command, so any sign of life counts as landed). */
+    private fun onPortSignal(p: MediaPort) {
+        reselect()
+        val e = escalation ?: return
+        if (e.portId != p.id) return
+        val confirmed = when (e.cmd) {
+            MediaCommands.Cmd.Play, MediaCommands.Cmd.Pause -> MediaCommands.confirmsPlayPause(e.cmd, MediaLogic.isPlaying(p.state))
+            MediaCommands.Cmd.Next, MediaCommands.Cmd.Previous -> true
+        }
+        if (confirmed) resolveEscalation(e, confirmed = true)
+    }
+
+    private fun resolveEscalation(e: Escalation, confirmed: Boolean) {
+        if (escalation !== e) return
+        e.cancelTimer?.invoke()
+        escalation = null
+        if (!confirmed) _failures.tryEmit(labelOf(e.portPackage))
     }
 
     /** Opens the player: the session's own activity if it has one, else the package's launch intent. */
@@ -277,10 +356,11 @@ object MediaNow {
     /** Takes the new session list: keeps the watched port of a session that is still there, watches new ones, forgets the gone ones. */
     private fun adopt(fresh: List<MediaPort>) {
         val old = ports.associateBy { it.id }
-        val next = fresh.map { f -> old[f.id] ?: f.also { it.register(::reselect) } }
+        val next = fresh.map { f -> old[f.id] ?: f.also { p -> p.register { onPortSignal(p) } } }
         val keep = next.map { it.id }.toSet()
         ports.filter { it.id !in keep }.forEach { it.unregister() }
         ports = next
+        escalation?.let { if (it.portId !in keep) resolveEscalation(it, confirmed = false) } // its session just disappeared from the list
         reselect()
     }
 
@@ -294,6 +374,7 @@ object MediaNow {
         ports.forEach { it.unregister() }
         ports = emptyList()
         current = null
+        escalation?.let { resolveEscalation(it, confirmed = false) } // its session is gone: fail now, don't wait out the timer
     }
 
     private fun labelOf(pkg: String): String {

@@ -136,11 +136,18 @@ class DockMagnifyW56Test {
         for (i in 0 until 5) assertEquals(free.offset[i], roomy.offset[i], 1e-3f)
     }
 
-    @Test fun DCK_04_mag_04_aDockThatAlreadyScrollsJustSpreadsAndTheViewportClipsIt() {
+    // W60 (dockMagnifyFix): this used to assert the OPPOSITE — that a row already wider than its room at rest (a scrolling dock) skipped
+    // containment and was left to spread unclamped ("the viewport clips it"). The owner's screenshot showed that reasoning does not hold for the
+    // real UI (a clip only hides a GPU layer's pixels at a hard edge; it does not stop the icon from visibly bleeding past the dock's own rounded
+    // background, which is drawn as part of the same layer tree, not as a clip boundary). `compute` now always contains the spread; see
+    // `DockMagnifyFixW60Test` for the full matrix.
+    @Test fun DCK_04_mag_04_aDockThatAlreadyScrollsIsStillHeldInsideItsRoom() {
         val (c, _) = row(10)
-        val r = lay(10, c[4], 2.0f, lo = 0f, hi = 300f) // the row is wider than the viewport already
-        assertEquals(2.0f, r.scale[4], 1e-4f)
-        assertTrue("no clamp shift was applied to a row that does not fit at rest", r.offset[0] <= 0f && r.offset[9] >= 0f)
+        val lo = 0f; val hi = 300f // the row is wider than the viewport already
+        val pointer = (lo + hi) / 2f // central: it can still hold its own fully-grown icon (26 * 2.0 = 52, well under the 150 dp either side)
+        val r = DockMagnify.compute(row(10).second, c, FloatArray(10) { half }, BooleanArray(10) { true }, pointer, 2.0f, 1f, pitch, 4f, lo, hi)
+        assertTrue("start inside the room", r.start >= lo - DockMagnify.EPS)
+        assertTrue("end inside the room", r.end <= hi + DockMagnify.EPS)
     }
 
     // --- side docks and right-to-left ---------------------------------------------------------------------------------------------------------

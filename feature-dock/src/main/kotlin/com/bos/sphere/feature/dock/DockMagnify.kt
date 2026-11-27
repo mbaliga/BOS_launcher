@@ -81,6 +81,8 @@ object DockMagnify {
     const val RISE_DP = 6f
     /** Where the icon's outer edge is inside a slot, as a fraction of the slot from its start: 6 dp margin plus the 40 dp icon. */
     const val OUTER_FRAC = (6f + ICON_DP) / SLOT_DP
+    /** W60 (dockMagnifyFix): how close to [lo, hi] is close enough (pixels); the same tolerance the stress test uses. */
+    const val EPS = 0.02f
 
     /** The room a dock asks for at each end of the row while it is being touched, so the spread has somewhere to go (dp). */
     fun slackDp(s: MagnifyStrength): Float = (s.factor - 1f) * 100f
@@ -131,7 +133,7 @@ object DockMagnify {
     /**
      * Lays the row out for a pointer at [pointer]. [amount] is the animated 0..1 strength of the effect (0 = at rest: every scale is 1, every offset 0),
      * [factor] the largest scale, [pitch] the resting distance between neighbouring centres, [gapHalf] half the gap between two slots. [lo]..[hi] is the room
-     * the row may use; a row that already was outside it at rest (a scrolling dock) is allowed to stay where it is.
+     * the row may use: [Result.start] and [Result.end] never leave it (W60, dockMagnifyFix), whether or not the row already scrolls at rest.
      */
     fun compute(
         ids: IntArray, centers: FloatArray, halves: FloatArray, magnifiable: BooleanArray,
@@ -157,31 +159,50 @@ object DockMagnify {
             }
         }
         place(1f, 1f)
-        // A row that does not fit even at rest (a scrolling dock) just spreads: the viewport clips what leaves it. Otherwise it must stay inside [lo, hi].
-        val overflow = mnB < lo - 1f || mxB > hi + 1f
-        if (n > 1 && amount != 0f && !overflow) {
-            // Each end must stay inside [lo, hi] WITHOUT moving the stretch off the pointer (the icon under it must stay under it): the row is drawn a
-            // little closer around the pointer where an end lacks room (never closer than the icons themselves), and grows less where that is not enough.
-            fun fits(k: Float): Boolean {
+        // W60 (dockMagnifyFix): the row must never leave [lo, hi], however many items it holds and however little room it is given — the owner's
+        // screenshot showed even a six-item, non-scrolling dock bleeding past the shelf at both ends. [lo, hi] is just the room the rail has (inside
+        // or outside a scrolling viewport): a row already wider than it at rest keeps scrolling (nothing here drags it back into view), but the
+        // SPREAD itself is always contained. Each end is first drawn a little closer around the pointer where it lacks room (never closer than
+        // MIN_PITCH_FRACTION of the resting pitch, so the growth stays close to full), and only where even full collapse (every centre landing on
+        // the pointer) at the current growth still does not fit does the growth itself get reduced ("every icon fits, some grow less"). Both
+        // bisections are over a monotonic predicate (more contraction, or less growth, only ever shrinks the row), so they always converge on
+        // something inside the room: a row whose rest layout already fits (the owner's six-item dock) always keeps its full growth, since full
+        // collapse at k = 1 already contains anything that full collapse at k = 0 (the rest layout) does.
+        if (n >= 1 && amount != 0f) {
+            fun within(): Boolean = mn >= lo - EPS && mx <= hi + EPS
+            fun fitsAt(k: Float): Boolean {
                 place(1f, k)
-                var lam = 1f
-                val needR = mx - hi; val needL = lo - mn
-                val spanR = centers[n - 1] - pointer; val spanL = pointer - centers[0]
-                if (needR > 0f && spanR > 1f) lam = min(lam, 1f - needR / spanR)
-                if (needL > 0f && spanL > 1f) lam = min(lam, 1f - needL / spanL)
-                if (lam < 1f) place(max(MIN_PITCH_FRACTION, lam), k)
-                return mn >= lo - 0.02f && mx <= hi + 0.02f
-            }
-            if (!fits(1f)) {
+                if (within()) return true
+                // Bisect the contraction lam in [0, 1]: lam = 1 is what was just placed (fails), lam = 0 always succeeds (every centre at the
+                // pointer), unless the pointer's own fully-grown icon at this k cannot fit even collapsed to a point — then no lam helps, and the
+                // caller must try a smaller k instead.
+                place(0f, k)
+                val floorOk = within()
                 var good = 0f; var bad = 1f
-                repeat(16) { val mid = (good + bad) / 2f; if (fits(mid)) good = mid else bad = mid }
-                fits(good)
+                repeat(24) { val mid = (good + bad) / 2f; place(mid, k); if (within()) good = mid else bad = mid }
+                place(good, k)
+                return floorOk
+            }
+            if (!fitsAt(1f)) {
+                var good = 0f; var bad = 1f
+                repeat(16) { val mid = (good + bad) / 2f; if (fitsAt(mid)) good = mid else bad = mid }
+                fitsAt(good)
             }
         }
         for (i in 0 until n) reach[i] = (halves[i] + gapHalf) * scale[i]
         if (n == 0) { mnB = 0f; mxB = 0f; mn = 0f; mx = 0f }
         return Result(ids, centers, halves, magnifiable, scale, offset, lift, mnB, mxB, mn, mx, reach)
     }
+
+    /**
+     * W60 (dockMagnifyFix): how far the dock's own background surface must grow at the start and the end so it still fully covers the row's drawn
+     * extent [start, end], given the surface's own un-grown footprint [baseStart, baseEnd] (the row's resting extent). Pure, and fed exactly the same
+     * fields the icon layers draw from, so the two can never disagree: since [compute] now keeps `start >= lo` and `end <= hi` always (whatever
+     * `baseStart`/`baseEnd` are, including a row that already overflows its room at rest), the growth is never negative and never asks the surface to
+     * reach past the room it was given either.
+     */
+    fun surfaceGrowth(baseStart: Float, baseEnd: Float, start: Float, end: Float): Pair<Float, Float> =
+        (baseStart - start).coerceAtLeast(0f) to (end - baseEnd).coerceAtLeast(0f)
 
     private val none = compute(IntArray(0), FloatArray(0), FloatArray(0), BooleanArray(0), 0f, 1f, 0f, 1f, 0f, 0f, 0f)
     internal fun empty(): Result = none
@@ -217,6 +238,17 @@ internal class MagnifyField {
     var viewport: LayoutCoordinates? = null
     /** Wave 58 (CFG-73): a still sample pointer (0..1 along the row) for the Settings Preview: the row is drawn magnified there with no finger; null = off. */
     var demo by mutableStateOf<Float?>(null)
+
+    // W60 (dockMagnifyFix): the press-drag-release launch gesture. These three are plain (non-Compose-state) vars that [DockRail] refreshes every
+    // recomposition from a `SideEffect`, so the long-lived pointer-tracking coroutine in [trackMagnify] always reads the current rail (its items,
+    // actions and whether a menu is open) without ever needing to restart that coroutine — restarting it mid-gesture would drop the finger it is
+    // following. [gestureActive] is false while magnify is off or the dock is being edited: [trackMagnify] then behaves exactly as it did before W60
+    // (the rail's own per-item clickable keeps doing the launching, as today).
+    var gestureActive: Boolean = false
+    /** Whether [p] (viewport pixels, the same frame as [pointer]) is still inside the dock's own interactive bounds. */
+    var insideBounds: (Offset) -> Boolean = { true }
+    /** The finger (or a mouse/stylus) was released at [at]; [cancelled] is true when it had already left [insideBounds] without lifting. */
+    var onGestureRelease: (cancelled: Boolean, at: Offset) -> Unit = { _, _ -> }
 
     class Member(val coords: LayoutCoordinates, val center: Float, val half: Float, val crossStart: Float, val crossSize: Float, val magnifiable: Boolean, val outerFrac: Float, val label: String)
     private val members = HashMap<Int, Member>()
@@ -287,27 +319,66 @@ internal class MagnifyField {
     companion object { const val NONE = Int.MIN_VALUE }
 }
 
-/** Reads the pointer on the dock without consuming anything, so taps, long presses, drags and the scroll work as they did. Positions are viewport pixels. */
+/**
+ * Reads the pointer on the dock without consuming anything, so taps, long presses, drags and the scroll work as they did. Positions are viewport
+ * pixels (the same frame as [MagnifyField.insideBounds] and the dock's own [MagnifyField.lo]/[MagnifyField.hi]).
+ *
+ * W60 (dockMagnifyFix): while [MagnifyField.gestureActive] (magnify is on, the dock is not being edited), this also drives the press-drag-release
+ * launch gesture: press anywhere on the strip, drag (past the touch slop, same as the magnification's own [MagnifyField.magnifyTouch]), release.
+ * If the finger leaves [MagnifyField.insideBounds] before lifting, the gesture is cancelled at once — the spread springs back immediately (forcing
+ * [MagnifyField.pointerDown] off drops [MagnifyField.wantsMagnify] straight away) and nothing launches even if the finger is later released
+ * (anywhere); further movement of that same physical press is ignored until it lifts, so a finger dragged back inside the bounds does not revive
+ * it (matching a dock-style drag-to-launch: once it is cancelled, it stays cancelled for that press). Otherwise [MagnifyField.onGestureRelease] is
+ * told where the release landed and whether it was cancelled; [DockRail] decides what (if anything) that launches, using the magnified geometry
+ * for a real drag and the (then still unmagnified) release point for a plain tap, exactly as a tap without this gesture would have hit.
+ */
 internal suspend fun PointerInputScope.trackMagnify(field: MagnifyField) {
     val slop = viewConfiguration.touchSlop
     val holdMs = 120L
     awaitPointerEventScope {
         var down = Offset.Zero
         var pending = false
+        var cancelled = false
         while (true) {
             val ev = if (pending) withTimeoutOrNull(holdMs) { awaitPointerEvent(PointerEventPass.Initial) } else awaitPointerEvent(PointerEventPass.Initial)
             if (ev == null) { field.magnifyTouch = true; pending = false; continue }
             val c = ev.changes.firstOrNull() ?: continue
             val main = if (field.horizontal) c.position.x else c.position.y
             if (c.type != PointerType.Touch) {
-                // A mouse, trackpad or stylus: hovering is enough, the effect starts at once. Exit ends it.
-                if (ev.type == PointerEventType.Exit) { field.pointerDown = false; field.magnifyTouch = false }
-                else { field.pointer = main; field.pointerDown = true; field.magnifyTouch = true }
+                // A mouse, trackpad or stylus: hovering is enough, the effect starts at once. A press-drag-release launches the same way a finger
+                // does; a plain click (no drag between press and release) reaches the release point with the geometry still unmagnified.
+                when {
+                    ev.type == PointerEventType.Exit -> { field.pointerDown = false; field.magnifyTouch = false; cancelled = false }
+                    ev.type == PointerEventType.Press -> { down = c.position; field.pointer = main; field.pointerDown = true; field.magnifyTouch = true; cancelled = field.gestureActive && !field.insideBounds(c.position) }
+                    ev.type == PointerEventType.Release -> {
+                        if (field.gestureActive && !cancelled && !field.insideBounds(c.position)) cancelled = true
+                        field.onGestureRelease(cancelled && field.gestureActive, c.position)
+                        field.pointerDown = true; field.magnifyTouch = true // still hovering after the click
+                        cancelled = false
+                    }
+                    else -> {
+                        field.pointer = main; field.pointerDown = true; field.magnifyTouch = true
+                        if (field.gestureActive && !cancelled && !field.insideBounds(c.position)) cancelled = true
+                    }
+                }
             } else if (c.pressed) {
-                if (!field.pointerDown || ev.type == PointerEventType.Press) { down = c.position; field.pointerDown = true; field.magnifyTouch = false; pending = true }
-                field.pointer = main
-                if (!field.magnifyTouch && (c.position - down).getDistance() > slop) { field.magnifyTouch = true; pending = false }
-            } else { field.pointerDown = false; field.magnifyTouch = false; pending = false }
+                if (!cancelled && (!field.pointerDown || ev.type == PointerEventType.Press)) { down = c.position; field.pointerDown = true; field.magnifyTouch = false; pending = true }
+                if (!cancelled) {
+                    field.pointer = main
+                    if (!field.magnifyTouch && (c.position - down).getDistance() > slop) { field.magnifyTouch = true; pending = false }
+                    if (field.gestureActive && !field.insideBounds(c.position)) {
+                        // Outside the dock's own interactive bounds without having lifted: cancelled at once, springing back now rather than
+                        // waiting for a release that may never come inside the bounds again.
+                        cancelled = true; pending = false; field.magnifyTouch = false; field.pointerDown = false
+                    }
+                }
+            } else {
+                // Release: the owner's "lift inside, it launches; lift outside (or it already left without lifting), nothing does" — so an up
+                // event whose own position is already outside the bounds counts as cancelled too, even if the finger had not strayed before.
+                if (field.gestureActive && !cancelled && !field.insideBounds(c.position)) cancelled = true
+                if (field.gestureActive) field.onGestureRelease(cancelled, c.position)
+                field.pointerDown = false; field.magnifyTouch = false; pending = false; cancelled = false
+            }
         }
     }
 }

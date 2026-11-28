@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <float name="lat" value="51.5074" />
+    <string name="place">SENTINEL_PLACE</string>
+</map>

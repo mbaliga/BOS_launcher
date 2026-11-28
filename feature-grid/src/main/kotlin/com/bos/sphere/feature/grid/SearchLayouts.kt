@@ -1,0 +1,920 @@
+package com.bos.sphere.feature.grid
+
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.bos.sphere.core.data.Channel
+import com.bos.sphere.core.data.ContactActions
+import com.bos.sphere.core.data.SearchCategory
+import com.bos.sphere.core.design.HyleColors
+import com.bos.sphere.core.design.smokyBackdrop
+import com.bos.sphere.core.design.L10n
+import com.bos.sphere.feature.search.WebRow
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.cos
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.unit.Dp
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
+
+/** What a tile tap / long-press does; supplied by the overlay. */
+internal class TileActions(
+    val onTap: (Tile) -> Unit,
+    val onLongPress: (Tile) -> Unit,
+    /** The user touched the results: hide the suggestion card. */
+    val onTouch: () -> Unit,
+    /** Right-click: defaults to what long-press does (PAL-20). */
+    val onSecondary: (Tile) -> Unit = onLongPress,
+)
+
+// ---------------------------------------------------------------- contact channel bar
+
+/** The call / SMS / email / WhatsApp / Telegram / Signal buttons of an expanded contact tile. */
+@Composable
+internal fun ContactChannelBar(c: ContactRow, onOpen: (android.content.Intent) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        Text(c.hit.name, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 140.dp).padding(end = 8.dp))
+        c.channels.forEach { ch ->
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            ChannelButton(ch) { ContactHabits.record(ctx, c.hit.id, ch); ContactActions.intentFor(ch, c.hit)?.let(onOpen) }
+        }
+        if (c.channels.isEmpty()) {
+            ChannelButton(Channel.Call) { onOpen(ContactActions.openContact(c.hit)) }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- filmstrip
+
+private val StripTile = 76.dp
+
+/**
+ * Wave 25: what the Filmstrip draws in the height it is given: the tile (76 dp, down to 32 dp), the caption line under it (26 dp), the footnote line
+ * (16 dp) and, for an app with shortcuts, the wrapping row of shortcut bubbles ([rowH] dp, part of the tile, so the height is reserved). [of] drops the row and the
+ * extras and shrinks the tile before any of it would run past [heightDp].
+ */
+internal class StripFit(val tile: Dp, val caption: Boolean, val footnote: Boolean, val pills: Boolean) {
+    companion object {
+        val Full = StripFit(StripTile, caption = true, footnote = true, pills = true)
+        fun of(heightDp: Float, rowH: Float = 0f): StripFit {
+            val withRow = rowH > 0f
+            // 4 dp of air under the caption (the caller's bottom padding).
+            val room = heightDp - 4f
+            val row = rowH
+            if (withRow && room >= 76f + row + 26f + 16f) return Full
+            if (withRow && room >= 76f + row + 26f) return StripFit(StripTile, caption = true, footnote = false, pills = true)
+            if (room >= 76f + 26f + 16f) return StripFit(StripTile, caption = true, footnote = true, pills = false)
+            if (room >= 76f + 26f) return StripFit(StripTile, caption = true, footnote = false, pills = false)
+            val tile = (room - 26f).coerceIn(32f, 76f)
+            if (room - 26f >= 32f) return StripFit(tile.dp, caption = true, footnote = false, pills = false)
+            return StripFit((room).coerceIn(32f, 76f).dp, caption = false, footnote = false, pills = false)
+        }
+    }
+}
+private val StripGap = 14.dp
+private const val LOOP_COUNT = Int.MAX_VALUE
+
+/** The next frame time for an endless animation: the platform's infinite-animation policy decides (none on a device, so this is plain withFrameNanos there; a test that auto-advances its clock ends the loop). */
+internal suspend fun infiniteFrameNanos(): Long {
+    val policy = kotlin.coroutines.coroutineContext[androidx.compose.ui.platform.InfiniteAnimationPolicy]
+    return if (policy != null) policy.onInfiniteOperation { androidx.compose.runtime.withFrameNanos { it } } else androidx.compose.runtime.withFrameNanos { it }
+}
+
+/**
+ * A horizontal strip of large tiles. With [motion] and 5+ tiles it drifts slowly (about 12 dp/s)
+ * and wraps seamlessly; it stops the instant the user touches it and resumes a moment after.
+ */
+@Composable
+internal fun Filmstrip(
+    tiles: List<Tile>,
+    motion: Boolean,
+    query: String,
+    expanded: ContactRow?,
+    onOpenIntent: (android.content.Intent) -> Unit,
+    footnote: String?,
+    actions: TileActions,
+    modifier: Modifier = Modifier,
+    /** Wave 18: a quiet line while there is nothing to show yet ("Rings fill up as you use Radar"). */
+    emptyHint: String? = null,
+    /** Wave 25: the tile size and what else fits in the room the caller has (landscape with the keyboard up), so nothing is cut at the bottom. */
+    fit: StripFit = StripFit.Full,
+) {
+    val z = LocalResultScale.current
+    val selectedKey = LocalRadarSelection.current
+    val n = tiles.size
+    val loop = motion && n >= 5
+    val state = remember(loop, n, tiles.firstOrNull()?.key) {
+        LazyListState(firstVisibleItemIndex = if (loop) (LOOP_COUNT / 2) - (LOOP_COUNT / 2) % n else 0)
+    }
+    var touching by remember { mutableStateOf(false) }
+    var lastTouchAt by remember { mutableLongStateOf(0L) }
+    val speedPx = with(LocalDensity.current) { 12.dp.toPx() }
+    LaunchedEffect(loop, n) {
+        if (!loop) return@LaunchedEffect
+        var last = androidx.compose.runtime.withFrameNanos { it }
+        var acc = 0f
+        while (true) {
+            // Wave 22 (tour): the drift is an endless animation, so it asks the platform's infinite-animation policy for its frames. On a device that is plain withFrameNanos; a UI test
+            // that auto-advances its clock ends the loop instead of never becoming idle (the seeded monkey walk hung on this in a busy state).
+            val now = infiniteFrameNanos()
+            val dt = (now - last) / 1_000_000_000f
+            last = now
+            if (touching) { lastTouchAt = now; acc = 0f; continue }
+            if (now - lastTouchAt < 1_500_000_000L || state.isScrollInProgress) continue
+            acc += speedPx * dt.coerceAtMost(0.1f)
+            if (acc >= 1f) { state.scrollBy(acc); acc = 0f }
+        }
+    }
+    // The keyboard selection scrolls into the middle.
+    LaunchedEffect(selectedKey, n) {
+        val target = tiles.indexOfFirst { it.key == selectedKey }
+        if (target < 0) return@LaunchedEffect
+        if (loop) {
+            val base = state.firstVisibleItemIndex - state.firstVisibleItemIndex % n
+            runCatching { state.animateScrollToItem(base + target) }
+        } else runCatching { state.animateScrollToItem(target) }
+    }
+    val centreIndex by remember(state) {
+        derivedStateOf {
+            val info = state.layoutInfo
+            val c = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+            info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2f - c) }?.index
+        }
+    }
+
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        if (n == 0) {
+            Box(Modifier.height(fit.tile), contentAlignment = Alignment.Center) {
+                if (emptyHint != null) Text(emptyHint, color = Color.White.copy(alpha = 0.6f), fontSize = (13 * z).sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
+            }
+        } else {
+            // The first tile starts exactly in the middle, and a flick settles on a tile (not between two).
+            val sidePad = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.let { ((it - fit.tile) / 2).coerceAtLeast(0.dp) }
+            LazyRow(
+                state = state,
+                horizontalArrangement = Arrangement.spacedBy(StripGap),
+                contentPadding = PaddingValues(horizontal = sidePad),
+                flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(
+                    state, androidx.compose.foundation.gestures.snapping.SnapPosition.Center,
+                ),
+                modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val e = awaitPointerEvent(PointerEventPass.Initial)
+                            val down = e.changes.any { it.pressed }
+                            if (down && !touching) actions.onTouch()
+                            touching = down
+                        }
+                    }
+                },
+            ) {
+                if (loop) {
+                    items(LOOP_COUNT, key = { it }) { i -> StripTileView(tiles[i % n], actions, fit) }
+                } else {
+                    itemsIndexed(tiles, key = { _, t -> t.key }) { _, t -> StripTileView(t, actions, fit) }
+                }
+            }
+        }
+        if (fit.caption) Box(Modifier.fillMaxWidth().heightIn(min = 26.dp).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
+            val focus = centreIndex?.let { if (n > 0) tiles.getOrNull(it % n) else null } ?: tiles.firstOrNull()
+            when {
+                expanded != null -> ContactChannelBar(expanded, onOpenIntent)
+                focus != null -> Text(
+                    tileCaption(focus, query), color = Color.White.copy(alpha = 0.92f), fontSize = (14 * z).sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                )
+                footnote != null -> Text(footnote, color = Color.White.copy(alpha = 0.6f), fontSize = (12 * z).sp, maxLines = 1)
+            }
+        }
+        if (fit.footnote && footnote != null && n > 0 && expanded == null) {
+            Text(footnote, color = Color.White.copy(alpha = 0.55f), fontSize = (11 * z).sp, maxLines = 1, modifier = Modifier.padding(bottom = 4.dp))
+        }
+    }
+}
+
+private fun tileCaption(t: Tile, query: String): AnnotatedString {
+    if (t is Tile.Hit && t.hit.snippet != null) {
+        return highlight(t.hit.title + "  ·  " + t.hit.snippet, query, Color(0xFFB9A8FF))
+    }
+    return AnnotatedString(t.caption())
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun StripTileView(tile: Tile, actions: TileActions, fit: StripFit) {
+  val rowW = if (tile is Tile.App && fit.pills && tile.shortcuts.isNotEmpty()) maxOf(fit.tile.value, ShortcutForm.BUBBLE_W * minOf(tile.shortcuts.size, ShortcutForm.PER_LINE)).dp else fit.tile
+  Column(Modifier.width(rowW), horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(
+        Modifier
+            .size(fit.tile)
+            .radarSelectedRing(LocalRadarSelection.current == tile.key, RoundedCornerShape(14.dp))
+            .secondaryClick { actions.onSecondary(tile) }
+            .radarDragOut(tile)
+            // NFR-13: the strip shows the caption of the centred tile only, so every tile carries its own name.
+            .semantics(mergeDescendants = true) { contentDescription = tile.caption() }
+            .combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) }),
+    ) { TileFace(tile, fit.tile) }
+    // PAL-03, wave 25 (shortcutForm): the app's shortcuts are one row of circles under its tile; the row's height is part of the layout (dropped, not overlapped, when the room is short).
+    if (tile is Tile.App && fit.pills) ShortcutBubbleRow(tile, onRun = { actions.onTap(Tile.Hit(it)) }, perLine = ShortcutForm.PER_LINE)
+  }
+}
+
+// ---------------------------------------------------------------- orbit
+
+
+/**
+ * Results floating on concentric elliptical rings (like the old AirDrop screen): the best match
+ * nearest the top of the innermost ring, then 5 / 9 / 13 / 17 outward. Wave 25: the rings are fitted to the
+ * region (wave 26: back to circles that may leave the screen); positions come from layout offsets so only layout (not composition)
+ * runs per frame.
+ */
+@Composable
+internal fun Orbit(
+    tiles: List<Tile>,
+    motionRequested: Boolean,
+    footnote: String?,
+    actions: TileActions,
+    /** Distance from the bottom edge to the common centre of the rings (the middle of the category wheel). */
+    centreFromBottom: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    /** Wave 22: the wheel's size, so tiles stay clear of what is really drawn. */
+    wheel: WheelSpec = WheelSpec.Default,
+    /** Reports how many of [tiles] have a slot on screen, so the keyboard never selects one that is not drawn. */
+    onVisibleCount: (Int) -> Unit = {},
+    /** Wave 18: a quiet line under the wheel while there is nothing to show yet ("Rings fill up as you use Radar"). */
+    emptyHint: String? = null,
+    /** Wave 20: the TalkBack names of the tiers, innermost first (match tiers while a query is typed). */
+    tierNames: List<String> = RadarRings.tierNames,
+    /**
+     * Wave 29 (radarFull): the Orbit's layer is the whole display area (the caller gives it the full width and the height down to the keyboard) and
+     * [region] is the part of it the rings were fitted to before (the free area under the field and above the mic), in this layer's pixels; null = the
+     * whole layer. [centreFromBottom] is measured from the region's top. The tiles revolve over the whole layer; only the still layout (reduced motion)
+     * keeps to the region, [reserveBottom] of it left for the result strip.
+     */
+    region: androidx.compose.ui.geometry.Rect? = null,
+    reserveBottom: androidx.compose.ui.unit.Dp = 0.dp,
+) {
+    // NFR-14: with system animations off the rings do not creep by themselves (a drag still turns them).
+    val motion = motionRequested && !com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    val z = LocalResultScale.current
+    val selectedKey = LocalRadarSelection.current
+    // Arc length travelled (px). It creeps along very slowly by itself; a sideways drag turns the
+    // rings directly and a fling leaves extra speed that eases back to the creep.
+    val travel = remember { mutableFloatStateOf(0f) }
+    val extra = remember { floatArrayOf(0f) } // px/s added by the user
+    val dragging = remember { booleanArrayOf(false) }
+    val density0 = LocalDensity.current
+    val appCtx = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    // PAL-23: tuned values persist; load them once so the Orbit uses them without the Lab page being opened first.
+    androidx.compose.runtime.LaunchedEffect(Unit) { OrbitFeel.load(appCtx) }
+    androidx.compose.runtime.LaunchedEffect(motion) {
+        var last = 0L
+        while (true) {
+            // The rings' creep is an endless animation: it asks the platform's infinite-animation policy for its frames (plain withFrameNanos on a device;
+            // a UI test that auto-advances its clock ends the loop instead of never becoming idle).
+            val now = infiniteFrameNanos()
+            val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.05f)
+            last = now
+            if (!dragging[0]) {
+                // PAL-23: the feel constants are read live, so the Lab page retunes a running Orbit.
+                val feel = OrbitFeel.current
+                val base = if (motion) with(density0) { feel.creepDp.dp.toPx() } else 0f
+                travel.floatValue += (base + extra[0]) * dt
+                extra[0] = OrbitMotion.decay(extra[0], dt, feel)
+            }
+        }
+    }
+
+    BoxWithConstraints(modifier.linearTraversal().clipToBounds().testTag(RADAR_ORBIT_TAG).pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val e = awaitPointerEvent(PointerEventPass.Initial)
+                if (e.changes.any { it.pressed }) actions.onTouch()
+            }
+        }
+    }.pointerInput(Unit) {
+        detectHorizontalDragGestures(
+            onDragStart = { dragging[0] = true },
+            onDragEnd = { dragging[0] = false },
+            onDragCancel = { dragging[0] = false },
+        ) { change, dx ->
+            change.consume()
+            travel.floatValue += dx
+            extra[0] = OrbitMotion.flingSpeed(extra[0], dx, OrbitFeel.current)
+        }
+    }) {
+        val density = LocalDensity.current
+        val rg = region ?: androidx.compose.ui.geometry.Rect(0f, 0f, with(density) { maxWidth.toPx() }, with(density) { maxHeight.toPx() })
+        val wPx = rg.width
+        val hPx = rg.height - with(density) { reserveBottom.toPx() }
+        val centrePx = with(density) { centreFromBottom.toPx() } // (named for history: this is the centre's distance from the region's top)
+        val cx = rg.left + wPx / 2f
+        val cy = rg.top + centrePx
+        val tileSize = 54.dp
+        val tilePx = with(density) { tileSize.toPx() }
+        val colW = 80.dp
+        val colWPx = with(density) { colW.toPx() }
+        // Keep tiles clear of the system's edge-swipe zones, which swallow touches along both sides.
+        val edgeGuard = with(density) { 28.dp.toPx() }
+        val margin = colWPx / 2f + edgeGuard
+        // Ring gaps stay wider than a tile (face + caption) so rings revolving past each other never touch.
+        // Wave 18: the rings are tiers (RadarRings): the first holds what you open most, then outward. The innermost
+        // ring starts clear of the category wheel at the centre.
+        val gap = with(density) { 92.dp.toPx() }
+        val radii = FloatArray(RadarRings.MAX_RINGS) { with(density) { 140.dp.toPx() } + it * gap }
+
+        // The rings are centred on the category wheel in the middle of the free area below the query line and run all the
+        // way round. Within a ring the best result sits straight above the centre and the rest alternate outward.
+        val boxW = colWPx + with(density) { 8.dp.toPx() }
+        val boxH = tilePx + with(density) { 26.dp.toPx() }
+        val textLeft = with(density) { 90.dp.toPx() * maxOf(1f, density.fontScale) }
+        val textRight = with(density) { 100.dp.toPx() * maxOf(1f, density.fontScale) }
+        val textHalfH = with(density) { wheel.halfVisible.toPx() }
+        val placements = remember(wPx, hPx, tiles.size, motion, centrePx, wheel, density.fontScale) {
+            val cx = wPx / 2f; val cy = centrePx // the fitting works in the region's own coordinates
+            // Candidate angles per ring, best position first.
+            val candidates = ArrayList<List<Double>>()
+            val pts = ArrayList<Offset>()
+            for (r in radii.indices) {
+                val even = RadarRings.evenAngles(RadarRings.capacity(r), r)
+                    .sortedBy { Math.abs(Math.atan2(sin(it + PI / 2), cos(it + PI / 2))) }
+                if (motion) { candidates += even; continue } // Moving: every slot stays, the tiles revolve through the whole screen like planets.
+                // Still: keep only slots that are on screen, clear of the wheel text and of each other.
+                val kept = ArrayList<Double>()
+                for (ang in even) {
+                    val pt = Offset(cx + radii[r] * cos(ang).toFloat(), cy + radii[r] * sin(ang).toFloat())
+                    val onScreen = pt.x in margin..(wPx - margin) && pt.y in (tilePx * 0.6f)..(hPx - tilePx * 1.1f)
+                    val onText = (pt.x + tilePx / 2f) > cx - textLeft && (pt.x - tilePx / 2f) < cx + textRight && abs(pt.y - cy) < textHalfH + tilePx * 0.6f
+                    if (onScreen && !onText && pts.none { abs(it.x - pt.x) < boxW && abs(it.y - pt.y) < boxH }) { kept += ang; pts += pt }
+                }
+                candidates += kept
+            }
+            val rings = RadarRings.assign(tiles.size, RadarRings.limits(candidates.map { it.size }))
+            val used = IntArray(radii.size)
+            // A ring that is not full spreads its few tiles evenly when moving; when still they take the best positions.
+            val perRing = IntArray(radii.size).also { c -> rings.forEach { c[it]++ } }
+            rings.map { r ->
+                val k = used[r]++
+                r to (if (motion) RadarRings.evenAngles(perRing[r], r)[k] else candidates[r][k])
+            }
+        }
+
+        val shown = tiles.take(placements.size)
+        androidx.compose.runtime.SideEffect { onVisibleCount(shown.size) }
+        // The centre of a result's face now, and where it rests (no travel): the satellites keep their offset to it.
+        fun centreAt(i: Int, travelPx: Float): Offset {
+            val (ring, baseAngle) = placements[i]
+            val dir = if (ring % 2 == 1) -1.0 else 1.0
+            val a = baseAngle + dir * travelPx / radii[ring].toDouble()
+            return Offset(cx + radii[ring] * cos(a).toFloat(), cy + radii[ring] * sin(a).toFloat())
+        }
+        fun restCentre(i: Int) = centreAt(i, 0f)
+        fun liveCentre(i: Int) = centreAt(i, travel.floatValue)
+        val dpPx = density.density
+        // The bubbles' labels follow the system font size up to 1.3 (the Orbit has no room for more around an app); the long-press tooltip and TalkBack carry the full title.
+        val satFont = minOf(density.fontScale, ORBIT_BUBBLE_FONT_MAX)
+        val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+        val layerW = with(density) { maxWidth.toPx() }
+        val satellites: List<List<ShortcutSatellites.Spot>> = remember(placements, shown, satFont, rtl, rg, hPx, centrePx, z) {
+            val counts = shown.map { (it as? Tile.App)?.shortcuts?.size ?: 0 }
+            if (counts.all { it == 0 }) return@remember emptyList()
+            // dp units from here on; a result's box is its 54 dp face and the caption under it (one line of the scaled text), 80 dp wide
+            val tileBoxDp = maxOf(80f, 54f + 3f + kotlin.math.ceil(10f * z * maxOf(1f, density.fontScale) * 1.25f) + 4f)
+            fun box(i: Int): androidx.compose.ui.geometry.Rect {
+                val c = restCentre(i)
+                return androidx.compose.ui.geometry.Rect((c.x - colWPx / 2f) / dpPx, (c.y - tilePx / 2f) / dpPx, (c.x + colWPx / 2f) / dpPx, (c.y - tilePx / 2f) / dpPx + tileBoxDp)
+            }
+            val fixed = androidx.compose.ui.geometry.Rect((cx - textLeft) / dpPx, (cy - textHalfH) / dpPx, (cx + textRight) / dpPx, (cy + textHalfH) / dpPx)
+            val bounds = androidx.compose.ui.geometry.Rect(12f, rg.top / dpPx, layerW / dpPx - 12f, (rg.top + hPx) / dpPx)
+            ShortcutSatellites.placeAll(
+                shown.indices.map(::box), counts, shown.indices.map { i -> placements[i].second }, satFont, bounds, listOf(fixed), rtl,
+            )
+        }
+        Canvas(Modifier.fillMaxSize()) {
+            // Each ring is a faint tier guide; the inner tiers are a little brighter.
+            for (r in radii.indices) drawCircle(Color.White.copy(alpha = 0.16f - 0.035f * r), radius = radii[r], center = Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
+            // The thin line from an app to each of its shortcut bubbles, from the rim of the face to the rim of the bubble's circle.
+            satellites.forEachIndexed { i, spots ->
+                if (spots.isEmpty()) return@forEachIndexed
+                val rest = restCentre(i); val live = liveCentre(i)
+                spots.forEach { sp ->
+                    val target = sp.circleCentre * dpPx - rest + live
+                    val v = target - live
+                    val len = v.getDistance()
+                    val r0 = 27.dp.toPx(); val r1 = (ShortcutForm.CIRCLE_DP / 2f).dp.toPx()
+                    if (len > r0 + r1) {
+                        val u = v / len
+                        drawLine(Color.White.copy(alpha = 0.4f), live + u * r0, target - u * r1, strokeWidth = 1.dp.toPx())
+                    }
+                }
+            }
+        }
+        // TalkBack: one quiet heading per ring that has results, named for its tier.
+        placements.map { it.first }.distinct().forEach { r ->
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .offset { IntOffset(cx.roundToInt(), (cy - radii[r]).roundToInt()) }
+                    .size(1.dp)
+                    .semantics { heading(); contentDescription = L10n.tr(tierNames[r.coerceIn(0, tierNames.lastIndex)]) },
+            )
+        }
+
+        shown.forEachIndexed { i, tile ->
+            val (ring, baseAngle) = placements[i]
+            val dir = if (ring % 2 == 1) -1.0 else 1.0
+            val tierDescription = L10n.tr(tierNames[ring.coerceIn(0, tierNames.lastIndex)])
+            Column(
+                Modifier
+                    // Wave 29: the offset comes first so the semantics node (and its test tag) sits where the tile is drawn; with it after the semantics the node reported the pre-offset
+                    // position (the layer's top left), which put TalkBack's focus frame and any test's bounds in the corner.
+                    .offset {
+                        val sway = dir * travel.floatValue / radii[ring].toDouble()
+                        val a = baseAngle + sway
+                        val x = cx + radii[ring] * cos(a).toFloat()
+                        val y = cy + radii[ring] * sin(a).toFloat()
+                        IntOffset((x - colWPx / 2f).roundToInt(), (y - tilePx / 2f).roundToInt())
+                    }
+                    .width(colW)
+                    // NFR-13: the tiles circle the screen, so geometry means nothing to TalkBack; they read in rank order, best match first.
+                    .semantics(mergeDescendants = true) { testTag = RADAR_ORBIT_TILE_TAG; traversalIndex = i.toFloat(); contentDescription = tile.caption(); stateDescription = tierDescription },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // Wave 29 (review): the face and its caption are one touch target (a tap on the name under the icon used to fall through and close Radar).
+                Column(
+                    Modifier.secondaryClick { actions.onSecondary(tile) }.radarDragOut(tile, pointer = false).orbitClick(tile, actions),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    androidx.compose.foundation.layout.Box(Modifier.radarSelectedRing(selectedKey == tile.key, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape)) { TileFace(tile, tileSize) }
+                    Text(
+                        tile.caption(), color = Color.White.copy(alpha = 0.85f), fontSize = (10 * z).sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+            }
+        }
+        // Wave 49 (actionBubbles, PAL-03): an app's shortcuts are bubbles of their own next to it, tied to it by a thin line, never a "+N".
+        shown.forEachIndexed { i, tile ->
+            val spots = satellites.getOrNull(i) ?: return@forEachIndexed
+            if (tile !is Tile.App || spots.isEmpty()) return@forEachIndexed
+            val rest = restCentre(i)
+            tile.shortcuts.take(spots.size).forEachIndexed { k, h ->
+                val box = spots[k].box
+                val dx = box.left * dpPx - rest.x; val dy = box.top * dpPx - rest.y
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .offset { val c = liveCentre(i); IntOffset((c.x + dx).roundToInt(), (c.y + dy).roundToInt()) }
+                        .semantics { traversalIndex = i + (k + 1) / 100f },
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDensity provides androidx.compose.ui.unit.Density(density.density, satFont)) {
+                        ShortcutBubble(tile, h, onRun = { actions.onTap(Tile.Hit(it)) })
+                    }
+                }
+            }
+        }
+        if (footnote != null) {
+            Text(
+                footnote, color = Color.White.copy(alpha = 0.55f), fontSize = (11 * z).sp, maxLines = 1,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = with(density) { rg.top.toDp() } + 4.dp),
+            )
+        }
+        if (emptyHint != null && tiles.isEmpty()) {
+            Text(
+                emptyHint, color = Color.White.copy(alpha = 0.6f), fontSize = (13 * z).sp, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.TopCenter).offset { IntOffset(0, (cy + with(density) { (wheel.height / 2 + 14.dp).toPx() }).roundToInt()) }.padding(horizontal = 32.dp),
+            )
+        }
+    }
+}
+
+/** Largest font scale the Orbit's shortcut bubbles use for their labels. */
+internal const val ORBIT_BUBBLE_FONT_MAX = 1.3f
+
+/** Height of the typed Orbit's result strip; the rings are centred above it. */
+internal val RadarStripHeight = 52.dp
+
+/**
+ * Wave 25 (shortcutForm): the strip under the typed Orbit rings holds everything that is not an app, a person or a file: the web hand-off rows, an inline answer, launcher
+ * commands, settings pages and the Filenames refinement. Each is one [ActionCircle], the same form as an app's shortcuts, one scrolling row, 48 dp high; the label is
+ * the content description and the long-press tooltip.
+ */
+@Composable
+internal fun ResultStrip(
+    tiles: List<Tile>,
+    filenames: String?,
+    actions: TileActions,
+    onFilenames: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectedKey = LocalRadarSelection.current
+    androidx.compose.foundation.layout.Row(
+        // Wave 29: the row is as wide as its circles (no full-width bar that would swallow the taps and drags meant for the rings behind it); it scrolls when there are more than fit.
+        // The padding sits outside the scrolling node: a pointer-input node (the scroll) takes the touch even where it ignores it, so its bounds are only the circles.
+        modifier.heightIn(min = RadarStripHeight).padding(horizontal = 16.dp, vertical = 2.dp).testTag(RADAR_STRIP_TAG).horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        tiles.forEach { t ->
+            ActionCircle(t.caption(), "strip.${t.key}", onClick = { actions.onTap(t) }, selected = selectedKey == t.key) { StripGlyph(t) }
+        }
+        if (filenames != null) ActionCircle(filenames, "strip.filenames", onClick = onFilenames) { KindIcon(ActionKind.FilterFiles, ShortcutForm.GLYPH_DP.dp, Color.White) }
+    }
+}
+
+internal const val RADAR_STRIP_TAG = "radarStrip"
+
+/** Wave 29: test tag of the Orbit's layer (its bounds are the whole display area). */
+internal const val RADAR_ORBIT_TAG = "radarOrbit"
+
+/** Wave 29: test tag of one revolving tile (face, caption and shortcuts). */
+internal const val RADAR_ORBIT_TILE_TAG = "orbitTile"
+
+/** The 24 dp glyph of a strip circle: the action's own icon (ActionIcons), the engine glyph for a web row, the settings glyph for a setting. */
+@Composable
+private fun StripGlyph(t: Tile) {
+    val d = ShortcutForm.GLYPH_DP.dp
+    when (t) {
+        is Tile.Hit -> HitLeadingIcon(t.hit, d, Color.White)
+        is Tile.Web -> KindIcon(when (t.row) { is WebRow.Open -> ActionKind.OpenInBrowser; is WebRow.Search -> ActionKind.SearchWeb; is WebRow.PlayStore -> ActionKind.RefineApps }, d, Color.White) // the Play Store row is no strip circle (wave 43: it is on the rings)
+        is Tile.Setting -> KindIcon(ActionKind.OpenSettingsPage, d, Color.White)
+        else -> TileFace(t, d)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.orbitClick(tile: Tile, actions: TileActions): Modifier =
+    this.combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { actions.onTap(tile) }, onLongClick = { actions.onLongPress(tile) })
+
+// ---------------------------------------------------------------- flat (macOS) list
+
+private sealed interface FRow {
+    val key: String
+    data class Header(val title: String) : FRow { override val key get() = "h:$title" }
+    data class Sugg(val item: SuggItem, val index: Int) : FRow { override val key get() = "s:$index" }
+    data class Item(val tile: Tile) : FRow { override val key get() = "i:${tile.key}" }
+    data class Note(val text: String) : FRow { override val key get() = "n:$text" }
+    /** Wave 38: the quiet row at the end that offers the hidden apps matching the query. */
+    data class HiddenToggle(val count: Int, val open: Boolean) : FRow { override val key get() = "hid:toggle" }
+    data class HiddenApp(val app: com.bos.sphere.core.data.AppEntry) : FRow { override val key get() = "hid:${app.key}" }
+}
+
+/** Wave 38: whether the scope (null = everything) includes apps, so the hidden-apps row has a place. */
+internal fun scopeShowsApps(scope: SearchCategory?): Boolean = scope == null || scope == SearchCategory.Apps
+
+/**
+ * The plain list: refinement suggestions on top, then Applications / Actions / Contacts / Files /
+ * Web sections in a dark translucent rounded card. Nothing at all for an empty query.
+ */
+@Composable
+internal fun FlatResults(
+    data: SearchData,
+    scope: SearchCategory?,
+    suggestions: List<SuggGroup>,
+    onPickSuggestion: (SuggItem) -> Unit,
+    onTileTap: (Tile) -> Unit,
+    onLongPressApp: (com.bos.sphere.core.data.AppEntry) -> Unit,
+    onOpenIntent: (android.content.Intent) -> Unit,
+    onQueryChange: (String) -> Unit,
+    onTouch: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Typing mode: no card, apps first without a header, suggestions last, "Web Suggestions". */
+    plain: Boolean = false,
+    /** Long-press / right-click on a result (the host shows the preview, the same one in all layouts). */
+    onPreview: (Tile) -> Unit = {},
+    /** Wave 29: the list's own padding (the room under the field and above the mic): rows scroll through it instead of being cut by a clipped box. */
+    contentPadding: PaddingValues = PaddingValues(bottom = 8.dp),
+    /** Wave 38 (popupsHidden): hidden apps whose name matches the query; never mixed into the results unless the user taps the row at the end. */
+    hiddenMatches: List<com.bos.sphere.core.data.AppEntry> = emptyList(),
+    onLaunchHidden: (com.bos.sphere.core.data.AppEntry) -> Unit = {},
+    onUnhideHidden: (com.bos.sphere.core.data.AppEntry) -> Unit = {},
+) {
+    var hiddenOpen by remember(data.query) { mutableStateOf(false) }
+    val rows = remember(data, scope, suggestions, hiddenMatches, hiddenOpen) {
+        buildList<FRow> {
+            var si = 0
+            fun addSuggestions() { suggestions.forEach { g -> add(FRow.Header(g.header)); g.items.forEach { add(FRow.Sugg(it, si++)) } } }
+            if (!plain) addSuggestions()
+            for ((cat, title) in flatSections(data)) {
+                if (scope != null && scope != cat) continue
+                if (!restingShows(data, scope, cat)) continue
+                val tiles = data.tiles(cat, limited = scope == null) // wave 43: in Everything only the top 3 live web suggestions
+                val note = data.footnote(cat)
+                if (tiles.isEmpty() && note == null) continue
+                // Suggestion headers already say "Contacts"/"Web": the results get their own header below.
+                // Wave 18: at rest the list is what you open most, most used first.
+                if (data.blank && cat == SearchCategory.Apps) add(FRow.Header(L10n.tr("Most used") + "​"))
+                else if (!(plain && cat == SearchCategory.Apps)) add(FRow.Header((if (plain && cat == SearchCategory.Web) L10n.tr("Web Suggestions") else title) + "​"))
+                var playHeader = false
+                tiles.forEach {
+                    // Wave 43: the Play Store results (not installed) come after the installed apps under their own header.
+                    if (cat == SearchCategory.Apps && !playHeader && isPlayTile(it)) { playHeader = true; add(FRow.Header(L10n.tr("Play Store") + "​")) }
+                    add(FRow.Item(it))
+                }
+                if (note != null) add(FRow.Note(note))
+            }
+            if (plain) addSuggestions()
+            if (hiddenMatches.isNotEmpty()) {
+                add(FRow.HiddenToggle(hiddenMatches.size, hiddenOpen))
+                if (hiddenOpen) hiddenMatches.forEach { add(FRow.HiddenApp(it)) }
+            }
+        }
+    }
+    if (rows.isEmpty()) {
+        // Wave 18: nothing learned yet; a quiet line instead of an empty screen.
+        if (data.blank && scope == null) Text(L10n.tr("Rings fill up as you use Radar"), color = Color(0x99FFFFFF), fontSize = (14 * LocalResultScale.current).sp, modifier = modifier.padding(horizontal = 4.dp, vertical = 12.dp))
+        return
+    }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val selectedKey = LocalRadarSelection.current
+    // The keyboard selection stays in view.
+    LaunchedEffect(selectedKey) {
+        val at = rows.indexOfFirst { it is FRow.Item && it.tile.key == selectedKey }
+        if (at >= 0) {
+            val vis = listState.layoutInfo.visibleItemsInfo
+            if (vis.isEmpty() || at <= vis.first().index || at >= vis.last().index) runCatching { listState.animateScrollToItem((at - 1).coerceAtLeast(0)) }
+        }
+    }
+    // Pinch and Ctrl+scroll live on the whole Radar screen (PAL-20), so the scale comes from LocalResultScale.
+    LazyColumn(
+        modifier
+            .then(if (plain) Modifier else Modifier.clip(RoundedCornerShape(16.dp)).background(Color(0xE61C1D21)).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(16.dp)))
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val e = awaitPointerEvent(PointerEventPass.Initial)
+                        if (e.changes.any { it.pressed }) onTouch()
+                    }
+                }
+            },
+        state = listState,
+        contentPadding = contentPadding,
+    ) {
+        itemsIndexed(rows, key = { _, r -> r.key }) { idx, row ->
+            val z = LocalResultScale.current
+            when (row) {
+                is FRow.Header -> Text(
+                    row.title.removeSuffix("​"), color = Color(0x99FFFFFF), fontSize = (15 * z).sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 3.dp).semantics { heading() },
+                )
+                is FRow.Note -> Text(row.text, color = Color(0x80FFFFFF), fontSize = (15 * z).sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                is FRow.Sugg -> {
+                    Row(
+                        Modifier.fillMaxWidth().clickable(role = androidx.compose.ui.semantics.Role.Button) { onPickSuggestion(row.item) }.padding(horizontal = 16.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        KindIcon(row.item.icon, 20.dp, if (row.item.accent) HyleColors.VioletSoft else Color.White)
+                        Text(
+                            row.item.label, color = if (row.item.accent) HyleColors.VioletSoft else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
+                    if (rows.getOrNull(idx + 1) is FRow.Sugg) Divider()
+                }
+                is FRow.HiddenToggle -> Text(
+                    if (row.open) L10n.tr("Hide the hidden apps") else if (row.count == 1) L10n.tr("1 hidden app matches: Show") else L10n.tr("%d hidden apps match: Show", row.count),
+                    color = Color(0x80FFFFFF), fontSize = (14 * z).sp,
+                    modifier = Modifier.fillMaxWidth().testTag("radar.hidden.toggle").clickable(role = androidx.compose.ui.semantics.Role.Button) { hiddenOpen = !hiddenOpen }.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                is FRow.HiddenApp -> Row(Modifier.fillMaxWidth().testTag("radar.hidden.${row.app.key}").padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AppIcon(row.app, 36.dp * z)
+                    Text(
+                        row.app.label, color = Color(0xB3FFFFFF), fontSize = (17 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLaunchHidden(row.app) }.padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                    )
+                    Text(
+                        L10n.tr("Unhide"), color = Color.White, fontSize = (13 * z).sp,
+                        modifier = Modifier.testTag("radar.unhide.${row.app.key}").semantics { contentDescription = L10n.tr("Unhide %s", row.app.label) }.clip(RoundedCornerShape(10.dp)).background(Color(0x33B9A8FF)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onUnhideHidden(row.app) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+                is FRow.Item -> {
+                    FlatTileRow(row.tile, data.query, onTileTap, onPreview, onOpenIntent, onQueryChange)
+                    if (rows.getOrNull(idx + 1) is FRow.Item) Divider()
+                }
+            }
+        }
+    }
+}
+
+/** The sections of the flat list, in order: Applications, Actions, Contacts, Files, Web (always last, PAL-06; an inline answer moves Actions to the top, PAL-05). */
+internal fun flatSections(data: SearchData): List<Pair<SearchCategory, String>> = listOf(
+    SearchCategory.Apps to L10n.tr("Applications"), SearchCategory.Actions to L10n.tr("Actions"),
+    SearchCategory.Contacts to L10n.tr("Contacts"), SearchCategory.Files to L10n.tr("Files"),
+    SearchCategory.Web to L10n.tr("Web"),
+).let { l -> if (data.answer != null) l.sortedBy { p -> if (p.first == SearchCategory.Actions) 0 else 1 } else l } // PAL-05, PAL-06: an answer on top, the web hand-off always last
+
+/** The results the keyboard walks in the flat list (PAL-07), top to bottom as they are drawn. */
+internal fun flatTiles(data: SearchData, scope: SearchCategory?): List<Tile> =
+    flatSections(data).filter { (scope == null || scope == it.first) && restingShows(data, scope, it.first) }.flatMap { data.tiles(it.first, limited = scope == null) }
+
+/** Wave 43: a Play Store result (the "Search the Play Store" row or one of the store's app suggestions). */
+internal fun isPlayTile(t: Tile): Boolean = (t is Tile.Web && t.row is WebRow.PlayStore) || (t is Tile.Hit && t.hit.kind == com.bos.sphere.core.data.HitKind.PlayStore)
+
+/** Before anything is typed, "Everything" lists only what you really use: apps and people (the same rule as [SearchData.tiles]). */
+internal fun restingShows(data: SearchData, scope: SearchCategory?, cat: SearchCategory): Boolean =
+    !(data.blank && scope == null && cat != SearchCategory.Apps && cat != SearchCategory.Contacts)
+
+@Composable
+private fun Divider() {
+    Box(Modifier.padding(start = 16.dp, end = 16.dp).fillMaxWidth().height(0.5.dp).background(Color(0x26FFFFFF)))
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FlatTileRow(
+    tile: Tile,
+    query: String,
+    onTap: (Tile) -> Unit,
+    onPreview: (Tile) -> Unit,
+    onOpenIntent: (android.content.Intent) -> Unit,
+    onQueryChange: (String) -> Unit,
+) {
+    val z = LocalResultScale.current
+    val sel = LocalRadarSelection.current == tile.key
+    val selBg = if (sel) Modifier.background(Color(0x33B9A8FF)).radarSelectedRing(true, RoundedCornerShape(10.dp)) else Modifier
+    when (tile) {
+        is Tile.Person -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().then(selBg).padding(vertical = 6.dp, horizontal = 16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f).secondaryClick { onPreview(tile) }.combinedClickable(role = androidx.compose.ui.semantics.Role.Button, onClick = { onOpenIntent(ContactActions.openContact(tile.c.hit)) }, onLongClick = { onPreview(tile) }),
+            ) {
+                ContactFace(tile.c, 38.dp * z)
+                Text(tile.c.hit.name, color = Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp, end = 6.dp))
+            }
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
+        }
+        else -> Column(Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(selBg)
+                .secondaryClick { onPreview(tile) }
+                .radarDragOut(tile)
+                .combinedClickable(
+                    role = androidx.compose.ui.semantics.Role.Button,
+                    onClick = { onTap(tile) },
+                    onLongClick = { onPreview(tile) },
+                )
+                .heightIn(min = 48.dp).padding(vertical = 7.dp, horizontal = 16.dp),
+        ) {
+            TileFace(tile, if (tile is Tile.Hit && tile.hit.snippet != null) 44.dp * z else 36.dp * z)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(
+                    if (tile is Tile.Hit) highlight(tile.hit.title, query, Color(0xFFB9A8FF)) else AnnotatedString(tile.caption()),
+                    color = if (tile is Tile.Allow) Color(0x99FFFFFF) else Color.White, fontSize = (18 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                if (tile is Tile.Hit) {
+                    tile.hit.subtitle?.let { Text(it, color = Color(0x99FFFFFF), fontSize = (12 * z).sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    tile.hit.snippet?.let {
+                        Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xCCFFFFFF), fontSize = (15 * z).sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
+            }
+            if (tile is Tile.Hit) sourceBadge(tile.hit.sourcePackage)?.let {
+                Text(it, color = Color(0xCCFFFFFF), fontSize = (10 * z).sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp).background(Color(0x33FFFFFF), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+            }
+        }
+        // Wave 25 (shortcutForm): the app's shortcut circles are a row of their own under the app's row (not inside its tap area), aligned with the name.
+        if (tile is Tile.App) ShortcutBubbleRow(tile, onRun = { onTap(Tile.Hit(it)) }, modifier = Modifier.padding(start = 16.dp + 36.dp * z + 12.dp - 4.dp, end = 8.dp), start = true)
+        }
+    }
+}
+
+
+/** Radar result text scale (1 = default), kept across visits. */
+internal val LocalResultScale = androidx.compose.runtime.compositionLocalOf { 1f }
+
+internal object RadarPrefs {
+    private fun sp(c: android.content.Context) = c.getSharedPreferences("radar_ui", android.content.Context.MODE_PRIVATE)
+    fun scale(c: android.content.Context): Float = runCatching { sp(c).getFloat("resultScale", 1.15f) }.getOrDefault(1.15f)
+    fun setScale(c: android.content.Context, v: Float) { runCatching { sp(c).edit().putFloat("resultScale", v).apply() } }
+}
+
+/** Long-press preview: the result at full size, with everything it knows, and the way to open it. */
+@Composable
+internal fun ResultPreview(
+    tile: Tile,
+    query: String,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onLongPressApp: (com.bos.sphere.core.data.AppEntry) -> Unit,
+    onOpenIntent: ((android.content.Intent) -> Unit)? = null,
+    /** PAL-03: runs one of an app result's nested shortcuts. */
+    onShortcut: (com.bos.sphere.core.data.SearchHit) -> Unit = {},
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        DialogControllerKeys()
+        androidx.compose.foundation.layout.Column(
+            Modifier.fillMaxWidth().smokyBackdrop().padding(horizontal = 40.dp, vertical = 56.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            TileFace(tile, 84.dp)
+            Text(tile.caption(), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
+            if (tile is Tile.Hit) {
+                tile.hit.subtitle?.let { Text(it, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp)) }
+                tile.hit.snippet?.let { Text(highlight(it, query, Color(0xFFB9A8FF)), color = Color(0xE6FFFFFF), fontSize = 16.sp, maxLines = 12, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp)) }
+            }
+            if (tile is Tile.App) ShortcutPreviewList(tile, onRun = onShortcut, modifier = Modifier.padding(top = 10.dp))
+            if (tile is Tile.Setting) {
+                Text(tile.entry.category, color = Color(0xB3FFFFFF), fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                if (tile.entry.description.isNotEmpty()) Text(tile.entry.description, color = Color(0xE6FFFFFF), fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
+            }
+            if (tile is Tile.Person && onOpenIntent != null) {
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                Row(Modifier.padding(top = 14.dp)) {
+                    tile.c.channels.forEach { ch -> ChannelButton(ch) { ContactHabits.record(ctx, tile.c.hit.id, ch); ContactActions.intentFor(ch, tile.c.hit)?.let(onOpenIntent) } }
+                }
+            }
+            // Never side by side: the primary action is a coloured box on top, the secondary one is plain text below it.
+            androidx.compose.foundation.layout.Column(Modifier.padding(top = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(L10n.tr("Open").uppercase(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(min = 200.dp).clip(RoundedCornerShape(14.dp)).background(HyleColors.Violet.copy(alpha = 0.55f)).clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onOpen).padding(horizontal = 28.dp, vertical = 12.dp))
+                if (tile is Tile.App) Text(L10n.tr("Options").uppercase(), color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(14.dp)).clickable(role = androidx.compose.ui.semantics.Role.Button) { onLongPressApp(tile.app) }.padding(horizontal = 20.dp, vertical = 12.dp))
+            }
+        }
+    }
+}
+
+/** INP-11: a drag out of a Radar app result (a mouse drag, or a finger after a long press) carries the app to the home, a folder or the dock. */
+internal fun Modifier.radarDragOut(tile: Tile, pointer: Boolean = true): Modifier =
+    if (tile is Tile.App) appDragSource(tile.app.key, onStart = { LauncherDrops.onDragStart?.invoke() }, pointer = pointer) else this

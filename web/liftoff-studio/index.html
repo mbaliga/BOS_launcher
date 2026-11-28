@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liftoff Studio</title>
+<meta name="description" content="Edit a Liftoff Launcher configuration in the browser, see the home as you change it, and export the file the app's Backup imports.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B0B10'/%3E%3Cpath d='M16 5l5 11-5-2-5 2z M12 20h8l-4 7z' fill='%238E7BFF'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><linearGradient id="cgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6A63FF"/><stop offset="1" stop-color="#0B0B10"/></linearGradient></defs></svg>
+
+<header class="top">
+  <h1 class="brand">LIFTOFF <span>STUDIO</span></h1>
+  <div class="bar" role="toolbar" aria-label="Profile">
+    <label class="sr" for="profileSel">Profile</label>
+    <select id="profileSel" class="profile-select"></select>
+    <button type="button" id="btnProfiles" class="btn">Profiles</button>
+    <button type="button" id="btnImport" class="btn">Import</button>
+    <button type="button" id="btnExport" class="btn primary">Export</button>
+    <button type="button" id="btnShare" class="btn">Share link</button>
+    <button type="button" id="btnTheme" class="btn theme" title="Colour theme of this page"></button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<main class="studio" id="studio">
+  <section class="stage" aria-label="Live preview">
+    <div class="phone" id="phone"></div>
+    <div class="scene-bar">
+      <div class="scenes" id="scenes" role="group" aria-label="What the preview shows"></div>
+      <div class="toggles"><label class="follow"><input type="checkbox" id="follow" checked> <span>Follow the setting I change</span></label>
+      <label class="follow"><input type="checkbox" id="landscape"> <span>Landscape</span></label></div>
+    </div>
+    <p class="caption" id="caption"></p>
+  </section>
+
+  <section class="panel" aria-label="Settings">
+    <div class="tabs" id="tabs" role="tablist" aria-label="Sections"></div>
+    <div class="tabpanel" id="tabPanel" role="tabpanel" tabindex="-1"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Runs in your browser. Nothing you change here is sent anywhere; profiles are kept in this browser only. Make a file with <b>Export</b>, then in the app use <b>Backup &rsaquo; Import</b>.</p>
+  <p class="small">The preview is a drawing made from the settings, not the app. Signal wallpapers are drawn approximately, still; System and Picture wallpapers are placeholders. Fonts are bundled under the SIL Open Font License (<a href="fonts/licenses/">licences</a>).</p>
+</footer>
+
+<!-- Profiles -->
+<dialog id="dlgProfiles" aria-labelledby="dlgProfilesT">
+  <form method="dialog" class="dlg-head"><h2 id="dlgProfilesT">PROFILES</h2><button class="btn icon" aria-label="Close">&times;</button></form>
+  <div class="dlg-body">
+    <ul id="profileList" class="plist"></ul>
+    <div class="row-actions">
+      <button type="button" class="btn" id="pNew">New</button>
+      <button type="button" class="btn" id="pDup">Duplicate</button>
+      <button type="button" class="btn" id="pRename">Rename</button>
+      <button type="button" class="btn danger" id="pDelete">Delete</button>
+    </div>
+    <h3 class="sect">QUICK LOOKS <small>apply to the current profile</small></h3>
+    <div class="chips" id="looks"></div>
+    <h3 class="sect">STARTER PROFILES <small>each makes a new profile</small></h3>
+    <div class="chips" id="starters"></div>
+    <div class="row-actions"><button type="button" class="btn" id="pReset">Reset this profile to the app defaults</button><button type="button" class="btn" id="pUndo" hidden>Undo</button></div>
+  </div>
+</dialog>
+
+<!-- Import -->
+<dialog id="dlgImport" aria-labelledby="dlgImportT">
+  <form method="dialog" class="dlg-head"><h2 id="dlgImportT">IMPORT</h2><button class="btn icon" aria-label="Close">&times;</button></form>
+  <div class="dlg-body">
+    <label class="drop" id="drop" for="fileIn"><b>Choose a file</b> or drop it here<br><small>A settings file or a Backup made by the app (liftoff-settings or liftoff-state, .json)</small></label>
+    <input type="file" id="fileIn" accept=".json,application/json,text/plain" class="sr">
+    <label class="lbl" for="pasteIn">or paste the file's text, or a Studio link</label>
+    <textarea id="pasteIn" rows="5" spellcheck="false" placeholder='{"format":"liftoff-settings", ...}  or  https://.../#p=...'></textarea>
+    <fieldset class="radios"><legend class="sr">Where to put it</legend>
+      <label><input type="radio" name="impWhere" value="new" checked> As a new profile</label>
+      <label><input type="radio" name="impWhere" value="current"> Into the current profile (replaces its settings)</label>
+    </fieldset>
+    <div id="impMsg" class="msg" role="status"></div>
+    <div class="row-actions"><button type="button" class="btn primary" id="impGo">Import</button></div>
+  </div>
+</dialog>
+
+<!-- Export -->
+<dialog id="dlgExport" aria-labelledby="dlgExportT">
+  <form method="dialog" class="dlg-head"><h2 id="dlgExportT">EXPORT</h2><button class="btn icon" aria-label="Close">&times;</button></form>
+  <div class="dlg-body">
+    <div class="xrow"><div><b>Settings only</b><p>The same file as the app's &ldquo;Export settings only&rdquo;. Carries the settings of the six sections, but not the dock settings, corner and gesture actions, ring shortcuts or Comms text size.</p></div><div class="acts"><button class="btn primary" id="xSettings">Download</button><button class="btn" id="xSettingsCopy">Copy</button></div></div>
+    <div class="xrow"><div><b>Settings with dock, corners and gestures</b><p>A Backup file that holds the settings and these parts. Importing it changes only these parts; layout, groups and workspaces on the phone are left alone. If the profile came from a full Backup, the rest of that Backup is carried through unchanged.</p></div><div class="acts"><button class="btn primary" id="xState">Download</button><button class="btn" id="xStateCopy">Copy</button></div></div>
+    <p class="small" id="xHow">In the app: Backup, then Import, then pick the file.</p>
+    <div id="xMsg" class="msg" role="status"></div>
+  </div>
+</dialog>
+
+<!-- Share -->
+<dialog id="dlgShare" aria-labelledby="dlgShareT">
+  <form method="dialog" class="dlg-head"><h2 id="dlgShareT">SHARE LINK</h2><button class="btn icon" aria-label="Close">&times;</button></form>
+  <div class="dlg-body">
+    <p class="small">The link holds the profile after the # sign, so it never goes to a server. Anyone who opens it gets a copy in their own browser. Only what differs from the defaults is in it.</p>
+    <textarea id="shareOut" rows="4" readonly spellcheck="false"></textarea>
+    <div id="shareMsg" class="msg" role="status"></div>
+    <div class="row-actions"><button class="btn primary" id="shareCopy">Copy link</button></div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="schema.js"></script>
+<script src="core.js"></script>
+<script src="preview.js"></script>
+<script src="cards.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

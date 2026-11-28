@@ -11,6 +11,8 @@ import android.os.UserManager
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOn
 
 /**
  * Source of truth for the launchable-app inventory.
@@ -22,6 +24,8 @@ import kotlinx.coroutines.flow.callbackFlow
  */
 interface AppRepository {
     val apps: Flow<List<AppEntry>>
+
+    /** Plain launch for the safe-mode screen only, which deliberately avoids the launch layer; every other launch goes through `AppLauncher` (WSP-01). */
     fun launch(entry: AppEntry)
 
     /** Opens the system App-info screen for [entry] (profile-aware). */
@@ -41,7 +45,8 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
 
     override val apps: Flow<List<AppEntry>> = callbackFlow {
         fun emitSnapshot() {
-            trySend(loadAll())
+            // A callback runs on the worker thread: a profile that cannot be read at this moment (locked or just removed) must not take the process down. The snapshot is skipped, never emitted short, so no app is taken for uninstalled (HOM-10).
+            runCatching { loadAll() }.getOrNull()?.let { trySend(it) }
         }
 
         val callback = object : LauncherApps.Callback() {
@@ -59,12 +64,20 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
                 user: UserHandle?,
                 replacing: Boolean,
             ) = emitSnapshot()
+
+            // HOM-10: suspend / unsuspend change an app's state without add or remove.
+            override fun onPackagesSuspended(packageNames: Array<out String>?, user: UserHandle?) = emitSnapshot()
+            override fun onPackagesUnsuspended(packageNames: Array<out String>?, user: UserHandle?) = emitSnapshot()
         }
 
-        launcherApps.registerCallback(callback)
+        // NFR-12: the package callbacks and the inventory (binder calls to LauncherApps) run on a background thread,
+        // never on the main thread the collector lives on.
+        val thread = android.os.HandlerThread("liftoff-apps").apply { start() }
+        launcherApps.registerCallback(callback, android.os.Handler(thread.looper))
         emitSnapshot() // initial inventory
-        awaitClose { launcherApps.unregisterCallback(callback) }
-    }
+        awaitClose { launcherApps.unregisterCallback(callback); thread.quitSafely() }
+        // A burst of callbacks (bulk install) collapses to the newest snapshot, still well inside 1 s.
+    }.conflate().flowOn(kotlinx.coroutines.Dispatchers.Default)
 
     private fun loadAll(): List<AppEntry> =
         userManager.userProfiles.flatMap { user ->
@@ -74,6 +87,10 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
                     componentName = info.componentName,
                     label = info.label.toString(),
                     user = user,
+                    suspended = (info.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SUSPENDED) != 0,
+                    versionStamp = runCatching { java.io.File(info.applicationInfo.sourceDir).lastModified() }.getOrDefault(0L),
+                    archived = AppFlags.archived(info.applicationInfo.flags),
+                    isSystem = !AppUninstall.isRemovable(info.applicationInfo.flags),
                     iconLoader = {
                         // Density 0 → let the system pick; LauncherApps badges for the profile.
                         runCatching { info.getBadgedIcon(0) }.getOrNull()
@@ -83,12 +100,7 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
         }.sortedBy { it.label.lowercase() }
 
     override fun launch(entry: AppEntry) {
-        launcherApps.startMainActivity(
-            entry.componentName,
-            entry.user,
-            /* sourceBounds = */ null,
-            /* opts = */ null,
-        )
+        launcherApps.startMainActivity(entry.componentName, entry.user, null, null)
     }
 
     override fun openAppDetails(entry: AppEntry) {
@@ -98,16 +110,7 @@ class LauncherAppsAppRepository(context: Context) : AppRepository {
     }
 
     override fun requestUninstall(entry: AppEntry) {
-        val intent = Intent(Intent.ACTION_DELETE).apply {
-            data = Uri.fromParts("package", entry.packageName, null)
-            putExtra(Intent.EXTRA_USER, entry.user)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        runCatching { appContext.startActivity(intent) }
+        AppUninstall.start(appContext, entry)
     }
 
-    companion object {
-        /** Convenience for callers that only have a [ComponentName]/package and the current user. */
-        fun currentUser(): UserHandle = Process.myUserHandle()
-    }
 }

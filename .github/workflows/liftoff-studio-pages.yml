@@ -1,0 +1,41 @@
+# OPTIONAL. Publishes web/liftoff-studio as a GitHub Pages site, at <pages-root>/liftoff/studio/.
+# Nothing runs until someone starts it by hand (Actions > "Publish Liftoff Studio" > Run workflow) AND Pages is enabled for the repository
+# (Settings > Pages > Source: GitHub Actions). It does not run on push. See web/liftoff-studio/README.md and docs/decisions/studio.md.
+name: Publish Liftoff Studio
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: liftoff-studio-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test the page logic
+        run: node --test web/liftoff-studio/tests/studio.test.js
+      - name: Stage the site (the tests stay behind)
+        run: |
+          mkdir -p _site/liftoff/studio
+          rsync -a --exclude tests --exclude README.md web/liftoff-studio/ _site/liftoff/studio/
+          printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=liftoff/studio/"><a href="liftoff/studio/">Liftoff Studio</a>' > _site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -36,9 +36,4 @@ object PerformanceMonitor {
         if (enabled) Log.d(TAG, message)
     }
 
-    fun logFrameMetrics(frameCount: Int, durationMs: Duration) {
-        if (!enabled) return
-        val fps = (frameCount / durationMs.inWholeMilliseconds.toFloat()) * 1000
-        Log.d(TAG, "Frame metrics: $frameCount frames in ${durationMs.inWholeMilliseconds}ms = ${String.format("%.1f", fps)} FPS")
-    }
 }

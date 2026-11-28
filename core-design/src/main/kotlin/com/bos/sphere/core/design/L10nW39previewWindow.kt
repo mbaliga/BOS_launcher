@@ -1,0 +1,87 @@
+package com.bos.sphere.core.design
+
+/** Wave 39 (previewWindow): the floating, movable, resizable and minimisable live preview in Settings. */
+internal val L10nW39previewWindowEnglish: Set<String> = setOf(
+    "Move left",
+    "Move right",
+    "Minimise",
+    "Restore",
+    "Reset position",
+    "Resize preview",
+    "Preview window",
+)
+
+internal val L10nW39previewWindow: Map<String, Map<String, String>> = mapOf(
+    "es" to mapOf(
+        "Move left" to "Mover a la izquierda",
+        "Move right" to "Mover a la derecha",
+        "Minimise" to "Minimizar",
+        "Restore" to "Restaurar",
+        "Reset position" to "Restablecer posición",
+        "Resize preview" to "Cambiar tamaño de la vista previa",
+        "Preview window" to "Ventana de vista previa",
+    ),
+    "fr" to mapOf(
+        "Move left" to "Déplacer à gauche",
+        "Move right" to "Déplacer à droite",
+        "Minimise" to "Réduire",
+        "Restore" to "Restaurer",
+        "Reset position" to "Réinitialiser la position",
+        "Resize preview" to "Redimensionner l'aperçu",
+        "Preview window" to "Fenêtre d'aperçu",
+    ),
+    "de" to mapOf(
+        "Move left" to "Nach links verschieben",
+        "Move right" to "Nach rechts verschieben",
+        "Minimise" to "Minimieren",
+        "Restore" to "Wiederherstellen",
+        "Reset position" to "Position zurücksetzen",
+        "Resize preview" to "Vorschau skalieren",
+        "Preview window" to "Vorschaufenster",
+    ),
+    "pt" to mapOf(
+        "Move left" to "Mover para a esquerda",
+        "Move right" to "Mover para a direita",
+        "Minimise" to "Minimizar",
+        "Restore" to "Restaurar",
+        "Reset position" to "Redefinir posição",
+        "Resize preview" to "Redimensionar a pré-visualização",
+        "Preview window" to "Janela de pré-visualização",
+    ),
+    "hi" to mapOf(
+        "Move left" to "बाएँ ले जाएँ",
+        "Move right" to "दाएँ ले जाएँ",
+        "Minimise" to "छोटा करें",
+        "Restore" to "वापस लाएँ",
+        "Reset position" to "स्थिति रीसेट करें",
+        "Resize preview" to "पूर्वावलोकन का आकार बदलें",
+        "Preview window" to "पूर्वावलोकन विंडो",
+    ),
+    "zh" to mapOf(
+        "Move left" to "向左移动",
+        "Move right" to "向右移动",
+        "Minimise" to "最小化",
+        "Restore" to "还原",
+        "Reset position" to "重置位置",
+        "Resize preview" to "调整预览大小",
+        "Preview window" to "预览窗口",
+    ),
+    "ja" to mapOf(
+        "Move left" to "左へ移動",
+        "Move right" to "右へ移動",
+        "Minimise" to "最小化",
+        "Restore" to "元に戻す",
+        "Reset position" to "位置をリセット",
+        "Resize preview" to "プレビューのサイズ変更",
+        "Preview window" to "プレビューウィンドウ",
+    ),
+    "ar" to mapOf(
+        "Move left" to "نقل إلى اليسار",
+        "Move right" to "نقل إلى اليمين",
+        "Minimise" to "تصغير",
+        "Restore" to "استعادة",
+        "Reset position" to "إعادة ضبط الموضع",
+        "Resize preview" to "تغيير حجم المعاينة",
+        "Preview window" to "نافذة المعاينة",
+    ),
+)

@@ -6,9 +6,35 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.bos.sphere.core.data.CornerActionId
+import com.bos.sphere.core.data.LauncherStores
+import com.bos.sphere.core.data.StateService
+import com.bos.sphere.core.data.ThemeMode
+import com.bos.sphere.core.design.HyleTheme
+import com.bos.sphere.core.design.L10n
+import com.bos.sphere.core.design.ThemeVariant
 import com.bos.sphere.core.design.SphereTheme
+import com.bos.sphere.feature.grid.WidgetConfigureResults
+import com.bos.sphere.feature.grid.InputModeProvider
+import com.bos.sphere.feature.grid.LauncherInput
+import com.bos.sphere.feature.grid.hotCorners
+import com.bos.sphere.feature.grid.homeDropTarget
+import com.bos.sphere.feature.grid.inputSensing
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
+import android.view.Menu
+import com.bos.sphere.core.input.KeyLabels
+
+/** [seq] makes repeated requests for the same action distinct. */
+data class ExternalAction(val id: CornerActionId, val seq: Int)
 
 /**
  * Single-Activity Compose host for the launcher surface. The window is transparent and
@@ -19,20 +45,136 @@ import com.bos.sphere.core.design.SphereTheme
 class MainActivity : ComponentActivity() {
 
     private var homeSignal by mutableIntStateOf(0)
+    private var externalAction by mutableStateOf<ExternalAction?>(null)
+    private var actionSeq = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Wave 18 (CFG-09, NFR-09): the shared crash-recovery screen comes first. With a crash pending it starts the recovery activity
+        // (splash, readable report, Share) and finishes this one before anything else runs, so nothing below can race it.
+        if (dev.aarso.crashrecovery.CrashRecovery.maybeShowRecovery(this, "Liftoff")) { super.onCreate(savedInstanceState); return }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        handleAction(intent)
+        com.bos.sphere.feature.grid.LauncherShortcuts.reload(this) // INP-10: saved key bindings, read off the main thread
+        // CFG-09: the start is recorded first (the "starting" marker); a crash below counts towards safe mode on the NEXT start, if the exit record says crash.
+        com.bos.sphere.feature.desktop.DesktopController.get(this).start()
+        // A recreate in the same process is a configuration change, not a start; a saved state in a NEW process (after a crash) still is one.
+        if (com.bos.sphere.core.data.CrashLoopMath.countsAsStart(savedInstanceState != null, com.bos.sphere.core.data.CrashLoopGuard.countedInThisProcess)) com.bos.sphere.core.data.CrashLoopGuard.onStart(this, jvmReportSince = { com.bos.sphere.CrashRecoveryHost.reportSince(this, it) })
+        // Second layer: the user continued past the recovery screen and the app crashed again (streak >= 2): safe mode as well.
+        if (com.bos.sphere.core.data.RecoveryDecision.screen(false, com.bos.sphere.core.data.CrashLoopGuard.safeMode, com.bos.sphere.CrashRecoveryHost.liveStreak(this)) == com.bos.sphere.core.data.RecoveryDecision.Screen.SafeMode) com.bos.sphere.core.data.CrashLoopGuard.enterSafeMode()
+        // Build-31 bridge: snapshot the old preference files before any store reads or writes them (never fatal).
+        runCatching { StateService.bridgeBuild31(applicationContext) }
+        runCatching { StateService.get(this).guardPlatformRestore() } // NFR-18: drop device-bound widget ids and picture after a platform restore
+        Thread { StateService.get(applicationContext).purgeBackgroundPictures() }.start() // wave 15: leftover pictures of the removed background gallery, off the main thread
+        // CFG-04 / CFG-01: destructive edits snapshot first; the user's keyboard shortcut overrides come back from the state store.
+        runCatching {
+            com.bos.sphere.core.data.DestructiveEdits.install { StateService.beforeDestructive(applicationContext, it) }
+            LauncherInput.registry.import(StateService.get(this).keyboardOverrides())
+            StateService.keyboardLiveSource = { LauncherInput.registry.export() } // CFG-01: an export reads the live registry
+        }
+        window.decorView.postDelayed({
+            com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext)
+            // A stable start is the last known good state: snapshot it so safe mode has something to restore (CFG-04).
+            if (!com.bos.sphere.core.data.CrashLoopGuard.safeMode) {
+                StateService.onStable(applicationContext)
+                dev.aarso.crashrecovery.CrashRecovery.clearStreak(applicationContext) // a normal start that stayed up is a recovery: the crash streak starts over
+            }
+        }, com.bos.sphere.core.data.CrashLoopMath.WINDOW_MS)
+        // Apply theme and language before the first frame so there is no flash of defaults.
+        LauncherStores.get(this).prefs.prefs.value.let { p ->
+            HyleTheme.apply(
+                when (p.themeMode) { ThemeMode.Dark -> ThemeVariant.Dark; ThemeMode.Amoled -> ThemeVariant.Amoled; ThemeMode.Light -> ThemeVariant.Light },
+                p.accentColor,
+            )
+            L10n.setLanguage(p.language.code)
+            com.bos.sphere.core.design.HyleFont.apply(p.uiFont)
+        }
         setContent {
             SphereTheme {
-                HomeScreen(homeSignal = homeSignal)
+                // The input layer observes pointer and touch from here without consuming anything (INP-06, INP-16).
+                InputModeProvider {
+                    Box(Modifier.fillMaxSize().inputSensing().hotCorners().homeDropTarget()) {
+                        // CFG-09: after a crash loop, a minimal grid with widgets off and a snapshot restore on offer.
+                        var safe by remember { mutableStateOf(com.bos.sphere.core.data.CrashLoopGuard.safeMode) }
+                        if (safe) com.bos.sphere.ui.SafeModeScreen(onContinue = { safe = false })
+                        else com.bos.sphere.feature.dock.DockSheetHost { HomeScreen(homeSignal = homeSignal, externalAction = externalAction) } // W55: the dock's sheet pushes the whole home out of its way
+                    }
+                }
             }
         }
+    }
+
+    /** A launcher-internal action forwarded by the motion service or its notification. */
+    private fun handleAction(intent: Intent?): Boolean {
+        // HOM-04: a Radar result for a home folder opens that folder.
+        intent?.getStringExtra(EXTRA_OPEN_FOLDER)?.let { id ->
+            intent.removeExtra(EXTRA_OPEN_FOLDER)
+            HomeOpenRequests.folder.value = id
+            // The folder opens on the home itself: close the drawer, search and other overlays first, as the home button does.
+            if (com.bos.sphere.core.catalog.HomeIntentRouting.closesOverlays(com.bos.sphere.core.catalog.HomeIntentRoute.OpenFolder(id))) homeSignal++
+            return true
+        }
+        val name = intent?.getStringExtra(EXTRA_ACTION) ?: return false
+        val id = CornerActionId.entries.firstOrNull { it.name == name } ?: return false
+        intent.removeExtra(EXTRA_ACTION)
+        externalAction = ExternalAction(id, ++actionSeq)
+        return true
+    }
+
+    companion object {
+        const val EXTRA_ACTION = "com.bos.sphere.extra.ACTION"
+        const val EXTRA_OPEN_FOLDER = "com.bos.sphere.extra.OPEN_FOLDER"
+    }
+
+    /** The system-launched widget configure screen reports back here (not through Compose). */
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        WidgetConfigureResults.deliver(requestCode, resultCode)
+    }
+
+    /** Controller buttons become arrows, Enter and Esc; registered shortcuts and focus keys are handled before Compose sees them (INP-04, INP-20). */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val e = LauncherInput.translate(event)
+        if (LauncherInput.onKeyEvent(e)) return true
+        return super.dispatchKeyEvent(e)
+    }
+
+    /** Publishes every registered shortcut to the system's keyboard shortcut helper (INP-04). */
+    override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
+        val infos = LauncherInput.registry.all().mapNotNull { (cmd, chord) ->
+            chord?.let {
+                val mods = (if (it.ctrl) KeyEvent.META_CTRL_ON else 0) or (if (it.alt) KeyEvent.META_ALT_ON else 0) or
+                    (if (it.shift) KeyEvent.META_SHIFT_ON else 0) or (if (it.meta) KeyEvent.META_META_ON else 0)
+                KeyboardShortcutInfo(L10n.tr(cmd.label), it.keyCode, mods)
+            }
+        }
+        data.add(KeyboardShortcutGroup(L10n.tr("Liftoff"), infos))
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
     }
 
     /** Pressing Home while already here delivers a new MAIN/HOME intent — reset the surface. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        homeSignal++
+        if (!handleAction(intent)) homeSignal++
+    }
+
+    // EXT-02: tell the desktop feature where this home activity runs, so the offer is skipped where the platform gives home.
+    override fun onStart() {
+        super.onStart()
+        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStarted(this, runCatching { display?.displayId }.getOrNull() ?: 0) // a context not tied to a display (a headless host) reads as the default display
+    }
+
+    override fun onStop() {
+        com.bos.sphere.feature.desktop.DesktopSurfaces.homeStopped(this)
+        runCatching { StateService.get(this).saveKeyboardOverrides(LauncherInput.registry.export()) }
+        super.onStop()
+    }
+
+    // CFG-09 (wave 19): a clean finish is not a crash; clear the "starting" marker. A recreate or the system's own teardown is not a finish.
+    override fun onDestroy() {
+        if (isFinishing && !isChangingConfigurations) runCatching { com.bos.sphere.core.data.CrashLoopGuard.onStable(applicationContext) }
+        super.onDestroy()
     }
 }

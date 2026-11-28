@@ -1,0 +1,87 @@
+package com.bos.sphere.core.design
+
+/** Wave 36 (pageEditor): the page editor with the page strip, the tabs and the swing. */
+internal val L10nW36pageEditorEnglish: Set<String> = setOf(
+    "Page editor tabs",
+    "The Glance has no apps or widgets. Pick a page.",
+    "Move earlier",
+    "Move later",
+    "Move page %d earlier",
+    "Move page %d later",
+    "Added to page %d",
+)
+
+internal val L10nW36pageEditor: Map<String, Map<String, String>> = mapOf(
+    "es" to mapOf(
+        "Page editor tabs" to "Pestañas del editor de páginas",
+        "The Glance has no apps or widgets. Pick a page." to "El Glance no tiene apps ni widgets. Elige una página.",
+        "Move earlier" to "Mover antes",
+        "Move later" to "Mover después",
+        "Move page %d earlier" to "Mover la página %d antes",
+        "Move page %d later" to "Mover la página %d después",
+        "Added to page %d" to "Añadido a la página %d",
+    ),
+    "fr" to mapOf(
+        "Page editor tabs" to "Onglets de l'éditeur de pages",
+        "The Glance has no apps or widgets. Pick a page." to "Le Glance n'a ni apps ni widgets. Choisissez une page.",
+        "Move earlier" to "Avancer",
+        "Move later" to "Reculer",
+        "Move page %d earlier" to "Avancer la page %d",
+        "Move page %d later" to "Reculer la page %d",
+        "Added to page %d" to "Ajouté à la page %d",
+    ),
+    "de" to mapOf(
+        "Page editor tabs" to "Tabs des Seiteneditors",
+        "The Glance has no apps or widgets. Pick a page." to "Der Glance hat keine Apps oder Widgets. Wähle eine Seite.",
+        "Move earlier" to "Nach vorn",
+        "Move later" to "Nach hinten",
+        "Move page %d earlier" to "Seite %d nach vorn",
+        "Move page %d later" to "Seite %d nach hinten",
+        "Added to page %d" to "Zu Seite %d hinzugefügt",
+    ),
+    "pt" to mapOf(
+        "Page editor tabs" to "Abas do editor de páginas",
+        "The Glance has no apps or widgets. Pick a page." to "O Glance não tem apps nem widgets. Escolha uma página.",
+        "Move earlier" to "Mover antes",
+        "Move later" to "Mover depois",
+        "Move page %d earlier" to "Mover a página %d antes",
+        "Move page %d later" to "Mover a página %d depois",
+        "Added to page %d" to "Adicionado à página %d",
+    ),
+    "hi" to mapOf(
+        "Page editor tabs" to "पेज एडिटर के टैब",
+        "The Glance has no apps or widgets. Pick a page." to "Glance में ऐप या विजेट नहीं होते। कोई पेज चुनें।",
+        "Move earlier" to "पहले ले जाएँ",
+        "Move later" to "बाद में ले जाएँ",
+        "Move page %d earlier" to "पेज %d को पहले ले जाएँ",
+        "Move page %d later" to "पेज %d को बाद में ले जाएँ",
+        "Added to page %d" to "पेज %d में जोड़ा गया",
+    ),
+    "zh" to mapOf(
+        "Page editor tabs" to "页面编辑器标签",
+        "The Glance has no apps or widgets. Pick a page." to "Glance 上没有应用或小部件。请选择一个页面。",
+        "Move earlier" to "前移",
+        "Move later" to "后移",
+        "Move page %d earlier" to "将第 %d 页前移",
+        "Move page %d later" to "将第 %d 页后移",
+        "Added to page %d" to "已添加到第 %d 页",
+    ),
+    "ja" to mapOf(
+        "Page editor tabs" to "ページエディタのタブ",
+        "The Glance has no apps or widgets. Pick a page." to "Glance にはアプリもウィジェットも置けません。ページを選んでください。",
+        "Move earlier" to "前へ移動",
+        "Move later" to "後ろへ移動",
+        "Move page %d earlier" to "ページ %d を前へ移動",
+        "Move page %d later" to "ページ %d を後ろへ移動",
+        "Added to page %d" to "ページ %d に追加しました",
+    ),
+    "ar" to mapOf(
+        "Page editor tabs" to "علامات تبويب محرر الصفحات",
+        "The Glance has no apps or widgets. Pick a page." to "لا تحتوي شاشة Glance على تطبيقات أو أدوات. اختر صفحة.",
+        "Move earlier" to "تحريك للأمام",
+        "Move later" to "تحريك للخلف",
+        "Move page %d earlier" to "تحريك الصفحة %d للأمام",
+        "Move page %d later" to "تحريك الصفحة %d للخلف",
+        "Added to page %d" to "أُضيف إلى الصفحة %d",
+    ),
+)

@@ -1,0 +1,12 @@
+# musicControls (wave 42)
+
+Owner report: "The music controls at the top dont always work." Causes found by reading the code (nothing was reproduced on a device):
+
+1. Only the session that was shown at the last session-list change had a callback. A second player starting (or the shown one pausing) sends only playback-state callbacks, so the line kept showing, and sending commands to, the paused player. Fix: every active session is watched; the pick is redone on every state or metadata callback, on every session-list change and again on every tap before the command goes out. Playing (also buffering, connecting, skipping, fast-forward) beats paused beats stopped; ties go to the session already shown, then to the system's order.
+2. `skipToNext()` and friends were sent bare. A session only acts when it advertises the action; browsers and older players advertise none, so the tap did nothing, and Next / Previous were disabled whenever the action bit was missing. Fix (`MediaCommands`): the transport call when the action is advertised, else a key down+up sent to that session with explicit PLAY / PAUSE / NEXT / PREVIOUS keycodes, else the audio service's media key. A skip control is dimmed only when the session reports actions and lacks that one; with no actions reported yet it stays usable. When every route fails a short "Can't control <app>" toast is shown.
+3. The pop-in was a graphicsLayer translation / alpha on the notch, which also moves or fades the hit area, and the notch was composed one frame after it was wanted. A tap during the roughly 250 ms spring or in the first frame missed the buttons. Fix: the animation is drawn only; the targets sit at their final place and are composed from the first frame.
+4. The skipping states (previous, next, queue item) were not "playing", so the icon flipped to Play and the session lost to a paused one during a track change. They count as playing now.
+
+Unchanged and checked: the play/pause icon already follows the reported state (no local guess); the auto-hide timer already holds while a finger is down and restarts on lift (`ControlsPop`); targets are 48 dp and clear of the 64 dp corner hotspots from 320 dp width; listeners are removed in `MediaNow.stop()`.
+
+Not verifiable here: how Spotify, YouTube Music, Apple Music, browsers and podcast apps actually react to the media-button and system-key routes, and whether their sessions advertise the actions the tables assume. Those are reasoned from the framework contract only.

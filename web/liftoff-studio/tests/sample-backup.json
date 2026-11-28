@@ -1,0 +1,234 @@
+{
+  "app": "Liftoff test",
+  "settings": {
+    "format": "liftoff-settings",
+    "settingsVersion": 2,
+    "prefs": {
+      "bgSlot1": "spire",
+      "wpGlanceAngle": 90,
+      "bgSlot2": "breathing-dots",
+      "wpPagesKind": "live",
+      "themeMode": "Light",
+      "clockStyle": "BigDigital",
+      "homePage": 0,
+      "searchActions": true,
+      "gridInsetTop": 0,
+      "iconTint": "None",
+      "indIntensity": 0.6,
+      "wpPagesPicGif": "still",
+      "uiSoundVolume": 0.4,
+      "wpGlanceSysDim": 0,
+      "indSpeed": 0.5,
+      "wpGlancePicDim": 0,
+      "wpGlanceTo": 4278913808,
+      "wpPagesFrom": 4280954731,
+      "kbOpenL": false,
+      "glanceControlsSec": 4,
+      "pageTransition": "Slide",
+      "searchDeep": true,
+      "kbOpenP": false,
+      "labels": false,
+      "glanceClockSize": "Large",
+      "launchpadRail": true,
+      "adaptiveGrid": false,
+      "glanceClockXLand": 0.5,
+      "lPaging": "Horizontal",
+      "settingsBackdrop": "Wallpaper",
+      "pRows": 6,
+      "style": "Grid",
+      "motionBg": false,
+      "iconScale": 0.82,
+      "homePages": "Continuous",
+      "wpPagesPicFit": "fill",
+      "clockTileAnalog": false,
+      "gridDensity": 1,
+      "glanceClockX": 0.5,
+      "labelScale": 1,
+      "glanceClockY": 0.14,
+      "recentsLimit": 24,
+      "gridInsetBottom": 0,
+      "wheelGrouping": "Letter",
+      "glanceClockAccent": false,
+      "iconPlate": true,
+      "hotCornersOn": true,
+      "futureInSettings": 1,
+      "contCols": 4,
+      "leftPage": "Launchpad",
+      "wpGlanceSolid": 4279637532,
+      "iconSpacing": 0,
+      "searchLayoutPinned": false,
+      "glanceClockDate": false,
+      "motionSens": 0.5,
+      "lCols": 5,
+      "searchWeb": true,
+      "cornerIconMode": "Glyph",
+      "webEngine": "DuckDuckGo",
+      "spacingV": -1,
+      "glanceHotspots": "TopLeft,TopRight,BottomRight,BottomLeft",
+      "lRows": 2,
+      "indMid": 4294947655,
+      "glanceClockYLand": 0.14,
+      "cornersFollow": true,
+      "indMetric": "Signal",
+      "glanceIndicator": true,
+      "wpGlanceFrom": 4280954731,
+      "clockFormat": "System",
+      "language": "System",
+      "radarIntensity": "Normal",
+      "uiFont": "space_grotesk",
+      "indIdle": 4287270809,
+      "glanceEnabled": true,
+      "radarSignalForce": "Live",
+      "indLow": 4294921549,
+      "settingsDim": 0.7,
+      "radarBackground": "Dimmed",
+      "searchContacts": true,
+      "webSuggestions": true,
+      "uiSounds": true,
+      "lpTheme": "Dark",
+      "showMusic": true,
+      "wpPagesSlot2": "breathing-dots",
+      "wpPagesSlot1": "spire",
+      "clockTileFormat": "System",
+      "wpGlancePicFit": "fill",
+      "clockTileDate": true,
+      "badgesOn": true,
+      "searchLayout": "Filmstrip",
+      "calmRegular": false,
+      "pCols": 3,
+      "cornerIconSize": 32,
+      "wheelWorkOnly": false,
+      "badgeCount": true,
+      "musicLineWidth": "FitAroundCorners",
+      "searchMotion": true,
+      "pPaging": "Horizontal",
+      "wpPagesPicDim": 0,
+      "searchFiles": true,
+      "iconShape": "Rounded",
+      "wpPagesAngle": 90,
+      "wpGlanceKind": "live",
+      "wpPagesTo": 4278913808,
+      "motion": true,
+      "scrollAxis": "Long",
+      "pageMode": "Multiple",
+      "gridInsetX": 0,
+      "indHigh": 4285267855,
+      "restoreSurfaces": false,
+      "rightSide": "RecentsPanel",
+      "hideStatusBar": true,
+      "wpPagesSame": true,
+      "wpGlancePicGif": "still",
+      "accent": 4287527935,
+      "homeOrder": "LeftToRight",
+      "gridBias": 0.4,
+      "wpPagesSolid": 4279637532,
+      "cornerStyle": "Glyph",
+      "cornersPerOri": false,
+      "alwaysKeyboard": false,
+      "recentsUsage": true,
+      "hotCornerDwell": 150,
+      "wpPagesSysDim": 0
+    }
+  },
+  "sessions": [],
+  "schemaVersion": 3,
+  "launchpad": {
+    "policies": [],
+    "rules": [],
+    "prefs": {
+      "default": "AppConversation",
+      "perApp": {}
+    },
+    "gestures": "PinchIn=ShowUnread;PinchOut=ShowAll;SwipeItemRight=Dismiss;SwipeItemLeft=Dismiss;LongPressItem=MoreOptions;DoubleTapHeader=NextGrouping"
+  },
+  "format": "liftoff-state",
+  "shortcuts": {
+    "corners": {
+      "BottomRight": {
+        "t": "single",
+        "i": "action:Search"
+      },
+      "BottomLeft": {
+        "t": "single",
+        "i": "action:AllApps"
+      },
+      "TopRight": {
+        "t": "single",
+        "i": "app:com.example.notes/.Main"
+      },
+      "TopLeft": {
+        "t": "single",
+        "i": "action:Phone"
+      }
+    },
+    "landscapeCorners": {},
+    "gestures": {
+      "PinchOut": "",
+      "SwipeRight": "",
+      "FaceDown": "",
+      "PinchIn": "action:Search",
+      "DoubleFlick": "action:RingerSilent",
+      "SwipeUp": "action:AllApps",
+      "SwipeDown": "action:Notifications",
+      "Shake": "app:com.example.torch",
+      "DoubleTap": "",
+      "LongPress": "",
+      "DoubleFlip": "action:Flashlight",
+      "SwipeLeft": ""
+    }
+  },
+  "widgets": [],
+  "futureSection": {"a": 1},
+  "layout": {
+    "pages": [],
+    "removed": [],
+    "hidden": [],
+    "seeded": false
+  },
+  "prefFiles": {
+    "puck_actions": {
+      "slots": {
+        "t": "s",
+        "v": "a:Flashlight\na:Clock\na:Notifications\na:DoNotDisturb\na:Search\na:Camera\na:Calculator\na:SystemSettings"
+      },
+      "segments": {
+        "t": "i",
+        "v": 7
+      },
+      "labels": {
+        "t": "b",
+        "v": true
+      }
+    },
+    "comms_scale": {"pct": {
+      "t": "i",
+      "v": 110
+    }},
+    "home_state": {"dock": {
+      "t": "set",
+      "v": []
+    }}
+  },
+  "paletteAliases": [],
+  "exportedAt": 1700000000000,
+  "workspaces": [{
+    "name": "Main",
+    "id": "w1"
+  }],
+  "dock": {
+    "settings": {
+      "mode": "PinnedPlusRecent",
+      "edge": "Bottom",
+      "groupShelf": true,
+      "style": "transparent",
+      "enabled": null
+    },
+    "groups": [{
+      "layout": "Grid",
+      "members": [],
+      "name": "Work",
+      "id": "g1"
+    }],
+    "activeId": "w1"
+  }
+}

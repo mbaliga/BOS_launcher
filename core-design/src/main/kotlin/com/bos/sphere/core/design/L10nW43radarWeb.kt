@@ -1,0 +1,87 @@
+package com.bos.sphere.core.design
+
+/** Wave 43 (radarWeb) strings: Web suggestions setting, the Play Store rows, the first-use note; merged by [L10n.tableFor]. */
+internal val L10nW43radarWebEnglish: Set<String> = setOf(
+    "Web suggestions",
+    "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions.",
+    "Enter and the Search row open this engine in your browser",
+    "Suggestions come from %s. Turn off in settings.",
+    "Search the Play Store for “%s”",
+    "Search {engine} for “{query}”",
+    "Play Store",
+)
+
+internal val L10nW43radarWeb: Map<String, Map<String, String>> = mapOf(
+    "es" to mapOf(
+        "Web suggestions" to "Sugerencias web",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "Envía lo que escribes en los ámbitos Web, Apps y Todo a %s y a Play Store para mostrar sugerencias.",
+        "Enter and the Search row open this engine in your browser" to "Intro y la fila Buscar abren este buscador en tu navegador",
+        "Suggestions come from %s. Turn off in settings." to "Las sugerencias vienen de %s. Desactívalas en ajustes.",
+        "Search the Play Store for “%s”" to "Buscar en Play Store “%s”",
+        "Search {engine} for “{query}”" to "Buscar en {engine} “{query}”",
+        "Play Store" to "Play Store",
+    ),
+    "fr" to mapOf(
+        "Web suggestions" to "Suggestions web",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "Envoie ce que vous tapez dans les portées Web, Apps et Tout à %s et au Play Store pour afficher des suggestions.",
+        "Enter and the Search row open this engine in your browser" to "Entrée et la ligne Rechercher ouvrent ce moteur dans votre navigateur",
+        "Suggestions come from %s. Turn off in settings." to "Les suggestions viennent de %s. Désactivez-les dans les réglages.",
+        "Search the Play Store for “%s”" to "Rechercher « %s » sur le Play Store",
+        "Search {engine} for “{query}”" to "Rechercher « {query} » sur {engine}",
+        "Play Store" to "Play Store",
+    ),
+    "de" to mapOf(
+        "Web suggestions" to "Websuchvorschläge",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "Sendet, was du im Web-, Apps- und Alles-Bereich tippst, an %s und den Play Store, um Vorschläge zu zeigen.",
+        "Enter and the Search row open this engine in your browser" to "Enter und die Suchzeile öffnen diese Suchmaschine im Browser",
+        "Suggestions come from %s. Turn off in settings." to "Die Vorschläge kommen von %s. In den Einstellungen ausschalten.",
+        "Search the Play Store for “%s”" to "Im Play Store nach „%s“ suchen",
+        "Search {engine} for “{query}”" to "Bei {engine} nach „{query}“ suchen",
+        "Play Store" to "Play Store",
+    ),
+    "pt" to mapOf(
+        "Web suggestions" to "Sugestões da web",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "Envia o que você digita nos escopos Web, Apps e Tudo para %s e a Play Store para mostrar sugestões.",
+        "Enter and the Search row open this engine in your browser" to "Enter e a linha Pesquisar abrem este buscador no navegador",
+        "Suggestions come from %s. Turn off in settings." to "As sugestões vêm de %s. Desative nas configurações.",
+        "Search the Play Store for “%s”" to "Pesquisar “%s” na Play Store",
+        "Search {engine} for “{query}”" to "Pesquisar “{query}” no {engine}",
+        "Play Store" to "Play Store",
+    ),
+    "hi" to mapOf(
+        "Web suggestions" to "वेब सुझाव",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "वेब, ऐप्स और सब कुछ दायरों में आप जो टाइप करते हैं, उसे सुझाव दिखाने के लिए %s और Play Store को भेजता है।",
+        "Enter and the Search row open this engine in your browser" to "Enter और खोज पंक्ति इस इंजन को आपके ब्राउज़र में खोलते हैं",
+        "Suggestions come from %s. Turn off in settings." to "सुझाव %s से आते हैं। सेटिंग में बंद करें।",
+        "Search the Play Store for “%s”" to "Play Store में “%s” खोजें",
+        "Search {engine} for “{query}”" to "{engine} पर “{query}” खोजें",
+        "Play Store" to "Play Store",
+    ),
+    "zh" to mapOf(
+        "Web suggestions" to "网页建议",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "会把你在“网页”“应用”和“全部”范围内输入的内容发送到 %s 和 Play 商店，以显示建议。",
+        "Enter and the Search row open this engine in your browser" to "回车和搜索行会在浏览器中打开此搜索引擎",
+        "Suggestions come from %s. Turn off in settings." to "建议来自 %s。可在设置中关闭。",
+        "Search the Play Store for “%s”" to "在 Play 商店搜索“%s”",
+        "Search {engine} for “{query}”" to "在 {engine} 搜索“{query}”",
+        "Play Store" to "Play 商店",
+    ),
+    "ja" to mapOf(
+        "Web suggestions" to "ウェブの候補",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "「ウェブ」「アプリ」「すべて」で入力した内容を、候補表示のために %s と Play ストアへ送信します。",
+        "Enter and the Search row open this engine in your browser" to "Enter と検索行はこの検索エンジンをブラウザで開きます",
+        "Suggestions come from %s. Turn off in settings." to "候補は %s から取得しています。設定でオフにできます。",
+        "Search the Play Store for “%s”" to "Play ストアで「%s」を検索",
+        "Search {engine} for “{query}”" to "{engine} で「{query}」を検索",
+        "Play Store" to "Play ストア",
+    ),
+    "ar" to mapOf(
+        "Web suggestions" to "اقتراحات الويب",
+        "Sends what you type in the Web, Apps and Everything scopes to %s and the Play Store to show suggestions." to "يرسل ما تكتبه في نطاقات الويب والتطبيقات والكل إلى %s ومتجر Play لعرض الاقتراحات.",
+        "Enter and the Search row open this engine in your browser" to "يفتح Enter وصف البحث محرك البحث هذا في متصفحك",
+        "Suggestions come from %s. Turn off in settings." to "الاقتراحات من %s. أوقفها من الإعدادات.",
+        "Search the Play Store for “%s”" to "ابحث في متجر Play عن «%s»",
+        "Search {engine} for “{query}”" to "ابحث في {engine} عن «{query}»",
+        "Play Store" to "متجر Play",
+    ),
+)

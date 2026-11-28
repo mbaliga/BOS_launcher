@@ -1,0 +1,1245 @@
+package com.bos.sphere.feature.grid
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.text.format.DateFormat
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.bos.sphere.core.design.L10n
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.bos.sphere.core.data.AppEntry
+import com.bos.sphere.core.data.HomeTiles
+import com.bos.sphere.core.data.HomeGesture
+import com.bos.sphere.core.data.HomeLayoutMath
+import com.bos.sphere.core.data.HomePage
+import com.bos.sphere.core.catalog.SpanGrid
+import com.bos.sphere.core.catalog.rect
+import com.bos.sphere.core.data.LauncherPrefs
+import com.bos.sphere.core.data.PageLayout
+import com.bos.sphere.core.data.PageShape
+import com.bos.sphere.core.data.PagingAxis
+import com.bos.sphere.core.design.HyleColors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.util.Date
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+/**
+ * Pager state whose page count GridHome drives (it adds a trailing drop page while dragging).
+ * Hoisted so the host can jump pages (e.g. Home press → first page) and read the current page.
+ */
+class GridHomeState internal constructor(val pager: PagerState, internal val count: androidx.compose.runtime.MutableIntState) {
+    val currentPage: Int get() = pager.currentPage
+
+    /** NFR-14: set from the motion preference by [rememberGridHomeState]; a host-driven animated jump then lands at once. */
+    @Volatile internal var stillPaging: Boolean = false
+
+    suspend fun goToPage(page: Int, animate: Boolean = true) {
+        val p = page.coerceIn(0, (count.intValue - 1).coerceAtLeast(0))
+        if (animate && !stillPaging) pager.animateScrollToPage(p) else pager.scrollToPage(p)
+    }
+}
+
+@Composable
+fun rememberGridHomeState(): GridHomeState {
+    val count = remember { mutableIntStateOf(1) }
+    val pager = androidx.compose.foundation.pager.rememberPagerState { count.intValue }
+    val state = remember(pager) { GridHomeState(pager, count) }
+    state.stillPaging = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    return state
+}
+
+/** Slot geometry of one page, grid or circle, in px within the page area. */
+internal sealed interface PageGeometry {
+    val capacity: Int
+    val iconPx: Float
+    fun center(index: Int): Pt
+    fun slotAt(x: Float, y: Float): Int
+    fun nearest(x: Float, y: Float): Int
+
+    class Grid(val g: GridGeometry, iconScale: Float, labels: Boolean) : PageGeometry {
+        override val capacity = g.capacity
+        override val iconPx = g.base * iconScale * (if (labels) 0.78f else 1f)
+        val labelOffset = if (labels) g.base * 0.06f else 0f
+        override fun center(index: Int) = Pt(g.centreX(index), g.centreY(index) - labelOffset * 2)
+        override fun slotAt(x: Float, y: Float) = g.cellAt(x, y)
+        override fun nearest(x: Float, y: Float) = g.nearestCell(x, y)
+    }
+
+    class Coverflow(val c: CoverflowGeometry) : PageGeometry {
+        override val capacity = PageLayout.COVERFLOW_CAPACITY
+        override val iconPx = c.focusSize
+        override fun center(index: Int) = c.center(index)
+        override fun slotAt(x: Float, y: Float) = c.slotAt(x, y)
+        override fun nearest(x: Float, y: Float) = c.nearest(x)
+    }
+
+    class Circle(val c: CircleGeometry) : PageGeometry {
+        override val capacity = c.capacity
+        override val iconPx = c.iconSize
+        override fun center(index: Int) = c.slotCenter(index)
+        override fun slotAt(x: Float, y: Float) = c.slotAt(x, y)
+        override fun nearest(x: Float, y: Float) = c.nearestSlot(x, y)
+    }
+
+    companion object {
+        fun of(
+            layout: PageLayout,
+            size: IntSize,
+            prefs: LauncherPrefs,
+            landscape: Boolean,
+            count: Int = 0,
+            coverPosition: Float = 0f,
+        ): PageGeometry {
+            val w = size.width.toFloat().coerceAtLeast(1f)
+            val h = size.height.toFloat().coerceAtLeast(1f)
+            return when (layout.shape) {
+                PageShape.Grid -> {
+                    val spec = layout.gridFor(landscape, prefs)
+                    Grid(
+                        GridGeometry.compute(w, h, spec.columns, spec.rows, verticalBias = if (landscape) 0.5f else prefs.gridBias, spread = prefs.iconSpacing,
+                            spreadY = if (prefs.spacingV >= 0f) prefs.spacingV else prefs.iconSpacing,
+                            insetX = prefs.gridInsetX, insetTop = prefs.gridInsetTop, insetBottom = prefs.gridInsetBottom, mirror = prefs.homeOrder.rtl),
+                        prefs.iconScale,
+                        prefs.showLabels,
+                    )
+                }
+                PageShape.Circle -> Circle(CircleGeometry.compute(w, h, layout.rings))
+                PageShape.Coverflow -> Coverflow(CoverflowGeometry(w, h, count, coverPosition))
+            }
+        }
+    }
+}
+
+private sealed interface Hit {
+    data class App(val key: String) : Hit
+    /** A non-focused coverflow item: tapping brings it to the centre. */
+    data class Focus(val page: Int, val index: Int) : Hit
+    data class Tile(val key: String) : Hit
+    data object Empty : Hit
+}
+
+private enum class Early { Up, Cancel, Swipe, Pinch }
+
+/**
+ * The paged home surface from the reference: a clock, pages of full-bleed icons (each page its
+ * own grid density or a circular arrangement), and a page indicator along the paging axis.
+ * Corners are layered on top by the caller ([CornerLayer]).
+ *
+ * One gesture arbiter on the page area handles: tap → launch; long-press → app menu (or page
+ * menu on empty space); long-press-and-drag → rearrange (across pages, with edge-dwell page
+ * flips and a trailing blank page to drop onto); pinch in/out; swipes perpendicular to the
+ * paging axis; double-tap on empty space. Paging itself is the pager's own scroll.
+ */
+@Composable
+fun GridHome(
+    pages: List<HomePage>,
+    appsByKey: Map<String, AppEntry>,
+    prefs: LauncherPrefs,
+    isLandscape: Boolean,
+    state: GridHomeState,
+    gesturesBound: Set<HomeGesture>,
+    capacityOf: (PageLayout) -> Int,
+    onLaunch: (AppEntry) -> Unit,
+    onAppLongPress: (AppEntry) -> Unit,
+    onPagesChange: (List<HomePage>) -> Unit,
+    onEmptyLongPress: (page: Int) -> Unit,
+    onGesture: (HomeGesture) -> Unit,
+    onClockTap: () -> Unit,
+    onTileTap: (String) -> Unit = {},
+    onTileLongPress: (key: String, page: Int) -> Unit,
+    /** HOM-01 / HOM-02 / HOM-08: folders, shortcuts, links and widget tiles that share the pages with apps. */
+    extras: HomeExtras? = null,
+    /** HOM-12: edit mode. Items are grabbed at once (no long press), and apps and shortcuts carry a remove handle. */
+    editMode: Boolean = false,
+    onRemoveItem: (String) -> Unit = {},
+    /** W26: what the dock rail takes from the app area beyond the frame band. Only the app area gives it up: the page dots, clock and corner icons stay in the band (the old container padding lifted them into the rail). */
+    reserveStart: Dp = 0.dp,
+    reserveEnd: Dp = 0.dp,
+    reserveBottom: Dp = 0.dp,
+    /** Wave 28: the home hosts the ONE page indicator above its pager; the grid then draws none of its own. */
+    drawIndicator: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    val ex by rememberUpdatedState(extras)
+    val editNow by rememberUpdatedState(editMode)
+    val paging = prefs.pagingFor(isLandscape)
+    val pagerState = state.pager
+    // NFR-14: with system animations off, page changes jump instead of sliding.
+    val stillPaging = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    // The whole surface is laid out in physical (LTR) coordinates — geometry, hit-testing and
+    // gestures are physical, and corners are pinned to physical corners — so RTL locales draw
+    // exactly where touches land. Text inside still shapes right-to-left.
+    val rtl = prefs.homeOrder.rtl // wave 26: the home order (not the app language) mirrors the pages and the cells
+    val density = LocalDensity.current
+    val haptics = rememberLauncherHaptics()
+    val scope = rememberCoroutineScope()
+
+    // The pager fills the whole screen so pages slide edge to edge; each page insets its own
+    // content. [areaSize] is that inner content area and [contentOffset] its top-left in screen px.
+    var fullSize by remember { mutableStateOf(IntSize.Zero) }
+    val safeInsets = WindowInsets.safeDrawing
+    val dir = LayoutDirection.Ltr
+    val indicatorAtStartEarly = prefs.pagingFor(isLandscape) == PagingAxis.Vertical
+    val cornerRow = prefs.cornerIconSize.dp + 22.dp
+    // The apps area is the same inset on every side, in either orientation; the corner icons, the
+    // clock and the page dots live in that margin band (see the mock-ups).
+    val padTopDpRaw = cornerRow
+    val padBottomDpRaw = when {
+        indicatorAtStartEarly -> cornerRow
+        else -> maxOf(cornerRow, 44.dp)
+    }.coerceAtLeast(cornerRow)
+    val padStartDpRaw = maxOf(cornerRow, if (indicatorAtStartEarly) 38.dp else 14.dp)
+    val padEndDpRaw = cornerRow
+    // The same frame as the scrolling homes: about 15% of the short side on every side, in either orientation.
+    val frameDp = with(density) { HomeFrame.band(fullSize.width.toFloat(), fullSize.height.toFloat()).toDp() }
+    val padTopDp = frameDp // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padBottomDp = frameDp + reserveBottom // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padStartDp = frameDp + reserveStart // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val padEndDp = frameDp + reserveEnd // the apps area never depends on the clock, dots or corner icons: they live in the margin band
+    val insetLeft = with(density) { safeInsets.getLeft(this, dir).toDp() }
+    val insetRight = with(density) { safeInsets.getRight(this, dir).toDp() }
+    val insetTop = with(density) { safeInsets.getTop(this).toDp() }
+    val insetBottom = with(density) { safeInsets.getBottom(this).toDp() }
+    val contentLeftPx = with(density) { (insetLeft + padStartDp).toPx() }
+    val contentTopPx = with(density) { (insetTop + padTopDp).toPx() }
+    val contentRightPx = with(density) { (insetRight + padEndDp).toPx() }
+    val contentBottomPx = with(density) { (insetBottom + padBottomDp).toPx() }
+    val areaSize = IntSize(
+        (fullSize.width - contentLeftPx - contentRightPx).toInt().coerceAtLeast(0),
+        (fullSize.height - contentTopPx - contentBottomPx).toInt().coerceAtLeast(0),
+    )
+    val contentOffset = Offset(contentLeftPx, contentTopPx)
+
+    // ---- drag state
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var dragBase by remember { mutableStateOf<List<HomePage>>(emptyList()) }
+    var dragPos by remember { mutableStateOf(Offset.Zero) }
+    // HOM-04: the drop-onto rule (dwell and hysteresis); while it is armed the reorder preview holds still.
+    val dropTracker = remember { com.bos.sphere.core.catalog.DropOntoTracker() }
+    var ontoArmed by remember { mutableStateOf<String?>(null) }
+    var edgeDir by remember { mutableIntStateOf(0) }
+
+    // Wave 45: the selection belongs to edit mode and to an item that is still on a page; its Remove goes through the home's remove path.
+    val removeNow by rememberUpdatedState(onRemoveItem)
+    val editGridRef = rememberUpdatedState(LocalEditGrid.current)
+    androidx.compose.runtime.SideEffect { ex?.selection?.moveActive = dragKey != null }
+    androidx.compose.runtime.SideEffect { ex?.selection?.onRemove = { removeNow(it) } }
+    LaunchedEffect(editMode, pages) {
+        val sel = ex?.selection ?: return@LaunchedEffect
+        val k = sel.selectedKey ?: return@LaunchedEffect
+        if (!editMode || pages.none { k in it.keys }) sel.clear()
+    }
+
+    // Fractional focused index per coverflow page.
+    val coverPos = remember { androidx.compose.runtime.mutableStateMapOf<Int, Float>() }
+
+    val coverJobs = remember { mutableMapOf<Int, kotlinx.coroutines.Job>() }
+
+    fun geomFor(page: Int, p: HomePage?) =
+        PageGeometry.of(p?.layout ?: PageLayout(), areaSize, prefs, isLandscape, p?.keys?.size ?: 0, clampedCover(coverPos, page, p))
+
+    fun focusCover(page: Int, index: Int) {
+        coverJobs.remove(page)?.cancel()
+        val last = (pages.getOrNull(page)?.keys?.size ?: 1) - 1
+        val target = index.coerceIn(0, last.coerceAtLeast(0)).toFloat()
+        coverJobs[page] = scope.launch {
+            androidx.compose.animation.core.animate(
+                clampedCover(coverPos, page, pages.getOrNull(page)),
+                target,
+                animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
+            ) { v, _ -> coverPos[page] = v }
+        }
+    }
+
+    fun dropTarget(): Pair<Int, Int> {
+        val key = dragKey ?: return 0 to 0
+        val tp = pagerState.currentPage
+        val base = dragBase.getOrNull(tp)
+        val remaining = base?.keys?.count { it != key } ?: 0
+        val local = dragPos - contentOffset
+        val idx = dropIndex(geomFor(tp, base?.copy(keys = base.keys.filter { it != key })), base?.keys?.filter { it != key }.orEmpty(), key, extras, local.x, local.y).coerceAtMost(remaining)
+        return tp to idx
+    }
+
+    // Wave 45: icons push the others aside while dragged (the page reflows live); a widget BLOCKS, so nothing moves for it until it is dropped on free cells.
+    val shown: List<HomePage> = dragKey?.takeIf { ontoArmed == null && ex?.isWidget(it) != true }?.let { key ->
+        val (tp, idx) = dropTarget()
+        HomeLayoutMath.move(dragBase, key, tp, idx, capacityOf, dropEmpty = false)
+    } ?: pages
+    val pageCount = if (dragKey != null) maxOf(shown.size, dragBase.size + 1) else shown.size
+    androidx.compose.runtime.SideEffect { state.count.intValue = pageCount }
+
+    // Edge dwell flips pages while dragging.
+    // HOM-04: a finger resting on a centre sends no new events, so the dwell is checked on a short tick while dragging.
+    LaunchedEffect(dragKey) {
+        while (dragKey != null) {
+            kotlinx.coroutines.delay(60)
+            dropTracker.tick(android.os.SystemClock.uptimeMillis())
+            if (dropTracker.armedKey != ontoArmed) ontoArmed = dropTracker.armedKey
+        }
+    }
+    LaunchedEffect(edgeDir, dragKey) {
+        while (dragKey != null && edgeDir != 0) {
+            delay(650)
+            val next = (pagerState.currentPage + edgeDir).coerceIn(0, pageCount - 1)
+            if (next != pagerState.currentPage) {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                pagerState.pageTo(next, stillPaging)
+            }
+        }
+    }
+
+    // Keep the same apps in view across a rotation (pages re-flow with a different capacity).
+    val latestPages by rememberUpdatedState(pages)
+    var anchorKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { anchorKey = latestPages.getOrNull(it)?.keys?.firstOrNull() }
+    }
+    LaunchedEffect(isLandscape) {
+        val k = anchorKey ?: return@LaunchedEffect
+        val idx = HomeLayoutMath.pageOf(latestPages, k)
+        if (idx >= 0 && idx != pagerState.currentPage) pagerState.scrollToPage(idx)
+    }
+
+    // Latest values for the long-lived gesture coroutine.
+    val st by rememberUpdatedState(
+        GestureInputs(pages, appsByKey, gesturesBound, paging, areaSize, prefs, isLandscape, coverPos, rtl, contentOffset),
+    )
+    val cb by rememberUpdatedState(
+        GestureCallbacks(
+            onLaunch, onAppLongPress, onEmptyLongPress, onGesture, onPagesChange, onClockTap,
+            { k -> ex?.takeIf { it.owns(k) }?.onTap(k) ?: onTileTap(k) },
+            { k, p -> ex?.takeIf { it.owns(k) }?.onLongPress(k) ?: onTileLongPress(k, p) },
+            capacityOf, ::focusCover,
+        ),
+    )
+
+    fun hitTest(page: Int, screenPos: Offset): Hit {
+        val s = st
+        val pos = screenPos - s.contentOffset
+        val p = s.pages.getOrNull(page) ?: return Hit.Empty
+        val coverPosition = clampedCover(s.coverPos, page, p)
+        val geom = PageGeometry.of(p.layout, s.areaSize, s.prefs, s.landscape, p.keys.size, coverPosition)
+        val slot = geom.slotAt(pos.x, pos.y)
+        if (slot < 0) return Hit.Empty
+        if (geom is PageGeometry.Coverflow && slot != kotlin.math.round(coverPosition).toInt()) return Hit.Focus(page, slot)
+        keyAtSlot(p, geom, slot, ex)?.let { return if (HomeTiles.isTile(it) || ex?.owns(it) == true) Hit.Tile(it) else Hit.App(it) }
+        return Hit.Empty
+    }
+
+    val safe = WindowInsets.safeDrawing
+    val indicatorAtStart = indicatorAtStartEarly
+
+    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr, LocalLabelScale provides prefs.labelScale) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { fullSize = it }
+                .pointerInput(Unit) {
+                    // Drop target from the *latest* inputs (this coroutine outlives compositions).
+                    fun dropTargetNow(): Pair<Int, Int> {
+                        val key = dragKey ?: return 0 to 0
+                        val s = st
+                        val tp = pagerState.currentPage
+                        val base = dragBase.getOrNull(tp)
+                        val rest = base?.keys?.filter { it != key }.orEmpty()
+                        val geom = PageGeometry.of(base?.layout ?: PageLayout(), s.areaSize, s.prefs, s.landscape, rest.size, clampedCover(s.coverPos, tp, base))
+                        val local = dragPos - s.contentOffset
+                        return tp to dropIndex(geom, rest, key, ex, local.x, local.y).coerceAtMost(rest.size)
+                    }
+                    val slop = viewConfiguration.touchSlop
+                    val swipeMin = 56.dp.toPx()
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val startPage = pagerState.currentPage
+                        val settled = !pagerState.isScrollInProgress
+                        val hit = if (settled) hitTest(startPage, down.position) else Hit.Empty
+                        var swipeDelta = Offset.Zero
+
+                        // HOM-12: in edit mode a press on an app or shortcut grabs it at once (the drag loop below).
+                        val grabNow = editNow && settled && !down.isConsumed &&
+                            (hit is Hit.App || (hit is Hit.Tile && ex?.owns(hit.key) == true && ex?.isWidget(hit.key) == false))
+                        val early: Early? = if (grabNow) null else withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                if (ev.changes.count { it.pressed } >= 2) return@withTimeoutOrNull Early.Pinch
+                                val c = ev.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull Early.Cancel
+                                if (!c.pressed) return@withTimeoutOrNull Early.Up
+                                if (c.isConsumed) return@withTimeoutOrNull Early.Cancel
+                                val d = c.position - down.position
+                                if (d.getDistance() > slop) {
+                                    val perpendicular = if (st.paging == PagingAxis.Horizontal) abs(d.y) > abs(d.x) else abs(d.x) > abs(d.y)
+                                    swipeDelta = d
+                                    return@withTimeoutOrNull if (perpendicular) Early.Swipe else Early.Cancel
+                                }
+                            }
+                            @Suppress("UNREACHABLE_CODE") Early.Cancel
+                        }
+
+                        when (early) {
+                            Early.Cancel -> Unit // the pager (or nobody) owns it
+
+                            Early.Up -> {
+                                if (!settled) return@awaitEachGesture
+                                if (editNow) {
+                                    // Wave 45: in edit mode a tap selects the item (again: deselects); a tap on empty space deselects.
+                                    when (hit) {
+                                        is Hit.App -> ex?.selection?.toggle(hit.key)
+                                        is Hit.Tile -> ex?.selection?.toggle(hit.key)
+                                        Hit.Empty -> ex?.selection?.clear()
+                                        is Hit.Focus -> Unit
+                                    }
+                                    return@awaitEachGesture
+                                }
+                                when (hit) {
+                                    is Hit.App -> st.apps[hit.key]?.let(cb.onLaunch)
+                                    is Hit.Focus -> cb.focusCover(hit.page, hit.index)
+                                    is Hit.Tile -> if (hit.key == HomeTiles.CLOCK) cb.onClockTap() else cb.onTileTap(hit.key)
+                                    Hit.Empty -> if (HomeGesture.DoubleTap in st.bound) {
+                                        val second = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                                            awaitFirstDown(requireUnconsumed = false)
+                                        }
+                                        if (second != null) {
+                                            // Wait for the second release (a held second press is not a tap).
+                                            val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                                var last = second
+                                                while (true) {
+                                                    val ev = awaitPointerEvent()
+                                                    val c = ev.changes.firstOrNull { it.id == second.id } ?: return@withTimeoutOrNull null
+                                                    if (c.isConsumed) return@withTimeoutOrNull null
+                                                    if (!c.pressed) return@withTimeoutOrNull last
+                                                    last = c
+                                                    if ((c.position - second.position).getDistance() > slop) return@withTimeoutOrNull null
+                                                }
+                                                @Suppress("UNREACHABLE_CODE") null
+                                            }
+                                            if (up != null) {
+                                                if ((second.position - down.position).getDistance() < 48.dp.toPx()) {
+                                                    cb.onGesture(HomeGesture.DoubleTap)
+                                                } else if (!pagerState.isScrollInProgress) {
+                                                    // Not a double tap: an ordinary tap somewhere else.
+                                                    when (val h2 = hitTest(pagerState.currentPage, second.position)) {
+                                                        is Hit.App -> st.apps[h2.key]?.let(cb.onLaunch)
+                                                        is Hit.Focus -> cb.focusCover(h2.page, h2.index)
+                                                        is Hit.Tile -> if (h2.key == HomeTiles.CLOCK) cb.onClockTap() else cb.onTileTap(h2.key)
+                                                        Hit.Empty -> Unit
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Early.Swipe -> {
+                                var total = swipeDelta
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    if (ev.changes.count { it.pressed } >= 2) return@awaitEachGesture
+                                    val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    // An ancestor took it (the Launchpad's swipe-right): not ours any more.
+                                    if (c.isConsumed) return@awaitEachGesture
+                                    total = c.position - down.position
+                                    if (!c.pressed) break
+                                }
+                                val g = when {
+                                    st.paging == PagingAxis.Horizontal && abs(total.y) > swipeMin ->
+                                        if (total.y < 0) HomeGesture.SwipeUp else HomeGesture.SwipeDown
+                                    // Swipe directions are physical (screen) directions, also under RTL.
+                                    st.paging == PagingAxis.Vertical && abs(total.x) > swipeMin ->
+                                        if (total.x < 0) HomeGesture.SwipeLeft else HomeGesture.SwipeRight
+                                    else -> null
+                                }
+                                // INP-08: a swipe that starts in the system's gesture bands is the system's, not ours.
+                                if (g != null && g in st.bound && !swipeStartsInSystemZone(down.position, st.areaSize, g)) cb.onGesture(g)
+                            }
+
+                            Early.Pinch -> {
+                                // Two fingers: take the gesture from the pager and measure the spread.
+                                var startSpan = -1f
+                                var span = -1f
+                                while (true) {
+                                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                    val pressed = ev.changes.filter { it.pressed }
+                                    ev.changes.forEach { it.consume() }
+                                    if (pressed.size >= 2) {
+                                        span = (pressed[0].position - pressed[1].position).getDistance()
+                                        if (startSpan < 0f) startSpan = span
+                                    }
+                                    if (pressed.isEmpty()) break
+                                }
+                                scope.launch { pagerState.pageTo(pagerState.currentPage, stillPaging) }
+                                if (startSpan > 0f && span > 0f) {
+                                    val ratio = span / startSpan
+                                    val g = when {
+                                        ratio < 0.7f -> HomeGesture.PinchIn
+                                        ratio > 1.4f -> HomeGesture.PinchOut
+                                        else -> null
+                                    }
+                                    if (g != null && g in st.bound) cb.onGesture(g)
+                                }
+                            }
+
+                            null -> {
+                                // Long press.
+                                if (!settled) return@awaitEachGesture
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val pressed: Hit = when (hit) {
+                                    is Hit.Focus -> st.pages.getOrNull(hit.page)?.keys?.getOrNull(hit.index)
+                                        ?.let { if (HomeTiles.isTile(it)) Hit.Tile(it) else Hit.App(it) } ?: Hit.Empty
+                                    else -> hit
+                                }.let { h -> if (h is Hit.Tile && ex?.owns(h.key) == true) Hit.App(h.key) else h }
+                                when (pressed) {
+                                    is Hit.Focus -> Unit
+                                    Hit.Empty -> {
+                                        cb.onEmptyLongPress(startPage)
+                                        do {
+                                            val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                            ev.changes.forEach { it.consume() }
+                                        } while (ev.changes.any { it.pressed })
+                                    }
+                                    is Hit.Tile -> {
+                                        do {
+                                            val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                            ev.changes.forEach { it.consume() }
+                                        } while (ev.changes.any { it.pressed })
+                                        when (pressed) {
+                                            is Hit.Tile -> cb.onTileLongPress(pressed.key, startPage)
+                                            else -> Unit
+                                        }
+                                    }
+                                    is Hit.App -> {
+                                        var dragging = false
+                                        while (true) {
+                                            val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                            ev.changes.forEach { it.consume() }
+                                            val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                            if (!c.pressed) break
+                                            if (!dragging && (c.position - down.position).getDistance() > slop) {
+                                                dragging = true
+                                                dragBase = st.pages
+                                                dragKey = pressed.key
+                                                if (editNow) ex?.selection?.select(pressed.key)
+                                            }
+                                            if (dragging) {
+                                                dragPos = c.position
+                                                run {
+                                                    val tpNow = pagerState.currentPage
+                                                    val b = dragBase.getOrNull(tpNow)
+                                                    val probe = dropOntoProbe(ex, b, PageGeometry.of(b?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, b?.keys?.size ?: 0, clampedCover(st.coverPos, tpNow, b)), dragPos - st.contentOffset)
+                                                    val now = android.os.SystemClock.uptimeMillis()
+                                                    if (probe != null && probe.hitKey != dragKey) dropTracker.update(probe.hitKey, probe.dx, probe.dy, probe.cell, now) else dropTracker.reset()
+                                                    ontoArmed = dropTracker.armedKey
+                                                    // W47: the page's grid dots brighten round the dragged item (a widget: the cells it would take), in the page grid's px.
+                                                    val gg = (PageGeometry.of(b?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, b?.keys?.size ?: 0, clampedCover(st.coverPos, tpNow, b)) as? PageGeometry.Grid)?.g
+                                                    if (gg != null) {
+                                                        val lc = dragPos - st.contentOffset
+                                                        val sp = dragKey?.let { k -> ex?.takeIf { it.isWidget(k) }?.spanOf(k) } ?: com.bos.sphere.core.catalog.WidgetSpan(1, 1)
+                                                        val hw = sp.cols * gg.pitchX / 2f; val hh = sp.rows * gg.pitchY / 2f
+                                                        editGridRef.value?.update(EdgeRect(lc.x - hw, lc.y - hh, lc.x + hw, lc.y + hh))
+                                                    }
+                                                }
+                                                val edge = EditCardGeometry.pageEdgeZoneDp(editNow).dp.toPx() // HOM-12: wider while the home is a scaled card
+                                                val (along, extent) = if (st.paging == PagingAxis.Horizontal) {
+                                                    c.position.x to size.width.toFloat()
+                                                } else {
+                                                    c.position.y to size.height.toFloat()
+                                                }
+                                                val rtlFlip = st.paging == PagingAxis.Horizontal && st.rtl
+                                                val raw = when {
+                                                    along < edge -> -1
+                                                    along > extent - edge -> 1
+                                                    else -> 0
+                                                }
+                                                edgeDir = if (rtlFlip) -raw else raw
+                                            }
+                                        }
+                                        edgeDir = 0
+                                        editGridRef.value?.clear()
+                                        if (dragging) {
+                                            val key = dragKey
+                                            if (key != null) {
+                                                val (tp, idx0) = dropTargetNow()
+                                                var idx = idx0
+                                                var refused = false
+                                                // Wave 45: a widget BLOCKS: dropped over another item it is refused (reject buzz); on free cells it lands where its ghost was.
+                                                if (ex?.isWidget(key) == true) {
+                                                    val b = dragBase.getOrNull(tp)
+                                                    val gg = (PageGeometry.of(b?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, b?.keys?.size ?: 0, clampedCover(st.coverPos, tp, b)) as? PageGeometry.Grid)?.g
+                                                    if (gg != null && b != null) {
+                                                        val spanOfNow: (String) -> com.bos.sphere.core.catalog.WidgetSpan = { ex?.spanOf(it) ?: com.bos.sphere.core.catalog.WidgetSpan(1, 1) }
+                                                        val lc = dragPos - st.contentOffset
+                                                        val rect = ItemDropMath.snapCentre(spanOfNow(key), lc.x, lc.y, gg.originX, gg.originY, gg.pitchX, gg.pitchY, gg.columns, gg.rows, gg.mirror)
+                                                        when (val wd = ItemDropMath.widgetDrop(b, key, spanOfNow, rect, gg.columns, gg.rows)) {
+                                                            is ItemDropMath.WidgetDrop.Blocked -> refused = true
+                                                            is ItemDropMath.WidgetDrop.Place -> idx = wd.index
+                                                            ItemDropMath.WidgetDrop.Fallback -> Unit
+                                                        }
+                                                    }
+                                                }
+                                                // HOM-04: ending on another item's centre files into a folder instead of reordering.
+                                                val iconPx = PageGeometry.of(dragBase.getOrNull(tp)?.layout ?: PageLayout(), st.areaSize, st.prefs, st.landscape, dragBase.getOrNull(tp)?.keys?.size ?: 0, clampedCover(st.coverPos, tp, dragBase.getOrNull(tp))).iconPx
+                                                val decision = ex?.let { com.bos.sphere.core.catalog.DropRule.decide(dropTracker, key, iconPx, it.state, android.os.SystemClock.uptimeMillis()) } ?: com.bos.sphere.core.catalog.DropDecision.Reorder
+                                                val onto = (decision as? com.bos.sphere.core.catalog.DropDecision.Onto)?.key
+                                                dropTracker.reset(); ontoArmed = null
+                                                if (refused) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                else if (onto != null) ex?.onDropOnto?.invoke(key, onto)
+                                                else cb.onPagesChange(HomeLayoutMath.move(dragBase, key, tp, idx, cb.capacityOf, dropEmpty = true))
+                                            }
+                                            dragKey = null
+                                            dragBase = emptyList()
+                                        } else {
+                                            if (editNow) { if (grabNow) ex?.selection?.toggle(pressed.key) else ex?.selection?.select(pressed.key) }
+                                            else st.apps[pressed.key]?.let(cb.onAppLongPress) ?: ex?.onLongPress?.invoke(pressed.key)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+        ) {
+            val pageContent: @Composable (Int) -> Unit = { index ->
+                val page = shown.getOrNull(index) ?: HomePage()
+                val geometry = geomFor(index, page)
+                // Coverflow pages scrub sideways; what they can't consume (at either end) flows to
+                // the pager through nested scroll.
+                val coverModifier = if (geometry is PageGeometry.Coverflow) {
+                    val cover = androidx.compose.foundation.gestures.rememberScrollableState { delta ->
+                        val step = geometry.c.stepPx
+                        val cur = clampedCover(coverPos, index, page)
+                        val next = (cur - delta / step).coerceIn(0f, (page.keys.size - 1).coerceAtLeast(0).toFloat())
+                        coverPos[index] = next
+                        -(next - cur) * step
+                    }
+                    LaunchedEffect(cover.isScrollInProgress) {
+                        if (cover.isScrollInProgress) coverJobs.remove(index)?.cancel()
+                        else focusCover(index, kotlin.math.round(clampedCover(coverPos, index, page)).toInt())
+                    }
+                    Modifier.scrollable(cover, androidx.compose.foundation.gestures.Orientation.Horizontal)
+                } else Modifier
+                PageView(
+                    page = page,
+                    geometry = geometry,
+                    modifier = Modifier
+                        .padding(
+                            start = insetLeft + padStartDp, top = insetTop + padTopDp,
+                            end = insetRight + padEndDp, bottom = insetBottom + padBottomDp,
+                        )
+                        .then(coverModifier),
+                    appsByKey = appsByKey,
+                    showLabels = prefs.showLabels && page.layout.shape != PageShape.Circle,
+                    draggingKey = dragKey,
+                    onLaunch = onLaunch,
+                    onLongPress = onAppLongPress,
+                    onItemFocused = { if (pagerState.currentPage != index) scope.launch { pagerState.pageTo(index, stillPaging) } },
+                    extras = extras,
+                    editing = editMode,
+                    onRemove = onRemoveItem,
+                    pageIndex = index,
+                )
+            }
+            GridKeyboardMove(pages, prefs, isLandscape, capacityOf, onPagesChange, showPage = { scope.launch { pagerState.pageTo(it, stillPaging) } }, extras = extras)
+            if (areaSize != IntSize.Zero) {
+                if (paging == PagingAxis.Horizontal) {
+                    HorizontalPager(
+                        state = pagerState,
+                        reverseLayout = rtl,
+                        userScrollEnabled = dragKey == null,
+                        beyondViewportPageCount = 1,
+                        modifier = Modifier.fillMaxSize(),
+                    ) { page -> Box(Modifier.fillMaxSize().pageEffect(prefs.pageTransition, vertical = false) { pagerState.getOffsetDistanceInPages(page) }) { pageContent(page) } }
+                } else {
+                    VerticalPager(
+                        state = pagerState,
+                        userScrollEnabled = dragKey == null,
+                        beyondViewportPageCount = 1,
+                        modifier = Modifier.fillMaxSize(),
+                    ) { page -> Box(Modifier.fillMaxSize().pageEffect(prefs.pageTransition, vertical = true) { pagerState.getOffsetDistanceInPages(page) }) { pageContent(page) } }
+                }
+            }
+
+            // Wave 45: where the dragged item will land (dashed ghost on the snapped cells; error colour when a widget is blocked) and, for an
+            // icon over another icon, the ring on the item it will make a folder with.
+            run {
+                val gk = dragKey ?: return@run
+                val exn = ex ?: return@run
+                val tpg = pagerState.currentPage
+                val gbase = dragBase.getOrNull(tpg) ?: return@run
+                val gg = (geomFor(tpg, gbase) as? PageGeometry.Grid)?.g ?: return@run
+                val pad = gg.base * 0.04f
+                val spanOfNow: (String) -> com.bos.sphere.core.catalog.WidgetSpan = { exn.spanOf(it) }
+                var blocked = false
+                val rect: com.bos.sphere.core.catalog.CellRect? = if (exn.isWidget(gk)) {
+                    val lc = dragPos - contentOffset
+                    val r = ItemDropMath.snapCentre(spanOfNow(gk), lc.x, lc.y, gg.originX, gg.originY, gg.pitchX, gg.pitchY, gg.columns, gg.rows, gg.mirror)
+                    blocked = ItemDropMath.widgetDrop(gbase, gk, spanOfNow, r, gg.columns, gg.rows) is ItemDropMath.WidgetDrop.Blocked
+                    r
+                } else shown.getOrNull(tpg)?.let { ItemDropMath.landing(it, gk, spanOfNow, gg.columns, gg.rows) }
+                val col = if (blocked) EditChrome.Error else HyleColors.Violet
+                fun place(r: com.bos.sphere.core.catalog.CellRect, mod: Modifier): Modifier {
+                    val l = contentOffset.x + gg.spanLeft(r.col, r.cols) + pad
+                    val t = contentOffset.y + gg.originY + r.row * gg.pitchY + pad
+                    return Modifier.offset { IntOffset(l.roundToInt(), t.roundToInt()) }
+                        .size(with(density) { (r.cols * gg.pitchX - 2 * pad).toDp() }, with(density) { (r.rows * gg.pitchY - 2 * pad).toDp() })
+                        .then(mod)
+                }
+                val radius = with(density) { (if (exn.isWidget(gk)) EditChrome.WidgetRadius.toPx() else gg.base * 0.2f) }
+                if (rect != null && ontoArmed == null) Box(place(rect, Modifier.testTag("move-ghost").moveGhost(col, radius, with(density) { 2.dp.toPx() }, with(density) { 10.dp.toPx() })))
+                val onto = ontoArmed
+                if (onto != null) {
+                    val tr = ItemDropMath.landing(gbase, onto, spanOfNow, gg.columns, gg.rows)
+                    if (tr != null) Box(place(tr, Modifier.testTag("folder-target").folderTarget(HyleColors.Violet, radius, with(density) { 2.dp.toPx() })))
+                }
+            }
+
+            // The icon under the finger while rearranging.
+            val key = dragKey
+            if (key != null) {
+                val tp = pagerState.currentPage
+                val iconPx = geomFor(tp, dragBase.getOrNull(tp)).iconPx
+                val iconDp = with(density) { iconPx.toDp() }
+                val ghostModifier = Modifier
+                    .offset { IntOffset((dragPos.x - iconPx / 2).roundToInt(), (dragPos.y - iconPx / 2).roundToInt()) }
+                    .size(iconDp)
+                    .graphicsLayer { scaleX = 1.12f; scaleY = 1.12f; alpha = 0.95f }
+                    .shadow(12.dp, RoundedCornerShape(iconDp * 0.22f))
+                val ghost = appsByKey[key]
+                when {
+                    ghost != null -> AppIcon(ghost, iconDp, ghostModifier)
+                    key == HomeTiles.CLOCK -> ClockTile(iconDp, ghostModifier)
+                    key == HomeTiles.SETTINGS -> SettingsTile(iconDp, ghostModifier)
+                    extras?.owns(key) == true && extras.isWidget(key) -> {
+                        // HOM-07: a widget is dragged as its whole span, not as one icon.
+                        val geo = geomFor(tp, dragBase.getOrNull(tp)) as? PageGeometry.Grid
+                        val sp = extras.spanOf(key)
+                        val wPx = (geo?.g?.pitchX ?: iconPx) * sp.cols
+                        val hPx = (geo?.g?.pitchY ?: iconPx) * sp.rows
+                        val wDp = with(density) { wPx.toDp() }
+                        val hDp = with(density) { hPx.toDp() }
+                        Box(
+                            Modifier
+                                .offset { IntOffset((dragPos.x - wPx / 2).roundToInt(), (dragPos.y - hPx / 2).roundToInt()) }
+                                .size(wDp, hDp)
+                                .graphicsLayer { alpha = 0.85f }
+                                .shadow(12.dp, RoundedCornerShape(16.dp))
+                                .background(HyleColors.Violet.copy(alpha = 0.35f), RoundedCornerShape(16.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(extraLabel(key, extras), color = HyleColors.InkBright, fontSize = 12.sp, maxLines = 1) }
+                    }
+                    extras?.owns(key) == true -> ExtraItemFace(key, extras, iconDp, ghostModifier)
+                }
+            }
+        }
+
+        if (editMode) ex?.selection?.let { EditSelectionOverlay(it, showBar = dragKey == null) }
+
+        if (drawIndicator) PageIndicator(
+            count = pageCount,
+            current = pagerState.currentPage,
+            vertical = indicatorAtStart,
+            onSelect = { scope.launch { pagerState.pageTo(it, stillPaging) } },
+            onMenu = { onEmptyLongPress(pagerState.currentPage) },
+            rtl = rtl,
+            homeIndex = prefs.homePage.coerceIn(0, (pageCount - 1).coerceAtLeast(0)),
+            modifier = if (indicatorAtStart) {
+                Modifier.align(Alignment.CenterStart).windowInsetsPadding(safe).padding(start = 14.dp)
+            } else {
+                Modifier.align(Alignment.BottomCenter).windowInsetsPadding(safe).padding(bottom = 26.dp)
+            },
+        )
+    }
+    }
+}
+
+/** A coverflow page's focus position, clamped to its current item count. */
+private fun clampedCover(map: Map<Int, Float>, page: Int, p: HomePage?): Float {
+    val last = ((p?.keys?.size ?: 1) - 1).coerceAtLeast(0)
+    // Until the user scrubs, a coverflow page rests on its middle app (neighbours on both sides).
+    return (map[page] ?: (last / 2).toFloat()).coerceIn(0f, last.toFloat())
+}
+
+private data class GestureInputs(
+    val pages: List<HomePage>,
+    val apps: Map<String, AppEntry>,
+    val bound: Set<HomeGesture>,
+    val paging: PagingAxis,
+    val areaSize: IntSize,
+    val prefs: LauncherPrefs,
+    val landscape: Boolean,
+    val coverPos: Map<Int, Float>,
+    val rtl: Boolean,
+    val contentOffset: Offset,
+)
+
+private class GestureCallbacks(
+    val onLaunch: (AppEntry) -> Unit,
+    val onAppLongPress: (AppEntry) -> Unit,
+    val onEmptyLongPress: (Int) -> Unit,
+    val onGesture: (HomeGesture) -> Unit,
+    val onPagesChange: (List<HomePage>) -> Unit,
+    val onClockTap: () -> Unit,
+    val onTileTap: (String) -> Unit,
+    val onTileLongPress: (String, Int) -> Unit,
+    val capacityOf: (PageLayout) -> Int,
+    val focusCover: (Int, Int) -> Unit,
+)
+
+@Composable
+private fun PageView(
+    page: HomePage,
+    geometry: PageGeometry,
+    appsByKey: Map<String, AppEntry>,
+    showLabels: Boolean,
+    draggingKey: String?,
+    onLaunch: (AppEntry) -> Unit,
+    onLongPress: (AppEntry) -> Unit,
+    modifier: Modifier = Modifier,
+    /** Keyboard focus reached an item: bring its page into view. */
+    onItemFocused: () -> Unit = {},
+    extras: HomeExtras? = null,
+    editing: Boolean = false,
+    onRemove: (String) -> Unit = {},
+    /** Wave 45 (editHandles): which page this is, for the edit actions of its items. */
+    pageIndex: Int = 0,
+) {
+    val density = LocalDensity.current
+    val packed = spanPacked(page, geometry, extras)
+    // Wave 45: the edit actions of every item here share one view of the page's grid (cells, order, mirror).
+    val gridG = (geometry as? PageGeometry.Grid)?.g
+    val editorOf: (String) -> ItemEditor? = { k ->
+        if (!editing || extras == null || gridG == null) null
+        else ItemEditor(k, extras, page.keys, pageIndex, gridG.columns, gridG.rows, gridG.mirror, true) { onRemove(k) }
+    }
+    if (editing && extras != null && gridG != null) androidx.compose.runtime.SideEffect {
+        extras.selection.pitchDpX = gridG.pitchX / density.density; extras.selection.pitchDpY = gridG.pitchY / density.density
+    }
+    Box(modifier.fillMaxSize()) {
+        if (geometry is PageGeometry.Circle) {
+            // Faint ring guides for circular pages.
+            Canvas(Modifier.fillMaxSize()) {
+                val c = geometry.c
+                for (r in 1..c.rings) {
+                    drawCircle(HyleColors.Hairline, radius = c.ringStep * r, center = Offset(c.center.x, c.center.y), style = Stroke(1.dp.toPx()))
+                }
+            }
+        }
+        if (editing && geometry is PageGeometry.Grid) EditGridDotsLayer(geometry.g) // W45 (editChrome): the real grid, one Canvas, behind the items
+        page.keys.forEachIndexed { index, itemKey ->
+            val extra = extras?.takeIf { it.owns(itemKey) }
+            val place = packed?.placed?.firstOrNull { it.key == itemKey }
+            if (packed != null && place == null) return@forEachIndexed // packed off this page: it reflows to the next
+            if (packed == null && index >= geometry.capacity) return@forEachIndexed
+            val slot = if (place != null) SpanGrid.cellOf(place, (geometry as PageGeometry.Grid).g.columns) else index
+            val app = appsByKey[itemKey]
+            if (app == null && extra == null && !HomeTiles.isTile(itemKey)) return@forEachIndexed
+            if (geometry is PageGeometry.Coverflow && !geometry.c.visible(index)) return@forEachIndexed
+            key(itemKey) {
+                if (extra != null && extra.isWidget(itemKey) && place != null && geometry is PageGeometry.Grid) {
+                    WidgetSlot(itemKey, extra, place, geometry, onItemFocused, editing, { onRemove(itemKey) }, packed?.placed.orEmpty(), page.keys, pageIndex)
+                } else {
+                val itemPx = if (geometry is PageGeometry.Coverflow) geometry.c.sizeAt(index) else geometry.iconPx
+                val itemDp = with(density) { itemPx.toDp() }
+                val center = geometry.center(slot)
+                val target = IntOffset((center.x - itemPx / 2).roundToInt(), (center.y - itemPx / 2).roundToInt())
+                // Coverflow follows the finger directly; grid/circle items glide to new slots.
+                val animated = geometry !is PageGeometry.Coverflow
+                val x = if (animated) animateFloatAsState(target.x.toFloat(), spring(dampingRatio = 0.8f, stiffness = 500f), label = "x").value else target.x.toFloat()
+                val y = if (animated) animateFloatAsState(target.y.toFloat(), spring(dampingRatio = 0.8f, stiffness = 500f), label = "y").value else target.y.toFloat()
+                val isDragged = itemKey == draggingKey
+                val settingsOpener = LocalItemSettingsOpener.current
+                val selectedNow = editing && extras?.selection?.isSelected(itemKey) == true
+                val editActions = if (editing) editorOf(itemKey)?.actions().orEmpty() else emptyList()
+                val cf = geometry is PageGeometry.Coverflow
+                val dCover = if (cf) index - (geometry as PageGeometry.Coverflow).c.position else 0f
+                val depth = if (cf) -kotlin.math.abs(dCover) else 0f
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                        .zIndex(depth)
+                        .graphicsLayer {
+                            alpha = if (isDragged) 0.18f else if (cf) (1f - 0.14f * kotlin.math.min(kotlin.math.abs(dCover), 4f)) else 1f
+                            if (cf) {
+                                // Cards lean towards the centre, like a real coverflow.
+                                rotationY = -dCover.coerceIn(-1f, 1f) * 42f
+                                cameraDistance = 14f * density.density
+                            }
+                        }
+                        .then(if (selectedNow && extras != null) Modifier.onGloballyPositioned { extras.selection.report(itemKey, it.boundsInRoot()) } else Modifier)
+                        .launcherItem(
+                            "grid.$itemKey", onFocused = onItemFocused,
+                            onActivate = app?.let { a -> { onLaunch(a) } } ?: extra?.let { e -> { e.onTap(itemKey) } },
+                            onMenu = app?.let { a -> { onLongPress(a) } } ?: extra?.let { e -> { e.onLongPress(itemKey) } },
+                        )
+                        .semantics(mergeDescendants = true) {
+                            if (app != null) {
+                                contentDescription = app.label
+                                onClick { onLaunch(app); true }
+                                customActions = listOf(CustomAccessibilityAction("Options") { onLongPress(app); true }) + itemSettingsActions(settingsOpener, itemKey, editing) + editActions
+                                if (editing) selected = selectedNow
+                            } else if (extra != null) {
+                                contentDescription = extraLabel(itemKey, extra)
+                                onClick { extra.onTap(itemKey); true }
+                                customActions = listOf(CustomAccessibilityAction("Options") { extra.onLongPress(itemKey); true }) + itemSettingsActions(settingsOpener, itemKey, editing) + editActions
+                                if (editing) selected = selectedNow
+                            } else {
+                                contentDescription = "Clock"
+                                customActions = itemSettingsActions(settingsOpener, itemKey, editing)
+                            }
+                        },
+                ) {
+                    if (app != null) {
+                        BadgedAppIcon(app, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
+                        // Coverflow names only the focused card; the rest would just pile up their labels.
+                        if (showLabels && (!cf || kotlin.math.abs(dCover) < 0.5f)) AppLabel(app.label, itemDp)
+                    } else if (itemKey == HomeTiles.SETTINGS) {
+                        SettingsTile(itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
+                        if (showLabels) AppLabel(L10n.tr("Settings"), itemDp)
+                    } else if (extra != null) {
+                        ExtraItemFace(itemKey, extra, itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
+                        if (showLabels && !cf) AppLabel(extraLabel(itemKey, extra), itemDp)
+                    } else {
+                        ClockTile(itemDp, Modifier.size(itemDp).selectionOutline(selectedNow, itemDp * 0.22f))
+                    }
+                }
+                }
+            }
+        }
+    }
+}
+
+/** The clock as a page tile, sized like an icon. Its face, hour format and day line come from [options] (the tile's item sheet, wave 45). */
+@Composable
+fun ClockTile(size: Dp, modifier: Modifier = Modifier, options: ClockTileOptions = LocalClockTileOptions.current) {
+    val now = rememberNow()
+    val context = LocalContext.current
+    val text = remember(now, options.format) {
+        val is24 = when (options.format) { com.bos.sphere.core.data.ClockFormat.Hour12 -> false; com.bos.sphere.core.data.ClockFormat.Hour24 -> true; else -> DateFormat.is24HourFormat(context) }
+        java.text.SimpleDateFormat(if (is24) "HH:mm" else "h:mm", java.util.Locale.getDefault()).format(now)
+    }
+    val day = remember(now) { java.text.SimpleDateFormat("EEE d", java.util.Locale.getDefault()).format(now) }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = modifier
+            .background(HyleColors.Surface, RoundedCornerShape(size * 0.22f))
+            .padding(4.dp)
+            .testTag(if (options.analog) "clock-tile-analog" else "clock-tile-digital"),
+    ) {
+        if (options.analog) {
+            val cal = remember(now) { java.util.Calendar.getInstance().apply { timeInMillis = now.time } }
+            val minute = cal.get(java.util.Calendar.MINUTE)
+            val hour = cal.get(java.util.Calendar.HOUR) % 12 + minute / 60f
+            val ink = HyleColors.InkBright
+            val dim = HyleColors.InkDim
+            val face = if (options.date) size * 0.62f else size * 0.78f
+            androidx.compose.foundation.Canvas(Modifier.size(face)) {
+                val c = center
+                val r = this.size.minDimension / 2f
+                drawCircle(dim, r, c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = r * 0.06f))
+                fun hand(frac: Float, len: Float, w: Float) {
+                    val a = (frac * 2f * Math.PI - Math.PI / 2).toFloat()
+                    drawLine(ink, c, androidx.compose.ui.geometry.Offset(c.x + kotlin.math.cos(a) * r * len, c.y + kotlin.math.sin(a) * r * len), strokeWidth = w, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                }
+                hand(hour / 12f, 0.5f, r * 0.1f)
+                hand(minute / 60f, 0.78f, r * 0.06f)
+            }
+        } else {
+            Text(text, color = HyleColors.InkBright, fontSize = (size.value * 0.24f).sp, fontWeight = FontWeight.Light, maxLines = 1)
+        }
+        if (options.date) Text(day.uppercase(), color = HyleColors.InkDim, fontSize = (size.value * 0.1f).sp, letterSpacing = 1.sp, maxLines = 1)
+    }
+}
+
+/** The "Home settings" icon: a gear on the accent plate. */
+@Composable
+fun SettingsTile(size: Dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier.background(Brush.linearGradient(listOf(HyleColors.VioletSoft, HyleColors.Violet)), RoundedCornerShape(size * 0.22f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Glyphs.Gear, contentDescription = "Settings", tint = HyleColors.OnAccent, modifier = Modifier.size(size * 0.5f))
+    }
+}
+
+/** Label text scale (Settings → Home → Labels). */
+val LocalLabelScale = androidx.compose.runtime.compositionLocalOf { 1f }
+
+@Composable
+internal fun AppLabel(label: String, iconDp: Dp) {
+    Text(
+        label,
+        color = HyleColors.Ink,
+        fontSize = (11f * LocalLabelScale.current).sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(top = 4.dp).width(iconDp * 1.25f),
+    )
+}
+
+/**
+ * The page-change effect. [offset] is this page's distance from the settled page in pages
+ * (0 = in view, ±1 = one page away). Read inside graphicsLayer so scrolling never recomposes.
+ */
+private fun Modifier.pageEffect(t: com.bos.sphere.core.data.PageTransition, vertical: Boolean, offset: () -> Float): Modifier =
+    if (t == com.bos.sphere.core.data.PageTransition.Slide) this else this.graphicsLayer {
+        val o = offset().coerceIn(-1f, 1f)
+        val a = kotlin.math.abs(o)
+        val dist = if (vertical) size.height else size.width
+        when (t) {
+            com.bos.sphere.core.data.PageTransition.Fade -> alpha = 1f - a
+            com.bos.sphere.core.data.PageTransition.Zoom -> { val s = 1f - 0.28f * a; scaleX = s; scaleY = s; alpha = 1f - 0.8f * a }
+            com.bos.sphere.core.data.PageTransition.Cube -> {
+                cameraDistance = 18f * density
+                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (vertical) 0.5f else if (o > 0f) 0f else 1f, if (vertical) (if (o > 0f) 0f else 1f) else 0.5f)
+                if (vertical) rotationX = o * 60f else rotationY = -o * 60f
+                alpha = 1f - 0.5f * a
+            }
+            com.bos.sphere.core.data.PageTransition.Flip -> {
+                cameraDistance = 18f * density
+                if (vertical) rotationX = o * 90f else rotationY = -o * 90f
+                alpha = if (a > 0.5f) 0f else 1f
+            }
+            com.bos.sphere.core.data.PageTransition.Stack -> {
+                // The page being left stays put and recedes while the next one slides over it.
+                if (o < 0f) {
+                    if (vertical) translationY = -o * dist else translationX = -o * dist
+                    val s = 1f - 0.1f * a; scaleX = s; scaleY = s; alpha = 1f - 0.5f * a
+                }
+            }
+            com.bos.sphere.core.data.PageTransition.Slide -> Unit
+        }
+    }
+
+/**
+ * THE page indicator of the home (wave 28, homeUnify): one component, one place, for every stop of the one pager. When Glance is on it is the first stop
+ * ([onGlance] non-null: the house glyph, lit while Glance shows, [glanceCurrent]); the pages follow as dots (the current one a long pill); on Glance the same
+ * row is the quiet Glance indicator the owner already had (the Comms glyph [onMenu], then the house; no dot for the right panel, which reads as a page that does not exist) and fades after a few
+ * seconds when [quiet]. The host draws it ONCE at a fixed place above the pager, so nothing jumps or duplicates when swiping from Glance to page 1.
+ */
+@Composable
+fun PageIndicator(
+    count: Int,
+    current: Int,
+    vertical: Boolean,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    onMenu: (() -> Unit)? = null,
+    /** Which page carries the house (the one the Home button returns to). Not drawn when the Glance stop (the house) is there. */
+    homeIndex: Int = 0,
+    /** Wave 26: right to left order draws the first stop at the right (the row is mirrored, whatever the app language is). */
+    rtl: Boolean = false,
+    /** Glance is the first stop: a leading house glyph (tag "pages.glancedot") that goes to it. Null: Glance is off, no stop. */
+    onGlance: (() -> Unit)? = null,
+    /** True while Glance is the stop on screen: the house is lit and no page dot is. */
+    glanceCurrent: Boolean = false,
+    /** The label of the leading glyph (Comms by default on the home; "Page options" on a bare grid). */
+    menuLabel: String = com.bos.sphere.core.design.L10n.tr("Page options"),
+    menuTag: String? = null,
+    /** The row dims after a few quiet seconds ([awakeNonce] wakes it); false keeps it fully lit. */
+    quiet: Boolean = false,
+    awakeNonce: Int = 0,
+    /** Wave 37 (editorDebt): true while the page editor is open: its strip cards announce "Page N of M", so the dots leave the accessibility tree (they stay drawn and tappable). */
+    hiddenFromAccessibility: Boolean = false,
+) {
+    if (count <= 1 && onGlance == null && onMenu == null) return
+    val reduced = com.bos.sphere.core.design.rememberMotionPrefs().reduced
+    var awake by remember { mutableStateOf(true) }
+    LaunchedEffect(awakeNonce, quiet) { awake = true; if (quiet) { kotlinx.coroutines.delay(4000); awake = false } }
+    val fade by androidx.compose.animation.core.animateFloatAsState(if (awake || !quiet) 1f else 0.38f, androidx.compose.animation.core.tween(if (reduced) 0 else 600), label = "pageIndicator")
+    val stops = count + (if (onGlance != null) 1 else 0)
+    val slot = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.8f / stops.coerceAtLeast(1)).coerceIn(24f, 48f).dp // every stop is a tappable square of this width and 48 dp height
+    val content: @Composable () -> Unit = {
+        if (onMenu != null) {
+            IndicatorButton(menuTag ?: "pages.menu", menuLabel, onMenu) { Icon(Glyphs.Menu, null, tint = HyleColors.InkDim, modifier = Modifier.size(16.dp)) }
+        }
+        if (onGlance != null) {
+            val lit = glanceCurrent
+            // The stop on screen is not interactive (one spoken line); the others are buttons that go to it.
+            Box(
+                Modifier.testTag("pages.glancedot").size(width = slot, height = 48.dp)
+                    .then(if (lit) Modifier.semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Glance home"); selected = true } else Modifier.pointerInput(Unit) { detectTapGesturesSimple { onGlance() } }
+                        .semantics {
+                            role = androidx.compose.ui.semantics.Role.Button; selected = false
+                            contentDescription = com.bos.sphere.core.design.L10n.tr("Glance home, stop %s of %s", 1, stops)
+                            onClick(com.bos.sphere.core.design.L10n.tr("Glance home")) { onGlance(); true }
+                        }),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Glyphs.Home, null, tint = if (lit) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), modifier = Modifier.size(if (lit) 18.dp else 14.dp)) }
+        }
+        for (i in 0 until count) {
+            val active = !glanceCurrent && i == current
+            val position = i + 1 + (if (onGlance != null) 1 else 0)
+            if (onGlance == null && i == homeIndex) {
+                Box(
+                    Modifier.testTag("pages.dot.$i").size(width = slot, height = 48.dp).pointerInput(i) { detectTapGesturesSimple { onSelect(i) } }
+                        .semantics { role = androidx.compose.ui.semantics.Role.Button; selected = active; contentDescription = com.bos.sphere.core.design.L10n.tr("Home page"); onClick(com.bos.sphere.core.design.L10n.tr("Home page")) { onSelect(i); true } },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Glyphs.Home, contentDescription = null, tint = if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), modifier = Modifier.size(if (active) 16.dp else 14.dp)) }
+                continue
+            }
+            val long by animateDpAsState(if (active) 20.dp else 6.dp, label = "pill")
+            Box(
+                Modifier
+                    .testTag("pages.dot.$i")
+                    .size(width = if (vertical) 48.dp else slot, height = if (vertical) slot else 48.dp)
+                    .semantics { contentDescription = com.bos.sphere.core.design.L10n.tr("Page %s of %s", position, stops); role = androidx.compose.ui.semantics.Role.Button; selected = active; onClick(com.bos.sphere.core.design.L10n.tr("Page %s", position)) { onSelect(i); true } }
+                    .pointerInput(i) { detectTapGesturesSimple { onSelect(i) } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(width = if (vertical) 6.dp else long, height = if (vertical) long else 6.dp).background(if (active) HyleColors.InkBright else HyleColors.Ink.copy(alpha = 0.75f), RoundedCornerShape(3.dp)))
+            }
+        }
+    }
+    if (vertical) {
+        Column(modifier.graphicsLayer { alpha = fade }.then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier).testTag("page.indicator"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { content() }
+    } else {
+        androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            Row(modifier.graphicsLayer { alpha = fade }.then(if (hiddenFromAccessibility) Modifier.clearAndSetSemantics {} else Modifier).testTag("page.indicator"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) { content() }
+        }
+    }
+}
+
+private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectTapGesturesSimple(onTap: () -> Unit) =
+    detectTapGestures(onTap = { onTap() })
+
+/** The current time, refreshed every minute and on clock / zone changes. */
+@Composable
+fun rememberNow(): Date {
+    val context = LocalContext.current
+    var now by remember { mutableStateOf(Date()) }
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) { now = Date() }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        now = Date()
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return now
+}
+
+/** HOM-08: a widget tile in its span box on a grid page. In edit mode it carries the move / resize / remove accessibility actions (wave 45) and, selected, the handles. */
+@Composable
+private fun WidgetSlot(
+    itemKey: String, extra: HomeExtras, place: com.bos.sphere.core.catalog.TilePlacement, geometry: PageGeometry.Grid, onItemFocused: () -> Unit,
+    editing: Boolean = false, onRemove: () -> Unit = {},
+    placed: List<com.bos.sphere.core.catalog.TilePlacement> = emptyList(), pageKeys: List<String> = emptyList(), pageIndex: Int = 0,
+) {
+    val density = LocalDensity.current
+    val g = geometry.g
+    val slot = com.bos.sphere.core.catalog.SpanGrid.cellOf(place, g.columns)
+    val pad = g.base * 0.04f
+    val wPx = place.span.cols * g.pitchX - 2 * pad
+    val hPx = place.span.rows * g.pitchY - 2 * pad
+    val left = g.spanLeft(slot % g.columns, place.span.cols) + pad
+    val top = g.cellTop(slot) + pad
+    val ctx = com.bos.sphere.feature.grid.ResizeContext(
+        place.rect(), g.columns, g.rows, g.pitchX, g.pitchY, g.mirror, true, placed, pageKeys, pageIndex, onRemove,
+    )
+    val a11y = if (editing) ItemEditor(itemKey, extra, pageKeys, pageIndex, g.columns, g.rows, g.mirror, true, onRemove).actions() else emptyList()
+    Box(
+        Modifier.offset { IntOffset(left.roundToInt(), top.roundToInt()) }
+            .size(with(density) { wPx.toDp() }, with(density) { hPx.toDp() })
+            .childrenOutOfBounds()
+            // The selected widget sits above its neighbours so its handles (half outside it) take the touches that fall on them.
+            .zIndex(if (editing && extra.isSelected(itemKey)) 10f else 0f),
+    ) {
+        HomeWidgetCell(
+            itemKey, extra, g.pitchX, g.pitchY,
+            Modifier.fillMaxSize().launcherItem("grid.$itemKey", onFocused = onItemFocused, onMenu = { extra.onLongPress(itemKey) })
+                .then(if (a11y.isEmpty()) Modifier else Modifier.semantics { customActions = a11y }),
+            ctx, editing,
+        )
+    }
+}
+
+/** NFR-14: slide to [page], or jump straight there when [still] (system animations off). */
+internal suspend fun PagerState.pageTo(page: Int, still: Boolean) {
+    if (still) scrollToPage(page) else animateScrollToPage(page)
+}

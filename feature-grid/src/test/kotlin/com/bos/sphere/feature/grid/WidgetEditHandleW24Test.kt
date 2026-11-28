@@ -1,0 +1,153 @@
+package com.bos.sphere.feature.grid
+
+import android.content.ComponentName
+import android.graphics.drawable.ColorDrawable
+import android.os.Process
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import com.bos.sphere.core.catalog.HomeState
+import com.bos.sphere.core.catalog.ItemDef
+import com.bos.sphere.core.catalog.ItemKeys
+import com.bos.sphere.core.catalog.ItemKind
+import com.bos.sphere.core.catalog.WidgetSpan
+import com.bos.sphere.core.catalog.WidgetStack
+import com.bos.sphere.core.catalog.WidgetStacks
+import com.bos.sphere.core.data.AppEntry
+import com.bos.sphere.core.data.HomeGesture
+import com.bos.sphere.core.data.HomePage
+import com.bos.sphere.core.data.LauncherPrefs
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/**
+ * HOM-12 (wave 24): the remove handle of a widget and of a widget stack on the live grid in edit mode. The hosted widget is a
+ * stand-in that takes every pointer event that reaches it, as an AppWidgetHostView does; the handle must still win its own touch.
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class WidgetEditHandleW24Test {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    private val app = AppEntry("demo.a", ComponentName("demo.a", "demo.a.Main"), "Alpha", Process.myUserHandle()) { ColorDrawable(0xFF3355AA.toInt()) }
+    private val clock = ItemKeys.widget(7)
+    private val weather = ItemKeys.widget(8)
+    private val notes = ItemKeys.widget(9)
+    private val stack = WidgetStacks.stackKey("s1")
+
+    private val sel = EditSelectionState().also { it.fallbackBar = false } // W47: the item action bar is the one remove path
+
+    private class Probe { val removed = mutableListOf<String>(); var widgetTouches = 0; var longPresses = 0 }
+
+    private val state = HomeState(
+        items = mapOf(
+            clock to ItemDef(clock, ItemKind.Widget, "Clock", "demo/.Clock"),
+            weather to ItemDef(weather, ItemKind.Widget, "Weather", "demo/.Weather"),
+            notes to ItemDef(notes, ItemKind.Widget, "Notes", "demo/.Notes"),
+            stack to ItemDef(stack, ItemKind.Widget, "Weather", WidgetStacks.encode(WidgetStack(listOf(weather, notes), 0))),
+        ),
+        widgets = mapOf(clock to WidgetSpan(2, 2), stack to WidgetSpan(2, 2)),
+    )
+
+    @Composable
+    private fun Scene(edit: Boolean, probe: Probe) {
+        val prefs = LauncherPrefs()
+        val extras = HomeExtras(
+            state, { if (it == app.key) app else null }, { null },
+            widget = { key, m ->
+                // The hosted view: consumes every event that starts on it (taps, drags, long presses).
+                Box(m.background(Color(0xFF224466)).testTag("hosted.$key").pointerInput(Unit) {
+                    awaitPointerEventScope { while (true) { val e = awaitPointerEvent(); e.changes.forEach { it.consume() }; probe.widgetTouches++ } }
+                })
+            },
+            onLongPress = { probe.longPresses++ }, selection = sel,
+        )
+        val pages = listOf(HomePage(keys = listOf(clock, stack, app.key), id = 1L))
+        Box(Modifier.fillMaxSize()) {
+            GridHome(
+                pages = pages, appsByKey = mapOf(app.key to app), prefs = prefs, isLandscape = false, state = rememberGridHomeState(),
+                gesturesBound = setOf(HomeGesture.PinchIn), capacityOf = { it.capacity(false, prefs) },
+                onLaunch = {}, onAppLongPress = {}, onPagesChange = {}, onEmptyLongPress = {}, onGesture = {}, onClockTap = {},
+                onTileLongPress = { _, _ -> }, extras = extras, editMode = edit, onRemoveItem = { probe.removed += it },
+            )
+            if (edit) ItemActionLayer(sel, null, {}, null, onRemove = { probe.removed += it; sel.clear() }, onSettings = {}, label = { it })
+        }
+    }
+
+    private fun settle() { rule.runOnUiThread { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }; rule.mainClock.advanceTimeBy(300) }
+
+    /** Wave 45 (editHandles): the in-widget remove badge is gone (it sat on the widget's content). A tap selects the widget; Remove is the action bar's button (wave 47). */
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_aWidgetInEditModeIsSelectedByATapEvenWhenTheHostedViewSwallowsTouchesAndRemovedByTheRemoveButton() {
+        rule.mainClock.autoAdvance = false
+        val probe = Probe()
+        rule.setContent { Scene(true, probe) }
+        rule.mainClock.advanceTimeBy(500)
+        rule.onNodeWithContentDescription("Remove from home: Clock", useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithTag("hosted.$clock", useUnmergedTree = true).performTouchInput { click(center) }
+        settle()
+        assertEquals(clock, sel.selectedKey)
+        assertEquals("the edit-mode shield keeps the touch from the hosted view", 0, probe.widgetTouches)
+        rule.onNodeWithTag(ItemBarTags.REMOVE).performClick()
+        settle()
+        assertEquals(listOf(clock), probe.removed)
+        assertEquals("no menu opened", 0, probe.longPresses)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_aTapOnTheWidgetBodyInEditModeRemovesNothingItOnlySelects() {
+        rule.mainClock.autoAdvance = false
+        val probe = Probe()
+        rule.setContent { Scene(true, probe) }
+        rule.mainClock.advanceTimeBy(500)
+        rule.onNodeWithTag("hosted.$clock", useUnmergedTree = true).performTouchInput { click(center) }
+        settle()
+        assertTrue(probe.removed.isEmpty())
+        assertEquals(clock, sel.selectedKey)
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_14_aStackInEditModeIsOneSelectableItemAndOneRemoveRemovesTheWholeStack() {
+        rule.mainClock.autoAdvance = false
+        val probe = Probe()
+        rule.setContent { Scene(true, probe) }
+        rule.mainClock.advanceTimeBy(500)
+        assertEquals(0, rule.onAllNodesWithContentDescription("Remove from home: Weather", useUnmergedTree = true).fetchSemanticsNodes().size)
+        rule.onNodeWithTag("hosted.$stack", useUnmergedTree = true).performTouchInput { click(center) }
+        settle()
+        assertEquals(stack, sel.selectedKey)
+        rule.onNodeWithTag(ItemBarTags.REMOVE).performClick()
+        settle()
+        assertEquals("the stack key goes to the host, which removes every member", listOf(stack), probe.removed)
+        // the app beside them has no remove badge (W47: the action bar replaced it)
+        rule.onNodeWithContentDescription("Remove from home: Alpha", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test @Config(sdk = [35], qualifiers = "w411dp-h891dp-port-xhdpi")
+    fun HOM_12_outsideEditModeWidgetsAndStacksHaveNoHandle() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent { Scene(false, Probe()) }
+        rule.mainClock.advanceTimeBy(500)
+        assertEquals(0, rule.onAllNodesWithContentDescription("Remove from home", substring = true, useUnmergedTree = true).fetchSemanticsNodes().size)
+        rule.onNodeWithTag("hosted.$clock", useUnmergedTree = true).assertExists()
+    }
+}

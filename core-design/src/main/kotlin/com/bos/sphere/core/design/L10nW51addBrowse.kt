@@ -1,0 +1,87 @@
+package com.bos.sphere.core.design
+
+/** Wave 51 (addBrowse): the widget carousel in the page editor's Widgets tab and in the edit tray (search, empty states, the card's spoken name, the panel title). */
+internal val L10nW51addBrowseEnglish: Set<String> = setOf(
+    "Search widgets",
+    "Loading widgets…",
+    "No widgets installed",
+    "No widget matches",
+    "Add widgets",
+    "Widget previews",
+    "Add widget: %s, %s, %s",
+)
+
+internal val L10nW51addBrowse: Map<String, Map<String, String>> = mapOf(
+    "es" to mapOf(
+        "Search widgets" to "Buscar widgets",
+        "Loading widgets…" to "Cargando widgets…",
+        "No widgets installed" to "No hay widgets instalados",
+        "No widget matches" to "Ningún widget coincide",
+        "Add widgets" to "Añadir widgets",
+        "Widget previews" to "Vistas previas de widgets",
+        "Add widget: %s, %s, %s" to "Añadir widget: %s, %s, %s",
+    ),
+    "fr" to mapOf(
+        "Search widgets" to "Rechercher des widgets",
+        "Loading widgets…" to "Chargement des widgets…",
+        "No widgets installed" to "Aucun widget installé",
+        "No widget matches" to "Aucun widget ne correspond",
+        "Add widgets" to "Ajouter des widgets",
+        "Widget previews" to "Aperçus des widgets",
+        "Add widget: %s, %s, %s" to "Ajouter le widget : %s, %s, %s",
+    ),
+    "de" to mapOf(
+        "Search widgets" to "Widgets suchen",
+        "Loading widgets…" to "Widgets werden geladen…",
+        "No widgets installed" to "Keine Widgets installiert",
+        "No widget matches" to "Kein Widget passt",
+        "Add widgets" to "Widgets hinzufügen",
+        "Widget previews" to "Widget-Vorschauen",
+        "Add widget: %s, %s, %s" to "Widget hinzufügen: %s, %s, %s",
+    ),
+    "pt" to mapOf(
+        "Search widgets" to "Pesquisar widgets",
+        "Loading widgets…" to "Carregando widgets…",
+        "No widgets installed" to "Nenhum widget instalado",
+        "No widget matches" to "Nenhum widget corresponde",
+        "Add widgets" to "Adicionar widgets",
+        "Widget previews" to "Pré-visualizações de widgets",
+        "Add widget: %s, %s, %s" to "Adicionar widget: %s, %s, %s",
+    ),
+    "hi" to mapOf(
+        "Search widgets" to "विजेट खोजें",
+        "Loading widgets…" to "विजेट लोड हो रहे हैं…",
+        "No widgets installed" to "कोई विजेट इंस्टॉल नहीं है",
+        "No widget matches" to "कोई विजेट मेल नहीं खाता",
+        "Add widgets" to "विजेट जोड़ें",
+        "Widget previews" to "विजेट पूर्वावलोकन",
+        "Add widget: %s, %s, %s" to "विजेट जोड़ें: %s, %s, %s",
+    ),
+    "zh" to mapOf(
+        "Search widgets" to "搜索小组件",
+        "Loading widgets…" to "正在加载小组件…",
+        "No widgets installed" to "没有已安装的小组件",
+        "No widget matches" to "没有匹配的小组件",
+        "Add widgets" to "添加小组件",
+        "Widget previews" to "小组件预览",
+        "Add widget: %s, %s, %s" to "添加小组件：%s，%s，%s",
+    ),
+    "ja" to mapOf(
+        "Search widgets" to "ウィジェットを検索",
+        "Loading widgets…" to "ウィジェットを読み込み中…",
+        "No widgets installed" to "インストールされたウィジェットはありません",
+        "No widget matches" to "一致するウィジェットはありません",
+        "Add widgets" to "ウィジェットを追加",
+        "Widget previews" to "ウィジェットのプレビュー",
+        "Add widget: %s, %s, %s" to "ウィジェットを追加：%s、%s、%s",
+    ),
+    "ar" to mapOf(
+        "Search widgets" to "ابحث عن أدوات",
+        "Loading widgets…" to "جارٍ تحميل الأدوات…",
+        "No widgets installed" to "لا توجد أدوات مثبتة",
+        "No widget matches" to "لا توجد أداة مطابقة",
+        "Add widgets" to "إضافة أدوات",
+        "Widget previews" to "معاينات الأدوات",
+        "Add widget: %s, %s, %s" to "إضافة أداة: %s، %s، %s",
+    ),
+)

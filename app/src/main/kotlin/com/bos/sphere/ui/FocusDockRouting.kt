@@ -1,0 +1,49 @@
+package com.bos.sphere.ui
+
+import com.bos.sphere.core.data.ChromeElement
+import com.bos.sphere.core.data.ChromeSettings
+import com.bos.sphere.core.data.HomeChromeRules
+import com.bos.sphere.core.data.HomeShown
+import com.bos.sphere.core.input.LauncherCommand
+
+/**
+ * INP-05: what "focus dock" does when an overlay hides the rail. The home's command handler calls [focusDock] and passes its own
+ * overlay flags and the dock controller; the rule lives here so a test can drive it without composing the home. With an overlay
+ * open (Radar, the drawer, the puck, Launchpad, Ground Control) the overlay is closed first, then the controller gets the
+ * command, which keeps the request pending for the rail that appears next.
+ *
+ * Wave 24 (the dock stays optional): when no rail can appear once the overlays close (the dock is off, or the landing draws no
+ * dock), the overlay is left alone and [onNoDock] says why instead. Before, the command closed Radar or the drawer for a rail
+ * that never came (on the default Glance landing too).
+ */
+internal object FocusDockRouting {
+    /** Why the home would show no rail after its overlays close. */
+    enum class NoDock(val message: String) {
+        Off("The dock is off. Turn it on in Settings, Home, Dock."),
+        Landing("This home landing shows no dock. On Glance, set Settings, Side panel, Right side to Dock rail."),
+        /** Wave 24 review: the rail steps aside while the home is being edited (DockLayer's visible flag), so "focus" found nothing. */
+        Editing("Finish editing the home first: the dock steps aside while you edit."),
+    }
+
+    /** Null when a rail shows on the home once nothing covers it (the same rules `DockLayer` and `DockHost` apply). */
+    fun noDock(landing: HomeShown, chrome: ChromeSettings, dockEnabled: Boolean, editing: Boolean = false): NoDock? = when {
+        HomeChromeRules.forcesDock(landing, chrome) -> if (editing) NoDock.Editing else null
+        !HomeChromeRules.shows(landing, ChromeElement.Dock, chrome) -> NoDock.Landing
+        !dockEnabled -> NoDock.Off
+        editing -> NoDock.Editing
+        else -> null
+    }
+
+    fun focusDock(
+        command: LauncherCommand,
+        overlayOpen: Boolean,
+        closeOverlays: () -> Unit,
+        dock: (LauncherCommand) -> Boolean,
+        noDock: NoDock? = null,
+        onNoDock: (NoDock) -> Unit = {},
+    ): Boolean {
+        if (noDock != null) { onNoDock(noDock); return true }
+        if (overlayOpen) closeOverlays()
+        return dock(command)
+    }
+}

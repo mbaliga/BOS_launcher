@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="pages">[{&quot;k&quot;:[&quot;tile:clock&quot;,&quot;com.example.mail/.Main#0&quot;,&quot;com.example.gone/.Main#0&quot;],&quot;s&quot;:&quot;Grid&quot;,&quot;r&quot;:2,&quot;id&quot;:1,&quot;p&quot;:[4,6]},{&quot;k&quot;:[&quot;com.example.maps/.Main#0&quot;],&quot;s&quot;:&quot;Circle&quot;,&quot;r&quot;:3,&quot;id&quot;:2}]</string>
+    <set name="removed">
+        <string>com.example.old/.Main#0</string>
+    </set>
+    <boolean name="seeded" value="true" />
+</map>

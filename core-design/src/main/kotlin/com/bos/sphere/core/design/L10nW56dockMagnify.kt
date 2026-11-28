@@ -1,0 +1,87 @@
+package com.bos.sphere.core.design
+
+/** Wave 56 (dockMagnify): the Magnify icons switch and its three strengths, the reworded dock style caption (the 3D look is now a glass shelf). */
+internal val L10nW56dockMagnifyEnglish: Set<String> = setOf(
+    "Magnify icons",
+    "Icons grow around your finger or pointer, like the Mac dock.",
+    "Subtle",
+    "Medium",
+    "Large",
+    "Drag along the dock to see it. Edit dock turns it off while you rearrange.",
+    "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it.",
+)
+
+internal val L10nW56dockMagnify: Map<String, Map<String, String>> = mapOf(
+    "es" to mapOf(
+        "Magnify icons" to "Ampliar iconos",
+        "Icons grow around your finger or pointer, like the Mac dock." to "Los iconos crecen alrededor de tu dedo o puntero, como en el dock del Mac.",
+        "Subtle" to "Sutil",
+        "Medium" to "Media",
+        "Large" to "Grande",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "Arrastra por el dock para verlo. Editar dock lo desactiva mientras reordenas.",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "Transparente no dibuja panel: solo los iconos, con un halo suave. 3D es una repisa de cristal con los iconos encima.",
+    ),
+    "fr" to mapOf(
+        "Magnify icons" to "Agrandir les icônes",
+        "Icons grow around your finger or pointer, like the Mac dock." to "Les icônes grossissent autour de votre doigt ou du pointeur, comme dans le dock du Mac.",
+        "Subtle" to "Léger",
+        "Medium" to "Moyen",
+        "Large" to "Grand",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "Faites glisser le long du dock pour le voir. Modifier le dock le désactive pendant le réarrangement.",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "Transparent ne dessine aucun panneau : seulement les icônes, avec un halo doux. 3D est une étagère en verre sur laquelle se tiennent les icônes.",
+    ),
+    "de" to mapOf(
+        "Magnify icons" to "Symbole vergrößern",
+        "Icons grow around your finger or pointer, like the Mac dock." to "Symbole wachsen um Finger oder Zeiger, wie im Mac-Dock.",
+        "Subtle" to "Dezent",
+        "Medium" to "Mittel",
+        "Large" to "Groß",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "Zieh am Dock entlang, um es zu sehen. „Dock bearbeiten“ schaltet es beim Umsortieren ab.",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "Transparent zeichnet kein Feld: nur die Symbole mit weichem Schein. 3D ist ein Glasregal, auf dem die Symbole stehen.",
+    ),
+    "pt" to mapOf(
+        "Magnify icons" to "Ampliar ícones",
+        "Icons grow around your finger or pointer, like the Mac dock." to "Os ícones crescem em volta do dedo ou do ponteiro, como no dock do Mac.",
+        "Subtle" to "Sutil",
+        "Medium" to "Médio",
+        "Large" to "Grande",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "Arraste ao longo do dock para ver. Editar dock desativa o efeito enquanto você reorganiza.",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "Transparente não desenha painel: só os ícones, com um halo suave. 3D é uma prateleira de vidro com os ícones sobre ela.",
+    ),
+    "hi" to mapOf(
+        "Magnify icons" to "आइकन बड़े करें",
+        "Icons grow around your finger or pointer, like the Mac dock." to "आइकन आपकी उँगली या पॉइंटर के आसपास बड़े हो जाते हैं, Mac के डॉक की तरह।",
+        "Subtle" to "हल्का",
+        "Medium" to "मध्यम",
+        "Large" to "बड़ा",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "इसे देखने के लिए डॉक पर उँगली घुमाएँ। डॉक संपादित करें के दौरान यह बंद रहता है।",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "पारदर्शी में कोई पैनल नहीं बनता: केवल आइकन, हल्की चमक के साथ। 3D एक काँच की शेल्फ़ है जिस पर आइकन खड़े होते हैं।",
+    ),
+    "zh" to mapOf(
+        "Magnify icons" to "放大图标",
+        "Icons grow around your finger or pointer, like the Mac dock." to "图标会在手指或指针周围放大，就像 Mac 的程序坞。",
+        "Subtle" to "轻微",
+        "Medium" to "中等",
+        "Large" to "较大",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "在程序坞上滑动即可查看。编辑程序坞时会暂时关闭。",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "透明不绘制面板：只有带柔和光晕的图标。3D 是一块玻璃搁板，图标立在上面。",
+    ),
+    "ja" to mapOf(
+        "Magnify icons" to "アイコンを拡大",
+        "Icons grow around your finger or pointer, like the Mac dock." to "アイコンが指やポインターの周りで拡大します。Mac のドックのように。",
+        "Subtle" to "控えめ",
+        "Medium" to "標準",
+        "Large" to "大",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "ドックをなぞると確認できます。ドックを編集中はオフになります。",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "透明はパネルを描かず、アイコンだけを柔らかな光で表示します。3D はアイコンが乗るガラスの棚です。",
+    ),
+    "ar" to mapOf(
+        "Magnify icons" to "تكبير الأيقونات",
+        "Icons grow around your finger or pointer, like the Mac dock." to "تكبر الأيقونات حول إصبعك أو المؤشر، كما في رصيف Mac.",
+        "Subtle" to "خفيف",
+        "Medium" to "متوسط",
+        "Large" to "كبير",
+        "Drag along the dock to see it. Edit dock turns it off while you rearrange." to "اسحب على طول الرصيف لترى ذلك. تعديل الرصيف يوقفه أثناء إعادة الترتيب.",
+        "Transparent draws no panel: only the icons, with a soft halo. 3D is a glass shelf with the icons standing on it." to "الشفاف لا يرسم لوحة: الأيقونات فقط مع توهج ناعم. ثلاثي الأبعاد رف زجاجي تقف عليه الأيقونات.",
+    ),
+)

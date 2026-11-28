@@ -1,0 +1,1 @@
+A landscape-first launcher: your apps on the equator of a sphere.

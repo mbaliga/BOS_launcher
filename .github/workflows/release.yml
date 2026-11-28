@@ -1,0 +1,93 @@
+name: Release (signed AAB)
+
+# Builds the Play bundle (AAB) and a signed APK for Liftoff.
+# Run it by hand (Actions -> Release -> Run workflow) or push a tag like v0.1.0.
+# It never uploads to Play; it produces files you download and upload yourself.
+#
+# Secrets (repo Settings -> Secrets and variables -> Actions):
+#   LIFTOFF_UPLOAD_KEYSTORE_B64       base64 of the upload keystore, ONE line (base64 -i FILE | tr -d '\n')
+#   LIFTOFF_UPLOAD_KEYSTORE_PASSWORD
+#   LIFTOFF_UPLOAD_KEY_ALIAS
+#   LIFTOFF_UPLOAD_KEY_PASSWORD
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check signing secrets first (fail fast, before any build)
+        env:
+          KS_B64: ${{ secrets.LIFTOFF_UPLOAD_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.LIFTOFF_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.LIFTOFF_UPLOAD_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.LIFTOFF_UPLOAD_KEY_PASSWORD }}
+        run: |
+          missing=""
+          [ -n "$KS_B64" ]   || missing="$missing LIFTOFF_UPLOAD_KEYSTORE_B64"
+          [ -n "$KS_PASS" ]  || missing="$missing LIFTOFF_UPLOAD_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ]|| missing="$missing LIFTOFF_UPLOAD_KEY_ALIAS"
+          [ -n "$KEY_PASS" ] || missing="$missing LIFTOFF_UPLOAD_KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Decode keystore
+        env:
+          KS_B64: ${{ secrets.LIFTOFF_UPLOAD_KEYSTORE_B64 }}
+        run: |
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          test -s "$RUNNER_TEMP/upload.jks" || { echo "::error::keystore decoded to an empty file"; exit 1; }
+
+      - name: Build signed AAB and APK
+        env:
+          LIFTOFF_KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
+          LIFTOFF_KEYSTORE_PASSWORD: ${{ secrets.LIFTOFF_UPLOAD_KEYSTORE_PASSWORD }}
+          LIFTOFF_KEY_ALIAS: ${{ secrets.LIFTOFF_UPLOAD_KEY_ALIAS }}
+          LIFTOFF_KEY_PASSWORD: ${{ secrets.LIFTOFF_UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :app:bundleRelease :app:assembleRelease --console=plain
+
+      - name: Verify the bundle is signed and record fingerprints
+        run: |
+          aab=$(ls app/build/outputs/bundle/release/*.aab)
+          echo "AAB: $aab"
+          # No -strict: a normal upload key is self-signed and -strict rejects that.
+          jarsigner -verify "$aab" | tail -3
+          keytool -printcert -jarfile "$aab" | grep -E "Owner|SHA256"
+          sha256sum "$aab" | tee "$aab.sha256"
+          # Permissions in the release APK (look for anything unexpected):
+          "$ANDROID_HOME"/build-tools/*/aapt2 dump permissions app/build/outputs/apk/release/*.apk 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: liftoff-release
+          path: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/bundle/release/*.sha256
+            app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14

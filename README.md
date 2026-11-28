@@ -1,4 +1,4 @@
-# Sphere Launcher
+# Liftoff
 
 > **Constellation** · `state: active` · public · [registry: `Personal-Tracker/CONSTELLATION.md`](https://github.com/mbaliga/Personal-Tracker/blob/main/CONSTELLATION.md)
 > Sphere/coverflow Android launcher (Compose, no AOSP fork).

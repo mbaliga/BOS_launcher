@@ -9,15 +9,30 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bos.sphere"
+        applicationId = "com.asoc.liftoff"
         minSdk = 31
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0-m1"
     }
 
+    // Release signing comes from the environment only (CI secrets / your shell); never from the repo.
+    // Without LIFTOFF_KEYSTORE_PATH the release build is simply unsigned.
+    val ksPath = System.getenv("LIFTOFF_KEYSTORE_PATH")
+    signingConfigs {
+        if (!ksPath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("LIFTOFF_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("LIFTOFF_KEY_ALIAS")
+                keyPassword = System.getenv("LIFTOFF_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

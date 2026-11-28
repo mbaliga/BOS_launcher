@@ -1,4 +1,4 @@
-# STATE — Sphere Launcher
+# STATE — Liftoff
 
 Living handoff. See `README.md` for the module map and `HANDOFF.md`/`ARCHITECTURE.md` for detail.
 

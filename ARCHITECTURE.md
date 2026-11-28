@@ -1,4 +1,4 @@
-# Sphere Launcher — Architecture & Code Organization
+# Liftoff — Architecture & Code Organization
 
 High-level design overview and module responsibilities.
 

@@ -1,8 +1,11 @@
 package com.bos.sphere.ui
 
+import android.content.pm.ApplicationInfo
 import android.os.BatteryManager
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -110,12 +113,30 @@ private fun BatteryReadout() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GearButton(onClick: () -> Unit) {
+    val context = LocalContext.current
+    val isDebuggable = remember { (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 }
     Box(
         modifier = Modifier
             .background(HyleColors.Surface.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                // Debug-only: long-press the settings gear to preview the crash-recovery
+                // screen without actually crashing (dev.aarso:crash-recovery — see that
+                // repo's README). Sphere Launcher has no About/version screen, so this is
+                // the nearest persistent affordance. Never reachable from a release build.
+                onLongClick = if (isDebuggable) {
+                    {
+                        context.startActivity(
+                            dev.aarso.crashrecovery.CrashRecovery.previewIntent(context, appLabel = "Sphere Launcher"),
+                        )
+                    }
+                } else {
+                    null
+                },
+            )
             .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
         Text("⚙", color = HyleColors.InkDim, fontSize = 16.sp)

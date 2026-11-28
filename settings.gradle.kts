@@ -20,6 +20,14 @@ dependencyResolutionManagement {
     }
 }
 
+// Narrow, deliberate addition: brings in mbaliga/Hyle-Design-System ONLY for its
+// :crash-recovery module (dev.aarso:crash-recovery — no dependency on :hyle). core-design's
+// own "Hyle-consumer debt" (re-implementing the visual language rather than depending on the
+// actual dev.aarso:hyle library) is untouched — this doesn't resolve or reference :hyle at
+// all. Update the pin with:
+//   git -C hyle-design-system fetch && git -C hyle-design-system checkout <sha> && git add hyle-design-system
+includeBuild("hyle-design-system")
+
 rootProject.name = "SphereLauncher"
 
 include(":app")

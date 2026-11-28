@@ -1,0 +1,72 @@
+name: Build & Release Debug APK
+
+# Builds a sideload-able debug APK on a runner that has the Android SDK (this repo's dev
+# container does not) and publishes it to a rolling GitHub Release, so it can be downloaded
+# and installed on a phone without a local build machine. Modeled on the same pattern already
+# in use elsewhere in this constellation (e.g. Horizkeeb's build-apk-release.yml).
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/meta-trunk-normalization-2y198w
+      - main
+    paths:
+      - "app/**"
+      - "core-design/**"
+      - "core-data/**"
+      - "feature-sphere/**"
+      - "feature-search/**"
+      - "shaders/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "settings.gradle.kts"
+      - ".github/workflows/build-apk-release.yml"
+
+# Supersede in-flight runs on the same branch so a re-push doesn't queue behind a stale build.
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # hyle-design-system submodule — :app's crash-recovery dependency resolves from its
+          # includeBuild (settings.gradle.kts); an empty submodule dir breaks the build.
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-debug-latest
+          name: "Sphere Launcher debug APK (latest)"
+          draft: false
+          prerelease: true
+          body: |
+            Latest debug build of Sphere Launcher from `${{ github.ref_name }}`.
+            Built from commit ${{ github.sha }}.
+
+            **Install:** download the APK, enable _Install unknown apps_ on your device, then
+            open it. To use it as your home screen: Settings → Apps → Default apps → Home app.
+          files: app/build/outputs/apk/debug/app-debug.apk

@@ -45,6 +45,9 @@ dependencies {
     implementation(project(":feature-sphere"))
     implementation(project(":feature-search"))
     implementation(project(":shaders"))
+    // Shared crash-recovery utility, resolved from the hyle-design-system includeBuild
+    // (settings.gradle.kts) — separate coordinate from :hyle, no dependency on it.
+    implementation("dev.aarso:crash-recovery:1.0.0")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
